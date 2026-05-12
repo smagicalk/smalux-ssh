@@ -1,0 +1,149 @@
+//! 后端执行命令模型。
+
+use crate::model::{Host, HostId, SessionId};
+
+use super::{
+    BackendAuth, PtyRequest, RemoteCommandRequest, SftpRequest, TunnelStartRequest,
+    TunnelStopRequest,
+};
+
+/// 后端执行器接收的命令。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BackendCommand {
+    Connect {
+        session_id: SessionId,
+        target: ConnectionTarget,
+    },
+    OpenShell {
+        session_id: SessionId,
+        pty: PtyRequest,
+    },
+    RunCommand {
+        session_id: SessionId,
+        request: RemoteCommandRequest,
+    },
+    Sftp {
+        session_id: SessionId,
+        request: SftpRequest,
+    },
+    StartTunnel {
+        session_id: SessionId,
+        request: TunnelStartRequest,
+    },
+    StopTunnel {
+        session_id: SessionId,
+        request: TunnelStopRequest,
+    },
+    Disconnect {
+        session_id: SessionId,
+    },
+}
+
+/// SSH 连接目标。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConnectionTarget {
+    pub host_id: HostId,
+    pub address: String,
+    pub port: u16,
+    pub auth: BackendAuth,
+}
+
+impl ConnectionTarget {
+    /// 从已保存主机配置生成后端连接目标。
+    pub fn from_host(host: &Host) -> Self {
+        Self {
+            host_id: host.id,
+            address: host.address.clone(),
+            port: host.port,
+            auth: BackendAuth::from(&host.auth),
+        }
+    }
+
+    /// 返回 `host:port` 展示字符串。
+    pub fn endpoint(&self) -> String {
+        format!("{}:{}", self.address, self.port)
+    }
+}
+
+impl BackendCommand {
+    /// 返回命令关联的会话标识。
+    pub fn session_id(&self) -> SessionId {
+        match self {
+            Self::Connect { session_id, .. }
+            | Self::OpenShell { session_id, .. }
+            | Self::RunCommand { session_id, .. }
+            | Self::Sftp { session_id, .. }
+            | Self::StartTunnel { session_id, .. }
+            | Self::StopTunnel { session_id, .. }
+            | Self::Disconnect { session_id } => *session_id,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{AuthProfile, SecretRef};
+    use crate::terminal::TerminalSize;
+    use uuid::Uuid;
+
+    fn host() -> Host {
+        Host {
+            id: HostId(Uuid::new_v4()),
+            name: "production".to_owned(),
+            group_id: None,
+            tags: Vec::new(),
+            address: "example.com".to_owned(),
+            port: 2222,
+            auth: AuthProfile::Agent {
+                username: "deploy".to_owned(),
+                key_hint: Some("id_ed25519".to_owned()),
+            },
+            proxy: None,
+            jumps: Vec::new(),
+            theme_override: None,
+            background_override: None,
+        }
+    }
+
+    #[test]
+    fn connection_target_keeps_host_identity_and_auth() {
+        let host = host();
+
+        let target = ConnectionTarget::from_host(&host);
+
+        assert_eq!(target.host_id, host.id);
+        assert_eq!(target.endpoint(), "example.com:2222");
+        assert_eq!(target.auth.username(), "deploy");
+    }
+
+    #[test]
+    fn backend_command_exposes_session_id() {
+        let session_id = SessionId(Uuid::new_v4());
+        let command = BackendCommand::OpenShell {
+            session_id,
+            pty: PtyRequest::xterm(TerminalSize::default()),
+        };
+
+        assert_eq!(command.session_id(), session_id);
+    }
+
+    #[test]
+    fn password_target_does_not_inline_plain_secret() {
+        let mut host = host();
+        host.auth = AuthProfile::Password {
+            username: "root".to_owned(),
+            secret: SecretRef("password:root".to_owned()),
+        };
+
+        let target = ConnectionTarget::from_host(&host);
+
+        assert!(matches!(
+            target.auth,
+            BackendAuth::Password {
+                secret: SecretRef(ref value),
+                ..
+            } if value == "password:root"
+        ));
+    }
+}
