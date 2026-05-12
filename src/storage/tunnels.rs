@@ -1,0 +1,80 @@
+//! 隧道规则的内存索引操作。
+
+use crate::model::TunnelRule;
+
+use super::StorageManager;
+
+impl StorageManager {
+    /// 保存或更新隧道规则。
+    pub fn upsert_tunnel_rule(&mut self, rule: TunnelRule) {
+        if let Some(existing) = self
+            .tunnel_rules
+            .iter_mut()
+            .find(|existing| existing.name == rule.name)
+        {
+            *existing = rule;
+        } else {
+            self.tunnel_rules.push(rule);
+        }
+    }
+
+    /// 按名称查找隧道规则。
+    pub fn tunnel_rule_by_name(&self, name: &str) -> Option<&TunnelRule> {
+        self.tunnel_rules.iter().find(|rule| rule.name == name)
+    }
+
+    /// 删除指定名称的隧道规则。
+    pub fn remove_tunnel_rule(&mut self, name: &str) -> bool {
+        let before = self.tunnel_rules.len();
+        self.tunnel_rules.retain(|rule| rule.name != name);
+        before != self.tunnel_rules.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{TunnelKind, TunnelRule};
+
+    fn sample_tunnel_rule() -> TunnelRule {
+        TunnelRule {
+            name: "dynamic-proxy".to_owned(),
+            kind: TunnelKind::Dynamic,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 1080,
+            target_host: "ignored-for-dynamic".to_owned(),
+            target_port: 0,
+            auto_start: false,
+        }
+    }
+
+    #[test]
+    fn tunnel_rules_can_be_found_and_removed_by_name() {
+        let mut storage = StorageManager::default();
+
+        storage.upsert_tunnel_rule(sample_tunnel_rule());
+
+        assert!(storage.tunnel_rule_by_name("dynamic-proxy").is_some());
+        assert!(storage.remove_tunnel_rule("dynamic-proxy"));
+        assert!(storage.tunnel_rule_by_name("dynamic-proxy").is_none());
+        assert!(!storage.remove_tunnel_rule("dynamic-proxy"));
+    }
+
+    #[test]
+    fn upsert_tunnel_rule_replaces_same_name() {
+        let mut storage = StorageManager::default();
+        let mut updated = sample_tunnel_rule();
+        updated.bind_port = 1081;
+
+        storage.upsert_tunnel_rule(sample_tunnel_rule());
+        storage.upsert_tunnel_rule(updated);
+
+        assert_eq!(storage.tunnel_rule_count(), 1);
+        assert_eq!(
+            storage
+                .tunnel_rule_by_name("dynamic-proxy")
+                .map(|rule| rule.bind_port),
+            Some(1081)
+        );
+    }
+}
