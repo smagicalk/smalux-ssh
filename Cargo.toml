@@ -1,0 +1,24 @@
+[package]
+name = "smagicalssh"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[dependencies]
+iced = { version = "0.14", default-features = false, features = ["wgpu", "tokio"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
+serde = { version = "1", features = ["derive"] }
+toml = "0.9"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+thiserror = "2"
+anyhow = "1"
+directories = "6"
+keyring = "3"
+redb = "3"
+portable-pty = "0.9"
+alacritty_terminal = "0.25"
+aws-lc-rs = { version = "1.16", features = ["prebuilt-nasm"] }
+russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "flate2", "rsa"] }
+russh-sftp = "2"
