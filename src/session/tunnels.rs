@@ -46,6 +46,19 @@ impl SessionManager {
             state.last_error = Some(reason.clone());
         })
     }
+
+    /// 按后端事件同步隧道运行态。
+    pub fn set_tunnel_status(&mut self, rule_name: &str, status: TunnelStatus) -> bool {
+        self.update_tunnel(rule_name, |state| {
+            if matches!(status, TunnelStatus::Stopped) {
+                state.started_at_unix_secs = None;
+            }
+            if !matches!(status, TunnelStatus::Failed) {
+                state.last_error = None;
+            }
+            state.status = status;
+        })
+    }
 }
 
 #[cfg(test)]
@@ -122,5 +135,19 @@ mod tests {
         assert_eq!(sessions.tunnel_runtime_count(), 1);
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Starting));
         assert_eq!(sessions.tunnels[0].started_at_unix_secs, Some(20));
+    }
+
+    #[test]
+    fn set_tunnel_status_synchronizes_backend_status() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+
+        sessions.start_tunnel(&rule, None, 10);
+
+        assert!(sessions.set_tunnel_status("local-db", TunnelStatus::Running));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
+        assert!(sessions.set_tunnel_status("local-db", TunnelStatus::Stopped));
+        assert_eq!(sessions.tunnels[0].started_at_unix_secs, None);
+        assert!(!sessions.set_tunnel_status("missing", TunnelStatus::Running));
     }
 }

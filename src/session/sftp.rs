@@ -55,6 +55,21 @@ impl SessionManager {
         }
     }
 
+    /// 按会话标签页更新 SFTP 当前目录和目录项。
+    pub fn set_sftp_entries_for_session(
+        &mut self,
+        session_id: SessionId,
+        current_dir: impl Into<String>,
+        entries: Vec<SftpEntry>,
+    ) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .and_then(|tab| tab.host_id)
+            .map(|host_id| self.set_sftp_entries(host_id, current_dir, entries))
+            .unwrap_or(false)
+    }
+
     /// 记录 SFTP 浏览错误。
     pub fn fail_sftp_browser(&mut self, host_id: HostId, reason: impl Into<String>) -> bool {
         if let Some(browser) = self
@@ -68,6 +83,20 @@ impl SessionManager {
         } else {
             false
         }
+    }
+
+    /// 按会话标签页记录 SFTP 浏览错误。
+    pub fn fail_sftp_browser_for_session(
+        &mut self,
+        session_id: SessionId,
+        reason: impl Into<String>,
+    ) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .and_then(|tab| tab.host_id)
+            .map(|host_id| self.fail_sftp_browser(host_id, reason))
+            .unwrap_or(false)
     }
 }
 
@@ -126,6 +155,23 @@ mod tests {
     }
 
     #[test]
+    fn sftp_entries_can_update_by_session_id() {
+        let mut sessions = SessionManager::default();
+        let host_id = host_id();
+        let session_id = session_id();
+
+        sessions.open_sftp_tab(session_id, host_id, "/home/ops");
+
+        assert!(sessions.set_sftp_entries_for_session(session_id, "/tmp", Vec::new()));
+        assert_eq!(sessions.sftp_browsers[0].current_dir, "/tmp");
+        assert!(!sessions.set_sftp_entries_for_session(
+            SessionId(Uuid::new_v4()),
+            "/missing",
+            Vec::new()
+        ));
+    }
+
+    #[test]
     fn sftp_browser_records_failure() {
         let mut sessions = SessionManager::default();
         let current_host_id = host_id();
@@ -138,5 +184,20 @@ mod tests {
             Some("permission denied")
         );
         assert!(!sessions.fail_sftp_browser(host_id(), "missing"));
+    }
+
+    #[test]
+    fn sftp_failure_can_update_by_session_id() {
+        let mut sessions = SessionManager::default();
+        let host_id = host_id();
+        let session_id = session_id();
+
+        sessions.open_sftp_tab(session_id, host_id, "/home/ops");
+
+        assert!(sessions.fail_sftp_browser_for_session(session_id, "network"));
+        assert_eq!(
+            sessions.sftp_browsers[0].last_error.as_deref(),
+            Some("network")
+        );
     }
 }

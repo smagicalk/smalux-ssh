@@ -7,6 +7,7 @@ mod auth;
 mod command;
 mod event;
 mod pty;
+mod reducer;
 mod sftp;
 mod tunnel;
 
@@ -14,5 +15,6 @@ pub use auth::*;
 pub use command::*;
 pub use event::*;
 pub use pty::*;
+pub use reducer::*;
 pub use sftp::*;
 pub use tunnel::*;
