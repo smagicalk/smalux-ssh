@@ -11,6 +11,9 @@ use crate::terminal::TerminalManager;
 
 use super::HostId;
 
+mod backend_pump;
+#[cfg(test)]
+mod backend_pump_tests;
 mod launch;
 #[cfg(test)]
 mod launch_tests;
@@ -67,6 +70,7 @@ pub enum Message {
 pub struct AppUpdateOutcome {
     pub state_changed: bool,
     pub queued_backend_commands: usize,
+    pub executed_backend_commands: usize,
     pub applied_backend_events: usize,
     pub error: Option<String>,
 }
