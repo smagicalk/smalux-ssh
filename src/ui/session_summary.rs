@@ -119,7 +119,14 @@ fn command_history(state: &AppState) -> Element<'_, Message> {
     }
 
     for item in state.storage.command_history.iter().rev().take(5) {
-        history = history.push(text(format!("{} | {:?}", item.command, item.exit_code)));
+        let mut line = row![text(format!("{} | {:?}", item.command, item.exit_code))].spacing(8);
+        if item.host_id.is_some() {
+            line = line.push(button("Run").on_press(Message::RunCommandHistory {
+                history_id: item.id,
+            }));
+        }
+
+        history = history.push(line);
     }
 
     history.into()

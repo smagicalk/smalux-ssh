@@ -15,9 +15,9 @@ use crate::storage::{RedbStorage, StorageManager, StoragePersistenceError};
 use crate::terminal::TerminalManager;
 
 use super::{
-    HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SessionId, SessionKind,
-    SessionStatus, SessionTab, SftpActionDraftField, TunnelRule, TunnelStatus, UiState,
-    VisualSettingsDraftField,
+    CommandHistoryId, HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
+    SessionId, SessionKind, SessionStatus, SessionTab, SftpActionDraftField, TunnelRule,
+    TunnelStatus, UiState, VisualSettingsDraftField,
 };
 
 mod backend_pump;
@@ -206,6 +206,9 @@ pub enum Message {
         command: String,
         request_pty: bool,
     },
+    RunCommandHistory {
+        history_id: CommandHistoryId,
+    },
     StartTunnel {
         host_id: HostId,
         rule: TunnelRule,
@@ -365,6 +368,7 @@ impl AppState {
                 command,
                 request_pty,
             } => self.run_remote_command(host_id, command, request_pty),
+            Message::RunCommandHistory { history_id } => self.run_command_history(history_id),
             Message::StartTunnel { host_id, rule } => self.start_tunnel(host_id, rule),
             Message::StopTunnel {
                 session_id,

@@ -284,6 +284,31 @@ impl AppState {
         queued_outcome(2)
     }
 
+    /// 重新执行一条带主机作用域的历史命令。
+    pub(super) fn run_command_history(&mut self, history_id: CommandHistoryId) -> AppUpdateOutcome {
+        let Some(history) = self
+            .storage
+            .command_history
+            .iter()
+            .find(|item| item.id == history_id)
+        else {
+            return AppUpdateOutcome {
+                error: Some(format!("找不到命令历史：{}", history_id.0)),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        let Some(host_id) = history.host_id else {
+            return AppUpdateOutcome {
+                error: Some("命令历史缺少主机，无法直接重跑".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        };
+        let command = history.command.clone();
+
+        self.run_remote_command(host_id, command, false)
+    }
+
     /// 启动端口转发或动态隧道，并建立对应的管理标签页。
     pub(super) fn start_tunnel(&mut self, host_id: HostId, rule: TunnelRule) -> AppUpdateOutcome {
         let Some(host) = self.host_by_id(host_id) else {
