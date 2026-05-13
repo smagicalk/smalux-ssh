@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{GroupId, HostId, SnippetId};
+use super::{GroupId, Host, HostId, SnippetId};
 
 /// 快捷命令。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +48,17 @@ pub enum SnippetScope {
     Global,
     Host(HostId),
     Group(GroupId),
+}
+
+impl SnippetScope {
+    /// 判断快捷命令是否可用于指定主机。
+    pub fn applies_to_host(&self, host: &Host) -> bool {
+        match self {
+            Self::Global => true,
+            Self::Host(host_id) => *host_id == host.id,
+            Self::Group(group_id) => host.group_id == Some(*group_id),
+        }
+    }
 }
 
 /// 快捷命令变量定义。
@@ -184,5 +195,32 @@ mod tests {
         let decoded: Snippet = toml::from_str(&encoded).expect("快捷命令应该可以从 TOML 反序列化");
 
         assert_eq!(decoded, snippet);
+    }
+
+    #[test]
+    fn snippet_scope_matches_global_host_and_group() {
+        let host_id = HostId(Uuid::new_v4());
+        let group_id = GroupId(Uuid::new_v4());
+        let host = Host {
+            id: host_id,
+            name: "staging".to_owned(),
+            group_id: Some(group_id),
+            tags: Vec::new(),
+            address: "staging.example.com".to_owned(),
+            port: 22,
+            auth: super::super::AuthProfile::Agent {
+                username: "ops".to_owned(),
+                key_hint: None,
+            },
+            proxy: None,
+            jumps: Vec::new(),
+            theme_override: None,
+            background_override: None,
+        };
+
+        assert!(SnippetScope::Global.applies_to_host(&host));
+        assert!(SnippetScope::Host(host_id).applies_to_host(&host));
+        assert!(SnippetScope::Group(group_id).applies_to_host(&host));
+        assert!(!SnippetScope::Host(HostId(Uuid::new_v4())).applies_to_host(&host));
     }
 }

@@ -7,7 +7,7 @@ use iced::{
 
 use crate::model::{
     AppState, AuthProfile, Host, HostId, Message, QuickHostAuthDraft, QuickHostAuthField,
-    QuickHostAuthKind, QuickHostDraftField, TunnelRule, VisualSettingsDraftField,
+    QuickHostAuthKind, QuickHostDraftField, Snippet, TunnelRule, VisualSettingsDraftField,
 };
 
 /// 渲染所有已保存主机的最小可用操作入口。
@@ -182,17 +182,58 @@ fn host_card<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
                 command: command_for_pty,
                 request_pty: true,
             }),
+            button("Save snippet").on_press(Message::SaveHostCommandSnippet { host_id }),
         ]
         .spacing(8),
         host_visual_settings(state, host),
     ]
     .spacing(8);
 
+    let snippets = host_snippets(state, host);
+    if !snippets.is_empty() {
+        content = content.push(snippet_list(host_id, snippets));
+    }
+
     if !state.storage.tunnel_rules.is_empty() {
         content = content.push(tunnel_rules(host_id, &state.storage.tunnel_rules));
     }
 
     content.into()
+}
+
+fn host_snippets<'a>(state: &'a AppState, host: &'a Host) -> Vec<&'a Snippet> {
+    state
+        .storage
+        .snippets
+        .iter()
+        .filter(|snippet| snippet.scope.applies_to_host(host))
+        .collect()
+}
+
+fn snippet_list<'a>(host_id: HostId, snippets: Vec<&'a Snippet>) -> Element<'a, Message> {
+    let mut rows = column![text("Snippets")].spacing(6);
+
+    for snippet in snippets {
+        rows = rows.push(
+            row![
+                text(snippet_label(snippet)),
+                button("Run").on_press(Message::RunSnippet {
+                    host_id,
+                    snippet_id: snippet.id,
+                }),
+                button("Remove").on_press(Message::RemoveSnippet {
+                    snippet_id: snippet.id,
+                }),
+            ]
+            .spacing(8),
+        );
+    }
+
+    rows.into()
+}
+
+fn snippet_label(snippet: &Snippet) -> String {
+    format!("{} | {}", snippet.name, snippet.command_template)
 }
 
 fn host_visual_settings<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
@@ -371,7 +412,7 @@ fn auth_label(auth: &AuthProfile) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AuthProfile, SecretRef};
+    use crate::model::{AuthProfile, SecretRef, SnippetScope};
     use uuid::Uuid;
 
     fn host(tags: Vec<String>) -> Host {
@@ -406,7 +447,18 @@ mod tests {
     #[test]
     fn host_action_view_accepts_populated_state() {
         let mut state = AppState::default();
-        state.storage.upsert_host(host(Vec::new()));
+        let host = host(Vec::new());
+        let host_id = host.id;
+        state.storage.upsert_host(host);
+        state.storage.upsert_snippet(Snippet {
+            id: crate::model::SnippetId(Uuid::new_v4()),
+            name: "uptime".to_owned(),
+            description: None,
+            command_template: "uptime".to_owned(),
+            scope: SnippetScope::Host(host_id),
+            variables: Vec::new(),
+            last_arguments: Vec::new(),
+        });
 
         let _element = view(&state);
     }

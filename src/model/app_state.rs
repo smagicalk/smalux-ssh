@@ -16,7 +16,7 @@ use crate::terminal::TerminalManager;
 
 use super::{
     CommandHistoryId, HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
-    SessionId, SessionKind, SessionStatus, SessionTab, SftpActionDraftField, TunnelRule,
+    SessionId, SessionKind, SessionStatus, SessionTab, SftpActionDraftField, SnippetId, TunnelRule,
     TunnelStatus, UiState, VisualSettingsDraftField,
 };
 
@@ -26,6 +26,9 @@ mod backend_pump_tests;
 mod launch;
 #[cfg(test)]
 mod launch_tests;
+mod snippets;
+#[cfg(test)]
+mod snippets_tests;
 mod storage_admin;
 #[cfg(test)]
 mod tests;
@@ -217,6 +220,16 @@ pub enum Message {
         command: String,
         request_pty: bool,
     },
+    SaveHostCommandSnippet {
+        host_id: HostId,
+    },
+    RunSnippet {
+        host_id: HostId,
+        snippet_id: SnippetId,
+    },
+    RemoveSnippet {
+        snippet_id: SnippetId,
+    },
     RunCommandHistory {
         history_id: CommandHistoryId,
     },
@@ -388,6 +401,12 @@ impl AppState {
                 command,
                 request_pty,
             } => self.run_remote_command(host_id, command, request_pty),
+            Message::SaveHostCommandSnippet { host_id } => self.save_host_command_snippet(host_id),
+            Message::RunSnippet {
+                host_id,
+                snippet_id,
+            } => self.run_snippet(host_id, snippet_id),
+            Message::RemoveSnippet { snippet_id } => self.remove_snippet(snippet_id),
             Message::RunCommandHistory { history_id } => self.run_command_history(history_id),
             Message::StartTunnel { host_id, rule } => self.start_tunnel(host_id, rule),
             Message::StopTunnel {
