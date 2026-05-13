@@ -1,11 +1,14 @@
 //! 基于 `russh` 的真实 SSH 客户端边界。
 
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use russh::client;
+use russh::Channel;
+use russh::client::{self, Msg};
 use russh::keys::agent::client::{AgentClient, AgentStream};
 use russh::keys::{Certificate, HashAlg, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
+use tokio::sync::mpsc;
 
 use crate::model::{HostKeyVerification, KnownHostEntry, SessionId};
 
@@ -24,6 +27,7 @@ const DEFAULT_KEEPALIVE_MAX: usize = 3;
 #[cfg(windows)]
 const WINDOWS_OPENSSH_AGENT_PIPE: &str = r"\\.\pipe\openssh-ssh-agent";
 type DynamicAgentClient = AgentClient<Box<dyn AgentStream + Send + Unpin + 'static>>;
+type ForwardedChannel = Channel<Msg>;
 
 /// `russh` 客户端配置。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -147,11 +151,13 @@ impl RusshConnector {
             endpoint: plan.endpoint.clone(),
         }];
         let host_key_result = SharedHostKeyResult::default();
+        let forwarded_channels = SharedForwardedChannels::default();
         let handler = SshClientHandler::new(
             plan.host.clone(),
             plan.port,
             self.host_key_policy.clone(),
             host_key_result.clone(),
+            forwarded_channels.clone(),
         );
         let config = Arc::new(self.settings.to_russh_config());
         let address = (plan.host.as_str(), plan.port);
@@ -177,6 +183,7 @@ impl RusshConnector {
                 handle,
                 endpoint: plan.endpoint,
                 username: plan.auth.username().to_owned(),
+                forwarded_channels,
             },
             events,
         })
@@ -194,6 +201,7 @@ pub struct RusshConnection {
     handle: client::Handle<SshClientHandler>,
     endpoint: String,
     username: String,
+    forwarded_channels: SharedForwardedChannels,
 }
 
 impl RusshConnection {
@@ -210,6 +218,15 @@ impl RusshConnection {
     /// 返回底层 `russh` 句柄，供后续 shell、命令、SFTP 和隧道模块复用。
     pub fn handle_mut(&mut self) -> &mut client::Handle<SshClientHandler> {
         &mut self.handle
+    }
+
+    /// 订阅指定远程转发规则收到的服务端 forwarded-tcpip channel。
+    pub fn subscribe_forwarded_channels(
+        &self,
+        bind_host: &str,
+        bind_port: u16,
+    ) -> mpsc::UnboundedReceiver<ForwardedChannel> {
+        self.forwarded_channels.subscribe(bind_host, bind_port)
     }
 
     /// 主动断开连接。
@@ -230,6 +247,7 @@ pub struct SshClientHandler {
     port: u16,
     host_key_policy: HostKeyPolicy,
     host_key_result: SharedHostKeyResult,
+    forwarded_channels: SharedForwardedChannels,
 }
 
 impl SshClientHandler {
@@ -238,12 +256,14 @@ impl SshClientHandler {
         port: u16,
         host_key_policy: HostKeyPolicy,
         host_key_result: SharedHostKeyResult,
+        forwarded_channels: SharedForwardedChannels,
     ) -> Self {
         Self {
             host,
             port,
             host_key_policy,
             host_key_result,
+            forwarded_channels,
         }
     }
 }
@@ -261,6 +281,21 @@ impl client::Handler for SshClientHandler {
         self.host_key_result.set(check.verification);
         Ok(check.accepted)
     }
+
+    async fn server_channel_open_forwarded_tcpip(
+        &mut self,
+        channel: ForwardedChannel,
+        connected_address: &str,
+        connected_port: u32,
+        _originator_address: &str,
+        _originator_port: u32,
+        _session: &mut client::Session,
+    ) -> Result<(), Self::Error> {
+        let port = u16::try_from(connected_port).map_err(|_| russh::Error::Inconsistent)?;
+        self.forwarded_channels
+            .send(connected_address, port, channel)
+            .map_err(|_| russh::Error::ChannelOpenFailure(russh::ChannelOpenFailure::ConnectFailed))
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -277,6 +312,43 @@ impl SharedHostKeyResult {
 
     fn get(&self) -> Option<HostKeyVerification> {
         self.value.lock().ok().and_then(|value| value.clone())
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct SharedForwardedChannels {
+    subscribers: Arc<Mutex<HashMap<(String, u16), mpsc::UnboundedSender<ForwardedChannel>>>>,
+}
+
+impl SharedForwardedChannels {
+    fn subscribe(
+        &self,
+        connected_address: &str,
+        connected_port: u16,
+    ) -> mpsc::UnboundedReceiver<ForwardedChannel> {
+        let (sender, receiver) = mpsc::unbounded_channel();
+        if let Ok(mut subscribers) = self.subscribers.lock() {
+            subscribers.insert((connected_address.to_owned(), connected_port), sender);
+        }
+        receiver
+    }
+
+    fn send(
+        &self,
+        connected_address: &str,
+        connected_port: u16,
+        channel: ForwardedChannel,
+    ) -> Result<(), mpsc::error::SendError<ForwardedChannel>> {
+        let sender = self.subscribers.lock().ok().and_then(|subscribers| {
+            subscribers
+                .get(&(connected_address.to_owned(), connected_port))
+                .cloned()
+        });
+
+        match sender {
+            Some(sender) => sender.send(channel),
+            None => Err(mpsc::error::SendError(channel)),
+        }
     }
 }
 

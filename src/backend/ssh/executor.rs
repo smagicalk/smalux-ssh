@@ -6,26 +6,30 @@ use tokio::runtime::Runtime;
 
 use crate::backend::{
     BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, ConnectionTarget,
-    PtyRequest, RemoteCommandRequest,
+    PtyRequest, RemoteCommandRequest, SftpRequest, TunnelStartRequest, TunnelStopRequest,
 };
 use crate::model::SessionId;
 use crate::security::SecretStore;
 
-use super::{RemoteShell, RusshConnection, RusshConnector, SshConnectionPlan};
+use super::{
+    RemoteSftp, RemoteShell, RemoteTunnel, RusshConnection, RusshConnector, SshConnectionPlan,
+};
 
 #[cfg(test)]
 mod tests;
 
 /// 将同步后端执行器接口适配到异步 `russh` 客户端。
-pub struct RusshBackendExecutor<S: SecretStore> {
+pub struct RusshBackendExecutor<S: SecretStore + Send> {
     runtime: Runtime,
     connector: RusshConnector,
     secret_store: S,
     connections: HashMap<SessionId, RusshConnection>,
     shells: HashMap<SessionId, RemoteShell>,
+    sftps: HashMap<SessionId, RemoteSftp>,
+    tunnels: HashMap<String, RemoteTunnel>,
 }
 
-impl<S: SecretStore> RusshBackendExecutor<S> {
+impl<S: SecretStore + Send> RusshBackendExecutor<S> {
     /// 创建使用默认连接器的真实 SSH 执行器。
     pub fn new(secret_store: S) -> std::io::Result<Self> {
         Self::with_connector(secret_store, RusshConnector::new())
@@ -39,6 +43,8 @@ impl<S: SecretStore> RusshBackendExecutor<S> {
             secret_store,
             connections: HashMap::new(),
             shells: HashMap::new(),
+            sftps: HashMap::new(),
+            tunnels: HashMap::new(),
         })
     }
 
@@ -50,6 +56,16 @@ impl<S: SecretStore> RusshBackendExecutor<S> {
     /// 当前缓存的交互式 shell 数量。
     pub fn shell_count(&self) -> usize {
         self.shells.len()
+    }
+
+    /// 当前缓存的 SFTP 子系统会话数量。
+    pub fn sftp_count(&self) -> usize {
+        self.sftps.len()
+    }
+
+    /// 当前运行中的隧道数量。
+    pub fn tunnel_count(&self) -> usize {
+        self.tunnels.len()
     }
 
     fn connect(
@@ -93,11 +109,75 @@ impl<S: SecretStore> RusshBackendExecutor<S> {
         runtime.block_on(connection.run_command(session_id, &request))
     }
 
+    fn sftp(
+        &mut self,
+        session_id: SessionId,
+        request: SftpRequest,
+    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        if !self.sftps.contains_key(&session_id) {
+            let runtime = &self.runtime;
+            let connection = self
+                .connections
+                .get_mut(&session_id)
+                .ok_or_else(|| connected_session_error("sftp"))?;
+            let sftp = runtime.block_on(connection.open_sftp(session_id))?;
+            self.sftps.insert(session_id, sftp);
+        }
+
+        let sftp = self
+            .sftps
+            .get(&session_id)
+            .ok_or_else(|| connected_session_error("sftp"))?;
+        self.runtime.block_on(sftp.execute(request))
+    }
+
+    fn start_tunnel(
+        &mut self,
+        session_id: SessionId,
+        request: TunnelStartRequest,
+    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        let connection = self
+            .connections
+            .remove(&session_id)
+            .ok_or_else(|| connected_session_error("start tunnel"))?;
+        let (tunnel, events) = self
+            .runtime
+            .block_on(connection.into_tunnel(session_id, request))?;
+        self.tunnels.insert(tunnel.rule_name().to_owned(), tunnel);
+        Ok(events)
+    }
+
+    fn stop_tunnel(
+        &mut self,
+        session_id: SessionId,
+        request: TunnelStopRequest,
+    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        let rule_name = request.rule_name;
+        if let Some(tunnel) = self.tunnels.remove(&rule_name) {
+            tunnel.stop();
+        }
+
+        Ok(vec![BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name,
+            status: crate::model::TunnelStatus::Stopped,
+        }])
+    }
+
     fn disconnect(
         &mut self,
         session_id: SessionId,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
         self.shells.remove(&session_id);
+
+        if let Some(sftp) = self.sftps.remove(&session_id) {
+            self.runtime.block_on(sftp.close())?;
+        }
+
+        for tunnel in self.tunnels.values() {
+            tunnel.stop();
+        }
+        self.tunnels.clear();
 
         if let Some(connection) = self.connections.remove(&session_id) {
             self.runtime.block_on(connection.disconnect())?;
@@ -107,13 +187,11 @@ impl<S: SecretStore> RusshBackendExecutor<S> {
     }
 }
 
-impl<S: SecretStore> BackendExecutor for RusshBackendExecutor<S> {
+impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
     fn execute(
         &mut self,
         command: BackendCommand,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let kind = command.kind();
-
         match command {
             BackendCommand::Connect { session_id, target } => self.connect(session_id, target),
             BackendCommand::OpenShell { session_id, pty } => self.open_shell(session_id, pty),
@@ -121,12 +199,19 @@ impl<S: SecretStore> BackendExecutor for RusshBackendExecutor<S> {
                 session_id,
                 request,
             } => self.run_command(session_id, request),
+            BackendCommand::Sftp {
+                session_id,
+                request,
+            } => self.sftp(session_id, request),
+            BackendCommand::StartTunnel {
+                session_id,
+                request,
+            } => self.start_tunnel(session_id, request),
+            BackendCommand::StopTunnel {
+                session_id,
+                request,
+            } => self.stop_tunnel(session_id, request),
             BackendCommand::Disconnect { session_id } => self.disconnect(session_id),
-            BackendCommand::Sftp { .. }
-            | BackendCommand::StartTunnel { .. }
-            | BackendCommand::StopTunnel { .. } => {
-                Err(BackendExecutionError::UnsupportedCommand { kind })
-            }
         }
     }
 }

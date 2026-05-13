@@ -5,6 +5,7 @@ use crate::model::{AuthProfile, Host, SecretRef, SessionKind, SessionStatus};
 mod remote_command;
 mod sftp;
 mod shell;
+mod tunnel;
 
 fn sample_host() -> Host {
     Host {

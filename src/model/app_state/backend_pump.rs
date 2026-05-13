@@ -6,7 +6,10 @@ use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
     /// 将当前队列中的后端命令交给执行器，并把返回事件归约到状态。
-    pub fn drain_backend_queue(&mut self, executor: &mut impl BackendExecutor) -> AppUpdateOutcome {
+    pub fn drain_backend_queue(
+        &mut self,
+        executor: &mut (impl BackendExecutor + ?Sized),
+    ) -> AppUpdateOutcome {
         let mut outcome = AppUpdateOutcome::default();
 
         while let Some(command) = self.backend_commands.pop_front() {

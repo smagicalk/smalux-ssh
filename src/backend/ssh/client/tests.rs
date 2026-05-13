@@ -115,6 +115,7 @@ async fn handler_records_host_key_verification_result() {
         22,
         HostKeyPolicy::AcceptAny,
         shared.clone(),
+        SharedForwardedChannels::default(),
     );
 
     let accepted = client::Handler::check_server_key(&mut handler, &key)

@@ -1,5 +1,8 @@
+use super::sftp::{join_remote_path, parent_remote_dir, sftp_entry_from_parts};
 use super::*;
+use crate::model::SftpEntryKind;
 use russh::CryptoVec;
+use russh_sftp::protocol::FileAttributes;
 use uuid::Uuid;
 
 fn session_id() -> SessionId {
@@ -144,4 +147,30 @@ fn shell_close_message_maps_to_disconnected() {
     let event = shell_message_to_event(session_id, ChannelMsg::Close);
 
     assert_eq!(event, Some(BackendEvent::Disconnected { session_id }));
+}
+
+#[test]
+fn sftp_entry_mapping_preserves_path_kind_and_metadata() {
+    let mut metadata = FileAttributes::empty();
+    metadata.size = Some(4096);
+    metadata.mtime = Some(1_700_000_000);
+    metadata.permissions = Some(0o100644);
+
+    let entry = sftp_entry_from_parts("/var/log", "syslog".to_owned(), metadata);
+
+    assert_eq!(entry.name, "syslog");
+    assert_eq!(entry.remote_path, "/var/log/syslog");
+    assert_eq!(entry.kind, SftpEntryKind::File);
+    assert_eq!(entry.size, Some(4096));
+    assert_eq!(entry.modified_at_unix_secs, Some(1_700_000_000));
+    assert_eq!(entry.permissions, Some(0o100644));
+}
+
+#[test]
+fn sftp_path_helpers_handle_root_and_nested_paths() {
+    assert_eq!(join_remote_path("/", "etc"), "/etc");
+    assert_eq!(join_remote_path("/var/log/", "syslog"), "/var/log/syslog");
+    assert_eq!(parent_remote_dir("/var/log/syslog"), "/var/log");
+    assert_eq!(parent_remote_dir("/tmp"), "/");
+    assert_eq!(parent_remote_dir("/"), "/");
 }

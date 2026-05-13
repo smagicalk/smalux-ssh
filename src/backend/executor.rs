@@ -1,6 +1,7 @@
 //! 后端命令执行器抽象。
 
 use std::collections::VecDeque;
+use std::sync::{Arc, Mutex};
 
 use super::{BackendCommand, BackendCommandKind, BackendEvent};
 
@@ -32,11 +33,27 @@ pub enum BackendExecutionError {
 ///
 /// 真实 SSH 后端可以在实现中启动异步任务，把后续事件通过通道送回 UI；
 /// 测试后端可以直接返回一组确定事件。
-pub trait BackendExecutor {
+pub trait BackendExecutor: Send {
     fn execute(
         &mut self,
         command: BackendCommand,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError>;
+}
+
+/// 共享后端执行器句柄。
+pub type SharedBackendExecutor = Arc<Mutex<Box<dyn BackendExecutor>>>;
+
+/// 把一个执行器包装成共享句柄。
+pub fn shared_backend_executor<E>(executor: E) -> SharedBackendExecutor
+where
+    E: BackendExecutor + 'static,
+{
+    Arc::new(Mutex::new(Box::new(executor)))
+}
+
+/// 创建占位共享执行器。
+pub fn noop_shared_backend_executor() -> SharedBackendExecutor {
+    shared_backend_executor(NoopBackendExecutor)
 }
 
 /// 不执行任何命令的占位执行器。

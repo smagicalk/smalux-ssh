@@ -1,5 +1,5 @@
 use super::*;
-use crate::backend::{BackendAuth, BackendCommandKind, SftpRequest};
+use crate::backend::{BackendAuth, SftpRequest};
 use crate::model::{HostId, SecretRef};
 use crate::security::MemorySecretStore;
 use crate::terminal::TerminalSize;
@@ -25,6 +25,7 @@ fn executor_starts_with_empty_runtime_state() {
 
     assert_eq!(executor.connection_count(), 0);
     assert_eq!(executor.shell_count(), 0);
+    assert_eq!(executor.sftp_count(), 0);
 }
 
 #[test]
@@ -111,7 +112,7 @@ fn disconnect_without_connection_still_emits_disconnected_event() {
 }
 
 #[test]
-fn unsupported_commands_are_reported_explicitly() {
+fn sftp_requires_connected_session() {
     let mut executor =
         RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
     let session_id = session_id();
@@ -123,12 +124,44 @@ fn unsupported_commands_are_reported_explicitly() {
                 remote_path: "/".to_owned(),
             },
         })
-        .expect_err("SFTP 尚未接入真实执行器");
+        .expect_err("未连接会话不能打开 SFTP");
 
-    assert_eq!(
+    assert!(matches!(
         error,
-        BackendExecutionError::UnsupportedCommand {
-            kind: BackendCommandKind::Sftp
-        }
-    );
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "sftp" && reason == "session is not connected"
+    ));
+}
+
+#[test]
+fn start_tunnel_requires_connected_session() {
+    let mut executor =
+        RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
+    let session_id = session_id();
+
+    let error = executor
+        .execute(BackendCommand::StartTunnel {
+            session_id,
+            request: crate::backend::TunnelStartRequest::new(crate::model::TunnelRule {
+                name: "proxy".to_owned(),
+                kind: crate::model::TunnelKind::Dynamic,
+                bind_host: "127.0.0.1".to_owned(),
+                bind_port: 1080,
+                target_host: String::new(),
+                target_port: 0,
+                auto_start: false,
+            })
+            .expect("动态隧道请求应该有效"),
+        })
+        .expect_err("未连接会话不能启动隧道");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "start tunnel" && reason == "session is not connected"
+    ));
 }

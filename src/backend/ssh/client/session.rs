@@ -11,6 +11,11 @@ use crate::terminal::TerminalSize;
 
 use super::RusshConnection;
 
+mod sftp;
+mod tunnel;
+pub use sftp::RemoteSftp;
+pub use tunnel::RemoteTunnel;
+
 #[cfg(test)]
 mod tests;
 
@@ -166,7 +171,7 @@ async fn prepare_pty(
     wait_channel_request(channel, operation).await
 }
 
-async fn wait_channel_request(
+pub(super) async fn wait_channel_request(
     channel: &mut Channel<client::Msg>,
     operation: &str,
 ) -> Result<(), BackendExecutionError> {
@@ -277,7 +282,7 @@ fn rows(size: TerminalSize) -> u32 {
     u32::from(size.rows.max(1))
 }
 
-fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
+pub(super) fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
     BackendExecutionError::ChannelFailed {
         operation: operation.to_owned(),
         reason: error.to_string(),
