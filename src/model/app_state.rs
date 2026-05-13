@@ -14,7 +14,7 @@ use crate::session::SessionManager;
 use crate::storage::StorageManager;
 use crate::terminal::TerminalManager;
 
-use super::{HostId, TunnelRule};
+use super::{HostId, TunnelRule, UiState};
 
 mod backend_pump;
 #[cfg(test)]
@@ -24,6 +24,7 @@ mod launch;
 mod launch_tests;
 #[cfg(test)]
 mod tests;
+mod ui_drafts;
 
 /// Iced 应用的根状态。
 ///
@@ -34,6 +35,7 @@ pub struct AppState {
     pub sessions: SessionManager,
     pub storage: StorageManager,
     pub terminal: TerminalManager,
+    pub ui: UiState,
     pub backend_commands: BackendCommandQueue,
     pub backend_executor: SharedBackendExecutor,
     pub theme: Theme,
@@ -46,6 +48,7 @@ impl fmt::Debug for AppState {
             .field("sessions", &self.sessions)
             .field("storage", &self.storage)
             .field("terminal", &self.terminal)
+            .field("ui", &self.ui)
             .field("backend_commands", &self.backend_commands)
             .field("backend_executor", &"<shared backend executor>")
             .field("theme", &self.theme)
@@ -60,6 +63,7 @@ impl Default for AppState {
             sessions: SessionManager::default(),
             storage: StorageManager::default(),
             terminal: TerminalManager::default(),
+            ui: UiState::default(),
             backend_commands: BackendCommandQueue::default(),
             backend_executor: noop_shared_backend_executor(),
             theme: Theme::Dark,
@@ -71,6 +75,14 @@ impl Default for AppState {
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleTheme,
+    UpdateHostCommandDraft {
+        host_id: HostId,
+        command: String,
+    },
+    UpdateHostSftpInitialDirDraft {
+        host_id: HostId,
+        initial_dir: String,
+    },
     OpenShell {
         host_id: HostId,
     },
@@ -130,6 +142,13 @@ impl AppState {
     pub fn apply(&mut self, message: Message) -> AppUpdateOutcome {
         match message {
             Message::ToggleTheme => self.toggle_theme(),
+            Message::UpdateHostCommandDraft { host_id, command } => {
+                self.update_host_command_draft(host_id, command)
+            }
+            Message::UpdateHostSftpInitialDirDraft {
+                host_id,
+                initial_dir,
+            } => self.update_host_sftp_initial_dir_draft(host_id, initial_dir),
             Message::OpenShell { host_id } => self.open_shell(host_id),
             Message::OpenSftp {
                 host_id,

@@ -12,6 +12,7 @@ mod session;
 mod sftp;
 mod snippet;
 mod tunnel;
+mod ui_state;
 mod visual;
 mod workspace;
 
@@ -24,6 +25,7 @@ pub use session::*;
 pub use sftp::*;
 pub use snippet::*;
 pub use tunnel::*;
+pub use ui_state::*;
 pub use visual::*;
 pub use workspace::*;
 
