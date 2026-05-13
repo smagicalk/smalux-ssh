@@ -49,6 +49,140 @@ impl AppState {
             ..AppUpdateOutcome::default()
         }
     }
+
+    /// 更新某台主机的视觉覆盖草稿。
+    pub(super) fn update_host_visual_settings_draft(
+        &mut self,
+        host_id: crate::model::HostId,
+        field: VisualSettingsDraftField,
+        value: String,
+    ) -> AppUpdateOutcome {
+        let Some((theme, background)) = self.host_visual_fallbacks(host_id) else {
+            return missing_host(host_id);
+        };
+
+        self.ui
+            .set_host_visual_settings_field(host_id, field, value, &theme, &background);
+        draft_changed()
+    }
+
+    /// 更新某台主机的背景开关草稿。
+    pub(super) fn set_host_visual_background_enabled(
+        &mut self,
+        host_id: crate::model::HostId,
+        enabled: bool,
+    ) -> AppUpdateOutcome {
+        let Some((theme, background)) = self.host_visual_fallbacks(host_id) else {
+            return missing_host(host_id);
+        };
+
+        self.ui
+            .set_host_visual_background_enabled(host_id, enabled, &theme, &background);
+        draft_changed()
+    }
+
+    /// 应用某台主机的主题和背景覆盖。
+    pub(super) fn apply_host_visual_settings(
+        &mut self,
+        host_id: crate::model::HostId,
+    ) -> AppUpdateOutcome {
+        let Some(host) = self
+            .storage
+            .hosts
+            .iter()
+            .find(|host| host.id == host_id)
+            .cloned()
+        else {
+            return missing_host(host_id);
+        };
+        let fallback_theme = host
+            .theme_override
+            .clone()
+            .unwrap_or_else(|| self.config.theme.clone());
+        let fallback_background = host
+            .background_override
+            .clone()
+            .unwrap_or_else(|| self.config.background.clone());
+        let draft = self
+            .ui
+            .host_visual_settings_for(host_id)
+            .cloned()
+            .unwrap_or_else(|| {
+                VisualSettingsDraft::from_profiles(&fallback_theme, &fallback_background)
+            });
+        let theme = match draft.build_theme_profile(&fallback_theme) {
+            Ok(theme) => theme,
+            Err(error) => return invalid_visual_settings(error.to_string()),
+        };
+        let background = match draft.build_background_profile(&fallback_background) {
+            Ok(background) => background,
+            Err(error) => return invalid_visual_settings(error.to_string()),
+        };
+
+        let Some(host) = self
+            .storage
+            .hosts
+            .iter_mut()
+            .find(|host| host.id == host_id)
+        else {
+            return missing_host(host_id);
+        };
+        let changed = host.theme_override.as_ref() != Some(&theme)
+            || host.background_override.as_ref() != Some(&background);
+        host.theme_override = Some(theme);
+        host.background_override = Some(background);
+        self.ui.clear_host_visual_settings_draft(host_id);
+
+        AppUpdateOutcome {
+            state_changed: changed,
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    /// 清除某台主机的主题和背景覆盖，恢复全局配置。
+    pub(super) fn clear_host_visual_settings(
+        &mut self,
+        host_id: crate::model::HostId,
+    ) -> AppUpdateOutcome {
+        let Some(host) = self
+            .storage
+            .hosts
+            .iter_mut()
+            .find(|host| host.id == host_id)
+        else {
+            return missing_host(host_id);
+        };
+
+        let changed = host.theme_override.is_some() || host.background_override.is_some();
+        host.theme_override = None;
+        host.background_override = None;
+        self.ui.clear_host_visual_settings_draft(host_id);
+
+        AppUpdateOutcome {
+            state_changed: changed,
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    fn host_visual_fallbacks(
+        &self,
+        host_id: crate::model::HostId,
+    ) -> Option<(crate::model::ThemeProfile, crate::model::BackgroundProfile)> {
+        self.storage
+            .hosts
+            .iter()
+            .find(|host| host.id == host_id)
+            .map(|host| {
+                (
+                    host.theme_override
+                        .clone()
+                        .unwrap_or_else(|| self.config.theme.clone()),
+                    host.background_override
+                        .clone()
+                        .unwrap_or_else(|| self.config.background.clone()),
+                )
+            })
+    }
 }
 
 fn invalid_visual_settings(error: String) -> AppUpdateOutcome {
@@ -58,10 +192,37 @@ fn invalid_visual_settings(error: String) -> AppUpdateOutcome {
     }
 }
 
+fn missing_host(host_id: crate::model::HostId) -> AppUpdateOutcome {
+    AppUpdateOutcome {
+        error: Some(format!("找不到主机：{}", host_id.0)),
+        ..AppUpdateOutcome::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ImageSource, Message};
+    use crate::model::{AuthProfile, Host, HostId, ImageSource, Message};
+    use uuid::Uuid;
+
+    fn sample_host() -> Host {
+        Host {
+            id: HostId(Uuid::new_v4()),
+            name: "production".to_owned(),
+            group_id: None,
+            tags: Vec::new(),
+            address: "prod.example.com".to_owned(),
+            port: 22,
+            auth: AuthProfile::Agent {
+                username: "deploy".to_owned(),
+                key_hint: None,
+            },
+            proxy: None,
+            jumps: Vec::new(),
+            theme_override: None,
+            background_override: None,
+        }
+    }
 
     #[test]
     fn visual_settings_messages_update_draft_and_apply_config() {
@@ -131,5 +292,67 @@ mod tests {
         assert!(outcome.error.is_some());
         assert_eq!(state.config, before);
         assert_eq!(state.storage.app_config, before);
+    }
+
+    #[test]
+    fn host_visual_settings_apply_and_clear_host_overrides() {
+        let mut state = AppState::default();
+        let host = sample_host();
+        let host_id = host.id;
+        state.storage.upsert_host(host);
+
+        state.apply(Message::UpdateHostVisualSettingsDraft {
+            host_id,
+            field: VisualSettingsDraftField::ThemeName,
+            value: "Prod Dark".to_owned(),
+        });
+        state.apply(Message::SetHostVisualBackgroundEnabled {
+            host_id,
+            enabled: true,
+        });
+        state.apply(Message::UpdateHostVisualSettingsDraft {
+            host_id,
+            field: VisualSettingsDraftField::BackgroundSources,
+            value: "wallpapers/prod.jpg".to_owned(),
+        });
+
+        let apply_outcome = state.apply(Message::ApplyHostVisualSettings { host_id });
+
+        assert!(apply_outcome.changed());
+        assert_eq!(
+            state.storage.hosts[0]
+                .theme_override
+                .as_ref()
+                .map(|theme| theme.name.as_str()),
+            Some("Prod Dark")
+        );
+        assert_eq!(
+            state.storage.hosts[0]
+                .background_override
+                .as_ref()
+                .map(|background| background.sources.clone()),
+            Some(vec![ImageSource::LocalPath(
+                "wallpapers/prod.jpg".to_owned()
+            )])
+        );
+        assert!(state.ui.host_visual_settings_for(host_id).is_none());
+
+        let clear_outcome = state.apply(Message::ClearHostVisualSettings { host_id });
+
+        assert!(clear_outcome.changed());
+        assert!(state.storage.hosts[0].theme_override.is_none());
+        assert!(state.storage.hosts[0].background_override.is_none());
+    }
+
+    #[test]
+    fn host_visual_settings_report_missing_host() {
+        let mut state = AppState::default();
+        let missing_host_id = HostId(Uuid::new_v4());
+
+        let outcome = state.apply(Message::ApplyHostVisualSettings {
+            host_id: missing_host_id,
+        });
+
+        assert!(outcome.error.is_some());
     }
 }

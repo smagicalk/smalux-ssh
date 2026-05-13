@@ -7,7 +7,7 @@ use iced::{
 
 use crate::model::{
     AppState, AuthProfile, Host, HostId, Message, QuickHostAuthDraft, QuickHostAuthField,
-    QuickHostAuthKind, QuickHostDraftField, TunnelRule,
+    QuickHostAuthKind, QuickHostDraftField, TunnelRule, VisualSettingsDraftField,
 };
 
 /// 渲染所有已保存主机的最小可用操作入口。
@@ -184,6 +184,7 @@ fn host_card<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
             }),
         ]
         .spacing(8),
+        host_visual_settings(state, host),
     ]
     .spacing(8);
 
@@ -192,6 +193,130 @@ fn host_card<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
     }
 
     content.into()
+}
+
+fn host_visual_settings<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
+    let host_id = host.id;
+    let draft = state.ui.host_visual_settings_for(host_id);
+    let override_state = if host.theme_override.is_some() || host.background_override.is_some() {
+        "override"
+    } else {
+        "global"
+    };
+    let background_enabled = draft
+        .map(|draft| draft.background_enabled)
+        .or_else(|| {
+            host.background_override
+                .as_ref()
+                .map(|background| background.enabled)
+        })
+        .unwrap_or(state.config.background.enabled);
+
+    column![
+        text(format!("Host visual | {override_state}")),
+        row![
+            host_visual_input(
+                host_id,
+                "theme",
+                draft
+                    .map(|draft| draft.theme_name.as_str())
+                    .unwrap_or(host_theme_name(host)),
+                VisualSettingsDraftField::ThemeName,
+            ),
+            host_visual_input(
+                host_id,
+                "font",
+                draft
+                    .map(|draft| draft.font_family.as_str())
+                    .unwrap_or(host_font_family(host)),
+                VisualSettingsDraftField::FontFamily,
+            ),
+            host_visual_input(
+                host_id,
+                "size",
+                draft.map(|draft| draft.font_size.as_str()).unwrap_or(""),
+                VisualSettingsDraftField::FontSize,
+            ),
+        ]
+        .spacing(8),
+        row![
+            button(if background_enabled {
+                "Background on"
+            } else {
+                "Background off"
+            })
+            .on_press(Message::SetHostVisualBackgroundEnabled {
+                host_id,
+                enabled: !background_enabled,
+            }),
+            host_visual_input(
+                host_id,
+                "sources",
+                draft
+                    .map(|draft| draft.background_sources.as_str())
+                    .unwrap_or(""),
+                VisualSettingsDraftField::BackgroundSources,
+            ),
+        ]
+        .spacing(8),
+        row![
+            host_visual_input(
+                host_id,
+                "rotation",
+                draft
+                    .map(|draft| draft.rotation_interval_secs.as_str())
+                    .unwrap_or(""),
+                VisualSettingsDraftField::RotationIntervalSecs,
+            ),
+            host_visual_input(
+                host_id,
+                "opacity",
+                draft.map(|draft| draft.opacity.as_str()).unwrap_or(""),
+                VisualSettingsDraftField::Opacity,
+            ),
+            host_visual_input(
+                host_id,
+                "blur",
+                draft.map(|draft| draft.blur.as_str()).unwrap_or(""),
+                VisualSettingsDraftField::Blur,
+            ),
+            button("Apply host visual").on_press(Message::ApplyHostVisualSettings { host_id }),
+            button("Use global").on_press(Message::ClearHostVisualSettings { host_id }),
+        ]
+        .spacing(8),
+    ]
+    .spacing(8)
+    .into()
+}
+
+fn host_theme_name(host: &Host) -> &str {
+    host.theme_override
+        .as_ref()
+        .map(|theme| theme.name.as_str())
+        .unwrap_or("")
+}
+
+fn host_font_family(host: &Host) -> &str {
+    host.theme_override
+        .as_ref()
+        .map(|theme| theme.font_family.as_str())
+        .unwrap_or("")
+}
+
+fn host_visual_input<'a>(
+    host_id: HostId,
+    placeholder: &'a str,
+    value: &'a str,
+    field: VisualSettingsDraftField,
+) -> Element<'a, Message> {
+    text_input(placeholder, value)
+        .on_input(move |value| Message::UpdateHostVisualSettingsDraft {
+            host_id,
+            field,
+            value,
+        })
+        .width(Length::Fill)
+        .into()
 }
 
 fn tunnel_rules<'a>(host_id: HostId, rules: &'a [TunnelRule]) -> Element<'a, Message> {

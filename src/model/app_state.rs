@@ -96,6 +96,21 @@ pub enum Message {
         enabled: bool,
     },
     ApplyVisualSettings,
+    UpdateHostVisualSettingsDraft {
+        host_id: HostId,
+        field: VisualSettingsDraftField,
+        value: String,
+    },
+    SetHostVisualBackgroundEnabled {
+        host_id: HostId,
+        enabled: bool,
+    },
+    ApplyHostVisualSettings {
+        host_id: HostId,
+    },
+    ClearHostVisualSettings {
+        host_id: HostId,
+    },
     UpdateQuickHostDraft {
         field: QuickHostDraftField,
         value: String,
@@ -248,6 +263,20 @@ impl AppState {
                 self.set_visual_background_enabled(enabled)
             }
             Message::ApplyVisualSettings => self.apply_visual_settings(),
+            Message::UpdateHostVisualSettingsDraft {
+                host_id,
+                field,
+                value,
+            } => self.update_host_visual_settings_draft(host_id, field, value),
+            Message::SetHostVisualBackgroundEnabled { host_id, enabled } => {
+                self.set_host_visual_background_enabled(host_id, enabled)
+            }
+            Message::ApplyHostVisualSettings { host_id } => {
+                self.apply_host_visual_settings(host_id)
+            }
+            Message::ClearHostVisualSettings { host_id } => {
+                self.clear_host_visual_settings(host_id)
+            }
             Message::UpdateQuickHostDraft { field, value } => {
                 self.update_quick_host_draft(field, value)
             }
