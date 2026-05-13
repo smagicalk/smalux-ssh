@@ -56,6 +56,9 @@ fn update(state: &mut AppState, message: Message) -> Task<Message> {
     if state.storage != storage_before {
         if let Err(error) = state.persist_storage() {
             tracing::error!(error = %error, "保存本地存储失败");
+            state
+                .ui
+                .set_last_error(format!("保存本地存储失败：{error}"));
         }
     }
 

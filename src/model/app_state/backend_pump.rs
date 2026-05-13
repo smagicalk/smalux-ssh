@@ -23,6 +23,7 @@ impl AppState {
                         reason: reason.clone(),
                     });
                     outcome.state_changed |= event_outcome.state_changed;
+                    outcome.state_changed |= self.ui.set_last_error(reason.clone());
                     outcome.applied_backend_events += event_outcome.applied_backend_events;
                     outcome.error = Some(reason);
                     break;

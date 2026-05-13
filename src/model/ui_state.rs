@@ -39,6 +39,7 @@ impl HostActionDraft {
 /// 纯 UI 层运行态。
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UiState {
+    pub last_error: Option<String>,
     pub quick_host: QuickHostDraft,
     pub visual_settings: VisualSettingsDraft,
     pub host_visual_settings_drafts: Vec<HostVisualSettingsDraft>,
@@ -51,6 +52,7 @@ impl UiState {
     /// 使用当前视觉配置初始化 UI 草稿。
     pub fn from_visual(theme: &ThemeProfile, background: &BackgroundProfile) -> Self {
         Self {
+            last_error: None,
             quick_host: QuickHostDraft::default(),
             visual_settings: VisualSettingsDraft::from_profiles(theme, background),
             host_visual_settings_drafts: Vec::new(),
@@ -58,6 +60,24 @@ impl UiState {
             sftp_action_drafts: Vec::new(),
             terminal_input_drafts: Vec::new(),
         }
+    }
+
+    /// 记录最近一次需要展示给用户的错误。
+    pub fn set_last_error(&mut self, error: impl Into<String>) -> bool {
+        let error = error.into();
+        if self.last_error.as_deref() == Some(error.as_str()) {
+            return false;
+        }
+
+        self.last_error = Some(error);
+        true
+    }
+
+    /// 清除当前错误提示。
+    pub fn clear_last_error(&mut self) -> bool {
+        let had_error = self.last_error.is_some();
+        self.last_error = None;
+        had_error
     }
 
     /// 更新全局视觉配置草稿字段。
@@ -387,6 +407,19 @@ mod tests {
 
         assert_eq!(ui.remote_command_for(host_id), "uptime");
         assert_eq!(ui.sftp_initial_dir_for(host_id), "/");
+        assert!(ui.last_error.is_none());
+    }
+
+    #[test]
+    fn last_error_can_be_set_and_cleared() {
+        let mut ui = UiState::default();
+
+        assert!(ui.set_last_error("连接失败"));
+        assert_eq!(ui.last_error.as_deref(), Some("连接失败"));
+        assert!(!ui.set_last_error("连接失败"));
+        assert!(ui.clear_last_error());
+        assert!(ui.last_error.is_none());
+        assert!(!ui.clear_last_error());
     }
 
     #[test]

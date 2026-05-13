@@ -210,9 +210,15 @@ fn close_session_tab_message_reports_missing_tab() {
 
     let outcome = state.apply(Message::CloseSessionTab { session_id });
 
-    assert!(!outcome.state_changed);
+    assert!(outcome.state_changed);
     assert!(outcome.error.is_some());
+    assert_eq!(state.ui.last_error.as_deref(), outcome.error.as_deref());
     assert!(state.backend_commands.is_empty());
+
+    let dismiss_outcome = state.apply(Message::DismissUiError);
+
+    assert!(dismiss_outcome.changed());
+    assert!(state.ui.last_error.is_none());
 }
 
 #[test]
@@ -240,8 +246,9 @@ fn close_session_tab_message_requires_stopping_running_tunnel_first() {
 
     let outcome = state.apply(Message::CloseSessionTab { session_id });
 
-    assert!(!outcome.state_changed);
+    assert!(outcome.state_changed);
     assert!(outcome.error.is_some());
+    assert_eq!(state.ui.last_error.as_deref(), outcome.error.as_deref());
     assert_eq!(state.sessions.tab_count(), 1);
     assert_eq!(state.sessions.tunnel_runtime_count(), 1);
     assert!(state.backend_commands.is_empty());

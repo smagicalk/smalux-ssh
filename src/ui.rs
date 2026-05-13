@@ -21,19 +21,26 @@ mod workspace;
 pub fn view(state: &AppState) -> Element<'_, Message> {
     let visual = state.config.resolve_visual_for_host(None);
 
-    let content = column![
-        header(state),
-        visual_settings::view(state),
-        overview(state, visual.theme.name.clone(), visual.background.enabled),
-        workspace::view(state),
-        security::view(state),
-        host_actions::view(state),
-        terminal_workspace::view(state),
-        sftp_workspace::view(state),
-        session_summary::view(state),
-    ]
-    .spacing(16)
-    .padding(16);
+    let mut content = column![header(state)];
+    if let Some(error) = state.ui.last_error.as_deref() {
+        content = content.push(error_banner(error));
+    }
+
+    content = content
+        .push(visual_settings::view(state))
+        .push(overview(
+            state,
+            visual.theme.name.clone(),
+            visual.background.enabled,
+        ))
+        .push(workspace::view(state))
+        .push(security::view(state))
+        .push(host_actions::view(state))
+        .push(terminal_workspace::view(state))
+        .push(sftp_workspace::view(state))
+        .push(session_summary::view(state))
+        .spacing(16)
+        .padding(16);
 
     scrollable(content).into()
 }
@@ -42,6 +49,15 @@ fn header(state: &AppState) -> Element<'_, Message> {
     row![
         text(&state.config.app_name).size(28),
         button("Toggle theme").on_press(Message::ToggleTheme),
+    ]
+    .spacing(12)
+    .into()
+}
+
+fn error_banner(error: &str) -> Element<'_, Message> {
+    row![
+        text(format!("Error: {error}")),
+        button("Dismiss").on_press(Message::DismissUiError),
     ]
     .spacing(12)
     .into()
@@ -141,6 +157,14 @@ mod tests {
             target_port: 5432,
             auto_start: false,
         });
+
+        let _element = view(&state);
+    }
+
+    #[test]
+    fn view_accepts_state_with_last_error() {
+        let mut state = AppState::default();
+        state.ui.set_last_error("认证失败");
 
         let _element = view(&state);
     }

@@ -139,6 +139,7 @@ pub enum Message {
         host: String,
         port: u16,
     },
+    DismissUiError,
     CloseSessionTab {
         session_id: SessionId,
     },
@@ -262,7 +263,7 @@ impl AppState {
 
     /// 将 UI 消息应用到根状态。
     pub fn apply(&mut self, message: Message) -> AppUpdateOutcome {
-        match message {
+        let mut outcome = match message {
             Message::ToggleTheme => self.toggle_theme(),
             Message::UpdateVisualSettingsDraft { field, value } => {
                 self.update_visual_settings_draft(field, value)
@@ -299,6 +300,7 @@ impl AppState {
             Message::RemoveCredential { name } => self.remove_credential(&name),
             Message::TrustKnownHost { host, port } => self.trust_known_host(&host, port),
             Message::RemoveKnownHost { host, port } => self.remove_known_host(&host, port),
+            Message::DismissUiError => self.dismiss_ui_error(),
             Message::CloseSessionTab { session_id } => self.close_session_tab(session_id),
             Message::ActivateTerminalTab { session_id } => {
                 if self.terminal.set_active_tab(session_id) {
@@ -365,7 +367,13 @@ impl AppState {
                 rule_name,
             } => self.stop_tunnel(session_id, rule_name),
             Message::BackendEventReceived(event) => self.apply_backend_event(event),
+        };
+
+        if let Some(error) = &outcome.error {
+            outcome.state_changed |= self.ui.set_last_error(error.clone());
         }
+
+        outcome
     }
 
     fn toggle_theme(&mut self) -> AppUpdateOutcome {
@@ -377,6 +385,13 @@ impl AppState {
 
         AppUpdateOutcome {
             state_changed: true,
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    fn dismiss_ui_error(&mut self) -> AppUpdateOutcome {
+        AppUpdateOutcome {
+            state_changed: self.ui.clear_last_error(),
             ..AppUpdateOutcome::default()
         }
     }
