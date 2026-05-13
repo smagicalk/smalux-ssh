@@ -2,19 +2,18 @@
 
 use iced::Task;
 use iced::Theme;
-use uuid::Uuid;
 
-use crate::backend::{
-    BackendCommand, BackendCommandQueue, BackendEvent, ConnectionTarget, PtyRequest,
-    apply_backend_event,
-};
+use crate::backend::{BackendCommandQueue, BackendEvent, apply_backend_event};
 use crate::config::AppConfig;
 use crate::session::SessionManager;
 use crate::storage::StorageManager;
-use crate::terminal::{TerminalManager, TerminalTabState};
+use crate::terminal::TerminalManager;
 
-use super::{HostId, SessionId, SessionStatus};
+use super::HostId;
 
+mod launch;
+#[cfg(test)]
+mod launch_tests;
 #[cfg(test)]
 mod tests;
 
@@ -48,7 +47,14 @@ impl Default for AppState {
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleTheme,
-    OpenShell { host_id: HostId },
+    OpenShell {
+        host_id: HostId,
+    },
+    RunRemoteCommand {
+        host_id: HostId,
+        command: String,
+        request_pty: bool,
+    },
     BackendEventReceived(BackendEvent),
 }
 
@@ -79,6 +85,11 @@ impl AppState {
         match message {
             Message::ToggleTheme => self.toggle_theme(),
             Message::OpenShell { host_id } => self.open_shell(host_id),
+            Message::RunRemoteCommand {
+                host_id,
+                command,
+                request_pty,
+            } => self.run_remote_command(host_id, command, request_pty),
             Message::BackendEventReceived(event) => self.apply_backend_event(event),
         }
     }
@@ -102,44 +113,6 @@ impl AppState {
         AppUpdateOutcome {
             state_changed: outcome.changed(),
             applied_backend_events: 1,
-            ..AppUpdateOutcome::default()
-        }
-    }
-
-    fn open_shell(&mut self, host_id: HostId) -> AppUpdateOutcome {
-        let Some(host) = self
-            .storage
-            .hosts
-            .iter()
-            .find(|host| host.id == host_id)
-            .cloned()
-        else {
-            return AppUpdateOutcome {
-                error: Some(format!("找不到主机：{}", host_id.0)),
-                ..AppUpdateOutcome::default()
-            };
-        };
-
-        let session_id = SessionId(Uuid::new_v4());
-        let terminal_tab = TerminalTabState::new(session_id, host.name.clone());
-        let pty = PtyRequest::xterm(terminal_tab.size);
-
-        self.sessions
-            .open_shell_tab(session_id, host.id, host.name.clone());
-        self.sessions
-            .set_status(session_id, SessionStatus::Connecting);
-        self.terminal.open_tab(terminal_tab);
-        self.backend_commands.extend([
-            BackendCommand::Connect {
-                session_id,
-                target: ConnectionTarget::from_host(&host),
-            },
-            BackendCommand::OpenShell { session_id, pty },
-        ]);
-
-        AppUpdateOutcome {
-            state_changed: true,
-            queued_backend_commands: 2,
             ..AppUpdateOutcome::default()
         }
     }
