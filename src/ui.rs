@@ -48,6 +48,10 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
         text(format!("session tabs: {}", state.sessions.tab_count())),
         text(format!("terminal tabs: {}", state.terminal.tab_count())),
         text(format!(
+            "backend queue: {}",
+            state.backend_commands.pending_count()
+        )),
+        text(format!(
             "local shells: {}",
             state.terminal.local_shell_count()
         )),
