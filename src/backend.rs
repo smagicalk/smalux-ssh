@@ -11,6 +11,7 @@ mod pty;
 mod queue;
 mod reducer;
 mod sftp;
+mod ssh;
 mod tunnel;
 
 pub use auth::*;
@@ -21,4 +22,5 @@ pub use pty::*;
 pub use queue::*;
 pub use reducer::*;
 pub use sftp::*;
+pub use ssh::*;
 pub use tunnel::*;
