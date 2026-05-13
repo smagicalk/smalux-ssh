@@ -46,6 +46,35 @@ impl StorageManager {
             false
         }
     }
+
+    /// 写入单个快捷命令参数，保留其它最近参数。
+    pub fn upsert_snippet_argument(&mut self, id: SnippetId, name: &str, value: String) -> bool {
+        let Some(snippet) = self.snippets.iter_mut().find(|snippet| snippet.id == id) else {
+            return false;
+        };
+        if !snippet
+            .variables
+            .iter()
+            .any(|variable| variable.name == name)
+        {
+            return false;
+        }
+
+        if let Some(argument) = snippet
+            .last_arguments
+            .iter_mut()
+            .find(|argument| argument.name == name)
+        {
+            argument.value = value;
+        } else {
+            snippet.last_arguments.push(SnippetArgument {
+                name: name.to_owned(),
+                value,
+            });
+        }
+
+        true
+    }
 }
 
 #[cfg(test)]
@@ -92,6 +121,9 @@ mod tests {
             }],
         ));
         assert_eq!(storage.snippets[0].last_arguments[0].value, "sshd");
+        assert!(storage.upsert_snippet_argument(snippet_id, "service", "nginx".to_owned()));
+        assert_eq!(storage.snippets[0].last_arguments[0].value, "nginx");
+        assert!(!storage.upsert_snippet_argument(snippet_id, "unknown", "value".to_owned()));
         assert!(!storage.record_snippet_arguments(SnippetId(Uuid::new_v4()), Vec::new()));
         assert!(storage.remove_snippet(snippet_id));
         assert!(!storage.remove_snippet(snippet_id));

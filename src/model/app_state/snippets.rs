@@ -2,7 +2,9 @@
 
 use uuid::Uuid;
 
-use crate::model::{HostId, Snippet, SnippetId, SnippetRenderError, SnippetScope};
+use crate::model::{
+    HostId, Snippet, SnippetId, SnippetRenderError, SnippetScope, variables_from_template,
+};
 
 use super::{AppState, AppUpdateOutcome};
 
@@ -27,9 +29,9 @@ impl AppState {
             id: SnippetId(Uuid::new_v4()),
             name: snippet_name(&command),
             description: Some("从主机命令草稿保存".to_owned()),
-            command_template: command,
+            command_template: command.clone(),
             scope: SnippetScope::Host(host_id),
-            variables: Vec::new(),
+            variables: variables_from_template(&command),
             last_arguments: Vec::new(),
         });
 
@@ -94,6 +96,29 @@ impl AppState {
             }
         } else {
             missing_snippet(snippet_id)
+        }
+    }
+
+    /// 更新快捷命令变量最近一次输入值。
+    pub(super) fn update_snippet_argument(
+        &mut self,
+        snippet_id: SnippetId,
+        name: String,
+        value: String,
+    ) -> AppUpdateOutcome {
+        if self
+            .storage
+            .upsert_snippet_argument(snippet_id, &name, value)
+        {
+            AppUpdateOutcome {
+                state_changed: true,
+                ..AppUpdateOutcome::default()
+            }
+        } else {
+            AppUpdateOutcome {
+                error: Some(format!("找不到快捷命令变量：{name}")),
+                ..AppUpdateOutcome::default()
+            }
         }
     }
 }

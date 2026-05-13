@@ -1,6 +1,8 @@
 use super::*;
 use crate::backend::BackendCommand;
-use crate::model::{AuthProfile, Host, SecretRef, Snippet, SnippetScope, SnippetVariable};
+use crate::model::{
+    AuthProfile, Host, SecretRef, Snippet, SnippetArgument, SnippetScope, SnippetVariable,
+};
 use uuid::Uuid;
 
 fn sample_host() -> Host {
@@ -54,6 +56,24 @@ fn save_host_command_snippet_uses_current_command_draft() {
         "systemctl status sshd"
     );
     assert_eq!(state.storage.snippets[0].scope, SnippetScope::Host(host_id));
+}
+
+#[test]
+fn save_host_command_snippet_infers_template_variables() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state
+        .ui
+        .set_remote_command(host_id, "systemctl restart {{service}}");
+
+    let outcome = state.apply(Message::SaveHostCommandSnippet { host_id });
+
+    assert!(outcome.changed());
+    assert_eq!(state.storage.snippets[0].variables.len(), 1);
+    assert_eq!(state.storage.snippets[0].variables[0].name, "service");
+    assert!(state.storage.snippets[0].variables[0].required);
 }
 
 #[test]
@@ -151,6 +171,71 @@ fn run_snippet_reports_missing_variable_until_arguments_exist() {
     assert!(outcome.changed());
     assert_eq!(outcome.error.as_deref(), Some("快捷命令缺少变量：service"));
     assert!(state.backend_commands.is_empty());
+}
+
+#[test]
+fn update_snippet_argument_allows_parameterized_snippet_to_run() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    let snippet = Snippet {
+        id: SnippetId(Uuid::new_v4()),
+        name: "restart".to_owned(),
+        description: None,
+        command_template: "systemctl restart {{service}}".to_owned(),
+        scope: SnippetScope::Host(host_id),
+        variables: vec![SnippetVariable {
+            name: "service".to_owned(),
+            default_value: None,
+            required: true,
+        }],
+        last_arguments: Vec::new(),
+    };
+    let snippet_id = snippet.id;
+    state.storage.upsert_host(host);
+    state.storage.upsert_snippet(snippet);
+
+    let updated = state.apply(Message::UpdateSnippetArgument {
+        snippet_id,
+        name: "service".to_owned(),
+        value: "nginx".to_owned(),
+    });
+    let outcome = state.apply(Message::RunSnippet {
+        host_id,
+        snippet_id,
+    });
+
+    assert!(updated.changed());
+    assert!(outcome.changed());
+    assert_eq!(
+        state.storage.snippets[0].last_arguments,
+        vec![SnippetArgument {
+            name: "service".to_owned(),
+            value: "nginx".to_owned(),
+        }]
+    );
+
+    let commands = state.backend_commands.drain();
+    assert!(matches!(
+        &commands[1],
+        BackendCommand::RunCommand { request, .. }
+            if request.command == "systemctl restart nginx"
+    ));
+}
+
+#[test]
+fn update_snippet_argument_reports_unknown_variable() {
+    let mut state = AppState::default();
+    let snippet_id = SnippetId(Uuid::new_v4());
+
+    let outcome = state.apply(Message::UpdateSnippetArgument {
+        snippet_id,
+        name: "service".to_owned(),
+        value: "nginx".to_owned(),
+    });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_some());
 }
 
 #[test]

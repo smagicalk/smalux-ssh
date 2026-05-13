@@ -214,7 +214,7 @@ fn snippet_list<'a>(host_id: HostId, snippets: Vec<&'a Snippet>) -> Element<'a, 
     let mut rows = column![text("Snippets")].spacing(6);
 
     for snippet in snippets {
-        rows = rows.push(
+        let mut snippet_rows = column![
             row![
                 text(snippet_label(snippet)),
                 button("Run").on_press(Message::RunSnippet {
@@ -225,11 +225,57 @@ fn snippet_list<'a>(host_id: HostId, snippets: Vec<&'a Snippet>) -> Element<'a, 
                     snippet_id: snippet.id,
                 }),
             ]
-            .spacing(8),
-        );
+            .spacing(8)
+        ]
+        .spacing(6);
+
+        if !snippet.variables.is_empty() {
+            snippet_rows = snippet_rows.push(snippet_argument_inputs(snippet));
+        }
+
+        rows = rows.push(snippet_rows);
     }
 
     rows.into()
+}
+
+fn snippet_argument_inputs<'a>(snippet: &'a Snippet) -> Element<'a, Message> {
+    let mut inputs = row![text("Args")].spacing(8);
+
+    for variable in &snippet.variables {
+        let snippet_id = snippet.id;
+        let name = variable.name.clone();
+        inputs = inputs.push(
+            text_input(
+                &variable.name,
+                snippet_argument_value(snippet, &variable.name),
+            )
+            .on_input(move |value| Message::UpdateSnippetArgument {
+                snippet_id,
+                name: name.clone(),
+                value,
+            })
+            .width(Length::Fill),
+        );
+    }
+
+    inputs.into()
+}
+
+fn snippet_argument_value<'a>(snippet: &'a Snippet, name: &str) -> &'a str {
+    snippet
+        .last_arguments
+        .iter()
+        .find(|argument| argument.name == name)
+        .map(|argument| argument.value.as_str())
+        .or_else(|| {
+            snippet
+                .variables
+                .iter()
+                .find(|variable| variable.name == name)
+                .and_then(|variable| variable.default_value.as_deref())
+        })
+        .unwrap_or("")
 }
 
 fn snippet_label(snippet: &Snippet) -> String {
@@ -412,7 +458,7 @@ fn auth_label(auth: &AuthProfile) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AuthProfile, SecretRef, SnippetScope};
+    use crate::model::{AuthProfile, SecretRef, SnippetArgument, SnippetScope, SnippetVariable};
     use uuid::Uuid;
 
     fn host(tags: Vec<String>) -> Host {
@@ -454,13 +500,51 @@ mod tests {
             id: crate::model::SnippetId(Uuid::new_v4()),
             name: "uptime".to_owned(),
             description: None,
-            command_template: "uptime".to_owned(),
+            command_template: "systemctl restart {{service}}".to_owned(),
             scope: SnippetScope::Host(host_id),
-            variables: Vec::new(),
-            last_arguments: Vec::new(),
+            variables: vec![SnippetVariable {
+                name: "service".to_owned(),
+                default_value: None,
+                required: true,
+            }],
+            last_arguments: vec![SnippetArgument {
+                name: "service".to_owned(),
+                value: "sshd".to_owned(),
+            }],
         });
 
         let _element = view(&state);
+    }
+
+    #[test]
+    fn snippet_argument_value_prefers_last_argument_then_default() {
+        let snippet = Snippet {
+            id: crate::model::SnippetId(Uuid::new_v4()),
+            name: "restart".to_owned(),
+            description: None,
+            command_template: "systemctl restart {{service}} {{mode}}".to_owned(),
+            scope: SnippetScope::Global,
+            variables: vec![
+                SnippetVariable {
+                    name: "service".to_owned(),
+                    default_value: Some("nginx".to_owned()),
+                    required: true,
+                },
+                SnippetVariable {
+                    name: "mode".to_owned(),
+                    default_value: Some("--now".to_owned()),
+                    required: false,
+                },
+            ],
+            last_arguments: vec![SnippetArgument {
+                name: "service".to_owned(),
+                value: "sshd".to_owned(),
+            }],
+        };
+
+        assert_eq!(snippet_argument_value(&snippet, "service"), "sshd");
+        assert_eq!(snippet_argument_value(&snippet, "mode"), "--now");
+        assert_eq!(snippet_argument_value(&snippet, "missing"), "");
     }
 
     #[test]

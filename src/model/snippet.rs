@@ -25,7 +25,7 @@ impl Snippet {
             let argument_value = arguments
                 .iter()
                 .find(|argument| argument.name == variable.name)
-                .map(|argument| argument.value.as_str());
+                .and_then(|argument| non_empty_required_value(argument.value.as_str(), variable));
             let value = argument_value
                 .or(variable.default_value.as_deref())
                 .or(if variable.required { None } else { Some("") })
@@ -40,6 +40,33 @@ impl Snippet {
 
         Ok(rendered)
     }
+}
+
+/// 从模板中提取 `{{name}}` 形式的变量定义。
+pub fn variables_from_template(template: &str) -> Vec<SnippetVariable> {
+    let mut variables: Vec<SnippetVariable> = Vec::new();
+    let mut rest = template;
+
+    while let Some(start) = rest.find("{{") {
+        let after_start = &rest[start + 2..];
+        let Some(end) = after_start.find("}}") else {
+            break;
+        };
+        let name = &after_start[..end];
+        if name == name.trim()
+            && is_valid_variable_name(name)
+            && !variables.iter().any(|variable| variable.name == name)
+        {
+            variables.push(SnippetVariable {
+                name: name.to_owned(),
+                default_value: None,
+                required: true,
+            });
+        }
+        rest = &after_start[end + 2..];
+    }
+
+    variables
 }
 
 /// 快捷命令作用域。
@@ -88,6 +115,21 @@ fn find_unresolved_placeholder(input: &str) -> Option<String> {
     let rest = &input[start + 2..];
     let end = rest.find("}}")?;
     Some(rest[..end].to_owned())
+}
+
+fn non_empty_required_value<'a>(value: &'a str, variable: &SnippetVariable) -> Option<&'a str> {
+    if variable.required && value.trim().is_empty() {
+        None
+    } else {
+        Some(value)
+    }
+}
+
+fn is_valid_variable_name(name: &str) -> bool {
+    !name.is_empty()
+        && name
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || matches!(character, '_' | '-'))
 }
 
 #[cfg(test)]
@@ -170,6 +212,46 @@ mod tests {
             unknown.render(&[]),
             Err(SnippetRenderError::UnknownVariable("extra".to_owned()))
         );
+    }
+
+    #[test]
+    fn snippet_render_treats_empty_required_argument_as_missing() {
+        let snippet = Snippet {
+            id: SnippetId(Uuid::new_v4()),
+            name: "restart".to_owned(),
+            description: None,
+            command_template: "systemctl restart {{service}}".to_owned(),
+            scope: SnippetScope::Global,
+            variables: vec![SnippetVariable {
+                name: "service".to_owned(),
+                default_value: None,
+                required: true,
+            }],
+            last_arguments: Vec::new(),
+        };
+
+        assert_eq!(
+            snippet.render(&[SnippetArgument {
+                name: "service".to_owned(),
+                value: "  ".to_owned(),
+            }]),
+            Err(SnippetRenderError::MissingVariable("service".to_owned()))
+        );
+    }
+
+    #[test]
+    fn variables_from_template_extracts_unique_valid_names() {
+        let variables =
+            variables_from_template("echo {{service}} {{ service }} {{bad.name}} {{service}}");
+
+        assert_eq!(
+            variables
+                .iter()
+                .map(|variable| variable.name.as_str())
+                .collect::<Vec<_>>(),
+            vec!["service"]
+        );
+        assert!(variables.iter().all(|variable| variable.required));
     }
 
     #[test]

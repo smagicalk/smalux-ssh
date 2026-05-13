@@ -227,6 +227,11 @@ pub enum Message {
         host_id: HostId,
         snippet_id: SnippetId,
     },
+    UpdateSnippetArgument {
+        snippet_id: SnippetId,
+        name: String,
+        value: String,
+    },
     RemoveSnippet {
         snippet_id: SnippetId,
     },
@@ -406,6 +411,11 @@ impl AppState {
                 host_id,
                 snippet_id,
             } => self.run_snippet(host_id, snippet_id),
+            Message::UpdateSnippetArgument {
+                snippet_id,
+                name,
+                value,
+            } => self.update_snippet_argument(snippet_id, name, value),
             Message::RemoveSnippet { snippet_id } => self.remove_snippet(snippet_id),
             Message::RunCommandHistory { history_id } => self.run_command_history(history_id),
             Message::StartTunnel { host_id, rule } => self.start_tunnel(host_id, rule),
