@@ -7,12 +7,30 @@ use crate::model::{
 /// 后端执行器产生的状态事件。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackendEvent {
+    Connecting {
+        session_id: SessionId,
+        endpoint: String,
+    },
     Connected {
+        session_id: SessionId,
+    },
+    Authenticating {
+        session_id: SessionId,
+        username: String,
+    },
+    Authenticated {
         session_id: SessionId,
     },
     HostKeyVerified {
         session_id: SessionId,
         result: HostKeyVerification,
+    },
+    ShellOpened {
+        session_id: SessionId,
+    },
+    RemoteCommandStarted {
+        session_id: SessionId,
+        command: String,
     },
     Output {
         session_id: SessionId,
@@ -51,8 +69,13 @@ impl BackendEvent {
     /// 返回事件关联的会话标识。
     pub fn session_id(&self) -> SessionId {
         match self {
-            Self::Connected { session_id }
+            Self::Connecting { session_id, .. }
+            | Self::Connected { session_id }
+            | Self::Authenticating { session_id, .. }
+            | Self::Authenticated { session_id }
             | Self::HostKeyVerified { session_id, .. }
+            | Self::ShellOpened { session_id }
+            | Self::RemoteCommandStarted { session_id, .. }
             | Self::Output { session_id, .. }
             | Self::CommandExited { session_id, .. }
             | Self::SftpEntries { session_id, .. }
@@ -89,5 +112,28 @@ mod tests {
         assert_eq!(output.session_id(), session_id);
         assert!(!output.is_terminal());
         assert!(failed.is_terminal());
+    }
+
+    #[test]
+    fn backend_connection_events_report_session() {
+        let session_id = SessionId(Uuid::new_v4());
+        let events = [
+            BackendEvent::Connecting {
+                session_id,
+                endpoint: "example.com:22".to_owned(),
+            },
+            BackendEvent::Authenticating {
+                session_id,
+                username: "deploy".to_owned(),
+            },
+            BackendEvent::Authenticated { session_id },
+            BackendEvent::ShellOpened { session_id },
+            BackendEvent::RemoteCommandStarted {
+                session_id,
+                command: "uptime".to_owned(),
+            },
+        ];
+
+        assert!(events.iter().all(|event| event.session_id() == session_id));
     }
 }

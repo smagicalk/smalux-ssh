@@ -1,6 +1,6 @@
 //! 后端命令队列执行泵。
 
-use crate::backend::BackendExecutor;
+use crate::backend::{BackendEvent, BackendExecutor};
 
 use super::{AppState, AppUpdateOutcome};
 
@@ -10,10 +10,18 @@ impl AppState {
         let mut outcome = AppUpdateOutcome::default();
 
         while let Some(command) = self.backend_commands.pop_front() {
+            let session_id = command.session_id();
             let events = match executor.execute(command) {
                 Ok(events) => events,
                 Err(error) => {
-                    outcome.error = Some(error.to_string());
+                    let reason = error.to_string();
+                    let event_outcome = self.apply_backend_event(BackendEvent::Failed {
+                        session_id,
+                        reason: reason.clone(),
+                    });
+                    outcome.state_changed |= event_outcome.state_changed;
+                    outcome.applied_backend_events += event_outcome.applied_backend_events;
+                    outcome.error = Some(reason);
                     break;
                 }
             };

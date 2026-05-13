@@ -27,12 +27,27 @@ pub fn apply_backend_event(
     event: BackendEvent,
 ) -> BackendEventOutcome {
     match event {
+        BackendEvent::Connecting { session_id, .. } => BackendEventOutcome {
+            session_updated: sessions.set_status(session_id, SessionStatus::Connecting),
+            terminal_updated: false,
+        },
         BackendEvent::Connected { session_id } => BackendEventOutcome {
             session_updated: sessions.set_status(session_id, SessionStatus::Connected),
             terminal_updated: false,
         },
-        BackendEvent::HostKeyVerified { session_id, .. } => BackendEventOutcome {
+        BackendEvent::Authenticating { session_id, .. }
+        | BackendEvent::HostKeyVerified { session_id, .. } => BackendEventOutcome {
             session_updated: sessions.set_status(session_id, SessionStatus::Authenticating),
+            terminal_updated: false,
+        },
+        BackendEvent::Authenticated { session_id } | BackendEvent::ShellOpened { session_id } => {
+            BackendEventOutcome {
+                session_updated: sessions.set_status(session_id, SessionStatus::Connected),
+                terminal_updated: false,
+            }
+        }
+        BackendEvent::RemoteCommandStarted { session_id, .. } => BackendEventOutcome {
+            session_updated: sessions.set_status(session_id, SessionStatus::RunningCommand),
             terminal_updated: false,
         },
         BackendEvent::Output { session_id, line } => BackendEventOutcome {

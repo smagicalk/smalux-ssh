@@ -9,6 +9,16 @@ use super::{BackendCommand, BackendCommandKind, BackendEvent};
 pub enum BackendExecutionError {
     #[error("后端执行器不支持命令：{kind:?}")]
     UnsupportedCommand { kind: BackendCommandKind },
+    #[error("连接 {endpoint} 失败：{reason}")]
+    ConnectionFailed { endpoint: String, reason: String },
+    #[error("用户 {username} 认证失败：{reason}")]
+    AuthenticationFailed { username: String, reason: String },
+    #[error("{operation} 通道失败：{reason}")]
+    ChannelFailed { operation: String, reason: String },
+    #[error("SFTP {operation} 失败：{reason}")]
+    SftpFailed { operation: String, reason: String },
+    #[error("隧道 {rule_name} 失败：{reason}")]
+    TunnelFailed { rule_name: String, reason: String },
     #[error("脚本执行器期望 {expected:?}，实际收到 {actual:?}")]
     UnexpectedCommand {
         expected: BackendCommandKind,
@@ -112,114 +122,4 @@ impl BackendExecutor for ScriptedBackendExecutor {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::backend::{ConnectionTarget, PtyRequest};
-    use crate::model::{AuthProfile, Host, HostId, SessionId};
-    use crate::terminal::TerminalSize;
-    use uuid::Uuid;
-
-    fn session_id() -> SessionId {
-        SessionId(Uuid::new_v4())
-    }
-
-    fn host() -> Host {
-        Host {
-            id: HostId(Uuid::new_v4()),
-            name: "production".to_owned(),
-            group_id: None,
-            tags: Vec::new(),
-            address: "example.com".to_owned(),
-            port: 22,
-            auth: AuthProfile::Agent {
-                username: "deploy".to_owned(),
-                key_hint: None,
-            },
-            proxy: None,
-            jumps: Vec::new(),
-            theme_override: None,
-            background_override: None,
-        }
-    }
-
-    #[test]
-    fn noop_executor_reports_unsupported_command() {
-        let mut executor = NoopBackendExecutor;
-        let session_id = session_id();
-
-        let error = executor
-            .execute(BackendCommand::OpenShell {
-                session_id,
-                pty: PtyRequest::xterm(TerminalSize::default()),
-            })
-            .expect_err("占位执行器应该拒绝命令");
-
-        assert_eq!(
-            error,
-            BackendExecutionError::UnsupportedCommand {
-                kind: BackendCommandKind::OpenShell
-            }
-        );
-    }
-
-    #[test]
-    fn scripted_executor_returns_matching_events() {
-        let mut executor = ScriptedBackendExecutor::new();
-        let session_id = session_id();
-        executor.push_response(ScriptedBackendResponse::new(
-            BackendCommandKind::Connect,
-            vec![BackendEvent::Connected { session_id }],
-        ));
-
-        let events = executor
-            .execute(BackendCommand::Connect {
-                session_id,
-                target: ConnectionTarget::from_host(&host()),
-            })
-            .expect("脚本执行器应该返回匹配事件");
-
-        assert_eq!(events, vec![BackendEvent::Connected { session_id }]);
-        assert_eq!(executor.executed(), &[BackendCommandKind::Connect]);
-        assert_eq!(executor.remaining(), 0);
-    }
-
-    #[test]
-    fn scripted_executor_rejects_unexpected_command_kind() {
-        let mut executor = ScriptedBackendExecutor::new();
-        let session_id = session_id();
-        executor.push_response(ScriptedBackendResponse::new(
-            BackendCommandKind::Disconnect,
-            Vec::new(),
-        ));
-
-        let error = executor
-            .execute(BackendCommand::OpenShell {
-                session_id,
-                pty: PtyRequest::xterm(TerminalSize::default()),
-            })
-            .expect_err("命令类型不匹配应该失败");
-
-        assert_eq!(
-            error,
-            BackendExecutionError::UnexpectedCommand {
-                expected: BackendCommandKind::Disconnect,
-                actual: BackendCommandKind::OpenShell,
-            }
-        );
-        assert_eq!(executor.executed(), &[]);
-        assert_eq!(executor.remaining(), 1);
-    }
-
-    #[test]
-    fn scripted_executor_reports_missing_response_without_recording_command() {
-        let mut executor = ScriptedBackendExecutor::new();
-        let session_id = session_id();
-
-        let error = executor
-            .execute(BackendCommand::Disconnect { session_id })
-            .expect_err("没有脚本响应时应该失败");
-
-        assert_eq!(error, BackendExecutionError::NoScriptedResponse);
-        assert_eq!(executor.executed(), &[]);
-    }
-}
+mod tests;

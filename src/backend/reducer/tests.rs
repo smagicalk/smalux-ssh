@@ -44,6 +44,57 @@ fn connected_event_updates_session_status() {
 }
 
 #[test]
+fn connection_lifecycle_events_update_session_status() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_remote_command_tab(session_id, host_id(), "uptime");
+
+    apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Authenticating {
+            session_id,
+            username: "deploy".to_owned(),
+        },
+    );
+    assert!(matches!(
+        sessions.tabs[0].status,
+        SessionStatus::Authenticating
+    ));
+
+    apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::RemoteCommandStarted {
+            session_id,
+            command: "uptime".to_owned(),
+        },
+    );
+    assert!(matches!(
+        sessions.tabs[0].status,
+        SessionStatus::RunningCommand
+    ));
+}
+
+#[test]
+fn shell_opened_marks_shell_session_connected() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::ShellOpened { session_id },
+    );
+
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+}
+
+#[test]
 fn output_event_appends_to_terminal_buffer() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

@@ -76,9 +76,13 @@ fn backend_queue_pump_stops_on_executor_error_and_keeps_remaining_commands() {
 
     assert!(outcome.changed());
     assert_eq!(outcome.executed_backend_commands, 0);
-    assert_eq!(outcome.applied_backend_events, 0);
+    assert_eq!(outcome.applied_backend_events, 1);
     assert!(outcome.error.as_deref().unwrap_or("").contains("不支持"));
     assert_eq!(state.backend_commands.pending_count(), 1);
+    assert!(matches!(
+        &state.sessions.tabs[0].status,
+        SessionStatus::Failed { reason } if reason.contains("不支持")
+    ));
 }
 
 #[test]
