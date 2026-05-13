@@ -11,7 +11,8 @@ use crate::backend::{
 };
 use crate::model::{
     CommandHistoryId, CommandHistoryItem, Host, HostId, RecentConnection, SessionId, SessionKind,
-    SessionStatus, TransferDirection, TransferId, TransferStatus, TransferTask, TunnelRule,
+    SessionStatus, SftpBookmark, TransferDirection, TransferId, TransferStatus, TransferTask,
+    TunnelRule,
 };
 use crate::terminal::TerminalTabState;
 
@@ -81,6 +82,58 @@ impl AppState {
         };
 
         self.queue_sftp_list_dir(host_id, current_dir)
+    }
+
+    /// 将当前 SFTP 浏览目录保存为书签。
+    pub(super) fn save_sftp_bookmark(&mut self, host_id: HostId) -> AppUpdateOutcome {
+        let Some(current_dir) = self.current_sftp_dir_for_host(host_id) else {
+            return missing_sftp_browser(host_id);
+        };
+
+        self.storage.upsert_sftp_bookmark(SftpBookmark {
+            host_id,
+            label: sftp_bookmark_label(&current_dir),
+            remote_path: current_dir,
+        });
+
+        AppUpdateOutcome {
+            state_changed: true,
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    /// 打开 SFTP 书签；已有浏览器时导航，否则新开 SFTP 标签页。
+    pub(super) fn open_sftp_bookmark(
+        &mut self,
+        host_id: HostId,
+        remote_path: String,
+    ) -> AppUpdateOutcome {
+        let remote_path = normalize_remote_dir(&remote_path);
+
+        if self.current_sftp_dir_for_host(host_id).is_some() {
+            self.queue_sftp_list_dir(host_id, remote_path)
+        } else {
+            self.open_sftp(host_id, remote_path)
+        }
+    }
+
+    /// 删除指定 SFTP 书签。
+    pub(super) fn remove_sftp_bookmark(
+        &mut self,
+        host_id: HostId,
+        remote_path: String,
+    ) -> AppUpdateOutcome {
+        if self.storage.remove_sftp_bookmark(host_id, &remote_path) {
+            AppUpdateOutcome {
+                state_changed: true,
+                ..AppUpdateOutcome::default()
+            }
+        } else {
+            AppUpdateOutcome {
+                error: Some(format!("找不到 SFTP 书签：{remote_path}")),
+                ..AppUpdateOutcome::default()
+            }
+        }
     }
 
     /// 切换到指定 SFTP 目录。
@@ -485,6 +538,19 @@ fn basename_local_path(path: &str) -> Option<String> {
         .file_name()
         .and_then(|file_name| file_name.to_str())
         .map(ToOwned::to_owned)
+}
+
+fn sftp_bookmark_label(remote_path: &str) -> String {
+    if remote_path == "/" {
+        return "/".to_owned();
+    }
+
+    remote_path
+        .trim_end_matches('/')
+        .rsplit('/')
+        .find(|part| !part.is_empty())
+        .unwrap_or(remote_path)
+        .to_owned()
 }
 
 fn missing_sftp_browser(host_id: HostId) -> AppUpdateOutcome {

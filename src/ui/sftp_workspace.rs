@@ -11,9 +11,46 @@ use crate::model::{AppState, Message, SftpActionDraftField, SftpEntryKind};
 
 /// 渲染 SFTP 工作区。
 pub fn view(state: &AppState) -> Element<'_, Message> {
-    column![text("SFTP Workspace").size(22), browsers(state)]
-        .spacing(12)
-        .into()
+    column![
+        text("SFTP Workspace").size(22),
+        bookmarks(state),
+        browsers(state),
+    ]
+    .spacing(12)
+    .into()
+}
+
+fn bookmarks(state: &AppState) -> Element<'_, Message> {
+    let mut bookmarks = column![text("Bookmarks").size(18)].spacing(8);
+
+    if state.storage.sftp_bookmarks.is_empty() {
+        return bookmarks.push(text("No SFTP bookmarks.")).into();
+    }
+
+    for bookmark in &state.storage.sftp_bookmarks {
+        bookmarks = bookmarks.push(
+            row![
+                text(format!(
+                    "{} | {} | {}",
+                    host_label(state, bookmark.host_id),
+                    bookmark.label,
+                    bookmark.remote_path
+                ))
+                .width(Length::Fill),
+                button("Open").on_press(Message::OpenSftpBookmark {
+                    host_id: bookmark.host_id,
+                    remote_path: bookmark.remote_path.clone(),
+                }),
+                button("Remove").on_press(Message::RemoveSftpBookmark {
+                    host_id: bookmark.host_id,
+                    remote_path: bookmark.remote_path.clone(),
+                }),
+            ]
+            .spacing(8),
+        );
+    }
+
+    bookmarks.into()
 }
 
 fn browsers(state: &AppState) -> Element<'_, Message> {
@@ -43,6 +80,7 @@ fn browser_panel<'a>(
     let mut content = column![
         row![
             text(title).width(Length::Fill),
+            button("Bookmark").on_press(Message::SaveSftpBookmark { host_id }),
             button("Refresh").on_press(Message::RefreshSftp { host_id }),
             if browser.current_dir != "/" {
                 button("Up").on_press(Message::NavigateSftp {
@@ -183,6 +221,16 @@ fn browser_title(state: &AppState, host_id: crate::model::HostId, current_dir: &
         .unwrap_or_else(|| format!("SFTP {current_dir}"))
 }
 
+fn host_label(state: &AppState, host_id: crate::model::HostId) -> String {
+    state
+        .storage
+        .hosts
+        .iter()
+        .find(|host| host.id == host_id)
+        .map(|host| host.name.clone())
+        .unwrap_or_else(|| host_id.0.to_string())
+}
+
 fn browser_selected_hint(
     state: &AppState,
     host_id: crate::model::HostId,
@@ -211,8 +259,8 @@ fn parent_remote_dir(remote_path: &str) -> String {
 mod tests {
     use super::*;
     use crate::model::{
-        AuthProfile, Host, HostId, SessionId, SessionStatus, SessionTab, SftpBrowserState,
-        SftpEntry, SftpEntryKind,
+        AuthProfile, Host, HostId, SessionId, SessionStatus, SessionTab, SftpBookmark,
+        SftpBrowserState, SftpEntry, SftpEntryKind,
     };
     use uuid::Uuid;
 
@@ -249,6 +297,11 @@ mod tests {
         let host_id = host.id;
         let session_id = SessionId(Uuid::new_v4());
         state.storage.upsert_host(host);
+        state.storage.upsert_sftp_bookmark(SftpBookmark {
+            host_id,
+            label: "ops".to_owned(),
+            remote_path: "/home/ops".to_owned(),
+        });
         state.sessions.tabs.push(SessionTab {
             id: session_id,
             host_id: Some(host_id),

@@ -169,6 +169,17 @@ pub enum Message {
     RefreshSftp {
         host_id: HostId,
     },
+    SaveSftpBookmark {
+        host_id: HostId,
+    },
+    OpenSftpBookmark {
+        host_id: HostId,
+        remote_path: String,
+    },
+    RemoveSftpBookmark {
+        host_id: HostId,
+        remote_path: String,
+    },
     NavigateSftp {
         host_id: HostId,
         remote_path: String,
@@ -339,6 +350,15 @@ impl AppState {
                 value,
             } => self.update_sftp_action_draft(host_id, field, value),
             Message::RefreshSftp { host_id } => self.refresh_sftp(host_id),
+            Message::SaveSftpBookmark { host_id } => self.save_sftp_bookmark(host_id),
+            Message::OpenSftpBookmark {
+                host_id,
+                remote_path,
+            } => self.open_sftp_bookmark(host_id, remote_path),
+            Message::RemoveSftpBookmark {
+                host_id,
+                remote_path,
+            } => self.remove_sftp_bookmark(host_id, remote_path),
             Message::NavigateSftp {
                 host_id,
                 remote_path,
