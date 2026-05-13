@@ -188,11 +188,6 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             self.runtime.block_on(sftp.close())?;
         }
 
-        for tunnel in self.tunnels.values() {
-            tunnel.stop();
-        }
-        self.tunnels.clear();
-
         if let Some(connection) = self.connections.remove(&session_id) {
             self.runtime.block_on(connection.disconnect())?;
         }

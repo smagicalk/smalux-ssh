@@ -1,6 +1,8 @@
 use super::*;
-use crate::backend::BackendEvent;
-use crate::model::{AuthProfile, Host, SessionStatus};
+use crate::backend::{BackendCommand, BackendEvent};
+use crate::model::{
+    AuthProfile, Host, SessionStatus, TunnelKind, TunnelRule, TunnelRuntimeState, TunnelStatus,
+};
 
 fn sample_host() -> Host {
     Host {
@@ -135,6 +137,114 @@ fn activate_terminal_tab_message_switches_active_tab() {
     assert!(outcome.changed());
     assert_eq!(state.terminal.active_tab, Some(session_id));
     assert_eq!(state.sessions.active_tab, Some(session_id));
+}
+
+#[test]
+fn close_session_tab_message_closes_shell_and_queues_disconnect() {
+    let mut state = AppState::default();
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state
+        .sessions
+        .open_shell_tab(session_id, host_id, "production");
+    state
+        .terminal
+        .open_tab(crate::terminal::TerminalTabState::new(
+            session_id,
+            "production",
+        ));
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert_eq!(state.sessions.tab_count(), 0);
+    assert_eq!(state.terminal.tab_count(), 0);
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Disconnect { session_id: queued_session_id })
+            if *queued_session_id == session_id
+    ));
+}
+
+#[test]
+fn close_session_tab_message_removes_last_sftp_browser_for_host() {
+    let mut state = AppState::default();
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state
+        .sessions
+        .open_sftp_tab(session_id, host_id, "/home/ops");
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert_eq!(state.sessions.tab_count(), 0);
+    assert_eq!(state.sessions.sftp_browser_count(), 0);
+}
+
+#[test]
+fn close_session_tab_message_keeps_sftp_browser_when_same_host_tab_remains() {
+    let mut state = AppState::default();
+    let first_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let second_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state.sessions.open_sftp_tab(first_id, host_id, "/home/ops");
+    state.sessions.open_sftp_tab(second_id, host_id, "/var/log");
+
+    let outcome = state.apply(Message::CloseSessionTab {
+        session_id: first_id,
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(state.sessions.tab_count(), 1);
+    assert_eq!(state.sessions.sftp_browser_count(), 1);
+    assert_eq!(state.sessions.sftp_browsers[0].current_dir, "/var/log");
+}
+
+#[test]
+fn close_session_tab_message_reports_missing_tab() {
+    let mut state = AppState::default();
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(!outcome.state_changed);
+    assert!(outcome.error.is_some());
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
+fn close_session_tab_message_requires_stopping_running_tunnel_first() {
+    let mut state = AppState::default();
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    let rule = TunnelRule {
+        name: "local-db".to_owned(),
+        kind: TunnelKind::Local,
+        bind_host: "127.0.0.1".to_owned(),
+        bind_port: 15432,
+        target_host: "10.0.0.5".to_owned(),
+        target_port: 5432,
+        auto_start: false,
+    };
+    state.sessions.open_tunnel_tab(session_id, host_id, &rule);
+    state.sessions.tunnels.push(TunnelRuntimeState {
+        rule_name: "local-db".to_owned(),
+        host_id: Some(host_id),
+        status: TunnelStatus::Running,
+        started_at_unix_secs: Some(1),
+        last_error: None,
+    });
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(!outcome.state_changed);
+    assert!(outcome.error.is_some());
+    assert_eq!(state.sessions.tab_count(), 1);
+    assert_eq!(state.sessions.tunnel_runtime_count(), 1);
+    assert!(state.backend_commands.is_empty());
 }
 
 #[test]

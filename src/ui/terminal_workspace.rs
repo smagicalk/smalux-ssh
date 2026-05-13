@@ -37,9 +37,17 @@ fn terminal_tabs(state: &AppState) -> Element<'_, Message> {
             tab.title.clone()
         };
 
-        tab_row = tab_row.push(button(text(label)).on_press(Message::ActivateTerminalTab {
-            session_id: tab.session_id,
-        }));
+        tab_row = tab_row.push(
+            row![
+                button(text(label)).on_press(Message::ActivateTerminalTab {
+                    session_id: tab.session_id,
+                }),
+                button("Close").on_press(Message::CloseSessionTab {
+                    session_id: tab.session_id,
+                }),
+            ]
+            .spacing(4),
+        );
     }
 
     tabs.push(tab_row).into()

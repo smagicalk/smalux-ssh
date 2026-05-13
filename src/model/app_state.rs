@@ -5,7 +5,7 @@ use iced::Theme;
 
 use std::fmt;
 
-use crate::backend::{BackendCommandQueue, BackendEvent, apply_backend_event};
+use crate::backend::{BackendCommand, BackendCommandQueue, BackendEvent, apply_backend_event};
 use crate::backend::{
     SharedBackendExecutor, noop_shared_backend_executor, shared_backend_executor,
 };
@@ -15,8 +15,9 @@ use crate::storage::{RedbStorage, StorageManager, StoragePersistenceError};
 use crate::terminal::TerminalManager;
 
 use super::{
-    HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SftpActionDraftField,
-    TunnelRule, UiState, VisualSettingsDraftField,
+    HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SessionId, SessionKind,
+    SessionStatus, SessionTab, SftpActionDraftField, TunnelRule, TunnelStatus, UiState,
+    VisualSettingsDraftField,
 };
 
 mod backend_pump;
@@ -138,15 +139,18 @@ pub enum Message {
         host: String,
         port: u16,
     },
+    CloseSessionTab {
+        session_id: SessionId,
+    },
     ActivateTerminalTab {
-        session_id: crate::model::SessionId,
+        session_id: SessionId,
     },
     UpdateTerminalInputDraft {
-        session_id: crate::model::SessionId,
+        session_id: SessionId,
         input: String,
     },
     SendTerminalInput {
-        session_id: crate::model::SessionId,
+        session_id: SessionId,
     },
     UpdateHostCommandDraft {
         host_id: HostId,
@@ -203,7 +207,7 @@ pub enum Message {
         rule: TunnelRule,
     },
     StopTunnel {
-        session_id: crate::model::SessionId,
+        session_id: SessionId,
         rule_name: String,
     },
     BackendEventReceived(BackendEvent),
@@ -295,6 +299,7 @@ impl AppState {
             Message::RemoveCredential { name } => self.remove_credential(&name),
             Message::TrustKnownHost { host, port } => self.trust_known_host(&host, port),
             Message::RemoveKnownHost { host, port } => self.remove_known_host(&host, port),
+            Message::CloseSessionTab { session_id } => self.close_session_tab(session_id),
             Message::ActivateTerminalTab { session_id } => {
                 if self.terminal.set_active_tab(session_id) {
                     self.sessions.active_tab = Some(session_id);
@@ -376,6 +381,96 @@ impl AppState {
         }
     }
 
+    fn close_session_tab(&mut self, session_id: SessionId) -> AppUpdateOutcome {
+        let Some(tab) = self
+            .sessions
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .cloned()
+        else {
+            return AppUpdateOutcome {
+                error: Some(format!("找不到会话标签页：{}", session_id.0)),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        if let SessionKind::Tunnel { rule_name } = &tab.kind {
+            if self.tunnel_requires_stop_before_close(rule_name) {
+                return AppUpdateOutcome {
+                    error: Some(format!("隧道 {rule_name} 仍在运行，请先停止再关闭标签页")),
+                    ..AppUpdateOutcome::default()
+                };
+            }
+        }
+
+        let should_disconnect = should_disconnect_on_close(&tab);
+        let session_closed = self.sessions.close_tab(session_id);
+        let terminal_closed = self.terminal.close_tab(session_id);
+        let sftp_browser_removed = self.remove_sftp_browser_after_tab_close(&tab);
+        let tunnel_runtime_removed = self.remove_tunnel_runtime_after_tab_close(&tab);
+
+        if should_disconnect {
+            self.backend_commands
+                .push(BackendCommand::Disconnect { session_id });
+        }
+
+        AppUpdateOutcome {
+            state_changed: session_closed
+                || terminal_closed
+                || sftp_browser_removed
+                || tunnel_runtime_removed,
+            queued_backend_commands: usize::from(should_disconnect),
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    fn tunnel_requires_stop_before_close(&self, rule_name: &str) -> bool {
+        self.sessions.tunnels.iter().any(|tunnel| {
+            tunnel.rule_name == rule_name
+                && matches!(
+                    tunnel.status,
+                    TunnelStatus::Starting | TunnelStatus::Running | TunnelStatus::Stopping
+                )
+        })
+    }
+
+    fn remove_sftp_browser_after_tab_close(&mut self, tab: &SessionTab) -> bool {
+        if !matches!(tab.kind, SessionKind::Sftp) {
+            return false;
+        }
+
+        let Some(host_id) = tab.host_id else {
+            return false;
+        };
+        let has_other_sftp_tab =
+            self.sessions.tabs.iter().any(|other| {
+                other.host_id == Some(host_id) && matches!(other.kind, SessionKind::Sftp)
+            });
+
+        if has_other_sftp_tab {
+            return false;
+        }
+
+        let before = self.sessions.sftp_browsers.len();
+        self.sessions
+            .sftp_browsers
+            .retain(|browser| browser.host_id != host_id);
+        before != self.sessions.sftp_browsers.len()
+    }
+
+    fn remove_tunnel_runtime_after_tab_close(&mut self, tab: &SessionTab) -> bool {
+        let SessionKind::Tunnel { rule_name } = &tab.kind else {
+            return false;
+        };
+
+        let before = self.sessions.tunnels.len();
+        self.sessions
+            .tunnels
+            .retain(|tunnel| tunnel.rule_name != *rule_name);
+        before != self.sessions.tunnels.len()
+    }
+
     fn apply_backend_event(&mut self, event: BackendEvent) -> AppUpdateOutcome {
         let outcome = apply_backend_event(&mut self.sessions, &mut self.terminal, event);
 
@@ -395,4 +490,12 @@ impl AppState {
 
         self.drain_backend_queue(&mut **executor)
     }
+}
+
+fn should_disconnect_on_close(tab: &SessionTab) -> bool {
+    !matches!(tab.kind, SessionKind::Tunnel { .. })
+        && !matches!(
+            tab.status,
+            SessionStatus::Disconnected | SessionStatus::Failed { .. }
+        )
 }

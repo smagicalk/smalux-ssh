@@ -40,6 +40,8 @@ fn session_tabs(state: &AppState) -> Element<'_, Message> {
             }));
         }
 
+        row = row.push(button("Close").on_press(Message::CloseSessionTab { session_id: tab.id }));
+
         tabs = tabs.push(row);
     }
 
