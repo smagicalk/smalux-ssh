@@ -1,9 +1,13 @@
 //! UI 输入草稿消息处理。
 
+use crate::backend::BackendCommand;
 use crate::model::HostId;
 use crate::model::QuickHostAuthField;
 use crate::model::QuickHostAuthKind;
 use crate::model::QuickHostDraftField;
+use crate::model::SessionId;
+use crate::model::SessionKind;
+use crate::model::SftpActionDraftField;
 use uuid::Uuid;
 
 use super::{AppState, AppUpdateOutcome};
@@ -75,6 +79,78 @@ impl AppState {
         self.ui.set_sftp_initial_dir(host_id, initial_dir);
         draft_changed()
     }
+
+    /// 更新 SFTP 操作草稿。
+    pub(super) fn update_sftp_action_draft(
+        &mut self,
+        host_id: HostId,
+        field: SftpActionDraftField,
+        value: String,
+    ) -> AppUpdateOutcome {
+        self.ui.set_sftp_action_field(host_id, field, value);
+        draft_changed()
+    }
+
+    /// 更新终端输入草稿。
+    pub(super) fn update_terminal_input_draft(
+        &mut self,
+        session_id: SessionId,
+        input: String,
+    ) -> AppUpdateOutcome {
+        self.ui.set_terminal_input(session_id, input);
+        draft_changed()
+    }
+
+    /// 把当前终端输入草稿发送到远程 shell。
+    pub(super) fn send_terminal_input(&mut self, session_id: SessionId) -> AppUpdateOutcome {
+        let Some(tab) = self
+            .sessions
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .cloned()
+        else {
+            return AppUpdateOutcome {
+                error: Some(format!("找不到会话：{}", session_id.0)),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        if !matches!(tab.kind, SessionKind::Shell) {
+            return AppUpdateOutcome {
+                error: Some("只有 Shell 标签页支持交互输入".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let Some(host_id) = tab.host_id else {
+            return AppUpdateOutcome {
+                error: Some("Shell 会话缺少主机标识".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        let input = self.ui.terminal_input_for(session_id).to_owned();
+        if input.trim().is_empty() {
+            return AppUpdateOutcome {
+                error: Some("终端输入不能为空".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        self.record_command_history(host_id, input.clone());
+        self.backend_commands.push(BackendCommand::SendShellInput {
+            session_id,
+            input: format!("{input}\n"),
+        });
+        self.ui.clear_terminal_input(session_id);
+
+        AppUpdateOutcome {
+            state_changed: true,
+            queued_backend_commands: 1,
+            ..AppUpdateOutcome::default()
+        }
+    }
 }
 
 fn draft_changed() -> AppUpdateOutcome {
@@ -93,6 +169,8 @@ mod tests {
     use crate::model::QuickHostAuthKind;
     use crate::model::QuickHostDraftField;
     use crate::model::SecretRef;
+    use crate::model::SessionId;
+    use crate::model::SftpActionDraftField;
     use uuid::Uuid;
 
     #[test]
@@ -228,5 +306,36 @@ mod tests {
         assert!(outcome.changed());
         assert_eq!(state.ui.sftp_initial_dir_for(host_id), "/etc");
         assert_eq!(state.sessions.tab_count(), 0);
+    }
+
+    #[test]
+    fn sftp_action_draft_message_updates_ui_state_only() {
+        let mut state = AppState::default();
+        let host_id = HostId(Uuid::new_v4());
+
+        let outcome = state.apply(Message::UpdateSftpActionDraft {
+            host_id,
+            field: SftpActionDraftField::LocalPath,
+            value: "C:/tmp/app.tar.gz".to_owned(),
+        });
+
+        assert!(outcome.changed());
+        assert_eq!(state.ui.sftp_local_path_for(host_id), "C:/tmp/app.tar.gz");
+        assert_eq!(state.backend_commands.pending_count(), 0);
+    }
+
+    #[test]
+    fn terminal_input_draft_message_updates_ui_state_only() {
+        let mut state = AppState::default();
+        let session_id = SessionId(Uuid::new_v4());
+
+        let outcome = state.apply(Message::UpdateTerminalInputDraft {
+            session_id,
+            input: "ls".to_owned(),
+        });
+
+        assert!(outcome.changed());
+        assert_eq!(state.ui.terminal_input_for(session_id), "ls");
+        assert_eq!(state.backend_commands.pending_count(), 0);
     }
 }

@@ -36,6 +36,16 @@ impl TerminalManager {
             false
         }
     }
+
+    /// 切换当前活动终端标签页。
+    pub fn set_active_tab(&mut self, session_id: SessionId) -> bool {
+        if self.tabs.iter().any(|tab| tab.session_id == session_id) {
+            self.active_tab = Some(session_id);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -97,5 +107,18 @@ mod tests {
         assert!(terminal.resize_tab(id, 160, 48));
         assert_eq!(terminal.tabs[0].size, TerminalSize::new(160, 48));
         assert!(!terminal.resize_tab(session_id(), 80, 24));
+    }
+
+    #[test]
+    fn set_active_tab_only_accepts_existing_tabs() {
+        let mut terminal = TerminalManager::default();
+        let first = session_id();
+        let second = session_id();
+
+        terminal.open_tab(TerminalTabState::new(first, "first"));
+
+        assert!(terminal.set_active_tab(first));
+        assert_eq!(terminal.active_tab, Some(first));
+        assert!(!terminal.set_active_tab(second));
     }
 }

@@ -68,11 +68,33 @@ fn open_shell_requires_connected_session() {
         .expect_err("未连接会话不能打开 shell");
 
     assert!(matches!(
+    error,
+    BackendExecutionError::ChannelFailed {
+        operation,
+        reason,
+    } if operation == "open shell" && reason == "session is not connected"
+    ));
+}
+
+#[test]
+fn send_shell_input_requires_connected_session() {
+    let mut executor =
+        RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
+    let session_id = session_id();
+
+    let error = executor
+        .execute(BackendCommand::SendShellInput {
+            session_id,
+            input: "ls".to_owned(),
+        })
+        .expect_err("未连接会话不能发送 shell 输入");
+
+    assert!(matches!(
         error,
         BackendExecutionError::ChannelFailed {
             operation,
             reason,
-        } if operation == "open shell" && reason == "session is not connected"
+        } if operation == "send shell input" && reason == "session is not connected"
     ));
 }
 

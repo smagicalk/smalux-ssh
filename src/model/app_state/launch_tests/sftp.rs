@@ -75,3 +75,171 @@ fn open_sftp_reports_missing_host_without_queueing_commands() {
     assert_eq!(state.sessions.sftp_browser_count(), 0);
     assert!(state.backend_commands.is_empty());
 }
+
+#[test]
+fn refresh_sftp_message_queues_current_directory_listing() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/var/log".to_owned(),
+    });
+    state.backend_commands.drain();
+
+    let outcome = state.apply(Message::RefreshSftp { host_id });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert!(state.sessions.sftp_browsers[0].loading);
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Sftp { request, .. })
+            if request.remote_path() == "/var/log"
+    ));
+}
+
+#[test]
+fn navigate_sftp_message_queues_target_directory_listing() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+
+    let outcome = state.apply(Message::NavigateSftp {
+        host_id,
+        remote_path: "/etc".to_owned(),
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Sftp { request, .. })
+            if request.remote_path() == "/etc"
+    ));
+}
+
+#[test]
+fn upload_sftp_message_queues_transfer_and_upload_request() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/app.tar.gz".to_owned(),
+    });
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::RemoteName,
+        value: "release.tar.gz".to_owned(),
+    });
+
+    let outcome = state.apply(Message::UploadSftp { host_id });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert_eq!(state.sessions.transfer_count(), 1);
+    assert!(matches!(
+        &state.sessions.transfers[0].direction,
+        crate::model::TransferDirection::Upload
+    ));
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Sftp { request, .. })
+            if request.remote_path() == "/home/ops/release.tar.gz"
+    ));
+}
+
+#[test]
+fn download_sftp_message_queues_transfer_and_download_request() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/deploy.sh".to_owned(),
+    });
+
+    let outcome = state.apply(Message::DownloadSftp {
+        host_id,
+        remote_path: "/home/ops/deploy.sh".to_owned(),
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert_eq!(state.sessions.transfer_count(), 1);
+    assert!(matches!(
+        &state.sessions.transfers[0].direction,
+        crate::model::TransferDirection::Download
+    ));
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Sftp { request, .. })
+            if request.remote_path() == "/home/ops/deploy.sh"
+    ));
+}
+
+#[test]
+fn create_and_remove_sftp_actions_queue_path_requests() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::NewDirName,
+        value: "incoming".to_owned(),
+    });
+
+    let mkdir_outcome = state.apply(Message::CreateSftpDir { host_id });
+    assert!(mkdir_outcome.changed());
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Sftp { request, .. })
+            if request.remote_path() == "/home/ops/incoming"
+    ));
+
+    state.backend_commands.drain();
+    let remove_outcome = state.apply(Message::RemoveSftpFile {
+        host_id,
+        remote_path: "/home/ops/deploy.sh".to_owned(),
+    });
+
+    assert!(remove_outcome.changed());
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::Sftp { request, .. })
+            if request.remote_path() == "/home/ops/deploy.sh"
+    ));
+}

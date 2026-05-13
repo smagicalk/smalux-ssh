@@ -15,7 +15,8 @@ use crate::storage::{RedbStorage, StorageManager, StoragePersistenceError};
 use crate::terminal::TerminalManager;
 
 use super::{
-    HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, TunnelRule, UiState,
+    HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SftpActionDraftField,
+    TunnelRule, UiState,
 };
 
 mod backend_pump;
@@ -24,6 +25,7 @@ mod backend_pump_tests;
 mod launch;
 #[cfg(test)]
 mod launch_tests;
+mod storage_admin;
 #[cfg(test)]
 mod tests;
 mod ui_drafts;
@@ -92,6 +94,27 @@ pub enum Message {
         value: String,
     },
     SaveQuickHost,
+    RemoveCredential {
+        name: String,
+    },
+    TrustKnownHost {
+        host: String,
+        port: u16,
+    },
+    RemoveKnownHost {
+        host: String,
+        port: u16,
+    },
+    ActivateTerminalTab {
+        session_id: crate::model::SessionId,
+    },
+    UpdateTerminalInputDraft {
+        session_id: crate::model::SessionId,
+        input: String,
+    },
+    SendTerminalInput {
+        session_id: crate::model::SessionId,
+    },
     UpdateHostCommandDraft {
         host_id: HostId,
         command: String,
@@ -99,6 +122,36 @@ pub enum Message {
     UpdateHostSftpInitialDirDraft {
         host_id: HostId,
         initial_dir: String,
+    },
+    UpdateSftpActionDraft {
+        host_id: HostId,
+        field: SftpActionDraftField,
+        value: String,
+    },
+    RefreshSftp {
+        host_id: HostId,
+    },
+    NavigateSftp {
+        host_id: HostId,
+        remote_path: String,
+    },
+    SelectSftpEntry {
+        host_id: HostId,
+        remote_path: String,
+    },
+    UploadSftp {
+        host_id: HostId,
+    },
+    DownloadSftp {
+        host_id: HostId,
+        remote_path: String,
+    },
+    RemoveSftpFile {
+        host_id: HostId,
+        remote_path: String,
+    },
+    CreateSftpDir {
+        host_id: HostId,
     },
     OpenShell {
         host_id: HostId,
@@ -182,6 +235,27 @@ impl AppState {
                 self.update_quick_host_auth_field(field, value)
             }
             Message::SaveQuickHost => self.save_quick_host(),
+            Message::RemoveCredential { name } => self.remove_credential(&name),
+            Message::TrustKnownHost { host, port } => self.trust_known_host(&host, port),
+            Message::RemoveKnownHost { host, port } => self.remove_known_host(&host, port),
+            Message::ActivateTerminalTab { session_id } => {
+                if self.terminal.set_active_tab(session_id) {
+                    self.sessions.active_tab = Some(session_id);
+                    AppUpdateOutcome {
+                        state_changed: true,
+                        ..AppUpdateOutcome::default()
+                    }
+                } else {
+                    AppUpdateOutcome {
+                        error: Some(format!("找不到终端标签页：{}", session_id.0)),
+                        ..AppUpdateOutcome::default()
+                    }
+                }
+            }
+            Message::UpdateTerminalInputDraft { session_id, input } => {
+                self.update_terminal_input_draft(session_id, input)
+            }
+            Message::SendTerminalInput { session_id } => self.send_terminal_input(session_id),
             Message::UpdateHostCommandDraft { host_id, command } => {
                 self.update_host_command_draft(host_id, command)
             }
@@ -189,6 +263,30 @@ impl AppState {
                 host_id,
                 initial_dir,
             } => self.update_host_sftp_initial_dir_draft(host_id, initial_dir),
+            Message::UpdateSftpActionDraft {
+                host_id,
+                field,
+                value,
+            } => self.update_sftp_action_draft(host_id, field, value),
+            Message::RefreshSftp { host_id } => self.refresh_sftp(host_id),
+            Message::NavigateSftp {
+                host_id,
+                remote_path,
+            } => self.navigate_sftp(host_id, remote_path),
+            Message::SelectSftpEntry {
+                host_id,
+                remote_path,
+            } => self.select_sftp_entry(host_id, remote_path),
+            Message::UploadSftp { host_id } => self.upload_sftp(host_id),
+            Message::DownloadSftp {
+                host_id,
+                remote_path,
+            } => self.download_sftp(host_id, remote_path),
+            Message::RemoveSftpFile {
+                host_id,
+                remote_path,
+            } => self.remove_sftp_file(host_id, remote_path),
+            Message::CreateSftpDir { host_id } => self.create_sftp_dir(host_id),
             Message::OpenShell { host_id } => self.open_shell(host_id),
             Message::OpenSftp {
                 host_id,

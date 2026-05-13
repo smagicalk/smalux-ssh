@@ -5,13 +5,15 @@ use iced::{
     widget::{button, column, row, text},
 };
 
-use crate::model::{AppState, Message, SessionKind, TunnelStatus};
+use crate::model::{
+    AppState, Message, SessionKind, TransferDirection, TransferStatus, TunnelStatus,
+};
 
 /// 渲染最小会话概览和隧道停止入口。
 pub fn view(state: &AppState) -> Element<'_, Message> {
     column![
         session_tabs(state),
-        sftp_browsers(state),
+        transfers(state),
         tunnel_runtime(state),
         recent_connections(state),
         command_history(state),
@@ -44,26 +46,26 @@ fn session_tabs(state: &AppState) -> Element<'_, Message> {
     tabs.into()
 }
 
-fn sftp_browsers(state: &AppState) -> Element<'_, Message> {
-    let mut browsers = column![text("SFTP").size(22)].spacing(8);
+fn transfers(state: &AppState) -> Element<'_, Message> {
+    let mut transfers = column![text("Transfers").size(22)].spacing(8);
 
-    if state.sessions.sftp_browsers.is_empty() {
-        return browsers.push(text("No SFTP browser opened.")).into();
+    if state.sessions.transfers.is_empty() {
+        return transfers.push(text("No transfer tasks.")).into();
     }
 
-    for browser in &state.sessions.sftp_browsers {
-        let loading = if browser.loading { "loading" } else { "ready" };
-        let error = browser.last_error.as_deref().unwrap_or("ok");
-        browsers = browsers.push(text(format!(
-            "{} | entries: {} | {} | {}",
-            browser.current_dir,
-            browser.entries.len(),
-            loading,
-            error
+    for task in &state.sessions.transfers {
+        transfers = transfers.push(text(format!(
+            "{} | {} | {} -> {} | {} | {}",
+            transfer_direction_label(&task.direction),
+            transfer_status_label(&task.status),
+            task.local_path,
+            task.remote_path,
+            task.transferred_bytes,
+            task.progress()
         )));
     }
 
-    browsers.into()
+    transfers.into()
 }
 
 fn tunnel_runtime(state: &AppState) -> Element<'_, Message> {
@@ -123,6 +125,23 @@ fn tunnel_status_label(status: &TunnelStatus) -> &'static str {
         TunnelStatus::Running => "running",
         TunnelStatus::Stopping => "stopping",
         TunnelStatus::Failed => "failed",
+    }
+}
+
+fn transfer_direction_label(direction: &TransferDirection) -> &'static str {
+    match direction {
+        TransferDirection::Upload => "upload",
+        TransferDirection::Download => "download",
+    }
+}
+
+fn transfer_status_label(status: &TransferStatus) -> String {
+    match status {
+        TransferStatus::Queued => "queued".to_owned(),
+        TransferStatus::Running => "running".to_owned(),
+        TransferStatus::Completed => "completed".to_owned(),
+        TransferStatus::Failed { reason } => format!("failed: {reason}"),
+        TransferStatus::Cancelled => "cancelled".to_owned(),
     }
 }
 

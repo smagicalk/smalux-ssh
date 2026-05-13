@@ -72,6 +72,34 @@ impl SessionManager {
         }
     }
 
+    /// 记录当前选中的 SFTP 目录项。
+    pub fn select_sftp_entry(&mut self, host_id: HostId, selected_path: impl Into<String>) -> bool {
+        if let Some(browser) = self
+            .sftp_browsers
+            .iter_mut()
+            .find(|browser| browser.host_id == host_id)
+        {
+            browser.selected_path = Some(selected_path.into());
+            true
+        } else {
+            false
+        }
+    }
+
+    /// 清空当前 SFTP 选中项。
+    pub fn clear_sftp_selection(&mut self, host_id: HostId) -> bool {
+        if let Some(browser) = self
+            .sftp_browsers
+            .iter_mut()
+            .find(|browser| browser.host_id == host_id)
+        {
+            browser.selected_path = None;
+            true
+        } else {
+            false
+        }
+    }
+
     /// 按会话标签页更新 SFTP 当前目录和目录项。
     pub fn set_sftp_entries_for_session(
         &mut self,

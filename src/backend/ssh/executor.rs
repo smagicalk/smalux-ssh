@@ -96,6 +96,20 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         Ok(report.events)
     }
 
+    fn send_shell_input(
+        &mut self,
+        session_id: SessionId,
+        input: String,
+    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        let runtime = &self.runtime;
+        let shell = self
+            .shells
+            .get(&session_id)
+            .ok_or_else(|| connected_session_error("send shell input"))?;
+        runtime.block_on(shell.send_input(input.as_bytes()))?;
+        Ok(Vec::new())
+    }
+
     fn run_command(
         &mut self,
         session_id: SessionId,
@@ -199,6 +213,9 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
                 session_id,
                 request,
             } => self.run_command(session_id, request),
+            BackendCommand::SendShellInput { session_id, input } => {
+                self.send_shell_input(session_id, input)
+            }
             BackendCommand::Sftp {
                 session_id,
                 request,

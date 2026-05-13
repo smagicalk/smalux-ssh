@@ -22,6 +22,10 @@ pub enum BackendCommand {
         session_id: SessionId,
         request: RemoteCommandRequest,
     },
+    SendShellInput {
+        session_id: SessionId,
+        input: String,
+    },
     Sftp {
         session_id: SessionId,
         request: SftpRequest,
@@ -72,6 +76,7 @@ impl BackendCommand {
             Self::Connect { session_id, .. }
             | Self::OpenShell { session_id, .. }
             | Self::RunCommand { session_id, .. }
+            | Self::SendShellInput { session_id, .. }
             | Self::Sftp { session_id, .. }
             | Self::StartTunnel { session_id, .. }
             | Self::StopTunnel { session_id, .. }
@@ -85,6 +90,7 @@ impl BackendCommand {
             Self::Connect { .. } => BackendCommandKind::Connect,
             Self::OpenShell { .. } => BackendCommandKind::OpenShell,
             Self::RunCommand { .. } => BackendCommandKind::RunCommand,
+            Self::SendShellInput { .. } => BackendCommandKind::SendShellInput,
             Self::Sftp { .. } => BackendCommandKind::Sftp,
             Self::StartTunnel { .. } => BackendCommandKind::StartTunnel,
             Self::StopTunnel { .. } => BackendCommandKind::StopTunnel,
@@ -99,6 +105,7 @@ pub enum BackendCommandKind {
     Connect,
     OpenShell,
     RunCommand,
+    SendShellInput,
     Sftp,
     StartTunnel,
     StopTunnel,
@@ -152,6 +159,18 @@ mod tests {
 
         assert_eq!(command.session_id(), session_id);
         assert_eq!(command.kind(), BackendCommandKind::OpenShell);
+    }
+
+    #[test]
+    fn shell_input_command_exposes_session_id() {
+        let session_id = SessionId(Uuid::new_v4());
+        let command = BackendCommand::SendShellInput {
+            session_id,
+            input: "ls".to_owned(),
+        };
+
+        assert_eq!(command.session_id(), session_id);
+        assert_eq!(command.kind(), BackendCommandKind::SendShellInput);
     }
 
     #[test]

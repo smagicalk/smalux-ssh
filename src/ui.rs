@@ -10,7 +10,10 @@ use iced::{
 use crate::model::{AppState, Message};
 
 mod host_actions;
+mod security;
 mod session_summary;
+mod sftp_workspace;
+mod terminal_workspace;
 
 /// 根据应用状态构建当前主界面。
 pub fn view(state: &AppState) -> Element<'_, Message> {
@@ -19,7 +22,10 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     let content = column![
         header(state),
         overview(state, visual.theme.name.clone(), visual.background.enabled),
+        security::view(state),
         host_actions::view(state),
+        terminal_workspace::view(state),
+        sftp_workspace::view(state),
         session_summary::view(state),
     ]
     .spacing(16)

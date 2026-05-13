@@ -3,10 +3,14 @@
 //! 这里仅保存尚未提交给后端的轻量输入值，避免把输入框状态混入 SSH 会话模型。
 
 mod quick_host;
+mod sftp_action;
+mod terminal_input;
 
-use super::HostId;
+use super::{HostId, SessionId};
 
 pub use quick_host::*;
+pub use sftp_action::*;
+pub use terminal_input::*;
 
 pub const DEFAULT_REMOTE_COMMAND: &str = "uptime";
 pub const DEFAULT_SFTP_INITIAL_DIR: &str = "/";
@@ -35,6 +39,8 @@ impl HostActionDraft {
 pub struct UiState {
     pub quick_host: QuickHostDraft,
     pub host_action_drafts: Vec<HostActionDraft>,
+    pub sftp_action_drafts: Vec<SftpActionDraft>,
+    pub terminal_input_drafts: Vec<TerminalInputDraft>,
 }
 
 impl UiState {
@@ -64,6 +70,75 @@ impl UiState {
     /// 更新 SFTP 初始路径输入草稿。
     pub fn set_sftp_initial_dir(&mut self, host_id: HostId, initial_dir: impl Into<String>) {
         self.ensure_host_action_draft(host_id).sftp_initial_dir = initial_dir.into();
+    }
+
+    /// 返回指定主机的 SFTP 本地路径草稿；没有草稿时返回空字符串。
+    pub fn sftp_local_path_for(&self, host_id: HostId) -> &str {
+        self.sftp_action_drafts
+            .iter()
+            .find(|draft| draft.host_id == host_id)
+            .map(|draft| draft.local_path.as_str())
+            .unwrap_or("")
+    }
+
+    /// 返回指定主机的 SFTP 远程文件名草稿；没有草稿时返回空字符串。
+    pub fn sftp_remote_name_for(&self, host_id: HostId) -> &str {
+        self.sftp_action_drafts
+            .iter()
+            .find(|draft| draft.host_id == host_id)
+            .map(|draft| draft.remote_name.as_str())
+            .unwrap_or("")
+    }
+
+    /// 返回指定主机的新目录名草稿；没有草稿时返回空字符串。
+    pub fn sftp_new_dir_name_for(&self, host_id: HostId) -> &str {
+        self.sftp_action_drafts
+            .iter()
+            .find(|draft| draft.host_id == host_id)
+            .map(|draft| draft.new_dir_name.as_str())
+            .unwrap_or("")
+    }
+
+    /// 更新指定主机的 SFTP 操作草稿。
+    pub fn set_sftp_action_field(
+        &mut self,
+        host_id: HostId,
+        field: SftpActionDraftField,
+        value: impl Into<String>,
+    ) {
+        let value = value.into();
+
+        match field {
+            SftpActionDraftField::LocalPath => {
+                self.ensure_sftp_action_draft(host_id).local_path = value
+            }
+            SftpActionDraftField::RemoteName => {
+                self.ensure_sftp_action_draft(host_id).remote_name = value
+            }
+            SftpActionDraftField::NewDirName => {
+                self.ensure_sftp_action_draft(host_id).new_dir_name = value
+            }
+        }
+    }
+
+    /// 返回指定终端会话的输入草稿；没有草稿时返回空字符串。
+    pub fn terminal_input_for(&self, session_id: SessionId) -> &str {
+        self.terminal_input_drafts
+            .iter()
+            .find(|draft| draft.session_id == session_id)
+            .map(|draft| draft.input.as_str())
+            .unwrap_or("")
+    }
+
+    /// 更新指定终端会话的输入草稿。
+    pub fn set_terminal_input(&mut self, session_id: SessionId, input: impl Into<String>) {
+        self.ensure_terminal_input_draft(session_id).input = input.into();
+    }
+
+    /// 清空指定终端会话的输入草稿。
+    pub fn clear_terminal_input(&mut self, session_id: SessionId) {
+        self.terminal_input_drafts
+            .retain(|draft| draft.session_id != session_id);
     }
 
     /// 更新快速新增主机表单字段。
@@ -122,6 +197,37 @@ impl UiState {
             .last_mut()
             .expect("刚插入的主机操作草稿应该存在")
     }
+
+    fn ensure_terminal_input_draft(&mut self, session_id: SessionId) -> &mut TerminalInputDraft {
+        if let Some(index) = self
+            .terminal_input_drafts
+            .iter()
+            .position(|draft| draft.session_id == session_id)
+        {
+            return &mut self.terminal_input_drafts[index];
+        }
+
+        self.terminal_input_drafts
+            .push(TerminalInputDraft::new(session_id));
+        self.terminal_input_drafts
+            .last_mut()
+            .expect("刚插入的终端输入草稿应该存在")
+    }
+
+    fn ensure_sftp_action_draft(&mut self, host_id: HostId) -> &mut SftpActionDraft {
+        if let Some(index) = self
+            .sftp_action_drafts
+            .iter()
+            .position(|draft| draft.host_id == host_id)
+        {
+            return &mut self.sftp_action_drafts[index];
+        }
+
+        self.sftp_action_drafts.push(SftpActionDraft::new(host_id));
+        self.sftp_action_drafts
+            .last_mut()
+            .expect("刚插入的 SFTP 操作草稿应该存在")
+    }
 }
 
 #[cfg(test)]
@@ -131,6 +237,26 @@ mod tests {
 
     fn host_id() -> HostId {
         HostId(Uuid::new_v4())
+    }
+
+    fn session_id() -> SessionId {
+        SessionId(Uuid::new_v4())
+    }
+
+    #[test]
+    fn sftp_action_drafts_are_scoped_per_host() {
+        let mut ui = UiState::default();
+        let first = host_id();
+        let second = host_id();
+
+        ui.set_sftp_action_field(first, SftpActionDraftField::LocalPath, "C:/tmp/app.tar.gz");
+        ui.set_sftp_action_field(second, SftpActionDraftField::RemoteName, "app.tar.gz");
+        ui.set_sftp_action_field(second, SftpActionDraftField::NewDirName, "releases");
+
+        assert_eq!(ui.sftp_local_path_for(first), "C:/tmp/app.tar.gz");
+        assert_eq!(ui.sftp_remote_name_for(first), "");
+        assert_eq!(ui.sftp_new_dir_name_for(second), "releases");
+        assert_eq!(ui.sftp_action_drafts.len(), 2);
     }
 
     #[test]
@@ -172,5 +298,24 @@ mod tests {
         assert_eq!(ui.quick_host.username, "");
         assert_eq!(ui.quick_host.port, "22");
         assert!(matches!(ui.quick_host.auth.kind, QuickHostAuthKind::Agent));
+    }
+
+    #[test]
+    fn terminal_input_drafts_are_scoped_per_session() {
+        let mut ui = UiState::default();
+        let first = session_id();
+        let second = session_id();
+
+        ui.set_terminal_input(first, "ls");
+        ui.set_terminal_input(second, "pwd");
+
+        assert_eq!(ui.terminal_input_for(first), "ls");
+        assert_eq!(ui.terminal_input_for(second), "pwd");
+        assert_eq!(ui.terminal_input_for(session_id()), "");
+        assert_eq!(ui.terminal_input_drafts.len(), 2);
+
+        ui.clear_terminal_input(first);
+        assert_eq!(ui.terminal_input_for(first), "");
+        assert_eq!(ui.terminal_input_for(second), "pwd");
     }
 }

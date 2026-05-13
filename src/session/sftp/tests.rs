@@ -69,6 +69,23 @@ fn sftp_loading_state_can_be_toggled() {
 }
 
 #[test]
+fn sftp_selection_can_be_set_and_cleared() {
+    let mut sessions = SessionManager::default();
+    let current_host_id = host_id();
+
+    sessions.open_sftp_tab(session_id(), current_host_id, "/home/ops");
+
+    assert!(sessions.select_sftp_entry(current_host_id, "/home/ops/deploy.sh"));
+    assert_eq!(
+        sessions.sftp_browsers[0].selected_path.as_deref(),
+        Some("/home/ops/deploy.sh")
+    );
+    assert!(sessions.clear_sftp_selection(current_host_id));
+    assert!(sessions.sftp_browsers[0].selected_path.is_none());
+    assert!(!sessions.clear_sftp_selection(host_id()));
+}
+
+#[test]
 fn sftp_entries_can_update_by_session_id() {
     let mut sessions = SessionManager::default();
     let host_id = host_id();
