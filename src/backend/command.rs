@@ -78,6 +78,31 @@ impl BackendCommand {
             | Self::Disconnect { session_id } => *session_id,
         }
     }
+
+    /// 返回命令类型，便于执行器路由和测试断言。
+    pub fn kind(&self) -> BackendCommandKind {
+        match self {
+            Self::Connect { .. } => BackendCommandKind::Connect,
+            Self::OpenShell { .. } => BackendCommandKind::OpenShell,
+            Self::RunCommand { .. } => BackendCommandKind::RunCommand,
+            Self::Sftp { .. } => BackendCommandKind::Sftp,
+            Self::StartTunnel { .. } => BackendCommandKind::StartTunnel,
+            Self::StopTunnel { .. } => BackendCommandKind::StopTunnel,
+            Self::Disconnect { .. } => BackendCommandKind::Disconnect,
+        }
+    }
+}
+
+/// 后端命令类型。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BackendCommandKind {
+    Connect,
+    OpenShell,
+    RunCommand,
+    Sftp,
+    StartTunnel,
+    StopTunnel,
+    Disconnect,
 }
 
 #[cfg(test)]
@@ -126,6 +151,7 @@ mod tests {
         };
 
         assert_eq!(command.session_id(), session_id);
+        assert_eq!(command.kind(), BackendCommandKind::OpenShell);
     }
 
     #[test]
