@@ -13,6 +13,7 @@ mod snippets;
 mod tunnels;
 mod workspace;
 
+use crate::config::AppConfig;
 use crate::model::{
     CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
     SftpBookmark, Snippet, TunnelRule, WorkspaceState,
@@ -25,6 +26,7 @@ pub(super) const DEFAULT_RECENT_LIMIT: usize = 20;
 /// 主机资产与隧道规则的管理器。
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct StorageManager {
+    pub app_config: AppConfig,
     pub hosts: Vec<Host>,
     pub groups: Vec<HostGroup>,
     pub credentials: Vec<CredentialMetadata>,

@@ -10,6 +10,7 @@ use redb::{Database, ReadableDatabase, TableDefinition, TableError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
+use crate::config::AppConfig;
 use crate::model::{
     CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
     SftpBookmark, Snippet, TunnelRule, WorkspaceState,
@@ -101,6 +102,7 @@ fn open_or_create_database(path: &Path) -> Result<Database, StoragePersistenceEr
 /// 持久化快照格式。
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 struct StorageSnapshot {
+    app_config: AppConfig,
     hosts: Vec<Host>,
     groups: Vec<HostGroup>,
     credentials: Vec<CredentialMetadata>,
@@ -116,6 +118,7 @@ struct StorageSnapshot {
 impl From<&StorageManager> for StorageSnapshot {
     fn from(storage: &StorageManager) -> Self {
         Self {
+            app_config: storage.app_config.clone(),
             hosts: storage.hosts.clone(),
             groups: storage.groups.clone(),
             credentials: storage.credentials.clone(),
@@ -133,6 +136,7 @@ impl From<&StorageManager> for StorageSnapshot {
 impl StorageSnapshot {
     fn into_storage(self) -> StorageManager {
         StorageManager {
+            app_config: self.app_config,
             hosts: self.hosts,
             groups: self.groups,
             credentials: self.credentials,
@@ -172,7 +176,8 @@ pub enum StoragePersistenceError {
 mod tests {
     use super::*;
     use crate::model::{
-        AuthProfile, CommandHistoryId, HostId, RecentConnection, TunnelKind, TunnelRule,
+        AuthProfile, CommandHistoryId, HostId, ImageSource, RecentConnection, TunnelKind,
+        TunnelRule,
     };
     use uuid::Uuid;
 
@@ -226,6 +231,10 @@ mod tests {
         let path = temp_db_path("roundtrip");
         let store = RedbStorage::new(&path);
         let mut storage = StorageManager::default();
+        storage.app_config.theme.name = "Solarized Dark".to_owned();
+        storage.app_config.background.enabled = true;
+        storage.app_config.background.sources =
+            vec![ImageSource::LocalPath("wallpapers/a.jpg".to_owned())];
         let host = sample_host();
         let host_id = host.id;
         storage.upsert_host(host);

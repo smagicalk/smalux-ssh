@@ -16,7 +16,7 @@ use crate::terminal::TerminalManager;
 
 use super::{
     HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SftpActionDraftField,
-    TunnelRule, UiState,
+    TunnelRule, UiState, VisualSettingsDraftField,
 };
 
 mod backend_pump;
@@ -29,6 +29,7 @@ mod storage_admin;
 #[cfg(test)]
 mod tests;
 mod ui_drafts;
+mod visual_settings;
 
 /// Iced 应用的根状态。
 ///
@@ -64,13 +65,18 @@ impl fmt::Debug for AppState {
 
 impl Default for AppState {
     fn default() -> Self {
+        let config = AppConfig::default();
+        let mut storage = StorageManager::default();
+        storage.app_config = config.clone();
+        let ui = UiState::from_visual(&config.theme, &config.background);
+
         Self {
-            config: AppConfig::default(),
+            config,
             sessions: SessionManager::default(),
-            storage: StorageManager::default(),
+            storage,
             storage_backend: None,
             terminal: TerminalManager::default(),
-            ui: UiState::default(),
+            ui,
             backend_commands: BackendCommandQueue::default(),
             backend_executor: noop_shared_backend_executor(),
             theme: Theme::Dark,
@@ -82,6 +88,14 @@ impl Default for AppState {
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleTheme,
+    UpdateVisualSettingsDraft {
+        field: VisualSettingsDraftField,
+        value: String,
+    },
+    SetVisualBackgroundEnabled {
+        enabled: bool,
+    },
+    ApplyVisualSettings,
     UpdateQuickHostDraft {
         field: QuickHostDraftField,
         value: String,
@@ -227,6 +241,13 @@ impl AppState {
     pub fn apply(&mut self, message: Message) -> AppUpdateOutcome {
         match message {
             Message::ToggleTheme => self.toggle_theme(),
+            Message::UpdateVisualSettingsDraft { field, value } => {
+                self.update_visual_settings_draft(field, value)
+            }
+            Message::SetVisualBackgroundEnabled { enabled } => {
+                self.set_visual_background_enabled(enabled)
+            }
+            Message::ApplyVisualSettings => self.apply_visual_settings(),
             Message::UpdateQuickHostDraft { field, value } => {
                 self.update_quick_host_draft(field, value)
             }

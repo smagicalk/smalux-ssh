@@ -153,7 +153,7 @@ impl AppState {
     }
 }
 
-fn draft_changed() -> AppUpdateOutcome {
+pub(super) fn draft_changed() -> AppUpdateOutcome {
     AppUpdateOutcome {
         state_changed: true,
         ..AppUpdateOutcome::default()

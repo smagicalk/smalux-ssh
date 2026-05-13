@@ -14,6 +14,7 @@ mod security;
 mod session_summary;
 mod sftp_workspace;
 mod terminal_workspace;
+mod visual_settings;
 
 /// 根据应用状态构建当前主界面。
 pub fn view(state: &AppState) -> Element<'_, Message> {
@@ -21,6 +22,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
 
     let content = column![
         header(state),
+        visual_settings::view(state),
         overview(state, visual.theme.name.clone(), visual.background.enabled),
         security::view(state),
         host_actions::view(state),

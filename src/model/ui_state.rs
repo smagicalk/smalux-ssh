@@ -5,12 +5,14 @@
 mod quick_host;
 mod sftp_action;
 mod terminal_input;
+mod visual_settings;
 
-use super::{HostId, SessionId};
+use super::{BackgroundProfile, HostId, SessionId, ThemeProfile};
 
 pub use quick_host::*;
 pub use sftp_action::*;
 pub use terminal_input::*;
+pub use visual_settings::*;
 
 pub const DEFAULT_REMOTE_COMMAND: &str = "uptime";
 pub const DEFAULT_SFTP_INITIAL_DIR: &str = "/";
@@ -38,12 +40,38 @@ impl HostActionDraft {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct UiState {
     pub quick_host: QuickHostDraft,
+    pub visual_settings: VisualSettingsDraft,
     pub host_action_drafts: Vec<HostActionDraft>,
     pub sftp_action_drafts: Vec<SftpActionDraft>,
     pub terminal_input_drafts: Vec<TerminalInputDraft>,
 }
 
 impl UiState {
+    /// 使用当前视觉配置初始化 UI 草稿。
+    pub fn from_visual(theme: &ThemeProfile, background: &BackgroundProfile) -> Self {
+        Self {
+            quick_host: QuickHostDraft::default(),
+            visual_settings: VisualSettingsDraft::from_profiles(theme, background),
+            host_action_drafts: Vec::new(),
+            sftp_action_drafts: Vec::new(),
+            terminal_input_drafts: Vec::new(),
+        }
+    }
+
+    /// 更新全局视觉配置草稿字段。
+    pub fn set_visual_settings_field(
+        &mut self,
+        field: VisualSettingsDraftField,
+        value: impl Into<String>,
+    ) {
+        self.visual_settings.set_field(field, value);
+    }
+
+    /// 更新全局背景开关草稿。
+    pub fn set_visual_background_enabled(&mut self, enabled: bool) {
+        self.visual_settings.set_background_enabled(enabled);
+    }
+
     /// 返回指定主机的远程命令草稿；没有草稿时使用默认命令。
     pub fn remote_command_for(&self, host_id: HostId) -> &str {
         self.host_action_drafts

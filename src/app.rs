@@ -26,7 +26,14 @@ fn boot() -> (AppState, Task<Message>) {
 
     if let Some(storage_backend) = RedbStorage::default_store() {
         match storage_backend.load() {
-            Ok(storage) => state.storage = storage,
+            Ok(storage) => {
+                state.storage = storage;
+                state.config = state.storage.app_config.clone();
+                state.ui = crate::model::UiState::from_visual(
+                    &state.config.theme,
+                    &state.config.background,
+                );
+            }
             Err(error) => tracing::warn!(
                 path = %storage_backend.path().display(),
                 error = %error,

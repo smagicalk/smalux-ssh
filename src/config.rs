@@ -7,10 +7,12 @@ mod background;
 mod defaults;
 mod visual;
 
+use serde::{Deserialize, Serialize};
+
 use crate::model::{BackgroundProfile, ThemeProfile};
 
 /// 桌面端运行所需的全局配置。
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct AppConfig {
     pub app_name: String,
     pub theme: ThemeProfile,
