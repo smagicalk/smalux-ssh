@@ -12,6 +12,9 @@ use crate::model::{HostKeyVerification, KnownHostEntry, SessionId};
 use super::super::{BackendEvent, BackendExecutionError};
 use super::{SshAuthPlan, SshConnectionPlan};
 
+mod session;
+pub use session::*;
+
 #[cfg(test)]
 mod tests;
 
@@ -20,6 +23,7 @@ const DEFAULT_KEEPALIVE_INTERVAL_SECS: u64 = 15;
 const DEFAULT_KEEPALIVE_MAX: usize = 3;
 #[cfg(windows)]
 const WINDOWS_OPENSSH_AGENT_PIPE: &str = r"\\.\pipe\openssh-ssh-agent";
+type DynamicAgentClient = AgentClient<Box<dyn AgentStream + Send + Unpin + 'static>>;
 
 /// `russh` 客户端配置。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -374,8 +378,7 @@ fn decode_private_key(
         .map_err(|error| authentication_error(username, error))
 }
 
-async fn connect_agent()
--> Result<AgentClient<Box<dyn AgentStream + Send + Unpin + 'static>>, russh::keys::Error> {
+async fn connect_agent() -> Result<DynamicAgentClient, russh::keys::Error> {
     #[cfg(unix)]
     {
         AgentClient::connect_env().await.map(AgentClient::dynamic)
