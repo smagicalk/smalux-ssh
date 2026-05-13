@@ -3,6 +3,7 @@ use crate::backend::BackendCommand;
 use crate::model::{AuthProfile, Host, SecretRef, SessionKind, SessionStatus};
 
 mod remote_command;
+mod sftp;
 mod shell;
 
 fn sample_host() -> Host {

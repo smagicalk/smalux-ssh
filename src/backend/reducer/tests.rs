@@ -172,3 +172,29 @@ fn failed_event_marks_session_failed() {
         SessionStatus::Failed { reason } if reason == "network"
     ));
 }
+
+#[test]
+fn failed_sftp_event_records_browser_error() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id(), "/home/ops");
+    sessions.set_sftp_loading(sessions.tabs[0].host_id.unwrap(), true);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Failed {
+            session_id,
+            reason: "permission denied".to_owned(),
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(!sessions.sftp_browsers[0].loading);
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("permission denied")
+    );
+}

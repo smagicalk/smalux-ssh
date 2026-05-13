@@ -87,10 +87,20 @@ pub fn apply_backend_event(
             session_updated: apply_tunnel_status(sessions, &rule_name, status),
             terminal_updated: false,
         },
-        BackendEvent::Failed { session_id, reason } => BackendEventOutcome {
-            session_updated: sessions.set_status(session_id, SessionStatus::Failed { reason }),
-            terminal_updated: false,
-        },
+        BackendEvent::Failed { session_id, reason } => {
+            let session_updated = sessions.set_status(
+                session_id,
+                SessionStatus::Failed {
+                    reason: reason.clone(),
+                },
+            );
+            let sftp_updated = sessions.fail_sftp_browser_for_session(session_id, reason);
+
+            BackendEventOutcome {
+                session_updated: session_updated || sftp_updated,
+                terminal_updated: false,
+            }
+        }
         BackendEvent::Disconnected { session_id } => BackendEventOutcome {
             session_updated: sessions.set_status(session_id, SessionStatus::Disconnected),
             terminal_updated: false,

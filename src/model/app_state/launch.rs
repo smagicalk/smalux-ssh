@@ -4,7 +4,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use uuid::Uuid;
 
-use crate::backend::{BackendCommand, ConnectionTarget, PtyRequest, RemoteCommandRequest};
+use crate::backend::{
+    BackendCommand, ConnectionTarget, PtyRequest, RemoteCommandRequest, SftpRequest,
+};
 use crate::model::{
     CommandHistoryId, CommandHistoryItem, Host, HostId, RecentConnection, SessionId, SessionStatus,
 };
@@ -32,6 +34,33 @@ impl AppState {
         self.backend_commands.extend([
             connect_command(session_id, &host),
             BackendCommand::OpenShell { session_id, pty },
+        ]);
+
+        queued_outcome(2)
+    }
+
+    /// 打开 SFTP 浏览器，并排队读取初始远端目录。
+    pub(super) fn open_sftp(&mut self, host_id: HostId, initial_dir: String) -> AppUpdateOutcome {
+        let initial_dir = normalize_remote_dir(&initial_dir);
+        let Some(host) = self.host_by_id(host_id) else {
+            return missing_host(host_id);
+        };
+
+        let session_id = SessionId(Uuid::new_v4());
+        self.sessions
+            .open_sftp_tab(session_id, host.id, initial_dir.clone());
+        self.sessions
+            .set_status(session_id, SessionStatus::Connecting);
+        self.sessions.set_sftp_loading(host.id, true);
+        self.record_recent_connection(&host);
+        self.backend_commands.extend([
+            connect_command(session_id, &host),
+            BackendCommand::Sftp {
+                session_id,
+                request: SftpRequest::ListDir {
+                    remote_path: initial_dir,
+                },
+            },
         ]);
 
         queued_outcome(2)
@@ -138,6 +167,16 @@ fn missing_host(host_id: HostId) -> AppUpdateOutcome {
     AppUpdateOutcome {
         error: Some(format!("找不到主机：{}", host_id.0)),
         ..AppUpdateOutcome::default()
+    }
+}
+
+fn normalize_remote_dir(remote_dir: &str) -> String {
+    let remote_dir = remote_dir.trim();
+
+    if remote_dir.is_empty() {
+        "/".to_owned()
+    } else {
+        remote_dir.to_owned()
     }
 }
 

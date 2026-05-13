@@ -50,6 +50,10 @@ pub enum Message {
     OpenShell {
         host_id: HostId,
     },
+    OpenSftp {
+        host_id: HostId,
+        initial_dir: String,
+    },
     RunRemoteCommand {
         host_id: HostId,
         command: String,
@@ -85,6 +89,10 @@ impl AppState {
         match message {
             Message::ToggleTheme => self.toggle_theme(),
             Message::OpenShell { host_id } => self.open_shell(host_id),
+            Message::OpenSftp {
+                host_id,
+                initial_dir,
+            } => self.open_sftp(host_id, initial_dir),
             Message::RunRemoteCommand {
                 host_id,
                 command,
