@@ -14,7 +14,7 @@ use crate::session::SessionManager;
 use crate::storage::StorageManager;
 use crate::terminal::TerminalManager;
 
-use super::{HostId, TunnelRule, UiState};
+use super::{HostId, QuickHostDraftField, TunnelRule, UiState};
 
 mod backend_pump;
 #[cfg(test)]
@@ -75,6 +75,11 @@ impl Default for AppState {
 #[derive(Debug, Clone)]
 pub enum Message {
     ToggleTheme,
+    UpdateQuickHostDraft {
+        field: QuickHostDraftField,
+        value: String,
+    },
+    SaveQuickHost,
     UpdateHostCommandDraft {
         host_id: HostId,
         command: String,
@@ -142,6 +147,10 @@ impl AppState {
     pub fn apply(&mut self, message: Message) -> AppUpdateOutcome {
         match message {
             Message::ToggleTheme => self.toggle_theme(),
+            Message::UpdateQuickHostDraft { field, value } => {
+                self.update_quick_host_draft(field, value)
+            }
+            Message::SaveQuickHost => self.save_quick_host(),
             Message::UpdateHostCommandDraft { host_id, command } => {
                 self.update_host_command_draft(host_id, command)
             }

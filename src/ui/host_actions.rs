@@ -5,11 +5,11 @@ use iced::{
     widget::{button, column, row, text, text_input},
 };
 
-use crate::model::{AppState, Host, HostId, Message, TunnelRule};
+use crate::model::{AppState, Host, HostId, Message, QuickHostDraftField, TunnelRule};
 
 /// 渲染所有已保存主机的最小可用操作入口。
 pub fn view(state: &AppState) -> Element<'_, Message> {
-    let mut hosts = column![text("Hosts").size(22)].spacing(12);
+    let mut hosts = column![text("Hosts").size(22), quick_host_form(state)].spacing(12);
 
     if state.storage.hosts.is_empty() {
         return hosts.push(text("No saved hosts yet.")).into();
@@ -20,6 +20,44 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     }
 
     hosts.into()
+}
+
+fn quick_host_form(state: &AppState) -> Element<'_, Message> {
+    let draft = &state.ui.quick_host;
+
+    column![
+        text("Quick host").size(18),
+        row![
+            quick_host_input("name", &draft.name, QuickHostDraftField::Name),
+            quick_host_input("address", &draft.address, QuickHostDraftField::Address),
+            quick_host_input("port", &draft.port, QuickHostDraftField::Port),
+        ]
+        .spacing(8),
+        row![
+            quick_host_input("username", &draft.username, QuickHostDraftField::Username),
+            quick_host_input(
+                "agent key hint",
+                &draft.key_hint,
+                QuickHostDraftField::KeyHint
+            ),
+            quick_host_input("tags", &draft.tags, QuickHostDraftField::Tags),
+        ]
+        .spacing(8),
+        button("Save agent host").on_press(Message::SaveQuickHost),
+    ]
+    .spacing(8)
+    .into()
+}
+
+fn quick_host_input<'a>(
+    placeholder: &'a str,
+    value: &'a str,
+    field: QuickHostDraftField,
+) -> Element<'a, Message> {
+    text_input(placeholder, value)
+        .on_input(move |value| Message::UpdateQuickHostDraft { field, value })
+        .width(Length::Fill)
+        .into()
 }
 
 fn host_card<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
@@ -147,5 +185,12 @@ mod tests {
         state.storage.upsert_host(host(Vec::new()));
 
         let _element = view(&state);
+    }
+
+    #[test]
+    fn quick_host_form_accepts_default_state() {
+        let state = AppState::default();
+
+        let _element = quick_host_form(&state);
     }
 }
