@@ -1,6 +1,8 @@
 //! UI 输入草稿消息处理。
 
 use crate::model::HostId;
+use crate::model::QuickHostAuthField;
+use crate::model::QuickHostAuthKind;
 use crate::model::QuickHostDraftField;
 use uuid::Uuid;
 
@@ -17,10 +19,29 @@ impl AppState {
         draft_changed()
     }
 
-    /// 保存快速新增主机，首版默认使用 ssh-agent 认证。
+    /// 更新快速新增主机认证方式。
+    pub(super) fn update_quick_host_auth_kind(
+        &mut self,
+        kind: QuickHostAuthKind,
+    ) -> AppUpdateOutcome {
+        self.ui.set_quick_host_auth_kind(kind);
+        draft_changed()
+    }
+
+    /// 更新快速新增主机认证字段。
+    pub(super) fn update_quick_host_auth_field(
+        &mut self,
+        field: QuickHostAuthField,
+        value: String,
+    ) -> AppUpdateOutcome {
+        self.ui.set_quick_host_auth_field(field, value);
+        draft_changed()
+    }
+
+    /// 保存快速新增主机。
     pub(super) fn save_quick_host(&mut self) -> AppUpdateOutcome {
         let host_id = HostId(Uuid::new_v4());
-        let host = match self.ui.quick_host.build_agent_host(host_id) {
+        let host = match self.ui.quick_host.build_host(host_id) {
             Ok(host) => host,
             Err(error) => {
                 return AppUpdateOutcome {
@@ -66,8 +87,12 @@ fn draft_changed() -> AppUpdateOutcome {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::model::AuthProfile;
     use crate::model::Message;
+    use crate::model::QuickHostAuthField;
+    use crate::model::QuickHostAuthKind;
     use crate::model::QuickHostDraftField;
+    use crate::model::SecretRef;
     use uuid::Uuid;
 
     #[test]
@@ -81,6 +106,31 @@ mod tests {
 
         assert!(outcome.changed());
         assert_eq!(state.ui.quick_host.address, "example.com");
+        assert_eq!(state.storage.host_count(), 0);
+    }
+
+    #[test]
+    fn quick_host_auth_messages_update_auth_draft_only() {
+        let mut state = AppState::default();
+
+        let kind_outcome = state.apply(Message::UpdateQuickHostAuthKind {
+            kind: QuickHostAuthKind::Password,
+        });
+        let field_outcome = state.apply(Message::UpdateQuickHostAuthField {
+            field: QuickHostAuthField::PasswordSecretRef,
+            value: "password:root".to_owned(),
+        });
+
+        assert!(kind_outcome.changed());
+        assert!(field_outcome.changed());
+        assert!(matches!(
+            state.ui.quick_host.auth.kind,
+            QuickHostAuthKind::Password
+        ));
+        assert_eq!(
+            state.ui.quick_host.auth.password_secret_ref,
+            "password:root"
+        );
         assert_eq!(state.storage.host_count(), 0);
     }
 
@@ -106,6 +156,36 @@ mod tests {
         assert_eq!(state.ui.quick_host.address, "");
         assert_eq!(state.ui.quick_host.port, "22");
         assert_eq!(state.backend_commands.pending_count(), 0);
+    }
+
+    #[test]
+    fn save_quick_host_honors_selected_password_auth() {
+        let mut state = AppState::default();
+        state
+            .ui
+            .set_quick_host_field(QuickHostDraftField::Address, "root.example.com".to_owned());
+        state
+            .ui
+            .set_quick_host_field(QuickHostDraftField::Username, "root".to_owned());
+        state
+            .ui
+            .set_quick_host_auth_kind(QuickHostAuthKind::Password);
+        state.ui.set_quick_host_auth_field(
+            QuickHostAuthField::PasswordSecretRef,
+            "password:root".to_owned(),
+        );
+
+        let outcome = state.apply(Message::SaveQuickHost);
+
+        assert!(outcome.changed());
+        assert_eq!(state.storage.host_count(), 1);
+        assert!(matches!(
+            &state.storage.hosts[0].auth,
+            AuthProfile::Password {
+                username,
+                secret: SecretRef(secret_ref),
+            } if username == "root" && secret_ref == "password:root"
+        ));
     }
 
     #[test]

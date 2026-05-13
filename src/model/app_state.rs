@@ -14,7 +14,9 @@ use crate::session::SessionManager;
 use crate::storage::{RedbStorage, StorageManager, StoragePersistenceError};
 use crate::terminal::TerminalManager;
 
-use super::{HostId, QuickHostDraftField, TunnelRule, UiState};
+use super::{
+    HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, TunnelRule, UiState,
+};
 
 mod backend_pump;
 #[cfg(test)]
@@ -80,6 +82,13 @@ pub enum Message {
     ToggleTheme,
     UpdateQuickHostDraft {
         field: QuickHostDraftField,
+        value: String,
+    },
+    UpdateQuickHostAuthKind {
+        kind: QuickHostAuthKind,
+    },
+    UpdateQuickHostAuthField {
+        field: QuickHostAuthField,
         value: String,
     },
     SaveQuickHost,
@@ -167,6 +176,10 @@ impl AppState {
             Message::ToggleTheme => self.toggle_theme(),
             Message::UpdateQuickHostDraft { field, value } => {
                 self.update_quick_host_draft(field, value)
+            }
+            Message::UpdateQuickHostAuthKind { kind } => self.update_quick_host_auth_kind(kind),
+            Message::UpdateQuickHostAuthField { field, value } => {
+                self.update_quick_host_auth_field(field, value)
             }
             Message::SaveQuickHost => self.save_quick_host(),
             Message::UpdateHostCommandDraft { host_id, command } => {

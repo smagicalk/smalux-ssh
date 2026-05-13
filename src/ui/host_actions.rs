@@ -5,7 +5,10 @@ use iced::{
     widget::{button, column, row, text, text_input},
 };
 
-use crate::model::{AppState, Host, HostId, Message, QuickHostDraftField, TunnelRule};
+use crate::model::{
+    AppState, AuthProfile, Host, HostId, Message, QuickHostAuthDraft, QuickHostAuthField,
+    QuickHostAuthKind, QuickHostDraftField, TunnelRule,
+};
 
 /// 渲染所有已保存主机的最小可用操作入口。
 pub fn view(state: &AppState) -> Element<'_, Message> {
@@ -35,15 +38,12 @@ fn quick_host_form(state: &AppState) -> Element<'_, Message> {
         .spacing(8),
         row![
             quick_host_input("username", &draft.username, QuickHostDraftField::Username),
-            quick_host_input(
-                "agent key hint",
-                &draft.key_hint,
-                QuickHostDraftField::KeyHint
-            ),
             quick_host_input("tags", &draft.tags, QuickHostDraftField::Tags),
         ]
         .spacing(8),
-        button("Save agent host").on_press(Message::SaveQuickHost),
+        auth_kind_selector(draft.auth.kind),
+        quick_host_auth_inputs(&draft.auth),
+        button("Save host").on_press(Message::SaveQuickHost),
     ]
     .spacing(8)
     .into()
@@ -56,6 +56,90 @@ fn quick_host_input<'a>(
 ) -> Element<'a, Message> {
     text_input(placeholder, value)
         .on_input(move |value| Message::UpdateQuickHostDraft { field, value })
+        .width(Length::Fill)
+        .into()
+}
+
+fn auth_kind_selector(selected: QuickHostAuthKind) -> Element<'static, Message> {
+    row![
+        auth_kind_button(QuickHostAuthKind::Password, selected),
+        auth_kind_button(QuickHostAuthKind::Key, selected),
+        auth_kind_button(QuickHostAuthKind::Agent, selected),
+        auth_kind_button(QuickHostAuthKind::Certificate, selected),
+    ]
+    .spacing(8)
+    .into()
+}
+
+fn auth_kind_button(
+    kind: QuickHostAuthKind,
+    selected: QuickHostAuthKind,
+) -> Element<'static, Message> {
+    let label = if kind == selected {
+        format!("* {}", kind.label())
+    } else {
+        kind.label().to_owned()
+    };
+
+    button(text(label))
+        .on_press(Message::UpdateQuickHostAuthKind { kind })
+        .into()
+}
+
+fn quick_host_auth_inputs(auth: &QuickHostAuthDraft) -> Element<'_, Message> {
+    match auth.kind {
+        QuickHostAuthKind::Password => row![quick_host_auth_input(
+            "password secret ref",
+            &auth.password_secret_ref,
+            QuickHostAuthField::PasswordSecretRef,
+        )]
+        .spacing(8)
+        .into(),
+        QuickHostAuthKind::Key => row![
+            quick_host_auth_input(
+                "private key ref",
+                &auth.private_key_ref,
+                QuickHostAuthField::PrivateKeyRef,
+            ),
+            quick_host_auth_input(
+                "passphrase ref",
+                &auth.passphrase_ref,
+                QuickHostAuthField::PassphraseRef,
+            ),
+        ]
+        .spacing(8)
+        .into(),
+        QuickHostAuthKind::Agent => row![quick_host_auth_input(
+            "agent key hint",
+            &auth.key_hint,
+            QuickHostAuthField::KeyHint,
+        )]
+        .spacing(8)
+        .into(),
+        QuickHostAuthKind::Certificate => row![
+            quick_host_auth_input(
+                "private key ref",
+                &auth.private_key_ref,
+                QuickHostAuthField::PrivateKeyRef,
+            ),
+            quick_host_auth_input(
+                "certificate ref",
+                &auth.certificate_ref,
+                QuickHostAuthField::CertificateRef,
+            ),
+        ]
+        .spacing(8)
+        .into(),
+    }
+}
+
+fn quick_host_auth_input<'a>(
+    placeholder: &'a str,
+    value: &'a str,
+    field: QuickHostAuthField,
+) -> Element<'a, Message> {
+    text_input(placeholder, value)
+        .on_input(move |value| Message::UpdateQuickHostAuthField { field, value })
         .width(Length::Fill)
         .into()
 }
@@ -141,7 +225,22 @@ fn host_subtitle(host: &Host) -> String {
         host.tags.join(", ")
     };
 
-    format!("{}:{} | tags: {}", host.address, host.port, tags)
+    format!(
+        "{}:{} | auth: {} | tags: {}",
+        host.address,
+        host.port,
+        auth_label(&host.auth),
+        tags
+    )
+}
+
+fn auth_label(auth: &AuthProfile) -> &'static str {
+    match auth {
+        AuthProfile::Password { .. } => "password",
+        AuthProfile::Key { .. } => "key",
+        AuthProfile::Agent { .. } => "ssh-agent",
+        AuthProfile::Certificate { .. } => "certificate",
+    }
 }
 
 #[cfg(test)]
@@ -175,7 +274,7 @@ mod tests {
 
         assert_eq!(
             host_subtitle(&host),
-            "staging.example.com:22 | tags: linux, prod"
+            "staging.example.com:22 | auth: password | tags: linux, prod"
         );
     }
 
@@ -190,6 +289,24 @@ mod tests {
     #[test]
     fn quick_host_form_accepts_default_state() {
         let state = AppState::default();
+
+        let _element = quick_host_form(&state);
+    }
+
+    #[test]
+    fn quick_host_form_accepts_certificate_auth_state() {
+        let mut state = AppState::default();
+        state
+            .ui
+            .set_quick_host_auth_kind(QuickHostAuthKind::Certificate);
+        state.ui.set_quick_host_auth_field(
+            QuickHostAuthField::PrivateKeyRef,
+            "key:cert-user".to_owned(),
+        );
+        state.ui.set_quick_host_auth_field(
+            QuickHostAuthField::CertificateRef,
+            "cert:cert-user".to_owned(),
+        );
 
         let _element = quick_host_form(&state);
     }
