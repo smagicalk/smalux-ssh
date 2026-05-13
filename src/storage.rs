@@ -7,6 +7,7 @@ mod credentials;
 mod history;
 mod hosts;
 mod known_hosts;
+mod persistence;
 mod sftp;
 mod snippets;
 mod tunnels;
@@ -17,10 +18,12 @@ use crate::model::{
     SftpBookmark, Snippet, TunnelRule, WorkspaceState,
 };
 
+pub use persistence::{RedbStorage, StoragePersistenceError};
+
 pub(super) const DEFAULT_RECENT_LIMIT: usize = 20;
 
 /// 主机资产与隧道规则的管理器。
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct StorageManager {
     pub hosts: Vec<Host>,
     pub groups: Vec<HostGroup>,

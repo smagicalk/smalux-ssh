@@ -11,7 +11,7 @@ use crate::backend::{
 };
 use crate::config::AppConfig;
 use crate::session::SessionManager;
-use crate::storage::StorageManager;
+use crate::storage::{RedbStorage, StorageManager, StoragePersistenceError};
 use crate::terminal::TerminalManager;
 
 use super::{HostId, QuickHostDraftField, TunnelRule, UiState};
@@ -34,6 +34,7 @@ pub struct AppState {
     pub config: AppConfig,
     pub sessions: SessionManager,
     pub storage: StorageManager,
+    pub storage_backend: Option<RedbStorage>,
     pub terminal: TerminalManager,
     pub ui: UiState,
     pub backend_commands: BackendCommandQueue,
@@ -47,6 +48,7 @@ impl fmt::Debug for AppState {
             .field("config", &self.config)
             .field("sessions", &self.sessions)
             .field("storage", &self.storage)
+            .field("storage_backend", &self.storage_backend)
             .field("terminal", &self.terminal)
             .field("ui", &self.ui)
             .field("backend_commands", &self.backend_commands)
@@ -62,6 +64,7 @@ impl Default for AppState {
             config: AppConfig::default(),
             sessions: SessionManager::default(),
             storage: StorageManager::default(),
+            storage_backend: None,
             terminal: TerminalManager::default(),
             ui: UiState::default(),
             backend_commands: BackendCommandQueue::default(),
@@ -136,6 +139,21 @@ impl AppState {
     {
         self.backend_executor = shared_backend_executor(executor);
         self
+    }
+
+    /// 使用指定本地存储后端启用持久化。
+    pub fn with_storage_backend(mut self, storage_backend: RedbStorage) -> Self {
+        self.storage_backend = Some(storage_backend);
+        self
+    }
+
+    /// 从已配置的本地存储后端保存当前持久化状态。
+    pub fn persist_storage(&self) -> Result<(), StoragePersistenceError> {
+        if let Some(storage_backend) = &self.storage_backend {
+            storage_backend.save(&self.storage)?;
+        }
+
+        Ok(())
     }
 
     /// 构造 Iced 启动需要的初始状态和首个任务。

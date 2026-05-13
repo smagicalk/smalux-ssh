@@ -8,6 +8,7 @@ use iced::{Element, Result, Task, application};
 use crate::backend::RusshBackendExecutor;
 use crate::model::{AppState, Message};
 use crate::security::KeyringSecretStore;
+use crate::storage::RedbStorage;
 use crate::ui;
 
 /// 启动桌面应用。
@@ -21,17 +22,36 @@ pub fn run() -> Result {
 fn boot() -> (AppState, Task<Message>) {
     let executor = RusshBackendExecutor::new(KeyringSecretStore::default())
         .unwrap_or_else(|error| panic!("无法创建真实 SSH 执行器：{error}"));
+    let mut state = AppState::default().with_backend_executor(executor);
 
-    (
-        AppState::default().with_backend_executor(executor),
-        Task::none(),
-    )
+    if let Some(storage_backend) = RedbStorage::default_store() {
+        match storage_backend.load() {
+            Ok(storage) => state.storage = storage,
+            Err(error) => tracing::warn!(
+                path = %storage_backend.path().display(),
+                error = %error,
+                "无法加载本地存储，使用空存储启动"
+            ),
+        }
+        state = state.with_storage_backend(storage_backend);
+    }
+
+    (state, Task::none())
 }
 
 /// Iced 消息更新函数。
 fn update(state: &mut AppState, message: Message) -> Task<Message> {
+    let storage_before = state.storage.clone();
+
     state.apply(message);
     state.drain_backend_queue_with_executor();
+
+    if state.storage != storage_before {
+        if let Err(error) = state.persist_storage() {
+            tracing::error!(error = %error, "保存本地存储失败");
+        }
+    }
+
     Task::none()
 }
 
@@ -96,6 +116,34 @@ mod tests {
         let _ = update(&mut state, Message::OpenShell { host_id });
 
         assert_eq!(state.backend_commands.pending_count(), 0);
+    }
+
+    #[test]
+    fn update_persists_storage_when_it_changes() {
+        use crate::model::QuickHostDraftField;
+
+        let path = std::env::temp_dir().join(format!(
+            "smagicalssh-app-update-{}.redb",
+            uuid::Uuid::new_v4()
+        ));
+        let storage_backend = RedbStorage::new(&path);
+        let mut state = AppState::default().with_storage_backend(storage_backend.clone());
+        state.ui.set_quick_host_field(
+            QuickHostDraftField::Address,
+            "persist.example.com".to_owned(),
+        );
+        state
+            .ui
+            .set_quick_host_field(QuickHostDraftField::Username, "deploy".to_owned());
+
+        let _ = update(&mut state, Message::SaveQuickHost);
+        let loaded = storage_backend
+            .load()
+            .expect("update 应该在存储变化后保存 redb 快照");
+
+        assert_eq!(loaded.host_count(), 1);
+        assert_eq!(loaded.hosts[0].address, "persist.example.com");
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]
