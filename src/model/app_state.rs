@@ -30,6 +30,7 @@ mod storage_admin;
 mod tests;
 mod ui_drafts;
 mod visual_settings;
+mod workspace;
 
 /// Iced 应用的根状态。
 ///
@@ -111,6 +112,9 @@ pub enum Message {
     ClearHostVisualSettings {
         host_id: HostId,
     },
+    SaveWorkspaceSnapshot,
+    RestoreWorkspaceSnapshot,
+    ClearWorkspaceSnapshot,
     UpdateQuickHostDraft {
         field: QuickHostDraftField,
         value: String,
@@ -277,6 +281,9 @@ impl AppState {
             Message::ClearHostVisualSettings { host_id } => {
                 self.clear_host_visual_settings(host_id)
             }
+            Message::SaveWorkspaceSnapshot => self.save_workspace_snapshot(),
+            Message::RestoreWorkspaceSnapshot => self.restore_workspace_snapshot(),
+            Message::ClearWorkspaceSnapshot => self.clear_workspace_snapshot(),
             Message::UpdateQuickHostDraft { field, value } => {
                 self.update_quick_host_draft(field, value)
             }

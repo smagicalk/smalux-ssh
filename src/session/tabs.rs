@@ -1,6 +1,8 @@
 //! 会话标签页的打开、状态更新和关闭操作。
 
-use crate::model::{HostId, SessionId, SessionKind, SessionStatus, SessionTab, TunnelRule};
+use crate::model::{
+    HostId, SessionId, SessionKind, SessionStatus, SessionTab, TunnelRule, WorkspaceTabSnapshot,
+};
 
 use super::SessionManager;
 
@@ -70,6 +72,28 @@ impl SessionManager {
         }
 
         before != self.tabs.len()
+    }
+
+    /// 从工作区快照恢复可见标签页元数据，不自动建立网络连接。
+    pub fn restore_tabs_from_workspace(
+        &mut self,
+        tabs: &[WorkspaceTabSnapshot],
+        active_tab: Option<SessionId>,
+    ) {
+        self.tabs = tabs
+            .iter()
+            .map(|snapshot| SessionTab {
+                id: snapshot.session_id,
+                host_id: snapshot.host_id,
+                kind: snapshot.kind.clone(),
+                title: snapshot.title.clone(),
+                status: SessionStatus::Disconnected,
+            })
+            .collect();
+        self.active = self.tabs.iter().map(|tab| tab.id).collect();
+        self.active_tab = active_tab
+            .filter(|active_id| self.tabs.iter().any(|tab| tab.id == *active_id))
+            .or_else(|| self.tabs.last().map(|tab| tab.id));
     }
 }
 
@@ -176,5 +200,42 @@ mod tests {
         assert_eq!(sessions.tab_count(), 1);
         assert_eq!(sessions.active_tab, Some(first_id));
         assert!(!sessions.close_tab(second_id));
+    }
+
+    #[test]
+    fn restore_tabs_from_workspace_marks_tabs_disconnected() {
+        let mut sessions = SessionManager::default();
+        let first_id = session_id();
+        let second_id = session_id();
+
+        sessions.restore_tabs_from_workspace(
+            &[
+                WorkspaceTabSnapshot {
+                    session_id: first_id,
+                    host_id: Some(host_id()),
+                    kind: SessionKind::Shell,
+                    title: "first".to_owned(),
+                    working_directory: None,
+                },
+                WorkspaceTabSnapshot {
+                    session_id: second_id,
+                    host_id: Some(host_id()),
+                    kind: SessionKind::RemoteCommand {
+                        command: "uptime".to_owned(),
+                    },
+                    title: "uptime".to_owned(),
+                    working_directory: None,
+                },
+            ],
+            Some(first_id),
+        );
+
+        assert_eq!(sessions.tab_count(), 2);
+        assert_eq!(sessions.active_count(), 2);
+        assert_eq!(sessions.active_tab, Some(first_id));
+        assert!(matches!(
+            sessions.tabs[0].status,
+            SessionStatus::Disconnected
+        ));
     }
 }
