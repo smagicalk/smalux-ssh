@@ -194,6 +194,9 @@ pub enum Message {
     OpenShell {
         host_id: HostId,
     },
+    OpenRecentConnection {
+        host_id: HostId,
+    },
     OpenSftp {
         host_id: HostId,
         initial_dir: String,
@@ -352,6 +355,7 @@ impl AppState {
             } => self.remove_sftp_file(host_id, remote_path),
             Message::CreateSftpDir { host_id } => self.create_sftp_dir(host_id),
             Message::OpenShell { host_id } => self.open_shell(host_id),
+            Message::OpenRecentConnection { host_id } => self.open_recent_connection(host_id),
             Message::OpenSftp {
                 host_id,
                 initial_dir,

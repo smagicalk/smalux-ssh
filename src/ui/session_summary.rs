@@ -97,10 +97,15 @@ fn recent_connections(state: &AppState) -> Element<'_, Message> {
     }
 
     for item in state.storage.recent_connections.iter().take(5) {
-        recent = recent.push(text(format!(
-            "{} | {}",
-            item.label, item.connected_at_unix_secs
-        )));
+        recent = recent.push(
+            row![
+                text(format!("{} | {}", item.label, item.connected_at_unix_secs)),
+                button("Open").on_press(Message::OpenRecentConnection {
+                    host_id: item.host_id,
+                }),
+            ]
+            .spacing(8),
+        );
     }
 
     recent.into()

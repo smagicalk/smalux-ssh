@@ -42,6 +42,11 @@ impl AppState {
         queued_outcome(2)
     }
 
+    /// 从最近连接记录重新打开交互式 Shell。
+    pub(super) fn open_recent_connection(&mut self, host_id: HostId) -> AppUpdateOutcome {
+        self.open_shell(host_id)
+    }
+
     /// 打开 SFTP 浏览器，并排队读取初始远端目录。
     pub(super) fn open_sftp(&mut self, host_id: HostId, initial_dir: String) -> AppUpdateOutcome {
         let initial_dir = normalize_remote_dir(&initial_dir);
