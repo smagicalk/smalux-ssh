@@ -3,14 +3,19 @@
 //! 这里只负责产品级首屏布局，业务操作仍委托到各功能视图模块。
 
 use iced::{
-    Alignment, Background, Border, Color, Element, Length, Shadow, Theme, Vector,
+    Alignment, Border, Color, Element, Length,
     widget::{Space, button, column, container, row, scrollable, text, text_input},
 };
 
-use crate::model::{AppState, Host, Message, QuickHostDraftField, SessionKind, SessionStatus};
+use crate::model::{
+    AppState, Host, HostListMode, Message, QuickHostDraftField, SessionKind, SessionStatus,
+    WorkspacePage,
+};
 
+mod command_palette;
 #[allow(dead_code)]
 mod host_actions;
+mod i18n;
 #[allow(dead_code)]
 mod security;
 #[allow(dead_code)]
@@ -19,10 +24,15 @@ mod session_summary;
 mod sftp_workspace;
 #[allow(dead_code)]
 mod terminal_workspace;
+mod theme;
 #[allow(dead_code)]
 mod visual_settings;
 #[allow(dead_code)]
 mod workspace;
+
+use command_palette::command_palette;
+use i18n::{background_label, host_list_mode_label, page_title, t, theme_name};
+use theme::*;
 
 /// 根据应用状态构建当前主界面。
 pub fn view(state: &AppState) -> Element<'_, Message> {
@@ -30,9 +40,13 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     if let Some(error) = state.ui.last_error.as_deref() {
         root = root.push(error_banner(error));
     }
+    if state.ui.workspace.command_palette.open {
+        root = root.push(command_palette(state));
+    }
 
     root = root.push(
         row![
+            nav_rail(state),
             connection_rail(state),
             vertical_rule(),
             command_workspace(state),
@@ -44,7 +58,7 @@ pub fn view(state: &AppState) -> Element<'_, Message> {
     container(root)
         .width(Length::Fill)
         .height(Length::Fill)
-        .style(app_background_style)
+        .style(move |_| app_background_style_for(state))
         .into()
 }
 
@@ -54,21 +68,30 @@ fn title_bar(state: &AppState) -> Element<'_, Message> {
             row![
                 brand_mark(),
                 column![
-                    text("smagicalssh").size(19).color(TEXT_STRONG),
-                    text("SSH · SFTP · Tunnels · Snippets")
-                        .size(11)
-                        .color(TEXT_MUTED),
+                    text(t(state, "app.name")).size(19).color(TEXT_STRONG),
+                    text(t(state, "app.subtitle")).size(11).color(TEXT_MUTED),
                 ]
                 .spacing(1),
             ]
             .spacing(10)
             .align_y(Alignment::Center),
-            protocol_tabs(),
+            page_tabs(state),
             Space::new().width(Length::Fill),
-            status_pill("Hosts", state.storage.host_count()),
-            status_pill("Tabs", state.sessions.tab_count()),
-            status_pill("Queue", state.backend_commands.pending_count()),
-            toolbar_button("Theme", Message::ToggleTheme),
+            command_search_button(state),
+            status_pill(t(state, "top.hosts"), state.storage.host_count()),
+            status_pill(t(state, "top.tabs"), state.sessions.tab_count()),
+            toolbar_button(
+                t(state, "top.new_connection"),
+                Message::SetWorkspacePage {
+                    page: WorkspacePage::Hosts,
+                }
+            ),
+            toolbar_button(
+                t(state, "nav.settings"),
+                Message::SetWorkspacePage {
+                    page: WorkspacePage::Settings,
+                }
+            ),
         ]
         .spacing(12)
         .align_y(Alignment::Center),
@@ -88,34 +111,61 @@ fn brand_mark() -> Element<'static, Message> {
         .into()
 }
 
-fn protocol_tabs() -> Element<'static, Message> {
+fn page_tabs(state: &AppState) -> Element<'_, Message> {
     row![
-        protocol_tab("SSH", true),
-        protocol_tab("SFTP", false),
-        protocol_tab("Tunnel", false),
-        protocol_tab("Snippet", false),
+        page_tab(state, "nav.hosts", WorkspacePage::Hosts),
+        page_tab(state, "nav.sftp", WorkspacePage::Sftp),
+        page_tab(state, "nav.tunnels", WorkspacePage::Tunnels),
+        page_tab(state, "nav.snippets", WorkspacePage::Snippets),
     ]
     .spacing(6)
     .align_y(Alignment::Center)
     .into()
 }
 
-fn protocol_tab(label: &'static str, active: bool) -> Element<'static, Message> {
-    container(
-        text(label)
-            .size(12)
-            .color(if active { TEXT_STRONG } else { TEXT_MUTED }),
+fn page_tab<'a>(
+    state: &'a AppState,
+    label_key: &'static str,
+    page: WorkspacePage,
+) -> Element<'a, Message> {
+    let active = state.ui.workspace.active_page == page;
+    button(
+        container(text(t(state, label_key)).size(12).color(if active {
+            TEXT_STRONG
+        } else {
+            TEXT_MUTED
+        }))
+        .padding([7, 12])
+        .style(if active {
+            active_tab_style
+        } else {
+            quiet_tab_style
+        }),
+    )
+    .padding(0)
+    .style(flat_button_style)
+    .on_press(Message::SetWorkspacePage { page })
+    .into()
+}
+
+fn command_search_button(state: &AppState) -> Element<'_, Message> {
+    button(
+        row![
+            text("⌘K").size(11).color(TEXT_MUTED),
+            text(t(state, "top.search")).size(12).color(TEXT_SOFT),
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center),
     )
     .padding([7, 12])
-    .style(if active {
-        active_tab_style
-    } else {
-        quiet_tab_style
+    .style(ghost_button_style)
+    .on_press(Message::OpenCommandPalette {
+        query: String::new(),
     })
     .into()
 }
 
-fn status_pill(label: &'static str, value: usize) -> Element<'static, Message> {
+fn status_pill(label: &str, value: usize) -> Element<'_, Message> {
     container(
         row![
             text(label).size(11).color(TEXT_MUTED),
@@ -129,7 +179,7 @@ fn status_pill(label: &'static str, value: usize) -> Element<'static, Message> {
     .into()
 }
 
-fn toolbar_button(label: &'static str, message: Message) -> Element<'static, Message> {
+fn toolbar_button(label: &str, message: Message) -> Element<'_, Message> {
     button(text(label).size(12))
         .padding([7, 12])
         .style(primary_button_style)
@@ -158,13 +208,67 @@ fn error_banner(error: &str) -> Element<'_, Message> {
     .into()
 }
 
+fn nav_rail(state: &AppState) -> Element<'_, Message> {
+    container(
+        column![
+            nav_icon(state, "H", "nav.hosts", WorkspacePage::Hosts),
+            nav_icon(state, "T", "nav.terminal", WorkspacePage::Terminal),
+            nav_icon(state, "F", "nav.sftp", WorkspacePage::Sftp),
+            nav_icon(state, "P", "nav.tunnels", WorkspacePage::Tunnels),
+            nav_icon(state, "S", "nav.snippets", WorkspacePage::Snippets),
+            nav_icon(state, "R", "nav.history", WorkspacePage::History),
+            Space::new().height(Length::Fill),
+            nav_icon(state, "⚙", "nav.settings", WorkspacePage::Settings),
+        ]
+        .spacing(10)
+        .align_x(Alignment::Center),
+    )
+    .width(64)
+    .height(Length::Fill)
+    .padding([14, 8])
+    .style(nav_rail_style)
+    .into()
+}
+
+fn nav_icon<'a>(
+    state: &'a AppState,
+    glyph: &'static str,
+    label_key: &'static str,
+    page: WorkspacePage,
+) -> Element<'a, Message> {
+    let active = state.ui.workspace.active_page == page;
+    button(
+        column![
+            text(glyph)
+                .size(14)
+                .color(if active { Color::WHITE } else { TEXT_MUTED }),
+            text(t(state, label_key))
+                .size(9)
+                .color(if active { TEXT_STRONG } else { TEXT_SUBTLE }),
+        ]
+        .spacing(2)
+        .align_x(Alignment::Center),
+    )
+    .padding([7, 4])
+    .width(48)
+    .style(if active {
+        primary_button_style
+    } else {
+        flat_button_style
+    })
+    .on_press(Message::SetWorkspacePage { page })
+    .into()
+}
+
 fn connection_rail(state: &AppState) -> Element<'_, Message> {
     container(
         column![
+            rail_header(state),
             quick_connect(state),
-            section_label("GROUPS"),
+            section_label(t(state, "hosts.groups")),
             group_tree(state),
-            section_label("HOSTS"),
+            hosts_filter_bar(state),
+            section_label(t(state, "hosts.hosts")),
             host_list(state),
         ]
         .spacing(12),
@@ -176,18 +280,61 @@ fn connection_rail(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
+fn rail_header(state: &AppState) -> Element<'_, Message> {
+    row![
+        column![
+            text(page_title(state)).size(16).color(TEXT_STRONG),
+            text(t(state, "hosts.filter_hint"))
+                .size(10)
+                .color(TEXT_MUTED),
+        ]
+        .spacing(2)
+        .width(Length::Fill),
+        button(text(host_list_mode_label(state)).size(10))
+            .padding([6, 9])
+            .style(ghost_button_style)
+            .on_press(Message::ToggleHostListMode),
+    ]
+    .spacing(8)
+    .align_y(Alignment::Center)
+    .into()
+}
+
+fn hosts_filter_bar(state: &AppState) -> Element<'_, Message> {
+    row![
+        filter_chip(t(state, "hosts.filter_group"), true),
+        filter_chip(t(state, "hosts.filter_tags"), false),
+        filter_chip(t(state, "hosts.filter_status"), false),
+    ]
+    .spacing(6)
+    .into()
+}
+
+fn filter_chip(label: &str, active: bool) -> Element<'_, Message> {
+    container(
+        text(label)
+            .size(10)
+            .color(if active { TEXT_STRONG } else { TEXT_MUTED }),
+    )
+    .padding([5, 8])
+    .style(if active { active_tab_style } else { pill_style })
+    .into()
+}
+
 fn quick_connect(state: &AppState) -> Element<'_, Message> {
     let draft = &state.ui.quick_host;
 
     container(
         column![
             row![
-                text("Quick Connect").size(15).color(TEXT_STRONG),
+                text(t(state, "hosts.quick_connect"))
+                    .size(15)
+                    .color(TEXT_STRONG),
                 Space::new().width(Length::Fill),
                 text("⌘K").size(11).color(TEXT_MUTED),
             ]
             .align_y(Alignment::Center),
-            text_input("host or alias", &draft.address)
+            text_input(t(state, "hosts.host_or_alias"), &draft.address)
                 .on_input(|value| Message::UpdateQuickHostDraft {
                     field: QuickHostDraftField::Address,
                     value,
@@ -196,7 +343,7 @@ fn quick_connect(state: &AppState) -> Element<'_, Message> {
                 .padding([9, 10])
                 .style(input_style),
             row![
-                text_input("user", &draft.username)
+                text_input(t(state, "hosts.user"), &draft.username)
                     .on_input(|value| Message::UpdateQuickHostDraft {
                         field: QuickHostDraftField::Username,
                         value,
@@ -204,7 +351,7 @@ fn quick_connect(state: &AppState) -> Element<'_, Message> {
                     .size(13)
                     .padding([9, 10])
                     .style(input_style),
-                button(text("Save").size(12))
+                button(text(t(state, "common.save")).size(12))
                     .padding([9, 12])
                     .style(primary_button_style)
                     .on_press(Message::SaveQuickHost),
@@ -218,20 +365,24 @@ fn quick_connect(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
-fn section_label(label: &'static str) -> Element<'static, Message> {
+fn section_label(label: &str) -> Element<'_, Message> {
     text(label).size(10).color(TEXT_SUBTLE).into()
 }
 
 fn group_tree(state: &AppState) -> Element<'_, Message> {
     let mut groups = column![group_row(
-        "All connections",
+        t(state, "hosts.all_connections"),
         state.storage.host_count(),
         true
     )]
     .spacing(6);
 
     if state.storage.groups.is_empty() {
-        groups = groups.push(group_row("Ungrouped", state.storage.host_count(), false));
+        groups = groups.push(group_row(
+            t(state, "hosts.ungrouped"),
+            state.storage.host_count(),
+            false,
+        ));
     } else {
         for group in &state.storage.groups {
             let count = state
@@ -275,21 +426,26 @@ fn host_list(state: &AppState) -> Element<'_, Message> {
     let mut list = column![].spacing(8);
 
     if state.storage.hosts.is_empty() {
-        list = list.push(empty_host_card());
+        list = list.push(empty_host_card(state));
     } else {
         for host in &state.storage.hosts {
-            list = list.push(host_row(state, host));
+            list = match state.ui.workspace.host_list_mode {
+                HostListMode::List => list.push(host_row(state, host)),
+                HostListMode::Card => list.push(host_card_large(state, host)),
+            };
         }
     }
 
     scrollable(list).height(Length::Fill).into()
 }
 
-fn empty_host_card() -> Element<'static, Message> {
+fn empty_host_card(state: &AppState) -> Element<'_, Message> {
     container(
         column![
-            text("No saved hosts").size(14).color(TEXT_SOFT),
-            text("Create one from Quick Connect.")
+            text(t(state, "hosts.empty_title"))
+                .size(14)
+                .color(TEXT_SOFT),
+            text(t(state, "hosts.empty_body"))
                 .size(12)
                 .color(TEXT_MUTED),
         ]
@@ -305,7 +461,7 @@ fn host_row<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
     let host_id = host.id;
     let subtitle = format!("{}@{}:{}", auth_user(host), host.address, host.port);
     let tag_line = if host.tags.is_empty() {
-        "no tags".to_owned()
+        t(state, "hosts.no_tags").to_owned()
     } else {
         host.tags.join(" · ")
     };
@@ -336,7 +492,7 @@ fn host_row<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
                     }
                 ),
                 small_action(
-                    "Run",
+                    t(state, "tool.run_short"),
                     Message::RunRemoteCommand {
                         host_id,
                         command,
@@ -352,6 +508,80 @@ fn host_row<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
     .width(Length::Fill)
     .style(host_card_style)
     .into()
+}
+
+fn host_card_large<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
+    let host_id = host.id;
+    let command = state.ui.remote_command_for(host_id).to_owned();
+
+    container(
+        column![
+            row![
+                host_badge(host.name.chars().next().unwrap_or('H')),
+                column![
+                    text(&host.name).size(15).color(TEXT_STRONG),
+                    text(format!(
+                        "{}@{}:{}",
+                        auth_user(host),
+                        host.address,
+                        host.port
+                    ))
+                    .size(11)
+                    .color(TEXT_MUTED),
+                ]
+                .spacing(3)
+                .width(Length::Fill),
+                connection_status_dot(state, host_id),
+            ]
+            .spacing(10)
+            .align_y(Alignment::Center),
+            tag_row(state, host),
+            row![
+                small_action(t(state, "tool.connect"), Message::OpenShell { host_id }),
+                small_action(
+                    "SFTP",
+                    Message::OpenSftp {
+                        host_id,
+                        initial_dir: state.ui.sftp_initial_dir_for(host_id).to_owned(),
+                    },
+                ),
+                small_action(
+                    t(state, "tool.run"),
+                    Message::RunRemoteCommand {
+                        host_id,
+                        command,
+                        request_pty: false,
+                    },
+                ),
+            ]
+            .spacing(6),
+        ]
+        .spacing(10),
+    )
+    .padding(13)
+    .width(Length::Fill)
+    .style(host_card_style)
+    .into()
+}
+
+fn tag_row<'a>(state: &'a AppState, host: &'a Host) -> Element<'a, Message> {
+    if host.tags.is_empty() {
+        return text(t(state, "hosts.no_tags"))
+            .size(11)
+            .color(TEXT_SUBTLE)
+            .into();
+    }
+
+    let mut row = row![].spacing(5);
+    for tag in host.tags.iter().take(3) {
+        row = row.push(
+            container(text(tag).size(10).color(TEXT_STRONG))
+                .padding([4, 7])
+                .style(tag_style),
+        );
+    }
+
+    row.into()
 }
 
 fn host_badge(initial: char) -> Element<'static, Message> {
@@ -380,7 +610,7 @@ fn connection_status_dot(state: &AppState, host_id: crate::model::HostId) -> Ele
     .into()
 }
 
-fn small_action(label: &'static str, message: Message) -> Element<'static, Message> {
+fn small_action(label: &str, message: Message) -> Element<'_, Message> {
     button(text(label).size(11))
         .padding([6, 9])
         .style(ghost_button_style)
@@ -389,24 +619,155 @@ fn small_action(label: &'static str, message: Message) -> Element<'static, Messa
 }
 
 fn command_workspace(state: &AppState) -> Element<'_, Message> {
-    container(
-        column![
-            workspace_tabs(state),
-            row![
-                terminal_stage(state),
-                column![snippet_strip(state), sftp_preview(state),]
-                    .spacing(12)
-                    .width(360),
+    let content: Element<'_, Message> = match state.ui.workspace.active_page {
+        WorkspacePage::Hosts | WorkspacePage::Terminal => host_terminal_workspace(state),
+        WorkspacePage::Sftp => sftp_page_workspace(state),
+        WorkspacePage::Tunnels => placeholder_workspace(state, "nav.tunnels", "settings.ssh"),
+        WorkspacePage::Snippets => placeholder_workspace(state, "nav.snippets", "snippet.subtitle"),
+        WorkspacePage::History => placeholder_workspace(state, "nav.history", "history.subtitle"),
+        WorkspacePage::Security => {
+            placeholder_workspace(state, "nav.security", "settings.security")
+        }
+        WorkspacePage::Settings => settings_workspace(state),
+    };
+
+    container(content)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(workspace_style)
+        .into()
+}
+
+fn host_terminal_workspace(state: &AppState) -> Element<'_, Message> {
+    column![
+        workspace_tabs(state),
+        row![
+            terminal_stage(state),
+            column![snippet_strip(state), sftp_preview(state),]
+                .spacing(12)
+                .width(360),
+        ]
+        .spacing(14)
+        .height(Length::Fill),
+    ]
+    .spacing(12)
+    .padding(16)
+    .into()
+}
+
+fn sftp_page_workspace(state: &AppState) -> Element<'_, Message> {
+    column![
+        workspace_page_header(state, "nav.sftp", "sftp.page_subtitle"),
+        container(
+            row![sftp_local_panel(state), sftp_remote_panel(state)]
+                .spacing(14)
+                .height(Length::Fill),
+        )
+        .height(Length::Fill),
+    ]
+    .spacing(12)
+    .padding(16)
+    .into()
+}
+
+fn placeholder_workspace<'a>(
+    state: &'a AppState,
+    title_key: &'static str,
+    subtitle_key: &'static str,
+) -> Element<'a, Message> {
+    column![
+        workspace_page_header(state, title_key, subtitle_key),
+        container(
+            column![
+                text(t(state, "common.coming_soon"))
+                    .size(22)
+                    .color(TEXT_STRONG),
+                text(t(state, "common.layout_reserved"))
+                    .size(13)
+                    .color(TEXT_MUTED),
             ]
-            .spacing(14)
-            .height(Length::Fill),
+            .spacing(8)
+            .align_x(Alignment::Center),
+        )
+        .center(Length::Fill)
+        .height(Length::Fill)
+        .style(side_panel_style),
+    ]
+    .spacing(12)
+    .padding(16)
+    .into()
+}
+
+fn settings_workspace(state: &AppState) -> Element<'_, Message> {
+    column![
+        workspace_page_header(state, "nav.settings", "settings.subtitle"),
+        row![
+            settings_category(
+                state,
+                "settings.general",
+                state.ui.workspace.language_label()
+            ),
+            settings_category(
+                state,
+                "settings.appearance",
+                theme_name(state.ui.workspace.theme)
+            ),
+            settings_category(state, "settings.ssh", "russh"),
+            settings_category(state, "settings.sftp", "dual layout"),
+        ]
+        .spacing(12),
+        row![
+            settings_category(state, "settings.terminal", "xterm-256color"),
+            settings_category(state, "settings.security", "keyring"),
+            settings_category(state, "settings.shortcuts", "Ctrl/Cmd+K"),
+            settings_category(state, "settings.advanced", "redb"),
+        ]
+        .spacing(12),
+        background_carousel_settings(state),
+    ]
+    .spacing(12)
+    .padding(16)
+    .into()
+}
+
+fn background_carousel_settings(state: &AppState) -> Element<'_, Message> {
+    let background = state.config.background.normalized();
+    let active_source = state
+        .ui
+        .workspace
+        .active_background_index(background.sources.len())
+        .and_then(|index| background.sources.get(index))
+        .map(background_label)
+        .unwrap_or("No background source")
+        .to_owned();
+    let summary = format!(
+        "{} sources · opacity {:.0}% · blur {:.0}px · {}s",
+        background.sources.len(),
+        background.opacity * 100.0,
+        background.blur,
+        background.rotation_interval_secs,
+    );
+
+    container(
+        row![
+            column![
+                text("Background Carousel").size(14).color(TEXT_STRONG),
+                text(summary).size(11).color(TEXT_MUTED),
+                text(active_source).size(11).color(TEXT_SOFT),
+            ]
+            .spacing(5)
+            .width(Length::Fill),
+            button(text("Next").size(11))
+                .padding([7, 10])
+                .style(ghost_button_style)
+                .on_press(Message::NextBackground),
         ]
         .spacing(12)
-        .padding(16),
+        .align_y(Alignment::Center),
     )
+    .padding(14)
     .width(Length::Fill)
-    .height(Length::Fill)
-    .style(workspace_style)
+    .style(side_panel_style)
     .into()
 }
 
@@ -433,6 +794,97 @@ fn workspace_tabs(state: &AppState) -> Element<'_, Message> {
     ]
     .spacing(10)
     .align_y(Alignment::Center)
+    .into()
+}
+
+fn workspace_page_header<'a>(
+    state: &'a AppState,
+    title_key: &'static str,
+    subtitle_key: &'static str,
+) -> Element<'a, Message> {
+    row![
+        column![
+            text(t(state, title_key)).size(20).color(TEXT_STRONG),
+            text(t(state, subtitle_key)).size(12).color(TEXT_MUTED),
+        ]
+        .spacing(3)
+        .width(Length::Fill),
+        toolbar_button(
+            t(state, "top.search"),
+            Message::OpenCommandPalette {
+                query: String::new(),
+            }
+        ),
+    ]
+    .spacing(10)
+    .align_y(Alignment::Center)
+    .into()
+}
+
+fn sftp_local_panel(state: &AppState) -> Element<'_, Message> {
+    let mut files = column![panel_title(t(state, "sftp.local"), 3)].spacing(8);
+    for (name, kind) in [
+        ("project/", "dir"),
+        ("deploy.sh", "file"),
+        ("artifact.tar", "file"),
+    ] {
+        files = files.push(file_row(name, kind));
+    }
+
+    container(files)
+        .padding(14)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(side_panel_style)
+        .into()
+}
+
+fn sftp_remote_panel(state: &AppState) -> Element<'_, Message> {
+    let mut files = column![panel_title(
+        t(state, "sftp.remote"),
+        state.sessions.sftp_browser_count()
+    )]
+    .spacing(8);
+
+    if let Some(browser) = state.sessions.sftp_browsers.first() {
+        for entry in &browser.entries {
+            files = files.push(file_row(
+                &entry.name,
+                match entry.kind {
+                    crate::model::SftpEntryKind::Directory => "dir",
+                    crate::model::SftpEntryKind::File => "file",
+                    crate::model::SftpEntryKind::Symlink => "link",
+                    crate::model::SftpEntryKind::Other => "other",
+                },
+            ));
+        }
+    } else {
+        files = files.push(empty_line(t(state, "sftp.empty")));
+    }
+
+    container(files)
+        .padding(14)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .style(side_panel_style)
+        .into()
+}
+
+fn settings_category<'a>(
+    state: &'a AppState,
+    key: &'static str,
+    value: &'a str,
+) -> Element<'a, Message> {
+    container(
+        column![
+            text(t(state, key)).size(14).color(TEXT_STRONG),
+            text(value).size(11).color(TEXT_MUTED),
+        ]
+        .spacing(6),
+    )
+    .padding(14)
+    .width(Length::Fill)
+    .style(side_panel_style)
     .into()
 }
 
@@ -483,7 +935,7 @@ fn terminal_stage(state: &AppState) -> Element<'_, Message> {
     if let Some(tab) = active_tab {
         let lines: Vec<&String> = tab.buffer.iter().rev().take(18).collect();
         if lines.is_empty() {
-            output = output.push(terminal_empty_state());
+            output = output.push(terminal_empty_state(state));
         } else {
             for line in lines.into_iter().rev() {
                 output = output.push(text(line).size(12).color(TERMINAL_TEXT));
@@ -492,10 +944,10 @@ fn terminal_stage(state: &AppState) -> Element<'_, Message> {
         output = output.push(shell_prompt(state, tab.session_id));
     } else {
         output = output
-            .push(terminal_empty_state())
+            .push(terminal_empty_state(state))
             .push(text("$ ssh deploy@production").size(12).color(TERMINAL_DIM))
             .push(
-                text("Waiting for a shell session...")
+                text(t(state, "terminal.waiting"))
                     .size(12)
                     .color(TERMINAL_TEXT),
             );
@@ -537,13 +989,13 @@ fn terminal_dot(color: Color) -> Element<'static, Message> {
         .into()
 }
 
-fn terminal_empty_state() -> Element<'static, Message> {
+fn terminal_empty_state(state: &AppState) -> Element<'_, Message> {
     column![
         Space::new().height(Length::Fill),
-        text("No active terminal output")
+        text(t(state, "terminal.empty_title"))
             .size(16)
             .color(TERMINAL_TEXT),
-        text("Open a host shell or run a command from the connection list.")
+        text(t(state, "terminal.empty_body"))
             .size(12)
             .color(TERMINAL_DIM),
         Space::new().height(Length::Fill),
@@ -563,7 +1015,7 @@ fn shell_prompt(state: &AppState, session_id: crate::model::SessionId) -> Elemen
         .unwrap_or(false);
 
     if !is_shell {
-        return text("Remote command output is read-only.")
+        return text(t(state, "terminal.read_only"))
             .size(11)
             .color(TERMINAL_DIM)
             .into();
@@ -572,14 +1024,17 @@ fn shell_prompt(state: &AppState, session_id: crate::model::SessionId) -> Elemen
     let draft = state.ui.terminal_input_for(session_id);
     row![
         text("❯").size(14).color(ACCENT),
-        text_input("send input", draft)
+        text_input(t(state, "terminal.send_input"), draft)
             .on_input(move |input| Message::UpdateTerminalInputDraft { session_id, input })
             .on_submit(Message::SendTerminalInput { session_id })
             .size(12)
             .padding([8, 10])
             .style(terminal_input_style)
             .width(Length::Fill),
-        small_action("Send", Message::SendTerminalInput { session_id }),
+        small_action(
+            t(state, "terminal.send"),
+            Message::SendTerminalInput { session_id }
+        ),
     ]
     .spacing(8)
     .align_y(Alignment::Center)
@@ -588,15 +1043,15 @@ fn shell_prompt(state: &AppState, session_id: crate::model::SessionId) -> Elemen
 
 fn snippet_strip(state: &AppState) -> Element<'_, Message> {
     let mut snippets = column![
-        panel_title("Snippets", state.storage.snippet_count()),
-        text("Reusable commands with variables")
+        panel_title(t(state, "nav.snippets"), state.storage.snippet_count()),
+        text(t(state, "snippet.subtitle"))
             .size(11)
             .color(TEXT_MUTED),
     ]
     .spacing(8);
 
     if state.storage.snippets.is_empty() {
-        snippets = snippets.push(empty_line("Save a command as a snippet from a host."));
+        snippets = snippets.push(empty_line(t(state, "snippet.empty")));
     } else {
         for snippet in state.storage.snippets.iter().take(4) {
             snippets = snippets.push(
@@ -622,8 +1077,8 @@ fn snippet_strip(state: &AppState) -> Element<'_, Message> {
 }
 
 fn sftp_preview(state: &AppState) -> Element<'_, Message> {
-    let mut left = column![text("Local").size(12).color(TEXT_MUTED)].spacing(6);
-    let mut right = column![text("Remote").size(12).color(TEXT_MUTED)].spacing(6);
+    let mut left = column![text(t(state, "sftp.local")).size(12).color(TEXT_MUTED)].spacing(6);
+    let mut right = column![text(t(state, "sftp.remote")).size(12).color(TEXT_MUTED)].spacing(6);
 
     left = left
         .push(file_row("project/", "dir"))
@@ -646,12 +1101,12 @@ fn sftp_preview(state: &AppState) -> Element<'_, Message> {
         right = right
             .push(file_row("/home", "dir"))
             .push(file_row("/var/log", "dir"))
-            .push(file_row("open SFTP to load", "hint"));
+            .push(file_row(t(state, "sftp.open_to_load"), "hint"));
     }
 
     container(
         column![
-            panel_title("SFTP", state.sessions.sftp_browser_count()),
+            panel_title(t(state, "nav.sftp"), state.sessions.sftp_browser_count()),
             row![left.width(Length::Fill), right.width(Length::Fill)].spacing(10),
         ]
         .spacing(10),
@@ -680,6 +1135,10 @@ fn file_row<'a>(name: &'a str, kind: &'static str) -> Element<'a, Message> {
 }
 
 fn activity_panel(state: &AppState) -> Element<'_, Message> {
+    if state.ui.workspace.right_sidebar_collapsed {
+        return collapsed_activity_panel(state);
+    }
+
     container(
         column![
             activity_header(state),
@@ -698,27 +1157,60 @@ fn activity_panel(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
+fn collapsed_activity_panel(state: &AppState) -> Element<'_, Message> {
+    container(
+        column![
+            button(text("›").size(18))
+                .padding([8, 10])
+                .style(primary_button_style)
+                .on_press(Message::ToggleRightSidebar),
+            text(t(state, "activity.collapsed"))
+                .size(10)
+                .color(TEXT_MUTED),
+        ]
+        .spacing(10)
+        .align_x(Alignment::Center),
+    )
+    .width(42)
+    .height(Length::Fill)
+    .padding([14, 4])
+    .style(activity_style)
+    .into()
+}
+
 fn activity_header(state: &AppState) -> Element<'_, Message> {
-    column![
-        text("Activity").size(16).color(TEXT_STRONG),
-        text(format!(
-            "{} transfers · {} tunnel rules · {} bookmarks",
-            state.sessions.transfer_count(),
-            state.storage.tunnel_rule_count(),
-            state.storage.sftp_bookmark_count()
-        ))
-        .size(11)
-        .color(TEXT_MUTED),
+    row![
+        column![
+            text(t(state, "activity.title")).size(16).color(TEXT_STRONG),
+            text(format!(
+                "{} {} · {} {} · {} {}",
+                state.sessions.transfer_count(),
+                t(state, "activity.transfers"),
+                state.storage.tunnel_rule_count(),
+                t(state, "activity.tunnel_rules"),
+                state.storage.sftp_bookmark_count(),
+                t(state, "activity.bookmarks"),
+            ))
+            .size(11)
+            .color(TEXT_MUTED),
+        ]
+        .spacing(4)
+        .width(Length::Fill),
+        button(text("‹").size(14))
+            .padding([6, 9])
+            .style(ghost_button_style)
+            .on_press(Message::ToggleRightSidebar),
     ]
-    .spacing(4)
+    .spacing(8)
+    .align_y(Alignment::Center)
     .into()
 }
 
 fn runtime_section(state: &AppState) -> Element<'_, Message> {
-    let mut rows = column![section_label("RUNTIME")].spacing(7);
+    let mut rows = column![section_label(t(state, "activity.runtime"))].spacing(7);
 
     if state.sessions.tabs.is_empty() {
-        rows = rows.push(empty_line("No running sessions."));
+        rows = rows.push(empty_line(t(state, "activity.no_sessions")));
     } else {
         for tab in state.sessions.tabs.iter().take(4) {
             let mut line = row![
@@ -728,7 +1220,7 @@ fn runtime_section(state: &AppState) -> Element<'_, Message> {
                 ]
                 .spacing(2)
                 .width(Length::Fill),
-                button(text("Close").size(10))
+                button(text(t(state, "common.close")).size(10))
                     .padding([5, 8])
                     .style(ghost_button_style)
                     .on_press(Message::CloseSessionTab { session_id: tab.id }),
@@ -738,7 +1230,7 @@ fn runtime_section(state: &AppState) -> Element<'_, Message> {
 
             if let SessionKind::Tunnel { rule_name } = &tab.kind {
                 line = line.push(
-                    button(text("Stop").size(10))
+                    button(text(t(state, "common.stop")).size(10))
                         .padding([5, 8])
                         .style(danger_button_style)
                         .on_press(Message::StopTunnel {
@@ -756,10 +1248,10 @@ fn runtime_section(state: &AppState) -> Element<'_, Message> {
 }
 
 fn recent_section(state: &AppState) -> Element<'_, Message> {
-    let mut rows = column![section_label("RECENT")].spacing(7);
+    let mut rows = column![section_label(t(state, "activity.recent"))].spacing(7);
 
     if state.storage.recent_connections.is_empty() {
-        rows = rows.push(empty_line("Recent connections appear here."));
+        rows = rows.push(empty_line(t(state, "activity.no_recent")));
     } else {
         for item in state.storage.recent_connections.iter().take(4) {
             rows = rows.push(
@@ -768,7 +1260,7 @@ fn recent_section(state: &AppState) -> Element<'_, Message> {
                         .size(12)
                         .color(TEXT_SOFT)
                         .width(Length::Fill),
-                    button(text("Open").size(10))
+                    button(text(t(state, "common.open")).size(10))
                         .padding([5, 8])
                         .style(ghost_button_style)
                         .on_press(Message::OpenRecentConnection {
@@ -785,14 +1277,14 @@ fn recent_section(state: &AppState) -> Element<'_, Message> {
 }
 
 fn history_section(state: &AppState) -> Element<'_, Message> {
-    let mut rows = column![section_label("COMMAND HISTORY")].spacing(7);
+    let mut rows = column![section_label(t(state, "activity.history"))].spacing(7);
 
     if state.storage.command_history.is_empty() {
-        rows = rows.push(empty_line("Run commands to build history."));
+        rows = rows.push(empty_line(t(state, "activity.no_history")));
     } else {
         for item in state.storage.command_history.iter().rev().take(4) {
             let run_button: Element<'_, Message> = if item.host_id.is_some() {
-                button(text("Run").size(10))
+                button(text(t(state, "tool.run_short")).size(10))
                     .padding([5, 8])
                     .style(ghost_button_style)
                     .on_press(Message::RunCommandHistory {
@@ -822,14 +1314,25 @@ fn history_section(state: &AppState) -> Element<'_, Message> {
 fn compact_links(state: &AppState) -> Element<'_, Message> {
     container(
         column![
-            text("Advanced panels").size(12).color(TEXT_MUTED),
-            compact_metric("credentials", state.storage.credential_count()),
-            compact_metric("known hosts", state.storage.known_host_count()),
+            text(t(state, "activity.advanced"))
+                .size(12)
+                .color(TEXT_MUTED),
             compact_metric(
-                "visual profiles",
+                t(state, "activity.credentials"),
+                state.storage.credential_count()
+            ),
+            compact_metric(
+                t(state, "activity.known_hosts"),
+                state.storage.known_host_count()
+            ),
+            compact_metric(
+                t(state, "activity.visual_profiles"),
                 usize::from(state.config.background.enabled)
             ),
-            compact_metric("workspace tabs", state.storage.workspace_tab_count()),
+            compact_metric(
+                t(state, "activity.workspace_tabs"),
+                state.storage.workspace_tab_count()
+            ),
         ]
         .spacing(6),
     )
@@ -838,7 +1341,7 @@ fn compact_links(state: &AppState) -> Element<'_, Message> {
     .into()
 }
 
-fn compact_metric(label: &'static str, value: usize) -> Element<'static, Message> {
+fn compact_metric(label: &str, value: usize) -> Element<'_, Message> {
     row![
         text(label).size(11).color(TEXT_MUTED).width(Length::Fill),
         text(value.to_string()).size(11).color(TEXT_SOFT),
@@ -847,7 +1350,7 @@ fn compact_metric(label: &'static str, value: usize) -> Element<'static, Message
     .into()
 }
 
-fn panel_title(label: &'static str, count: usize) -> Element<'static, Message> {
+fn panel_title(label: &str, count: usize) -> Element<'_, Message> {
     row![
         text(label).size(14).color(TEXT_STRONG).width(Length::Fill),
         text(count.to_string()).size(11).color(TEXT_MUTED),
@@ -856,7 +1359,7 @@ fn panel_title(label: &'static str, count: usize) -> Element<'static, Message> {
     .into()
 }
 
-fn empty_line(label: &'static str) -> Element<'static, Message> {
+fn empty_line(label: &str) -> Element<'_, Message> {
     text(label).size(11).color(TEXT_MUTED).into()
 }
 
@@ -884,236 +1387,6 @@ fn vertical_rule() -> Element<'static, Message> {
         .height(Length::Fill)
         .style(rule_style)
         .into()
-}
-
-const TEXT_STRONG: Color = Color::from_rgb8(236, 240, 246);
-const TEXT_SOFT: Color = Color::from_rgb8(199, 208, 219);
-const TEXT_MUTED: Color = Color::from_rgb8(127, 139, 153);
-const TEXT_SUBTLE: Color = Color::from_rgb8(91, 103, 118);
-const ACCENT: Color = Color::from_rgb8(47, 201, 146);
-const BLUE: Color = Color::from_rgb8(94, 151, 246);
-const SURFACE: Color = Color::from_rgb8(18, 23, 31);
-const SURFACE_2: Color = Color::from_rgb8(24, 31, 41);
-const BORDER: Color = Color::from_rgb8(47, 58, 74);
-const TERMINAL_BG: Color = Color::from_rgb8(6, 10, 14);
-const TERMINAL_TEXT: Color = Color::from_rgb8(198, 238, 214);
-const TERMINAL_DIM: Color = Color::from_rgb8(95, 120, 112);
-
-fn app_background_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(11, 15, 21))
-        .color(TEXT_SOFT)
-}
-
-fn title_bar_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(14, 19, 26))
-        .border(Border::default().width(1).color(BORDER))
-}
-
-fn rail_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(13, 18, 25))
-        .border(Border::default().width(1).color(BORDER))
-}
-
-fn workspace_style(_: &Theme) -> container::Style {
-    container::Style::default().background(Color::from_rgb8(11, 15, 21))
-}
-
-fn activity_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(14, 19, 26))
-        .border(Border::default().width(1).color(BORDER))
-}
-
-fn quick_connect_style(_: &Theme) -> container::Style {
-    elevated_style(SURFACE_2, 8)
-}
-
-fn host_card_style(_: &Theme) -> container::Style {
-    elevated_style(SURFACE, 8).border(Border::default().rounded(8).width(1).color(BORDER))
-}
-
-fn side_panel_style(_: &Theme) -> container::Style {
-    elevated_style(SURFACE_2, 8)
-}
-
-fn terminal_style(_: &Theme) -> container::Style {
-    container::Style {
-        text_color: Some(TERMINAL_TEXT),
-        background: Some(Background::Color(TERMINAL_BG)),
-        border: Border::default()
-            .rounded(8)
-            .width(1)
-            .color(Color::from_rgb8(32, 50, 48)),
-        shadow: Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.35),
-            offset: Vector::new(0.0, 8.0),
-            blur_radius: 24.0,
-        },
-        snap: false,
-    }
-}
-
-fn list_item_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(21, 27, 36))
-        .border(Border::default().rounded(6).width(1).color(BORDER))
-}
-
-fn selected_row_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(23, 44, 42))
-        .border(Border::default().rounded(6).width(1).color(ACCENT))
-}
-
-fn transparent_style(_: &Theme) -> container::Style {
-    container::Style::default()
-}
-
-fn accent_block_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(ACCENT)
-        .border(Border::default().rounded(8))
-}
-
-fn badge_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(34, 47, 59))
-        .border(Border::default().rounded(8).width(1).color(BORDER))
-}
-
-fn active_tab_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(28, 43, 49))
-        .border(Border::default().rounded(8).width(1).color(ACCENT))
-}
-
-fn quiet_tab_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(SURFACE)
-        .border(Border::default().rounded(8).width(1).color(BORDER))
-}
-
-fn pill_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(20, 26, 35))
-        .border(Border::default().rounded(999).width(1).color(BORDER))
-}
-
-fn rule_style(_: &Theme) -> container::Style {
-    container::Style::default().background(BORDER)
-}
-
-fn error_banner_style(_: &Theme) -> container::Style {
-    container::Style::default()
-        .background(Color::from_rgb8(78, 40, 32))
-        .border(
-            Border::default()
-                .width(1)
-                .color(Color::from_rgb8(144, 68, 48)),
-        )
-}
-
-fn elevated_style(background: Color, radius: u8) -> container::Style {
-    container::Style {
-        text_color: Some(TEXT_SOFT),
-        background: Some(Background::Color(background)),
-        border: Border::default().rounded(radius).width(1).color(BORDER),
-        shadow: Shadow {
-            color: Color::from_rgba(0.0, 0.0, 0.0, 0.20),
-            offset: Vector::new(0.0, 4.0),
-            blur_radius: 14.0,
-        },
-        snap: false,
-    }
-}
-
-fn primary_button_style(_: &Theme, status: button::Status) -> button::Style {
-    let bg = match status {
-        button::Status::Hovered => Color::from_rgb8(61, 215, 160),
-        _ => ACCENT,
-    };
-
-    button::Style {
-        background: Some(Background::Color(bg)),
-        text_color: Color::from_rgb8(3, 20, 16),
-        border: Border::default().rounded(6),
-        shadow: Shadow::default(),
-        snap: false,
-    }
-}
-
-fn ghost_button_style(_: &Theme, status: button::Status) -> button::Style {
-    let bg = match status {
-        button::Status::Hovered => Color::from_rgb8(34, 45, 58),
-        _ => Color::from_rgb8(23, 30, 40),
-    };
-
-    button::Style {
-        background: Some(Background::Color(bg)),
-        text_color: TEXT_SOFT,
-        border: Border::default().rounded(6).width(1).color(BORDER),
-        shadow: Shadow::default(),
-        snap: false,
-    }
-}
-
-fn danger_button_style(_: &Theme, _: button::Status) -> button::Style {
-    button::Style {
-        background: Some(Background::Color(Color::from_rgb8(74, 35, 35))),
-        text_color: Color::from_rgb8(255, 196, 196),
-        border: Border::default()
-            .rounded(6)
-            .width(1)
-            .color(Color::from_rgb8(129, 56, 56)),
-        shadow: Shadow::default(),
-        snap: false,
-    }
-}
-
-fn flat_button_style(_: &Theme, _: button::Status) -> button::Style {
-    button::Style {
-        background: None,
-        text_color: TEXT_SOFT,
-        border: Border::default(),
-        shadow: Shadow::default(),
-        snap: false,
-    }
-}
-
-fn input_style(_: &Theme, status: text_input::Status) -> text_input::Style {
-    let border_color = match status {
-        text_input::Status::Focused { .. } => ACCENT,
-        text_input::Status::Hovered => BLUE,
-        _ => BORDER,
-    };
-
-    text_input::Style {
-        background: Background::Color(Color::from_rgb8(12, 17, 24)),
-        border: Border::default().rounded(6).width(1).color(border_color),
-        icon: TEXT_MUTED,
-        placeholder: TEXT_SUBTLE,
-        value: TEXT_STRONG,
-        selection: Color::from_rgb8(42, 94, 78),
-    }
-}
-
-fn terminal_input_style(_: &Theme, status: text_input::Status) -> text_input::Style {
-    let border_color = match status {
-        text_input::Status::Focused { .. } => ACCENT,
-        _ => Color::from_rgb8(26, 47, 43),
-    };
-
-    text_input::Style {
-        background: Background::Color(Color::from_rgb8(5, 12, 13)),
-        border: Border::default().rounded(6).width(1).color(border_color),
-        icon: TERMINAL_DIM,
-        placeholder: TERMINAL_DIM,
-        value: TERMINAL_TEXT,
-        selection: Color::from_rgb8(25, 82, 62),
-    }
 }
 
 #[cfg(test)]

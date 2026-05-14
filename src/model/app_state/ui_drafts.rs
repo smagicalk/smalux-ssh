@@ -8,6 +8,7 @@ use crate::model::QuickHostDraftField;
 use crate::model::SessionId;
 use crate::model::SessionKind;
 use crate::model::SftpActionDraftField;
+use crate::model::WorkspacePage;
 use uuid::Uuid;
 
 use super::{AppState, AppUpdateOutcome};
@@ -150,6 +151,50 @@ impl AppState {
             queued_backend_commands: 1,
             ..AppUpdateOutcome::default()
         }
+    }
+
+    /// 切换当前一级工作区页面。
+    pub(super) fn set_workspace_page(&mut self, page: WorkspacePage) -> AppUpdateOutcome {
+        self.ui.workspace.active_page = page;
+        draft_changed()
+    }
+
+    /// 切换 Hosts 列表展示方式。
+    pub(super) fn toggle_host_list_mode(&mut self) -> AppUpdateOutcome {
+        self.ui.workspace.toggle_host_list_mode();
+        draft_changed()
+    }
+
+    /// 折叠或展开右侧详情栏。
+    pub(super) fn toggle_right_sidebar(&mut self) -> AppUpdateOutcome {
+        self.ui.workspace.toggle_right_sidebar();
+        draft_changed()
+    }
+
+    /// 打开命令面板。
+    pub(super) fn open_command_palette(&mut self, query: String) -> AppUpdateOutcome {
+        self.ui.workspace.open_command_palette(query);
+        draft_changed()
+    }
+
+    /// 更新命令面板查询。
+    pub(super) fn update_command_palette_query(&mut self, query: String) -> AppUpdateOutcome {
+        self.ui.workspace.command_palette.query = query;
+        self.ui.workspace.command_palette.open = true;
+        draft_changed()
+    }
+
+    /// 关闭命令面板。
+    pub(super) fn close_command_palette(&mut self) -> AppUpdateOutcome {
+        self.ui.workspace.close_command_palette();
+        draft_changed()
+    }
+
+    /// 切换到下一张背景轮播图。
+    pub(super) fn next_background(&mut self) -> AppUpdateOutcome {
+        let source_count = self.config.background.normalized().sources.len();
+        self.ui.workspace.next_background(source_count);
+        draft_changed()
     }
 }
 
@@ -336,6 +381,30 @@ mod tests {
 
         assert!(outcome.changed());
         assert_eq!(state.ui.terminal_input_for(session_id), "ls");
+        assert_eq!(state.backend_commands.pending_count(), 0);
+    }
+
+    #[test]
+    fn workspace_ui_messages_update_layout_state_only() {
+        let mut state = AppState::default();
+
+        state.apply(Message::SetWorkspacePage {
+            page: WorkspacePage::Settings,
+        });
+        state.apply(Message::ToggleHostListMode);
+        state.apply(Message::ToggleRightSidebar);
+        state.apply(Message::OpenCommandPalette {
+            query: "prod".to_owned(),
+        });
+
+        assert_eq!(state.ui.workspace.active_page, WorkspacePage::Settings);
+        assert!(matches!(
+            state.ui.workspace.host_list_mode,
+            crate::model::HostListMode::Card
+        ));
+        assert!(state.ui.workspace.right_sidebar_collapsed);
+        assert!(state.ui.workspace.command_palette.open);
+        assert_eq!(state.ui.workspace.command_palette.query, "prod");
         assert_eq!(state.backend_commands.pending_count(), 0);
     }
 }

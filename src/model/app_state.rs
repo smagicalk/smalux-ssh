@@ -17,7 +17,7 @@ use crate::terminal::TerminalManager;
 use super::{
     CommandHistoryId, HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
     SessionId, SessionKind, SessionStatus, SessionTab, SftpActionDraftField, SnippetId, TunnelRule,
-    TunnelStatus, UiState, VisualSettingsDraftField,
+    TunnelStatus, UiState, VisualSettingsDraftField, WorkspacePage,
 };
 
 mod backend_pump;
@@ -143,6 +143,19 @@ pub enum Message {
         port: u16,
     },
     DismissUiError,
+    SetWorkspacePage {
+        page: WorkspacePage,
+    },
+    ToggleHostListMode,
+    ToggleRightSidebar,
+    OpenCommandPalette {
+        query: String,
+    },
+    UpdateCommandPaletteQuery {
+        query: String,
+    },
+    CloseCommandPalette,
+    NextBackground,
     CloseSessionTab {
         session_id: SessionId,
     },
@@ -336,6 +349,15 @@ impl AppState {
             Message::TrustKnownHost { host, port } => self.trust_known_host(&host, port),
             Message::RemoveKnownHost { host, port } => self.remove_known_host(&host, port),
             Message::DismissUiError => self.dismiss_ui_error(),
+            Message::SetWorkspacePage { page } => self.set_workspace_page(page),
+            Message::ToggleHostListMode => self.toggle_host_list_mode(),
+            Message::ToggleRightSidebar => self.toggle_right_sidebar(),
+            Message::OpenCommandPalette { query } => self.open_command_palette(query),
+            Message::UpdateCommandPaletteQuery { query } => {
+                self.update_command_palette_query(query)
+            }
+            Message::CloseCommandPalette => self.close_command_palette(),
+            Message::NextBackground => self.next_background(),
             Message::CloseSessionTab { session_id } => self.close_session_tab(session_id),
             Message::ActivateTerminalTab { session_id } => {
                 if self.terminal.set_active_tab(session_id) {

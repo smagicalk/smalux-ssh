@@ -6,6 +6,7 @@ mod quick_host;
 mod sftp_action;
 mod terminal_input;
 mod visual_settings;
+mod workspace_ui;
 
 use super::{BackgroundProfile, HostId, SessionId, ThemeProfile};
 
@@ -13,6 +14,7 @@ pub use quick_host::*;
 pub use sftp_action::*;
 pub use terminal_input::*;
 pub use visual_settings::*;
+pub use workspace_ui::*;
 
 pub const DEFAULT_REMOTE_COMMAND: &str = "uptime";
 pub const DEFAULT_SFTP_INITIAL_DIR: &str = "/";
@@ -46,6 +48,7 @@ pub struct UiState {
     pub host_action_drafts: Vec<HostActionDraft>,
     pub sftp_action_drafts: Vec<SftpActionDraft>,
     pub terminal_input_drafts: Vec<TerminalInputDraft>,
+    pub workspace: WorkspaceUiState,
 }
 
 impl UiState {
@@ -59,6 +62,7 @@ impl UiState {
             host_action_drafts: Vec::new(),
             sftp_action_drafts: Vec::new(),
             terminal_input_drafts: Vec::new(),
+            workspace: WorkspaceUiState::default(),
         }
     }
 
