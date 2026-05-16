@@ -3,11 +3,13 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, PtyRequest, RemoteCommandRequest};
-use crate::model::{CommandHistoryId, CommandHistoryItem, HostId, SessionId, SessionStatus};
+use crate::model::{
+    CommandHistoryId, CommandHistoryItem, HostId, SessionId, SessionStatus, WorkspacePage,
+};
 use crate::terminal::TerminalTabState;
 
 use super::launch::{connect_command, missing_host, queued_outcome, unix_now_secs};
-use super::{AppState, AppUpdateOutcome, WorkspacePage};
+use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
     /// 执行一次性远程命令，并记录主机作用域命令历史。
