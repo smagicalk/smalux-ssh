@@ -417,6 +417,56 @@ fn cancel_sftp_upload_clears_browser_loading_when_queued_request_is_removed() {
 }
 
 #[test]
+fn cancel_sftp_upload_keeps_browser_loading_when_another_refresh_request_remains() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    assert!(
+        state
+            .sessions
+            .set_sftp_entries(host_id, "/home/ops", Vec::new())
+    );
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/app.tar.gz".to_owned(),
+    });
+    state.apply(Message::UploadSftp { host_id });
+    let first_transfer_id = state.sessions.transfers[0].id;
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/assets.tar.gz".to_owned(),
+    });
+    state.apply(Message::UploadSftp { host_id });
+    assert_eq!(state.backend_commands.pending_count(), 2);
+
+    let outcome = state.apply(Message::CancelSftpTransfer {
+        transfer_id: first_transfer_id,
+    });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_none());
+    assert_eq!(state.backend_commands.pending_count(), 1);
+    assert!(state.sessions.sftp_browsers[0].loading);
+    assert!(matches!(
+        state.sessions.transfers[0].status,
+        crate::model::TransferStatus::Cancelled
+    ));
+    assert!(matches!(
+        state.sessions.transfers[1].status,
+        crate::model::TransferStatus::Queued
+    ));
+}
+
+#[test]
 fn cancel_sftp_transfer_rejects_transfer_already_removed_from_queue() {
     let mut state = AppState::default();
     let host = sample_host();

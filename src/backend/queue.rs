@@ -31,6 +31,11 @@ impl BackendCommandQueue {
         self.commands.front()
     }
 
+    /// 按排队顺序只读遍历待执行命令。
+    pub fn iter(&self) -> impl Iterator<Item = &BackendCommand> {
+        self.commands.iter()
+    }
+
     /// 排空队列并返回待执行命令。
     pub fn drain(&mut self) -> Vec<BackendCommand> {
         self.commands.drain(..).collect()
@@ -130,5 +135,25 @@ mod tests {
             queue.front(),
             Some(BackendCommand::Disconnect { session_id }) if *session_id == second
         ));
+    }
+
+    #[test]
+    fn iter_reads_commands_without_consuming_queue() {
+        let mut queue = BackendCommandQueue::default();
+        let first = session_id();
+        let second = session_id();
+
+        queue.extend([
+            BackendCommand::Disconnect { session_id: first },
+            BackendCommand::Disconnect { session_id: second },
+        ]);
+
+        let session_ids = queue
+            .iter()
+            .map(BackendCommand::session_id)
+            .collect::<Vec<_>>();
+
+        assert_eq!(session_ids, vec![first, second]);
+        assert_eq!(queue.pending_count(), 2);
     }
 }

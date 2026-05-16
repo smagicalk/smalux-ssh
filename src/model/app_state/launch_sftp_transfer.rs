@@ -5,7 +5,9 @@ use std::path::Path;
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, SftpRequest};
-use crate::model::{HostId, TransferDirection, TransferId, TransferStatus, TransferTask};
+use crate::model::{
+    HostId, SessionId, TransferDirection, TransferId, TransferStatus, TransferTask,
+};
 
 use super::launch::{join_remote_path, queued_outcome};
 use super::launch_sftp::missing_sftp_browser;
@@ -149,8 +151,14 @@ impl AppState {
             };
         }
 
+        let has_pending_browser_refresh =
+            has_pending_sftp_browser_refresh(&self.sessions, &self.backend_commands, task.host_id);
         let transfer_cancelled = self.sessions.cancel_queued_transfer(transfer_id);
-        let loading_cleared = clear_loading_for_cancelled_transfer(&mut self.sessions, &task);
+        let loading_cleared = clear_loading_for_cancelled_transfer(
+            &mut self.sessions,
+            &task,
+            has_pending_browser_refresh,
+        );
 
         AppUpdateOutcome {
             state_changed: transfer_cancelled || loading_cleared || removed_commands > 0,
@@ -207,10 +215,40 @@ fn is_sftp_transfer_command(command: &BackendCommand, transfer_id: TransferId) -
 fn clear_loading_for_cancelled_transfer(
     sessions: &mut crate::session::SessionManager,
     task: &TransferTask,
+    has_pending_browser_refresh: bool,
 ) -> bool {
-    if matches!(task.direction, TransferDirection::Upload) {
+    if matches!(task.direction, TransferDirection::Upload) && !has_pending_browser_refresh {
         sessions.set_sftp_loading(task.host_id, false)
     } else {
         false
     }
+}
+
+fn has_pending_sftp_browser_refresh(
+    sessions: &crate::session::SessionManager,
+    commands: &crate::backend::BackendCommandQueue,
+    host_id: HostId,
+) -> bool {
+    commands.iter().any(|command| {
+        let BackendCommand::Sftp {
+            session_id,
+            request,
+        } = command
+        else {
+            return false;
+        };
+
+        request.refreshes_browser() && session_matches_host(sessions, *session_id, host_id)
+    })
+}
+
+fn session_matches_host(
+    sessions: &crate::session::SessionManager,
+    session_id: SessionId,
+    host_id: HostId,
+) -> bool {
+    sessions
+        .tabs
+        .iter()
+        .any(|tab| tab.id == session_id && tab.host_id == Some(host_id))
 }
