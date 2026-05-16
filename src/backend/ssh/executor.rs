@@ -1,6 +1,7 @@
 //! `russh` 后端执行器。
 
 use std::collections::HashMap;
+use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
@@ -28,6 +29,9 @@ pub struct RusshBackendExecutor<S: SecretStore + Send> {
     sftps: HashMap<SessionId, RemoteSftp>,
     tunnels: HashMap<String, RemoteTunnel>,
 }
+
+const REMOTE_SHELL_DRAIN_MAX_EVENTS: usize = 64;
+const REMOTE_SHELL_DRAIN_POLL_TIMEOUT: Duration = Duration::from_millis(1);
 
 impl<S: SecretStore + Send> RusshBackendExecutor<S> {
     /// 创建使用默认连接器的真实 SSH 执行器。
@@ -108,6 +112,26 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             .ok_or_else(|| connected_session_error("send shell input"))?;
         runtime.block_on(shell.send_input(input.as_bytes()))?;
         Ok(Vec::new())
+    }
+
+    fn drain_session_output(
+        &mut self,
+        session_id: SessionId,
+    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        let runtime = &self.runtime;
+        let Some(shell) = self.shells.get_mut(&session_id) else {
+            return Ok(Vec::new());
+        };
+        let events = runtime.block_on(shell.drain_ready_events(
+            REMOTE_SHELL_DRAIN_MAX_EVENTS,
+            REMOTE_SHELL_DRAIN_POLL_TIMEOUT,
+        ));
+
+        if events.iter().any(BackendEvent::is_terminal) {
+            self.shells.remove(&session_id);
+        }
+
+        Ok(events)
     }
 
     fn run_command(
@@ -211,7 +235,9 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
             BackendCommand::SendShellInput { session_id, input } => {
                 self.send_shell_input(session_id, input)
             }
-            BackendCommand::DrainSessionOutput { .. } => Ok(Vec::new()),
+            BackendCommand::DrainSessionOutput { session_id } => {
+                self.drain_session_output(session_id)
+            }
             BackendCommand::Sftp {
                 session_id,
                 request,

@@ -112,6 +112,23 @@ fn drain_session_output_noops_for_remote_executor() {
 }
 
 #[test]
+fn drain_session_output_without_shell_stays_empty_even_after_disconnect() {
+    let mut executor =
+        RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
+    let session_id = session_id();
+
+    let first = executor
+        .execute(BackendCommand::DrainSessionOutput { session_id })
+        .expect("缺失 shell 应保持幂等");
+    let second = executor
+        .execute(BackendCommand::Disconnect { session_id })
+        .expect("断开缺失连接应保持幂等");
+
+    assert!(first.is_empty());
+    assert_eq!(second, vec![BackendEvent::Disconnected { session_id }]);
+}
+
+#[test]
 fn run_command_requires_connected_session() {
     let mut executor =
         RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");

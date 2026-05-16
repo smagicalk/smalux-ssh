@@ -1,9 +1,11 @@
 //! SSH session channel、PTY、shell 和远程命令执行。
 
 use std::io::Cursor;
+use std::time::Duration;
 
 use russh::client;
 use russh::{Channel, ChannelMsg};
+use tokio::time::timeout;
 
 use crate::backend::{BackendEvent, BackendExecutionError, PtyRequest, RemoteCommandRequest};
 use crate::model::SessionId;
@@ -55,14 +57,50 @@ impl RemoteShell {
             .map_err(|error| channel_error("shell resize", error))
     }
 
-    /// 读取下一条远程 shell 输出事件。
-    pub async fn next_event(&mut self) -> Option<BackendEvent> {
-        match self.channel.wait().await {
-            Some(message) => shell_message_to_event(self.session_id, message),
-            None => Some(BackendEvent::Disconnected {
-                session_id: self.session_id,
-            }),
+    /// 在给定时间预算内尽量抽干已经到达的远程 shell 输出。
+    pub async fn drain_ready_events(
+        &mut self,
+        max_events: usize,
+        poll_timeout: Duration,
+    ) -> Vec<BackendEvent> {
+        let mut events = Vec::new();
+
+        if max_events == 0 {
+            return events;
         }
+
+        while events.len() < max_events {
+            let message = if events.is_empty() {
+                match timeout(poll_timeout, self.channel.wait()).await {
+                    Ok(message) => message,
+                    Err(_) => break,
+                }
+            } else {
+                match timeout(Duration::ZERO, self.channel.wait()).await {
+                    Ok(message) => message,
+                    Err(_) => break,
+                }
+            };
+
+            let Some(message) = message else {
+                events.push(BackendEvent::Disconnected {
+                    session_id: self.session_id,
+                });
+                break;
+            };
+
+            let Some(event) = shell_message_to_event(self.session_id, message) else {
+                continue;
+            };
+
+            let disconnected = matches!(event, BackendEvent::Disconnected { .. });
+            events.push(event);
+            if disconnected {
+                break;
+            }
+        }
+
+        events
     }
 }
 

@@ -85,6 +85,18 @@ impl SessionManager {
         before != self.tabs.len()
     }
 
+    /// 返回需要后台轮询输出的交互式 shell 标签页。
+    pub fn interactive_shell_tab_ids(&self) -> Vec<SessionId> {
+        self.tabs
+            .iter()
+            .filter(|tab| {
+                matches!(tab.kind, SessionKind::LocalShell | SessionKind::Shell)
+                    && matches!(tab.status, SessionStatus::Connected)
+            })
+            .map(|tab| tab.id)
+            .collect()
+    }
+
     /// 从工作区快照恢复可见标签页元数据，不自动建立网络连接。
     pub fn restore_tabs_from_workspace(
         &mut self,
@@ -225,6 +237,24 @@ mod tests {
         assert_eq!(sessions.tab_count(), 1);
         assert_eq!(sessions.active_tab, Some(first_id));
         assert!(!sessions.close_tab(second_id));
+    }
+
+    #[test]
+    fn interactive_shell_tab_ids_include_only_connected_shell_tabs() {
+        let mut sessions = SessionManager::default();
+        let local_id = session_id();
+        let shell_id = session_id();
+        let command_id = session_id();
+
+        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_shell_tab(shell_id, host_id(), "production");
+        sessions.open_remote_command_tab(command_id, host_id(), "uptime");
+        sessions.set_status(shell_id, SessionStatus::Connected);
+
+        assert_eq!(
+            sessions.interactive_shell_tab_ids(),
+            vec![local_id, shell_id]
+        );
     }
 
     #[test]
