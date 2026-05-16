@@ -2,8 +2,8 @@
 //!
 //! 负责关闭、激活会话标签页，以及清理关联的终端、SFTP 和隧道运行态。
 
-use crate::backend::BackendCommand;
-use crate::model::{SessionId, SessionKind, SessionStatus, SessionTab, TunnelStatus};
+use crate::backend::{BackendCommand, SftpRequest};
+use crate::model::{SessionId, SessionKind, SessionStatus, SessionTab, TransferId, TunnelStatus};
 
 use super::{AppState, AppUpdateOutcome};
 
@@ -31,7 +31,9 @@ impl AppState {
             }
         }
 
-        let should_disconnect = should_disconnect_on_close(&tab);
+        let pending_cleanup = self.remove_pending_backend_commands_for_session(session_id);
+        let should_disconnect =
+            should_disconnect_on_close(&tab) && !pending_cleanup.removed_connect;
         let session_closed = self.sessions.close_tab(session_id);
         let terminal_closed = self.terminal.close_tab(session_id);
         let sftp_browser_removed = self.remove_sftp_browser_after_tab_close(&tab);
@@ -46,7 +48,8 @@ impl AppState {
             state_changed: session_closed
                 || terminal_closed
                 || sftp_browser_removed
-                || tunnel_runtime_removed,
+                || tunnel_runtime_removed
+                || pending_cleanup.changed(),
             queued_backend_commands: usize::from(should_disconnect),
             ..AppUpdateOutcome::default()
         }
@@ -115,6 +118,35 @@ impl AppState {
             .retain(|tunnel| tunnel.rule_name != *rule_name);
         before != self.sessions.tunnels.len()
     }
+
+    fn remove_pending_backend_commands_for_session(
+        &mut self,
+        session_id: SessionId,
+    ) -> PendingCloseCommandCleanup {
+        let mut removed_connect = false;
+        let mut transfer_ids = Vec::new();
+        let removed_count = self.backend_commands.retain(|command| {
+            if command.session_id() != session_id {
+                return true;
+            }
+
+            removed_connect |= matches!(command, BackendCommand::Connect { .. });
+            if let Some(transfer_id) = sftp_transfer_id(command) {
+                transfer_ids.push(transfer_id);
+            }
+            false
+        });
+        let cancelled_transfer_count = transfer_ids
+            .into_iter()
+            .filter(|transfer_id| self.sessions.cancel_queued_transfer(*transfer_id))
+            .count();
+
+        PendingCloseCommandCleanup {
+            removed_count,
+            removed_connect,
+            cancelled_transfer_count,
+        }
+    }
 }
 
 fn should_disconnect_on_close(tab: &SessionTab) -> bool {
@@ -123,4 +155,28 @@ fn should_disconnect_on_close(tab: &SessionTab) -> bool {
             tab.status,
             SessionStatus::Disconnected | SessionStatus::Failed { .. }
         )
+}
+
+fn sftp_transfer_id(command: &BackendCommand) -> Option<TransferId> {
+    let BackendCommand::Sftp { request, .. } = command else {
+        return None;
+    };
+
+    match request {
+        SftpRequest::Upload { id, .. } | SftpRequest::Download { id, .. } => Some(*id),
+        _ => None,
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+struct PendingCloseCommandCleanup {
+    removed_count: usize,
+    removed_connect: bool,
+    cancelled_transfer_count: usize,
+}
+
+impl PendingCloseCommandCleanup {
+    fn changed(self) -> bool {
+        self.removed_count > 0 || self.cancelled_transfer_count > 0
+    }
 }

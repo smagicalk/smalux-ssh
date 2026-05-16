@@ -171,6 +171,25 @@ fn close_session_tab_message_closes_shell_and_queues_disconnect() {
 }
 
 #[test]
+fn close_pending_shell_tab_removes_launch_commands_without_disconnect() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state.apply(Message::OpenShell { host_id });
+    let session_id = state.sessions.tabs[0].id;
+    assert_eq!(state.backend_commands.pending_count(), 2);
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert_eq!(state.sessions.tab_count(), 0);
+    assert_eq!(state.terminal.tab_count(), 0);
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
 fn close_session_tab_message_removes_last_sftp_browser_for_host() {
     let mut state = AppState::default();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
@@ -185,6 +204,42 @@ fn close_session_tab_message_removes_last_sftp_browser_for_host() {
     assert_eq!(outcome.queued_backend_commands, 1);
     assert_eq!(state.sessions.tab_count(), 0);
     assert_eq!(state.sessions.sftp_browser_count(), 0);
+}
+
+#[test]
+fn close_pending_sftp_tab_cancels_queued_transfer_and_removes_commands() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    let session_id = state.sessions.tabs[0].id;
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/app.tar.gz".to_owned(),
+    });
+    state.apply(Message::UploadSftp { host_id });
+    assert_eq!(state.backend_commands.pending_count(), 3);
+    assert!(matches!(
+        state.sessions.transfers[0].status,
+        crate::model::TransferStatus::Queued
+    ));
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert_eq!(state.sessions.tab_count(), 0);
+    assert_eq!(state.sessions.sftp_browser_count(), 0);
+    assert!(state.backend_commands.is_empty());
+    assert!(matches!(
+        state.sessions.transfers[0].status,
+        crate::model::TransferStatus::Cancelled
+    ));
 }
 
 #[test]
