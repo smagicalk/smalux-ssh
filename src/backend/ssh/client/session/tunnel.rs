@@ -1,50 +1,28 @@
 //! SSH 端口转发和隧道运行时。
 
-use std::net::SocketAddr;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
 
-use russh::Channel;
-use russh::client;
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::time::{Duration, timeout};
 
 use crate::backend::{BackendEvent, BackendExecutionError, TunnelStartRequest};
 use crate::model::{SessionId, TunnelKind, TunnelStatus};
 
-use super::super::{RusshConnection, SshClientHandler};
+use super::super::RusshConnection;
 
+mod handle;
 mod socks5;
-use socks5::{read_socks5_target, write_socks5_success};
+mod tcp;
 
-/// 运行中的 SSH 隧道句柄。
-pub struct RemoteTunnel {
-    rule_name: String,
-    running: Arc<AtomicBool>,
-    bind_host: String,
-    bind_port: u16,
-}
-
-impl RemoteTunnel {
-    /// 返回关联的隧道规则名称。
-    pub fn rule_name(&self) -> &str {
-        &self.rule_name
-    }
-
-    /// 返回本地或远端监听地址。
-    pub fn bind_endpoint(&self) -> String {
-        format!("{}:{}", self.bind_host, self.bind_port)
-    }
-
-    /// 请求隧道循环停止。已建立的连接会自然结束。
-    pub fn stop(&self) {
-        self.running.store(false, Ordering::SeqCst);
-    }
-}
+pub use handle::RemoteTunnel;
+use handle::tunnel;
+use tcp::{
+    accept_with_tick, bind_tcp_listener, pipe_direct_tcpip, pipe_forwarded_tcpip,
+    serve_socks5_connection,
+};
 
 impl RusshConnection {
     /// 消费当前连接并启动端口转发或动态隧道。
@@ -202,142 +180,6 @@ impl RusshConnection {
     }
 }
 
-fn tunnel(
-    rule_name: String,
-    running: Arc<AtomicBool>,
-    bind_host: String,
-    bind_port: u16,
-) -> RemoteTunnel {
-    RemoteTunnel {
-        rule_name,
-        running,
-        bind_host,
-        bind_port,
-    }
-}
-
-async fn bind_tcp_listener(
-    bind_host: &str,
-    bind_port: u16,
-    rule_name: &str,
-) -> Result<TcpListener, BackendExecutionError> {
-    TcpListener::bind((bind_host, bind_port))
-        .await
-        .map_err(|error| BackendExecutionError::TunnelFailed {
-            rule_name: rule_name.to_owned(),
-            reason: error.to_string(),
-        })
-}
-
-async fn accept_with_tick(
-    listener: &TcpListener,
-) -> Result<Option<(TcpStream, SocketAddr)>, std::io::Error> {
-    match timeout(Duration::from_millis(250), listener.accept()).await {
-        Ok(result) => result.map(Some),
-        Err(_) => Ok(None),
-    }
-}
-
-async fn pipe_direct_tcpip(
-    handle: &mut client::Handle<SshClientHandler>,
-    mut socket: TcpStream,
-    originator: SocketAddr,
-    target_host: String,
-    target_port: u16,
-) -> Result<(), BackendExecutionError> {
-    let channel = handle
-        .channel_open_direct_tcpip(
-            target_host,
-            u32::from(target_port),
-            originator.ip().to_string(),
-            u32::from(originator.port()),
-        )
-        .await
-        .map_err(|error| BackendExecutionError::ChannelFailed {
-            operation: "direct tcpip".to_owned(),
-            reason: error.to_string(),
-        })?;
-    let mut stream = channel.into_stream();
-    copy_bidirectional(&mut socket, &mut stream)
-        .await
-        .map_err(|error| BackendExecutionError::TunnelFailed {
-            rule_name: "direct-tcpip".to_owned(),
-            reason: error.to_string(),
-        })?;
-    Ok(())
-}
-
-async fn pipe_forwarded_tcpip(
-    channel: Channel<client::Msg>,
-    target_host: String,
-    target_port: u16,
-) -> Result<(), BackendExecutionError> {
-    let mut socket = TcpStream::connect((target_host.as_str(), target_port))
-        .await
-        .map_err(|error| BackendExecutionError::TunnelFailed {
-            rule_name: "remote-forward".to_owned(),
-            reason: error.to_string(),
-        })?;
-    let mut stream = channel.into_stream();
-    copy_bidirectional(&mut stream, &mut socket)
-        .await
-        .map_err(|error| BackendExecutionError::TunnelFailed {
-            rule_name: "remote-forward".to_owned(),
-            reason: error.to_string(),
-        })?;
-    Ok(())
-}
-
-async fn serve_socks5_connection(
-    handle: &mut client::Handle<SshClientHandler>,
-    mut socket: TcpStream,
-    originator: SocketAddr,
-) -> Result<(), BackendExecutionError> {
-    let target = read_socks5_target(&mut socket).await.map_err(|error| {
-        BackendExecutionError::TunnelFailed {
-            rule_name: "dynamic-socks5".to_owned(),
-            reason: error,
-        }
-    })?;
-    let channel = handle
-        .channel_open_direct_tcpip(
-            target.host.clone(),
-            u32::from(target.port),
-            originator.ip().to_string(),
-            u32::from(originator.port()),
-        )
-        .await
-        .map_err(|error| BackendExecutionError::ChannelFailed {
-            operation: "dynamic socks5".to_owned(),
-            reason: error.to_string(),
-        })?;
-
-    write_socks5_success(&mut socket).await.map_err(|error| {
-        BackendExecutionError::TunnelFailed {
-            rule_name: "dynamic-socks5".to_owned(),
-            reason: error.to_string(),
-        }
-    })?;
-
-    let mut stream = channel.into_stream();
-    copy_bidirectional(&mut socket, &mut stream)
-        .await
-        .map_err(|error| BackendExecutionError::TunnelFailed {
-            rule_name: "dynamic-socks5".to_owned(),
-            reason: error.to_string(),
-        })?;
-    Ok(())
-}
-
-async fn copy_bidirectional<A, B>(left: &mut A, right: &mut B) -> std::io::Result<()>
-where
-    A: AsyncRead + AsyncWrite + Unpin,
-    B: AsyncRead + AsyncWrite + Unpin,
-{
-    let _ = tokio::io::copy_bidirectional(left, right).await?;
-    Ok(())
-}
-
 fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
     BackendExecutionError::TunnelFailed {
         rule_name: rule_name.to_owned(),
@@ -346,22 +188,4 @@ fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn remote_tunnel_reports_endpoint_and_can_stop() {
-        let running = Arc::new(AtomicBool::new(true));
-        let tunnel = tunnel(
-            "proxy".to_owned(),
-            running.clone(),
-            "127.0.0.1".to_owned(),
-            1080,
-        );
-
-        assert_eq!(tunnel.rule_name(), "proxy");
-        assert_eq!(tunnel.bind_endpoint(), "127.0.0.1:1080");
-        tunnel.stop();
-        assert!(!running.load(Ordering::SeqCst));
-    }
-}
+mod tests;
