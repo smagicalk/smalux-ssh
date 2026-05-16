@@ -21,8 +21,12 @@ mod backend_pump;
 #[cfg(test)]
 mod backend_pump_tests;
 mod launch;
+mod launch_remote_command;
+mod launch_sftp;
+mod launch_sftp_transfer;
 #[cfg(test)]
 mod launch_tests;
+mod launch_tunnel;
 mod snippets;
 #[cfg(test)]
 mod snippets_tests;
@@ -30,8 +34,11 @@ mod storage_admin;
 #[cfg(test)]
 mod tests;
 mod ui_drafts;
+#[cfg(test)]
+mod ui_drafts_tests;
 mod visual_settings;
 mod workspace;
+mod workspace_ui;
 
 /// Slint 应用的根状态。
 ///
