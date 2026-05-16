@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, TunnelStartRequest, TunnelStopRequest};
-use crate::model::{HostId, SessionId, SessionStatus, TunnelRule, WorkspacePage};
+use crate::model::{HostId, SessionId, SessionKind, SessionStatus, TunnelRule, WorkspacePage};
 
 use super::launch::{connect_command, missing_host, queued_outcome, unix_now_secs};
 use super::{AppState, AppUpdateOutcome};
@@ -23,6 +23,15 @@ impl AppState {
                 };
             }
         };
+        if self.has_open_tunnel_tab(&request.rule.name) {
+            return AppUpdateOutcome {
+                error: Some(format!(
+                    "隧道 {} 已有打开的标签页，请先关闭旧标签页再重新启动",
+                    request.rule.name
+                )),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         let session_id = SessionId(Uuid::new_v4());
         self.sessions.open_tunnel_tab(session_id, host.id, &rule);
@@ -56,5 +65,17 @@ impl AppState {
         });
 
         queued_outcome(1)
+    }
+
+    /// 判断同名隧道标签是否已经打开，避免后端同名隧道互相覆盖。
+    fn has_open_tunnel_tab(&self, rule_name: &str) -> bool {
+        self.sessions.tabs.iter().any(|tab| {
+            matches!(
+                &tab.kind,
+                SessionKind::Tunnel {
+                    rule_name: existing_rule_name,
+                } if existing_rule_name == rule_name
+            )
+        })
     }
 }
