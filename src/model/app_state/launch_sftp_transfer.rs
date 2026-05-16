@@ -118,6 +118,45 @@ impl AppState {
         queued_outcome(1)
     }
 
+    /// 取消尚未交给后端执行器的 SFTP 传输。
+    pub(super) fn cancel_sftp_transfer(&mut self, transfer_id: TransferId) -> AppUpdateOutcome {
+        let Some(task) = self
+            .sessions
+            .transfers
+            .iter()
+            .find(|task| task.id == transfer_id)
+        else {
+            return AppUpdateOutcome {
+                error: Some(format!("找不到 SFTP 传输任务：{}", transfer_id.0)),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        if !matches!(task.status, TransferStatus::Queued) {
+            return AppUpdateOutcome {
+                error: Some("只能取消尚未开始的 SFTP 传输".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let removed_commands = self
+            .backend_commands
+            .retain(|command| !is_sftp_transfer_command(command, transfer_id));
+        if removed_commands == 0 {
+            return AppUpdateOutcome {
+                error: Some("SFTP 传输已经开始，无法从队列取消".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let transfer_cancelled = self.sessions.cancel_queued_transfer(transfer_id);
+
+        AppUpdateOutcome {
+            state_changed: transfer_cancelled || removed_commands > 0,
+            ..AppUpdateOutcome::default()
+        }
+    }
+
     /// 删除远程文件。
     pub(super) fn remove_sftp_file(
         &mut self,
@@ -151,4 +190,15 @@ fn basename_local_path(path: &str) -> Option<String> {
         .file_name()
         .and_then(|file_name| file_name.to_str())
         .map(ToOwned::to_owned)
+}
+
+fn is_sftp_transfer_command(command: &BackendCommand, transfer_id: TransferId) -> bool {
+    matches!(
+        command,
+        BackendCommand::Sftp {
+            request:
+                SftpRequest::Upload { id, .. } | SftpRequest::Download { id, .. },
+            ..
+        } if *id == transfer_id
+    )
 }

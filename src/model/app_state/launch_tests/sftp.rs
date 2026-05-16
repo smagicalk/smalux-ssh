@@ -317,6 +317,74 @@ fn download_sftp_message_queues_transfer_and_download_request() {
 }
 
 #[test]
+fn cancel_sftp_transfer_cancels_queued_transfer_and_removes_backend_command() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/deploy.sh".to_owned(),
+    });
+    state.apply(Message::DownloadSftp {
+        host_id,
+        remote_path: "/home/ops/deploy.sh".to_owned(),
+    });
+    let transfer_id = state.sessions.transfers[0].id;
+
+    let outcome = state.apply(Message::CancelSftpTransfer { transfer_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_none());
+    assert!(matches!(
+        state.sessions.transfers[0].status,
+        crate::model::TransferStatus::Cancelled
+    ));
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
+fn cancel_sftp_transfer_rejects_transfer_already_removed_from_queue() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/deploy.sh".to_owned(),
+    });
+    state.apply(Message::DownloadSftp {
+        host_id,
+        remote_path: "/home/ops/deploy.sh".to_owned(),
+    });
+    let transfer_id = state.sessions.transfers[0].id;
+    state.backend_commands.drain();
+
+    let outcome = state.apply(Message::CancelSftpTransfer { transfer_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.as_deref().unwrap_or("").contains("已经开始"));
+    assert!(matches!(
+        state.sessions.transfers[0].status,
+        crate::model::TransferStatus::Queued
+    ));
+}
+
+#[test]
 fn create_and_remove_sftp_actions_queue_path_requests() {
     let mut state = AppState::default();
     let host = sample_host();

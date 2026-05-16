@@ -106,6 +106,7 @@ impl AppState {
                 host_id,
                 remote_path,
             } => self.download_sftp(host_id, remote_path),
+            Message::CancelSftpTransfer { transfer_id } => self.cancel_sftp_transfer(transfer_id),
             Message::RemoveSftpFile {
                 host_id,
                 remote_path,

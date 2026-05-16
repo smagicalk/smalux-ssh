@@ -37,6 +37,20 @@ impl SessionManager {
             false
         }
     }
+
+    /// 取消仍在队列中的传输任务。
+    pub fn cancel_queued_transfer(&mut self, id: TransferId) -> bool {
+        if let Some(task) = self.transfers.iter_mut().find(|task| task.id == id) {
+            if !matches!(task.status, TransferStatus::Queued) {
+                return false;
+            }
+
+            task.status = TransferStatus::Cancelled;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[cfg(test)]
@@ -89,5 +103,30 @@ mod tests {
             1,
             TransferStatus::Running
         ));
+    }
+
+    #[test]
+    fn cancel_queued_transfer_only_updates_queued_tasks() {
+        let mut sessions = SessionManager::default();
+        let queued_id = TransferId(Uuid::new_v4());
+        let running_id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+        let mut running = transfer_task(running_id, host_id);
+        running.status = TransferStatus::Running;
+
+        sessions.enqueue_transfer(transfer_task(queued_id, host_id));
+        sessions.enqueue_transfer(running);
+
+        assert!(sessions.cancel_queued_transfer(queued_id));
+        assert!(matches!(
+            sessions.transfers[0].status,
+            TransferStatus::Cancelled
+        ));
+        assert!(!sessions.cancel_queued_transfer(running_id));
+        assert!(matches!(
+            sessions.transfers[1].status,
+            TransferStatus::Running
+        ));
+        assert!(!sessions.cancel_queued_transfer(TransferId(Uuid::new_v4())));
     }
 }

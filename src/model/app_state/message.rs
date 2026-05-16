@@ -3,7 +3,7 @@
 use crate::backend::BackendEvent;
 use crate::model::{
     CommandHistoryId, HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
-    SessionId, SftpActionDraftField, SnippetId, ToolPanelMode, TunnelRule,
+    SessionId, SftpActionDraftField, SnippetId, ToolPanelMode, TransferId, TunnelRule,
     VisualSettingsDraftField, WorkspacePage,
 };
 
@@ -150,6 +150,9 @@ pub enum Message {
     DownloadSftp {
         host_id: HostId,
         remote_path: String,
+    },
+    CancelSftpTransfer {
+        transfer_id: TransferId,
     },
     RemoveSftpFile {
         host_id: HostId,

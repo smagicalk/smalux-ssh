@@ -36,6 +36,13 @@ impl BackendCommandQueue {
         self.commands.drain(..).collect()
     }
 
+    /// 保留满足条件的命令，并返回被移除的命令数量。
+    pub fn retain(&mut self, mut keep: impl FnMut(&BackendCommand) -> bool) -> usize {
+        let before = self.commands.len();
+        self.commands.retain(|command| keep(command));
+        before - self.commands.len()
+    }
+
     /// 当前等待执行的命令数量。
     pub fn pending_count(&self) -> usize {
         self.commands.len()
@@ -102,5 +109,26 @@ mod tests {
 
         assert_eq!(commands.len(), 1);
         assert!(queue.is_empty());
+    }
+
+    #[test]
+    fn retain_removes_matching_commands_and_reports_count() {
+        let mut queue = BackendCommandQueue::default();
+        let first = session_id();
+        let second = session_id();
+
+        queue.extend([
+            BackendCommand::Disconnect { session_id: first },
+            BackendCommand::Disconnect { session_id: second },
+        ]);
+
+        let removed = queue.retain(|command| command.session_id() != first);
+
+        assert_eq!(removed, 1);
+        assert_eq!(queue.pending_count(), 1);
+        assert!(matches!(
+            queue.front(),
+            Some(BackendCommand::Disconnect { session_id }) if *session_id == second
+        ));
     }
 }
