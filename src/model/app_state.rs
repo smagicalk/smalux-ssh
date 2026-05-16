@@ -2,23 +2,25 @@
 
 use std::fmt;
 
-use crate::backend::{BackendCommand, BackendCommandQueue, BackendEvent, apply_backend_event};
 use crate::backend::{
-    SharedBackendExecutor, noop_shared_backend_executor, shared_backend_executor,
+    BackendCommandQueue, SharedBackendExecutor, noop_shared_backend_executor,
+    shared_backend_executor,
 };
 use crate::config::AppConfig;
 use crate::session::SessionManager;
 use crate::storage::{RedbStorage, StorageManager, StoragePersistenceError};
 use crate::terminal::TerminalManager;
 
-use super::{SessionId, SessionKind, SessionStatus, SessionTab, TunnelStatus, UiState};
+use super::UiState;
 
 #[cfg(test)]
 use super::{HostId, SnippetId, VisualSettingsDraftField, WorkspacePage};
 
+mod backend_events;
 mod backend_pump;
 #[cfg(test)]
 mod backend_pump_tests;
+mod dispatch;
 mod launch;
 mod launch_remote_command;
 mod launch_sftp;
@@ -27,6 +29,7 @@ mod launch_sftp_transfer;
 mod launch_tests;
 mod launch_tunnel;
 mod message;
+mod session_tabs;
 mod snippets;
 #[cfg(test)]
 mod snippets_tests;
@@ -135,291 +138,4 @@ impl AppState {
 
         Ok(())
     }
-
-    /// 将 UI 消息应用到根状态。
-    pub fn apply(&mut self, message: Message) -> AppUpdateOutcome {
-        let mut outcome = match message {
-            Message::UpdateVisualSettingsDraft { field, value } => {
-                self.update_visual_settings_draft(field, value)
-            }
-            Message::SetVisualBackgroundEnabled { enabled } => {
-                self.set_visual_background_enabled(enabled)
-            }
-            Message::ApplyVisualSettings => self.apply_visual_settings(),
-            Message::UpdateHostVisualSettingsDraft {
-                host_id,
-                field,
-                value,
-            } => self.update_host_visual_settings_draft(host_id, field, value),
-            Message::SetHostVisualBackgroundEnabled { host_id, enabled } => {
-                self.set_host_visual_background_enabled(host_id, enabled)
-            }
-            Message::ApplyHostVisualSettings { host_id } => {
-                self.apply_host_visual_settings(host_id)
-            }
-            Message::ClearHostVisualSettings { host_id } => {
-                self.clear_host_visual_settings(host_id)
-            }
-            Message::SaveWorkspaceSnapshot => self.save_workspace_snapshot(),
-            Message::RestoreWorkspaceSnapshot => self.restore_workspace_snapshot(),
-            Message::ClearWorkspaceSnapshot => self.clear_workspace_snapshot(),
-            Message::UpdateQuickHostDraft { field, value } => {
-                self.update_quick_host_draft(field, value)
-            }
-            Message::UpdateQuickHostAuthKind { kind } => self.update_quick_host_auth_kind(kind),
-            Message::UpdateQuickHostAuthField { field, value } => {
-                self.update_quick_host_auth_field(field, value)
-            }
-            Message::SaveQuickHost => self.save_quick_host(),
-            Message::RemoveCredential { name } => self.remove_credential(&name),
-            Message::TrustKnownHost { host, port } => self.trust_known_host(&host, port),
-            Message::RemoveKnownHost { host, port } => self.remove_known_host(&host, port),
-            Message::DismissUiError => self.dismiss_ui_error(),
-            Message::SetWorkspacePage { page } => self.set_workspace_page(page),
-            Message::ToggleHostListMode => self.toggle_host_list_mode(),
-            Message::UpdateHostSearchQuery { query } => self.update_host_search_query(query),
-            Message::ResizeHostsPanel { width } => self.resize_hosts_panel(width),
-            Message::ResizeActivityPanel { width } => self.resize_activity_panel(width),
-            Message::ResizeToolPanel { width } => self.resize_tool_panel(width),
-            Message::OpenToolPanel { mode } => self.open_tool_panel(mode),
-            Message::CloseToolPanel => self.close_tool_panel(),
-            Message::ToggleRightSidebar => self.toggle_right_sidebar(),
-            Message::OpenCommandPalette { query } => self.open_command_palette(query),
-            Message::UpdateCommandPaletteQuery { query } => {
-                self.update_command_palette_query(query)
-            }
-            Message::CloseCommandPalette => self.close_command_palette(),
-            Message::NextBackground => self.next_background(),
-            Message::CloseSessionTab { session_id } => self.close_session_tab(session_id),
-            Message::ActivateTerminalTab { session_id } => self.activate_session_tab(session_id),
-            Message::UpdateTerminalInputDraft { session_id, input } => {
-                self.update_terminal_input_draft(session_id, input)
-            }
-            Message::AppendTerminalInputDraft { session_id, text } => {
-                self.append_terminal_input_draft(session_id, text)
-            }
-            Message::BackspaceTerminalInputDraft { session_id } => {
-                self.backspace_terminal_input_draft(session_id)
-            }
-            Message::SendTerminalInput { session_id } => self.send_terminal_input(session_id),
-            Message::UpdateHostCommandDraft { host_id, command } => {
-                self.update_host_command_draft(host_id, command)
-            }
-            Message::UpdateHostSftpInitialDirDraft {
-                host_id,
-                initial_dir,
-            } => self.update_host_sftp_initial_dir_draft(host_id, initial_dir),
-            Message::UpdateSftpActionDraft {
-                host_id,
-                field,
-                value,
-            } => self.update_sftp_action_draft(host_id, field, value),
-            Message::RefreshSftp { host_id } => self.refresh_sftp(host_id),
-            Message::SaveSftpBookmark { host_id } => self.save_sftp_bookmark(host_id),
-            Message::OpenSftpBookmark {
-                host_id,
-                remote_path,
-            } => self.open_sftp_bookmark(host_id, remote_path),
-            Message::RemoveSftpBookmark {
-                host_id,
-                remote_path,
-            } => self.remove_sftp_bookmark(host_id, remote_path),
-            Message::NavigateSftp {
-                host_id,
-                remote_path,
-            } => self.navigate_sftp(host_id, remote_path),
-            Message::SelectSftpEntry {
-                host_id,
-                remote_path,
-            } => self.select_sftp_entry(host_id, remote_path),
-            Message::UploadSftp { host_id } => self.upload_sftp(host_id),
-            Message::DownloadSftp {
-                host_id,
-                remote_path,
-            } => self.download_sftp(host_id, remote_path),
-            Message::RemoveSftpFile {
-                host_id,
-                remote_path,
-            } => self.remove_sftp_file(host_id, remote_path),
-            Message::CreateSftpDir { host_id } => self.create_sftp_dir(host_id),
-            Message::OpenShell { host_id } => self.open_shell(host_id),
-            Message::OpenRecentConnection { host_id } => self.open_recent_connection(host_id),
-            Message::OpenSftp {
-                host_id,
-                initial_dir,
-            } => self.open_sftp(host_id, initial_dir),
-            Message::RunRemoteCommand {
-                host_id,
-                command,
-                request_pty,
-            } => self.run_remote_command(host_id, command, request_pty),
-            Message::SaveHostCommandSnippet { host_id } => self.save_host_command_snippet(host_id),
-            Message::RunSnippet {
-                host_id,
-                snippet_id,
-            } => self.run_snippet(host_id, snippet_id),
-            Message::UpdateSnippetArgument {
-                snippet_id,
-                name,
-                value,
-            } => self.update_snippet_argument(snippet_id, name, value),
-            Message::RemoveSnippet { snippet_id } => self.remove_snippet(snippet_id),
-            Message::RunCommandHistory { history_id } => self.run_command_history(history_id),
-            Message::StartTunnel { host_id, rule } => self.start_tunnel(host_id, rule),
-            Message::StopTunnel {
-                session_id,
-                rule_name,
-            } => self.stop_tunnel(session_id, rule_name),
-            Message::BackendEventReceived(event) => self.apply_backend_event(event),
-        };
-
-        if let Some(error) = &outcome.error {
-            outcome.state_changed |= self.ui.set_last_error(error.clone());
-        }
-
-        outcome
-    }
-
-    fn dismiss_ui_error(&mut self) -> AppUpdateOutcome {
-        AppUpdateOutcome {
-            state_changed: self.ui.clear_last_error(),
-            ..AppUpdateOutcome::default()
-        }
-    }
-
-    fn close_session_tab(&mut self, session_id: SessionId) -> AppUpdateOutcome {
-        let Some(tab) = self
-            .sessions
-            .tabs
-            .iter()
-            .find(|tab| tab.id == session_id)
-            .cloned()
-        else {
-            return AppUpdateOutcome {
-                error: Some(format!("找不到会话标签页：{}", session_id.0)),
-                ..AppUpdateOutcome::default()
-            };
-        };
-
-        if let SessionKind::Tunnel { rule_name } = &tab.kind {
-            if self.tunnel_requires_stop_before_close(rule_name) {
-                return AppUpdateOutcome {
-                    error: Some(format!("隧道 {rule_name} 仍在运行，请先停止再关闭标签页")),
-                    ..AppUpdateOutcome::default()
-                };
-            }
-        }
-
-        let should_disconnect = should_disconnect_on_close(&tab);
-        let session_closed = self.sessions.close_tab(session_id);
-        let terminal_closed = self.terminal.close_tab(session_id);
-        let sftp_browser_removed = self.remove_sftp_browser_after_tab_close(&tab);
-        let tunnel_runtime_removed = self.remove_tunnel_runtime_after_tab_close(&tab);
-
-        if should_disconnect {
-            self.backend_commands
-                .push(BackendCommand::Disconnect { session_id });
-        }
-
-        AppUpdateOutcome {
-            state_changed: session_closed
-                || terminal_closed
-                || sftp_browser_removed
-                || tunnel_runtime_removed,
-            queued_backend_commands: usize::from(should_disconnect),
-            ..AppUpdateOutcome::default()
-        }
-    }
-
-    fn activate_session_tab(&mut self, session_id: SessionId) -> AppUpdateOutcome {
-        if !self.sessions.tabs.iter().any(|tab| tab.id == session_id) {
-            return AppUpdateOutcome {
-                error: Some(format!("找不到会话标签页：{}", session_id.0)),
-                ..AppUpdateOutcome::default()
-            };
-        }
-
-        let terminal_changed = self.terminal.set_active_tab(session_id);
-        let session_changed = self.sessions.active_tab != Some(session_id);
-        self.sessions.active_tab = Some(session_id);
-
-        AppUpdateOutcome {
-            state_changed: terminal_changed || session_changed,
-            ..AppUpdateOutcome::default()
-        }
-    }
-
-    fn tunnel_requires_stop_before_close(&self, rule_name: &str) -> bool {
-        self.sessions.tunnels.iter().any(|tunnel| {
-            tunnel.rule_name == rule_name
-                && matches!(
-                    tunnel.status,
-                    TunnelStatus::Starting | TunnelStatus::Running | TunnelStatus::Stopping
-                )
-        })
-    }
-
-    fn remove_sftp_browser_after_tab_close(&mut self, tab: &SessionTab) -> bool {
-        if !matches!(tab.kind, SessionKind::Sftp) {
-            return false;
-        }
-
-        let Some(host_id) = tab.host_id else {
-            return false;
-        };
-        let has_other_sftp_tab =
-            self.sessions.tabs.iter().any(|other| {
-                other.host_id == Some(host_id) && matches!(other.kind, SessionKind::Sftp)
-            });
-
-        if has_other_sftp_tab {
-            return false;
-        }
-
-        let before = self.sessions.sftp_browsers.len();
-        self.sessions
-            .sftp_browsers
-            .retain(|browser| browser.host_id != host_id);
-        before != self.sessions.sftp_browsers.len()
-    }
-
-    fn remove_tunnel_runtime_after_tab_close(&mut self, tab: &SessionTab) -> bool {
-        let SessionKind::Tunnel { rule_name } = &tab.kind else {
-            return false;
-        };
-
-        let before = self.sessions.tunnels.len();
-        self.sessions
-            .tunnels
-            .retain(|tunnel| tunnel.rule_name != *rule_name);
-        before != self.sessions.tunnels.len()
-    }
-
-    fn apply_backend_event(&mut self, event: BackendEvent) -> AppUpdateOutcome {
-        let outcome = apply_backend_event(&mut self.sessions, &mut self.terminal, event);
-
-        AppUpdateOutcome {
-            state_changed: outcome.changed(),
-            applied_backend_events: 1,
-            ..AppUpdateOutcome::default()
-        }
-    }
-
-    /// 使用当前共享执行器泵出已排队的后台命令。
-    pub fn drain_backend_queue_with_executor(&mut self) -> AppUpdateOutcome {
-        let backend_executor = self.backend_executor.clone();
-        let mut executor = backend_executor
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-
-        self.drain_backend_queue(&mut **executor)
-    }
-}
-
-fn should_disconnect_on_close(tab: &SessionTab) -> bool {
-    !matches!(tab.kind, SessionKind::Tunnel { .. })
-        && !matches!(
-            tab.status,
-            SessionStatus::Disconnected | SessionStatus::Failed { .. }
-        )
 }

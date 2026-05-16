@@ -2,7 +2,7 @@ use super::*;
 use crate::backend::BackendCommand;
 use crate::model::{
     AuthProfile, Message, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SecretRef,
-    SftpActionDraftField,
+    SessionId, SftpActionDraftField,
 };
 use uuid::Uuid;
 
