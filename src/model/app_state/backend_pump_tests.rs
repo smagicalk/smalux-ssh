@@ -79,7 +79,7 @@ fn backend_queue_pump_executes_commands_and_applies_events() {
 }
 
 #[test]
-fn backend_queue_pump_stops_on_executor_error_and_keeps_remaining_commands() {
+fn backend_queue_pump_discards_failed_session_tail_commands() {
     let mut state = AppState::default();
     let host = sample_host();
     let host_id = host.id;
@@ -94,11 +94,82 @@ fn backend_queue_pump_stops_on_executor_error_and_keeps_remaining_commands() {
     assert_eq!(outcome.applied_backend_events, 1);
     assert!(outcome.error.as_deref().unwrap_or("").contains("不支持"));
     assert_eq!(state.ui.last_error.as_deref(), outcome.error.as_deref());
-    assert_eq!(state.backend_commands.pending_count(), 1);
+    assert!(state.backend_commands.is_empty());
     assert!(matches!(
         &state.sessions.tabs[0].status,
         SessionStatus::Failed { reason } if reason.contains("不支持")
     ));
+}
+
+#[test]
+fn backend_queue_pump_keeps_other_session_commands_after_terminal_error() {
+    let mut state = AppState::default();
+    let first = sample_host();
+    let second = sample_host();
+    let first_id = first.id;
+    let second_id = second.id;
+    state.storage.upsert_host(first);
+    state.storage.upsert_host(second);
+    state.apply(Message::OpenShell { host_id: first_id });
+    state.apply(Message::OpenShell { host_id: second_id });
+    let failed_session_id = state.sessions.tabs[0].id;
+    let remaining_session_id = state.sessions.tabs[1].id;
+    let mut executor = NoopBackendExecutor;
+
+    let outcome = state.drain_backend_queue(&mut executor);
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.executed_backend_commands, 0);
+    assert_eq!(outcome.applied_backend_events, 1);
+    assert_eq!(state.backend_commands.pending_count(), 2);
+    assert!(
+        state
+            .backend_commands
+            .iter()
+            .all(|command| command.session_id() == remaining_session_id)
+    );
+    assert!(matches!(
+        state.sessions.tabs[0].status,
+        SessionStatus::Failed { .. }
+    ));
+    assert!(matches!(
+        state.sessions.tabs[1].status,
+        SessionStatus::Connecting
+    ));
+    assert_ne!(failed_session_id, remaining_session_id);
+}
+
+#[test]
+fn backend_queue_pump_marks_pruned_sftp_transfer_failed_on_terminal_error() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/app.tar.gz".to_owned(),
+    });
+    state.apply(Message::UploadSftp { host_id });
+    let transfer_id = state.sessions.transfers[0].id;
+    let mut executor = NoopBackendExecutor;
+
+    let outcome = state.drain_backend_queue(&mut executor);
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.executed_backend_commands, 0);
+    assert_eq!(outcome.applied_backend_events, 2);
+    assert!(state.backend_commands.is_empty());
+    assert_eq!(state.sessions.transfers[0].id, transfer_id);
+    assert!(matches!(
+        &state.sessions.transfers[0].status,
+        TransferStatus::Failed { reason } if reason.contains("不支持")
+    ));
+    assert!(!state.sessions.sftp_browsers[0].loading);
 }
 
 #[test]
@@ -202,7 +273,7 @@ fn backend_queue_pump_marks_tunnel_failed_on_executor_error() {
     assert!(outcome.changed());
     assert_eq!(outcome.executed_backend_commands, 0);
     assert_eq!(outcome.applied_backend_events, 1);
-    assert_eq!(state.backend_commands.pending_count(), 1);
+    assert!(state.backend_commands.is_empty());
     assert!(matches!(
         &state.sessions.tabs[0].status,
         SessionStatus::Failed { reason } if reason.contains("不支持")

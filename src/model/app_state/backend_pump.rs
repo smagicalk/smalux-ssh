@@ -1,7 +1,8 @@
 //! 后端命令队列执行泵。
 
 use crate::backend::{
-    BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, SftpRequest,
+    BackendCommand, BackendCommandQueue, BackendEvent, BackendExecutionError, BackendExecutor,
+    SftpRequest,
 };
 use crate::model::{SessionId, TransferId, TransferStatus};
 
@@ -22,16 +23,30 @@ impl AppState {
                 Ok(events) => events,
                 Err(error) => {
                     let reason = error.to_string();
+                    let is_sftp_operation_failure = sftp_operation_failed(&error);
                     let failure_events = failed_backend_events(
                         session_id,
                         reason.clone(),
                         failed_transfer,
-                        sftp_operation_failed(&error),
+                        is_sftp_operation_failure,
                     );
                     for event in failure_events {
                         let event_outcome = self.apply_backend_event(event);
                         outcome.state_changed |= event_outcome.state_changed;
                         outcome.applied_backend_events += event_outcome.applied_backend_events;
+                    }
+                    if !is_sftp_operation_failure {
+                        let discarded = discard_pending_commands_for_failed_session(
+                            &mut self.backend_commands,
+                            session_id,
+                            &reason,
+                        );
+                        outcome.state_changed |= discarded.removed_count > 0;
+                        for event in discarded.failure_events {
+                            let event_outcome = self.apply_backend_event(event);
+                            outcome.state_changed |= event_outcome.state_changed;
+                            outcome.applied_backend_events += event_outcome.applied_backend_events;
+                        }
                     }
                     outcome.state_changed |= self.ui.set_last_error(reason.clone());
                     outcome.error = Some(reason);
@@ -59,15 +74,7 @@ fn failed_backend_events(
 ) -> Vec<BackendEvent> {
     let mut events = Vec::new();
     if let Some(transfer) = transfer {
-        events.push(BackendEvent::TransferProgress {
-            session_id: transfer.session_id,
-            transfer_id: transfer.transfer_id,
-            total_bytes: None,
-            transferred_bytes: 0,
-            status: TransferStatus::Failed {
-                reason: reason.clone(),
-            },
-        });
+        events.push(transfer_failed_event(transfer, reason.clone()));
     }
     if sftp_operation_failed {
         events.push(BackendEvent::SftpFailed { session_id, reason });
@@ -77,8 +84,51 @@ fn failed_backend_events(
     events
 }
 
+fn discard_pending_commands_for_failed_session(
+    commands: &mut BackendCommandQueue,
+    session_id: SessionId,
+    reason: &str,
+) -> DiscardedPendingCommands {
+    let mut transfer_failures = Vec::new();
+    let removed_count = commands.retain(|command| {
+        if command.session_id() != session_id {
+            return true;
+        }
+
+        if let Some(transfer) = failed_transfer_for_command(command) {
+            transfer_failures.push(transfer);
+        }
+        false
+    });
+    let failure_events = transfer_failures
+        .into_iter()
+        .map(|transfer| transfer_failed_event(transfer, reason.to_owned()))
+        .collect();
+
+    DiscardedPendingCommands {
+        removed_count,
+        failure_events,
+    }
+}
+
+fn transfer_failed_event(transfer: FailedTransfer, reason: String) -> BackendEvent {
+    BackendEvent::TransferProgress {
+        session_id: transfer.session_id,
+        transfer_id: transfer.transfer_id,
+        total_bytes: None,
+        transferred_bytes: 0,
+        status: TransferStatus::Failed { reason },
+    }
+}
+
 fn sftp_operation_failed(error: &BackendExecutionError) -> bool {
     matches!(error, BackendExecutionError::SftpFailed { .. })
+}
+
+#[derive(Debug, Default)]
+struct DiscardedPendingCommands {
+    removed_count: usize,
+    failure_events: Vec<BackendEvent>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
