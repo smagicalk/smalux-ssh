@@ -1,0 +1,35 @@
+import { AppTheme } from "./theme.slint";
+
+export component VerticalSplitter inherits Rectangle {
+    in property <int> base-width;
+    in property <bool> reverse: false;
+    callback resize(width: int);
+
+    width: 7px;
+    background: AppTheme.window-bg;
+
+    Rectangle {
+        x: 3px;
+        width: 1px;
+        height: parent.height;
+        background: AppTheme.border-soft;
+    }
+
+    TouchArea {
+        property <int> drag-start-width: root.base-width;
+
+        mouse-cursor: ew-resize;
+
+        pointer-event(event) => {
+            if event.button == PointerEventButton.left && event.kind == PointerEventKind.down {
+                self.drag-start-width = root.base-width;
+            }
+        }
+
+        moved => {
+            if self.pressed {
+                root.resize(self.drag-start-width + ((root.reverse ? -1 : 1) * ((self.mouse-x - self.pressed-x) / 1px)));
+            }
+        }
+    }
+}

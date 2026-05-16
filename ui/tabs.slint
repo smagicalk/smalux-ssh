@@ -1,0 +1,61 @@
+import { AppTheme } from "./theme.slint";
+
+export component TabChip inherits Rectangle {
+    in property <string> session-id;
+    in property <string> title;
+    in property <string> kind;
+    in property <string> status;
+    in property <bool> active-tab;
+    callback activate();
+    callback close();
+
+    height: 25px;
+    width: 156px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: active-tab ? AppTheme.accent-blue : AppTheme.border;
+    background: active-tab ? #142a36 : AppTheme.surface-bg;
+
+    HorizontalLayout {
+        padding-left: 7px;
+        padding-right: 4px;
+        spacing: 5px;
+
+        TouchArea {
+            clicked => { root.activate(); }
+            HorizontalLayout {
+                spacing: 5px;
+                Text {
+                    text: kind;
+                    color: active-tab ? AppTheme.accent-blue : #9aa8ba;
+                    font-size: 9px;
+                    vertical-alignment: center;
+                }
+                Text {
+                    text: title;
+                    color: AppTheme.text;
+                    font-size: 10px;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+            }
+        }
+
+        Rectangle {
+            width: 19px;
+            height: 18px;
+            border-radius: 4px;
+            background: active-tab ? #1e3b4a : #1a222e;
+            TouchArea {
+                clicked => { root.close(); }
+            }
+            Text {
+                text: "x";
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

@@ -1,6 +1,6 @@
 //! 后端事件到 UI 状态的归约逻辑。
 
-use crate::model::{SessionStatus, TunnelStatus};
+use crate::model::{LOCAL_TERMINAL_SESSION_ID, SessionStatus, TunnelStatus};
 use crate::session::SessionManager;
 use crate::terminal::TerminalManager;
 
@@ -50,9 +50,26 @@ pub fn apply_backend_event(
             session_updated: sessions.set_status(session_id, SessionStatus::RunningCommand),
             terminal_updated: false,
         },
-        BackendEvent::Output { session_id, line } => BackendEventOutcome {
+        BackendEvent::Output { session_id, line } => {
+            let is_duplicate_local_echo = session_id == LOCAL_TERMINAL_SESSION_ID
+                && terminal.suppress_duplicate_echo(
+                    session_id,
+                    crate::backend::LocalShellProfile::default_for_platform().prompt,
+                    &line,
+                );
+
+            BackendEventOutcome {
+                session_updated: false,
+                terminal_updated: if is_duplicate_local_echo {
+                    false
+                } else {
+                    terminal.append_output(session_id, line)
+                },
+            }
+        }
+        BackendEvent::ClearTerminal { session_id } => BackendEventOutcome {
             session_updated: false,
-            terminal_updated: terminal.append_output(session_id, line),
+            terminal_updated: terminal.clear_output(session_id),
         },
         BackendEvent::CommandExited {
             session_id,

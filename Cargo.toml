@@ -5,7 +5,7 @@ edition = "2024"
 rust-version = "1.95"
 
 [dependencies]
-iced = { version = "0.14", default-features = false, features = ["wgpu", "tokio"] }
+slint = "1.15"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
 serde = { version = "1", features = ["derive"] }
 toml = "0.9"
@@ -22,3 +22,6 @@ alacritty_terminal = "0.25"
 aws-lc-rs = { version = "1.16", features = ["prebuilt-nasm"] }
 russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "flate2", "rsa"] }
 russh-sftp = "2"
+
+[build-dependencies]
+slint-build = "1.15"

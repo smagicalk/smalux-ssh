@@ -15,6 +15,18 @@ pub struct GroupId(pub Uuid);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SessionId(pub Uuid);
 
+/// 默认本地终端会话 ID。
+pub const LOCAL_TERMINAL_SESSION_ID: SessionId =
+    SessionId(Uuid::from_u128(0x11111111111111111111111111111111));
+
+/// 默认本地终端标题。
+#[cfg(windows)]
+pub const DEFAULT_LOCAL_TERMINAL_TITLE: &str = "Local Shell";
+
+/// 默认本地终端标题。
+#[cfg(not(windows))]
+pub const DEFAULT_LOCAL_TERMINAL_TITLE: &str = "Local Shell";
+
 /// 命令历史唯一标识。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CommandHistoryId(pub Uuid);

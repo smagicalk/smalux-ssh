@@ -1,0 +1,88 @@
+import { LineEdit, ScrollView } from "std-widgets.slint";
+import { HostRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { CompactButton, FilterChip } from "./common.slint";
+import { HostCard } from "./hosts.slint";
+
+export component HostsPanel inherits Rectangle {
+    in property <string> active-page;
+    in property <string> host-list-mode;
+    in property <string> host-search-query;
+    in property <int> panel-width;
+    in property <[HostRow]> hosts;
+    callback toggle-host-list-mode();
+    callback update-host-search(query: string);
+    callback open-shell(host-id: string);
+    callback open-host-sftp(host-id: string);
+    callback run-host-command(host-id: string);
+
+    width: root.panel-width * 1px;
+    background: AppTheme.panel-bg;
+    border-width: 1px;
+    border-color: AppTheme.border;
+
+    VerticalLayout {
+        padding: 9px;
+        spacing: 7px;
+
+        HorizontalLayout {
+            Text {
+                text: root.active-page;
+                color: AppTheme.text;
+                font-size: 13px;
+                font-weight: 700;
+                vertical-alignment: center;
+            }
+            Rectangle { horizontal-stretch: 1; }
+            CompactButton {
+                label: root.host-list-mode;
+                clicked => { root.toggle-host-list-mode(); }
+            }
+        }
+
+        LineEdit {
+            text: root.host-search-query;
+            placeholder-text: "host, address or tag";
+            height: 26px;
+            edited(query) => { root.update-host-search(query); }
+            accepted(query) => { root.update-host-search(query); }
+        }
+
+        HorizontalLayout {
+            spacing: 5px;
+            FilterChip { label: "Group"; active: true; }
+            FilterChip { label: "Tags"; active: false; }
+            FilterChip { label: "Status"; active: false; }
+        }
+
+        Text { text: "HOSTS"; color: #5b6776; font-size: 9px; }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                if root.hosts.length == 0: HostCard {
+                    host-id: "";
+                    name: "No saved hosts";
+                    endpoint: "Create one from Quick Connect.";
+                    auth: "Agent";
+                    group: "Default";
+                    tags: "ssh / sftp / tunnels";
+                    status: "Empty";
+                }
+                for host in root.hosts: HostCard {
+                    host-id: host.id;
+                    name: host.name;
+                    endpoint: host.endpoint;
+                    auth: host.auth;
+                    group: host.group;
+                    tags: host.tags;
+                    status: host.status;
+                    open-shell => { root.open-shell(host.id); }
+                    open-sftp => { root.open-host-sftp(host.id); }
+                    run-command => { root.run-host-command(host.id); }
+                }
+            }
+        }
+    }
+}

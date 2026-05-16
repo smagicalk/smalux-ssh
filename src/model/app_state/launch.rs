@@ -12,7 +12,7 @@ use crate::backend::{
 use crate::model::{
     CommandHistoryId, CommandHistoryItem, Host, HostId, RecentConnection, SessionId, SessionKind,
     SessionStatus, SftpBookmark, TransferDirection, TransferId, TransferStatus, TransferTask,
-    TunnelRule,
+    TunnelRule, WorkspacePage,
 };
 use crate::terminal::TerminalTabState;
 
@@ -33,6 +33,7 @@ impl AppState {
             .open_shell_tab(session_id, host.id, host.name.clone());
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
+        self.ui.workspace.active_page = WorkspacePage::Terminal;
         self.terminal.open_tab(terminal_tab);
         self.record_recent_connection(&host);
         self.backend_commands.extend([
@@ -61,6 +62,7 @@ impl AppState {
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
         self.sessions.set_sftp_loading(host.id, true);
+        self.ui.workspace.active_page = WorkspacePage::Sftp;
         self.record_recent_connection(&host);
         self.backend_commands.extend([
             connect_command(session_id, &host),
@@ -323,6 +325,7 @@ impl AppState {
             .open_remote_command_tab(session_id, host.id, command.clone());
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
+        self.ui.workspace.active_page = WorkspacePage::Terminal;
         self.terminal.open_tab(terminal_tab);
         self.record_recent_connection(&host);
         self.record_command_history(host.id, command);
@@ -381,6 +384,7 @@ impl AppState {
         self.sessions.open_tunnel_tab(session_id, host.id, &rule);
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
+        self.ui.workspace.active_page = WorkspacePage::Tunnels;
         self.sessions
             .start_tunnel(&rule, Some(host.id), unix_now_secs());
         self.record_recent_connection(&host);

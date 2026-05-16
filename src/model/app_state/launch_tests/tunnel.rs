@@ -30,6 +30,7 @@ fn start_tunnel_message_creates_tab_runtime_and_queues_backend_commands() {
     assert_eq!(outcome.queued_backend_commands, 2);
     assert_eq!(state.sessions.tab_count(), 1);
     assert_eq!(state.sessions.tunnel_runtime_count(), 1);
+    assert_eq!(state.ui.workspace.active_page, WorkspacePage::Tunnels);
     assert!(matches!(
         state.sessions.tabs[0].kind,
         SessionKind::Tunnel { .. }

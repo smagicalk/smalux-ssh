@@ -1,0 +1,129 @@
+import { Button, ScrollView } from "std-widgets.slint";
+import { SftpEntryRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { ToolRow } from "./common.slint";
+
+export component SftpEntryItem inherits Rectangle {
+    in property <SftpEntryRow> entry;
+    callback select(path: string);
+
+    height: 30px;
+    border-radius: 5px;
+    background: entry.selected ? #173044 : #00000000;
+
+    TouchArea {
+        clicked => { root.select(root.entry.path); }
+    }
+
+    HorizontalLayout {
+        padding-left: 7px;
+        padding-right: 7px;
+        spacing: 6px;
+        Text {
+            text: entry.kind;
+            color: entry.kind == "Dir" ? AppTheme.accent-blue : AppTheme.text-muted;
+            font-size: 9px;
+            width: 30px;
+            vertical-alignment: center;
+        }
+        Text {
+            text: entry.name;
+            color: AppTheme.text;
+            font-size: 10px;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+        }
+        Text {
+            text: entry.size;
+            color: AppTheme.text-muted;
+            font-size: 9px;
+            width: 68px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component SftpPane inherits Rectangle {
+    in property <string> host-id;
+    in property <string> title;
+    in property <string> current-dir;
+    in property <string> selected-path;
+    in property <bool> loading;
+    in property <string> error;
+    in property <[SftpEntryRow]> entries;
+    callback refresh(host-id: string);
+    callback select-entry(host-id: string, path: string);
+
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-strong;
+    background: #101823;
+    horizontal-stretch: 1;
+    vertical-stretch: 1;
+
+    VerticalLayout {
+        padding: 9px;
+        spacing: 7px;
+        HorizontalLayout {
+            Text { text: title; color: AppTheme.text-strong; font-size: 12px; font-weight: 700; }
+            Rectangle { horizontal-stretch: 1; }
+            Text { text: root.loading ? "Loading" : root.current-dir; color: AppTheme.text-muted; font-size: 10px; vertical-alignment: center; }
+            Button { text: "Refresh"; height: 22px; enabled: root.host-id != ""; clicked => { root.refresh(root.host-id); } }
+        }
+        HorizontalLayout {
+            spacing: 7px;
+            Rectangle {
+                border-radius: 6px;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                background: #0b1119;
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 6px;
+                    Text { text: "Local"; color: #92b7ff; font-size: 11px; font-weight: 700; }
+                    ToolRow { label: "Workspace"; value: "C:/"; }
+                    ToolRow { label: "Queue"; value: "0"; }
+                    ToolRow { label: "Selected"; value: root.selected-path == "" ? "-" : root.selected-path; }
+                }
+            }
+            Rectangle {
+                border-radius: 6px;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                background: #0b1119;
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding: 8px;
+                    spacing: 6px;
+                    Text { text: "Remote"; color: #6ff0b8; font-size: 11px; font-weight: 700; }
+                    ToolRow { label: "Path"; value: root.current-dir; }
+                    ToolRow { label: "Entries"; value: root.entries.length; }
+                    if root.error != "": Text {
+                        text: root.error;
+                        color: #ffd9d9;
+                        font-size: 10px;
+                    }
+                    ScrollView {
+                        vertical-stretch: 1;
+                        VerticalLayout {
+                            spacing: 3px;
+                            if root.entries.length == 0: Text {
+                                text: root.loading ? "Loading remote directory..." : "No remote entries loaded.";
+                                color: AppTheme.text-muted;
+                                font-size: 10px;
+                            }
+                            for entry in root.entries: SftpEntryItem {
+                                entry: entry;
+                                select(path) => { root.select-entry(root.host-id, path); }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

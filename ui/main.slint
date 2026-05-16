@@ -1,0 +1,227 @@
+import { ActivityRow, CommandPaletteRow, HostRow, SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { ActivityPanel } from "./activity_panel.slint";
+import { CommandPaletteOverlay } from "./command_palette.slint";
+import { HostsPanel } from "./hosts_panel.slint";
+import { MainWorkspace } from "./main_workspace.slint";
+import { NavRail } from "./rail.slint";
+import { VerticalSplitter } from "./splitter.slint";
+import { TopBar } from "./topbar.slint";
+
+export component AppWindow inherits Window {
+    in property <string> host-count: "0";
+    in property <string> tab-count: "0";
+    in property <string> active-page: "Hosts";
+    in property <string> language-label: "system";
+    in property <string> theme-name: "Professional Dark";
+    in property <string> background-summary: "0 sources";
+    in property <string> host-list-mode: "List";
+    in property <string> host-search-query: "";
+    in property <int> hosts-panel-width: 276;
+    in property <int> activity-panel-width: 244;
+    in property <int> tool-panel-width: 328;
+    in property <string> tool-panel-mode: "Closed";
+    in property <bool> right-sidebar-collapsed: false;
+    property <length> rail-width: 44px;
+    property <length> splitter-width: 6px;
+    property <length> collapsed-activity-width: 34px;
+    property <length> left-content-width: root.rail-width + (root.hosts-panel-width * 1px) + root.splitter-width;
+    property <length> right-panel-width: root.right-sidebar-collapsed ? root.collapsed-activity-width : (root.activity-panel-width * 1px);
+    property <length> right-splitter-width: root.right-sidebar-collapsed ? 0px : root.splitter-width;
+    in property <string> active-session-id: "";
+    in property <string> active-tab-title: "Local Shell";
+    in property <string> active-tab-kind: "Shell";
+    in property <string> active-tab-status: "Idle";
+    in property <string> terminal-input: "";
+    in property <string> terminal-prompt: ">";
+    in property <[string]> terminal-output: [];
+    in property <bool> terminal-can-send-input: false;
+    in property <string> sftp-host-id: "";
+    in property <string> sftp-title: "SFTP Workspace";
+    in property <string> sftp-current-dir: "/";
+    in property <string> sftp-selected-path: "";
+    in property <bool> sftp-loading: false;
+    in property <string> sftp-error: "";
+    in property <string> last-error: "";
+    in property <bool> command-palette-open: false;
+    in property <string> command-palette-query: "";
+    in property <[HostRow]> hosts: [];
+    in property <[SessionTabRow]> tabs: [];
+    in property <[SftpEntryRow]> sftp-entries: [];
+    in property <[ActivityRow]> activity: [];
+    in property <[CommandPaletteRow]> command-palette-results: [];
+    in property <[string]> recent: [];
+    in property <[string]> history: [];
+    in property <[ToolItemRow]> snippets: [];
+    in property <[ToolItemRow]> tunnels: [];
+
+    callback open-hosts();
+    callback open-terminal();
+    callback open-sftp();
+    callback open-tunnels();
+    callback open-snippets();
+    callback open-history();
+    callback open-settings();
+    callback toggle-host-list-mode();
+    callback update-host-search(query: string);
+    callback resize-hosts-panel(width: int);
+    callback resize-activity-panel(width: int);
+    callback resize-tool-panel(width: int);
+    callback open-tool-panel(mode: string);
+    callback close-tool-panel();
+    callback toggle-right-sidebar();
+    callback next-background();
+    callback open-command-palette();
+    callback update-command-palette(query: string);
+    callback close-command-palette();
+    callback activate-command-palette-item(item-id: string, kind: string);
+    callback open-shell(host-id: string);
+    callback open-host-sftp(host-id: string);
+    callback run-host-command(host-id: string);
+    callback activate-session(session-id: string);
+    callback close-session(session-id: string);
+    callback append-terminal-input(session-id: string, text: string);
+    callback backspace-terminal-input(session-id: string);
+    callback update-terminal-input(session-id: string, text: string);
+    callback send-terminal-input(session-id: string, text: string);
+    callback refresh-sftp(host-id: string);
+    callback select-sftp-entry(host-id: string, path: string);
+
+    title: "smagicalssh";
+    preferred-width: 1280px;
+    preferred-height: 820px;
+    min-width: 940px;
+    min-height: 600px;
+    background: AppTheme.window-bg;
+
+    VerticalLayout {
+        spacing: 0px;
+
+        TopBar {
+            active-page: root.active-page;
+            open-settings => { root.open-settings(); }
+            open-command-palette => { root.open-command-palette(); }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
+            clip: true;
+
+            NavRail {
+                x: 0px;
+                y: 0px;
+                height: parent.height;
+                active-page: root.active-page;
+                open-hosts => { root.open-hosts(); }
+                open-terminal => { root.open-terminal(); }
+                open-sftp => { root.open-sftp(); }
+                open-tunnels => { root.open-tunnels(); }
+                open-snippets => { root.open-snippets(); }
+                open-history => { root.open-history(); }
+                open-settings => { root.open-settings(); }
+            }
+
+            HostsPanel {
+                x: root.rail-width;
+                y: 0px;
+                height: parent.height;
+                active-page: root.active-page;
+                host-list-mode: root.host-list-mode;
+                host-search-query: root.host-search-query;
+                panel-width: root.hosts-panel-width;
+                hosts: root.hosts;
+                toggle-host-list-mode => { root.toggle-host-list-mode(); }
+                update-host-search(query) => { root.update-host-search(query); }
+                open-shell(host-id) => { root.open-shell(host-id); }
+                open-host-sftp(host-id) => { root.open-host-sftp(host-id); }
+                run-host-command(host-id) => { root.run-host-command(host-id); }
+            }
+
+            VerticalSplitter {
+                x: root.rail-width + (root.hosts-panel-width * 1px);
+                y: 0px;
+                height: parent.height;
+                base-width: root.hosts-panel-width;
+                resize(width) => { root.resize-hosts-panel(width); }
+            }
+
+            MainWorkspace {
+                x: root.left-content-width;
+                y: 0px;
+                width: max(0px, parent.width - root.left-content-width - root.right-panel-width - root.right-splitter-width);
+                height: parent.height;
+                active-page: root.active-page;
+                active-session-id: root.active-session-id;
+                active-tab-title: root.active-tab-title;
+                active-tab-kind: root.active-tab-kind;
+                active-tab-status: root.active-tab-status;
+                terminal-input: root.terminal-input;
+                terminal-prompt: root.terminal-prompt;
+                terminal-output: root.terminal-output;
+                terminal-can-send-input: root.terminal-can-send-input;
+                sftp-host-id: root.sftp-host-id;
+                sftp-title: root.sftp-title;
+                sftp-current-dir: root.sftp-current-dir;
+                sftp-selected-path: root.sftp-selected-path;
+                sftp-loading: root.sftp-loading;
+                sftp-error: root.sftp-error;
+                sftp-entries: root.sftp-entries;
+                tool-panel-width: root.tool-panel-width;
+                tool-panel-mode: root.tool-panel-mode;
+                last-error: root.last-error;
+                history-count: root.history.length;
+                tabs: root.tabs;
+                history: root.history;
+                snippets: root.snippets;
+                tunnels: root.tunnels;
+                activate-session(session-id) => { root.activate-session(session-id); }
+                close-session(session-id) => { root.close-session(session-id); }
+                append-terminal-input(session-id, text) => { root.append-terminal-input(session-id, text); }
+                backspace-terminal-input(session-id) => { root.backspace-terminal-input(session-id); }
+                update-terminal-input(session-id, text) => { root.update-terminal-input(session-id, text); }
+                send-terminal-input(session-id, text) => { root.send-terminal-input(session-id, text); }
+                refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
+                select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+                resize-tool-panel(width) => { root.resize-tool-panel(width); }
+                open-tool-panel(mode) => { root.open-tool-panel(mode); }
+                close-tool-panel => { root.close-tool-panel(); }
+            }
+
+            if !root.right-sidebar-collapsed: VerticalSplitter {
+                x: parent.width - root.right-panel-width - root.splitter-width;
+                y: 0px;
+                height: parent.height;
+                base-width: root.activity-panel-width;
+                reverse: true;
+                resize(width) => { root.resize-activity-panel(width); }
+            }
+
+            ActivityPanel {
+                x: parent.width - root.right-panel-width;
+                y: 0px;
+                height: parent.height;
+                collapsed: root.right-sidebar-collapsed;
+                tab-count: root.tab-count;
+                host-count: root.host-count;
+                panel-width: root.activity-panel-width;
+                activity: root.activity;
+                recent: root.recent;
+                toggle => { root.toggle-right-sidebar(); }
+                next-background => { root.next-background(); }
+            }
+        }
+    }
+
+    if root.command-palette-open: CommandPaletteOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        query: root.command-palette-query;
+        results: root.command-palette-results;
+        update-query(query) => { root.update-command-palette(query); }
+        close => { root.close-command-palette(); }
+        activate-item(item-id, kind) => { root.activate-command-palette-item(item-id, kind); }
+    }
+}

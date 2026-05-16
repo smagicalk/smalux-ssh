@@ -255,6 +255,24 @@ impl UiState {
         self.ensure_terminal_input_draft(session_id).input = input.into();
     }
 
+    /// 向指定终端会话的输入草稿追加文本。
+    pub fn append_terminal_input(&mut self, session_id: SessionId, text: impl AsRef<str>) {
+        self.ensure_terminal_input_draft(session_id)
+            .input
+            .push_str(text.as_ref());
+    }
+
+    /// 删除指定终端会话输入草稿的最后一个字符。
+    pub fn backspace_terminal_input(&mut self, session_id: SessionId) {
+        if let Some(draft) = self
+            .terminal_input_drafts
+            .iter_mut()
+            .find(|draft| draft.session_id == session_id)
+        {
+            draft.input.pop();
+        }
+    }
+
     /// 清空指定终端会话的输入草稿。
     pub fn clear_terminal_input(&mut self, session_id: SessionId) {
         self.terminal_input_drafts
@@ -466,11 +484,15 @@ mod tests {
 
         ui.set_terminal_input(first, "ls");
         ui.set_terminal_input(second, "pwd");
+        ui.append_terminal_input(first, " -la");
 
-        assert_eq!(ui.terminal_input_for(first), "ls");
+        assert_eq!(ui.terminal_input_for(first), "ls -la");
         assert_eq!(ui.terminal_input_for(second), "pwd");
         assert_eq!(ui.terminal_input_for(session_id()), "");
         assert_eq!(ui.terminal_input_drafts.len(), 2);
+
+        ui.backspace_terminal_input(first);
+        assert_eq!(ui.terminal_input_for(first), "ls -l");
 
         ui.clear_terminal_input(first);
         assert_eq!(ui.terminal_input_for(first), "");

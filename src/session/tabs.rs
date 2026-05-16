@@ -7,6 +7,17 @@ use crate::model::{
 use super::SessionManager;
 
 impl SessionManager {
+    /// 打开一个本地 Shell 标签页。
+    pub fn open_local_shell_tab(&mut self, id: SessionId, title: impl Into<String>) {
+        self.push_tab(SessionTab {
+            id,
+            host_id: None,
+            kind: SessionKind::LocalShell,
+            title: title.into(),
+            status: SessionStatus::Connected,
+        });
+    }
+
     /// 打开一个新的交互式 Shell 标签页。
     pub fn open_shell_tab(&mut self, id: SessionId, host_id: HostId, title: impl Into<String>) {
         self.push_tab(SessionTab {
@@ -137,6 +148,20 @@ mod tests {
         assert_eq!(sessions.tabs[0].host_id, Some(host_id));
         assert!(matches!(sessions.tabs[0].kind, SessionKind::Shell));
         assert!(matches!(sessions.tabs[0].status, SessionStatus::Created));
+    }
+
+    #[test]
+    fn opening_local_shell_tab_tracks_active_session_without_host() {
+        let mut sessions = SessionManager::default();
+        let id = session_id();
+
+        sessions.open_local_shell_tab(id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+
+        assert_eq!(sessions.tab_count(), 1);
+        assert_eq!(sessions.active_tab, Some(id));
+        assert_eq!(sessions.tabs[0].host_id, None);
+        assert!(matches!(sessions.tabs[0].kind, SessionKind::LocalShell));
+        assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
     }
 
     #[test]

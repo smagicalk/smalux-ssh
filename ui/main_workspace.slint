@@ -1,0 +1,158 @@
+import { SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { VerticalSplitter } from "./splitter.slint";
+import { SftpPane, TerminalPane, ToolDock, ToolPanel } from "./workspace.slint";
+import { TabChip } from "./tabs.slint";
+
+export component MainWorkspace inherits Rectangle {
+    in property <string> active-page;
+    in property <string> active-session-id;
+    in property <string> active-tab-title;
+    in property <string> active-tab-kind;
+    in property <string> active-tab-status;
+    in property <string> terminal-input;
+    in property <string> terminal-prompt;
+    in property <[string]> terminal-output;
+    in property <bool> terminal-can-send-input;
+    in property <string> sftp-host-id;
+    in property <string> sftp-title;
+    in property <string> sftp-current-dir;
+    in property <string> sftp-selected-path;
+    in property <bool> sftp-loading;
+    in property <string> sftp-error;
+    in property <int> tool-panel-width;
+    in property <string> tool-panel-mode;
+    in property <string> last-error;
+    in property <int> history-count;
+    in property <[SessionTabRow]> tabs;
+    in property <[SftpEntryRow]> sftp-entries;
+    in property <[string]> history;
+    in property <[ToolItemRow]> snippets;
+    in property <[ToolItemRow]> tunnels;
+    callback activate-session(session-id: string);
+    callback close-session(session-id: string);
+    callback append-terminal-input(session-id: string, text: string);
+    callback backspace-terminal-input(session-id: string);
+    callback update-terminal-input(session-id: string, text: string);
+    callback send-terminal-input(session-id: string, text: string);
+    callback refresh-sftp(host-id: string);
+    callback select-sftp-entry(host-id: string, path: string);
+    callback resize-tool-panel(width: int);
+    callback open-tool-panel(mode: string);
+    callback close-tool-panel();
+
+    background: AppTheme.window-bg;
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 7px;
+
+        HorizontalLayout {
+            spacing: 6px;
+            for tab in root.tabs: TabChip {
+                session-id: tab.id;
+                title: tab.title;
+                kind: tab.kind;
+                status: tab.status;
+                active-tab: tab.active;
+                activate => { root.activate-session(tab.id); }
+                close => { root.close-session(tab.id); }
+            }
+            if root.tabs.length == 0: Rectangle {
+                height: 25px;
+                width: 156px;
+                border-radius: 6px;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                background: AppTheme.surface-bg;
+                Text {
+                    text: root.active-tab-title;
+                    color: AppTheme.text;
+                    font-size: 10px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        if root.active-page == "SFTP": SftpPane {
+            host-id: root.sftp-host-id;
+            title: root.sftp-title;
+            current-dir: root.sftp-current-dir;
+            selected-path: root.sftp-selected-path;
+            loading: root.sftp-loading;
+            error: root.sftp-error;
+            entries: root.sftp-entries;
+            refresh(host-id) => { root.refresh-sftp(host-id); }
+            select-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+        }
+
+        if root.active-page != "SFTP": HorizontalLayout {
+            spacing: 7px;
+            TerminalPane {
+                session-id: root.active-session-id;
+                title: root.active-tab-title;
+                kind: root.active-tab-kind;
+                status: root.active-tab-status;
+                input: root.terminal-input;
+                prompt: root.terminal-prompt;
+                output-lines: root.terminal-output;
+                can-send-input: root.terminal-can-send-input;
+                append-input(session-id, text) => { root.append-terminal-input(session-id, text); }
+                backspace-input(session-id) => { root.backspace-terminal-input(session-id); }
+                update-input(session-id, text) => { root.update-terminal-input(session-id, text); }
+                send-input(session-id, text) => { root.send-terminal-input(session-id, text); }
+            }
+
+            if root.tool-panel-mode != "Closed": VerticalSplitter {
+                base-width: root.tool-panel-width;
+                reverse: true;
+                resize(width) => { root.resize-tool-panel(width); }
+            }
+
+            if root.tool-panel-mode != "Closed": ToolPanel {
+                panel-width: root.tool-panel-width;
+                mode: root.tool-panel-mode;
+                history-count: root.history-count;
+                sftp-host-id: root.sftp-host-id;
+                sftp-title: "SFTP Split";
+                sftp-current-dir: root.sftp-current-dir;
+                sftp-selected-path: root.sftp-selected-path;
+                sftp-loading: root.sftp-loading;
+                sftp-error: root.sftp-error;
+                sftp-entries: root.sftp-entries;
+                history: root.history;
+                snippets: root.snippets;
+                tunnels: root.tunnels;
+                close => { root.close-tool-panel(); }
+                refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
+                select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+            }
+        }
+
+        if root.last-error != "": Rectangle {
+            height: 34px;
+            border-radius: 7px;
+            border-width: 1px;
+            border-color: AppTheme.danger;
+            background: #301416;
+            Text {
+                text: root.last-error;
+                color: #ffd9d9;
+                font-size: 12px;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    if root.active-page != "SFTP": ToolDock {
+        x: root.tool-panel-mode == "Closed"
+            ? root.width - self.width - 14px
+            : max(8px, root.width - (root.tool-panel-width * 1px) - self.width - 26px);
+        y: 8px;
+        open-tool(mode) => { root.open-tool-panel(mode); }
+    }
+}

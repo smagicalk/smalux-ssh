@@ -36,6 +36,9 @@ pub enum BackendEvent {
         session_id: SessionId,
         line: String,
     },
+    ClearTerminal {
+        session_id: SessionId,
+    },
     CommandExited {
         session_id: SessionId,
         exit_code: Option<i32>,
@@ -77,6 +80,7 @@ impl BackendEvent {
             | Self::ShellOpened { session_id }
             | Self::RemoteCommandStarted { session_id, .. }
             | Self::Output { session_id, .. }
+            | Self::ClearTerminal { session_id }
             | Self::CommandExited { session_id, .. }
             | Self::SftpEntries { session_id, .. }
             | Self::TransferProgress { session_id, .. }

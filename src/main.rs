@@ -6,8 +6,7 @@ pub mod security;
 pub mod session;
 pub mod storage;
 pub mod terminal;
-pub mod ui;
 
-fn main() -> iced::Result {
+fn main() -> Result<(), slint::PlatformError> {
     app::run()
 }

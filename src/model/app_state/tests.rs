@@ -24,7 +24,7 @@ fn sample_host() -> Host {
 }
 
 #[test]
-fn default_state_starts_empty_and_dark() {
+fn default_state_starts_empty() {
     let state = AppState::default();
 
     assert_eq!(state.config.app_name, "smagicalssh");
@@ -32,27 +32,6 @@ fn default_state_starts_empty_and_dark() {
     assert_eq!(state.storage.host_count(), 0);
     assert_eq!(state.terminal.tab_count(), 0);
     assert_eq!(state.backend_commands.pending_count(), 0);
-    assert!(matches!(state.theme, Theme::Dark));
-}
-
-#[test]
-fn boot_returns_default_state_without_startup_task() {
-    let (state, _task) = AppState::boot();
-
-    assert_eq!(state.config.app_name, "smagicalssh");
-    assert!(matches!(state.theme, Theme::Dark));
-}
-
-#[test]
-fn toggle_theme_switches_between_dark_and_light() {
-    let mut state = AppState::default();
-
-    let outcome = state.apply(Message::ToggleTheme);
-    assert!(outcome.changed());
-    assert!(matches!(state.theme, Theme::Light));
-
-    state.apply(Message::ToggleTheme);
-    assert!(matches!(state.theme, Theme::Dark));
 }
 
 #[test]
@@ -125,6 +104,10 @@ fn trust_known_host_message_marks_entry_trusted() {
 fn activate_terminal_tab_message_switches_active_tab() {
     let mut state = AppState::default();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state
+        .sessions
+        .open_shell_tab(session_id, host_id, "production");
     state
         .terminal
         .open_tab(crate::terminal::TerminalTabState::new(
@@ -137,6 +120,26 @@ fn activate_terminal_tab_message_switches_active_tab() {
     assert!(outcome.changed());
     assert_eq!(state.terminal.active_tab, Some(session_id));
     assert_eq!(state.sessions.active_tab, Some(session_id));
+}
+
+#[test]
+fn activate_sftp_tab_message_switches_session_without_terminal_tab() {
+    let mut state = AppState::default();
+    let first_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let second_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state.sessions.open_sftp_tab(first_session_id, host_id, "/");
+    state
+        .sessions
+        .open_sftp_tab(second_session_id, host_id, "/var/log");
+
+    let outcome = state.apply(Message::ActivateTerminalTab {
+        session_id: first_session_id,
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(state.sessions.active_tab, Some(first_session_id));
+    assert!(state.terminal.active_tab.is_none());
 }
 
 #[test]
@@ -281,6 +284,30 @@ fn send_terminal_input_message_queues_shell_input_and_records_history() {
         Some(crate::backend::BackendCommand::SendShellInput { session_id: queued_session_id, input })
             if *queued_session_id == session_id && input == "ls\n"
     ));
+}
+
+#[test]
+fn send_remote_terminal_input_rejects_empty_command() {
+    let mut state = AppState::default();
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state
+        .sessions
+        .open_shell_tab(session_id, host_id, "production");
+    state
+        .terminal
+        .open_tab(crate::terminal::TerminalTabState::new(
+            session_id,
+            "production",
+        ));
+    state.ui.set_terminal_input(session_id, "  ");
+
+    let outcome = state.apply(Message::SendTerminalInput { session_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.as_deref().unwrap_or("").contains("不能为空"));
+    assert!(state.backend_commands.is_empty());
+    assert_eq!(state.storage.command_history_count(), 0);
 }
 
 #[test]

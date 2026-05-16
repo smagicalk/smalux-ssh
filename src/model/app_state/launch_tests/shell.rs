@@ -13,6 +13,7 @@ fn open_shell_message_creates_tabs_and_queues_backend_commands() {
     assert_eq!(outcome.queued_backend_commands, 2);
     assert_eq!(state.sessions.tab_count(), 1);
     assert_eq!(state.terminal.tab_count(), 1);
+    assert_eq!(state.ui.workspace.active_page, WorkspacePage::Terminal);
     assert_eq!(state.storage.recent_count(), 1);
     assert_eq!(state.storage.recent_connections[0].label, "production");
     assert!(matches!(
@@ -74,6 +75,7 @@ fn open_recent_connection_reuses_shell_launch_flow() {
     assert_eq!(outcome.queued_backend_commands, 2);
     assert_eq!(state.sessions.tab_count(), 1);
     assert_eq!(state.terminal.tab_count(), 1);
+    assert_eq!(state.ui.workspace.active_page, WorkspacePage::Terminal);
     assert_eq!(state.storage.recent_count(), 1);
     assert_eq!(state.storage.recent_connections[0].label, "production");
     assert_eq!(state.backend_commands.pending_count(), 2);

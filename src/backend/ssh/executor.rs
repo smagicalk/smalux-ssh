@@ -211,6 +211,7 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
             BackendCommand::SendShellInput { session_id, input } => {
                 self.send_shell_input(session_id, input)
             }
+            BackendCommand::DrainSessionOutput { .. } => Ok(Vec::new()),
             BackendCommand::Sftp {
                 session_id,
                 request,

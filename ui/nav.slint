@@ -1,0 +1,76 @@
+import { AppTheme } from "./theme.slint";
+
+export component NavButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked();
+
+    width: 64px;
+    height: 21px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: active ? AppTheme.accent-blue : #00000000;
+    background: active ? #143044 : #00000000;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        color: active ? AppTheme.text-strong : AppTheme.text-muted;
+        font-size: 10px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component RailButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> active;
+    callback clicked();
+
+    width: 30px;
+    height: 29px;
+    border-radius: 5px;
+    border-width: 1px;
+    border-color: active ? AppTheme.accent : #00000000;
+    background: active ? #15352f : #111720;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        color: active ? AppTheme.text-strong : AppTheme.text-muted;
+        font-size: 11px;
+        font-weight: active ? 700 : 400;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component ToolbarButton inherits Rectangle {
+    in property <string> label;
+    callback clicked();
+
+    width: 46px;
+    height: 20px;
+    border-radius: 4px;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    background: AppTheme.surface-bg;
+
+    TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: label;
+        color: AppTheme.text;
+        font-size: 10px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}

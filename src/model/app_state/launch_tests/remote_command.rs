@@ -17,6 +17,7 @@ fn run_remote_command_queues_exec_request_and_records_history() {
     assert_eq!(outcome.queued_backend_commands, 2);
     assert_eq!(state.sessions.tab_count(), 1);
     assert_eq!(state.terminal.tab_count(), 1);
+    assert_eq!(state.ui.workspace.active_page, WorkspacePage::Terminal);
     assert_eq!(state.storage.recent_count(), 1);
     assert_eq!(state.storage.command_history_count(), 1);
     assert_eq!(state.storage.command_history[0].command, "uptime");

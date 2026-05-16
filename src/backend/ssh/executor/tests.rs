@@ -99,6 +99,19 @@ fn send_shell_input_requires_connected_session() {
 }
 
 #[test]
+fn drain_session_output_noops_for_remote_executor() {
+    let mut executor =
+        RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
+    let session_id = session_id();
+
+    let events = executor
+        .execute(BackendCommand::DrainSessionOutput { session_id })
+        .expect("远程执行器 drain 应保持幂等");
+
+    assert!(events.is_empty());
+}
+
+#[test]
 fn run_command_requires_connected_session() {
     let mut executor =
         RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");

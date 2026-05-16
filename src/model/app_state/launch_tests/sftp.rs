@@ -16,6 +16,7 @@ fn open_sftp_message_creates_browser_and_queues_list_dir() {
     assert_eq!(outcome.queued_backend_commands, 2);
     assert_eq!(state.sessions.tab_count(), 1);
     assert_eq!(state.sessions.sftp_browser_count(), 1);
+    assert_eq!(state.ui.workspace.active_page, WorkspacePage::Sftp);
     assert_eq!(state.sessions.sftp_browsers[0].current_dir, "/var/log");
     assert!(state.sessions.sftp_browsers[0].loading);
     assert_eq!(state.storage.recent_count(), 1);

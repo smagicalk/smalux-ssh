@@ -135,7 +135,7 @@ Rust 跨平台桌面 SSH 工作台，目标是参考并整合 XTerminal、Termor
 
 ## 技术栈
 
-- GUI: `iced`
+- GUI: `slint`
 - 异步运行时: `tokio`
 - SSH: `russh`
 - SFTP: `russh-sftp`
@@ -160,7 +160,7 @@ Rust 跨平台桌面 SSH 工作台，目标是参考并整合 XTerminal、Termor
 
 ### 分层
 
-- 表现层: `iced` 负责窗口、布局、事件、主题、背景与各类面板
+- 表现层: `slint` 负责窗口、布局、事件、主题、背景与各类面板
 - 领域层: 主机、会话、分组、隧道、Snippets、主题、背景、日志等核心数据模型
 - 服务层: SSH、SFTP、端口转发、PTY、配置存储、凭据存储、同步
 - 平台适配层: `ssh-agent`、本地文件选择、系统凭据库、在线图片源、本地终端入口
@@ -220,7 +220,7 @@ Rust 跨平台桌面 SSH 工作台，目标是参考并整合 XTerminal、Termor
 
 ### 关键实现点
 
-- 终端渲染需要自定义封装，`iced` 不提供现成的完整终端组件
+- 终端渲染需要自定义封装，Slint 不提供现成的完整 SSH 终端组件
 - SSH 与 SFTP 需要共享连接上下文，避免重复认证和重复建连
 - 背景图片轮转与模糊/透明叠加要和终端绘制层解耦
 - 主机级配置覆盖全局配置，但必须保留可回退路径
@@ -329,10 +329,8 @@ src/
 - `src/app.rs`: 应用状态、消息路由、全局初始化
 - `src/model.rs`: Host、Session、Theme、Background 等核心模型
 - `src/config.rs`: 全局配置与主机覆盖配置的读写
-- `src/ui/mod.rs`: UI 总入口
-- `src/ui/shell.rs`: 主布局、侧边栏、标签页、分屏
-- `src/ui/theme.rs`: 主题切换与配色
-- `src/ui/background.rs`: 背景图片轮转、透明度、模糊度
+- `ui/main.slint`: Slint UI 总入口、主布局、侧边栏、标签页、右侧信息栏
+- `build.rs`: 编译 Slint 声明式 UI
 - `src/session/mod.rs`: 会话总入口
 - `src/session/ssh.rs`: SSH 连接与数据流
 - `src/session/auth.rs`: 认证方式

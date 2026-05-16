@@ -6,9 +6,11 @@
 mod buffer;
 mod selection;
 mod shells;
+mod stream;
 mod tabs;
 mod types;
 
+pub use stream::*;
 pub use types::*;
 
 use crate::model::SessionId;

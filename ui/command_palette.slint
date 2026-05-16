@@ -1,0 +1,104 @@
+import { Button, LineEdit, ScrollView } from "std-widgets.slint";
+import { CommandPaletteRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+
+export component CommandPaletteItem inherits Rectangle {
+    in property <CommandPaletteRow> item;
+    callback activate();
+
+    height: 48px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    background: #101823;
+
+    TouchArea {
+        clicked => { root.activate(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 10px;
+
+        Rectangle {
+            width: 52px;
+            height: 24px;
+            border-radius: 6px;
+            background: item.kind == "Host" ? #15352f : item.kind == "Recent" ? #142a36 : #291f3c;
+            Text {
+                text: item.kind;
+                color: AppTheme.text;
+                font-size: 10px;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        VerticalLayout {
+            spacing: 4px;
+            Text { text: item.title; color: AppTheme.text-strong; font-size: 12px; font-weight: 700; }
+            Text { text: item.subtitle; color: #8b98aa; font-size: 10px; }
+        }
+    }
+}
+
+export component CommandPaletteOverlay inherits Rectangle {
+    in property <string> query;
+    in property <[CommandPaletteRow]> results;
+    callback update-query(query: string);
+    callback close();
+    callback activate-item(item-id: string, kind: string);
+
+    background: AppTheme.overlay-bg;
+
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: 70px;
+        width: min(root.width - 48px, 680px);
+        height: min(root.height - 140px, 520px);
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.panel-bg;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 10px;
+
+            HorizontalLayout {
+                Text { text: "Command Palette"; color: AppTheme.text-strong; font-size: 15px; font-weight: 700; }
+                Rectangle { horizontal-stretch: 1; }
+                Button { text: "Esc"; height: 24px; clicked => { root.close(); } }
+            }
+
+            LineEdit {
+                text: root.query;
+                placeholder-text: "Search hosts, recent connections, command history";
+                height: 34px;
+                edited(query) => { root.update-query(query); }
+                accepted(query) => { root.update-query(query); }
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    spacing: 8px;
+                    if root.results.length == 0: Text {
+                        text: "No matching command.";
+                        color: AppTheme.text-muted;
+                        font-size: 12px;
+                    }
+                    for item in root.results: CommandPaletteItem {
+                        item: item;
+                        activate => { root.activate-item(item.id, item.kind); }
+                    }
+                }
+            }
+        }
+    }
+}

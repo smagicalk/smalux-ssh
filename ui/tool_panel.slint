@@ -1,0 +1,107 @@
+import { ScrollView } from "std-widgets.slint";
+import { SftpEntryRow, ToolItemRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { CompactButton, FilterChip, ToolRow } from "./common.slint";
+import { SftpPane } from "./sftp_pane.slint";
+
+export component ToolDock inherits Rectangle {
+    callback open-tool(mode: string);
+
+    width: 132px;
+    height: 25px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    background: #101721e6;
+
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        spacing: 4px;
+
+        CompactButton { label: "F"; clicked => { root.open-tool("SFTP"); } }
+        CompactButton { label: "{}"; clicked => { root.open-tool("Snippets"); } }
+        CompactButton { label: "H"; clicked => { root.open-tool("History"); } }
+        CompactButton { label: "Tun"; clicked => { root.open-tool("Tunnels"); } }
+    }
+}
+
+export component ToolPanel inherits Rectangle {
+    in property <int> panel-width;
+    in property <string> mode;
+    in property <int> history-count;
+    in property <string> sftp-host-id;
+    in property <string> sftp-title;
+    in property <string> sftp-current-dir;
+    in property <string> sftp-selected-path;
+    in property <bool> sftp-loading;
+    in property <string> sftp-error;
+    in property <[SftpEntryRow]> sftp-entries;
+    in property <[string]> history;
+    in property <[ToolItemRow]> snippets;
+    in property <[ToolItemRow]> tunnels;
+    callback close();
+    callback refresh-sftp(host-id: string);
+    callback select-sftp-entry(host-id: string, path: string);
+
+    width: root.panel-width * 1px;
+    background: AppTheme.raised-bg;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border;
+
+    VerticalLayout {
+        padding: 9px;
+        spacing: 8px;
+        HorizontalLayout {
+            Text { text: root.mode; color: AppTheme.text; font-size: 12px; font-weight: 700; }
+            Rectangle { horizontal-stretch: 1; }
+            FilterChip { label: "Pinned"; active: true; }
+            CompactButton { label: "x"; clicked => { root.close(); } }
+        }
+        if root.mode == "SFTP": SftpPane {
+            host-id: root.sftp-host-id;
+            title: root.sftp-title;
+            current-dir: root.sftp-current-dir;
+            selected-path: root.sftp-selected-path;
+            loading: root.sftp-loading;
+            error: root.sftp-error;
+            entries: root.sftp-entries;
+            refresh(host-id) => { root.refresh-sftp(host-id); }
+            select-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+        }
+        if root.mode == "Snippets": ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                if root.snippets.length == 0: ToolRow { label: "No snippets"; value: "empty"; }
+                for item in root.snippets: ToolRow {
+                    label: item.title;
+                    value: item.subtitle == "" ? item.meta : item.subtitle + " · " + item.meta;
+                }
+            }
+        }
+        if root.mode == "History": ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                ToolRow { label: "Commands"; value: root.history-count + " saved"; }
+                if root.history.length == 0: ToolRow { label: "No history"; value: "empty"; }
+                for command in root.history: ToolRow { label: command; value: "run"; }
+            }
+        }
+        if root.mode == "Tunnels": ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                if root.tunnels.length == 0: ToolRow { label: "No tunnels"; value: "empty"; }
+                for item in root.tunnels: ToolRow {
+                    label: item.title;
+                    value: item.subtitle == "" ? item.meta : item.subtitle + " · " + item.meta;
+                }
+            }
+        }
+    }
+}

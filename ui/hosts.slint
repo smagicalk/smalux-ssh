@@ -1,0 +1,72 @@
+import { AppTheme } from "./theme.slint";
+import { CompactButton } from "./common.slint";
+
+export component HostCard inherits Rectangle {
+    in property <string> host-id;
+    in property <string> name;
+    in property <string> endpoint;
+    in property <string> auth;
+    in property <string> group;
+    in property <string> tags;
+    in property <string> status;
+    callback open-shell();
+    callback open-sftp();
+    callback run-command();
+
+    height: 76px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: status == "Connected" ? AppTheme.accent : AppTheme.border;
+    background: AppTheme.surface-bg;
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 7px;
+        padding-top: 6px;
+        padding-bottom: 6px;
+        spacing: 7px;
+
+        Rectangle {
+            width: 7px;
+            border-radius: 5px;
+            background: status == "Connected" ? AppTheme.accent : status == "Connecting" ? AppTheme.warning : #4c83ff;
+        }
+
+        VerticalLayout {
+            spacing: 3px;
+            horizontal-stretch: 1;
+            Text { text: name; color: AppTheme.text-strong; font-size: 12px; font-weight: 700; }
+            Text { text: endpoint; color: AppTheme.text-soft; font-size: 10px; }
+            Text { text: tags; color: #6ff0b8; font-size: 9px; }
+            HorizontalLayout {
+                spacing: 4px;
+                CompactButton { label: "Shell"; clicked => { root.open-shell(); } }
+                CompactButton { label: "SFTP"; clicked => { root.open-sftp(); } }
+                CompactButton { label: "Run"; clicked => { root.run-command(); } }
+            }
+        }
+
+        VerticalLayout {
+            width: 62px;
+            spacing: 3px;
+            Text {
+                text: status;
+                color: status == "Connected" ? #6ff0b8 : #9aa8ba;
+                font-size: 9px;
+                horizontal-alignment: right;
+            }
+            Text {
+                text: auth;
+                color: AppTheme.accent-violet;
+                font-size: 9px;
+                horizontal-alignment: right;
+            }
+            Text {
+                text: group;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                horizontal-alignment: right;
+            }
+        }
+    }
+}

@@ -17,6 +17,7 @@ pub struct SessionTab {
 /// 会话标签页承载的功能类型。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SessionKind {
+    LocalShell,
     Shell,
     RemoteCommand { command: String },
     Sftp,

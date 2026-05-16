@@ -1,0 +1,43 @@
+export struct HostRow {
+    id: string,
+    name: string,
+    endpoint: string,
+    auth: string,
+    group: string,
+    tags: string,
+    status: string,
+}
+
+export struct SessionTabRow {
+    id: string,
+    title: string,
+    kind: string,
+    status: string,
+    active: bool,
+}
+
+export struct ActivityRow {
+    label: string,
+    value: string,
+}
+
+export struct CommandPaletteRow {
+    id: string,
+    title: string,
+    subtitle: string,
+    kind: string,
+}
+
+export struct SftpEntryRow {
+    name: string,
+    path: string,
+    kind: string,
+    size: string,
+    selected: bool,
+}
+
+export struct ToolItemRow {
+    title: string,
+    subtitle: string,
+    meta: string,
+}

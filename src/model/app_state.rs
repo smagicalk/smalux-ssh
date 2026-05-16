@@ -1,7 +1,4 @@
-//! Iced 应用根状态和消息调度。
-
-use iced::Task;
-use iced::Theme;
+//! 应用根状态和消息调度。
 
 use std::fmt;
 
@@ -16,8 +13,8 @@ use crate::terminal::TerminalManager;
 
 use super::{
     CommandHistoryId, HostId, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
-    SessionId, SessionKind, SessionStatus, SessionTab, SftpActionDraftField, SnippetId, TunnelRule,
-    TunnelStatus, UiState, VisualSettingsDraftField, WorkspacePage,
+    SessionId, SessionKind, SessionStatus, SessionTab, SftpActionDraftField, SnippetId,
+    ToolPanelMode, TunnelRule, TunnelStatus, UiState, VisualSettingsDraftField, WorkspacePage,
 };
 
 mod backend_pump;
@@ -36,7 +33,7 @@ mod ui_drafts;
 mod visual_settings;
 mod workspace;
 
-/// Iced 应用的根状态。
+/// Slint 应用的根状态。
 ///
 /// 根状态只组合各个单一职责管理器，不直接实现 SSH、SFTP 或终端细节。
 #[derive(Clone)]
@@ -49,7 +46,6 @@ pub struct AppState {
     pub ui: UiState,
     pub backend_commands: BackendCommandQueue,
     pub backend_executor: SharedBackendExecutor,
-    pub theme: Theme,
 }
 
 impl fmt::Debug for AppState {
@@ -63,7 +59,6 @@ impl fmt::Debug for AppState {
             .field("ui", &self.ui)
             .field("backend_commands", &self.backend_commands)
             .field("backend_executor", &"<shared backend executor>")
-            .field("theme", &self.theme)
             .finish()
     }
 }
@@ -84,7 +79,6 @@ impl Default for AppState {
             ui,
             backend_commands: BackendCommandQueue::default(),
             backend_executor: noop_shared_backend_executor(),
-            theme: Theme::Dark,
         }
     }
 }
@@ -92,7 +86,6 @@ impl Default for AppState {
 /// UI 与后台任务之间传递的消息。
 #[derive(Debug, Clone)]
 pub enum Message {
-    ToggleTheme,
     UpdateVisualSettingsDraft {
         field: VisualSettingsDraftField,
         value: String,
@@ -147,6 +140,22 @@ pub enum Message {
         page: WorkspacePage,
     },
     ToggleHostListMode,
+    UpdateHostSearchQuery {
+        query: String,
+    },
+    ResizeHostsPanel {
+        width: i32,
+    },
+    ResizeActivityPanel {
+        width: i32,
+    },
+    ResizeToolPanel {
+        width: i32,
+    },
+    OpenToolPanel {
+        mode: ToolPanelMode,
+    },
+    CloseToolPanel,
     ToggleRightSidebar,
     OpenCommandPalette {
         query: String,
@@ -165,6 +174,13 @@ pub enum Message {
     UpdateTerminalInputDraft {
         session_id: SessionId,
         input: String,
+    },
+    AppendTerminalInputDraft {
+        session_id: SessionId,
+        text: String,
+    },
+    BackspaceTerminalInputDraft {
+        session_id: SessionId,
     },
     SendTerminalInput {
         session_id: SessionId,
@@ -304,15 +320,9 @@ impl AppState {
         Ok(())
     }
 
-    /// 构造 Iced 启动需要的初始状态和首个任务。
-    pub fn boot() -> (Self, Task<Message>) {
-        (Self::default(), Task::none())
-    }
-
     /// 将 UI 消息应用到根状态。
     pub fn apply(&mut self, message: Message) -> AppUpdateOutcome {
         let mut outcome = match message {
-            Message::ToggleTheme => self.toggle_theme(),
             Message::UpdateVisualSettingsDraft { field, value } => {
                 self.update_visual_settings_draft(field, value)
             }
@@ -351,6 +361,12 @@ impl AppState {
             Message::DismissUiError => self.dismiss_ui_error(),
             Message::SetWorkspacePage { page } => self.set_workspace_page(page),
             Message::ToggleHostListMode => self.toggle_host_list_mode(),
+            Message::UpdateHostSearchQuery { query } => self.update_host_search_query(query),
+            Message::ResizeHostsPanel { width } => self.resize_hosts_panel(width),
+            Message::ResizeActivityPanel { width } => self.resize_activity_panel(width),
+            Message::ResizeToolPanel { width } => self.resize_tool_panel(width),
+            Message::OpenToolPanel { mode } => self.open_tool_panel(mode),
+            Message::CloseToolPanel => self.close_tool_panel(),
             Message::ToggleRightSidebar => self.toggle_right_sidebar(),
             Message::OpenCommandPalette { query } => self.open_command_palette(query),
             Message::UpdateCommandPaletteQuery { query } => {
@@ -359,22 +375,15 @@ impl AppState {
             Message::CloseCommandPalette => self.close_command_palette(),
             Message::NextBackground => self.next_background(),
             Message::CloseSessionTab { session_id } => self.close_session_tab(session_id),
-            Message::ActivateTerminalTab { session_id } => {
-                if self.terminal.set_active_tab(session_id) {
-                    self.sessions.active_tab = Some(session_id);
-                    AppUpdateOutcome {
-                        state_changed: true,
-                        ..AppUpdateOutcome::default()
-                    }
-                } else {
-                    AppUpdateOutcome {
-                        error: Some(format!("找不到终端标签页：{}", session_id.0)),
-                        ..AppUpdateOutcome::default()
-                    }
-                }
-            }
+            Message::ActivateTerminalTab { session_id } => self.activate_session_tab(session_id),
             Message::UpdateTerminalInputDraft { session_id, input } => {
                 self.update_terminal_input_draft(session_id, input)
+            }
+            Message::AppendTerminalInputDraft { session_id, text } => {
+                self.append_terminal_input_draft(session_id, text)
+            }
+            Message::BackspaceTerminalInputDraft { session_id } => {
+                self.backspace_terminal_input_draft(session_id)
             }
             Message::SendTerminalInput { session_id } => self.send_terminal_input(session_id),
             Message::UpdateHostCommandDraft { host_id, command } => {
@@ -455,19 +464,6 @@ impl AppState {
         outcome
     }
 
-    fn toggle_theme(&mut self) -> AppUpdateOutcome {
-        self.theme = if matches!(self.theme, Theme::Dark) {
-            Theme::Light
-        } else {
-            Theme::Dark
-        };
-
-        AppUpdateOutcome {
-            state_changed: true,
-            ..AppUpdateOutcome::default()
-        }
-    }
-
     fn dismiss_ui_error(&mut self) -> AppUpdateOutcome {
         AppUpdateOutcome {
             state_changed: self.ui.clear_last_error(),
@@ -515,6 +511,24 @@ impl AppState {
                 || sftp_browser_removed
                 || tunnel_runtime_removed,
             queued_backend_commands: usize::from(should_disconnect),
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    fn activate_session_tab(&mut self, session_id: SessionId) -> AppUpdateOutcome {
+        if !self.sessions.tabs.iter().any(|tab| tab.id == session_id) {
+            return AppUpdateOutcome {
+                error: Some(format!("找不到会话标签页：{}", session_id.0)),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let terminal_changed = self.terminal.set_active_tab(session_id);
+        let session_changed = self.sessions.active_tab != Some(session_id);
+        self.sessions.active_tab = Some(session_id);
+
+        AppUpdateOutcome {
+            state_changed: terminal_changed || session_changed,
             ..AppUpdateOutcome::default()
         }
     }

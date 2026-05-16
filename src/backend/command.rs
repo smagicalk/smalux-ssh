@@ -26,6 +26,9 @@ pub enum BackendCommand {
         session_id: SessionId,
         input: String,
     },
+    DrainSessionOutput {
+        session_id: SessionId,
+    },
     Sftp {
         session_id: SessionId,
         request: SftpRequest,
@@ -77,6 +80,7 @@ impl BackendCommand {
             | Self::OpenShell { session_id, .. }
             | Self::RunCommand { session_id, .. }
             | Self::SendShellInput { session_id, .. }
+            | Self::DrainSessionOutput { session_id }
             | Self::Sftp { session_id, .. }
             | Self::StartTunnel { session_id, .. }
             | Self::StopTunnel { session_id, .. }
@@ -91,6 +95,7 @@ impl BackendCommand {
             Self::OpenShell { .. } => BackendCommandKind::OpenShell,
             Self::RunCommand { .. } => BackendCommandKind::RunCommand,
             Self::SendShellInput { .. } => BackendCommandKind::SendShellInput,
+            Self::DrainSessionOutput { .. } => BackendCommandKind::DrainSessionOutput,
             Self::Sftp { .. } => BackendCommandKind::Sftp,
             Self::StartTunnel { .. } => BackendCommandKind::StartTunnel,
             Self::StopTunnel { .. } => BackendCommandKind::StopTunnel,
@@ -106,6 +111,7 @@ pub enum BackendCommandKind {
     OpenShell,
     RunCommand,
     SendShellInput,
+    DrainSessionOutput,
     Sftp,
     StartTunnel,
     StopTunnel,
@@ -190,5 +196,14 @@ mod tests {
                 ..
             } if value == "password:root"
         ));
+    }
+
+    #[test]
+    fn drain_session_output_command_exposes_session_id() {
+        let session_id = SessionId(Uuid::new_v4());
+        let command = BackendCommand::DrainSessionOutput { session_id };
+
+        assert_eq!(command.session_id(), session_id);
+        assert_eq!(command.kind(), BackendCommandKind::DrainSessionOutput);
     }
 }
