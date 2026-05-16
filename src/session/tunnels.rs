@@ -37,6 +37,14 @@ impl SessionManager {
         })
     }
 
+    /// 标记隧道正在停止，等待后端确认。
+    pub fn mark_tunnel_stopping(&mut self, rule_name: &str) -> bool {
+        self.update_tunnel(rule_name, |state| {
+            state.status = TunnelStatus::Stopping;
+            state.last_error = None;
+        })
+    }
+
     /// 标记隧道失败并记录错误。
     pub fn fail_tunnel(&mut self, rule_name: &str, reason: impl Into<String>) -> bool {
         let reason = reason.into();
@@ -122,6 +130,9 @@ mod tests {
 
         assert!(sessions.mark_tunnel_running("local-db"));
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
+
+        assert!(sessions.mark_tunnel_stopping("local-db"));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Stopping));
 
         assert!(sessions.stop_tunnel("local-db"));
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Stopped));

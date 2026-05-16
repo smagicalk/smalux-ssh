@@ -49,6 +49,7 @@ impl AppState {
         session_id: SessionId,
         rule_name: String,
     ) -> AppUpdateOutcome {
+        self.sessions.mark_tunnel_stopping(&rule_name);
         self.backend_commands.push(BackendCommand::StopTunnel {
             session_id,
             request: TunnelStopRequest::by_name(rule_name),
