@@ -380,6 +380,43 @@ fn cancel_sftp_transfer_cancels_queued_transfer_and_removes_backend_command() {
 }
 
 #[test]
+fn cancel_sftp_upload_clears_browser_loading_when_queued_request_is_removed() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    assert!(
+        state
+            .sessions
+            .set_sftp_entries(host_id, "/home/ops", Vec::new())
+    );
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/app.tar.gz".to_owned(),
+    });
+    state.apply(Message::UploadSftp { host_id });
+    let transfer_id = state.sessions.transfers[0].id;
+    assert!(state.sessions.sftp_browsers[0].loading);
+
+    let outcome = state.apply(Message::CancelSftpTransfer { transfer_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_none());
+    assert!(!state.sessions.sftp_browsers[0].loading);
+    assert!(matches!(
+        state.sessions.transfers[0].status,
+        crate::model::TransferStatus::Cancelled
+    ));
+}
+
+#[test]
 fn cancel_sftp_transfer_rejects_transfer_already_removed_from_queue() {
     let mut state = AppState::default();
     let host = sample_host();

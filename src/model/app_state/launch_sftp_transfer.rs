@@ -124,6 +124,7 @@ impl AppState {
             .transfers
             .iter()
             .find(|task| task.id == transfer_id)
+            .cloned()
         else {
             return AppUpdateOutcome {
                 error: Some(format!("找不到 SFTP 传输任务：{}", transfer_id.0)),
@@ -149,9 +150,10 @@ impl AppState {
         }
 
         let transfer_cancelled = self.sessions.cancel_queued_transfer(transfer_id);
+        let loading_cleared = clear_loading_for_cancelled_transfer(&mut self.sessions, &task);
 
         AppUpdateOutcome {
-            state_changed: transfer_cancelled || removed_commands > 0,
+            state_changed: transfer_cancelled || loading_cleared || removed_commands > 0,
             ..AppUpdateOutcome::default()
         }
     }
@@ -200,4 +202,15 @@ fn is_sftp_transfer_command(command: &BackendCommand, transfer_id: TransferId) -
             ..
         } if *id == transfer_id
     )
+}
+
+fn clear_loading_for_cancelled_transfer(
+    sessions: &mut crate::session::SessionManager,
+    task: &TransferTask,
+) -> bool {
+    if matches!(task.direction, TransferDirection::Upload) {
+        sessions.set_sftp_loading(task.host_id, false)
+    } else {
+        false
+    }
 }
