@@ -30,7 +30,8 @@ impl SessionManager {
             if total_bytes.is_some() {
                 task.total_bytes = total_bytes;
             }
-            task.transferred_bytes = transferred_bytes;
+            task.transferred_bytes =
+                normalized_transferred_bytes(task.total_bytes, transferred_bytes, &status);
             task.status = status;
             true
         } else {
@@ -50,6 +51,18 @@ impl SessionManager {
         } else {
             false
         }
+    }
+}
+
+fn normalized_transferred_bytes(
+    total_bytes: Option<u64>,
+    transferred_bytes: u64,
+    status: &TransferStatus,
+) -> u64 {
+    if matches!(status, TransferStatus::Completed) {
+        total_bytes.unwrap_or(transferred_bytes)
+    } else {
+        transferred_bytes
     }
 }
 
@@ -128,5 +141,22 @@ mod tests {
             TransferStatus::Running
         ));
         assert!(!sessions.cancel_queued_transfer(TransferId(Uuid::new_v4())));
+    }
+
+    #[test]
+    fn completed_transfer_uses_known_total_as_final_progress() {
+        let mut sessions = SessionManager::default();
+        let id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+
+        sessions.enqueue_transfer(transfer_task(id, host_id));
+
+        assert!(sessions.update_transfer_progress(id, Some(100), 80, TransferStatus::Completed));
+        assert_eq!(sessions.transfers[0].total_bytes, Some(100));
+        assert_eq!(sessions.transfers[0].transferred_bytes, 100);
+        assert!(matches!(
+            sessions.transfers[0].status,
+            TransferStatus::Completed
+        ));
     }
 }
