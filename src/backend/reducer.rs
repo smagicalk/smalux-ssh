@@ -102,12 +102,14 @@ pub fn apply_backend_event(
         },
         BackendEvent::TransferProgress {
             transfer_id,
+            total_bytes,
             transferred_bytes,
             status,
             ..
         } => BackendEventOutcome {
             session_updated: sessions.update_transfer_progress(
                 transfer_id,
+                total_bytes,
                 transferred_bytes,
                 status,
             ),

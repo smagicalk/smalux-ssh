@@ -2,13 +2,15 @@
 
 use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::{FileAttributes, FileType as RusshSftpFileType};
-use tokio::io::AsyncWriteExt;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use crate::backend::{BackendEvent, BackendExecutionError, SftpRequest};
-use crate::model::{SessionId, SftpEntry, SftpEntryKind, TransferStatus};
+use crate::model::{SessionId, SftpEntry, SftpEntryKind, TransferId, TransferStatus};
 
 use super::super::RusshConnection;
 use super::{channel_error, wait_channel_request};
+
+const SFTP_TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
 
 /// 已打开的远程 SFTP 子系统会话。
 pub struct RemoteSftp {
@@ -85,50 +87,143 @@ impl RemoteSftp {
 
     async fn upload(
         &self,
-        id: crate::model::TransferId,
+        id: TransferId,
         local_path: String,
         remote_path: String,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let data = tokio::fs::read(&local_path)
+        let mut local_file = tokio::fs::File::open(&local_path)
             .await
-            .map_err(|error| sftp_io_error("upload read local", error))?;
-        let total_bytes = data.len() as u64;
+            .map_err(|error| sftp_io_error("upload open local", error))?;
+        let total_bytes = local_file
+            .metadata()
+            .await
+            .map_err(|error| sftp_io_error("upload stat local", error))?
+            .len();
         let mut remote_file = self
             .session
             .create(remote_path.clone())
             .await
             .map_err(|error| sftp_error("upload open remote", error))?;
+        let mut events = vec![transfer_event(
+            self.session_id,
+            id,
+            Some(total_bytes),
+            0,
+            TransferStatus::Running,
+        )];
+        let mut transferred_bytes = 0_u64;
+        let mut buffer = vec![0_u8; SFTP_TRANSFER_CHUNK_SIZE];
 
-        remote_file
-            .write_all(&data)
-            .await
-            .map_err(|error| sftp_io_error("upload write remote", error))?;
+        loop {
+            let bytes_read = local_file
+                .read(&mut buffer)
+                .await
+                .map_err(|error| sftp_io_error("upload read local", error))?;
+
+            if bytes_read == 0 {
+                break;
+            }
+
+            remote_file
+                .write_all(&buffer[..bytes_read])
+                .await
+                .map_err(|error| sftp_io_error("upload write remote", error))?;
+            transferred_bytes += bytes_read as u64;
+            events.push(transfer_event(
+                self.session_id,
+                id,
+                Some(total_bytes),
+                transferred_bytes,
+                TransferStatus::Running,
+            ));
+        }
+
         remote_file
             .shutdown()
             .await
             .map_err(|error| sftp_io_error("upload close remote", error))?;
 
-        let mut events = transfer_events(self.session_id, id, total_bytes);
+        events.push(transfer_event(
+            self.session_id,
+            id,
+            Some(total_bytes),
+            transferred_bytes,
+            TransferStatus::Completed,
+        ));
         events.extend(self.list_dir(parent_remote_dir(&remote_path)).await?);
         Ok(events)
     }
 
     async fn download(
         &self,
-        id: crate::model::TransferId,
+        id: TransferId,
         remote_path: String,
         local_path: String,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let data = self
+        let mut remote_file = self
             .session
-            .read(remote_path)
+            .open(remote_path)
             .await
-            .map_err(|error| sftp_error("download read remote", error))?;
-        tokio::fs::write(&local_path, &data)
+            .map_err(|error| sftp_error("download open remote", error))?;
+        let total_bytes = remote_file
+            .metadata()
             .await
-            .map_err(|error| sftp_io_error("download write local", error))?;
+            .map_err(|error| sftp_error("download stat remote", error))?
+            .size;
+        let mut local_file = tokio::fs::File::create(&local_path)
+            .await
+            .map_err(|error| sftp_io_error("download open local", error))?;
+        let mut events = vec![transfer_event(
+            self.session_id,
+            id,
+            total_bytes,
+            0,
+            TransferStatus::Running,
+        )];
+        let mut transferred_bytes = 0_u64;
+        let mut buffer = vec![0_u8; SFTP_TRANSFER_CHUNK_SIZE];
 
-        Ok(transfer_events(self.session_id, id, data.len() as u64))
+        loop {
+            let bytes_read = remote_file
+                .read(&mut buffer)
+                .await
+                .map_err(|error| sftp_io_error("download read remote", error))?;
+
+            if bytes_read == 0 {
+                break;
+            }
+
+            local_file
+                .write_all(&buffer[..bytes_read])
+                .await
+                .map_err(|error| sftp_io_error("download write local", error))?;
+            transferred_bytes += bytes_read as u64;
+            events.push(transfer_event(
+                self.session_id,
+                id,
+                total_bytes,
+                transferred_bytes,
+                TransferStatus::Running,
+            ));
+        }
+
+        local_file
+            .flush()
+            .await
+            .map_err(|error| sftp_io_error("download flush local", error))?;
+        remote_file
+            .shutdown()
+            .await
+            .map_err(|error| sftp_io_error("download close remote", error))?;
+
+        events.push(transfer_event(
+            self.session_id,
+            id,
+            total_bytes,
+            transferred_bytes,
+            TransferStatus::Completed,
+        ));
+        Ok(events)
     }
 }
 
@@ -196,25 +291,20 @@ pub(super) fn parent_remote_dir(remote_path: &str) -> String {
     }
 }
 
-fn transfer_events(
+pub(super) fn transfer_event(
     session_id: SessionId,
-    transfer_id: crate::model::TransferId,
+    transfer_id: TransferId,
+    total_bytes: Option<u64>,
     transferred_bytes: u64,
-) -> Vec<BackendEvent> {
-    vec![
-        BackendEvent::TransferProgress {
-            session_id,
-            transfer_id,
-            transferred_bytes: 0,
-            status: TransferStatus::Running,
-        },
-        BackendEvent::TransferProgress {
-            session_id,
-            transfer_id,
-            transferred_bytes,
-            status: TransferStatus::Completed,
-        },
-    ]
+    status: TransferStatus,
+) -> BackendEvent {
+    BackendEvent::TransferProgress {
+        session_id,
+        transfer_id,
+        total_bytes,
+        transferred_bytes,
+        status,
+    }
 }
 
 fn sftp_error(operation: &str, error: impl std::fmt::Display) -> BackendExecutionError {

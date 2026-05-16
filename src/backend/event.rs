@@ -51,6 +51,7 @@ pub enum BackendEvent {
     TransferProgress {
         session_id: SessionId,
         transfer_id: TransferId,
+        total_bytes: Option<u64>,
         transferred_bytes: u64,
         status: TransferStatus,
     },

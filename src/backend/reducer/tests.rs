@@ -206,12 +206,14 @@ fn transfer_progress_event_updates_existing_transfer() {
         BackendEvent::TransferProgress {
             session_id,
             transfer_id,
+            total_bytes: Some(120),
             transferred_bytes: 80,
             status: TransferStatus::Running,
         },
     );
 
     assert!(outcome.session_updated);
+    assert_eq!(sessions.transfers[0].total_bytes, Some(120));
     assert_eq!(sessions.transfers[0].transferred_bytes, 80);
     assert!(matches!(
         sessions.transfers[0].status,

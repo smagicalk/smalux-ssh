@@ -22,10 +22,14 @@ impl SessionManager {
     pub fn update_transfer_progress(
         &mut self,
         id: TransferId,
+        total_bytes: Option<u64>,
         transferred_bytes: u64,
         status: TransferStatus,
     ) -> bool {
         if let Some(task) = self.transfers.iter_mut().find(|task| task.id == id) {
+            if total_bytes.is_some() {
+                task.total_bytes = total_bytes;
+            }
             task.transferred_bytes = transferred_bytes;
             task.status = status;
             true
@@ -72,7 +76,8 @@ mod tests {
         assert_eq!(sessions.transfer_count(), 1);
         assert_eq!(sessions.transfers[0].total_bytes, Some(200));
 
-        assert!(sessions.update_transfer_progress(id, 200, TransferStatus::Completed));
+        assert!(sessions.update_transfer_progress(id, Some(200), 200, TransferStatus::Completed));
+        assert_eq!(sessions.transfers[0].total_bytes, Some(200));
         assert_eq!(sessions.transfers[0].transferred_bytes, 200);
         assert!(matches!(
             sessions.transfers[0].status,
@@ -80,6 +85,7 @@ mod tests {
         ));
         assert!(!sessions.update_transfer_progress(
             TransferId(Uuid::new_v4()),
+            None,
             1,
             TransferStatus::Running
         ));
