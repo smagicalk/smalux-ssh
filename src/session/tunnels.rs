@@ -1,6 +1,6 @@
 //! SSH 隧道运行态操作。
 
-use crate::model::{HostId, TunnelRule, TunnelRuntimeState, TunnelStatus};
+use crate::model::{HostId, SessionId, SessionKind, TunnelRule, TunnelRuntimeState, TunnelStatus};
 
 use super::SessionManager;
 
@@ -47,6 +47,23 @@ impl SessionManager {
         })
     }
 
+    /// 按会话标签页标记隧道失败。
+    pub fn fail_tunnel_for_session(
+        &mut self,
+        session_id: SessionId,
+        reason: impl Into<String>,
+    ) -> bool {
+        let reason = reason.into();
+        let Some(rule_name) = self.tabs.iter().find_map(|tab| match &tab.kind {
+            SessionKind::Tunnel { rule_name } if tab.id == session_id => Some(rule_name.clone()),
+            _ => None,
+        }) else {
+            return false;
+        };
+
+        self.fail_tunnel(&rule_name, reason)
+    }
+
     /// 按后端事件同步隧道运行态。
     pub fn set_tunnel_status(&mut self, rule_name: &str, status: TunnelStatus) -> bool {
         self.update_tunnel(rule_name, |state| {
@@ -69,6 +86,10 @@ mod tests {
 
     fn host_id() -> HostId {
         HostId(Uuid::new_v4())
+    }
+
+    fn session_id() -> SessionId {
+        SessionId(Uuid::new_v4())
     }
 
     fn tunnel_rule(name: &str) -> TunnelRule {
@@ -121,6 +142,25 @@ mod tests {
             Some("bind failed")
         );
         assert!(!sessions.fail_tunnel("missing", "not found"));
+    }
+
+    #[test]
+    fn fail_tunnel_for_session_updates_matching_tunnel_only() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(session_id, host_id, &rule);
+        sessions.start_tunnel(&rule, Some(host_id), 10);
+
+        assert!(sessions.fail_tunnel_for_session(session_id, "bind failed"));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Failed));
+        assert_eq!(
+            sessions.tunnels[0].last_error.as_deref(),
+            Some("bind failed")
+        );
+        assert!(!sessions.fail_tunnel_for_session(SessionId(Uuid::new_v4()), "missing"));
     }
 
     #[test]

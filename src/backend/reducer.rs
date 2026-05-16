@@ -128,10 +128,11 @@ pub fn apply_backend_event(
                     reason: reason.clone(),
                 },
             );
-            let sftp_updated = sessions.fail_sftp_browser_for_session(session_id, reason);
+            let sftp_updated = sessions.fail_sftp_browser_for_session(session_id, reason.clone());
+            let tunnel_updated = sessions.fail_tunnel_for_session(session_id, reason);
 
             BackendEventOutcome {
-                session_updated: session_updated || sftp_updated,
+                session_updated: session_updated || sftp_updated || tunnel_updated,
                 terminal_updated: false,
             }
         }

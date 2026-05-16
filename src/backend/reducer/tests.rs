@@ -291,3 +291,31 @@ fn failed_sftp_event_records_browser_error() {
         Some("permission denied")
     );
 }
+
+#[test]
+fn failed_event_marks_tunnel_runtime_failed() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+    let host_id = host_id();
+    let rule = tunnel_rule("local-db");
+
+    sessions.open_tunnel_tab(session_id, host_id, &rule);
+    sessions.start_tunnel(&rule, Some(host_id), 10);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Failed {
+            session_id,
+            reason: "bind failed".to_owned(),
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Failed));
+    assert_eq!(
+        sessions.tunnels[0].last_error.as_deref(),
+        Some("bind failed")
+    );
+}
