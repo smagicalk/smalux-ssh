@@ -243,6 +243,67 @@ fn close_pending_sftp_tab_cancels_queued_transfer_and_removes_commands() {
 }
 
 #[test]
+fn close_pending_tunnel_tab_removes_launch_commands_without_stop() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    let rule = TunnelRule {
+        name: "local-db".to_owned(),
+        kind: TunnelKind::Local,
+        bind_host: "127.0.0.1".to_owned(),
+        bind_port: 15432,
+        target_host: "10.0.0.5".to_owned(),
+        target_port: 5432,
+        auto_start: false,
+    };
+    state.storage.upsert_host(host);
+    state.apply(Message::StartTunnel { host_id, rule });
+    let session_id = state.sessions.tabs[0].id;
+    assert_eq!(state.backend_commands.pending_count(), 2);
+    assert!(matches!(
+        state.sessions.tunnels[0].status,
+        TunnelStatus::Starting
+    ));
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_none());
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert_eq!(state.sessions.tab_count(), 0);
+    assert_eq!(state.sessions.tunnel_runtime_count(), 0);
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
+fn close_starting_tunnel_without_pending_launch_commands_requires_stop() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    let rule = TunnelRule {
+        name: "local-db".to_owned(),
+        kind: TunnelKind::Local,
+        bind_host: "127.0.0.1".to_owned(),
+        bind_port: 15432,
+        target_host: "10.0.0.5".to_owned(),
+        target_port: 5432,
+        auto_start: false,
+    };
+    state.storage.upsert_host(host);
+    state.apply(Message::StartTunnel { host_id, rule });
+    let session_id = state.sessions.tabs[0].id;
+    state.backend_commands.drain();
+
+    let outcome = state.apply(Message::CloseSessionTab { session_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_some());
+    assert_eq!(state.sessions.tab_count(), 1);
+    assert_eq!(state.sessions.tunnel_runtime_count(), 1);
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
 fn close_session_tab_message_keeps_sftp_browser_when_same_host_tab_remains() {
     let mut state = AppState::default();
     let first_id = crate::model::SessionId(uuid::Uuid::new_v4());

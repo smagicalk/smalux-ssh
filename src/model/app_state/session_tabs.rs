@@ -22,8 +22,17 @@ impl AppState {
             };
         };
 
+        let can_cancel_pending_tunnel_launch = match &tab.kind {
+            SessionKind::Tunnel { rule_name } => {
+                self.can_cancel_pending_tunnel_launch(session_id, rule_name)
+            }
+            _ => false,
+        };
+
         if let SessionKind::Tunnel { rule_name } = &tab.kind {
-            if self.tunnel_requires_stop_before_close(rule_name) {
+            if self.tunnel_requires_stop_before_close(rule_name)
+                && !can_cancel_pending_tunnel_launch
+            {
                 return AppUpdateOutcome {
                     error: Some(format!("隧道 {rule_name} 仍在运行，请先停止再关闭标签页")),
                     ..AppUpdateOutcome::default()
@@ -32,8 +41,7 @@ impl AppState {
         }
 
         let pending_cleanup = self.remove_pending_backend_commands_for_session(session_id);
-        let should_disconnect =
-            should_disconnect_on_close(&tab) && !pending_cleanup.removed_connect;
+        let should_disconnect = should_disconnect_on_close(&tab, &pending_cleanup);
         let session_closed = self.sessions.close_tab(session_id);
         let terminal_closed = self.terminal.close_tab(session_id);
         let sftp_browser_removed = self.remove_sftp_browser_after_tab_close(&tab);
@@ -83,6 +91,18 @@ impl AppState {
         })
     }
 
+    fn can_cancel_pending_tunnel_launch(&self, session_id: SessionId, rule_name: &str) -> bool {
+        let runtime_is_starting = self.sessions.tunnels.iter().any(|tunnel| {
+            tunnel.rule_name == rule_name && matches!(tunnel.status, TunnelStatus::Starting)
+        });
+
+        runtime_is_starting
+            && self
+                .backend_commands
+                .iter()
+                .any(|command| is_tunnel_launch_command(command, session_id, rule_name))
+    }
+
     fn remove_sftp_browser_after_tab_close(&mut self, tab: &SessionTab) -> bool {
         if !matches!(tab.kind, SessionKind::Sftp) {
             return false;
@@ -124,6 +144,7 @@ impl AppState {
         session_id: SessionId,
     ) -> PendingCloseCommandCleanup {
         let mut removed_connect = false;
+        let mut removed_start_tunnel = false;
         let mut transfer_ids = Vec::new();
         let removed_count = self.backend_commands.retain(|command| {
             if command.session_id() != session_id {
@@ -131,6 +152,7 @@ impl AppState {
             }
 
             removed_connect |= matches!(command, BackendCommand::Connect { .. });
+            removed_start_tunnel |= matches!(command, BackendCommand::StartTunnel { .. });
             if let Some(transfer_id) = sftp_transfer_id(command) {
                 transfer_ids.push(transfer_id);
             }
@@ -144,13 +166,20 @@ impl AppState {
         PendingCloseCommandCleanup {
             removed_count,
             removed_connect,
+            removed_start_tunnel,
             cancelled_transfer_count,
         }
     }
 }
 
-fn should_disconnect_on_close(tab: &SessionTab) -> bool {
-    !matches!(tab.kind, SessionKind::Tunnel { .. })
+fn should_disconnect_on_close(tab: &SessionTab, cleanup: &PendingCloseCommandCleanup) -> bool {
+    let closed_before_connect = cleanup.removed_connect;
+    let cancelled_connected_tunnel_launch = matches!(tab.kind, SessionKind::Tunnel { .. })
+        && cleanup.removed_start_tunnel
+        && !closed_before_connect;
+
+    (cancelled_connected_tunnel_launch || !matches!(tab.kind, SessionKind::Tunnel { .. }))
+        && !closed_before_connect
         && !matches!(
             tab.status,
             SessionStatus::Disconnected | SessionStatus::Failed { .. }
@@ -168,10 +197,29 @@ fn sftp_transfer_id(command: &BackendCommand) -> Option<TransferId> {
     }
 }
 
+fn is_tunnel_launch_command(
+    command: &BackendCommand,
+    session_id: SessionId,
+    rule_name: &str,
+) -> bool {
+    match command {
+        BackendCommand::Connect {
+            session_id: command_session_id,
+            ..
+        } => *command_session_id == session_id,
+        BackendCommand::StartTunnel {
+            session_id: command_session_id,
+            request,
+        } => *command_session_id == session_id && request.rule.name == rule_name,
+        _ => false,
+    }
+}
+
 #[derive(Debug, Clone, Copy, Default)]
 struct PendingCloseCommandCleanup {
     removed_count: usize,
     removed_connect: bool,
+    removed_start_tunnel: bool,
     cancelled_transfer_count: usize,
 }
 
