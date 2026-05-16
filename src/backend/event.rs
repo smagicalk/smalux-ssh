@@ -55,6 +55,10 @@ pub enum BackendEvent {
         transferred_bytes: u64,
         status: TransferStatus,
     },
+    SftpFailed {
+        session_id: SessionId,
+        reason: String,
+    },
     TunnelStatusChanged {
         session_id: SessionId,
         rule_name: String,
@@ -85,6 +89,7 @@ impl BackendEvent {
             | Self::CommandExited { session_id, .. }
             | Self::SftpEntries { session_id, .. }
             | Self::TransferProgress { session_id, .. }
+            | Self::SftpFailed { session_id, .. }
             | Self::TunnelStatusChanged { session_id, .. }
             | Self::Failed { session_id, .. }
             | Self::Disconnected { session_id } => *session_id,
@@ -117,6 +122,18 @@ mod tests {
         assert_eq!(output.session_id(), session_id);
         assert!(!output.is_terminal());
         assert!(failed.is_terminal());
+    }
+
+    #[test]
+    fn sftp_failed_event_is_not_terminal() {
+        let session_id = SessionId(Uuid::new_v4());
+        let event = BackendEvent::SftpFailed {
+            session_id,
+            reason: "permission denied".to_owned(),
+        };
+
+        assert_eq!(event.session_id(), session_id);
+        assert!(!event.is_terminal());
     }
 
     #[test]

@@ -1,6 +1,8 @@
 //! 后端命令队列执行泵。
 
-use crate::backend::{BackendCommand, BackendEvent, BackendExecutor, SftpRequest};
+use crate::backend::{
+    BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, SftpRequest,
+};
 use crate::model::{SessionId, TransferId, TransferStatus};
 
 use super::{AppState, AppUpdateOutcome};
@@ -20,8 +22,12 @@ impl AppState {
                 Ok(events) => events,
                 Err(error) => {
                     let reason = error.to_string();
-                    let failure_events =
-                        failed_backend_events(session_id, reason.clone(), failed_transfer);
+                    let failure_events = failed_backend_events(
+                        session_id,
+                        reason.clone(),
+                        failed_transfer,
+                        sftp_operation_failed(&error),
+                    );
                     for event in failure_events {
                         let event_outcome = self.apply_backend_event(event);
                         outcome.state_changed |= event_outcome.state_changed;
@@ -49,6 +55,7 @@ fn failed_backend_events(
     session_id: SessionId,
     reason: String,
     transfer: Option<FailedTransfer>,
+    sftp_operation_failed: bool,
 ) -> Vec<BackendEvent> {
     let mut events = Vec::new();
     if let Some(transfer) = transfer {
@@ -62,8 +69,16 @@ fn failed_backend_events(
             },
         });
     }
-    events.push(BackendEvent::Failed { session_id, reason });
+    if sftp_operation_failed {
+        events.push(BackendEvent::SftpFailed { session_id, reason });
+    } else {
+        events.push(BackendEvent::Failed { session_id, reason });
+    }
     events
+}
+
+fn sftp_operation_failed(error: &BackendExecutionError) -> bool {
+    matches!(error, BackendExecutionError::SftpFailed { .. })
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
