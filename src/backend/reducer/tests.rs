@@ -293,6 +293,29 @@ fn failed_sftp_event_records_browser_error() {
 }
 
 #[test]
+fn disconnected_sftp_event_stops_browser_loading() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id(), "/home/ops");
+    sessions.set_sftp_loading(sessions.tabs[0].host_id.unwrap(), true);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Disconnected { session_id },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(!sessions.sftp_browsers[0].loading);
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("SFTP 会话已断开")
+    );
+}
+
+#[test]
 fn failed_event_marks_tunnel_runtime_failed() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

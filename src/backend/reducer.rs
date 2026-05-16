@@ -136,10 +136,16 @@ pub fn apply_backend_event(
                 terminal_updated: false,
             }
         }
-        BackendEvent::Disconnected { session_id } => BackendEventOutcome {
-            session_updated: sessions.set_status(session_id, SessionStatus::Disconnected),
-            terminal_updated: false,
-        },
+        BackendEvent::Disconnected { session_id } => {
+            let session_updated = sessions.set_status(session_id, SessionStatus::Disconnected);
+            let sftp_updated =
+                sessions.fail_sftp_browser_for_session(session_id, "SFTP 会话已断开");
+
+            BackendEventOutcome {
+                session_updated: session_updated || sftp_updated,
+                terminal_updated: false,
+            }
+        }
     }
 }
 
