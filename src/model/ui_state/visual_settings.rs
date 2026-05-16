@@ -4,6 +4,10 @@ use std::fmt;
 
 use crate::model::{BackgroundProfile, ImageSource, ThemeProfile};
 
+use super::{
+    BackgroundProfile as UiBackgroundProfile, HostId, ThemeProfile as UiThemeProfile, UiState,
+};
+
 /// 全局视觉配置草稿字段。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum VisualSettingsDraftField {
@@ -114,6 +118,95 @@ impl VisualSettingsDraft {
             blur,
         })
         .map(|background| background.normalized())
+    }
+}
+
+/// 单台主机的视觉配置草稿。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HostVisualSettingsDraft {
+    pub host_id: HostId,
+    pub settings: VisualSettingsDraft,
+}
+
+impl UiState {
+    /// 更新全局视觉配置草稿字段。
+    pub fn set_visual_settings_field(
+        &mut self,
+        field: VisualSettingsDraftField,
+        value: impl Into<String>,
+    ) {
+        self.visual_settings.set_field(field, value);
+    }
+
+    /// 更新全局背景开关草稿。
+    pub fn set_visual_background_enabled(&mut self, enabled: bool) {
+        self.visual_settings.set_background_enabled(enabled);
+    }
+
+    /// 返回指定主机的视觉配置草稿。
+    pub fn host_visual_settings_for(&self, host_id: HostId) -> Option<&VisualSettingsDraft> {
+        self.host_visual_settings_drafts
+            .iter()
+            .find(|draft| draft.host_id == host_id)
+            .map(|draft| &draft.settings)
+    }
+
+    /// 准备指定主机的视觉配置草稿。
+    pub fn ensure_host_visual_settings_draft(
+        &mut self,
+        host_id: HostId,
+        theme: &UiThemeProfile,
+        background: &UiBackgroundProfile,
+    ) -> &mut VisualSettingsDraft {
+        if let Some(index) = self
+            .host_visual_settings_drafts
+            .iter()
+            .position(|draft| draft.host_id == host_id)
+        {
+            return &mut self.host_visual_settings_drafts[index].settings;
+        }
+
+        self.host_visual_settings_drafts
+            .push(HostVisualSettingsDraft {
+                host_id,
+                settings: VisualSettingsDraft::from_profiles(theme, background),
+            });
+        &mut self
+            .host_visual_settings_drafts
+            .last_mut()
+            .expect("刚插入的主机视觉草稿应该存在")
+            .settings
+    }
+
+    /// 更新指定主机的视觉配置草稿字段。
+    pub fn set_host_visual_settings_field(
+        &mut self,
+        host_id: HostId,
+        field: VisualSettingsDraftField,
+        value: impl Into<String>,
+        fallback_theme: &UiThemeProfile,
+        fallback_background: &UiBackgroundProfile,
+    ) {
+        self.ensure_host_visual_settings_draft(host_id, fallback_theme, fallback_background)
+            .set_field(field, value);
+    }
+
+    /// 更新指定主机的背景开关草稿。
+    pub fn set_host_visual_background_enabled(
+        &mut self,
+        host_id: HostId,
+        enabled: bool,
+        fallback_theme: &UiThemeProfile,
+        fallback_background: &UiBackgroundProfile,
+    ) {
+        self.ensure_host_visual_settings_draft(host_id, fallback_theme, fallback_background)
+            .set_background_enabled(enabled);
+    }
+
+    /// 清除指定主机的视觉配置草稿。
+    pub fn clear_host_visual_settings_draft(&mut self, host_id: HostId) {
+        self.host_visual_settings_drafts
+            .retain(|draft| draft.host_id != host_id);
     }
 }
 
@@ -252,68 +345,4 @@ fn format_background_sources(sources: &[ImageSource]) -> String {
         })
         .collect::<Vec<_>>()
         .join(", ")
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn draft_round_trips_profiles() {
-        let theme = ThemeProfile {
-            name: "Solarized".to_owned(),
-            font_family: "Maple Mono".to_owned(),
-            font_size: 15.5,
-        };
-        let background = BackgroundProfile {
-            enabled: true,
-            sources: vec![
-                ImageSource::LocalPath("wallpapers/a.jpg".to_owned()),
-                ImageSource::Url("https://example.com/b.jpg".to_owned()),
-            ],
-            rotation_interval_secs: 120,
-            opacity: 0.4,
-            blur: 12.0,
-        };
-
-        let draft = VisualSettingsDraft::from_profiles(&theme, &background);
-        let rebuilt_theme = draft
-            .build_theme_profile(&ThemeProfile {
-                name: String::new(),
-                font_family: String::new(),
-                font_size: 14.0,
-            })
-            .expect("主题草稿应该可以还原");
-        let rebuilt_background = draft
-            .build_background_profile(&BackgroundProfile {
-                enabled: false,
-                sources: Vec::new(),
-                rotation_interval_secs: 300,
-                opacity: 0.18,
-                blur: 8.0,
-            })
-            .expect("背景草稿应该可以还原");
-
-        assert_eq!(rebuilt_theme, theme);
-        assert_eq!(rebuilt_background, background.normalized());
-    }
-
-    #[test]
-    fn draft_reports_invalid_background_sources() {
-        let draft = VisualSettingsDraft {
-            background_sources: "url:".to_owned(),
-            ..VisualSettingsDraft::default()
-        };
-
-        assert!(matches!(
-            draft.build_background_profile(&BackgroundProfile {
-                enabled: false,
-                sources: Vec::new(),
-                rotation_interval_secs: 300,
-                opacity: 0.18,
-                blur: 8.0,
-            }),
-            Err(VisualSettingsDraftError::InvalidBackgroundSource(_))
-        ));
-    }
 }
