@@ -317,6 +317,35 @@ fn download_sftp_message_queues_transfer_and_download_request() {
 }
 
 #[test]
+fn download_sftp_message_keeps_browser_loading_unchanged() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    state.backend_commands.drain();
+    assert!(
+        state
+            .sessions
+            .set_sftp_entries(host_id, "/home/ops", Vec::new())
+    );
+    assert!(!state.sessions.sftp_browsers[0].loading);
+
+    let outcome = state.apply(Message::DownloadSftp {
+        host_id,
+        remote_path: "/home/ops/deploy.sh".to_owned(),
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.queued_backend_commands, 1);
+    assert!(!state.sessions.sftp_browsers[0].loading);
+}
+
+#[test]
 fn cancel_sftp_transfer_cancels_queued_transfer_and_removes_backend_command() {
     let mut state = AppState::default();
     let host = sample_host();
