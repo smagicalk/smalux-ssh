@@ -65,7 +65,9 @@ impl SessionManager {
     /// 更新标签页状态。
     pub fn set_status(&mut self, id: SessionId, status: SessionStatus) -> bool {
         if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
+            let is_terminal = is_terminal_status(&status);
             tab.status = status;
+            self.sync_active_index_for_status(id, is_terminal);
             true
         } else {
             false
@@ -113,11 +115,26 @@ impl SessionManager {
                 status: SessionStatus::Disconnected,
             })
             .collect();
-        self.active = self.tabs.iter().map(|tab| tab.id).collect();
+        self.active.clear();
         self.active_tab = active_tab
             .filter(|active_id| self.tabs.iter().any(|tab| tab.id == *active_id))
             .or_else(|| self.tabs.last().map(|tab| tab.id));
     }
+
+    fn sync_active_index_for_status(&mut self, id: SessionId, is_terminal: bool) {
+        if is_terminal {
+            self.active.retain(|active_id| *active_id != id);
+        } else if !self.active.contains(&id) {
+            self.active.push(id);
+        }
+    }
+}
+
+fn is_terminal_status(status: &SessionStatus) -> bool {
+    matches!(
+        status,
+        SessionStatus::Disconnected | SessionStatus::Failed { .. }
+    )
 }
 
 #[cfg(test)]
@@ -224,6 +241,27 @@ mod tests {
     }
 
     #[test]
+    fn terminal_status_removes_session_from_active_index() {
+        let mut sessions = SessionManager::default();
+        let first_id = session_id();
+        let second_id = session_id();
+
+        sessions.open_shell_tab(first_id, host_id(), "first");
+        sessions.open_shell_tab(second_id, host_id(), "second");
+
+        assert!(sessions.set_status(first_id, SessionStatus::Disconnected));
+        assert_eq!(sessions.active, vec![second_id]);
+
+        assert!(sessions.set_status(
+            second_id,
+            SessionStatus::Failed {
+                reason: "network".to_owned()
+            }
+        ));
+        assert!(sessions.active.is_empty());
+    }
+
+    #[test]
     fn close_tab_removes_active_session_and_selects_previous_tab() {
         let mut sessions = SessionManager::default();
         let first_id = session_id();
@@ -286,7 +324,7 @@ mod tests {
         );
 
         assert_eq!(sessions.tab_count(), 2);
-        assert_eq!(sessions.active_count(), 2);
+        assert_eq!(sessions.active_count(), 0);
         assert_eq!(sessions.active_tab, Some(first_id));
         assert!(matches!(
             sessions.tabs[0].status,
