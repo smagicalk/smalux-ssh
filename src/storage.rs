@@ -22,6 +22,7 @@ use crate::model::{
 pub use persistence::{RedbStorage, StoragePersistenceError};
 
 pub(super) const DEFAULT_RECENT_LIMIT: usize = 20;
+pub(super) const DEFAULT_COMMAND_HISTORY_LIMIT: usize = 500;
 
 /// 主机资产与隧道规则的管理器。
 #[derive(Debug, Clone, Default, PartialEq)]
