@@ -5,6 +5,7 @@
 use crate::backend::{BackendEvent, apply_backend_event};
 use crate::model::{CommandHistoryId, HostId, SessionId, SessionKind};
 
+use super::launch::unix_now_secs;
 use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
@@ -14,8 +15,8 @@ impl AppState {
             exit_code,
         } = &event
         {
-            // 会话状态更新前仍能读取 RemoteCommand 元数据，用于精确回写历史退出码。
-            self.update_remote_command_history_exit_code(*session_id, *exit_code);
+            // 会话状态更新前仍能读取 RemoteCommand 元数据，用于精确回写命令历史结果。
+            self.update_remote_command_history_result(*session_id, *exit_code);
         }
 
         let outcome = apply_backend_event(&mut self.sessions, &mut self.terminal, event);
@@ -37,7 +38,7 @@ impl AppState {
         self.drain_backend_queue(&mut **executor)
     }
 
-    fn update_remote_command_history_exit_code(
+    fn update_remote_command_history_result(
         &mut self,
         session_id: SessionId,
         exit_code: Option<i32>,
@@ -79,6 +80,7 @@ impl AppState {
         let Some(history) = history else { return false };
 
         history.exit_code = exit_code;
+        history.duration_ms = Some(command_duration_ms(history.started_at_unix_secs));
         true
     }
 }
@@ -87,4 +89,10 @@ struct RemoteCommandHistoryMatch {
     host_id: HostId,
     command: String,
     history_id: Option<CommandHistoryId>,
+}
+
+fn command_duration_ms(started_at_unix_secs: u64) -> u64 {
+    unix_now_secs()
+        .saturating_sub(started_at_unix_secs)
+        .saturating_mul(1_000)
 }
