@@ -52,6 +52,57 @@ fn sftp_entries_update_existing_browser() {
 }
 
 #[test]
+fn sftp_entries_clear_stale_selection_after_refresh() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+
+    sessions.open_sftp_tab(session_id(), host_id, "/home/ops");
+    sessions.select_sftp_entry(host_id, "/home/ops/deploy.sh");
+
+    assert!(sessions.set_sftp_entries(
+        host_id,
+        "/home/ops",
+        vec![SftpEntry {
+            name: "config.toml".to_owned(),
+            remote_path: "/home/ops/config.toml".to_owned(),
+            kind: SftpEntryKind::File,
+            size: Some(128),
+            modified_at_unix_secs: None,
+            permissions: None,
+        }],
+    ));
+
+    assert!(sessions.sftp_browsers[0].selected_path.is_none());
+}
+
+#[test]
+fn sftp_entries_keep_visible_selection_after_refresh() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+
+    sessions.open_sftp_tab(session_id(), host_id, "/home/ops");
+    sessions.select_sftp_entry(host_id, "/home/ops/deploy.sh");
+
+    assert!(sessions.set_sftp_entries(
+        host_id,
+        "/home/ops",
+        vec![SftpEntry {
+            name: "deploy.sh".to_owned(),
+            remote_path: "/home/ops/deploy.sh".to_owned(),
+            kind: SftpEntryKind::File,
+            size: Some(256),
+            modified_at_unix_secs: None,
+            permissions: None,
+        }],
+    ));
+
+    assert_eq!(
+        sessions.sftp_browsers[0].selected_path.as_deref(),
+        Some("/home/ops/deploy.sh")
+    );
+}
+
+#[test]
 fn sftp_loading_state_can_be_toggled() {
     let mut sessions = SessionManager::default();
     let current_host_id = host_id();

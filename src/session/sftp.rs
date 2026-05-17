@@ -45,8 +45,20 @@ impl SessionManager {
             .iter_mut()
             .find(|browser| browser.host_id == host_id)
         {
+            let selected_still_visible = browser
+                .selected_path
+                .as_ref()
+                .map(|selected_path| {
+                    entries
+                        .iter()
+                        .any(|entry| entry.remote_path == *selected_path)
+                })
+                .unwrap_or(true);
             browser.current_dir = current_dir.into();
             browser.entries = entries;
+            if !selected_still_visible {
+                browser.selected_path = None;
+            }
             browser.loading = false;
             browser.last_error = None;
             true
