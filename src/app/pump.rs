@@ -48,10 +48,28 @@ fn enqueue_drain_commands(
     session_ids: impl IntoIterator<Item = crate::model::SessionId>,
 ) {
     for session_id in session_ids {
+        if has_pending_drain_command(state, session_id) {
+            continue;
+        }
+
         state
             .backend_commands
             .push(BackendCommand::DrainSessionOutput { session_id });
     }
+}
+
+fn has_pending_drain_command(
+    state: &crate::model::AppState,
+    session_id: crate::model::SessionId,
+) -> bool {
+    state.backend_commands.iter().any(|command| {
+        matches!(
+            command,
+            BackendCommand::DrainSessionOutput {
+                session_id: pending_session_id,
+            } if *pending_session_id == session_id
+        )
+    })
 }
 
 #[cfg(test)]
@@ -108,6 +126,32 @@ mod tests {
                     session_id: shell_id
                 }
             ]
+        );
+    }
+
+    #[test]
+    fn pump_drain_queue_deduplicates_pending_session_drains() {
+        let mut state = AppState::default();
+        let shell_id = session_id();
+
+        state
+            .sessions
+            .open_shell_tab(shell_id, crate::model::HostId(Uuid::new_v4()), "ssh");
+        assert!(
+            state
+                .sessions
+                .set_status(shell_id, SessionStatus::Connected)
+        );
+
+        let session_ids = state.sessions.interactive_shell_tab_ids();
+        enqueue_drain_commands(&mut state, session_ids.clone());
+        enqueue_drain_commands(&mut state, session_ids);
+
+        assert_eq!(
+            state.backend_commands.drain(),
+            vec![BackendCommand::DrainSessionOutput {
+                session_id: shell_id
+            }]
         );
     }
 }
