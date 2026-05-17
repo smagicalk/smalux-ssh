@@ -3,7 +3,9 @@
 //! 负责把后端事件应用到会话和终端状态，以及从共享执行器泵出后台命令。
 
 use crate::backend::{BackendEvent, apply_backend_event};
-use crate::model::{CommandHistoryId, HostId, SessionId, SessionKind};
+use crate::model::{
+    CommandHistoryId, CommandHistoryItem, HostId, SessionId, SessionKind, SessionTab,
+};
 
 use super::launch::unix_now_secs;
 use super::{AppState, AppUpdateOutcome};
@@ -51,29 +53,41 @@ impl AppState {
         session_id: SessionId,
         exit_code: Option<i32>,
     ) -> bool {
-        let Some(match_key) = self.sessions.tabs.iter().find_map(|tab| {
-            if tab.id != session_id {
-                return None;
-            };
-
-            let SessionKind::RemoteCommand {
-                command,
-                history_id,
-            } = &tab.kind
-            else {
-                return None;
-            };
-
-            let host_id = tab.host_id?;
-            Some(RemoteCommandHistoryMatch {
-                host_id,
-                command: command.clone(),
-                history_id: *history_id,
-            })
-        }) else {
+        let Some(match_key) = self
+            .sessions
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .and_then(remote_command_history_match)
+        else {
             return false;
         };
 
+        self.finish_matching_remote_command_history(
+            match_key,
+            RemoteCommandHistoryFinish::BackendEvent { exit_code },
+        )
+    }
+
+    pub(super) fn finish_remote_command_history_for_closed_tab(
+        &mut self,
+        tab: &SessionTab,
+    ) -> bool {
+        let Some(match_key) = remote_command_history_match(tab) else {
+            return false;
+        };
+
+        self.finish_matching_remote_command_history(
+            match_key,
+            RemoteCommandHistoryFinish::ClosedTab,
+        )
+    }
+
+    fn finish_matching_remote_command_history(
+        &mut self,
+        match_key: RemoteCommandHistoryMatch,
+        finish: RemoteCommandHistoryFinish,
+    ) -> bool {
         let history = if let Some(history_id) = match_key.history_id {
             self.storage
                 .command_history
@@ -87,9 +101,7 @@ impl AppState {
 
         let Some(history) = history else { return false };
 
-        history.exit_code = exit_code;
-        history.duration_ms = Some(command_duration_ms(history.started_at_unix_secs));
-        true
+        finish.apply_to(history)
     }
 }
 
@@ -97,6 +109,47 @@ struct RemoteCommandHistoryMatch {
     host_id: HostId,
     command: String,
     history_id: Option<CommandHistoryId>,
+}
+
+enum RemoteCommandHistoryFinish {
+    BackendEvent { exit_code: Option<i32> },
+    ClosedTab,
+}
+
+impl RemoteCommandHistoryFinish {
+    fn apply_to(self, history: &mut CommandHistoryItem) -> bool {
+        let previous_exit_code = history.exit_code;
+        let previous_duration_ms = history.duration_ms;
+
+        if let RemoteCommandHistoryFinish::BackendEvent {
+            exit_code: Some(exit_code),
+        } = self
+        {
+            history.exit_code = Some(exit_code);
+        }
+
+        if history.duration_ms.is_none() {
+            history.duration_ms = Some(command_duration_ms(history.started_at_unix_secs));
+        }
+
+        history.exit_code != previous_exit_code || history.duration_ms != previous_duration_ms
+    }
+}
+
+fn remote_command_history_match(tab: &SessionTab) -> Option<RemoteCommandHistoryMatch> {
+    let SessionKind::RemoteCommand {
+        command,
+        history_id,
+    } = &tab.kind
+    else {
+        return None;
+    };
+
+    Some(RemoteCommandHistoryMatch {
+        host_id: tab.host_id?,
+        command: command.clone(),
+        history_id: *history_id,
+    })
 }
 
 fn command_duration_ms(started_at_unix_secs: u64) -> u64 {

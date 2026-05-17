@@ -41,6 +41,7 @@ impl AppState {
         }
 
         let pending_cleanup = self.remove_pending_backend_commands_for_session(session_id);
+        let command_history_finished = self.finish_remote_command_history_for_closed_tab(&tab);
         let should_disconnect = should_disconnect_on_close(&tab, &pending_cleanup);
         let session_closed = self.sessions.close_tab(session_id);
         let terminal_closed = self.terminal.close_tab(session_id);
@@ -57,7 +58,8 @@ impl AppState {
                 || terminal_closed
                 || sftp_browser_removed
                 || tunnel_runtime_removed
-                || pending_cleanup.changed(),
+                || pending_cleanup.changed()
+                || command_history_finished,
             queued_backend_commands: usize::from(should_disconnect),
             ..AppUpdateOutcome::default()
         }
