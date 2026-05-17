@@ -11,6 +11,7 @@ pub struct TunnelStartRequest {
 impl TunnelStartRequest {
     /// 从隧道规则构造启动请求，并复用模型层校验。
     pub fn new(rule: TunnelRule) -> Result<Self, TunnelRuleValidationError> {
+        let rule = rule.normalized();
         rule.validate()?;
         Ok(Self { rule })
     }
@@ -68,6 +69,22 @@ mod tests {
             TunnelStartRequest::new(invalid),
             Err(TunnelRuleValidationError::EmptyName)
         );
+    }
+
+    #[test]
+    fn tunnel_start_request_uses_normalized_rule() {
+        let rule = TunnelRule {
+            name: " proxy ".to_owned(),
+            bind_host: " 127.0.0.1 ".to_owned(),
+            target_host: " 10.0.0.5 ".to_owned(),
+            ..tunnel_rule(TunnelKind::Local)
+        };
+
+        let request = TunnelStartRequest::new(rule).expect("修剪后有效的规则应该可以启动");
+
+        assert_eq!(request.rule.name, "proxy");
+        assert_eq!(request.rule.bind_host, "127.0.0.1");
+        assert_eq!(request.rule.target_host, "10.0.0.5");
     }
 
     #[test]

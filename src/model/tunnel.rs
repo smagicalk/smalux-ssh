@@ -17,6 +17,15 @@ pub struct TunnelRule {
 }
 
 impl TunnelRule {
+    /// 返回去除首尾空白后的规则副本，保证运行态、标签页和后端请求使用同一套键值。
+    pub fn normalized(&self) -> Self {
+        let mut rule = self.clone();
+        rule.name = rule.name.trim().to_owned();
+        rule.bind_host = rule.bind_host.trim().to_owned();
+        rule.target_host = rule.target_host.trim().to_owned();
+        rule
+    }
+
     /// 校验隧道规则是否具备启动所需的最小参数。
     pub fn validate(&self) -> Result<(), TunnelRuleValidationError> {
         if self.name.trim().is_empty() {
@@ -171,6 +180,29 @@ mod tests {
         assert_eq!(
             empty_target.validate(),
             Err(TunnelRuleValidationError::EmptyTargetHost)
+        );
+    }
+
+    #[test]
+    fn tunnel_rule_normalization_trims_identity_and_endpoints() {
+        let rule = TunnelRule {
+            name: " local-db ".to_owned(),
+            kind: TunnelKind::Local,
+            bind_host: " 127.0.0.1 ".to_owned(),
+            bind_port: 15432,
+            target_host: " 10.0.0.5 ".to_owned(),
+            target_port: 5432,
+            auto_start: false,
+        };
+
+        let normalized = rule.normalized();
+
+        assert_eq!(normalized.name, "local-db");
+        assert_eq!(normalized.bind_host, "127.0.0.1");
+        assert_eq!(normalized.target_host, "10.0.0.5");
+        assert_eq!(
+            normalized.display_endpoint(),
+            "L 127.0.0.1:15432 -> 10.0.0.5:5432"
         );
     }
 

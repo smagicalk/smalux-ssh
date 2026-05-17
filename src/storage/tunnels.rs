@@ -7,6 +7,7 @@ use super::StorageManager;
 impl StorageManager {
     /// 保存或更新隧道规则。
     pub fn upsert_tunnel_rule(&mut self, rule: TunnelRule) {
+        let rule = rule.normalized();
         if let Some(existing) = self
             .tunnel_rules
             .iter_mut()
@@ -76,5 +77,26 @@ mod tests {
                 .map(|rule| rule.bind_port),
             Some(1081)
         );
+    }
+
+    #[test]
+    fn upsert_tunnel_rule_normalizes_rule_identity() {
+        let mut storage = StorageManager::default();
+        let mut spaced = sample_tunnel_rule();
+        spaced.name = " dynamic-proxy ".to_owned();
+        spaced.bind_host = " 127.0.0.1 ".to_owned();
+        spaced.target_host = " ignored-for-dynamic ".to_owned();
+        spaced.bind_port = 1081;
+
+        storage.upsert_tunnel_rule(sample_tunnel_rule());
+        storage.upsert_tunnel_rule(spaced);
+
+        assert_eq!(storage.tunnel_rule_count(), 1);
+        let stored = storage
+            .tunnel_rule_by_name("dynamic-proxy")
+            .expect("规范化后的名称应该可以查到规则");
+        assert_eq!(stored.bind_host, "127.0.0.1");
+        assert_eq!(stored.target_host, "ignored-for-dynamic");
+        assert_eq!(stored.bind_port, 1081);
     }
 }

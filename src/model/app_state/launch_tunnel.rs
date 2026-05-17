@@ -16,7 +16,7 @@ impl AppState {
         let Some(host) = self.host_by_id(host_id) else {
             return missing_host(host_id);
         };
-        let request = match TunnelStartRequest::new(rule.clone()) {
+        let request = match TunnelStartRequest::new(rule) {
             Ok(request) => request,
             Err(error) => {
                 return AppUpdateOutcome {
@@ -36,12 +36,13 @@ impl AppState {
         }
 
         let session_id = SessionId(Uuid::new_v4());
-        self.sessions.open_tunnel_tab(session_id, host.id, &rule);
+        self.sessions
+            .open_tunnel_tab(session_id, host.id, &request.rule);
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
         self.ui.workspace.active_page = WorkspacePage::Tunnels;
         self.sessions
-            .start_tunnel(&rule, Some(host.id), unix_now_secs());
+            .start_tunnel(&request.rule, Some(host.id), unix_now_secs());
         self.record_recent_connection(&host);
         self.backend_commands.extend([
             connect_command(session_id, &host),
@@ -60,6 +61,14 @@ impl AppState {
         session_id: SessionId,
         rule_name: String,
     ) -> AppUpdateOutcome {
+        let rule_name = rule_name.trim().to_owned();
+        if rule_name.is_empty() {
+            return AppUpdateOutcome {
+                error: Some("隧道名称不能为空".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
         match self.sessions.tunnel_status(&rule_name) {
             Some(TunnelStatus::Starting | TunnelStatus::Running) => {}
             Some(TunnelStatus::Stopping) => {
