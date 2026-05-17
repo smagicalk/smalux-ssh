@@ -120,11 +120,30 @@ pub fn apply_backend_event(
             terminal_updated: false,
         },
         BackendEvent::TunnelStatusChanged {
-            rule_name, status, ..
-        } => BackendEventOutcome {
-            session_updated: apply_tunnel_status(sessions, &rule_name, status),
-            terminal_updated: false,
-        },
+            session_id,
+            rule_name,
+            status,
+        } => {
+            let tunnel_updated = apply_tunnel_status(sessions, &rule_name, status.clone());
+            let session_updated = match status {
+                TunnelStatus::Running => sessions.set_status(session_id, SessionStatus::Connected),
+                TunnelStatus::Stopped => {
+                    sessions.set_status(session_id, SessionStatus::Disconnected)
+                }
+                TunnelStatus::Failed => sessions.set_status(
+                    session_id,
+                    SessionStatus::Failed {
+                        reason: "backend tunnel failed".to_owned(),
+                    },
+                ),
+                TunnelStatus::Starting | TunnelStatus::Stopping => false,
+            };
+
+            BackendEventOutcome {
+                session_updated: tunnel_updated || session_updated,
+                terminal_updated: false,
+            }
+        }
         BackendEvent::Failed { session_id, reason } => {
             let session_updated = sessions.set_status(
                 session_id,

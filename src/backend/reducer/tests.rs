@@ -226,9 +226,11 @@ fn tunnel_status_event_updates_runtime_state() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
     let session_id = session_id();
+    let host_id = host_id();
     let rule = tunnel_rule("local-db");
 
-    sessions.start_tunnel(&rule, Some(host_id()), 10);
+    sessions.open_tunnel_tab(session_id, host_id, &rule);
+    sessions.start_tunnel(&rule, Some(host_id), 10);
     let outcome = apply_backend_event(
         &mut sessions,
         &mut terminal,
@@ -241,6 +243,37 @@ fn tunnel_status_event_updates_runtime_state() {
 
     assert!(outcome.session_updated);
     assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+}
+
+#[test]
+fn tunnel_stopped_event_marks_session_disconnected() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+    let host_id = host_id();
+    let rule = tunnel_rule("local-db");
+
+    sessions.open_tunnel_tab(session_id, host_id, &rule);
+    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.set_status(session_id, SessionStatus::Connected);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name: "local-db".to_owned(),
+            status: TunnelStatus::Stopped,
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Stopped));
+    assert!(matches!(
+        sessions.tabs[0].status,
+        SessionStatus::Disconnected
+    ));
 }
 
 #[test]
