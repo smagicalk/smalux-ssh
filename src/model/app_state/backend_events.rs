@@ -21,6 +21,9 @@ impl AppState {
             BackendEvent::Failed { session_id, .. } => {
                 self.finish_remote_command_history(*session_id, None);
             }
+            BackendEvent::Disconnected { session_id } => {
+                self.finish_remote_command_history(*session_id, None);
+            }
             _ => {}
         }
 
