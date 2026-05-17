@@ -80,6 +80,34 @@ impl SessionManager {
         self.fail_tunnel(&rule_name, reason)
     }
 
+    /// 按会话标签页和规则名同步隧道运行态，避免迟到事件污染同名新会话。
+    pub fn set_tunnel_status_for_session(
+        &mut self,
+        session_id: SessionId,
+        rule_name: &str,
+        status: TunnelStatus,
+    ) -> bool {
+        if !self.tunnel_tab_matches_rule(session_id, rule_name) {
+            return false;
+        }
+
+        self.set_tunnel_status(rule_name, status)
+    }
+
+    /// 按会话标签页和规则名标记隧道失败。
+    pub fn fail_tunnel_for_session_rule(
+        &mut self,
+        session_id: SessionId,
+        rule_name: &str,
+        reason: impl Into<String>,
+    ) -> bool {
+        if !self.tunnel_tab_matches_rule(session_id, rule_name) {
+            return false;
+        }
+
+        self.fail_tunnel(rule_name, reason)
+    }
+
     /// 按后端事件同步隧道运行态。
     pub fn set_tunnel_status(&mut self, rule_name: &str, status: TunnelStatus) -> bool {
         self.update_tunnel(rule_name, |state| {
@@ -90,6 +118,18 @@ impl SessionManager {
                 state.last_error = None;
             }
             state.status = status;
+        })
+    }
+
+    fn tunnel_tab_matches_rule(&self, session_id: SessionId, rule_name: &str) -> bool {
+        self.tabs.iter().any(|tab| {
+            tab.id == session_id
+                && matches!(
+                    &tab.kind,
+                    SessionKind::Tunnel {
+                        rule_name: tab_rule_name,
+                    } if tab_rule_name == rule_name
+                )
         })
     }
 }
@@ -212,5 +252,71 @@ mod tests {
         assert!(sessions.set_tunnel_status("local-db", TunnelStatus::Stopped));
         assert_eq!(sessions.tunnels[0].started_at_unix_secs, None);
         assert!(!sessions.set_tunnel_status("missing", TunnelStatus::Running));
+    }
+
+    #[test]
+    fn set_tunnel_status_for_session_requires_matching_tunnel_tab() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let current_session_id = session_id();
+        let stale_session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(current_session_id, host_id, &rule);
+        sessions.start_tunnel(&rule, Some(host_id), 10);
+
+        assert!(!sessions.set_tunnel_status_for_session(
+            stale_session_id,
+            "local-db",
+            TunnelStatus::Stopped
+        ));
+        assert!(!sessions.set_tunnel_status_for_session(
+            current_session_id,
+            "metrics",
+            TunnelStatus::Stopped
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Starting));
+
+        assert!(sessions.set_tunnel_status_for_session(
+            current_session_id,
+            "local-db",
+            TunnelStatus::Running
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
+    }
+
+    #[test]
+    fn fail_tunnel_for_session_rule_requires_matching_tunnel_tab() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let current_session_id = session_id();
+        let stale_session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(current_session_id, host_id, &rule);
+        sessions.start_tunnel(&rule, Some(host_id), 10);
+
+        assert!(!sessions.fail_tunnel_for_session_rule(
+            stale_session_id,
+            "local-db",
+            "bind failed"
+        ));
+        assert!(!sessions.fail_tunnel_for_session_rule(
+            current_session_id,
+            "metrics",
+            "bind failed"
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Starting));
+
+        assert!(sessions.fail_tunnel_for_session_rule(
+            current_session_id,
+            "local-db",
+            "bind failed"
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Failed));
+        assert_eq!(
+            sessions.tunnels[0].last_error.as_deref(),
+            Some("bind failed")
+        );
     }
 }

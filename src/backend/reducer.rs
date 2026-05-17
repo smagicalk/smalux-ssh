@@ -1,6 +1,6 @@
 //! 后端事件到 UI 状态的归约逻辑。
 
-use crate::model::{LOCAL_TERMINAL_SESSION_ID, SessionStatus, TunnelStatus};
+use crate::model::{LOCAL_TERMINAL_SESSION_ID, SessionId, SessionStatus, TunnelStatus};
 use crate::session::SessionManager;
 use crate::terminal::TerminalManager;
 
@@ -124,19 +124,12 @@ pub fn apply_backend_event(
             rule_name,
             status,
         } => {
-            let tunnel_updated = apply_tunnel_status(sessions, &rule_name, status.clone());
-            let session_updated = match status {
-                TunnelStatus::Running => sessions.set_status(session_id, SessionStatus::Connected),
-                TunnelStatus::Stopped => {
-                    sessions.set_status(session_id, SessionStatus::Disconnected)
-                }
-                TunnelStatus::Failed => sessions.set_status(
-                    session_id,
-                    SessionStatus::Failed {
-                        reason: "backend tunnel failed".to_owned(),
-                    },
-                ),
-                TunnelStatus::Starting | TunnelStatus::Stopping => false,
+            let tunnel_updated =
+                apply_tunnel_status(sessions, session_id, &rule_name, status.clone());
+            let session_updated = if tunnel_updated {
+                apply_tunnel_session_status(sessions, session_id, status)
+            } else {
+                false
             };
 
             BackendEventOutcome {
@@ -174,13 +167,32 @@ pub fn apply_backend_event(
 
 fn apply_tunnel_status(
     sessions: &mut SessionManager,
+    session_id: SessionId,
     rule_name: &str,
     status: TunnelStatus,
 ) -> bool {
     if matches!(status, TunnelStatus::Failed) {
-        sessions.fail_tunnel(rule_name, "backend tunnel failed")
+        sessions.fail_tunnel_for_session_rule(session_id, rule_name, "backend tunnel failed")
     } else {
-        sessions.set_tunnel_status(rule_name, status)
+        sessions.set_tunnel_status_for_session(session_id, rule_name, status)
+    }
+}
+
+fn apply_tunnel_session_status(
+    sessions: &mut SessionManager,
+    session_id: SessionId,
+    status: TunnelStatus,
+) -> bool {
+    match status {
+        TunnelStatus::Running => sessions.set_status(session_id, SessionStatus::Connected),
+        TunnelStatus::Stopped => sessions.set_status(session_id, SessionStatus::Disconnected),
+        TunnelStatus::Failed => sessions.set_status(
+            session_id,
+            SessionStatus::Failed {
+                reason: "backend tunnel failed".to_owned(),
+            },
+        ),
+        TunnelStatus::Starting | TunnelStatus::Stopping => false,
     }
 }
 
