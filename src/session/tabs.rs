@@ -106,8 +106,8 @@ impl SessionManager {
             .collect()
     }
 
-    /// 判断终端输出是否仍可写入对应会话。
-    pub fn can_accept_terminal_output(&self, id: SessionId) -> bool {
+    /// 判断终端缓冲是否仍可被对应会话更新。
+    pub fn can_update_terminal_buffer(&self, id: SessionId) -> bool {
         self.tabs
             .iter()
             .find(|tab| tab.id == id)
@@ -308,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn terminal_output_acceptance_depends_on_session_status() {
+    fn terminal_buffer_update_acceptance_depends_on_session_status() {
         let mut sessions = SessionManager::default();
         let shell_id = session_id();
         let failed_id = session_id();
@@ -316,8 +316,8 @@ mod tests {
         sessions.open_shell_tab(shell_id, host_id(), "shell");
         sessions.open_shell_tab(failed_id, host_id(), "failed");
 
-        assert!(sessions.can_accept_terminal_output(shell_id));
-        assert!(!sessions.can_accept_terminal_output(session_id()));
+        assert!(sessions.can_update_terminal_buffer(shell_id));
+        assert!(!sessions.can_update_terminal_buffer(session_id()));
 
         assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
         assert!(sessions.set_status(
@@ -327,8 +327,8 @@ mod tests {
             }
         ));
 
-        assert!(!sessions.can_accept_terminal_output(shell_id));
-        assert!(!sessions.can_accept_terminal_output(failed_id));
+        assert!(!sessions.can_update_terminal_buffer(shell_id));
+        assert!(!sessions.can_update_terminal_buffer(failed_id));
     }
 
     #[test]

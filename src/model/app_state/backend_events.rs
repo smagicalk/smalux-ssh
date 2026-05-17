@@ -118,6 +118,10 @@ enum RemoteCommandHistoryFinish {
 
 impl RemoteCommandHistoryFinish {
     fn apply_to(self, history: &mut CommandHistoryItem) -> bool {
+        if command_history_is_finished(history) {
+            return false;
+        }
+
         let previous_exit_code = history.exit_code;
         let previous_duration_ms = history.duration_ms;
 
@@ -134,6 +138,10 @@ impl RemoteCommandHistoryFinish {
 
         history.exit_code != previous_exit_code || history.duration_ms != previous_duration_ms
     }
+}
+
+fn command_history_is_finished(history: &CommandHistoryItem) -> bool {
+    history.duration_ms.is_some()
 }
 
 fn remote_command_history_match(tab: &SessionTab) -> Option<RemoteCommandHistoryMatch> {

@@ -51,7 +51,7 @@ pub fn apply_backend_event(
             terminal_updated: false,
         },
         BackendEvent::Output { session_id, line } => {
-            if !sessions.can_accept_terminal_output(session_id) {
+            if !sessions.can_update_terminal_buffer(session_id) {
                 return BackendEventOutcome {
                     session_updated: false,
                     terminal_updated: false,
@@ -74,10 +74,19 @@ pub fn apply_backend_event(
                 },
             }
         }
-        BackendEvent::ClearTerminal { session_id } => BackendEventOutcome {
-            session_updated: false,
-            terminal_updated: terminal.clear_output(session_id),
-        },
+        BackendEvent::ClearTerminal { session_id } => {
+            if !sessions.can_update_terminal_buffer(session_id) {
+                return BackendEventOutcome {
+                    session_updated: false,
+                    terminal_updated: false,
+                };
+            }
+
+            BackendEventOutcome {
+                session_updated: false,
+                terminal_updated: terminal.clear_output(session_id),
+            }
+        }
         BackendEvent::CommandExited {
             session_id,
             exit_code,

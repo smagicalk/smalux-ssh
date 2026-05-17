@@ -200,6 +200,8 @@ fn clear_terminal_event_clears_terminal_buffer() {
     let mut terminal = TerminalManager::default();
     let session_id = session_id();
 
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    sessions.set_status(session_id, SessionStatus::Connected);
     terminal.open_tab(TerminalTabState::new(session_id, "production"));
     terminal.append_output(session_id, "old output");
     let outcome = apply_backend_event(
@@ -210,6 +212,26 @@ fn clear_terminal_event_clears_terminal_buffer() {
 
     assert!(outcome.terminal_updated);
     assert!(terminal.tabs[0].buffer.is_empty());
+}
+
+#[test]
+fn clear_terminal_event_ignores_terminal_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    sessions.set_status(session_id, SessionStatus::Disconnected);
+    terminal.open_tab(TerminalTabState::new(session_id, "production"));
+    terminal.append_output(session_id, "old output");
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::ClearTerminal { session_id },
+    );
+
+    assert!(!outcome.changed());
+    assert_eq!(terminal.tabs[0].buffer, vec!["old output"]);
 }
 
 #[test]
