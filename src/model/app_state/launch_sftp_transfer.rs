@@ -86,6 +86,13 @@ impl AppState {
         let Some(session_id) = self.sftp_session_id_for_host(host_id) else {
             return missing_active_sftp_session(host_id);
         };
+        let remote_path = remote_path.trim().to_owned();
+        if remote_path.is_empty() || remote_path == "/" {
+            return AppUpdateOutcome {
+                error: Some("SFTP 下载路径不能为空或根目录".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         let local_path = self.ui.sftp_local_path_for(host_id).trim().to_owned();
         let local_path = if local_path.is_empty() {
