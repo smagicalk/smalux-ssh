@@ -222,6 +222,43 @@ fn transfer_progress_event_updates_existing_transfer() {
 }
 
 #[test]
+fn transfer_progress_event_ignores_cancelled_transfer() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let transfer_id = TransferId(Uuid::new_v4());
+    let session_id = session_id();
+
+    sessions.enqueue_transfer(TransferTask {
+        id: transfer_id,
+        host_id: host_id(),
+        direction: TransferDirection::Download,
+        local_path: "C:/tmp/syslog".to_owned(),
+        remote_path: "/var/log/syslog".to_owned(),
+        total_bytes: Some(100),
+        transferred_bytes: 0,
+        status: TransferStatus::Cancelled,
+    });
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::TransferProgress {
+            session_id,
+            transfer_id,
+            total_bytes: Some(120),
+            transferred_bytes: 80,
+            status: TransferStatus::Running,
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert_eq!(sessions.transfers[0].transferred_bytes, 0);
+    assert!(matches!(
+        sessions.transfers[0].status,
+        TransferStatus::Cancelled
+    ));
+}
+
+#[test]
 fn tunnel_status_event_updates_runtime_state() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

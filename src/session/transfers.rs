@@ -27,6 +27,9 @@ impl SessionManager {
         status: TransferStatus,
     ) -> bool {
         if let Some(task) = self.transfers.iter_mut().find(|task| task.id == id) {
+            if transfer_status_is_terminal(&task.status) {
+                return false;
+            }
             if total_bytes.is_some() {
                 task.total_bytes = total_bytes;
             }
@@ -52,6 +55,13 @@ impl SessionManager {
             false
         }
     }
+}
+
+fn transfer_status_is_terminal(status: &TransferStatus) -> bool {
+    matches!(
+        status,
+        TransferStatus::Completed | TransferStatus::Failed { .. } | TransferStatus::Cancelled
+    )
 }
 
 fn normalized_transferred_bytes(
@@ -158,5 +168,71 @@ mod tests {
             sessions.transfers[0].status,
             TransferStatus::Completed
         ));
+    }
+
+    #[test]
+    fn terminal_transfer_status_ignores_late_progress() {
+        let mut sessions = SessionManager::default();
+        let cancelled_id = TransferId(Uuid::new_v4());
+        let completed_id = TransferId(Uuid::new_v4());
+        let failed_id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+
+        sessions.enqueue_transfer(transfer_task(cancelled_id, host_id));
+        sessions.enqueue_transfer(transfer_task(completed_id, host_id));
+        sessions.enqueue_transfer(transfer_task(failed_id, host_id));
+        assert!(sessions.cancel_queued_transfer(cancelled_id));
+        assert!(sessions.update_transfer_progress(
+            completed_id,
+            Some(100),
+            80,
+            TransferStatus::Completed
+        ));
+        assert!(sessions.update_transfer_progress(
+            failed_id,
+            None,
+            0,
+            TransferStatus::Failed {
+                reason: "network".to_owned(),
+            }
+        ));
+
+        assert!(!sessions.update_transfer_progress(
+            cancelled_id,
+            Some(100),
+            50,
+            TransferStatus::Running
+        ));
+        assert!(!sessions.update_transfer_progress(
+            completed_id,
+            Some(100),
+            50,
+            TransferStatus::Running
+        ));
+        assert!(!sessions.update_transfer_progress(
+            failed_id,
+            Some(100),
+            100,
+            TransferStatus::Completed
+        ));
+
+        assert!(matches!(
+            sessions.transfers[0].status,
+            TransferStatus::Cancelled
+        ));
+        assert_eq!(sessions.transfers[0].total_bytes, Some(100));
+        assert_eq!(sessions.transfers[0].transferred_bytes, 0);
+        assert!(matches!(
+            sessions.transfers[1].status,
+            TransferStatus::Completed
+        ));
+        assert_eq!(sessions.transfers[1].total_bytes, Some(100));
+        assert_eq!(sessions.transfers[1].transferred_bytes, 100);
+        assert!(matches!(
+            &sessions.transfers[2].status,
+            TransferStatus::Failed { reason } if reason == "network"
+        ));
+        assert_eq!(sessions.transfers[2].total_bytes, Some(100));
+        assert_eq!(sessions.transfers[2].transferred_bytes, 0);
     }
 }
