@@ -184,6 +184,41 @@ fn stop_tunnel_message_reports_missing_runtime_without_queueing_command() {
 }
 
 #[test]
+fn stop_tunnel_message_rejects_mismatched_session_without_queueing_command() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    let rule = tunnel_rule(TunnelKind::Local);
+    state.storage.upsert_host(host);
+    state.apply(Message::StartTunnel {
+        host_id,
+        rule: rule.clone(),
+    });
+    let mut another_rule = tunnel_rule(TunnelKind::Local);
+    another_rule.name = "metrics".to_owned();
+    state.apply(Message::StartTunnel {
+        host_id,
+        rule: another_rule,
+    });
+    state.backend_commands.drain();
+    let wrong_session_id = state.sessions.tabs[1].id;
+
+    let outcome = state.apply(Message::StopTunnel {
+        session_id: wrong_session_id,
+        rule_name: rule.name,
+    });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.as_deref().unwrap_or("").contains("不匹配"));
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert_eq!(
+        state.sessions.tunnel_status("local-db"),
+        Some(&TunnelStatus::Starting)
+    );
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
 fn stop_tunnel_message_marks_runtime_stopping_before_backend_ack() {
     let mut state = AppState::default();
     let host = sample_host();

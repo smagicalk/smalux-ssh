@@ -90,6 +90,12 @@ impl AppState {
                 };
             }
         }
+        if !self.tunnel_stop_target_matches_tab(session_id, &rule_name) {
+            return AppUpdateOutcome {
+                error: Some(format!("隧道 {rule_name} 与会话标签页不匹配")),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         self.sessions.mark_tunnel_stopping(&rule_name);
         self.backend_commands.push(BackendCommand::StopTunnel {
@@ -109,6 +115,19 @@ impl AppState {
                     rule_name: existing_rule_name,
                 } if existing_rule_name == rule_name
             )
+        })
+    }
+
+    /// 判断停止命令是否来自对应的隧道标签页。
+    fn tunnel_stop_target_matches_tab(&self, session_id: SessionId, rule_name: &str) -> bool {
+        self.sessions.tabs.iter().any(|tab| {
+            tab.id == session_id
+                && matches!(
+                    &tab.kind,
+                    SessionKind::Tunnel {
+                        rule_name: tab_rule_name,
+                    } if tab_rule_name == rule_name
+                )
         })
     }
 }
