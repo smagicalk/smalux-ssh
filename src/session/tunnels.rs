@@ -29,6 +29,14 @@ impl SessionManager {
         })
     }
 
+    /// 查询指定隧道规则的当前运行状态。
+    pub fn tunnel_status(&self, rule_name: &str) -> Option<&TunnelStatus> {
+        self.tunnels
+            .iter()
+            .find(|state| state.rule_name == rule_name)
+            .map(|state| &state.status)
+    }
+
     /// 标记隧道停止。
     pub fn stop_tunnel(&mut self, rule_name: &str) -> bool {
         self.update_tunnel(rule_name, |state| {
@@ -121,6 +129,10 @@ mod tests {
         sessions.start_tunnel(&rule, Some(host_id), 1_700_000_000);
 
         assert_eq!(sessions.tunnel_runtime_count(), 1);
+        assert_eq!(
+            sessions.tunnel_status("local-db"),
+            Some(&TunnelStatus::Starting)
+        );
         assert_eq!(sessions.tunnels[0].host_id, Some(host_id));
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Starting));
         assert_eq!(

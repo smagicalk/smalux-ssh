@@ -3,7 +3,9 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, TunnelStartRequest, TunnelStopRequest};
-use crate::model::{HostId, SessionId, SessionKind, SessionStatus, TunnelRule, WorkspacePage};
+use crate::model::{
+    HostId, SessionId, SessionKind, SessionStatus, TunnelRule, TunnelStatus, WorkspacePage,
+};
 
 use super::launch::{connect_command, missing_host, queued_outcome, unix_now_secs};
 use super::{AppState, AppUpdateOutcome};
@@ -58,6 +60,28 @@ impl AppState {
         session_id: SessionId,
         rule_name: String,
     ) -> AppUpdateOutcome {
+        match self.sessions.tunnel_status(&rule_name) {
+            Some(TunnelStatus::Starting | TunnelStatus::Running) => {}
+            Some(TunnelStatus::Stopping) => {
+                return AppUpdateOutcome {
+                    error: Some(format!("隧道 {rule_name} 正在停止，请等待后端确认")),
+                    ..AppUpdateOutcome::default()
+                };
+            }
+            Some(TunnelStatus::Stopped | TunnelStatus::Failed) => {
+                return AppUpdateOutcome {
+                    error: Some(format!("隧道 {rule_name} 已停止或失败，没有可停止的运行态")),
+                    ..AppUpdateOutcome::default()
+                };
+            }
+            None => {
+                return AppUpdateOutcome {
+                    error: Some(format!("隧道 {rule_name} 没有可停止的运行态")),
+                    ..AppUpdateOutcome::default()
+                };
+            }
+        }
+
         self.sessions.mark_tunnel_stopping(&rule_name);
         self.backend_commands.push(BackendCommand::StopTunnel {
             session_id,
