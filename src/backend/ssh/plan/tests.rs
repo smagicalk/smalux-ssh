@@ -95,16 +95,21 @@ fn agent_plan_does_not_read_secret_store() {
 fn certificate_plan_resolves_key_and_certificate() {
     let mut store = MemorySecretStore::new();
     let key = SecretRef("key:cert".to_owned());
+    let passphrase = SecretRef("passphrase:cert".to_owned());
     let certificate = SecretRef("cert:deploy".to_owned());
     store
         .set_secret(&key, "PRIVATE KEY")
         .expect("私钥应该可以写入");
+    store
+        .set_secret(&passphrase, "phrase")
+        .expect("证书私钥口令应该可以写入");
     store
         .set_secret(&certificate, "CERT")
         .expect("证书应该可以写入");
     let target = target(BackendAuth::Certificate {
         username: "deploy".to_owned(),
         key,
+        passphrase: Some(passphrase),
         certificate,
     });
 
@@ -115,9 +120,10 @@ fn certificate_plan_resolves_key_and_certificate() {
         plan.auth,
         SshAuthPlan::Certificate {
             private_key,
+            passphrase: Some(passphrase),
             certificate,
             ..
-        } if private_key == "PRIVATE KEY" && certificate == "CERT"
+        } if private_key == "PRIVATE KEY" && passphrase == "phrase" && certificate == "CERT"
     ));
 }
 

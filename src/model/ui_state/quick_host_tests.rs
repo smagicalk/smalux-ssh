@@ -171,6 +171,7 @@ fn quick_host_draft_builds_certificate_host() {
         auth: QuickHostAuthDraft {
             kind: QuickHostAuthKind::Certificate,
             private_key_ref: "key:cert-user".to_owned(),
+            passphrase_ref: "passphrase:cert-user".to_owned(),
             certificate_ref: "cert:cert-user".to_owned(),
             ..QuickHostAuthDraft::default()
         },
@@ -185,9 +186,11 @@ fn quick_host_draft_builds_certificate_host() {
         AuthProfile::Certificate {
             username,
             key: SecretRef(ref key_ref),
+            passphrase: Some(SecretRef(ref passphrase_ref)),
             certificate: SecretRef(ref certificate_ref),
         } if username == "cert-user"
             && key_ref == "key:cert-user"
+            && passphrase_ref == "passphrase:cert-user"
             && certificate_ref == "cert:cert-user"
     ));
 }

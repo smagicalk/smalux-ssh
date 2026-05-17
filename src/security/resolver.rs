@@ -23,6 +23,7 @@ pub enum ResolvedAuth {
     Certificate {
         username: String,
         private_key: String,
+        passphrase: Option<String>,
         certificate: String,
     },
 }
@@ -64,10 +65,15 @@ impl<'a, S: SecretStore> AuthResolver<'a, S> {
             BackendAuth::Certificate {
                 username,
                 key,
+                passphrase,
                 certificate,
             } => Ok(ResolvedAuth::Certificate {
                 username: username.clone(),
                 private_key: self.store.get_secret(key)?,
+                passphrase: passphrase
+                    .as_ref()
+                    .map(|reference| self.store.get_secret(reference))
+                    .transpose()?,
                 certificate: self.store.get_secret(certificate)?,
             }),
         }
@@ -145,6 +151,43 @@ mod tests {
                 username: "deploy".to_owned(),
                 private_key: "PRIVATE KEY".to_owned(),
                 passphrase: Some("phrase".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn resolver_reads_certificate_key_and_optional_passphrase() {
+        let mut store = MemorySecretStore::new();
+        let key_ref = SecretRef("key:cert".to_owned());
+        let passphrase_ref = SecretRef("passphrase:cert".to_owned());
+        let certificate_ref = SecretRef("cert:cert".to_owned());
+        store
+            .set_secret(&key_ref, "PRIVATE KEY")
+            .expect("私钥应该可以写入");
+        store
+            .set_secret(&passphrase_ref, "phrase")
+            .expect("证书私钥口令应该可以写入");
+        store
+            .set_secret(&certificate_ref, "CERT")
+            .expect("证书应该可以写入");
+        let resolver = AuthResolver::new(&store);
+
+        let resolved = resolver
+            .resolve(&BackendAuth::Certificate {
+                username: "cert-user".to_owned(),
+                key: key_ref,
+                passphrase: Some(passphrase_ref),
+                certificate: certificate_ref,
+            })
+            .expect("证书认证应该可以解析");
+
+        assert_eq!(
+            resolved,
+            ResolvedAuth::Certificate {
+                username: "cert-user".to_owned(),
+                private_key: "PRIVATE KEY".to_owned(),
+                passphrase: Some("phrase".to_owned()),
+                certificate: "CERT".to_owned(),
             }
         );
     }

@@ -184,6 +184,11 @@ impl QuickHostAuthDraft {
                 Ok(AuthProfile::Certificate {
                     username: username.to_owned(),
                     key: SecretRef(private_key_ref.to_owned()),
+                    passphrase: if self.passphrase_ref.trim().is_empty() {
+                        None
+                    } else {
+                        Some(SecretRef(self.passphrase_ref.trim().to_owned()))
+                    },
                     certificate: SecretRef(certificate_ref.to_owned()),
                 })
             }

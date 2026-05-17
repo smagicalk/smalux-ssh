@@ -44,9 +44,10 @@ pub(super) async fn authenticate(
         SshAuthPlan::Certificate {
             username,
             private_key,
+            passphrase,
             certificate,
         } => {
-            let key = decode_private_key(private_key, None, username)?;
+            let key = decode_private_key(private_key, passphrase.as_deref(), username)?;
             let certificate = Certificate::from_openssh(certificate)
                 .map_err(|error| authentication_error(username, error))?;
             handle

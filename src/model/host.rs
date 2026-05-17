@@ -48,6 +48,7 @@ pub enum AuthProfile {
     Certificate {
         username: String,
         key: SecretRef,
+        passphrase: Option<SecretRef>,
         certificate: SecretRef,
     },
 }
@@ -135,6 +136,7 @@ mod tests {
                 AuthProfile::Certificate {
                     username: "cert-user".to_owned(),
                     key: secret("key:cert-user"),
+                    passphrase: Some(secret("passphrase:cert-user")),
                     certificate: secret("cert:cert-user"),
                 },
             ],

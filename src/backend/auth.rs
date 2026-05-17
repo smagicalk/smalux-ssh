@@ -23,6 +23,7 @@ pub enum BackendAuth {
     Certificate {
         username: String,
         key: SecretRef,
+        passphrase: Option<SecretRef>,
         certificate: SecretRef,
     },
 }
@@ -50,10 +51,12 @@ impl From<&AuthProfile> for BackendAuth {
             AuthProfile::Certificate {
                 username,
                 key,
+                passphrase,
                 certificate,
             } => Self::Certificate {
                 username: username.clone(),
                 key: key.clone(),
+                passphrase: passphrase.clone(),
                 certificate: certificate.clone(),
             },
         }

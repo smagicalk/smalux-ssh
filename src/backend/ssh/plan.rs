@@ -61,6 +61,7 @@ pub enum SshAuthPlan {
     Certificate {
         username: String,
         private_key: String,
+        passphrase: Option<String>,
         certificate: String,
     },
 }
@@ -104,10 +105,12 @@ impl From<ResolvedAuth> for SshAuthPlan {
             ResolvedAuth::Certificate {
                 username,
                 private_key,
+                passphrase,
                 certificate,
             } => Self::Certificate {
                 username,
                 private_key,
+                passphrase,
                 certificate,
             },
         }
