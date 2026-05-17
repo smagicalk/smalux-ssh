@@ -171,3 +171,32 @@ fn run_command_history_rejects_global_history_without_host() {
     assert_eq!(state.storage.command_history_count(), 1);
     assert!(state.backend_commands.is_empty());
 }
+
+#[test]
+fn remote_command_exit_updates_latest_history_exit_code() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state.apply(Message::RunRemoteCommand {
+        host_id,
+        command: "systemctl is-active sshd".to_owned(),
+        request_pty: false,
+    });
+    let session_id = state.sessions.tabs[0].id;
+    assert_eq!(state.storage.command_history[0].exit_code, None);
+
+    let outcome = state.apply(Message::BackendEventReceived(
+        crate::backend::BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(3),
+        },
+    ));
+
+    assert!(outcome.changed());
+    assert_eq!(state.storage.command_history[0].exit_code, Some(3));
+    assert!(matches!(
+        state.sessions.tabs[0].status,
+        SessionStatus::Failed { .. }
+    ));
+}
