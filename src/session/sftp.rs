@@ -24,6 +24,7 @@ impl SessionManager {
             status: SessionStatus::Created,
         });
         self.upsert_sftp_browser(SftpBrowserState {
+            session_id: id,
             host_id,
             current_dir: initial_dir,
             entries: Vec::new(),
@@ -123,6 +124,7 @@ impl SessionManager {
             .iter()
             .find(|tab| tab.id == session_id)
             .and_then(|tab| tab.host_id)
+            .filter(|host_id| self.sftp_browser_belongs_to_session(*host_id, session_id))
             .map(|host_id| self.set_sftp_entries(host_id, current_dir, entries))
             .unwrap_or(false)
     }
@@ -154,8 +156,15 @@ impl SessionManager {
             .iter()
             .find(|tab| tab.id == session_id && matches!(tab.kind, SessionKind::Sftp))
             .and_then(|tab| tab.host_id)
+            .filter(|host_id| self.sftp_browser_belongs_to_session(*host_id, session_id))
             .map(|host_id| self.fail_sftp_browser(host_id, reason))
             .unwrap_or(false)
+    }
+
+    fn sftp_browser_belongs_to_session(&self, host_id: HostId, session_id: SessionId) -> bool {
+        self.sftp_browsers
+            .iter()
+            .any(|browser| browser.host_id == host_id && browser.session_id == session_id)
     }
 }
 

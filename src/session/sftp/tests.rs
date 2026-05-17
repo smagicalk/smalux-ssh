@@ -20,6 +20,7 @@ fn opening_sftp_tab_creates_browser_state() {
 
     assert_eq!(sessions.tab_count(), 1);
     assert_eq!(sessions.sftp_browser_count(), 1);
+    assert_eq!(sessions.sftp_browsers[0].session_id, id);
     assert_eq!(sessions.sftp_browsers[0].host_id, host_id);
     assert_eq!(sessions.sftp_browsers[0].current_dir, "/home/ops");
     assert!(matches!(sessions.tabs[0].kind, SessionKind::Sftp));
@@ -154,6 +155,35 @@ fn sftp_entries_can_update_by_session_id() {
 }
 
 #[test]
+fn sftp_entries_by_session_ignore_stale_tab_for_same_host() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let stale_session_id = session_id();
+    let current_session_id = session_id();
+
+    sessions.open_sftp_tab(stale_session_id, host_id, "/old");
+    sessions.open_sftp_tab(current_session_id, host_id, "/new");
+
+    assert!(!sessions.set_sftp_entries_for_session(
+        stale_session_id,
+        "/old-result",
+        vec![SftpEntry {
+            name: "stale.log".to_owned(),
+            remote_path: "/old-result/stale.log".to_owned(),
+            kind: SftpEntryKind::File,
+            size: Some(1),
+            modified_at_unix_secs: None,
+            permissions: None,
+        }],
+    ));
+    assert_eq!(sessions.sftp_browsers[0].current_dir, "/new");
+    assert!(sessions.sftp_browsers[0].entries.is_empty());
+
+    assert!(sessions.set_sftp_entries_for_session(current_session_id, "/new-result", Vec::new()));
+    assert_eq!(sessions.sftp_browsers[0].current_dir, "/new-result");
+}
+
+#[test]
 fn sftp_browser_records_failure() {
     let mut sessions = SessionManager::default();
     let current_host_id = host_id();
@@ -180,6 +210,26 @@ fn sftp_failure_can_update_by_session_id() {
     assert_eq!(
         sessions.sftp_browsers[0].last_error.as_deref(),
         Some("network")
+    );
+}
+
+#[test]
+fn sftp_failure_by_session_ignores_stale_tab_for_same_host() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let stale_session_id = session_id();
+    let current_session_id = session_id();
+
+    sessions.open_sftp_tab(stale_session_id, host_id, "/old");
+    sessions.open_sftp_tab(current_session_id, host_id, "/new");
+
+    assert!(!sessions.fail_sftp_browser_for_session(stale_session_id, "late failure"));
+    assert!(sessions.sftp_browsers[0].last_error.is_none());
+
+    assert!(sessions.fail_sftp_browser_for_session(current_session_id, "current failure"));
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("current failure")
     );
 }
 

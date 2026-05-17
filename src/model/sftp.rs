@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{HostId, TransferId};
+use super::{HostId, SessionId, TransferId};
 
 /// SFTP 书签。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -42,6 +42,8 @@ impl SftpEntry {
 /// SFTP 浏览面板运行态。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SftpBrowserState {
+    /// 当前拥有该浏览器状态的 SFTP 会话，用于丢弃旧会话迟到事件。
+    pub session_id: SessionId,
     pub host_id: HostId,
     pub current_dir: String,
     pub entries: Vec<SftpEntry>,
@@ -139,6 +141,7 @@ mod tests {
     fn sftp_state_round_trips_through_toml() {
         let host_id = HostId(Uuid::new_v4());
         let state = SftpBrowserState {
+            session_id: SessionId(Uuid::new_v4()),
             host_id,
             current_dir: "/home/ops".to_owned(),
             entries: vec![SftpEntry {

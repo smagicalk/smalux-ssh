@@ -110,6 +110,7 @@ impl AppState {
                 .clone()
                 .unwrap_or_else(|| "/".to_owned());
             self.sessions.upsert_sftp_browser(SftpBrowserState {
+                session_id: tab.session_id,
                 host_id,
                 current_dir,
                 entries: Vec::new(),
