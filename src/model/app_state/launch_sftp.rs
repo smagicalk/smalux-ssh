@@ -72,7 +72,7 @@ impl AppState {
     ) -> AppUpdateOutcome {
         let remote_path = normalize_remote_dir(&remote_path);
 
-        if self.current_sftp_dir_for_host(host_id).is_some() {
+        if self.sftp_session_id_for_host(host_id).is_some() {
             self.queue_sftp_list_dir(host_id, remote_path)
         } else {
             self.open_sftp(host_id, remote_path)
