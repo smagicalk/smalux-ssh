@@ -172,6 +172,14 @@ impl AppState {
         host_id: HostId,
         remote_path: String,
     ) -> AppUpdateOutcome {
+        let remote_path = remote_path.trim().to_owned();
+        if remote_path.is_empty() || remote_path == "/" {
+            return AppUpdateOutcome {
+                error: Some("SFTP 删除路径不能为空或根目录".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
         self.queue_sftp_path_action(host_id, SftpRequest::RemoveFile { remote_path })
     }
 
@@ -188,6 +196,12 @@ impl AppState {
                 ..AppUpdateOutcome::default()
             };
         }
+        if !is_plain_remote_name(&new_dir_name) {
+            return AppUpdateOutcome {
+                error: Some("SFTP 新目录名不能包含路径分隔符".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         let remote_path = join_remote_path(&current_dir, &new_dir_name);
         self.queue_sftp_path_action(host_id, SftpRequest::CreateDir { remote_path })
@@ -199,6 +213,10 @@ fn basename_local_path(path: &str) -> Option<String> {
         .file_name()
         .and_then(|file_name| file_name.to_str())
         .map(ToOwned::to_owned)
+}
+
+fn is_plain_remote_name(name: &str) -> bool {
+    !matches!(name, "." | "..") && !name.contains('/') && !name.contains('\\')
 }
 
 fn is_sftp_transfer_command(command: &BackendCommand, transfer_id: TransferId) -> bool {
