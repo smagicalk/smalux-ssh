@@ -103,6 +103,37 @@ fn refresh_sftp_message_queues_current_directory_listing() {
 }
 
 #[test]
+fn refresh_sftp_rejects_disconnected_browser_without_queueing_command() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/var/log".to_owned(),
+    });
+    let session_id = state.sessions.tabs[0].id;
+    state.backend_commands.drain();
+    state
+        .sessions
+        .set_status(session_id, crate::model::SessionStatus::Disconnected);
+
+    let outcome = state.apply(Message::RefreshSftp { host_id });
+
+    assert!(outcome.changed());
+    assert!(
+        outcome
+            .error
+            .as_deref()
+            .unwrap_or("")
+            .contains("没有可用的 SFTP 会话")
+    );
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
 fn navigate_sftp_message_queues_target_directory_listing() {
     let mut state = AppState::default();
     let host = sample_host();
@@ -277,6 +308,43 @@ fn upload_sftp_message_queues_transfer_and_upload_request() {
         Some(BackendCommand::Sftp { request, .. })
             if request.remote_path() == "/home/ops/release.tar.gz"
     ));
+}
+
+#[test]
+fn upload_sftp_rejects_disconnected_session_without_transfer() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    state.apply(Message::OpenSftp {
+        host_id,
+        initial_dir: "/home/ops".to_owned(),
+    });
+    let session_id = state.sessions.tabs[0].id;
+    state.backend_commands.drain();
+    state
+        .sessions
+        .set_status(session_id, crate::model::SessionStatus::Disconnected);
+    state.apply(Message::UpdateSftpActionDraft {
+        host_id,
+        field: crate::model::SftpActionDraftField::LocalPath,
+        value: "C:/tmp/app.tar.gz".to_owned(),
+    });
+
+    let outcome = state.apply(Message::UploadSftp { host_id });
+
+    assert!(outcome.changed());
+    assert!(
+        outcome
+            .error
+            .as_deref()
+            .unwrap_or("")
+            .contains("没有可用的 SFTP 会话")
+    );
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert_eq!(state.sessions.transfer_count(), 0);
+    assert!(state.backend_commands.is_empty());
 }
 
 #[test]

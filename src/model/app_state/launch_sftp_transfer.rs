@@ -10,14 +10,14 @@ use crate::model::{
 };
 
 use super::launch::{join_remote_path, queued_outcome};
-use super::launch_sftp::missing_sftp_browser;
+use super::launch_sftp::{missing_active_sftp_session, missing_sftp_browser};
 use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
     /// 将本地文件上传到当前 SFTP 目录。
     pub(super) fn upload_sftp(&mut self, host_id: HostId) -> AppUpdateOutcome {
         let Some(session_id) = self.sftp_session_id_for_host(host_id) else {
-            return missing_sftp_browser(host_id);
+            return missing_active_sftp_session(host_id);
         };
         let Some(current_dir) = self.current_sftp_dir_for_host(host_id) else {
             return missing_sftp_browser(host_id);
@@ -78,7 +78,7 @@ impl AppState {
         remote_path: String,
     ) -> AppUpdateOutcome {
         let Some(session_id) = self.sftp_session_id_for_host(host_id) else {
-            return missing_sftp_browser(host_id);
+            return missing_active_sftp_session(host_id);
         };
 
         let local_path = self.ui.sftp_local_path_for(host_id).trim().to_owned();

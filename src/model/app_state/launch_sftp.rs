@@ -135,7 +135,7 @@ impl AppState {
         request: SftpRequest,
     ) -> AppUpdateOutcome {
         let Some(session_id) = self.sftp_session_id_for_host(host_id) else {
-            return missing_sftp_browser(host_id);
+            return missing_active_sftp_session(host_id);
         };
 
         self.sessions.set_sftp_loading(host_id, true);
@@ -160,7 +160,11 @@ impl AppState {
             .tabs
             .iter()
             .rev()
-            .find(|tab| tab.host_id == Some(host_id) && matches!(tab.kind, SessionKind::Sftp))
+            .find(|tab| {
+                tab.host_id == Some(host_id)
+                    && matches!(tab.kind, SessionKind::Sftp)
+                    && sftp_tab_can_accept_commands(&tab.status)
+            })
             .map(|tab| tab.id)
     }
 }
@@ -183,4 +187,18 @@ pub(super) fn missing_sftp_browser(host_id: HostId) -> AppUpdateOutcome {
         error: Some(format!("找不到该主机的 SFTP 浏览器：{}", host_id.0)),
         ..AppUpdateOutcome::default()
     }
+}
+
+pub(super) fn missing_active_sftp_session(host_id: HostId) -> AppUpdateOutcome {
+    AppUpdateOutcome {
+        error: Some(format!("该主机没有可用的 SFTP 会话：{}", host_id.0)),
+        ..AppUpdateOutcome::default()
+    }
+}
+
+fn sftp_tab_can_accept_commands(status: &SessionStatus) -> bool {
+    !matches!(
+        status,
+        SessionStatus::Disconnected | SessionStatus::Failed { .. }
+    )
 }
