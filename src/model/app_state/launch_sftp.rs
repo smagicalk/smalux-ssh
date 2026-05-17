@@ -134,7 +134,7 @@ impl AppState {
         host_id: HostId,
         request: SftpRequest,
     ) -> AppUpdateOutcome {
-        let Some(session_id) = self.sftp_session_id_for_host(host_id) else {
+        let Some(session_id) = self.claim_sftp_session_id_for_host(host_id) else {
             return missing_active_sftp_session(host_id);
         };
 
@@ -156,6 +156,27 @@ impl AppState {
     }
 
     pub(super) fn sftp_session_id_for_host(&self, host_id: HostId) -> Option<SessionId> {
+        self.sftp_browser_owner_session_id(host_id)
+            .filter(|session_id| self.sftp_session_can_accept_commands(*session_id, host_id))
+            .or_else(|| self.fallback_sftp_session_id_for_host(host_id))
+    }
+
+    pub(super) fn claim_sftp_session_id_for_host(&mut self, host_id: HostId) -> Option<SessionId> {
+        let session_id = self.sftp_session_id_for_host(host_id)?;
+        self.sessions
+            .reassign_sftp_browser_session(host_id, session_id);
+        Some(session_id)
+    }
+
+    fn sftp_browser_owner_session_id(&self, host_id: HostId) -> Option<SessionId> {
+        self.sessions
+            .sftp_browsers
+            .iter()
+            .find(|browser| browser.host_id == host_id)
+            .map(|browser| browser.session_id)
+    }
+
+    fn fallback_sftp_session_id_for_host(&self, host_id: HostId) -> Option<SessionId> {
         self.sessions
             .tabs
             .iter()
@@ -166,6 +187,15 @@ impl AppState {
                     && sftp_tab_can_accept_commands(&tab.status)
             })
             .map(|tab| tab.id)
+    }
+
+    fn sftp_session_can_accept_commands(&self, session_id: SessionId, host_id: HostId) -> bool {
+        self.sessions.tabs.iter().any(|tab| {
+            tab.id == session_id
+                && tab.host_id == Some(host_id)
+                && matches!(tab.kind, SessionKind::Sftp)
+                && sftp_tab_can_accept_commands(&tab.status)
+        })
     }
 }
 

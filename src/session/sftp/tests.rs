@@ -138,6 +138,22 @@ fn sftp_selection_can_be_set_and_cleared() {
 }
 
 #[test]
+fn sftp_browser_owner_can_be_reassigned() {
+    let mut sessions = SessionManager::default();
+    let current_host_id = host_id();
+    let missing_host_id = host_id();
+    let first_session_id = session_id();
+    let second_session_id = session_id();
+
+    sessions.open_sftp_tab(first_session_id, current_host_id, "/home/ops");
+
+    assert!(sessions.reassign_sftp_browser_session(current_host_id, second_session_id));
+    assert_eq!(sessions.sftp_browsers[0].session_id, second_session_id);
+    assert!(!sessions.reassign_sftp_browser_session(current_host_id, second_session_id));
+    assert!(!sessions.reassign_sftp_browser_session(missing_host_id, first_session_id));
+}
+
+#[test]
 fn sftp_entries_can_update_by_session_id() {
     let mut sessions = SessionManager::default();
     let host_id = host_id();

@@ -113,6 +113,28 @@ impl SessionManager {
         }
     }
 
+    /// 将 SFTP 浏览器归属转交给指定会话。
+    pub fn reassign_sftp_browser_session(
+        &mut self,
+        host_id: HostId,
+        session_id: SessionId,
+    ) -> bool {
+        let Some(browser) = self
+            .sftp_browsers
+            .iter_mut()
+            .find(|browser| browser.host_id == host_id)
+        else {
+            return false;
+        };
+
+        if browser.session_id == session_id {
+            return false;
+        }
+
+        browser.session_id = session_id;
+        true
+    }
+
     /// 按会话标签页更新 SFTP 当前目录和目录项。
     pub fn set_sftp_entries_for_session(
         &mut self,
