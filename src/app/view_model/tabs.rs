@@ -106,7 +106,7 @@ pub(in crate::app) fn active_terminal(state: &AppState) -> TerminalViewModel {
         output_lines,
         input: state.ui.terminal_input_for(tab.id).to_owned(),
         prompt: terminal_prompt_for_kind(&tab.kind),
-        can_send_input: matches!(tab.kind, SessionKind::LocalShell | SessionKind::Shell),
+        can_send_input: tab.can_accept_terminal_input(),
     }
 }
 
@@ -125,7 +125,7 @@ fn local_terminal_prompt() -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{HostId, SessionId};
+    use crate::model::{HostId, SessionId, SessionStatus};
     use crate::terminal::TerminalTabState;
     use uuid::Uuid;
 
@@ -137,6 +137,9 @@ mod tests {
         state
             .sessions
             .open_shell_tab(session_id, host_id, "production");
+        state
+            .sessions
+            .set_status(session_id, SessionStatus::Connected);
         state
             .terminal
             .open_tab(TerminalTabState::new(session_id, "production"));
@@ -174,6 +177,9 @@ mod tests {
             .sessions
             .open_shell_tab(shell_id, host_id, "production");
         state
+            .sessions
+            .set_status(shell_id, SessionStatus::Connected);
+        state
             .terminal
             .open_tab(TerminalTabState::new(shell_id, "production"));
         state.sessions.open_sftp_tab(sftp_id, host_id, "/var/log");
@@ -184,5 +190,26 @@ mod tests {
         assert_eq!(terminal.host_id, host_id.0.to_string());
         assert_eq!(terminal.title, "production");
         assert!(terminal.can_send_input);
+    }
+
+    #[test]
+    fn active_terminal_disables_remote_shell_input_when_terminal() {
+        let mut state = AppState::default();
+        let session_id = SessionId(Uuid::new_v4());
+        let host_id = HostId(Uuid::new_v4());
+        state
+            .sessions
+            .open_shell_tab(session_id, host_id, "production");
+        state
+            .sessions
+            .set_status(session_id, SessionStatus::Disconnected);
+        state
+            .terminal
+            .open_tab(TerminalTabState::new(session_id, "production"));
+
+        let terminal = active_terminal(&state);
+
+        assert_eq!(terminal.session_id, session_id.0.to_string());
+        assert!(!terminal.can_send_input);
     }
 }

@@ -155,6 +155,12 @@ impl AppState {
                 ..AppUpdateOutcome::default()
             };
         }
+        if !tab.can_accept_terminal_input() {
+            return AppUpdateOutcome {
+                error: Some("当前 Shell 会话不可交互，请重新连接后再发送输入".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         let host_id = if matches!(tab.kind, SessionKind::LocalShell) {
             None
