@@ -68,6 +68,10 @@ impl SessionManager {
     /// 更新标签页状态。
     pub fn set_status(&mut self, id: SessionId, status: SessionStatus) -> bool {
         if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
+            if is_terminal_status(&tab.status) {
+                return false;
+            }
+
             let is_terminal = is_terminal_status(&status);
             tab.status = status;
             self.sync_active_index_for_status(id, is_terminal);
@@ -263,6 +267,36 @@ mod tests {
             }
         ));
         assert!(sessions.active.is_empty());
+    }
+
+    #[test]
+    fn terminal_session_status_ignores_late_non_terminal_status() {
+        let mut sessions = SessionManager::default();
+        let disconnected_id = session_id();
+        let failed_id = session_id();
+
+        sessions.open_shell_tab(disconnected_id, host_id(), "disconnected");
+        sessions.open_shell_tab(failed_id, host_id(), "failed");
+        assert!(sessions.set_status(disconnected_id, SessionStatus::Disconnected));
+        assert!(sessions.set_status(
+            failed_id,
+            SessionStatus::Failed {
+                reason: "network".to_owned()
+            }
+        ));
+
+        assert!(!sessions.set_status(disconnected_id, SessionStatus::Connected));
+        assert!(!sessions.set_status(failed_id, SessionStatus::Connecting));
+
+        assert!(sessions.active.is_empty());
+        assert!(matches!(
+            sessions.tabs[0].status,
+            SessionStatus::Disconnected
+        ));
+        assert!(matches!(
+            &sessions.tabs[1].status,
+            SessionStatus::Failed { reason } if reason == "network"
+        ));
     }
 
     #[test]

@@ -44,6 +44,33 @@ fn connected_event_updates_session_status() {
 }
 
 #[test]
+fn connected_event_ignores_terminal_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    sessions.set_status(
+        session_id,
+        SessionStatus::Failed {
+            reason: "network".to_owned(),
+        },
+    );
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Connected { session_id },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(
+        &sessions.tabs[0].status,
+        SessionStatus::Failed { reason } if reason == "network"
+    ));
+    assert!(sessions.active.is_empty());
+}
+
+#[test]
 fn connection_lifecycle_events_update_session_status() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
