@@ -16,6 +16,8 @@ use crate::model::{
     SftpBookmark, Snippet, TunnelRule, WorkspaceState,
 };
 
+#[cfg(test)]
+use super::DEFAULT_COMMAND_HISTORY_LIMIT;
 use super::StorageManager;
 
 const STORAGE_FILE_NAME: &str = "smagicalssh.redb";
@@ -135,19 +137,28 @@ impl From<&StorageManager> for StorageSnapshot {
 
 impl StorageSnapshot {
     fn into_storage(self) -> StorageManager {
-        StorageManager {
+        let mut storage = StorageManager {
             app_config: self.app_config,
             hosts: self.hosts,
             groups: self.groups,
             credentials: self.credentials,
             known_hosts: self.known_hosts,
             recent_connections: self.recent_connections,
-            command_history: self.command_history,
+            command_history: Vec::new(),
             snippets: self.snippets,
             sftp_bookmarks: self.sftp_bookmarks,
-            tunnel_rules: self.tunnel_rules,
+            tunnel_rules: Vec::new(),
             workspace: self.workspace,
+        };
+
+        for item in self.command_history {
+            storage.add_command_history(item);
         }
+        for rule in self.tunnel_rules {
+            storage.upsert_tunnel_rule(rule);
+        }
+
+        storage
     }
 }
 
@@ -258,6 +269,64 @@ mod tests {
         let loaded = store.load().expect("存储快照应该可以从 redb 读取");
 
         assert_eq!(loaded, storage);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn loaded_snapshot_reapplies_storage_invariants() {
+        let path = temp_db_path("normalize");
+        let store = RedbStorage::new(&path);
+        let host = sample_host();
+        let host_id = host.id;
+        let mut raw = StorageSnapshot {
+            hosts: vec![host],
+            ..StorageSnapshot::default()
+        };
+
+        for index in 0..(DEFAULT_COMMAND_HISTORY_LIMIT + 3) {
+            raw.command_history.push(CommandHistoryItem {
+                id: CommandHistoryId(Uuid::new_v4()),
+                host_id: Some(host_id),
+                command: format!("cmd-{index}"),
+                working_directory: None,
+                exit_code: Some(0),
+                started_at_unix_secs: index as u64,
+                duration_ms: Some(1),
+            });
+        }
+
+        let mut spaced_rule = sample_tunnel_rule();
+        spaced_rule.name = " dynamic-proxy ".to_owned();
+        spaced_rule.bind_host = " 127.0.0.1 ".to_owned();
+        raw.tunnel_rules.push(sample_tunnel_rule());
+        raw.tunnel_rules.push(spaced_rule);
+
+        let encoded = toml::to_string(&raw).expect("测试快照应该可以序列化");
+        let db = open_or_create_database(&path).expect("测试数据库应该可以创建");
+        let write_txn = db.begin_write().expect("测试事务应该可以创建");
+        {
+            let mut table = write_txn
+                .open_table(SNAPSHOT_TABLE)
+                .expect("测试表应该可以打开");
+            table
+                .insert(SNAPSHOT_KEY, encoded.as_bytes())
+                .expect("测试快照应该可以写入");
+        }
+        write_txn.commit().expect("测试事务应该可以提交");
+        drop(db);
+
+        let loaded = store.load().expect("存储快照应该可以从 redb 读取");
+
+        assert_eq!(
+            loaded.command_history_count(),
+            DEFAULT_COMMAND_HISTORY_LIMIT
+        );
+        assert_eq!(loaded.command_history[0].command, "cmd-3");
+        assert_eq!(loaded.tunnel_rule_count(), 1);
+        let rule = loaded
+            .tunnel_rule_by_name("dynamic-proxy")
+            .expect("加载后应该按规范化名称查到隧道规则");
+        assert_eq!(rule.bind_host, "127.0.0.1");
         let _ = fs::remove_file(path);
     }
 
