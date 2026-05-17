@@ -106,6 +106,14 @@ impl SessionManager {
             .collect()
     }
 
+    /// 判断终端输出是否仍可写入对应会话。
+    pub fn can_accept_terminal_output(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| !is_terminal_status(&tab.status))
+    }
+
     /// 从工作区快照恢复可见标签页元数据，不自动建立网络连接。
     pub fn restore_tabs_from_workspace(
         &mut self,
@@ -297,6 +305,30 @@ mod tests {
             &sessions.tabs[1].status,
             SessionStatus::Failed { reason } if reason == "network"
         ));
+    }
+
+    #[test]
+    fn terminal_output_acceptance_depends_on_session_status() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let failed_id = session_id();
+
+        sessions.open_shell_tab(shell_id, host_id(), "shell");
+        sessions.open_shell_tab(failed_id, host_id(), "failed");
+
+        assert!(sessions.can_accept_terminal_output(shell_id));
+        assert!(!sessions.can_accept_terminal_output(session_id()));
+
+        assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
+        assert!(sessions.set_status(
+            failed_id,
+            SessionStatus::Failed {
+                reason: "network".to_owned()
+            }
+        ));
+
+        assert!(!sessions.can_accept_terminal_output(shell_id));
+        assert!(!sessions.can_accept_terminal_output(failed_id));
     }
 
     #[test]

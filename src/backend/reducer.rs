@@ -51,6 +51,13 @@ pub fn apply_backend_event(
             terminal_updated: false,
         },
         BackendEvent::Output { session_id, line } => {
+            if !sessions.can_accept_terminal_output(session_id) {
+                return BackendEventOutcome {
+                    session_updated: false,
+                    terminal_updated: false,
+                };
+            }
+
             let is_duplicate_local_echo = session_id == LOCAL_TERMINAL_SESSION_ID
                 && terminal.suppress_duplicate_echo(
                     session_id,

@@ -127,6 +127,8 @@ fn output_event_appends_to_terminal_buffer() {
     let mut terminal = TerminalManager::default();
     let session_id = session_id();
 
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    sessions.set_status(session_id, SessionStatus::Connected);
     terminal.open_tab(TerminalTabState::new(session_id, "production"));
     let outcome = apply_backend_event(
         &mut sessions,
@@ -142,12 +144,41 @@ fn output_event_appends_to_terminal_buffer() {
 }
 
 #[test]
+fn output_event_ignores_terminal_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    sessions.set_status(
+        session_id,
+        SessionStatus::Failed {
+            reason: "network".to_owned(),
+        },
+    );
+    terminal.open_tab(TerminalTabState::new(session_id, "production"));
+    terminal.append_output(session_id, "old output");
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Output {
+            session_id,
+            line: "late output".to_owned(),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert_eq!(terminal.tabs[0].buffer, vec!["old output"]);
+}
+
+#[test]
 fn local_terminal_output_drops_duplicate_shell_echo() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
     let session_id = crate::model::LOCAL_TERMINAL_SESSION_ID;
     let prompt = crate::backend::LocalShellProfile::default_for_platform().prompt;
 
+    sessions.open_local_shell_tab(session_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
     terminal.open_tab(TerminalTabState::new(session_id, "local"));
     terminal.append_local_echo(session_id, prompt, "ls\n");
     let outcome = apply_backend_event(
