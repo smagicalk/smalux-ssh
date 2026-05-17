@@ -1,7 +1,8 @@
 //! 会话标签页的打开、状态更新和关闭操作。
 
 use crate::model::{
-    HostId, SessionId, SessionKind, SessionStatus, SessionTab, TunnelRule, WorkspaceTabSnapshot,
+    CommandHistoryId, HostId, SessionId, SessionKind, SessionStatus, SessionTab, TunnelRule,
+    WorkspaceTabSnapshot,
 };
 
 use super::SessionManager;
@@ -35,6 +36,7 @@ impl SessionManager {
         id: SessionId,
         host_id: HostId,
         command: impl Into<String>,
+        history_id: Option<CommandHistoryId>,
     ) {
         let command = command.into();
 
@@ -43,6 +45,7 @@ impl SessionManager {
             host_id: Some(host_id),
             kind: SessionKind::RemoteCommand {
                 command: command.clone(),
+                history_id,
             },
             title: command,
             status: SessionStatus::Created,
@@ -198,12 +201,13 @@ mod tests {
         let mut sessions = SessionManager::default();
         let id = session_id();
 
-        sessions.open_remote_command_tab(id, host_id(), "uptime");
+        sessions.open_remote_command_tab(id, host_id(), "uptime", None);
 
         assert_eq!(sessions.tabs[0].title, "uptime");
         assert!(matches!(
             &sessions.tabs[0].kind,
-            SessionKind::RemoteCommand { command } if command == "uptime"
+            SessionKind::RemoteCommand { command, history_id }
+                if command == "uptime" && history_id.is_none()
         ));
     }
 
@@ -286,7 +290,7 @@ mod tests {
 
         sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
         sessions.open_shell_tab(shell_id, host_id(), "production");
-        sessions.open_remote_command_tab(command_id, host_id(), "uptime");
+        sessions.open_remote_command_tab(command_id, host_id(), "uptime", None);
         sessions.set_status(shell_id, SessionStatus::Connected);
 
         assert_eq!(
@@ -315,6 +319,7 @@ mod tests {
                     host_id: Some(host_id()),
                     kind: SessionKind::RemoteCommand {
                         command: "uptime".to_owned(),
+                        history_id: None,
                     },
                     title: "uptime".to_owned(),
                     working_directory: None,

@@ -34,15 +34,19 @@ impl AppState {
         let session_id = SessionId(Uuid::new_v4());
         let terminal_tab = TerminalTabState::new(session_id, command.clone());
         let request = remote_command_request(command.clone(), terminal_tab.size, request_pty);
+        let history_id = self.record_command_history(host.id, command.clone());
 
-        self.sessions
-            .open_remote_command_tab(session_id, host.id, command.clone());
+        self.sessions.open_remote_command_tab(
+            session_id,
+            host.id,
+            command.clone(),
+            Some(history_id),
+        );
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
         self.ui.workspace.active_page = WorkspacePage::Terminal;
         self.terminal.open_tab(terminal_tab);
         self.record_recent_connection(&host);
-        self.record_command_history(host.id, command);
         self.backend_commands.extend([
             connect_command(session_id, &host),
             BackendCommand::RunCommand {
@@ -79,9 +83,14 @@ impl AppState {
         self.run_remote_command(host_id, command, false)
     }
 
-    pub(super) fn record_command_history(&mut self, host_id: HostId, command: String) {
+    pub(super) fn record_command_history(
+        &mut self,
+        host_id: HostId,
+        command: String,
+    ) -> CommandHistoryId {
+        let history_id = CommandHistoryId(Uuid::new_v4());
         self.storage.add_command_history(CommandHistoryItem {
-            id: CommandHistoryId(Uuid::new_v4()),
+            id: history_id,
             host_id: Some(host_id),
             command,
             working_directory: None,
@@ -89,6 +98,7 @@ impl AppState {
             started_at_unix_secs: unix_now_secs(),
             duration_ms: None,
         });
+        history_id
     }
 }
 

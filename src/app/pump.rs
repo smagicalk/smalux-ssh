@@ -82,6 +82,7 @@ mod tests {
             remote_command_id,
             crate::model::HostId(Uuid::new_v4()),
             "uptime",
+            None,
         );
         assert!(
             state

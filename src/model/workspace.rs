@@ -175,6 +175,7 @@ mod tests {
             host_id: None,
             kind: SessionKind::RemoteCommand {
                 command: "uptime".to_owned(),
+                history_id: None,
             },
             title: "uptime".to_owned(),
             working_directory: None,

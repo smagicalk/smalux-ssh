@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{HostId, SessionId};
+use super::{CommandHistoryId, HostId, SessionId};
 
 /// UI 中打开的会话标签页。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,9 +19,14 @@ pub struct SessionTab {
 pub enum SessionKind {
     LocalShell,
     Shell,
-    RemoteCommand { command: String },
+    RemoteCommand {
+        command: String,
+        history_id: Option<CommandHistoryId>,
+    },
     Sftp,
-    Tunnel { rule_name: String },
+    Tunnel {
+        rule_name: String,
+    },
 }
 
 /// SSH 会话生命周期状态。
@@ -45,11 +50,13 @@ mod tests {
     #[test]
     fn session_tab_round_trips_remote_command_state() {
         let host_id = HostId(Uuid::new_v4());
+        let history_id = CommandHistoryId(Uuid::new_v4());
         let tab = SessionTab {
             id: SessionId(Uuid::new_v4()),
             host_id: Some(host_id),
             kind: SessionKind::RemoteCommand {
                 command: "uptime".to_owned(),
+                history_id: Some(history_id),
             },
             title: "uptime".to_owned(),
             status: SessionStatus::RunningCommand,

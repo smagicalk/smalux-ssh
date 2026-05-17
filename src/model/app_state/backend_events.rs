@@ -3,7 +3,7 @@
 //! 负责把后端事件应用到会话和终端状态，以及从共享执行器泵出后台命令。
 
 use crate::backend::{BackendEvent, apply_backend_event};
-use crate::model::{SessionId, SessionKind};
+use crate::model::{CommandHistoryId, HostId, SessionId, SessionKind};
 
 use super::{AppState, AppUpdateOutcome};
 
@@ -14,7 +14,7 @@ impl AppState {
             exit_code,
         } = &event
         {
-            // 会话状态更新前仍能直接读取 RemoteCommand 的原始命令，用于回写历史退出码。
+            // 会话状态更新前仍能读取 RemoteCommand 元数据，用于精确回写历史退出码。
             self.update_remote_command_history_exit_code(*session_id, *exit_code);
         }
 
@@ -42,28 +42,49 @@ impl AppState {
         session_id: SessionId,
         exit_code: Option<i32>,
     ) -> bool {
-        let Some((host_id, command)) = self.sessions.tabs.iter().find_map(|tab| {
-            let SessionKind::RemoteCommand { command } = &tab.kind else {
+        let Some(match_key) = self.sessions.tabs.iter().find_map(|tab| {
+            if tab.id != session_id {
                 return None;
             };
-            (tab.id == session_id)
-                .then(|| tab.host_id.map(|host_id| (host_id, command.clone())))
-                .flatten()
+
+            let SessionKind::RemoteCommand {
+                command,
+                history_id,
+            } = &tab.kind
+            else {
+                return None;
+            };
+
+            let host_id = tab.host_id?;
+            Some(RemoteCommandHistoryMatch {
+                host_id,
+                command: command.clone(),
+                history_id: *history_id,
+            })
         }) else {
             return false;
         };
 
-        let Some(history) = self
-            .storage
-            .command_history
-            .iter_mut()
-            .rev()
-            .find(|item| item.host_id == Some(host_id) && item.command == command)
-        else {
-            return false;
+        let history = if let Some(history_id) = match_key.history_id {
+            self.storage
+                .command_history
+                .iter_mut()
+                .find(|item| item.id == history_id)
+        } else {
+            self.storage.command_history.iter_mut().rev().find(|item| {
+                item.host_id == Some(match_key.host_id) && item.command == match_key.command
+            })
         };
+
+        let Some(history) = history else { return false };
 
         history.exit_code = exit_code;
         true
     }
+}
+
+struct RemoteCommandHistoryMatch {
+    host_id: HostId,
+    command: String,
+    history_id: Option<CommandHistoryId>,
 }

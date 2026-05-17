@@ -49,7 +49,7 @@ fn connection_lifecycle_events_update_session_status() {
     let mut terminal = TerminalManager::default();
     let session_id = session_id();
 
-    sessions.open_remote_command_tab(session_id, host_id(), "uptime");
+    sessions.open_remote_command_tab(session_id, host_id(), "uptime", None);
 
     apply_backend_event(
         &mut sessions,
