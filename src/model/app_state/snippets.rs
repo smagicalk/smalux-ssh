@@ -83,6 +83,12 @@ impl AppState {
                 };
             }
         };
+        if command.trim().is_empty() {
+            return AppUpdateOutcome {
+                error: Some("快捷命令渲染结果不能为空".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         self.run_remote_command(host_id, command, false)
     }
