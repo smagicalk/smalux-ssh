@@ -45,6 +45,12 @@ impl AppState {
         } else {
             remote_name.to_owned()
         };
+        if !is_plain_remote_name(&remote_name) {
+            return AppUpdateOutcome {
+                error: Some("SFTP 远程文件名不能包含路径分隔符".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
         let remote_path = join_remote_path(&current_dir, &remote_name);
         let transfer_id = TransferId(Uuid::new_v4());
 
