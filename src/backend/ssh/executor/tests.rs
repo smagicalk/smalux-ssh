@@ -256,6 +256,30 @@ fn taking_cached_session_subresources_is_idempotent_for_missing_session() {
     assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
 }
 
+#[test]
+fn replacing_cached_shell_returns_previous_shell_for_same_session() {
+    let session_id = session_id();
+    let mut shells = HashMap::from([(session_id, "old-shell")]);
+
+    let previous = replace_cached_shell(&mut shells, session_id, "new-shell");
+
+    assert_eq!(previous, Some("old-shell"));
+    assert_eq!(shells.get(&session_id), Some(&"new-shell"));
+}
+
+#[test]
+fn replacing_cached_shell_keeps_other_sessions() {
+    let target_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([(other_session_id, "other-shell")]);
+
+    let previous = replace_cached_shell(&mut shells, target_session_id, "target-shell");
+
+    assert_eq!(previous, None);
+    assert_eq!(shells.get(&target_session_id), Some(&"target-shell"));
+    assert_eq!(shells.get(&other_session_id), Some(&"other-shell"));
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct OwnedTunnel {
     session_id: SessionId,

@@ -105,7 +105,8 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             .get_mut(&session_id)
             .ok_or_else(|| connected_session_error("open shell"))?;
         let report = runtime.block_on(connection.open_shell(session_id, &pty))?;
-        self.shells.insert(session_id, report.shell);
+        let previous_shell = replace_cached_shell(&mut self.shells, session_id, report.shell);
+        self.close_detached_shell_input(session_id, previous_shell, "opening shell");
         Ok(report.events)
     }
 
@@ -356,13 +357,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         resources: CachedSessionSubresources<RemoteShell, RemoteSftp>,
         operation: &'static str,
     ) {
-        if resources.shell.is_some() {
-            tracing::warn!(
-                session_id = %session_id.0,
-                operation,
-                "dropping stale remote shell"
-            );
-        }
+        self.close_detached_shell_input(session_id, resources.shell, operation);
 
         if let Some(sftp) = resources.sftp
             && let Err(error) = self.runtime.block_on(sftp.close())
@@ -372,6 +367,26 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
                 operation,
                 error = %error,
                 "failed to close stale SFTP session"
+            );
+        }
+    }
+
+    fn close_detached_shell_input(
+        &self,
+        session_id: SessionId,
+        shell: Option<RemoteShell>,
+        operation: &'static str,
+    ) {
+        let Some(shell) = shell else {
+            return;
+        };
+
+        if let Err(error) = self.runtime.block_on(shell.close_input()) {
+            tracing::warn!(
+                session_id = %session_id.0,
+                operation,
+                error = %error,
+                "failed to close detached remote shell input"
             );
         }
     }
@@ -429,6 +444,14 @@ fn take_cached_session_resources<TShell, TSftp, TConnection>(
         sftp: sftps.remove(&session_id),
         connection: connections.remove(&session_id),
     }
+}
+
+fn replace_cached_shell<TShell>(
+    shells: &mut HashMap<SessionId, TShell>,
+    session_id: SessionId,
+    shell: TShell,
+) -> Option<TShell> {
+    shells.insert(session_id, shell)
 }
 
 fn remove_tunnel_for_session_rule<TTunnel>(
