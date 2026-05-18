@@ -20,24 +20,25 @@
 - 最近核心新增：真实后端 SFTP 请求失败后丢弃对应缓存子系统句柄，下一次请求重新打开 SFTP 会话。
 - 最近核心新增：远程 shell 输入写入失败后丢弃对应缓存 shell 句柄，避免后端继续保留失效交互通道。
 - 最近核心新增：真实后端同 `session_id` 重连成功时先清理旧 shell/SFTP/connection 资源，避免重连后复用旧子系统句柄。
-- 最新核心新增：启动隧道前清理同 `session_id` 的旧 shell/SFTP 子资源，避免 connection 交给 tunnel 后仍残留交互子系统句柄。
+- 最近核心新增：启动隧道前清理同 `session_id` 的旧 shell/SFTP 子资源，避免 connection 交给 tunnel 后仍残留交互子系统句柄。
+- 最新核心新增：断开连接时先取出全部后端资源并尽力关闭，关闭失败只记录警告，最终仍回传 Disconnected。
 
 ## 最近提交
 
+- `ffacbca 清理启动隧道前的后端子资源`
 - `3fadd34 清理重连前的后端旧资源`
 - `17bca9b 清理失败的远程 shell 输入句柄`
 - `9ff13f6 清理失败的 SFTP 后端会话`
 - `0a19ebb 保护隧道终态运行态`
-- `484dded 收敛 SFTP 会话终态后的运行态`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 95 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 96 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test` 通过，`384 passed, 2 ignored`
+  - `cargo test` 通过，`385 passed, 2 ignored`
 
 ## 提交要求
 

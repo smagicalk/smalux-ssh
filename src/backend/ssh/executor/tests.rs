@@ -128,6 +128,29 @@ fn taking_cached_session_resources_is_idempotent_for_missing_session() {
 }
 
 #[test]
+fn taking_cached_session_resources_detaches_all_target_resources_before_close() {
+    let session_id = session_id();
+    let mut shells = HashMap::from([(session_id, "shell")]);
+    let mut sftps = HashMap::from([(session_id, "sftp")]);
+    let mut connections = HashMap::from([(session_id, "connection")]);
+
+    let resources =
+        take_cached_session_resources(&mut shells, &mut sftps, &mut connections, session_id);
+
+    assert_eq!(
+        resources,
+        CachedSessionResources {
+            shell: Some("shell"),
+            sftp: Some("sftp"),
+            connection: Some("connection"),
+        }
+    );
+    assert!(shells.is_empty());
+    assert!(sftps.is_empty());
+    assert!(connections.is_empty());
+}
+
+#[test]
 fn taking_cached_session_subresources_removes_only_target_session() {
     let target_session_id = session_id();
     let other_session_id = session_id();

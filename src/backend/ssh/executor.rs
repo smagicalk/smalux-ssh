@@ -220,15 +220,13 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         &mut self,
         session_id: SessionId,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        self.shells.remove(&session_id);
-
-        if let Some(sftp) = self.sftps.remove(&session_id) {
-            self.runtime.block_on(sftp.close())?;
-        }
-
-        if let Some(connection) = self.connections.remove(&session_id) {
-            self.runtime.block_on(connection.disconnect())?;
-        }
+        let resources = take_cached_session_resources(
+            &mut self.shells,
+            &mut self.sftps,
+            &mut self.connections,
+            session_id,
+        );
+        self.close_disconnected_session_resources(session_id, resources);
 
         Ok(vec![BackendEvent::Disconnected { session_id }])
     }
@@ -254,6 +252,31 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
                 session_id = %session_id.0,
                 error = %error,
                 "failed to disconnect stale SSH connection before reconnect"
+            );
+        }
+    }
+
+    fn close_disconnected_session_resources(
+        &self,
+        session_id: SessionId,
+        resources: CachedSessionResources<RemoteShell, RemoteSftp, RusshConnection>,
+    ) {
+        self.close_stale_session_subresources(
+            session_id,
+            CachedSessionSubresources {
+                shell: resources.shell,
+                sftp: resources.sftp,
+            },
+            "disconnecting",
+        );
+
+        if let Some(connection) = resources.connection
+            && let Err(error) = self.runtime.block_on(connection.disconnect())
+        {
+            tracing::warn!(
+                session_id = %session_id.0,
+                error = %error,
+                "failed to disconnect SSH connection"
             );
         }
     }
