@@ -158,7 +158,7 @@ impl AppState {
 
         let removed_commands = self
             .backend_commands
-            .retain(|command| !is_sftp_transfer_command(command, transfer_id));
+            .retain(|command| !is_sftp_transfer_command(command, task.session_id, transfer_id));
         if removed_commands == 0 {
             return AppUpdateOutcome {
                 error: Some("SFTP 传输已经开始，无法从队列取消".to_owned()),
@@ -168,7 +168,9 @@ impl AppState {
 
         let has_pending_browser_refresh =
             has_pending_sftp_browser_refresh(&self.sessions, &self.backend_commands, task.host_id);
-        let transfer_cancelled = self.sessions.cancel_queued_transfer(transfer_id);
+        let transfer_cancelled = self
+            .sessions
+            .cancel_queued_transfer(task.session_id, transfer_id);
         let loading_cleared = clear_loading_for_cancelled_transfer(
             &mut self.sessions,
             &task,
@@ -234,14 +236,19 @@ fn is_plain_remote_name(name: &str) -> bool {
     !matches!(name, "." | "..") && !name.contains('/') && !name.contains('\\')
 }
 
-fn is_sftp_transfer_command(command: &BackendCommand, transfer_id: TransferId) -> bool {
+fn is_sftp_transfer_command(
+    command: &BackendCommand,
+    task_session_id: SessionId,
+    transfer_id: TransferId,
+) -> bool {
     matches!(
         command,
         BackendCommand::Sftp {
+            session_id,
             request:
                 SftpRequest::Upload { id, .. } | SftpRequest::Download { id, .. },
             ..
-        } if *id == transfer_id
+        } if *session_id == task_session_id && *id == transfer_id
     )
 }
 

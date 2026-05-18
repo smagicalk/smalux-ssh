@@ -48,8 +48,12 @@ impl SessionManager {
     }
 
     /// 取消仍在队列中的传输任务。
-    pub fn cancel_queued_transfer(&mut self, id: TransferId) -> bool {
-        if let Some(task) = self.transfers.iter_mut().find(|task| task.id == id) {
+    pub fn cancel_queued_transfer(&mut self, session_id: SessionId, id: TransferId) -> bool {
+        if let Some(task) = self
+            .transfers
+            .iter_mut()
+            .find(|task| task.id == id && task.session_id == session_id)
+        {
             if !matches!(task.status, TransferStatus::Queued) {
                 return false;
             }
@@ -213,19 +217,44 @@ mod tests {
         running.status = TransferStatus::Running;
 
         sessions.enqueue_transfer(transfer_task(queued_id, host_id));
+        let session_id = sessions.transfers[0].session_id;
+        running.session_id = session_id;
         sessions.enqueue_transfer(running);
 
-        assert!(sessions.cancel_queued_transfer(queued_id));
+        assert!(sessions.cancel_queued_transfer(session_id, queued_id));
         assert!(matches!(
             sessions.transfers[0].status,
             TransferStatus::Cancelled
         ));
-        assert!(!sessions.cancel_queued_transfer(running_id));
+        assert!(!sessions.cancel_queued_transfer(session_id, running_id));
         assert!(matches!(
             sessions.transfers[1].status,
             TransferStatus::Running
         ));
-        assert!(!sessions.cancel_queued_transfer(TransferId(Uuid::new_v4())));
+        assert!(!sessions.cancel_queued_transfer(session_id, TransferId(Uuid::new_v4())));
+    }
+
+    #[test]
+    fn cancel_queued_transfer_requires_matching_session_owner() {
+        let mut sessions = SessionManager::default();
+        let id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+
+        sessions.enqueue_transfer(transfer_task(id, host_id));
+        let owner_session_id = sessions.transfers[0].session_id;
+        let stale_session_id = SessionId(Uuid::new_v4());
+
+        assert!(!sessions.cancel_queued_transfer(stale_session_id, id));
+        assert!(matches!(
+            sessions.transfers[0].status,
+            TransferStatus::Queued
+        ));
+
+        assert!(sessions.cancel_queued_transfer(owner_session_id, id));
+        assert!(matches!(
+            sessions.transfers[0].status,
+            TransferStatus::Cancelled
+        ));
     }
 
     #[test]
@@ -266,7 +295,7 @@ mod tests {
         let session_id = sessions.transfers[0].session_id;
         sessions.transfers[1].session_id = session_id;
         sessions.transfers[2].session_id = session_id;
-        assert!(sessions.cancel_queued_transfer(cancelled_id));
+        assert!(sessions.cancel_queued_transfer(session_id, cancelled_id));
         assert!(sessions.update_transfer_progress(
             session_id,
             completed_id,

@@ -195,7 +195,10 @@ impl AppState {
         });
         let cancelled_transfer_count = transfer_ids
             .into_iter()
-            .filter(|transfer_id| self.sessions.cancel_queued_transfer(*transfer_id))
+            .filter(|transfer_id| {
+                self.sessions
+                    .cancel_queued_transfer(session_id, *transfer_id)
+            })
             .count();
 
         PendingCloseCommandCleanup {
