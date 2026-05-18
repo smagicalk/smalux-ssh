@@ -118,6 +118,61 @@ fn send_shell_input_requires_connected_session() {
 }
 
 #[test]
+fn shell_input_failure_drops_only_failed_cached_shell() {
+    let failed_session_id = session_id();
+    let other_session_id = session_id();
+    let result: Result<(), BackendExecutionError> = Err(BackendExecutionError::ChannelFailed {
+        operation: "shell input".to_owned(),
+        reason: "channel closed".to_owned(),
+    });
+    let mut cached_shells = HashMap::from([
+        (failed_session_id, "failed-shell"),
+        (other_session_id, "other-shell"),
+    ]);
+
+    let dropped =
+        drop_cached_shell_after_failed_input(&mut cached_shells, failed_session_id, &result);
+
+    assert!(dropped);
+    assert!(!cached_shells.contains_key(&failed_session_id));
+    assert_eq!(cached_shells.get(&other_session_id), Some(&"other-shell"));
+}
+
+#[test]
+fn shell_input_cache_survives_success_and_non_channel_failures() {
+    let success_session_id = session_id();
+    let sftp_failure_session_id = session_id();
+    let success: Result<(), BackendExecutionError> = Ok(());
+    let sftp_failure: Result<(), BackendExecutionError> = Err(BackendExecutionError::SftpFailed {
+        operation: "list dir".to_owned(),
+        reason: "permission denied".to_owned(),
+    });
+    let mut cached_shells = HashMap::from([
+        (success_session_id, "success-shell"),
+        (sftp_failure_session_id, "sftp-failure-shell"),
+    ]);
+
+    let dropped_after_success =
+        drop_cached_shell_after_failed_input(&mut cached_shells, success_session_id, &success);
+    let dropped_after_sftp_failure = drop_cached_shell_after_failed_input(
+        &mut cached_shells,
+        sftp_failure_session_id,
+        &sftp_failure,
+    );
+
+    assert!(!dropped_after_success);
+    assert!(!dropped_after_sftp_failure);
+    assert_eq!(
+        cached_shells.get(&success_session_id),
+        Some(&"success-shell")
+    );
+    assert_eq!(
+        cached_shells.get(&sftp_failure_session_id),
+        Some(&"sftp-failure-shell")
+    );
+}
+
+#[test]
 fn drain_session_output_noops_for_remote_executor() {
     let mut executor =
         RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");

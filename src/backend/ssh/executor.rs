@@ -110,7 +110,9 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             .shells
             .get(&session_id)
             .ok_or_else(|| connected_session_error("send shell input"))?;
-        runtime.block_on(shell.send_input(input.as_bytes()))?;
+        let result = runtime.block_on(shell.send_input(input.as_bytes()));
+        drop_cached_shell_after_failed_input(&mut self.shells, session_id, &result);
+        result?;
         Ok(Vec::new())
     }
 
@@ -262,6 +264,22 @@ fn connected_session_error(operation: &str) -> BackendExecutionError {
         operation: operation.to_owned(),
         reason: "session is not connected".to_owned(),
     }
+}
+
+fn drop_cached_shell_after_failed_input<T>(
+    shells: &mut HashMap<SessionId, T>,
+    session_id: SessionId,
+    result: &Result<(), BackendExecutionError>,
+) -> bool {
+    if !shell_input_result_requires_session_drop(result) {
+        return false;
+    }
+
+    shells.remove(&session_id).is_some()
+}
+
+fn shell_input_result_requires_session_drop(result: &Result<(), BackendExecutionError>) -> bool {
+    matches!(result, Err(BackendExecutionError::ChannelFailed { .. }))
 }
 
 fn drop_cached_sftp_after_failed_request<T>(
