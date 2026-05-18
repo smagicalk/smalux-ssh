@@ -151,6 +151,64 @@ fn taking_cached_session_resources_detaches_all_target_resources_before_close() 
 }
 
 #[test]
+fn taking_cached_session_runtime_resources_detaches_owned_tunnels() {
+    let target_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([(target_session_id, "target-shell")]);
+    let mut sftps = HashMap::from([(target_session_id, "target-sftp")]);
+    let mut connections = HashMap::from([(target_session_id, "target-connection")]);
+    let mut tunnels = HashMap::from([
+        (
+            "proxy".to_owned(),
+            TestTunnel {
+                session_id: target_session_id,
+                rule_name: "proxy".to_owned(),
+                stopped: false,
+            },
+        ),
+        (
+            "metrics".to_owned(),
+            TestTunnel {
+                session_id: other_session_id,
+                rule_name: "metrics".to_owned(),
+                stopped: false,
+            },
+        ),
+    ]);
+
+    let resources = take_cached_session_runtime_resources(
+        &mut shells,
+        &mut sftps,
+        &mut connections,
+        &mut tunnels,
+        target_session_id,
+    );
+
+    assert_eq!(
+        resources.cached_resources,
+        CachedSessionResources {
+            shell: Some("target-shell"),
+            sftp: Some("target-sftp"),
+            connection: Some("target-connection"),
+        }
+    );
+    assert_eq!(resources.tunnels.len(), 1);
+    assert_eq!(resources.tunnels[0].rule_name, "proxy");
+    assert!(shells.is_empty());
+    assert!(sftps.is_empty());
+    assert!(connections.is_empty());
+    assert!(!tunnels.contains_key("proxy"));
+    assert_eq!(
+        tunnels.get("metrics"),
+        Some(&TestTunnel {
+            session_id: other_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        })
+    );
+}
+
+#[test]
 fn taking_cached_session_subresources_removes_only_target_session() {
     let target_session_id = session_id();
     let other_session_id = session_id();
@@ -401,7 +459,7 @@ fn taking_tunnels_for_session_removes_only_owned_tunnels() {
 }
 
 #[test]
-fn stopping_stale_tunnels_stops_each_removed_tunnel() {
+fn stopping_detached_tunnels_stops_each_removed_tunnel() {
     let session_id = session_id();
     let tunnels = vec![
         TestTunnel {
@@ -417,7 +475,7 @@ fn stopping_stale_tunnels_stops_each_removed_tunnel() {
     ];
     STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow_mut().clear());
 
-    stop_stale_tunnels(session_id, tunnels, "test");
+    stop_detached_tunnels(session_id, tunnels, "test");
 
     let mut stopped = STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow().clone());
     stopped.sort();

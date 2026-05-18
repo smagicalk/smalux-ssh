@@ -81,15 +81,15 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let report = self
             .runtime
             .block_on(self.connector.connect(session_id, plan))?;
-        let stale_resources = take_cached_session_resources(
+        let stale_runtime = take_cached_session_runtime_resources(
             &mut self.shells,
             &mut self.sftps,
             &mut self.connections,
+            &mut self.tunnels,
             session_id,
         );
-        let stale_tunnels = take_tunnels_for_session(&mut self.tunnels, session_id);
-        self.close_stale_session_resources(session_id, stale_resources);
-        stop_stale_tunnels(session_id, stale_tunnels, "reconnecting");
+        self.close_stale_session_resources(session_id, stale_runtime.cached_resources);
+        stop_detached_tunnels(session_id, stale_runtime.tunnels, "reconnecting");
         self.connections.insert(session_id, report.connection);
         Ok(report.events)
     }
@@ -224,13 +224,15 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         &mut self,
         session_id: SessionId,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let resources = take_cached_session_resources(
+        let resources = take_cached_session_runtime_resources(
             &mut self.shells,
             &mut self.sftps,
             &mut self.connections,
+            &mut self.tunnels,
             session_id,
         );
-        self.close_disconnected_session_resources(session_id, resources);
+        self.close_disconnected_session_resources(session_id, resources.cached_resources);
+        stop_detached_tunnels(session_id, resources.tunnels, "disconnecting");
 
         Ok(vec![BackendEvent::Disconnected { session_id }])
     }
@@ -369,6 +371,29 @@ struct CachedSessionResources<TShell, TSftp, TConnection> {
     connection: Option<TConnection>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+struct CachedSessionRuntimeResources<TShell, TSftp, TConnection, TTunnel> {
+    cached_resources: CachedSessionResources<TShell, TSftp, TConnection>,
+    tunnels: Vec<TTunnel>,
+}
+
+/// 一次性取出会话拥有的所有后端运行态，调用方随后负责关闭或停止。
+fn take_cached_session_runtime_resources<TShell, TSftp, TConnection, TTunnel>(
+    shells: &mut HashMap<SessionId, TShell>,
+    sftps: &mut HashMap<SessionId, TSftp>,
+    connections: &mut HashMap<SessionId, TConnection>,
+    tunnels: &mut HashMap<String, TTunnel>,
+    session_id: SessionId,
+) -> CachedSessionRuntimeResources<TShell, TSftp, TConnection, TTunnel>
+where
+    TTunnel: TunnelOwner,
+{
+    CachedSessionRuntimeResources {
+        cached_resources: take_cached_session_resources(shells, sftps, connections, session_id),
+        tunnels: take_tunnels_for_session(tunnels, session_id),
+    }
+}
+
 fn take_cached_session_subresources<TShell, TSftp>(
     shells: &mut HashMap<SessionId, TShell>,
     sftps: &mut HashMap<SessionId, TSftp>,
@@ -462,7 +487,7 @@ where
         .collect()
 }
 
-fn stop_stale_tunnels<TTunnel>(
+fn stop_detached_tunnels<TTunnel>(
     session_id: SessionId,
     tunnels: Vec<TTunnel>,
     operation: &'static str,
@@ -476,7 +501,7 @@ fn stop_stale_tunnels<TTunnel>(
             session_id = %session_id.0,
             operation,
             rule_name,
-            "stopped stale SSH tunnel"
+            "stopped detached SSH tunnel"
         );
     }
 }
