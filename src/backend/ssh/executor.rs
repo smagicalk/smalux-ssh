@@ -81,6 +81,13 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let report = self
             .runtime
             .block_on(self.connector.connect(session_id, plan))?;
+        let stale_resources = take_cached_session_resources(
+            &mut self.shells,
+            &mut self.sftps,
+            &mut self.connections,
+            session_id,
+        );
+        self.close_stale_session_resources(session_id, stale_resources);
         self.connections.insert(session_id, report.connection);
         Ok(report.events)
     }
@@ -222,6 +229,39 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
 
         Ok(vec![BackendEvent::Disconnected { session_id }])
     }
+
+    fn close_stale_session_resources(
+        &self,
+        session_id: SessionId,
+        resources: CachedSessionResources<RemoteShell, RemoteSftp, RusshConnection>,
+    ) {
+        if resources.shell.is_some() {
+            tracing::warn!(
+                session_id = %session_id.0,
+                "dropping stale remote shell before reconnect"
+            );
+        }
+
+        if let Some(sftp) = resources.sftp
+            && let Err(error) = self.runtime.block_on(sftp.close())
+        {
+            tracing::warn!(
+                session_id = %session_id.0,
+                error = %error,
+                "failed to close stale SFTP session before reconnect"
+            );
+        }
+
+        if let Some(connection) = resources.connection
+            && let Err(error) = self.runtime.block_on(connection.disconnect())
+        {
+            tracing::warn!(
+                session_id = %session_id.0,
+                error = %error,
+                "failed to disconnect stale SSH connection before reconnect"
+            );
+        }
+    }
 }
 
 impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
@@ -263,6 +303,26 @@ fn connected_session_error(operation: &str) -> BackendExecutionError {
     BackendExecutionError::ChannelFailed {
         operation: operation.to_owned(),
         reason: "session is not connected".to_owned(),
+    }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CachedSessionResources<TShell, TSftp, TConnection> {
+    shell: Option<TShell>,
+    sftp: Option<TSftp>,
+    connection: Option<TConnection>,
+}
+
+fn take_cached_session_resources<TShell, TSftp, TConnection>(
+    shells: &mut HashMap<SessionId, TShell>,
+    sftps: &mut HashMap<SessionId, TSftp>,
+    connections: &mut HashMap<SessionId, TConnection>,
+    session_id: SessionId,
+) -> CachedSessionResources<TShell, TSftp, TConnection> {
+    CachedSessionResources {
+        shell: shells.remove(&session_id),
+        sftp: sftps.remove(&session_id),
+        connection: connections.remove(&session_id),
     }
 }
 

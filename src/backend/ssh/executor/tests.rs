@@ -58,6 +58,76 @@ fn connect_missing_secret_fails_before_network_access() {
 }
 
 #[test]
+fn taking_cached_session_resources_removes_only_target_session() {
+    let target_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([
+        (target_session_id, "target-shell"),
+        (other_session_id, "other-shell"),
+    ]);
+    let mut sftps = HashMap::from([
+        (target_session_id, "target-sftp"),
+        (other_session_id, "other-sftp"),
+    ]);
+    let mut connections = HashMap::from([
+        (target_session_id, "target-connection"),
+        (other_session_id, "other-connection"),
+    ]);
+
+    let resources =
+        take_cached_session_resources(&mut shells, &mut sftps, &mut connections, target_session_id);
+
+    assert_eq!(
+        resources,
+        CachedSessionResources {
+            shell: Some("target-shell"),
+            sftp: Some("target-sftp"),
+            connection: Some("target-connection"),
+        }
+    );
+    assert!(!shells.contains_key(&target_session_id));
+    assert!(!sftps.contains_key(&target_session_id));
+    assert!(!connections.contains_key(&target_session_id));
+    assert_eq!(shells.get(&other_session_id), Some(&"other-shell"));
+    assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
+    assert_eq!(
+        connections.get(&other_session_id),
+        Some(&"other-connection")
+    );
+}
+
+#[test]
+fn taking_cached_session_resources_is_idempotent_for_missing_session() {
+    let missing_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([(other_session_id, "other-shell")]);
+    let mut sftps = HashMap::from([(other_session_id, "other-sftp")]);
+    let mut connections = HashMap::from([(other_session_id, "other-connection")]);
+
+    let resources = take_cached_session_resources(
+        &mut shells,
+        &mut sftps,
+        &mut connections,
+        missing_session_id,
+    );
+
+    assert_eq!(
+        resources,
+        CachedSessionResources {
+            shell: None::<&str>,
+            sftp: None::<&str>,
+            connection: None::<&str>,
+        }
+    );
+    assert_eq!(shells.get(&other_session_id), Some(&"other-shell"));
+    assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
+    assert_eq!(
+        connections.get(&other_session_id),
+        Some(&"other-connection")
+    );
+}
+
+#[test]
 fn host_key_rejected_error_is_connection_scoped() {
     let error = BackendExecutionError::HostKeyRejected {
         host: "example.com".to_owned(),
