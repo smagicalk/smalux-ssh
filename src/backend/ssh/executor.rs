@@ -166,7 +166,9 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             .sftps
             .get(&session_id)
             .ok_or_else(|| connected_session_error("sftp"))?;
-        self.runtime.block_on(sftp.execute(request))
+        let result = self.runtime.block_on(sftp.execute(request));
+        drop_cached_sftp_after_failed_request(&mut self.sftps, session_id, &result);
+        result
     }
 
     fn start_tunnel(
@@ -260,4 +262,22 @@ fn connected_session_error(operation: &str) -> BackendExecutionError {
         operation: operation.to_owned(),
         reason: "session is not connected".to_owned(),
     }
+}
+
+fn drop_cached_sftp_after_failed_request<T>(
+    sftps: &mut HashMap<SessionId, T>,
+    session_id: SessionId,
+    result: &Result<Vec<BackendEvent>, BackendExecutionError>,
+) -> bool {
+    if !sftp_result_requires_session_drop(result) {
+        return false;
+    }
+
+    sftps.remove(&session_id).is_some()
+}
+
+fn sftp_result_requires_session_drop(
+    result: &Result<Vec<BackendEvent>, BackendExecutionError>,
+) -> bool {
+    matches!(result, Err(BackendExecutionError::SftpFailed { .. }))
 }
