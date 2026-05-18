@@ -4,8 +4,8 @@ use crate::backend::{
     ScriptedBackendExecutor, ScriptedBackendResponse,
 };
 use crate::model::{
-    AuthProfile, Host, LOCAL_TERMINAL_SESSION_ID, SessionStatus, TransferStatus, TunnelKind,
-    TunnelRule, TunnelStatus,
+    AuthProfile, Host, HostKeyVerification, KeyAlgorithm, KnownHostEntry,
+    LOCAL_TERMINAL_SESSION_ID, SessionStatus, TransferStatus, TunnelKind, TunnelRule, TunnelStatus,
 };
 
 fn sample_host() -> Host {
@@ -102,6 +102,59 @@ fn backend_queue_pump_discards_failed_session_tail_commands() {
 }
 
 #[test]
+fn backend_queue_pump_records_unknown_host_key_candidate() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state.apply(Message::OpenShell { host_id });
+    let mut executor = RejectingHostKeyExecutor::new(HostKeyVerification::Unknown);
+
+    let outcome = state.drain_backend_queue(&mut executor);
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.applied_backend_events, 1);
+    assert!(state.backend_commands.is_empty());
+    assert_eq!(state.storage.known_host_count(), 1);
+    assert_eq!(
+        state.storage.known_hosts[0],
+        KnownHostEntry::untrusted("example.com", 22, KeyAlgorithm::Ed25519, "SHA256:new")
+    );
+    assert!(matches!(
+        &state.sessions.tabs[0].status,
+        SessionStatus::Failed { reason } if reason.contains("主机密钥未被信任")
+    ));
+}
+
+#[test]
+fn backend_queue_pump_does_not_overwrite_trusted_host_on_mismatch() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+    state.storage.upsert_known_host(KnownHostEntry {
+        host: "example.com".to_owned(),
+        port: 22,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        fingerprint: "SHA256:old".to_owned(),
+        trusted: true,
+    });
+    state.apply(Message::OpenShell { host_id });
+    let mut executor = RejectingHostKeyExecutor::new(HostKeyVerification::Mismatch {
+        expected: "SHA256:old".to_owned(),
+        actual: "SHA256:new".to_owned(),
+    });
+
+    let outcome = state.drain_backend_queue(&mut executor);
+
+    assert!(outcome.changed());
+    assert_eq!(state.storage.known_host_count(), 1);
+    assert_eq!(state.storage.known_hosts[0].fingerprint, "SHA256:old");
+    assert!(state.storage.known_hosts[0].trusted);
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
 fn backend_queue_pump_marks_failed_remote_command_history_finished() {
     let mut state = AppState::default();
     let host = sample_host();
@@ -127,6 +180,32 @@ fn backend_queue_pump_marks_failed_remote_command_history_finished() {
         state.sessions.tabs[0].status,
         SessionStatus::Failed { .. }
     ));
+}
+
+#[derive(Debug)]
+struct RejectingHostKeyExecutor {
+    verification: HostKeyVerification,
+}
+
+impl RejectingHostKeyExecutor {
+    fn new(verification: HostKeyVerification) -> Self {
+        Self { verification }
+    }
+}
+
+impl BackendExecutor for RejectingHostKeyExecutor {
+    fn execute(
+        &mut self,
+        _command: crate::backend::BackendCommand,
+    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        Err(BackendExecutionError::HostKeyRejected {
+            host: "example.com".to_owned(),
+            port: 22,
+            key_algorithm: KeyAlgorithm::Ed25519,
+            fingerprint: "SHA256:new".to_owned(),
+            verification: self.verification.clone(),
+        })
+    }
 }
 
 #[test]

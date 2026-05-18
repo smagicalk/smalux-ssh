@@ -1,7 +1,8 @@
 //! 后端执行器向状态层回传的事件。
 
 use crate::model::{
-    HostKeyVerification, SessionId, SftpEntry, TransferId, TransferStatus, TunnelStatus,
+    HostKeyVerification, KeyAlgorithm, SessionId, SftpEntry, TransferId, TransferStatus,
+    TunnelStatus,
 };
 
 /// 后端执行器产生的状态事件。
@@ -23,6 +24,10 @@ pub enum BackendEvent {
     },
     HostKeyVerified {
         session_id: SessionId,
+        host: String,
+        port: u16,
+        key_algorithm: KeyAlgorithm,
+        fingerprint: String,
         result: HostKeyVerification,
     },
     ShellOpened {

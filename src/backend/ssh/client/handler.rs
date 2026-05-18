@@ -7,9 +7,7 @@ use russh::Channel;
 use russh::client::{self, Msg};
 use tokio::sync::mpsc;
 
-use crate::model::HostKeyVerification;
-
-use super::HostKeyPolicy;
+use super::{HostKeyCheck, HostKeyPolicy};
 
 pub(super) type ForwardedChannel = Channel<Msg>;
 
@@ -50,8 +48,9 @@ impl client::Handler for SshClientHandler {
         let check = self
             .host_key_policy
             .check(&self.host, self.port, server_public_key);
-        self.host_key_result.set(check.verification);
-        Ok(check.accepted)
+        let accepted = check.accepted;
+        self.host_key_result.set(check);
+        Ok(accepted)
     }
 
     async fn server_channel_open_forwarded_tcpip(
@@ -72,17 +71,17 @@ impl client::Handler for SshClientHandler {
 
 #[derive(Debug, Clone, Default)]
 pub(super) struct SharedHostKeyResult {
-    value: Arc<Mutex<Option<HostKeyVerification>>>,
+    value: Arc<Mutex<Option<HostKeyCheck>>>,
 }
 
 impl SharedHostKeyResult {
-    pub(super) fn set(&self, result: HostKeyVerification) {
+    pub(super) fn set(&self, result: HostKeyCheck) {
         if let Ok(mut value) = self.value.lock() {
             *value = Some(result);
         }
     }
 
-    pub(super) fn get(&self) -> Option<HostKeyVerification> {
+    pub(super) fn get(&self) -> Option<HostKeyCheck> {
         self.value.lock().ok().and_then(|value| value.clone())
     }
 }

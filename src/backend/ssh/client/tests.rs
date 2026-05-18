@@ -6,7 +6,7 @@ use russh::keys::PublicKey;
 
 use super::auth::{decode_private_key, select_agent_identity};
 use super::handler::{SharedForwardedChannels, SharedHostKeyResult};
-use super::host_key::host_key_fingerprint;
+use super::host_key::{host_key_algorithm, host_key_fingerprint};
 use super::settings::test_constants::{
     DEFAULT_INACTIVITY_TIMEOUT_SECS, DEFAULT_KEEPALIVE_INTERVAL_SECS, DEFAULT_KEEPALIVE_MAX,
 };
@@ -45,8 +45,22 @@ fn accept_any_policy_allows_unknown_key_explicitly() {
     let check = HostKeyPolicy::AcceptAny.check("example.com", 22, &key);
 
     assert!(check.accepted);
+    assert_eq!(check.host, "example.com");
+    assert_eq!(check.port, 22);
+    assert_eq!(check.key_algorithm, KeyAlgorithm::Ed25519);
     assert_eq!(check.verification, HostKeyVerification::Unknown);
     assert!(check.fingerprint.starts_with("SHA256:"));
+}
+
+#[test]
+fn default_policy_rejects_unknown_key_for_first_trust() {
+    let key = sample_public_key();
+
+    let check = HostKeyPolicy::default().check("example.com", 22, &key);
+
+    assert!(!check.accepted);
+    assert_eq!(check.verification, HostKeyVerification::Unknown);
+    assert_eq!(check.key_algorithm, KeyAlgorithm::Ed25519);
 }
 
 #[test]
@@ -135,5 +149,16 @@ async fn handler_records_host_key_verification_result() {
         .expect("主机密钥检查不应失败");
 
     assert!(accepted);
-    assert_eq!(shared.get(), Some(HostKeyVerification::Unknown));
+    let check = shared.get().expect("处理器应该记录主机密钥检查结果");
+    assert_eq!(check.host, "example.com");
+    assert_eq!(check.port, 22);
+    assert_eq!(check.key_algorithm, KeyAlgorithm::Ed25519);
+    assert_eq!(check.verification, HostKeyVerification::Unknown);
+}
+
+#[test]
+fn host_key_algorithm_maps_public_key_algorithm() {
+    let key = sample_public_key();
+
+    assert_eq!(host_key_algorithm(&key), KeyAlgorithm::Ed25519);
 }

@@ -8,7 +8,9 @@ use crate::model::{
 };
 use crate::terminal::TerminalTabState;
 
-use super::launch::{connect_command, missing_host, queued_outcome, unix_now_secs};
+use super::launch::{
+    connect_command_with_known_hosts, missing_host, queued_outcome, unix_now_secs,
+};
 use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
@@ -47,8 +49,9 @@ impl AppState {
         self.ui.workspace.active_page = WorkspacePage::Terminal;
         self.terminal.open_tab(terminal_tab);
         self.record_recent_connection(&host);
+        let known_hosts = self.storage.known_hosts.clone();
         self.backend_commands.extend([
-            connect_command(session_id, &host),
+            connect_command_with_known_hosts(session_id, &host, known_hosts),
             BackendCommand::RunCommand {
                 session_id,
                 request,

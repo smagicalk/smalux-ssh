@@ -3,6 +3,8 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+use crate::model::{HostKeyVerification, KeyAlgorithm};
+
 use super::{BackendCommand, BackendCommandKind, BackendEvent};
 
 /// 后端执行错误。
@@ -12,6 +14,14 @@ pub enum BackendExecutionError {
     UnsupportedCommand { kind: BackendCommandKind },
     #[error("连接 {endpoint} 失败：{reason}")]
     ConnectionFailed { endpoint: String, reason: String },
+    #[error("主机密钥未被信任：{host}:{port} {fingerprint}")]
+    HostKeyRejected {
+        host: String,
+        port: u16,
+        key_algorithm: KeyAlgorithm,
+        fingerprint: String,
+        verification: HostKeyVerification,
+    },
     #[error("用户 {username} 认证失败：{reason}")]
     AuthenticationFailed { username: String, reason: String },
     #[error("{operation} 通道失败：{reason}")]

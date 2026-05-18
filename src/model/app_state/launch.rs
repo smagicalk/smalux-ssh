@@ -28,8 +28,9 @@ impl AppState {
         self.ui.workspace.active_page = WorkspacePage::Terminal;
         self.terminal.open_tab(terminal_tab);
         self.record_recent_connection(&host);
+        let known_hosts = self.storage.known_hosts.clone();
         self.backend_commands.extend([
-            connect_command(session_id, &host),
+            connect_command_with_known_hosts(session_id, &host, known_hosts),
             BackendCommand::OpenShell { session_id, pty },
         ]);
 
@@ -58,10 +59,14 @@ impl AppState {
     }
 }
 
-pub(super) fn connect_command(session_id: SessionId, host: &Host) -> BackendCommand {
+pub(super) fn connect_command_with_known_hosts(
+    session_id: SessionId,
+    host: &Host,
+    known_hosts: Vec<crate::model::KnownHostEntry>,
+) -> BackendCommand {
     BackendCommand::Connect {
         session_id,
-        target: ConnectionTarget::from_host(host),
+        target: ConnectionTarget::from_host_with_known_hosts(host, known_hosts),
     }
 }
 

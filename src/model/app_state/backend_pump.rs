@@ -4,7 +4,7 @@ use crate::backend::{
     BackendCommand, BackendCommandQueue, BackendEvent, BackendExecutionError, BackendExecutor,
     SftpRequest,
 };
-use crate::model::{SessionId, TransferId, TransferStatus};
+use crate::model::{HostKeyVerification, KnownHostEntry, SessionId, TransferId, TransferStatus};
 
 use super::{AppState, AppUpdateOutcome};
 
@@ -24,6 +24,7 @@ impl AppState {
                 Err(error) => {
                     let reason = error.to_string();
                     let is_sftp_operation_failure = sftp_operation_failed(&error);
+                    outcome.state_changed |= self.record_rejected_host_key(&error);
                     let failure_events = failed_backend_events(
                         session_id,
                         reason.clone(),
@@ -63,6 +64,32 @@ impl AppState {
         }
 
         outcome
+    }
+}
+
+impl AppState {
+    fn record_rejected_host_key(&mut self, error: &BackendExecutionError) -> bool {
+        let BackendExecutionError::HostKeyRejected {
+            host,
+            port,
+            key_algorithm,
+            fingerprint,
+            verification,
+        } = error
+        else {
+            return false;
+        };
+        if matches!(verification, HostKeyVerification::Mismatch { .. }) {
+            return false;
+        }
+
+        self.storage.upsert_known_host(KnownHostEntry::untrusted(
+            host.clone(),
+            *port,
+            key_algorithm.clone(),
+            fingerprint.clone(),
+        ));
+        true
     }
 }
 

@@ -35,6 +35,21 @@ pub enum KeyAlgorithm {
     Unknown(String),
 }
 
+impl KeyAlgorithm {
+    /// 从 OpenSSH 算法标识转换为内部展示分类。
+    pub fn from_ssh_algorithm(algorithm: &str) -> Self {
+        if algorithm.contains("ed25519") {
+            Self::Ed25519
+        } else if algorithm.contains("rsa") {
+            Self::Rsa
+        } else if algorithm.contains("ecdsa") {
+            Self::Ecdsa
+        } else {
+            Self::Unknown(algorithm.to_owned())
+        }
+    }
+}
+
 /// Known Hosts 记录。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct KnownHostEntry {
@@ -46,6 +61,22 @@ pub struct KnownHostEntry {
 }
 
 impl KnownHostEntry {
+    /// 创建一个等待用户确认的 Known Hosts 候选记录。
+    pub fn untrusted(
+        host: impl Into<String>,
+        port: u16,
+        key_algorithm: KeyAlgorithm,
+        fingerprint: impl Into<String>,
+    ) -> Self {
+        Self {
+            host: host.into(),
+            port,
+            key_algorithm,
+            fingerprint: fingerprint.into(),
+            trusted: false,
+        }
+    }
+
     /// 判断远端主机指纹是否与本地记录匹配。
     pub fn verify(&self, host: &str, port: u16, fingerprint: &str) -> HostKeyVerification {
         if self.host != host || self.port != port {
@@ -77,6 +108,37 @@ pub enum HostKeyVerification {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_algorithm_maps_common_openssh_names() {
+        assert_eq!(
+            KeyAlgorithm::from_ssh_algorithm("ssh-ed25519"),
+            KeyAlgorithm::Ed25519
+        );
+        assert_eq!(
+            KeyAlgorithm::from_ssh_algorithm("rsa-sha2-256"),
+            KeyAlgorithm::Rsa
+        );
+        assert_eq!(
+            KeyAlgorithm::from_ssh_algorithm("ecdsa-sha2-nistp256"),
+            KeyAlgorithm::Ecdsa
+        );
+        assert_eq!(
+            KeyAlgorithm::from_ssh_algorithm("ssh-dss"),
+            KeyAlgorithm::Unknown("ssh-dss".to_owned())
+        );
+    }
+
+    #[test]
+    fn untrusted_known_host_entry_keeps_candidate_fingerprint() {
+        let entry =
+            KnownHostEntry::untrusted("example.com", 22, KeyAlgorithm::Ed25519, "SHA256:new");
+
+        assert_eq!(entry.host, "example.com");
+        assert_eq!(entry.port, 22);
+        assert_eq!(entry.fingerprint, "SHA256:new");
+        assert!(!entry.trusted);
+    }
 
     #[test]
     fn known_host_entry_verifies_trusted_untrusted_unknown_and_mismatch() {

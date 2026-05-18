@@ -1,5 +1,6 @@
 //! SSH 连接执行计划。
 
+use crate::model::KnownHostEntry;
 use crate::security::{AuthResolver, ResolvedAuth, SecretStore, SecurityError};
 
 use super::super::{BackendExecutionError, ConnectionTarget};
@@ -14,6 +15,7 @@ pub struct SshConnectionPlan {
     pub port: u16,
     pub endpoint: String,
     pub auth: SshAuthPlan,
+    pub known_hosts: Vec<KnownHostEntry>,
 }
 
 impl SshConnectionPlan {
@@ -33,6 +35,7 @@ impl SshConnectionPlan {
             port: target.port,
             endpoint: target.endpoint(),
             auth,
+            known_hosts: target.known_hosts.clone(),
         })
     }
 

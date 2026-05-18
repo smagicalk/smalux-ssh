@@ -7,7 +7,9 @@ use crate::model::{
     HostId, SessionId, SessionKind, SessionStatus, TunnelRule, TunnelStatus, WorkspacePage,
 };
 
-use super::launch::{connect_command, missing_host, queued_outcome, unix_now_secs};
+use super::launch::{
+    connect_command_with_known_hosts, missing_host, queued_outcome, unix_now_secs,
+};
 use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
@@ -44,8 +46,9 @@ impl AppState {
         self.sessions
             .start_tunnel(&request.rule, Some(host.id), unix_now_secs());
         self.record_recent_connection(&host);
+        let known_hosts = self.storage.known_hosts.clone();
         self.backend_commands.extend([
-            connect_command(session_id, &host),
+            connect_command_with_known_hosts(session_id, &host, known_hosts),
             BackendCommand::StartTunnel {
                 session_id,
                 request,

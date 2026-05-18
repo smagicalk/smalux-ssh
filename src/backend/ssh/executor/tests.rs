@@ -1,6 +1,7 @@
 use super::*;
 use crate::backend::{BackendAuth, SftpRequest};
-use crate::model::{HostId, SecretRef};
+use crate::model::HostKeyVerification;
+use crate::model::{HostId, KeyAlgorithm, SecretRef};
 use crate::security::MemorySecretStore;
 use crate::terminal::TerminalSize;
 use uuid::Uuid;
@@ -15,6 +16,7 @@ fn target(auth: BackendAuth) -> ConnectionTarget {
         address: "example.com".to_owned(),
         port: 22,
         auth,
+        known_hosts: Vec::new(),
     }
 }
 
@@ -52,6 +54,22 @@ fn connect_missing_secret_fails_before_network_access() {
         } if username == "deploy" && reason.contains("找不到凭据引用")
     ));
     assert_eq!(executor.connection_count(), 0);
+}
+
+#[test]
+fn host_key_rejected_error_is_connection_scoped() {
+    let error = BackendExecutionError::HostKeyRejected {
+        host: "example.com".to_owned(),
+        port: 22,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        fingerprint: "SHA256:new".to_owned(),
+        verification: HostKeyVerification::Unknown,
+    };
+
+    assert_eq!(
+        error.to_string(),
+        "主机密钥未被信任：example.com:22 SHA256:new"
+    );
 }
 
 #[test]

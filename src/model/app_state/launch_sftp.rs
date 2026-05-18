@@ -5,7 +5,9 @@ use uuid::Uuid;
 use crate::backend::{BackendCommand, SftpRequest};
 use crate::model::{HostId, SessionId, SessionKind, SessionStatus, SftpBookmark, WorkspacePage};
 
-use super::launch::{connect_command, missing_host, normalize_remote_dir, queued_outcome};
+use super::launch::{
+    connect_command_with_known_hosts, missing_host, normalize_remote_dir, queued_outcome,
+};
 use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
@@ -24,8 +26,9 @@ impl AppState {
         self.sessions.set_sftp_loading(host.id, true);
         self.ui.workspace.active_page = WorkspacePage::Sftp;
         self.record_recent_connection(&host);
+        let known_hosts = self.storage.known_hosts.clone();
         self.backend_commands.extend([
-            connect_command(session_id, &host),
+            connect_command_with_known_hosts(session_id, &host, known_hosts),
             BackendCommand::Sftp {
                 session_id,
                 request: SftpRequest::ListDir {

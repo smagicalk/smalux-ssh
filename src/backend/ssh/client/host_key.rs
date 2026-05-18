@@ -2,12 +2,12 @@
 
 use russh::keys::{HashAlg, PublicKey};
 
-use crate::model::{HostKeyVerification, KnownHostEntry};
+use crate::model::{HostKeyVerification, KeyAlgorithm, KnownHostEntry};
 
 /// 主机密钥校验策略。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum HostKeyPolicy {
-    /// 明确允许未知主机密钥，后续应接入 Known Hosts 首次信任确认。
+    /// 明确允许未知主机密钥，仅用于测试或用户显式放宽校验。
     AcceptAny,
     /// 只允许已信任的 Known Hosts 记录。
     KnownHosts(Vec<KnownHostEntry>),
@@ -15,7 +15,7 @@ pub enum HostKeyPolicy {
 
 impl Default for HostKeyPolicy {
     fn default() -> Self {
-        Self::AcceptAny
+        Self::KnownHosts(Vec::new())
     }
 }
 
@@ -26,6 +26,9 @@ impl HostKeyPolicy {
 
         match self {
             Self::AcceptAny => HostKeyCheck {
+                host: host.to_owned(),
+                port,
+                key_algorithm: host_key_algorithm(public_key),
                 verification: HostKeyVerification::Unknown,
                 accepted: true,
                 fingerprint,
@@ -38,6 +41,9 @@ impl HostKeyPolicy {
                     .unwrap_or(HostKeyVerification::Unknown);
 
                 HostKeyCheck {
+                    host: host.to_owned(),
+                    port,
+                    key_algorithm: host_key_algorithm(public_key),
                     accepted: matches!(verification, HostKeyVerification::Trusted),
                     verification,
                     fingerprint,
@@ -50,6 +56,9 @@ impl HostKeyPolicy {
 /// 单次主机密钥校验结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostKeyCheck {
+    pub host: String,
+    pub port: u16,
+    pub key_algorithm: KeyAlgorithm,
     pub verification: HostKeyVerification,
     pub accepted: bool,
     pub fingerprint: String,
@@ -57,4 +66,8 @@ pub struct HostKeyCheck {
 
 pub(super) fn host_key_fingerprint(public_key: &PublicKey) -> String {
     public_key.fingerprint(HashAlg::Sha256).to_string()
+}
+
+pub(super) fn host_key_algorithm(public_key: &PublicKey) -> KeyAlgorithm {
+    KeyAlgorithm::from_ssh_algorithm(public_key.algorithm().as_str())
 }

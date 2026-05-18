@@ -1,6 +1,6 @@
 //! 后端执行命令模型。
 
-use crate::model::{Host, HostId, SessionId};
+use crate::model::{Host, HostId, KnownHostEntry, SessionId};
 
 use super::{
     BackendAuth, PtyRequest, RemoteCommandRequest, SftpRequest, TunnelStartRequest,
@@ -53,16 +53,23 @@ pub struct ConnectionTarget {
     pub address: String,
     pub port: u16,
     pub auth: BackendAuth,
+    pub known_hosts: Vec<KnownHostEntry>,
 }
 
 impl ConnectionTarget {
     /// 从已保存主机配置生成后端连接目标。
     pub fn from_host(host: &Host) -> Self {
+        Self::from_host_with_known_hosts(host, Vec::new())
+    }
+
+    /// 从已保存主机配置和 Known Hosts 快照生成后端连接目标。
+    pub fn from_host_with_known_hosts(host: &Host, known_hosts: Vec<KnownHostEntry>) -> Self {
         Self {
             host_id: host.id,
             address: host.address.clone(),
             port: host.port,
             auth: BackendAuth::from(&host.auth),
+            known_hosts,
         }
     }
 
@@ -121,7 +128,7 @@ pub enum BackendCommandKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AuthProfile, SecretRef};
+    use crate::model::{AuthProfile, KeyAlgorithm, KnownHostEntry, SecretRef};
     use crate::terminal::TerminalSize;
     use uuid::Uuid;
 
@@ -148,11 +155,20 @@ mod tests {
     fn connection_target_keeps_host_identity_and_auth() {
         let host = host();
 
-        let target = ConnectionTarget::from_host(&host);
+        let target = ConnectionTarget::from_host_with_known_hosts(
+            &host,
+            vec![KnownHostEntry::untrusted(
+                "example.com",
+                2222,
+                KeyAlgorithm::Ed25519,
+                "SHA256:demo",
+            )],
+        );
 
         assert_eq!(target.host_id, host.id);
         assert_eq!(target.endpoint(), "example.com:2222");
         assert_eq!(target.auth.username(), "deploy");
+        assert_eq!(target.known_hosts.len(), 1);
     }
 
     #[test]

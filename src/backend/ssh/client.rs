@@ -69,7 +69,7 @@ impl RusshConnector {
         let handler = SshClientHandler::new(
             plan.host.clone(),
             plan.port,
-            self.host_key_policy.clone(),
+            self.host_key_policy_for_plan(&plan),
             host_key_result.clone(),
             forwarded_channels.clone(),
         );
@@ -78,10 +78,19 @@ impl RusshConnector {
 
         let mut handle = client::connect(config, address, handler)
             .await
-            .map_err(|error| connection_error(&plan.endpoint, error))?;
+            .map_err(|error| {
+                host_key_or_connection_error(&plan.endpoint, &host_key_result, error)
+            })?;
 
-        if let Some(result) = host_key_result.get() {
-            events.push(BackendEvent::HostKeyVerified { session_id, result });
+        if let Some(check) = host_key_result.get() {
+            events.push(BackendEvent::HostKeyVerified {
+                session_id,
+                host: check.host,
+                port: check.port,
+                key_algorithm: check.key_algorithm,
+                fingerprint: check.fingerprint,
+                result: check.verification,
+            });
         }
 
         events.push(BackendEvent::Authenticating {
@@ -101,6 +110,16 @@ impl RusshConnector {
             },
             events,
         })
+    }
+
+    fn host_key_policy_for_plan(&self, plan: &SshConnectionPlan) -> HostKeyPolicy {
+        match &self.host_key_policy {
+            HostKeyPolicy::AcceptAny => HostKeyPolicy::AcceptAny,
+            HostKeyPolicy::KnownHosts(configured) if plan.known_hosts.is_empty() => {
+                HostKeyPolicy::KnownHosts(configured.clone())
+            }
+            HostKeyPolicy::KnownHosts(_) => HostKeyPolicy::KnownHosts(plan.known_hosts.clone()),
+        }
     }
 }
 
@@ -153,6 +172,26 @@ impl RusshConnection {
                 reason: error.to_string(),
             })
     }
+}
+
+fn host_key_or_connection_error(
+    endpoint: &str,
+    host_key_result: &SharedHostKeyResult,
+    error: russh::Error,
+) -> BackendExecutionError {
+    if let Some(check) = host_key_result.get()
+        && !check.accepted
+    {
+        return BackendExecutionError::HostKeyRejected {
+            host: check.host,
+            port: check.port,
+            key_algorithm: check.key_algorithm,
+            fingerprint: check.fingerprint,
+            verification: check.verification,
+        };
+    }
+
+    connection_error(endpoint, error)
 }
 
 fn connection_error(endpoint: &str, error: russh::Error) -> BackendExecutionError {

@@ -1,6 +1,6 @@
 use super::*;
 use crate::backend::{BackendAuth, ConnectionTarget};
-use crate::model::{HostId, SecretRef};
+use crate::model::{HostId, KeyAlgorithm, KnownHostEntry, SecretRef};
 use crate::security::MemorySecretStore;
 use crate::security::SecretStore;
 use uuid::Uuid;
@@ -11,6 +11,12 @@ fn target(auth: BackendAuth) -> ConnectionTarget {
         address: "example.com".to_owned(),
         port: 2222,
         auth,
+        known_hosts: vec![KnownHostEntry::untrusted(
+            "example.com",
+            2222,
+            KeyAlgorithm::Ed25519,
+            "SHA256:demo",
+        )],
     }
 }
 
@@ -32,6 +38,7 @@ fn password_plan_resolves_secret_and_endpoint() {
     assert_eq!(plan.port, 2222);
     assert_eq!(plan.endpoint, "example.com:2222");
     assert_eq!(plan.username(), "root");
+    assert_eq!(plan.known_hosts.len(), 1);
     assert!(matches!(
         plan.auth,
         SshAuthPlan::Password {
