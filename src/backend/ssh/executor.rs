@@ -205,7 +205,9 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         request: TunnelStopRequest,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
         let rule_name = request.rule_name;
-        if let Some(tunnel) = self.tunnels.remove(&rule_name) {
+        if let Some(tunnel) =
+            remove_tunnel_for_session_rule(&mut self.tunnels, session_id, &rule_name)
+        {
             tunnel.stop();
         }
 
@@ -386,6 +388,34 @@ fn take_cached_session_resources<TShell, TSftp, TConnection>(
         shell: shells.remove(&session_id),
         sftp: sftps.remove(&session_id),
         connection: connections.remove(&session_id),
+    }
+}
+
+fn remove_tunnel_for_session_rule<TTunnel>(
+    tunnels: &mut HashMap<String, TTunnel>,
+    session_id: SessionId,
+    rule_name: &str,
+) -> Option<TTunnel>
+where
+    TTunnel: TunnelOwner,
+{
+    if !tunnels
+        .get(rule_name)
+        .is_some_and(|tunnel| tunnel.session_id() == session_id)
+    {
+        return None;
+    }
+
+    tunnels.remove(rule_name)
+}
+
+trait TunnelOwner {
+    fn session_id(&self) -> SessionId;
+}
+
+impl TunnelOwner for RemoteTunnel {
+    fn session_id(&self) -> SessionId {
+        self.session_id()
     }
 }
 

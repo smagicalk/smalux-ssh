@@ -198,6 +198,58 @@ fn taking_cached_session_subresources_is_idempotent_for_missing_session() {
     assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct OwnedTunnel {
+    session_id: SessionId,
+}
+
+impl TunnelOwner for OwnedTunnel {
+    fn session_id(&self) -> SessionId {
+        self.session_id
+    }
+}
+
+#[test]
+fn removing_tunnel_requires_matching_session_and_rule() {
+    let owner_session_id = session_id();
+    let stale_session_id = session_id();
+    let other_session_id = session_id();
+    let mut tunnels = HashMap::from([
+        (
+            "proxy".to_owned(),
+            OwnedTunnel {
+                session_id: owner_session_id,
+            },
+        ),
+        (
+            "metrics".to_owned(),
+            OwnedTunnel {
+                session_id: other_session_id,
+            },
+        ),
+    ]);
+
+    let stale = remove_tunnel_for_session_rule(&mut tunnels, stale_session_id, "proxy");
+    let missing = remove_tunnel_for_session_rule(&mut tunnels, owner_session_id, "missing");
+    let removed = remove_tunnel_for_session_rule(&mut tunnels, owner_session_id, "proxy");
+
+    assert_eq!(stale, None);
+    assert_eq!(missing, None);
+    assert_eq!(
+        removed,
+        Some(OwnedTunnel {
+            session_id: owner_session_id,
+        })
+    );
+    assert!(!tunnels.contains_key("proxy"));
+    assert_eq!(
+        tunnels.get("metrics"),
+        Some(&OwnedTunnel {
+            session_id: other_session_id,
+        })
+    );
+}
+
 #[test]
 fn host_key_rejected_error_is_connection_scoped() {
     let error = BackendExecutionError::HostKeyRejected {

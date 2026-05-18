@@ -75,7 +75,13 @@ impl RusshConnection {
         });
 
         Ok((
-            tunnel(rule.name, running, rule.bind_host, rule.bind_port),
+            tunnel(
+                session_id,
+                rule.name,
+                running,
+                rule.bind_host,
+                rule.bind_port,
+            ),
             vec![BackendEvent::TunnelStatusChanged {
                 session_id,
                 rule_name,
@@ -118,7 +124,13 @@ impl RusshConnection {
         });
 
         Ok((
-            tunnel(rule.name, running, rule.bind_host, rule.bind_port),
+            tunnel(
+                session_id,
+                rule.name,
+                running,
+                rule.bind_host,
+                rule.bind_port,
+            ),
             vec![BackendEvent::TunnelStatusChanged {
                 session_id,
                 rule_name,
@@ -170,7 +182,13 @@ impl RusshConnection {
         });
 
         Ok((
-            tunnel(rule.name, running, rule.bind_host, rule.bind_port),
+            tunnel(
+                session_id,
+                rule.name,
+                running,
+                rule.bind_host,
+                rule.bind_port,
+            ),
             vec![BackendEvent::TunnelStatusChanged {
                 session_id,
                 rule_name,
