@@ -279,7 +279,7 @@ fn clear_loading_for_cancelled_transfer(
     has_pending_browser_refresh: bool,
 ) -> bool {
     if matches!(task.direction, TransferDirection::Upload) && !has_pending_browser_refresh {
-        sessions.set_sftp_loading(task.host_id, false)
+        sessions.set_sftp_loading_for_session(task.session_id, false)
     } else {
         false
     }

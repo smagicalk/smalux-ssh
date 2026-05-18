@@ -85,6 +85,23 @@ impl SessionManager {
         }
     }
 
+    /// 按会话标签页设置 SFTP 浏览器加载状态。
+    pub fn set_sftp_loading_for_session(&mut self, session_id: SessionId, loading: bool) -> bool {
+        let Some(host_id) = self
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id && matches!(tab.kind, SessionKind::Sftp))
+            .and_then(|tab| tab.host_id)
+        else {
+            return false;
+        };
+        if !self.sftp_browser_belongs_to_session(host_id, session_id) {
+            return false;
+        }
+
+        self.set_sftp_loading(host_id, loading)
+    }
+
     /// 记录当前选中的 SFTP 目录项。
     pub fn select_sftp_entry(&mut self, host_id: HostId, selected_path: impl Into<String>) -> bool {
         if let Some(browser) = self

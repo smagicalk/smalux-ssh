@@ -121,6 +121,24 @@ fn sftp_loading_state_can_be_toggled() {
 }
 
 #[test]
+fn sftp_loading_by_session_requires_current_browser_owner() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let stale_session_id = session_id();
+    let current_session_id = session_id();
+
+    sessions.open_sftp_tab(stale_session_id, host_id, "/old");
+    sessions.open_sftp_tab(current_session_id, host_id, "/new");
+    sessions.set_sftp_loading(host_id, true);
+
+    assert!(!sessions.set_sftp_loading_for_session(stale_session_id, false));
+    assert!(sessions.sftp_browsers[0].loading);
+
+    assert!(sessions.set_sftp_loading_for_session(current_session_id, false));
+    assert!(!sessions.sftp_browsers[0].loading);
+}
+
+#[test]
 fn sftp_selection_can_be_set_and_cleared() {
     let mut sessions = SessionManager::default();
     let current_host_id = host_id();
