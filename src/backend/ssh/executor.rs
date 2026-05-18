@@ -195,7 +195,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let (tunnel, events) = self
             .runtime
             .block_on(connection.into_tunnel(session_id, request))?;
-        self.tunnels.insert(tunnel.rule_name().to_owned(), tunnel);
+        replace_tunnel_stopping_previous(&mut self.tunnels, tunnel);
         Ok(events)
     }
 
@@ -413,9 +413,40 @@ trait TunnelOwner {
     fn session_id(&self) -> SessionId;
 }
 
+trait StoppableTunnel {
+    fn stop(&self);
+}
+
 impl TunnelOwner for RemoteTunnel {
     fn session_id(&self) -> SessionId {
         self.session_id()
+    }
+}
+
+impl StoppableTunnel for RemoteTunnel {
+    fn stop(&self) {
+        RemoteTunnel::stop(self);
+    }
+}
+
+fn replace_tunnel_stopping_previous<TTunnel>(
+    tunnels: &mut HashMap<String, TTunnel>,
+    tunnel: TTunnel,
+) where
+    TTunnel: RuleNamedTunnel + StoppableTunnel,
+{
+    if let Some(previous) = tunnels.insert(tunnel.rule_name().to_owned(), tunnel) {
+        previous.stop();
+    }
+}
+
+trait RuleNamedTunnel {
+    fn rule_name(&self) -> &str;
+}
+
+impl RuleNamedTunnel for RemoteTunnel {
+    fn rule_name(&self) -> &str {
+        RemoteTunnel::rule_name(self)
     }
 }
 

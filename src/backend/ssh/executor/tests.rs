@@ -209,6 +209,36 @@ impl TunnelOwner for OwnedTunnel {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct TestTunnel {
+    session_id: SessionId,
+    rule_name: String,
+    stopped: bool,
+}
+
+impl TunnelOwner for TestTunnel {
+    fn session_id(&self) -> SessionId {
+        self.session_id
+    }
+}
+
+impl RuleNamedTunnel for TestTunnel {
+    fn rule_name(&self) -> &str {
+        &self.rule_name
+    }
+}
+
+impl StoppableTunnel for TestTunnel {
+    fn stop(&self) {
+        STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow_mut().push(self.rule_name.clone()));
+    }
+}
+
+thread_local! {
+    static STOPPED_TEST_TUNNEL_NAMES: std::cell::RefCell<Vec<String>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
 #[test]
 fn removing_tunnel_requires_matching_session_and_rule() {
     let owner_session_id = session_id();
@@ -246,6 +276,78 @@ fn removing_tunnel_requires_matching_session_and_rule() {
         tunnels.get("metrics"),
         Some(&OwnedTunnel {
             session_id: other_session_id,
+        })
+    );
+}
+
+#[test]
+fn replacing_tunnel_stops_previous_same_rule() {
+    let old_session_id = session_id();
+    let new_session_id = session_id();
+    let mut tunnels = HashMap::from([(
+        "proxy".to_owned(),
+        TestTunnel {
+            session_id: old_session_id,
+            rule_name: "proxy".to_owned(),
+            stopped: false,
+        },
+    )]);
+    STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow_mut().clear());
+
+    replace_tunnel_stopping_previous(
+        &mut tunnels,
+        TestTunnel {
+            session_id: new_session_id,
+            rule_name: "proxy".to_owned(),
+            stopped: false,
+        },
+    );
+
+    assert_eq!(
+        STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow().clone()),
+        ["proxy"]
+    );
+    assert_eq!(
+        tunnels.get("proxy"),
+        Some(&TestTunnel {
+            session_id: new_session_id,
+            rule_name: "proxy".to_owned(),
+            stopped: false,
+        })
+    );
+}
+
+#[test]
+fn replacing_tunnel_keeps_unrelated_rules_running() {
+    let existing_session_id = session_id();
+    let new_session_id = session_id();
+    let mut tunnels = HashMap::from([(
+        "metrics".to_owned(),
+        TestTunnel {
+            session_id: existing_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        },
+    )]);
+    STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow_mut().clear());
+
+    replace_tunnel_stopping_previous(
+        &mut tunnels,
+        TestTunnel {
+            session_id: new_session_id,
+            rule_name: "proxy".to_owned(),
+            stopped: false,
+        },
+    );
+
+    assert!(STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow().is_empty()));
+    assert!(tunnels.contains_key("metrics"));
+    assert_eq!(
+        tunnels.get("proxy"),
+        Some(&TestTunnel {
+            session_id: new_session_id,
+            rule_name: "proxy".to_owned(),
+            stopped: false,
         })
     );
 }
