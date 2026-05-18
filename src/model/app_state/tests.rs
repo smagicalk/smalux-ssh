@@ -101,6 +101,27 @@ fn trust_known_host_message_marks_entry_trusted() {
 }
 
 #[test]
+fn remove_known_host_message_deletes_entry() {
+    let mut state = AppState::default();
+    state
+        .storage
+        .upsert_known_host(crate::model::KnownHostEntry::untrusted(
+            "example.com",
+            22,
+            crate::model::KeyAlgorithm::Ed25519,
+            "SHA256:demo",
+        ));
+
+    let outcome = state.apply(Message::RemoveKnownHost {
+        host: "example.com".to_owned(),
+        port: 22,
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(state.storage.known_host_count(), 0);
+}
+
+#[test]
 fn activate_terminal_tab_message_switches_active_tab() {
     let mut state = AppState::default();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());

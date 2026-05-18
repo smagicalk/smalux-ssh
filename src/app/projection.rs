@@ -8,10 +8,12 @@ use crate::model::AppState;
 
 use super::view_model::{
     ActivityViewModel, AppViewModel, CommandPaletteItemViewModel, HostViewModel,
-    SessionTabViewModel, SftpEntryViewModel, ToolItemViewModel, active_terminal, app_view_model,
+    KnownHostViewModel, SessionTabViewModel, SftpEntryViewModel, ToolItemViewModel,
+    active_terminal, app_view_model,
 };
 use super::{
-    ActivityRow, AppWindow, CommandPaletteRow, HostRow, SessionTabRow, SftpEntryRow, ToolItemRow,
+    ActivityRow, AppWindow, CommandPaletteRow, HostRow, KnownHostRow, SessionTabRow, SftpEntryRow,
+    ToolItemRow,
 };
 
 /// 将当前应用状态同步到 Slint 窗口。
@@ -72,6 +74,7 @@ fn sync_view_model(window: &AppWindow, model: &AppViewModel) {
     window.set_history(string_model(&model.history));
     window.set_snippets(tool_item_model(&model.snippets));
     window.set_tunnels(tool_item_model(&model.tunnels));
+    window.set_known_hosts(known_host_model(&model.known_hosts));
 }
 
 fn host_model(items: &[HostViewModel]) -> ModelRc<HostRow> {
@@ -149,6 +152,19 @@ fn tool_item_model(items: &[ToolItemViewModel]) -> ModelRc<ToolItemRow> {
             title: item.title.as_str().into(),
             subtitle: item.subtitle.as_str().into(),
             meta: item.meta.as_str().into(),
+        })
+        .collect::<Vec<_>>();
+    ModelRc::new(VecModel::from(rows))
+}
+
+fn known_host_model(items: &[KnownHostViewModel]) -> ModelRc<KnownHostRow> {
+    let rows = items
+        .iter()
+        .map(|item| KnownHostRow {
+            host: item.host.as_str().into(),
+            port: i32::from(item.port),
+            fingerprint: item.fingerprint.as_str().into(),
+            status: item.status.as_str().into(),
         })
         .collect::<Vec<_>>();
     ModelRc::new(VecModel::from(rows))

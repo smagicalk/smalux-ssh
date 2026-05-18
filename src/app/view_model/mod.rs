@@ -34,6 +34,15 @@ pub(super) struct ToolItemViewModel {
     pub meta: String,
 }
 
+/// Known Hosts 工具分栏的展示项。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct KnownHostViewModel {
+    pub host: String,
+    pub port: u16,
+    pub fingerprint: String,
+    pub status: String,
+}
+
 /// Slint 窗口所需的完整展示模型。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct AppViewModel {
@@ -63,6 +72,7 @@ pub(super) struct AppViewModel {
     pub history: Vec<String>,
     pub snippets: Vec<ToolItemViewModel>,
     pub tunnels: Vec<ToolItemViewModel>,
+    pub known_hosts: Vec<KnownHostViewModel>,
 }
 
 /// 从核心状态创建 UI 展示模型。
@@ -105,6 +115,7 @@ pub(super) fn app_view_model(state: &AppState) -> AppViewModel {
             .collect(),
         snippets: snippet_items(state),
         tunnels: tunnel_items(state),
+        known_hosts: known_host_items(state),
     }
 }
 
@@ -150,6 +161,20 @@ fn tunnel_items(state: &AppState) -> Vec<ToolItemViewModel> {
     saved.chain(runtime).collect()
 }
 
+fn known_host_items(state: &AppState) -> Vec<KnownHostViewModel> {
+    state
+        .storage
+        .known_hosts
+        .iter()
+        .map(|entry| KnownHostViewModel {
+            host: entry.host.clone(),
+            port: entry.port,
+            fingerprint: entry.fingerprint.clone(),
+            status: if entry.trusted { "trusted" } else { "pending" }.to_owned(),
+        })
+        .collect()
+}
+
 fn tool_panel_mode_label(mode: crate::model::ToolPanelMode) -> &'static str {
     match mode {
         crate::model::ToolPanelMode::Closed => "Closed",
@@ -157,13 +182,14 @@ fn tool_panel_mode_label(mode: crate::model::ToolPanelMode) -> &'static str {
         crate::model::ToolPanelMode::Snippets => "Snippets",
         crate::model::ToolPanelMode::History => "History",
         crate::model::ToolPanelMode::Tunnels => "Tunnels",
+        crate::model::ToolPanelMode::KnownHosts => "KnownHosts",
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AuthProfile, Host, HostId, SecretRef};
+    use crate::model::{AuthProfile, Host, HostId, KeyAlgorithm, KnownHostEntry, SecretRef};
     use uuid::Uuid;
 
     #[test]
@@ -203,5 +229,24 @@ mod tests {
         let vm = app_view_model(&state);
 
         assert_eq!(vm.hosts[0].auth, "Password");
+    }
+
+    #[test]
+    fn app_view_model_projects_known_hosts_for_tool_panel() {
+        let mut state = AppState::default();
+        state.storage.upsert_known_host(KnownHostEntry::untrusted(
+            "example.com",
+            22,
+            KeyAlgorithm::Ed25519,
+            "SHA256:new",
+        ));
+
+        let vm = app_view_model(&state);
+
+        assert_eq!(vm.known_hosts.len(), 1);
+        assert_eq!(vm.known_hosts[0].host, "example.com");
+        assert_eq!(vm.known_hosts[0].port, 22);
+        assert_eq!(vm.known_hosts[0].fingerprint, "SHA256:new");
+        assert_eq!(vm.known_hosts[0].status, "pending");
     }
 }

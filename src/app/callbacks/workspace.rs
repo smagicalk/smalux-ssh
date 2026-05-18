@@ -105,8 +105,59 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     }
     {
         let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_trust_known_host(move |host, port| {
+            let Some(port) = known_host_port(port) else {
+                return;
+            };
+            apply_and_sync(
+                &weak,
+                &state,
+                Message::TrustKnownHost {
+                    host: host.to_string(),
+                    port,
+                },
+            );
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_remove_known_host(move |host, port| {
+            let Some(port) = known_host_port(port) else {
+                return;
+            };
+            apply_and_sync(
+                &weak,
+                &state,
+                Message::RemoveKnownHost {
+                    host: host.to_string(),
+                    port,
+                },
+            );
+        });
+    }
+    {
+        let weak = window.as_weak();
         window.on_next_background(move || {
             apply_and_sync(&weak, &state, Message::NextBackground);
         });
+    }
+}
+
+fn known_host_port(port: i32) -> Option<u16> {
+    u16::try_from(port).ok().filter(|port| *port > 0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn known_host_port_rejects_invalid_values() {
+        assert_eq!(known_host_port(22), Some(22));
+        assert_eq!(known_host_port(0), None);
+        assert_eq!(known_host_port(-1), None);
+        assert_eq!(known_host_port(70_000), None);
     }
 }

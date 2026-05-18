@@ -166,7 +166,7 @@ mod tests {
         let mut state = AppState::default();
 
         let open = state.apply(Message::OpenToolPanel {
-            mode: ToolPanelMode::History,
+            mode: ToolPanelMode::KnownHosts,
         });
         let close = state.apply(Message::CloseToolPanel);
 

@@ -73,6 +73,7 @@ fn parse_tool_panel_mode(mode: &str) -> Option<crate::model::ToolPanelMode> {
         "Snippets" => Some(crate::model::ToolPanelMode::Snippets),
         "History" => Some(crate::model::ToolPanelMode::History),
         "Tunnels" => Some(crate::model::ToolPanelMode::Tunnels),
+        "KnownHosts" => Some(crate::model::ToolPanelMode::KnownHosts),
         _ => None,
     }
 }

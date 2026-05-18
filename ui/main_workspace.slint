@@ -1,4 +1,4 @@
-import { SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { KnownHostRow, SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { VerticalSplitter } from "./splitter.slint";
 import { SftpPane, TerminalPane, ToolDock, ToolPanel } from "./workspace.slint";
@@ -29,6 +29,7 @@ export component MainWorkspace inherits Rectangle {
     in property <[string]> history;
     in property <[ToolItemRow]> snippets;
     in property <[ToolItemRow]> tunnels;
+    in property <[KnownHostRow]> known-hosts;
     callback activate-session(session-id: string);
     callback close-session(session-id: string);
     callback append-terminal-input(session-id: string, text: string);
@@ -37,6 +38,8 @@ export component MainWorkspace inherits Rectangle {
     callback send-terminal-input(session-id: string, text: string);
     callback refresh-sftp(host-id: string);
     callback select-sftp-entry(host-id: string, path: string);
+    callback trust-known-host(host: string, port: int);
+    callback remove-known-host(host: string, port: int);
     callback resize-tool-panel(width: int);
     callback open-tool-panel(mode: string);
     callback close-tool-panel();
@@ -126,9 +129,12 @@ export component MainWorkspace inherits Rectangle {
                 history: root.history;
                 snippets: root.snippets;
                 tunnels: root.tunnels;
+                known-hosts: root.known-hosts;
                 close => { root.close-tool-panel(); }
                 refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
                 select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+                trust-known-host(host, port) => { root.trust-known-host(host, port); }
+                remove-known-host(host, port) => { root.remove-known-host(host, port); }
             }
         }
 

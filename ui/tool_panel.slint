@@ -1,5 +1,5 @@
 import { ScrollView } from "std-widgets.slint";
-import { SftpEntryRow, ToolItemRow } from "./models.slint";
+import { KnownHostRow, SftpEntryRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { CompactButton, FilterChip, ToolRow } from "./common.slint";
 import { SftpPane } from "./sftp_pane.slint";
@@ -7,7 +7,7 @@ import { SftpPane } from "./sftp_pane.slint";
 export component ToolDock inherits Rectangle {
     callback open-tool(mode: string);
 
-    width: 132px;
+    width: 160px;
     height: 25px;
     border-radius: 6px;
     border-width: 1px;
@@ -25,6 +25,7 @@ export component ToolDock inherits Rectangle {
         CompactButton { label: "{}"; clicked => { root.open-tool("Snippets"); } }
         CompactButton { label: "H"; clicked => { root.open-tool("History"); } }
         CompactButton { label: "Tun"; clicked => { root.open-tool("Tunnels"); } }
+        CompactButton { label: "KH"; clicked => { root.open-tool("KnownHosts"); } }
     }
 }
 
@@ -42,9 +43,12 @@ export component ToolPanel inherits Rectangle {
     in property <[string]> history;
     in property <[ToolItemRow]> snippets;
     in property <[ToolItemRow]> tunnels;
+    in property <[KnownHostRow]> known-hosts;
     callback close();
     callback refresh-sftp(host-id: string);
     callback select-sftp-entry(host-id: string, path: string);
+    callback trust-known-host(host: string, port: int);
+    callback remove-known-host(host: string, port: int);
 
     width: root.panel-width * 1px;
     background: AppTheme.raised-bg;
@@ -100,6 +104,58 @@ export component ToolPanel inherits Rectangle {
                 for item in root.tunnels: ToolRow {
                     label: item.title;
                     value: item.subtitle == "" ? item.meta : item.subtitle + " · " + item.meta;
+                }
+            }
+        }
+        if root.mode == "KnownHosts": ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 6px;
+                if root.known-hosts.length == 0: ToolRow { label: "No known hosts"; value: "empty"; }
+                for item in root.known-hosts: Rectangle {
+                    height: 58px;
+                    border-radius: 6px;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+                    background: AppTheme.surface-bg;
+
+                    HorizontalLayout {
+                        padding: 7px;
+                        spacing: 6px;
+                        VerticalLayout {
+                            spacing: 2px;
+                            Text {
+                                text: item.host + ":" + item.port;
+                                color: AppTheme.text;
+                                font-size: 11px;
+                                font-weight: 700;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: item.fingerprint;
+                                color: AppTheme.text-muted;
+                                font-size: 10px;
+                                overflow: elide;
+                            }
+                            Text {
+                                text: item.status;
+                                color: item.status == "trusted" ? AppTheme.accent : AppTheme.warning;
+                                font-size: 10px;
+                            }
+                        }
+                        VerticalLayout {
+                            width: 66px;
+                            spacing: 4px;
+                            CompactButton {
+                                label: "Trust";
+                                clicked => { root.trust-known-host(item.host, item.port); }
+                            }
+                            CompactButton {
+                                label: "Del";
+                                clicked => { root.remove-known-host(item.host, item.port); }
+                            }
+                        }
+                    }
                 }
             }
         }

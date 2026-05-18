@@ -52,6 +52,7 @@ pub enum ToolPanelMode {
     Snippets,
     History,
     Tunnels,
+    KnownHosts,
 }
 
 impl Default for ToolPanelMode {

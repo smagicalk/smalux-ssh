@@ -1,4 +1,4 @@
-import { ActivityRow, CommandPaletteRow, HostRow, SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { ActivityRow, CommandPaletteRow, HostRow, KnownHostRow, SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { ActivityPanel } from "./activity_panel.slint";
 import { CommandPaletteOverlay } from "./command_palette.slint";
@@ -54,6 +54,7 @@ export component AppWindow inherits Window {
     in property <[string]> history: [];
     in property <[ToolItemRow]> snippets: [];
     in property <[ToolItemRow]> tunnels: [];
+    in property <[KnownHostRow]> known-hosts: [];
 
     callback open-hosts();
     callback open-terminal();
@@ -86,6 +87,8 @@ export component AppWindow inherits Window {
     callback send-terminal-input(session-id: string, text: string);
     callback refresh-sftp(host-id: string);
     callback select-sftp-entry(host-id: string, path: string);
+    callback trust-known-host(host: string, port: int);
+    callback remove-known-host(host: string, port: int);
 
     title: "smagicalssh";
     preferred-width: 1280px;
@@ -175,6 +178,7 @@ export component AppWindow inherits Window {
                 history: root.history;
                 snippets: root.snippets;
                 tunnels: root.tunnels;
+                known-hosts: root.known-hosts;
                 activate-session(session-id) => { root.activate-session(session-id); }
                 close-session(session-id) => { root.close-session(session-id); }
                 append-terminal-input(session-id, text) => { root.append-terminal-input(session-id, text); }
@@ -183,6 +187,8 @@ export component AppWindow inherits Window {
                 send-terminal-input(session-id, text) => { root.send-terminal-input(session-id, text); }
                 refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
                 select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+                trust-known-host(host, port) => { root.trust-known-host(host, port); }
+                remove-known-host(host, port) => { root.remove-known-host(host, port); }
                 resize-tool-panel(width) => { root.resize-tool-panel(width); }
                 open-tool-panel(mode) => { root.open-tool-panel(mode); }
                 close-tool-panel => { root.close-tool-panel(); }
