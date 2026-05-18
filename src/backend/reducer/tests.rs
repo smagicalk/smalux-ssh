@@ -431,7 +431,7 @@ fn tunnel_status_event_updates_runtime_state() {
     let rule = tunnel_rule("local-db");
 
     sessions.open_tunnel_tab(session_id, host_id, &rule);
-    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.start_tunnel(session_id, &rule, Some(host_id), 10);
     let outcome = apply_backend_event(
         &mut sessions,
         &mut terminal,
@@ -457,7 +457,7 @@ fn tunnel_status_event_ignores_stale_session_for_same_rule() {
     let rule = tunnel_rule("local-db");
 
     sessions.open_tunnel_tab(current_session_id, host_id, &rule);
-    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.start_tunnel(current_session_id, &rule, Some(host_id), 10);
 
     let outcome = apply_backend_event(
         &mut sessions,
@@ -482,7 +482,7 @@ fn tunnel_status_event_ignores_rule_mismatch_for_session() {
     let rule = tunnel_rule("local-db");
 
     sessions.open_tunnel_tab(session_id, host_id, &rule);
-    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.start_tunnel(session_id, &rule, Some(host_id), 10);
 
     let outcome = apply_backend_event(
         &mut sessions,
@@ -508,7 +508,7 @@ fn tunnel_stopped_event_marks_session_disconnected() {
     let rule = tunnel_rule("local-db");
 
     sessions.open_tunnel_tab(session_id, host_id, &rule);
-    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.start_tunnel(session_id, &rule, Some(host_id), 10);
     sessions.set_status(session_id, SessionStatus::Connected);
 
     let outcome = apply_backend_event(
@@ -610,7 +610,7 @@ fn disconnected_tunnel_event_stops_runtime_and_marks_session_disconnected() {
     let rule = tunnel_rule("local-db");
 
     sessions.open_tunnel_tab(session_id, host_id, &rule);
-    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.start_tunnel(session_id, &rule, Some(host_id), 10);
     sessions.set_status(session_id, SessionStatus::Connected);
 
     let outcome = apply_backend_event(
@@ -689,7 +689,7 @@ fn failed_event_marks_tunnel_runtime_failed() {
     let rule = tunnel_rule("local-db");
 
     sessions.open_tunnel_tab(session_id, host_id, &rule);
-    sessions.start_tunnel(&rule, Some(host_id), 10);
+    sessions.start_tunnel(session_id, &rule, Some(host_id), 10);
 
     let outcome = apply_backend_event(
         &mut sessions,

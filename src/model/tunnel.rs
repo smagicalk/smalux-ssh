@@ -90,6 +90,7 @@ pub enum TunnelKind {
 /// 单条隧道规则的运行态。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TunnelRuntimeState {
+    pub session_id: super::SessionId,
     pub rule_name: String,
     pub host_id: Option<HostId>,
     pub status: TunnelStatus,
@@ -110,7 +111,7 @@ pub enum TunnelStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::HostId;
+    use crate::model::{HostId, SessionId};
     use uuid::Uuid;
 
     #[test]
@@ -209,6 +210,7 @@ mod tests {
     #[test]
     fn tunnel_runtime_state_round_trips_through_toml() {
         let state = TunnelRuntimeState {
+            session_id: SessionId(Uuid::new_v4()),
             rule_name: "local-db".to_owned(),
             host_id: Some(HostId(Uuid::new_v4())),
             status: TunnelStatus::Running,

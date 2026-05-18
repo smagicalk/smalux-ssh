@@ -56,11 +56,9 @@ impl SessionManager {
     }
 
     pub(crate) fn upsert_tunnel(&mut self, tunnel: TunnelRuntimeState) {
-        if let Some(existing) = self
-            .tunnels
-            .iter_mut()
-            .find(|existing| existing.rule_name == tunnel.rule_name)
-        {
+        if let Some(existing) = self.tunnels.iter_mut().find(|existing| {
+            existing.session_id == tunnel.session_id && existing.rule_name == tunnel.rule_name
+        }) {
             *existing = tunnel;
         } else {
             self.tunnels.push(tunnel);
@@ -81,13 +79,14 @@ impl SessionManager {
 
     pub(crate) fn update_tunnel(
         &mut self,
+        session_id: SessionId,
         rule_name: &str,
         update: impl FnOnce(&mut TunnelRuntimeState),
     ) -> bool {
         if let Some(tunnel) = self
             .tunnels
             .iter_mut()
-            .find(|tunnel| tunnel.rule_name == rule_name)
+            .find(|tunnel| tunnel.session_id == session_id && tunnel.rule_name == rule_name)
         {
             update(tunnel);
             true

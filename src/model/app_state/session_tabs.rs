@@ -30,7 +30,7 @@ impl AppState {
         };
 
         if let SessionKind::Tunnel { rule_name } = &tab.kind {
-            if self.tunnel_requires_stop_before_close(rule_name)
+            if self.tunnel_requires_stop_before_close(session_id, rule_name)
                 && !can_cancel_pending_tunnel_launch
             {
                 return AppUpdateOutcome {
@@ -83,9 +83,10 @@ impl AppState {
         }
     }
 
-    fn tunnel_requires_stop_before_close(&self, rule_name: &str) -> bool {
+    fn tunnel_requires_stop_before_close(&self, session_id: SessionId, rule_name: &str) -> bool {
         self.sessions.tunnels.iter().any(|tunnel| {
-            tunnel.rule_name == rule_name
+            tunnel.session_id == session_id
+                && tunnel.rule_name == rule_name
                 && matches!(
                     tunnel.status,
                     TunnelStatus::Starting | TunnelStatus::Running | TunnelStatus::Stopping
@@ -95,7 +96,9 @@ impl AppState {
 
     fn can_cancel_pending_tunnel_launch(&self, session_id: SessionId, rule_name: &str) -> bool {
         let runtime_is_starting = self.sessions.tunnels.iter().any(|tunnel| {
-            tunnel.rule_name == rule_name && matches!(tunnel.status, TunnelStatus::Starting)
+            tunnel.session_id == session_id
+                && tunnel.rule_name == rule_name
+                && matches!(tunnel.status, TunnelStatus::Starting)
         });
 
         runtime_is_starting
@@ -170,7 +173,7 @@ impl AppState {
         let before = self.sessions.tunnels.len();
         self.sessions
             .tunnels
-            .retain(|tunnel| tunnel.rule_name != *rule_name);
+            .retain(|tunnel| tunnel.session_id != tab.id || tunnel.rule_name != *rule_name);
         before != self.sessions.tunnels.len()
     }
 

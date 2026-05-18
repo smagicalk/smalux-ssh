@@ -33,23 +33,25 @@
 - 最新核心新增：`BackendEvent::SftpFailed` 只收敛 SFTP 浏览器错误，不再把同会话未关联传输一并失败；传输失败继续由传输事件和连接级失败负责。
 - 最新核心新增：SFTP `TransferProgress` 更新必须同时匹配 `transfer_id` 与 `session_id`，避免迟到或错会话事件污染新传输状态。
 - 最新核心新增：SFTP 传输取消和关闭标签页清理 pending 传输时同样校验 `session_id`，避免同 ID 错会话任务或命令被误取消。
+- 最新核心新增：隧道运行态绑定 `session_id`，前端停止、失败和关闭标签页清理均按 `session_id + rule_name` 收敛，避免同名错会话隧道运行态互相污染。
 
 ## 最近提交
 
+- `7526c51 校验 SFTP 传输取消归属`
 - `8193ebd 校验 SFTP 传输进度归属`
 - `b5dc1e6 收窄 SFTP 失败的传输收敛`
 - `232e53f 裁剪失败后的 SFTP 传输命令`
 - `161e17e 替换 SFTP 缓存时关闭旧会话`
-- `31aad0d 替换远程 shell 时关闭旧输入`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 107 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 108 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test` 通过，`403 passed, 2 ignored`
+  - 聚焦隧道运行态归属测试通过
+  - `cargo test` 通过，`406 passed, 2 ignored`
   - `git diff --check` 通过
   - BOM 与中文抽样检查通过
 
