@@ -87,7 +87,9 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             &mut self.connections,
             session_id,
         );
+        let stale_tunnels = take_tunnels_for_session(&mut self.tunnels, session_id);
         self.close_stale_session_resources(session_id, stale_resources);
+        stop_stale_tunnels(session_id, stale_tunnels, "reconnecting");
         self.connections.insert(session_id, report.connection);
         Ok(report.events)
     }
@@ -437,6 +439,45 @@ fn replace_tunnel_stopping_previous<TTunnel>(
 {
     if let Some(previous) = tunnels.insert(tunnel.rule_name().to_owned(), tunnel) {
         previous.stop();
+    }
+}
+
+fn take_tunnels_for_session<TTunnel>(
+    tunnels: &mut HashMap<String, TTunnel>,
+    session_id: SessionId,
+) -> Vec<TTunnel>
+where
+    TTunnel: TunnelOwner,
+{
+    let rule_names = tunnels
+        .iter()
+        .filter_map(|(rule_name, tunnel)| {
+            (tunnel.session_id() == session_id).then(|| rule_name.clone())
+        })
+        .collect::<Vec<_>>();
+
+    rule_names
+        .into_iter()
+        .filter_map(|rule_name| tunnels.remove(&rule_name))
+        .collect()
+}
+
+fn stop_stale_tunnels<TTunnel>(
+    session_id: SessionId,
+    tunnels: Vec<TTunnel>,
+    operation: &'static str,
+) where
+    TTunnel: RuleNamedTunnel + StoppableTunnel,
+{
+    for tunnel in tunnels {
+        let rule_name = tunnel.rule_name().to_owned();
+        tunnel.stop();
+        tracing::warn!(
+            session_id = %session_id.0,
+            operation,
+            rule_name,
+            "stopped stale SSH tunnel"
+        );
     }
 }
 

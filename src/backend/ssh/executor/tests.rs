@@ -353,6 +353,78 @@ fn replacing_tunnel_keeps_unrelated_rules_running() {
 }
 
 #[test]
+fn taking_tunnels_for_session_removes_only_owned_tunnels() {
+    let owner_session_id = session_id();
+    let other_session_id = session_id();
+    let mut tunnels = HashMap::from([
+        (
+            "proxy".to_owned(),
+            TestTunnel {
+                session_id: owner_session_id,
+                rule_name: "proxy".to_owned(),
+                stopped: false,
+            },
+        ),
+        (
+            "db".to_owned(),
+            TestTunnel {
+                session_id: owner_session_id,
+                rule_name: "db".to_owned(),
+                stopped: false,
+            },
+        ),
+        (
+            "metrics".to_owned(),
+            TestTunnel {
+                session_id: other_session_id,
+                rule_name: "metrics".to_owned(),
+                stopped: false,
+            },
+        ),
+    ]);
+
+    let removed = take_tunnels_for_session(&mut tunnels, owner_session_id);
+
+    assert_eq!(removed.len(), 2);
+    assert!(removed.iter().any(|tunnel| tunnel.rule_name == "proxy"));
+    assert!(removed.iter().any(|tunnel| tunnel.rule_name == "db"));
+    assert!(!tunnels.contains_key("proxy"));
+    assert!(!tunnels.contains_key("db"));
+    assert_eq!(
+        tunnels.get("metrics"),
+        Some(&TestTunnel {
+            session_id: other_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        })
+    );
+}
+
+#[test]
+fn stopping_stale_tunnels_stops_each_removed_tunnel() {
+    let session_id = session_id();
+    let tunnels = vec![
+        TestTunnel {
+            session_id,
+            rule_name: "proxy".to_owned(),
+            stopped: false,
+        },
+        TestTunnel {
+            session_id,
+            rule_name: "db".to_owned(),
+            stopped: false,
+        },
+    ];
+    STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow_mut().clear());
+
+    stop_stale_tunnels(session_id, tunnels, "test");
+
+    let mut stopped = STOPPED_TEST_TUNNEL_NAMES.with(|names| names.borrow().clone());
+    stopped.sort();
+    assert_eq!(stopped, ["db", "proxy"]);
+}
+
+#[test]
 fn host_key_rejected_error_is_connection_scoped() {
     let error = BackendExecutionError::HostKeyRejected {
         host: "example.com".to_owned(),
