@@ -48,6 +48,18 @@ impl AppState {
                             outcome.state_changed |= event_outcome.state_changed;
                             outcome.applied_backend_events += event_outcome.applied_backend_events;
                         }
+                    } else {
+                        let discarded = discard_pending_sftp_transfers_for_failed_session(
+                            &mut self.backend_commands,
+                            session_id,
+                            &reason,
+                        );
+                        outcome.state_changed |= discarded.removed_count > 0;
+                        for event in discarded.failure_events {
+                            let event_outcome = self.apply_backend_event(event);
+                            outcome.state_changed |= event_outcome.state_changed;
+                            outcome.applied_backend_events += event_outcome.applied_backend_events;
+                        }
                     }
                     outcome.state_changed |= self.ui.set_last_error(reason.clone());
                     outcome.error = Some(reason);
@@ -125,6 +137,34 @@ fn discard_pending_commands_for_failed_session(
         if let Some(transfer) = failed_transfer_for_command(command) {
             transfer_failures.push(transfer);
         }
+        false
+    });
+    let failure_events = transfer_failures
+        .into_iter()
+        .map(|transfer| transfer_failed_event(transfer, reason.to_owned()))
+        .collect();
+
+    DiscardedPendingCommands {
+        removed_count,
+        failure_events,
+    }
+}
+
+fn discard_pending_sftp_transfers_for_failed_session(
+    commands: &mut BackendCommandQueue,
+    session_id: SessionId,
+    reason: &str,
+) -> DiscardedPendingCommands {
+    let mut transfer_failures = Vec::new();
+    let removed_count = commands.retain(|command| {
+        if command.session_id() != session_id {
+            return true;
+        }
+
+        let Some(transfer) = failed_transfer_for_command(command) else {
+            return true;
+        };
+        transfer_failures.push(transfer);
         false
     });
     let failure_events = transfer_failures
