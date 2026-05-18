@@ -23,6 +23,13 @@ impl SessionManager {
 
     /// 标记隧道已经进入运行态。
     pub fn mark_tunnel_running(&mut self, rule_name: &str) -> bool {
+        if self
+            .tunnel_status(rule_name)
+            .is_some_and(tunnel_status_is_terminal)
+        {
+            return false;
+        }
+
         self.update_tunnel(rule_name, |state| {
             state.status = TunnelStatus::Running;
             state.last_error = None;
@@ -66,6 +73,13 @@ impl SessionManager {
 
     /// 标记隧道正在停止，等待后端确认。
     pub fn mark_tunnel_stopping(&mut self, rule_name: &str) -> bool {
+        if self
+            .tunnel_status(rule_name)
+            .is_some_and(tunnel_status_is_terminal)
+        {
+            return false;
+        }
+
         self.update_tunnel(rule_name, |state| {
             state.status = TunnelStatus::Stopping;
             state.last_error = None;
@@ -75,6 +89,12 @@ impl SessionManager {
     /// 标记隧道失败并记录错误。
     pub fn fail_tunnel(&mut self, rule_name: &str, reason: impl Into<String>) -> bool {
         let reason = reason.into();
+        if self
+            .tunnel_status(rule_name)
+            .is_some_and(tunnel_status_is_terminal)
+        {
+            return false;
+        }
 
         self.update_tunnel(rule_name, |state| {
             state.status = TunnelStatus::Failed;
@@ -129,6 +149,13 @@ impl SessionManager {
 
     /// 按后端事件同步隧道运行态。
     pub fn set_tunnel_status(&mut self, rule_name: &str, status: TunnelStatus) -> bool {
+        if self
+            .tunnel_status(rule_name)
+            .is_some_and(tunnel_status_is_terminal)
+        {
+            return false;
+        }
+
         self.update_tunnel(rule_name, |state| {
             if matches!(status, TunnelStatus::Stopped) {
                 state.started_at_unix_secs = None;
@@ -151,6 +178,10 @@ impl SessionManager {
                 )
         })
     }
+}
+
+fn tunnel_status_is_terminal(status: &TunnelStatus) -> bool {
+    matches!(status, TunnelStatus::Stopped | TunnelStatus::Failed)
 }
 
 #[cfg(test)]
@@ -274,6 +305,26 @@ mod tests {
         assert!(sessions.fail_tunnel("local-db", "bind failed"));
         assert!(!sessions.stop_tunnel("local-db"));
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Failed));
+    }
+
+    #[test]
+    fn terminal_tunnel_status_ignores_late_state_updates() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(session_id, host_id, &rule);
+        sessions.start_tunnel(&rule, Some(host_id), 10);
+        assert!(sessions.set_tunnel_status("local-db", TunnelStatus::Running));
+        assert!(sessions.stop_tunnel("local-db"));
+
+        assert!(!sessions.mark_tunnel_running("local-db"));
+        assert!(!sessions.mark_tunnel_stopping("local-db"));
+        assert!(!sessions.fail_tunnel("local-db", "late failure"));
+        assert!(!sessions.set_tunnel_status("local-db", TunnelStatus::Running));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Stopped));
+        assert_eq!(sessions.tunnels[0].last_error, None);
     }
 
     #[test]

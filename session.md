@@ -15,7 +15,8 @@
 - 已实现 SFTP 浏览、上传、下载、删除、创建目录、书签、传输状态、取消队列任务。
 - 已实现隧道 Local / Remote / Dynamic SOCKS5 的启动、停止、状态管理。
 - 已实现 Known Hosts、凭据引用、安全解析、redb 快照持久化。
-- 本轮新增：SFTP 传输任务绑定 `session_id`，会话断开/失败时只收敛对应会话的非终态传输；`Disconnected` 对 tunnel 标签页同步为停止。
+- 最近核心新增：SFTP 传输任务绑定 `session_id`，会话断开/失败时只收敛对应会话的非终态传输。
+- 最新核心新增：隧道运行态终态保护，避免停止/失败后被迟到事件重新拉回运行态。
 
 ## 最近提交
 
@@ -28,11 +29,11 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：领先 `origin/dev` 89 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 91 个提交
 - 最近验证：
+  - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test` 通过，`373 passed, 2 ignored`
-  - `cargo fmt --check` 只剩 `src/session/transfers.rs` 的末尾一处格式待重跑
+  - `cargo test` 通过，`376 passed, 2 ignored`
 
 ## 提交要求
 
@@ -42,6 +43,6 @@
 
 ## 下一步建议
 
-1. 重新跑 `cargo fmt --check`。
-2. 跑 `git diff --check`、BOM 检查、中文抽样检查。
-3. 若都通过，提交本轮核心收敛改动。
+1. 继续检查真实运行时资源清理和错误状态收敛。
+2. 做本地应用预览和核心烟测：本地终端、SSH shell、远程命令、SFTP、隧道。
+3. 烟测通过后再进入 UI 调整阶段。
