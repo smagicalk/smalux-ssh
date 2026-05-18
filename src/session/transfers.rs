@@ -10,7 +10,7 @@ impl SessionManager {
         if let Some(existing) = self
             .transfers
             .iter_mut()
-            .find(|existing| existing.id == task.id)
+            .find(|existing| existing.id == task.id && existing.session_id == task.session_id)
         {
             *existing = task;
         } else {
@@ -136,9 +136,12 @@ mod tests {
         let id = TransferId(Uuid::new_v4());
         let host_id = host_id();
         let mut updated = transfer_task(id, host_id);
+        let session_id = updated.session_id;
         updated.total_bytes = Some(200);
 
-        sessions.enqueue_transfer(transfer_task(id, host_id));
+        let mut original = transfer_task(id, host_id);
+        original.session_id = session_id;
+        sessions.enqueue_transfer(original);
         sessions.enqueue_transfer(updated);
 
         assert_eq!(sessions.transfer_count(), 1);
@@ -205,6 +208,30 @@ mod tests {
             sessions.transfers[0].status,
             TransferStatus::Running
         ));
+    }
+
+    #[test]
+    fn enqueue_transfer_scopes_replacement_by_session_owner() {
+        let mut sessions = SessionManager::default();
+        let id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+        let first_session_id = SessionId(Uuid::new_v4());
+        let second_session_id = SessionId(Uuid::new_v4());
+        let mut first = transfer_task(id, host_id);
+        let mut second = transfer_task(id, host_id);
+        first.session_id = first_session_id;
+        first.local_path = "C:/tmp/first.log".to_owned();
+        second.session_id = second_session_id;
+        second.local_path = "C:/tmp/second.log".to_owned();
+
+        sessions.enqueue_transfer(first);
+        sessions.enqueue_transfer(second);
+
+        assert_eq!(sessions.transfer_count(), 2);
+        assert_eq!(sessions.transfers[0].session_id, first_session_id);
+        assert_eq!(sessions.transfers[0].local_path, "C:/tmp/first.log");
+        assert_eq!(sessions.transfers[1].session_id, second_session_id);
+        assert_eq!(sessions.transfers[1].local_path, "C:/tmp/second.log");
     }
 
     #[test]
