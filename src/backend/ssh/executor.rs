@@ -171,7 +171,8 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
                 .get_mut(&session_id)
                 .ok_or_else(|| connected_session_error("sftp"))?;
             let sftp = runtime.block_on(connection.open_sftp(session_id))?;
-            self.sftps.insert(session_id, sftp);
+            let previous_sftp = replace_cached_sftp(&mut self.sftps, session_id, sftp);
+            self.close_detached_sftp(session_id, previous_sftp, "opening sftp");
         }
 
         let sftp = self
@@ -359,14 +360,25 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
     ) {
         self.close_detached_shell_input(session_id, resources.shell, operation);
 
-        if let Some(sftp) = resources.sftp
-            && let Err(error) = self.runtime.block_on(sftp.close())
-        {
+        self.close_detached_sftp(session_id, resources.sftp, operation);
+    }
+
+    fn close_detached_sftp(
+        &self,
+        session_id: SessionId,
+        sftp: Option<RemoteSftp>,
+        operation: &'static str,
+    ) {
+        let Some(sftp) = sftp else {
+            return;
+        };
+
+        if let Err(error) = self.runtime.block_on(sftp.close()) {
             tracing::warn!(
                 session_id = %session_id.0,
                 operation,
                 error = %error,
-                "failed to close stale SFTP session"
+                "failed to close detached SFTP session"
             );
         }
     }
@@ -452,6 +464,14 @@ fn replace_cached_shell<TShell>(
     shell: TShell,
 ) -> Option<TShell> {
     shells.insert(session_id, shell)
+}
+
+fn replace_cached_sftp<TSftp>(
+    sftps: &mut HashMap<SessionId, TSftp>,
+    session_id: SessionId,
+    sftp: TSftp,
+) -> Option<TSftp> {
+    sftps.insert(session_id, sftp)
 }
 
 fn remove_tunnel_for_session_rule<TTunnel>(

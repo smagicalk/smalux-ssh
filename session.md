@@ -28,23 +28,24 @@
 - 最新核心新增：真实后端断开连接时会统一取出 shell/SFTP/connection/tunnel 运行态，并停止该会话遗留的后端隧道。
 - 最新核心新增：远程 shell drain 收到 `CommandExited` / `Failed` / `Disconnected` 后都会丢弃缓存 shell 句柄，避免 shell 退出后继续复用失效通道。
 - 最新核心新增：真实后端重复打开同一 `session_id` 的 shell 时会取出被替换的旧 shell，并尽力关闭旧输入通道。
+- 最新核心新增：真实后端缓存 SFTP 会话替换时会取出旧 SFTP，并复用统一关闭逻辑，避免旧子系统句柄被静默覆盖。
 
 ## 最近提交
 
+- `31aad0d 替换远程 shell 时关闭旧输入`
 - `a93afab 退出远程 shell 后丢弃缓存`
 - `588ce73 断开时停止后端隧道`
 - `477ed43 清理重连前的后端隧道`
 - `4f5fc90 停止被覆盖的后端隧道`
-- `e59a6bd 按会话保护后端隧道停止`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 102 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 103 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test` 通过，`394 passed, 2 ignored`
+  - `cargo test` 通过，`396 passed, 2 ignored`
   - `git diff --check` 通过
   - BOM 与中文抽样检查通过
 
