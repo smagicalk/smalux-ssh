@@ -189,6 +189,9 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             .connections
             .remove(&session_id)
             .ok_or_else(|| connected_session_error("start tunnel"))?;
+        let stale_subresources =
+            take_cached_session_subresources(&mut self.shells, &mut self.sftps, session_id);
+        self.close_stale_session_subresources(session_id, stale_subresources, "starting tunnel");
         let (tunnel, events) = self
             .runtime
             .block_on(connection.into_tunnel(session_id, request))?;
@@ -235,22 +238,14 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         session_id: SessionId,
         resources: CachedSessionResources<RemoteShell, RemoteSftp, RusshConnection>,
     ) {
-        if resources.shell.is_some() {
-            tracing::warn!(
-                session_id = %session_id.0,
-                "dropping stale remote shell before reconnect"
-            );
-        }
-
-        if let Some(sftp) = resources.sftp
-            && let Err(error) = self.runtime.block_on(sftp.close())
-        {
-            tracing::warn!(
-                session_id = %session_id.0,
-                error = %error,
-                "failed to close stale SFTP session before reconnect"
-            );
-        }
+        self.close_stale_session_subresources(
+            session_id,
+            CachedSessionSubresources {
+                shell: resources.shell,
+                sftp: resources.sftp,
+            },
+            "reconnecting",
+        );
 
         if let Some(connection) = resources.connection
             && let Err(error) = self.runtime.block_on(connection.disconnect())
@@ -262,6 +257,12 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             );
         }
     }
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct CachedSessionSubresources<TShell, TSftp> {
+    shell: Option<TShell>,
+    sftp: Option<TSftp>,
 }
 
 impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
@@ -306,11 +307,50 @@ fn connected_session_error(operation: &str) -> BackendExecutionError {
     }
 }
 
+impl<S: SecretStore + Send> RusshBackendExecutor<S> {
+    fn close_stale_session_subresources(
+        &self,
+        session_id: SessionId,
+        resources: CachedSessionSubresources<RemoteShell, RemoteSftp>,
+        operation: &'static str,
+    ) {
+        if resources.shell.is_some() {
+            tracing::warn!(
+                session_id = %session_id.0,
+                operation,
+                "dropping stale remote shell"
+            );
+        }
+
+        if let Some(sftp) = resources.sftp
+            && let Err(error) = self.runtime.block_on(sftp.close())
+        {
+            tracing::warn!(
+                session_id = %session_id.0,
+                operation,
+                error = %error,
+                "failed to close stale SFTP session"
+            );
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 struct CachedSessionResources<TShell, TSftp, TConnection> {
     shell: Option<TShell>,
     sftp: Option<TSftp>,
     connection: Option<TConnection>,
+}
+
+fn take_cached_session_subresources<TShell, TSftp>(
+    shells: &mut HashMap<SessionId, TShell>,
+    sftps: &mut HashMap<SessionId, TSftp>,
+    session_id: SessionId,
+) -> CachedSessionSubresources<TShell, TSftp> {
+    CachedSessionSubresources {
+        shell: shells.remove(&session_id),
+        sftp: sftps.remove(&session_id),
+    }
 }
 
 fn take_cached_session_resources<TShell, TSftp, TConnection>(

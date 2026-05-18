@@ -128,6 +128,54 @@ fn taking_cached_session_resources_is_idempotent_for_missing_session() {
 }
 
 #[test]
+fn taking_cached_session_subresources_removes_only_target_session() {
+    let target_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([
+        (target_session_id, "target-shell"),
+        (other_session_id, "other-shell"),
+    ]);
+    let mut sftps = HashMap::from([
+        (target_session_id, "target-sftp"),
+        (other_session_id, "other-sftp"),
+    ]);
+
+    let resources = take_cached_session_subresources(&mut shells, &mut sftps, target_session_id);
+
+    assert_eq!(
+        resources,
+        CachedSessionSubresources {
+            shell: Some("target-shell"),
+            sftp: Some("target-sftp"),
+        }
+    );
+    assert!(!shells.contains_key(&target_session_id));
+    assert!(!sftps.contains_key(&target_session_id));
+    assert_eq!(shells.get(&other_session_id), Some(&"other-shell"));
+    assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
+}
+
+#[test]
+fn taking_cached_session_subresources_is_idempotent_for_missing_session() {
+    let missing_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([(other_session_id, "other-shell")]);
+    let mut sftps = HashMap::from([(other_session_id, "other-sftp")]);
+
+    let resources = take_cached_session_subresources(&mut shells, &mut sftps, missing_session_id);
+
+    assert_eq!(
+        resources,
+        CachedSessionSubresources {
+            shell: None::<&str>,
+            sftp: None::<&str>,
+        }
+    );
+    assert_eq!(shells.get(&other_session_id), Some(&"other-shell"));
+    assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
+}
+
+#[test]
 fn host_key_rejected_error_is_connection_scoped() {
     let error = BackendExecutionError::HostKeyRejected {
         host: "example.com".to_owned(),
