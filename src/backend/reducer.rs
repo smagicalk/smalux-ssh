@@ -117,13 +117,14 @@ pub fn apply_backend_event(
             terminal_updated: false,
         },
         BackendEvent::TransferProgress {
+            session_id,
             transfer_id,
             total_bytes,
             transferred_bytes,
             status,
-            ..
         } => BackendEventOutcome {
             session_updated: sessions.update_transfer_progress(
+                session_id,
                 transfer_id,
                 total_bytes,
                 transferred_bytes,

@@ -21,12 +21,17 @@ impl SessionManager {
     /// 更新传输进度。
     pub fn update_transfer_progress(
         &mut self,
+        session_id: SessionId,
         id: TransferId,
         total_bytes: Option<u64>,
         transferred_bytes: u64,
         status: TransferStatus,
     ) -> bool {
-        if let Some(task) = self.transfers.iter_mut().find(|task| task.id == id) {
+        if let Some(task) = self
+            .transfers
+            .iter_mut()
+            .find(|task| task.id == id && task.session_id == session_id)
+        {
             if transfer_status_is_terminal(&task.status) {
                 return false;
             }
@@ -135,7 +140,15 @@ mod tests {
         assert_eq!(sessions.transfer_count(), 1);
         assert_eq!(sessions.transfers[0].total_bytes, Some(200));
 
-        assert!(sessions.update_transfer_progress(id, Some(200), 200, TransferStatus::Completed));
+        let session_id = sessions.transfers[0].session_id;
+
+        assert!(sessions.update_transfer_progress(
+            session_id,
+            id,
+            Some(200),
+            200,
+            TransferStatus::Completed
+        ));
         assert_eq!(sessions.transfers[0].total_bytes, Some(200));
         assert_eq!(sessions.transfers[0].transferred_bytes, 200);
         assert!(matches!(
@@ -143,9 +156,49 @@ mod tests {
             TransferStatus::Completed
         ));
         assert!(!sessions.update_transfer_progress(
+            session_id,
             TransferId(Uuid::new_v4()),
             None,
             1,
+            TransferStatus::Running
+        ));
+    }
+
+    #[test]
+    fn transfer_progress_requires_matching_session_owner() {
+        let mut sessions = SessionManager::default();
+        let id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+
+        sessions.enqueue_transfer(transfer_task(id, host_id));
+        let owner_session_id = sessions.transfers[0].session_id;
+        let stale_session_id = SessionId(Uuid::new_v4());
+
+        assert!(!sessions.update_transfer_progress(
+            stale_session_id,
+            id,
+            Some(200),
+            120,
+            TransferStatus::Running
+        ));
+        assert_eq!(sessions.transfers[0].total_bytes, Some(100));
+        assert_eq!(sessions.transfers[0].transferred_bytes, 0);
+        assert!(matches!(
+            sessions.transfers[0].status,
+            TransferStatus::Queued
+        ));
+
+        assert!(sessions.update_transfer_progress(
+            owner_session_id,
+            id,
+            Some(200),
+            120,
+            TransferStatus::Running
+        ));
+        assert_eq!(sessions.transfers[0].total_bytes, Some(200));
+        assert_eq!(sessions.transfers[0].transferred_bytes, 120);
+        assert!(matches!(
+            sessions.transfers[0].status,
             TransferStatus::Running
         ));
     }
@@ -182,8 +235,15 @@ mod tests {
         let host_id = host_id();
 
         sessions.enqueue_transfer(transfer_task(id, host_id));
+        let session_id = sessions.transfers[0].session_id;
 
-        assert!(sessions.update_transfer_progress(id, Some(100), 80, TransferStatus::Completed));
+        assert!(sessions.update_transfer_progress(
+            session_id,
+            id,
+            Some(100),
+            80,
+            TransferStatus::Completed
+        ));
         assert_eq!(sessions.transfers[0].total_bytes, Some(100));
         assert_eq!(sessions.transfers[0].transferred_bytes, 100);
         assert!(matches!(
@@ -203,14 +263,19 @@ mod tests {
         sessions.enqueue_transfer(transfer_task(cancelled_id, host_id));
         sessions.enqueue_transfer(transfer_task(completed_id, host_id));
         sessions.enqueue_transfer(transfer_task(failed_id, host_id));
+        let session_id = sessions.transfers[0].session_id;
+        sessions.transfers[1].session_id = session_id;
+        sessions.transfers[2].session_id = session_id;
         assert!(sessions.cancel_queued_transfer(cancelled_id));
         assert!(sessions.update_transfer_progress(
+            session_id,
             completed_id,
             Some(100),
             80,
             TransferStatus::Completed
         ));
         assert!(sessions.update_transfer_progress(
+            session_id,
             failed_id,
             None,
             0,
@@ -220,18 +285,21 @@ mod tests {
         ));
 
         assert!(!sessions.update_transfer_progress(
+            session_id,
             cancelled_id,
             Some(100),
             50,
             TransferStatus::Running
         ));
         assert!(!sessions.update_transfer_progress(
+            session_id,
             completed_id,
             Some(100),
             50,
             TransferStatus::Running
         ));
         assert!(!sessions.update_transfer_progress(
+            session_id,
             failed_id,
             Some(100),
             100,
