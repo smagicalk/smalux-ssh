@@ -136,17 +136,20 @@ impl AppState {
 
     /// 取消尚未交给后端执行器的 SFTP 传输。
     pub(super) fn cancel_sftp_transfer(&mut self, transfer_id: TransferId) -> AppUpdateOutcome {
-        let Some(task) = self
-            .sessions
-            .transfers
-            .iter()
-            .find(|task| task.id == transfer_id)
-            .cloned()
-        else {
-            return AppUpdateOutcome {
-                error: Some(format!("找不到 SFTP 传输任务：{}", transfer_id.0)),
-                ..AppUpdateOutcome::default()
-            };
+        let task = match unique_transfer_task(&self.sessions.transfers, transfer_id) {
+            TransferLookup::Found(task) => task,
+            TransferLookup::Missing => {
+                return AppUpdateOutcome {
+                    error: Some(format!("找不到 SFTP 传输任务：{}", transfer_id.0)),
+                    ..AppUpdateOutcome::default()
+                };
+            }
+            TransferLookup::Ambiguous => {
+                return AppUpdateOutcome {
+                    error: Some(format!("SFTP 传输任务不唯一，无法取消：{}", transfer_id.0)),
+                    ..AppUpdateOutcome::default()
+                };
+            }
         };
 
         if !matches!(task.status, TransferStatus::Queued) {
@@ -234,6 +237,24 @@ fn basename_local_path(path: &str) -> Option<String> {
 
 fn is_plain_remote_name(name: &str) -> bool {
     !matches!(name, "." | "..") && !name.contains('/') && !name.contains('\\')
+}
+
+fn unique_transfer_task(tasks: &[TransferTask], transfer_id: TransferId) -> TransferLookup {
+    let mut matches = tasks.iter().filter(|task| task.id == transfer_id);
+    let Some(task) = matches.next() else {
+        return TransferLookup::Missing;
+    };
+    if matches.next().is_some() {
+        return TransferLookup::Ambiguous;
+    }
+
+    TransferLookup::Found(task.clone())
+}
+
+enum TransferLookup {
+    Found(TransferTask),
+    Missing,
+    Ambiguous,
 }
 
 fn is_sftp_transfer_command(
