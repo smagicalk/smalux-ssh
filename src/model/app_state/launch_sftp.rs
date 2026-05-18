@@ -118,6 +118,10 @@ impl AppState {
         host_id: HostId,
         remote_path: String,
     ) -> AppUpdateOutcome {
+        if self.claim_sftp_session_id_for_host(host_id).is_none() {
+            return missing_active_sftp_session(host_id);
+        }
+
         if self.sessions.select_sftp_entry(host_id, remote_path) {
             AppUpdateOutcome {
                 state_changed: true,
