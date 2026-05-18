@@ -219,6 +219,44 @@ fn stop_tunnel_message_rejects_mismatched_session_without_queueing_command() {
 }
 
 #[test]
+fn stop_tunnel_message_reports_missing_session_runtime_without_panic() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    let rule = tunnel_rule(TunnelKind::Local);
+    state.storage.upsert_host(host);
+    state.apply(Message::StartTunnel {
+        host_id,
+        rule: rule.clone(),
+    });
+    let session_id = state.sessions.tabs[0].id;
+    let other_session_id = SessionId(uuid::Uuid::new_v4());
+    state.sessions.tunnels[0].session_id = other_session_id;
+    state.backend_commands.drain();
+
+    let outcome = state.apply(Message::StopTunnel {
+        session_id,
+        rule_name: rule.name,
+    });
+
+    assert!(outcome.changed());
+    assert!(
+        outcome
+            .error
+            .as_deref()
+            .unwrap_or("")
+            .contains("没有当前会话的运行态")
+    );
+    assert_eq!(outcome.queued_backend_commands, 0);
+    assert_eq!(state.sessions.tunnels[0].session_id, other_session_id);
+    assert!(matches!(
+        state.sessions.tunnels[0].status,
+        TunnelStatus::Starting
+    ));
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
 fn stop_tunnel_message_marks_runtime_stopping_before_backend_ack() {
     let mut state = AppState::default();
     let host = sample_host();

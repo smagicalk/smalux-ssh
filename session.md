@@ -36,24 +36,25 @@
 - 最新核心新增：隧道运行态绑定 `session_id`，前端停止、失败和关闭标签页清理均按 `session_id + rule_name` 收敛，避免同名错会话隧道运行态互相污染。
 - 最新核心新增：SFTP 传输入队替换同样按 `session_id + transfer_id` 收敛，避免同 ID 错会话传输任务互相覆盖。
 - 最新核心新增：取消 SFTP 传输时若 `transfer_id` 命中多个会话任务会 fail-fast 报错，不再按列表顺序误取消第一条。
+- 最新核心新增：停止隧道时如果规则级运行态存在但当前会话运行态缺失，会返回明确错误，不再触发不可达分支 panic。
 
 ## 最近提交
 
+- `23f0c0d 拒绝歧义 SFTP 传输取消`
 - `eb02eca 收窄 SFTP 传输入队归属`
 - `4a39f1c 绑定隧道运行态会话归属`
 - `7526c51 校验 SFTP 传输取消归属`
 - `8193ebd 校验 SFTP 传输进度归属`
-- `b5dc1e6 收窄 SFTP 失败的传输收敛`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 110 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 111 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦 SFTP 传输取消歧义测试通过
-  - `cargo test` 通过，`408 passed, 2 ignored`
+  - 聚焦隧道停止错会话运行态测试通过
+  - `cargo test` 通过，`409 passed, 2 ignored`
   - `git diff --check` 通过
   - BOM 与中文抽样检查通过
 

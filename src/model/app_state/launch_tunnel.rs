@@ -102,7 +102,12 @@ impl AppState {
                     ..AppUpdateOutcome::default()
                 };
             }
-            None => unreachable!("rule-level tunnel status was checked before session match"),
+            None => {
+                return AppUpdateOutcome {
+                    error: Some(format!("隧道 {rule_name} 没有当前会话的运行态")),
+                    ..AppUpdateOutcome::default()
+                };
+            }
         }
         self.sessions.mark_tunnel_stopping(session_id, &rule_name);
         self.backend_commands.push(BackendCommand::StopTunnel {
