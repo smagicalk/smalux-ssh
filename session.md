@@ -30,23 +30,24 @@
 - 最新核心新增：真实后端重复打开同一 `session_id` 的 shell 时会取出被替换的旧 shell，并尽力关闭旧输入通道。
 - 最新核心新增：真实后端缓存 SFTP 会话替换时会取出旧 SFTP，并复用统一关闭逻辑，避免旧子系统句柄被静默覆盖。
 - 最新核心新增：SFTP 操作失败后会裁剪同会话后续 pending 上传/下载命令并标记传输失败，同时保留浏览/刷新类 SFTP 命令和会话连接态。
+- 最新核心新增：`BackendEvent::SftpFailed` 只收敛 SFTP 浏览器错误，不再把同会话未关联传输一并失败；传输失败继续由传输事件和连接级失败负责。
 
 ## 最近提交
 
+- `232e53f 裁剪失败后的 SFTP 传输命令`
 - `161e17e 替换 SFTP 缓存时关闭旧会话`
 - `31aad0d 替换远程 shell 时关闭旧输入`
 - `a93afab 退出远程 shell 后丢弃缓存`
 - `588ce73 断开时停止后端隧道`
-- `477ed43 清理重连前的后端隧道`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 104 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 105 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test` 通过，`397 passed, 2 ignored`
+  - `cargo test` 通过，`398 passed, 2 ignored`
   - `git diff --check` 通过
   - BOM 与中文抽样检查通过
 

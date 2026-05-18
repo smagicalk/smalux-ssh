@@ -341,6 +341,48 @@ fn transfer_progress_event_ignores_cancelled_transfer() {
 }
 
 #[test]
+fn sftp_failed_event_records_browser_error_without_failing_transfers() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let current_session_id = session_id();
+    let current_host_id = host_id();
+
+    sessions.open_sftp_tab(current_session_id, current_host_id, "/home/ops");
+    sessions.set_sftp_loading(current_host_id, true);
+    sessions.enqueue_transfer(TransferTask {
+        id: TransferId(Uuid::new_v4()),
+        session_id: current_session_id,
+        host_id: current_host_id,
+        direction: TransferDirection::Download,
+        local_path: "C:/tmp/syslog".to_owned(),
+        remote_path: "/var/log/syslog".to_owned(),
+        total_bytes: Some(100),
+        transferred_bytes: 0,
+        status: TransferStatus::Queued,
+    });
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::SftpFailed {
+            session_id: current_session_id,
+            reason: "permission denied".to_owned(),
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(!sessions.sftp_browsers[0].loading);
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("permission denied")
+    );
+    assert!(matches!(
+        sessions.transfers[0].status,
+        TransferStatus::Queued
+    ));
+}
+
+#[test]
 fn tunnel_status_event_updates_runtime_state() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
