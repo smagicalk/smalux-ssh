@@ -1,6 +1,6 @@
 //! SFTP 传输队列运行态操作。
 
-use crate::model::{TransferId, TransferStatus, TransferTask};
+use crate::model::{SessionId, TransferId, TransferStatus, TransferTask};
 
 use super::SessionManager;
 
@@ -55,6 +55,27 @@ impl SessionManager {
             false
         }
     }
+
+    /// 将指定 SFTP 会话拥有的非终态传输任务标记为失败。
+    pub fn fail_transfers_for_session(
+        &mut self,
+        session_id: SessionId,
+        reason: impl Into<String>,
+    ) -> bool {
+        let reason = reason.into();
+        let mut updated = false;
+
+        for task in self.transfers.iter_mut().filter(|task| {
+            task.session_id == session_id && !transfer_status_is_terminal(&task.status)
+        }) {
+            task.status = TransferStatus::Failed {
+                reason: reason.clone(),
+            };
+            updated = true;
+        }
+
+        updated
+    }
 }
 
 fn transfer_status_is_terminal(status: &TransferStatus) -> bool {
@@ -89,6 +110,7 @@ mod tests {
     fn transfer_task(id: TransferId, host_id: HostId) -> TransferTask {
         TransferTask {
             id,
+            session_id: SessionId(Uuid::new_v4()),
             host_id,
             direction: TransferDirection::Download,
             local_path: "C:/tmp/syslog".to_owned(),
@@ -234,5 +256,52 @@ mod tests {
         ));
         assert_eq!(sessions.transfers[2].total_bytes, Some(100));
         assert_eq!(sessions.transfers[2].transferred_bytes, 0);
+    }
+
+    #[test]
+    fn fail_transfers_for_session_updates_only_non_terminal_owned_tasks() {
+        let mut sessions = SessionManager::default();
+        let current_session_id = SessionId(Uuid::new_v4());
+        let other_session_id = SessionId(Uuid::new_v4());
+        let queued_id = TransferId(Uuid::new_v4());
+        let running_id = TransferId(Uuid::new_v4());
+        let completed_id = TransferId(Uuid::new_v4());
+        let other_id = TransferId(Uuid::new_v4());
+        let host_id = host_id();
+        let mut queued = transfer_task(queued_id, host_id);
+        let mut running = transfer_task(running_id, host_id);
+        let mut completed = transfer_task(completed_id, host_id);
+        let mut other = transfer_task(other_id, host_id);
+        queued.session_id = current_session_id;
+        running.session_id = current_session_id;
+        running.status = TransferStatus::Running;
+        completed.session_id = current_session_id;
+        completed.status = TransferStatus::Completed;
+        other.session_id = other_session_id;
+
+        sessions.enqueue_transfer(queued);
+        sessions.enqueue_transfer(running);
+        sessions.enqueue_transfer(completed);
+        sessions.enqueue_transfer(other);
+
+        assert!(sessions.fail_transfers_for_session(current_session_id, "sftp disconnected"));
+
+        assert!(matches!(
+            &sessions.transfers[0].status,
+            TransferStatus::Failed { reason } if reason == "sftp disconnected"
+        ));
+        assert!(matches!(
+            &sessions.transfers[1].status,
+            TransferStatus::Failed { reason } if reason == "sftp disconnected"
+        ));
+        assert!(matches!(
+            sessions.transfers[2].status,
+            TransferStatus::Completed
+        ));
+        assert!(matches!(
+            sessions.transfers[3].status,
+            TransferStatus::Queued
+        ));
+        assert!(!sessions.fail_transfers_for_session(SessionId(Uuid::new_v4()), "missing"));
     }
 }

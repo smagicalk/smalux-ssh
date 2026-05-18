@@ -39,10 +39,29 @@ impl SessionManager {
 
     /// 标记隧道停止。
     pub fn stop_tunnel(&mut self, rule_name: &str) -> bool {
+        let Some(status) = self.tunnel_status(rule_name) else {
+            return false;
+        };
+        if matches!(status, TunnelStatus::Stopped | TunnelStatus::Failed) {
+            return false;
+        }
+
         self.update_tunnel(rule_name, |state| {
             state.status = TunnelStatus::Stopped;
             state.started_at_unix_secs = None;
         })
+    }
+
+    /// 按会话标签页标记隧道停止。
+    pub fn stop_tunnel_for_session(&mut self, session_id: SessionId) -> bool {
+        let Some(rule_name) = self.tabs.iter().find_map(|tab| match &tab.kind {
+            SessionKind::Tunnel { rule_name } if tab.id == session_id => Some(rule_name.clone()),
+            _ => None,
+        }) else {
+            return false;
+        };
+
+        self.stop_tunnel(&rule_name)
     }
 
     /// 标记隧道正在停止，等待后端确认。
@@ -224,6 +243,37 @@ mod tests {
             Some("bind failed")
         );
         assert!(!sessions.fail_tunnel_for_session(SessionId(Uuid::new_v4()), "missing"));
+    }
+
+    #[test]
+    fn stop_tunnel_for_session_updates_matching_tunnel_only() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(session_id, host_id, &rule);
+        sessions.start_tunnel(&rule, Some(host_id), 10);
+        sessions.mark_tunnel_running("local-db");
+
+        assert!(sessions.stop_tunnel_for_session(session_id));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Stopped));
+        assert_eq!(sessions.tunnels[0].started_at_unix_secs, None);
+        assert!(!sessions.stop_tunnel_for_session(SessionId(Uuid::new_v4())));
+    }
+
+    #[test]
+    fn stop_tunnel_ignores_failed_runtime_state() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(session_id, host_id, &rule);
+        sessions.start_tunnel(&rule, Some(host_id), 10);
+        assert!(sessions.fail_tunnel("local-db", "bind failed"));
+        assert!(!sessions.stop_tunnel("local-db"));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Failed));
     }
 
     #[test]

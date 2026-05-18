@@ -56,6 +56,7 @@ impl AppState {
 
         self.sessions.enqueue_transfer(TransferTask {
             id: transfer_id,
+            session_id,
             host_id,
             direction: TransferDirection::Upload,
             local_path: local_path.clone(),
@@ -112,6 +113,7 @@ impl AppState {
 
         self.sessions.enqueue_transfer(TransferTask {
             id: transfer_id,
+            session_id,
             host_id,
             direction: TransferDirection::Download,
             local_path: local_path.clone(),

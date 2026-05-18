@@ -272,6 +272,7 @@ fn transfer_progress_event_updates_existing_transfer() {
 
     sessions.enqueue_transfer(TransferTask {
         id: transfer_id,
+        session_id,
         host_id: host_id(),
         direction: TransferDirection::Download,
         local_path: "C:/tmp/syslog".to_owned(),
@@ -310,6 +311,7 @@ fn transfer_progress_event_ignores_cancelled_transfer() {
 
     sessions.enqueue_transfer(TransferTask {
         id: transfer_id,
+        session_id,
         host_id: host_id(),
         direction: TransferDirection::Download,
         local_path: "C:/tmp/syslog".to_owned(),
@@ -515,6 +517,59 @@ fn disconnected_sftp_event_stops_browser_loading() {
         sessions.sftp_browsers[0].last_error.as_deref(),
         Some("SFTP 会话已断开")
     );
+}
+
+#[test]
+fn disconnected_sftp_event_fails_owned_transfers_only() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let current_session_id = session_id();
+    let other_session_id = session_id();
+    let current_host_id = host_id();
+    let other_host_id = host_id();
+
+    sessions.open_sftp_tab(current_session_id, current_host_id, "/home/ops");
+    sessions.open_sftp_tab(other_session_id, other_host_id, "/var/log");
+    sessions.enqueue_transfer(TransferTask {
+        id: TransferId(Uuid::new_v4()),
+        session_id: current_session_id,
+        host_id: current_host_id,
+        direction: TransferDirection::Download,
+        local_path: "C:/tmp/syslog".to_owned(),
+        remote_path: "/var/log/syslog".to_owned(),
+        total_bytes: Some(100),
+        transferred_bytes: 0,
+        status: TransferStatus::Queued,
+    });
+    sessions.enqueue_transfer(TransferTask {
+        id: TransferId(Uuid::new_v4()),
+        session_id: other_session_id,
+        host_id: other_host_id,
+        direction: TransferDirection::Download,
+        local_path: "C:/tmp/auth.log".to_owned(),
+        remote_path: "/var/log/auth.log".to_owned(),
+        total_bytes: Some(100),
+        transferred_bytes: 0,
+        status: TransferStatus::Queued,
+    });
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Disconnected {
+            session_id: current_session_id,
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(matches!(
+        &sessions.transfers[0].status,
+        TransferStatus::Failed { reason } if reason == "SFTP 会话已断开"
+    ));
+    assert!(matches!(
+        sessions.transfers[1].status,
+        TransferStatus::Queued
+    ));
 }
 
 #[test]

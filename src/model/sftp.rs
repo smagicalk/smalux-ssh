@@ -73,6 +73,7 @@ pub enum TransferStatus {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransferTask {
     pub id: TransferId,
+    pub session_id: SessionId,
     pub host_id: HostId,
     pub direction: TransferDirection,
     pub local_path: String,
@@ -125,6 +126,7 @@ mod tests {
     fn transfer_task_progress_is_clamped() {
         let task = TransferTask {
             id: TransferId(Uuid::new_v4()),
+            session_id: SessionId(Uuid::new_v4()),
             host_id: HostId(Uuid::new_v4()),
             direction: TransferDirection::Download,
             local_path: "C:/tmp/syslog".to_owned(),
@@ -168,6 +170,7 @@ mod tests {
     fn transfer_task_round_trips_through_toml() {
         let task = TransferTask {
             id: TransferId(Uuid::new_v4()),
+            session_id: SessionId(Uuid::new_v4()),
             host_id: HostId(Uuid::new_v4()),
             direction: TransferDirection::Upload,
             local_path: "C:/deploy/app.tar.gz".to_owned(),
