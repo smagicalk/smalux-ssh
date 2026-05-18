@@ -138,7 +138,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             REMOTE_SHELL_DRAIN_POLL_TIMEOUT,
         ));
 
-        if events.iter().any(BackendEvent::is_terminal) {
+        if remote_shell_events_require_cache_drop(&events) {
             self.shells.remove(&session_id);
         }
 
@@ -334,6 +334,19 @@ fn connected_session_error(operation: &str) -> BackendExecutionError {
         operation: operation.to_owned(),
         reason: "session is not connected".to_owned(),
     }
+}
+
+fn remote_shell_events_require_cache_drop(events: &[BackendEvent]) -> bool {
+    events.iter().any(remote_shell_event_requires_cache_drop)
+}
+
+fn remote_shell_event_requires_cache_drop(event: &BackendEvent) -> bool {
+    matches!(
+        event,
+        BackendEvent::CommandExited { .. }
+            | BackendEvent::Failed { .. }
+            | BackendEvent::Disconnected { .. }
+    )
 }
 
 impl<S: SecretStore + Send> RusshBackendExecutor<S> {

@@ -598,6 +598,37 @@ fn shell_input_cache_survives_success_and_non_channel_failures() {
 }
 
 #[test]
+fn remote_shell_cache_drop_follows_shell_terminal_events() {
+    let session_id = session_id();
+
+    assert!(!remote_shell_events_require_cache_drop(&[
+        BackendEvent::Output {
+            session_id,
+            line: "still running".to_owned(),
+        },
+        BackendEvent::SftpFailed {
+            session_id,
+            reason: "unrelated sftp failure".to_owned(),
+        },
+    ]));
+    assert!(remote_shell_events_require_cache_drop(&[
+        BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(0),
+        },
+    ]));
+    assert!(remote_shell_events_require_cache_drop(&[
+        BackendEvent::Failed {
+            session_id,
+            reason: "channel failed".to_owned(),
+        },
+    ]));
+    assert!(remote_shell_events_require_cache_drop(&[
+        BackendEvent::Disconnected { session_id },
+    ]));
+}
+
+#[test]
 fn drain_session_output_noops_for_remote_executor() {
     let mut executor =
         RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
