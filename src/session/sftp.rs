@@ -106,6 +106,22 @@ impl SessionManager {
         self.set_sftp_loading(host_id, loading)
     }
 
+    /// 判断 SFTP 浏览命令是否仍允许发往后端执行器。
+    pub fn can_execute_sftp_browser_command(&self, session_id: SessionId) -> bool {
+        let Some(tab) = self.tabs.iter().find(|tab| {
+            tab.id == session_id
+                && matches!(tab.kind, SessionKind::Sftp)
+                && sftp_tab_can_accept_browser_owner(&tab.status)
+        }) else {
+            return false;
+        };
+        let Some(host_id) = tab.host_id else {
+            return false;
+        };
+
+        self.sftp_browser_belongs_to_session(host_id, session_id)
+    }
+
     /// 记录当前选中的 SFTP 目录项。
     pub fn select_sftp_entry(&mut self, host_id: HostId, selected_path: impl Into<String>) -> bool {
         if let Some(browser) = self

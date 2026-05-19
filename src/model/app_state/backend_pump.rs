@@ -18,6 +18,7 @@ impl AppState {
 
         while let Some(command) = self.backend_commands.pop_front() {
             if !self.can_execute_backend_command(&command) {
+                outcome.state_changed |= self.skip_stale_backend_command(&command);
                 continue;
             }
 
@@ -92,8 +93,25 @@ impl AppState {
             BackendCommand::DrainSessionOutput { session_id } => {
                 self.sessions.can_drain_interactive_shell(*session_id)
             }
+            BackendCommand::Sftp {
+                session_id,
+                request: SftpRequest::ListDir { .. },
+            } => self.sessions.can_execute_sftp_browser_command(*session_id),
             _ => true,
         }
+    }
+
+    fn skip_stale_backend_command(&mut self, command: &BackendCommand) -> bool {
+        let BackendCommand::Sftp {
+            session_id,
+            request: SftpRequest::ListDir { .. },
+        } = command
+        else {
+            return false;
+        };
+
+        self.sessions
+            .set_sftp_loading_for_session(*session_id, false)
     }
 }
 

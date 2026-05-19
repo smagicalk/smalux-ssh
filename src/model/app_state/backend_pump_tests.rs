@@ -318,6 +318,50 @@ fn backend_queue_pump_skips_terminal_shell_input_commands() {
 }
 
 #[test]
+fn backend_queue_pump_skips_terminal_sftp_list_commands() {
+    let mut state = AppState::default();
+    let host = sample_host();
+    let host_id = host.id;
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    state.storage.upsert_host(host);
+    state
+        .sessions
+        .open_sftp_tab(session_id, host_id, "/home/ops");
+    state
+        .sessions
+        .set_status(session_id, SessionStatus::Connected);
+    state
+        .sessions
+        .set_sftp_loading_for_session(session_id, true);
+    state
+        .backend_commands
+        .push(crate::backend::BackendCommand::Sftp {
+            session_id,
+            request: crate::backend::SftpRequest::ListDir {
+                remote_path: "/home/ops".to_owned(),
+            },
+        });
+    state
+        .sessions
+        .set_status(session_id, SessionStatus::Disconnected);
+    let mut executor = NoopBackendExecutor;
+
+    let outcome = state.drain_backend_queue(&mut executor);
+
+    assert!(outcome.changed());
+    assert_eq!(outcome.executed_backend_commands, 0);
+    assert_eq!(outcome.applied_backend_events, 0);
+    assert!(outcome.error.is_none());
+    assert!(state.backend_commands.is_empty());
+    assert!(!state.sessions.sftp_browsers[0].loading);
+    assert!(state.sessions.sftp_browsers[0].last_error.is_none());
+    assert!(matches!(
+        state.sessions.tabs[0].status,
+        SessionStatus::Disconnected
+    ));
+}
+
+#[test]
 fn backend_queue_pump_marks_pruned_sftp_transfer_failed_on_terminal_error() {
     let mut state = AppState::default();
     let host = sample_host();
