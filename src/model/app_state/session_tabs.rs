@@ -245,17 +245,11 @@ fn should_disconnect_on_close(tab: &SessionTab, cleanup: &PendingCloseCommandCle
 
     (cancelled_connected_tunnel_launch || !matches!(tab.kind, SessionKind::Tunnel { .. }))
         && !closed_before_connect
-        && !matches!(
-            tab.status,
-            SessionStatus::Disconnected | SessionStatus::Failed { .. }
-        )
+        && !tab.status.is_terminal()
 }
 
 fn sftp_tab_can_accept_browser_owner(status: &SessionStatus) -> bool {
-    !matches!(
-        status,
-        SessionStatus::Disconnected | SessionStatus::Failed { .. }
-    )
+    !status.is_terminal()
 }
 
 fn sftp_transfer_id(command: &BackendCommand) -> Option<TransferId> {

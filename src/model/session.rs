@@ -51,6 +51,13 @@ pub enum SessionStatus {
     Failed { reason: String },
 }
 
+impl SessionStatus {
+    /// 判断状态是否已经进入终态，不应再被普通运行时事件拉回。
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, Self::Disconnected | Self::Failed { .. })
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,5 +119,22 @@ mod tests {
         assert!(connected_shell.can_accept_terminal_input());
         assert!(!disconnected_shell.can_accept_terminal_input());
         assert!(!remote_command.can_accept_terminal_input());
+    }
+
+    #[test]
+    fn session_status_terminal_state_is_centralized() {
+        assert!(!SessionStatus::Created.is_terminal());
+        assert!(!SessionStatus::Connecting.is_terminal());
+        assert!(!SessionStatus::Authenticating.is_terminal());
+        assert!(!SessionStatus::Connected.is_terminal());
+        assert!(!SessionStatus::RunningCommand.is_terminal());
+        assert!(!SessionStatus::Reconnecting.is_terminal());
+        assert!(SessionStatus::Disconnected.is_terminal());
+        assert!(
+            SessionStatus::Failed {
+                reason: "network".to_owned(),
+            }
+            .is_terminal()
+        );
     }
 }

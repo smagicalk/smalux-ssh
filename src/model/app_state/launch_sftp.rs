@@ -234,8 +234,5 @@ pub(super) fn missing_active_sftp_session(host_id: HostId) -> AppUpdateOutcome {
 }
 
 fn sftp_tab_can_accept_commands(status: &SessionStatus) -> bool {
-    !matches!(
-        status,
-        SessionStatus::Disconnected | SessionStatus::Failed { .. }
-    )
+    !status.is_terminal()
 }

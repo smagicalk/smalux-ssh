@@ -296,10 +296,7 @@ impl SessionManager {
 }
 
 fn sftp_tab_can_accept_browser_owner(status: &SessionStatus) -> bool {
-    !matches!(
-        status,
-        SessionStatus::Disconnected | SessionStatus::Failed { .. }
-    )
+    !status.is_terminal()
 }
 
 #[cfg(test)]

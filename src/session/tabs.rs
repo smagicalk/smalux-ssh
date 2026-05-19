@@ -68,11 +68,11 @@ impl SessionManager {
     /// 更新标签页状态。
     pub fn set_status(&mut self, id: SessionId, status: SessionStatus) -> bool {
         if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
-            if is_terminal_status(&tab.status) {
+            if tab.status.is_terminal() {
                 return false;
             }
 
-            let is_terminal = is_terminal_status(&status);
+            let is_terminal = status.is_terminal();
             tab.status = status;
             self.sync_active_index_for_status(id, is_terminal);
             true
@@ -111,7 +111,7 @@ impl SessionManager {
         self.tabs
             .iter()
             .find(|tab| tab.id == id)
-            .is_some_and(|tab| !is_terminal_status(&tab.status))
+            .is_some_and(|tab| !tab.status.is_terminal())
     }
 
     /// 从工作区快照恢复可见标签页元数据，不自动建立网络连接。
@@ -143,13 +143,6 @@ impl SessionManager {
             self.active.push(id);
         }
     }
-}
-
-fn is_terminal_status(status: &SessionStatus) -> bool {
-    matches!(
-        status,
-        SessionStatus::Disconnected | SessionStatus::Failed { .. }
-    )
 }
 
 #[cfg(test)]
