@@ -2,8 +2,64 @@ use std::time::{Duration, Instant};
 
 use super::*;
 use crate::backend::PtyRequest;
-use crate::model::LOCAL_TERMINAL_SESSION_ID;
+use crate::model::{LOCAL_TERMINAL_SESSION_ID, SessionId};
 use crate::terminal::TerminalSize;
+use uuid::Uuid;
+
+fn session_id() -> SessionId {
+    SessionId(Uuid::new_v4())
+}
+
+#[test]
+fn drain_missing_local_session_returns_no_events() {
+    let mut executor = LocalPtyBackendExecutor::default();
+    let session_id = session_id();
+
+    let events = executor
+        .execute(BackendCommand::DrainSessionOutput { session_id })
+        .expect("draining a missing local session should be a no-op");
+
+    assert!(events.is_empty());
+    assert_eq!(executor.session_count(), 0);
+}
+
+#[test]
+fn disconnect_missing_local_session_still_reports_disconnected() {
+    let mut executor = LocalPtyBackendExecutor::default();
+    let session_id = session_id();
+
+    let events = executor
+        .execute(BackendCommand::Disconnect { session_id })
+        .expect("disconnecting a missing local session should be idempotent");
+
+    assert_eq!(events, vec![BackendEvent::Disconnected { session_id }]);
+    assert_eq!(executor.session_count(), 0);
+}
+
+#[test]
+fn local_pty_rejects_unsupported_commands_without_starting_session() {
+    let mut executor = LocalPtyBackendExecutor::default();
+    let session_id = session_id();
+
+    let error = executor
+        .execute(BackendCommand::RunCommand {
+            session_id,
+            request: crate::backend::RemoteCommandRequest {
+                command: "whoami".to_owned(),
+                pty: None,
+            },
+        })
+        .expect_err("local pty should reject remote command execution");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "local pty" && reason.contains("RunCommand")
+    ));
+    assert_eq!(executor.session_count(), 0);
+}
 
 #[test]
 #[ignore = "requires interactive Windows ConPTY output in the test runner"]
