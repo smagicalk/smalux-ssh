@@ -249,4 +249,62 @@ mod tests {
         assert_eq!(vm.known_hosts[0].fingerprint, "SHA256:new");
         assert_eq!(vm.known_hosts[0].status, "pending");
     }
+
+    #[test]
+    fn app_view_model_keeps_sftp_panel_on_active_host_without_browser() {
+        let mut state = AppState::default();
+        let sftp_host = Host {
+            id: HostId(Uuid::new_v4()),
+            name: "files".to_owned(),
+            group_id: None,
+            tags: Vec::new(),
+            address: "files.example.com".to_owned(),
+            port: 22,
+            auth: AuthProfile::Agent {
+                username: "deploy".to_owned(),
+                key_hint: None,
+            },
+            proxy: None,
+            jumps: Vec::new(),
+            theme_override: None,
+            background_override: None,
+        };
+        let shell_host = Host {
+            id: HostId(Uuid::new_v4()),
+            name: "shell".to_owned(),
+            group_id: None,
+            tags: Vec::new(),
+            address: "shell.example.com".to_owned(),
+            port: 22,
+            auth: AuthProfile::Agent {
+                username: "deploy".to_owned(),
+                key_hint: None,
+            },
+            proxy: None,
+            jumps: Vec::new(),
+            theme_override: None,
+            background_override: None,
+        };
+        let sftp_host_id = sftp_host.id;
+        let shell_host_id = shell_host.id;
+        state.storage.upsert_host(sftp_host);
+        state.storage.upsert_host(shell_host);
+        state.sessions.open_sftp_tab(
+            crate::model::SessionId(Uuid::new_v4()),
+            sftp_host_id,
+            "/var/log",
+        );
+        state.sessions.open_shell_tab(
+            crate::model::SessionId(Uuid::new_v4()),
+            shell_host_id,
+            "shell",
+        );
+
+        let vm = app_view_model(&state);
+
+        assert_eq!(vm.sftp.host_id, shell_host_id.0.to_string());
+        assert_eq!(vm.sftp.title, "SFTP · shell");
+        assert_eq!(vm.sftp.current_dir, "/");
+        assert!(vm.sftp.entries.is_empty());
+    }
 }

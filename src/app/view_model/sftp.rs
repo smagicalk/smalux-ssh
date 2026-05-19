@@ -27,39 +27,35 @@ pub(in crate::app) struct SftpViewModel {
 }
 
 pub(super) fn active_sftp(state: &AppState) -> SftpViewModel {
-    let active_host_id = state
-        .sessions
-        .active_tab
-        .and_then(|session_id| {
-            state
-                .sessions
-                .tabs
-                .iter()
-                .find(|tab| tab.id == session_id)
-                .and_then(|tab| tab.host_id)
-        })
-        .or_else(|| {
-            state
-                .sessions
-                .sftp_browsers
-                .last()
-                .map(|browser| browser.host_id)
-        });
+    if let Some(host_id) = active_host_id(state) {
+        return state
+            .sessions
+            .sftp_browsers
+            .iter()
+            .find(|browser| browser.host_id == host_id)
+            .map(|browser| browser_view_model(state, browser))
+            .unwrap_or_else(|| empty_sftp_for_host(state, host_id));
+    }
 
-    let Some(host_id) = active_host_id else {
+    let Some(browser) = state.sessions.sftp_browsers.last() else {
         return empty_sftp();
     };
 
-    let Some(browser) = state
-        .sessions
-        .sftp_browsers
-        .iter()
-        .find(|browser| browser.host_id == host_id)
-        .or_else(|| state.sessions.sftp_browsers.last())
-    else {
-        return empty_sftp_for_host(state, host_id);
-    };
+    browser_view_model(state, browser)
+}
 
+fn active_host_id(state: &AppState) -> Option<HostId> {
+    state.sessions.active_tab.and_then(|session_id| {
+        state
+            .sessions
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .and_then(|tab| tab.host_id)
+    })
+}
+
+fn browser_view_model(state: &AppState, browser: &crate::model::SftpBrowserState) -> SftpViewModel {
     let selected_path = browser.selected_path.clone().unwrap_or_default();
     SftpViewModel {
         host_id: browser.host_id.0.to_string(),
