@@ -136,6 +136,10 @@ impl SessionManager {
         host_id: HostId,
         session_id: SessionId,
     ) -> bool {
+        if !self.session_is_sftp_tab_for_host(session_id, host_id) {
+            return false;
+        }
+
         let Some(browser) = self
             .sftp_browsers
             .iter_mut()
@@ -250,6 +254,14 @@ impl SessionManager {
         self.sftp_browsers
             .iter()
             .any(|browser| browser.host_id == host_id && browser.session_id == session_id)
+    }
+
+    fn session_is_sftp_tab_for_host(&self, session_id: SessionId, host_id: HostId) -> bool {
+        self.tabs.iter().any(|tab| {
+            tab.id == session_id
+                && tab.host_id == Some(host_id)
+                && matches!(tab.kind, SessionKind::Sftp)
+        })
     }
 }
 

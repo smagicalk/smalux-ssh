@@ -164,11 +164,33 @@ fn sftp_browser_owner_can_be_reassigned() {
     let second_session_id = session_id();
 
     sessions.open_sftp_tab(first_session_id, current_host_id, "/home/ops");
+    sessions.open_sftp_tab(second_session_id, current_host_id, "/var/log");
+    sessions.reassign_sftp_browser_session(current_host_id, first_session_id);
 
     assert!(sessions.reassign_sftp_browser_session(current_host_id, second_session_id));
     assert_eq!(sessions.sftp_browsers[0].session_id, second_session_id);
     assert!(!sessions.reassign_sftp_browser_session(current_host_id, second_session_id));
     assert!(!sessions.reassign_sftp_browser_session(missing_host_id, first_session_id));
+}
+
+#[test]
+fn sftp_browser_owner_reassignment_requires_matching_sftp_tab() {
+    let mut sessions = SessionManager::default();
+    let current_host_id = host_id();
+    let other_host_id = host_id();
+    let first_session_id = session_id();
+    let shell_session_id = session_id();
+    let other_host_session_id = session_id();
+    let missing_session_id = session_id();
+
+    sessions.open_sftp_tab(first_session_id, current_host_id, "/home/ops");
+    sessions.open_shell_tab(shell_session_id, current_host_id, "shell");
+    sessions.open_sftp_tab(other_host_session_id, other_host_id, "/tmp");
+
+    assert!(!sessions.reassign_sftp_browser_session(current_host_id, shell_session_id));
+    assert!(!sessions.reassign_sftp_browser_session(current_host_id, other_host_session_id));
+    assert!(!sessions.reassign_sftp_browser_session(current_host_id, missing_session_id));
+    assert_eq!(sessions.sftp_browsers[0].session_id, first_session_id);
 }
 
 #[test]
