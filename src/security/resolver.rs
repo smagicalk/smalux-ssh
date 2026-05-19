@@ -156,6 +156,33 @@ mod tests {
     }
 
     #[test]
+    fn resolver_keeps_missing_key_passphrase_as_none() {
+        let mut store = MemorySecretStore::new();
+        let key_ref = SecretRef("key:deploy".to_owned());
+        store
+            .set_secret(&key_ref, "PRIVATE KEY")
+            .expect("私钥应该可以写入");
+        let resolver = AuthResolver::new(&store);
+
+        let resolved = resolver
+            .resolve(&BackendAuth::Key {
+                username: "deploy".to_owned(),
+                key: key_ref,
+                passphrase: None,
+            })
+            .expect("无口令私钥认证应该可以解析");
+
+        assert_eq!(
+            resolved,
+            ResolvedAuth::Key {
+                username: "deploy".to_owned(),
+                private_key: "PRIVATE KEY".to_owned(),
+                passphrase: None,
+            }
+        );
+    }
+
+    #[test]
     fn resolver_reads_certificate_key_and_optional_passphrase() {
         let mut store = MemorySecretStore::new();
         let key_ref = SecretRef("key:cert".to_owned());
@@ -187,6 +214,39 @@ mod tests {
                 username: "cert-user".to_owned(),
                 private_key: "PRIVATE KEY".to_owned(),
                 passphrase: Some("phrase".to_owned()),
+                certificate: "CERT".to_owned(),
+            }
+        );
+    }
+
+    #[test]
+    fn resolver_keeps_missing_certificate_passphrase_as_none() {
+        let mut store = MemorySecretStore::new();
+        let key_ref = SecretRef("key:cert".to_owned());
+        let certificate_ref = SecretRef("cert:cert".to_owned());
+        store
+            .set_secret(&key_ref, "PRIVATE KEY")
+            .expect("私钥应该可以写入");
+        store
+            .set_secret(&certificate_ref, "CERT")
+            .expect("证书应该可以写入");
+        let resolver = AuthResolver::new(&store);
+
+        let resolved = resolver
+            .resolve(&BackendAuth::Certificate {
+                username: "cert-user".to_owned(),
+                key: key_ref,
+                passphrase: None,
+                certificate: certificate_ref,
+            })
+            .expect("无口令证书认证应该可以解析");
+
+        assert_eq!(
+            resolved,
+            ResolvedAuth::Certificate {
+                username: "cert-user".to_owned(),
+                private_key: "PRIVATE KEY".to_owned(),
+                passphrase: None,
                 certificate: "CERT".to_owned(),
             }
         );
@@ -227,5 +287,48 @@ mod tests {
             .expect_err("缺失凭据应该返回错误");
 
         assert_eq!(error, SecurityError::MissingSecret(missing));
+    }
+
+    #[test]
+    fn resolver_reports_missing_key_passphrase_secret() {
+        let mut store = MemorySecretStore::new();
+        let key_ref = SecretRef("key:deploy".to_owned());
+        let missing_passphrase = SecretRef("passphrase:missing".to_owned());
+        store
+            .set_secret(&key_ref, "PRIVATE KEY")
+            .expect("私钥应该可以写入");
+        let resolver = AuthResolver::new(&store);
+
+        let error = resolver
+            .resolve(&BackendAuth::Key {
+                username: "deploy".to_owned(),
+                key: key_ref,
+                passphrase: Some(missing_passphrase.clone()),
+            })
+            .expect_err("缺失私钥口令应该返回错误");
+
+        assert_eq!(error, SecurityError::MissingSecret(missing_passphrase));
+    }
+
+    #[test]
+    fn resolver_reports_missing_certificate_secret() {
+        let mut store = MemorySecretStore::new();
+        let key_ref = SecretRef("key:cert".to_owned());
+        let missing_certificate = SecretRef("cert:missing".to_owned());
+        store
+            .set_secret(&key_ref, "PRIVATE KEY")
+            .expect("私钥应该可以写入");
+        let resolver = AuthResolver::new(&store);
+
+        let error = resolver
+            .resolve(&BackendAuth::Certificate {
+                username: "cert-user".to_owned(),
+                key: key_ref,
+                passphrase: None,
+                certificate: missing_certificate.clone(),
+            })
+            .expect_err("缺失证书应该返回错误");
+
+        assert_eq!(error, SecurityError::MissingSecret(missing_certificate));
     }
 }

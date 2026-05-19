@@ -94,11 +94,13 @@
 - 最新核心新增：`client/tests.rs` 补齐 SSH handler 共享状态边界，覆盖拒绝的 host key 结果记录和同 endpoint forwarded channel 订阅替换关闭旧 receiver。
 - 最新核心新增：`executor/tests.rs` 补齐真实 SSH executor 空状态/缺失会话幂等边界，覆盖 tunnel_count 初始值、缺失 runtime 取资源、缺失会话取隧道和停止不存在隧道。
 - 最新核心新增：`plan/tests.rs` 补齐 SSH 连接计划联网前边界，覆盖 key/certificate 无 passphrase 保持 `None`，以及缺失私钥/证书凭据时保留认证用户名并映射为认证失败。
+- 最新核心新增：`security/resolver.rs` 补齐认证材料解析边界，覆盖 key/certificate 无 passphrase 保持 `None`，缺失私钥口令和缺失证书时返回精确 `MissingSecret`。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：补齐 SSH 连接计划联网前边界测试并整理恢复记录
+- 本轮待提交：补齐认证材料解析边界测试并整理恢复记录
+- `a893647 补齐 SSH 连接计划边界测试`
 - `9884ad5 补齐 SSH executor 幂等边界测试`
 - `3428f72 补齐 SSH handler 共享状态测试`
 - `6305762 补齐 SOCKS5 隧道错误路径测试`
@@ -129,7 +131,7 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 164 个提交；本轮提交后预计领先 165 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 165 个提交；本轮提交后预计领先 166 个提交
 - 最近验证：
   - `cargo test local_pty -- --nocapture` 通过，`10 passed, 2 ignored`
   - `cargo test` 通过，`503 passed, 2 ignored`
@@ -174,6 +176,7 @@
 - `cargo test backend::ssh::client::tests -- --nocapture` 通过，`17 passed`
 - `cargo test backend::ssh::executor::tests -- --nocapture` 通过，`37 passed`
 - `cargo test backend::ssh::plan::tests -- --nocapture` 通过，`9 passed`
+- `cargo test security::resolver::tests -- --nocapture` 通过，`9 passed`
 - `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过
