@@ -89,11 +89,12 @@
 - 最新核心新增：`client/tests.rs` 补齐主机密钥策略、算法 hint、认证错误和 `host_key_or_connection_error` 的纯离线测试。
 - 最新核心新增：`client/session/tests.rs` 补齐 `collect_command_message` 的 `ExitSignal` 输出映射和非终态消息忽略测试。
 - 最新核心新增：`client/session/sftp.rs` 的 `copy_transfer_with_progress` 补齐读取错误映射测试。
+- 最新核心新增：`executor/tests.rs` 补齐 `connected_session_error`、shell 输入缓存失效门和 SFTP 缓存失效门的离线测试。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：补齐 SSH client/session/SFTP 纯离线边界测试并整理恢复记录
+- 本轮待提交：补齐 SSH executor 纯 helper 边界测试并整理恢复记录
 - `9d2ec1b 补齐本地 PTY fallback 状态测试`
 - `a8280cb 抽出本地 PTY reader 读取逻辑`
 - `b4cfe55 收紧 SOCKS5 方法协商`
@@ -158,6 +159,8 @@
 - `cargo test backend::ssh::client::session::sftp -- --nocapture` 通过，`4 passed`
 - `cargo fmt --check` 通过
 - `cargo test` 通过，`512 passed, 2 ignored`
+- `cargo test backend::ssh::executor::tests -- --nocapture` 通过，`34 passed`
+- `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过
 

@@ -591,6 +591,19 @@ fn send_shell_input_requires_connected_session() {
 }
 
 #[test]
+fn connected_session_error_reports_expected_context() {
+    let error = connected_session_error("open shell");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "open shell" && reason == "session is not connected"
+    ));
+}
+
+#[test]
 fn shell_input_failure_drops_only_failed_cached_shell() {
     let failed_session_id = session_id();
     let other_session_id = session_id();
@@ -643,6 +656,24 @@ fn shell_input_cache_survives_success_and_non_channel_failures() {
         cached_shells.get(&sftp_failure_session_id),
         Some(&"sftp-failure-shell")
     );
+}
+
+#[test]
+fn shell_input_drop_gate_is_strict_about_channel_failures_only() {
+    let channel_failure: Result<(), BackendExecutionError> =
+        Err(BackendExecutionError::ChannelFailed {
+            operation: "shell input".to_owned(),
+            reason: "channel closed".to_owned(),
+        });
+    let sftp_failure: Result<(), BackendExecutionError> = Err(BackendExecutionError::SftpFailed {
+        operation: "list dir".to_owned(),
+        reason: "permission denied".to_owned(),
+    });
+    let success: Result<(), BackendExecutionError> = Ok(());
+
+    assert!(shell_input_result_requires_session_drop(&channel_failure));
+    assert!(!shell_input_result_requires_session_drop(&sftp_failure));
+    assert!(!shell_input_result_requires_session_drop(&success));
 }
 
 #[test]
@@ -835,6 +866,25 @@ fn sftp_cache_survives_success_and_non_sftp_failures() {
         cached_sftps.get(&channel_failure_session_id),
         Some(&"channel-failure-session")
     );
+}
+
+#[test]
+fn sftp_drop_gate_is_strict_about_sftp_failures_only() {
+    let sftp_failure: Result<Vec<BackendEvent>, BackendExecutionError> =
+        Err(BackendExecutionError::SftpFailed {
+            operation: "list dir".to_owned(),
+            reason: "permission denied".to_owned(),
+        });
+    let channel_failure: Result<Vec<BackendEvent>, BackendExecutionError> =
+        Err(BackendExecutionError::ChannelFailed {
+            operation: "read".to_owned(),
+            reason: "channel closed".to_owned(),
+        });
+    let success: Result<Vec<BackendEvent>, BackendExecutionError> = Ok(Vec::new());
+
+    assert!(sftp_result_requires_session_drop(&sftp_failure));
+    assert!(!sftp_result_requires_session_drop(&channel_failure));
+    assert!(!sftp_result_requires_session_drop(&success));
 }
 
 #[test]
