@@ -2,15 +2,17 @@
 
 use std::net::{IpAddr, Ipv4Addr};
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::net::TcpStream;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 pub(super) struct Socks5Target {
     pub host: String,
     pub port: u16,
 }
 
-pub(super) async fn read_socks5_target(stream: &mut TcpStream) -> Result<Socks5Target, String> {
+pub(super) async fn read_socks5_target<S>(stream: &mut S) -> Result<Socks5Target, String>
+where
+    S: AsyncRead + AsyncWrite + Unpin,
+{
     let mut greeting = [0_u8; 2];
     stream
         .read_exact(&mut greeting)
@@ -58,13 +60,19 @@ pub(super) async fn read_socks5_target(stream: &mut TcpStream) -> Result<Socks5T
     })
 }
 
-pub(super) async fn write_socks5_success(stream: &mut TcpStream) -> std::io::Result<()> {
+pub(super) async fn write_socks5_success<S>(stream: &mut S) -> std::io::Result<()>
+where
+    S: AsyncWrite + Unpin,
+{
     stream
         .write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0])
         .await
 }
 
-async fn read_ipv4(stream: &mut TcpStream) -> Result<String, String> {
+async fn read_ipv4<S>(stream: &mut S) -> Result<String, String>
+where
+    S: AsyncRead + Unpin,
+{
     let mut octets = [0_u8; 4];
     stream
         .read_exact(&mut octets)
@@ -73,7 +81,10 @@ async fn read_ipv4(stream: &mut TcpStream) -> Result<String, String> {
     Ok(IpAddr::V4(Ipv4Addr::from(octets)).to_string())
 }
 
-async fn read_ipv6(stream: &mut TcpStream) -> Result<String, String> {
+async fn read_ipv6<S>(stream: &mut S) -> Result<String, String>
+where
+    S: AsyncRead + Unpin,
+{
     let mut octets = [0_u8; 16];
     stream
         .read_exact(&mut octets)
@@ -82,7 +93,10 @@ async fn read_ipv6(stream: &mut TcpStream) -> Result<String, String> {
     Ok(IpAddr::V6(octets.into()).to_string())
 }
 
-async fn read_domain(stream: &mut TcpStream) -> Result<String, String> {
+async fn read_domain<S>(stream: &mut S) -> Result<String, String>
+where
+    S: AsyncRead + Unpin,
+{
     let mut length = [0_u8; 1];
     stream
         .read_exact(&mut length)
