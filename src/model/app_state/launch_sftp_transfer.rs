@@ -169,8 +169,12 @@ impl AppState {
             };
         }
 
-        let has_pending_browser_refresh =
-            has_pending_sftp_browser_refresh(&self.sessions, &self.backend_commands, task.host_id);
+        let has_pending_browser_refresh = has_pending_sftp_browser_refresh(
+            &self.sessions,
+            &self.backend_commands,
+            task.host_id,
+            task.session_id,
+        );
         let transfer_cancelled = self
             .sessions
             .cancel_queued_transfer(task.session_id, transfer_id);
@@ -289,6 +293,7 @@ fn has_pending_sftp_browser_refresh(
     sessions: &crate::session::SessionManager,
     commands: &crate::backend::BackendCommandQueue,
     host_id: HostId,
+    current_session_id: SessionId,
 ) -> bool {
     commands.iter().any(|command| {
         let BackendCommand::Sftp {
@@ -299,7 +304,9 @@ fn has_pending_sftp_browser_refresh(
             return false;
         };
 
-        request.refreshes_browser() && session_matches_host(sessions, *session_id, host_id)
+        request.refreshes_browser()
+            && *session_id == current_session_id
+            && session_matches_host(sessions, *session_id, host_id)
     })
 }
 
