@@ -133,3 +133,72 @@ where
     let _ = tokio::io::copy_bidirectional(left, right).await?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    use crate::backend::BackendExecutionError;
+
+    use super::{accept_with_tick, bind_tcp_listener, copy_bidirectional};
+
+    #[tokio::test]
+    async fn bind_tcp_listener_reports_rule_name_on_failure() {
+        let listener = bind_tcp_listener("127.0.0.1", 0, "primary").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+
+        let error = bind_tcp_listener("127.0.0.1", port, "duplicate")
+            .await
+            .unwrap_err();
+
+        match error {
+            BackendExecutionError::TunnelFailed { rule_name, reason } => {
+                assert_eq!(rule_name, "duplicate");
+                assert!(!reason.is_empty());
+            }
+            other => panic!("unexpected error: {other:?}"),
+        }
+    }
+
+    #[tokio::test]
+    async fn accept_with_tick_returns_none_without_connection() {
+        let listener = bind_tcp_listener("127.0.0.1", 0, "idle").await.unwrap();
+
+        let accepted = accept_with_tick(&listener).await.unwrap();
+
+        assert!(accepted.is_none());
+    }
+
+    #[tokio::test]
+    async fn copy_bidirectional_moves_bytes_in_both_directions() {
+        let left_listener = bind_tcp_listener("127.0.0.1", 0, "left").await.unwrap();
+        let right_listener = bind_tcp_listener("127.0.0.1", 0, "right").await.unwrap();
+        let left_addr = left_listener.local_addr().unwrap();
+        let right_addr = right_listener.local_addr().unwrap();
+
+        let mut left_client = tokio::net::TcpStream::connect(left_addr).await.unwrap();
+        let mut right_client = tokio::net::TcpStream::connect(right_addr).await.unwrap();
+        let (mut left_server, _) = left_listener.accept().await.unwrap();
+        let (mut right_server, _) = right_listener.accept().await.unwrap();
+
+        let pipe = tokio::spawn(async move {
+            copy_bidirectional(&mut left_server, &mut right_server)
+                .await
+                .unwrap();
+        });
+
+        left_client.write_all(b"left-to-right").await.unwrap();
+        right_client.write_all(b"right-to-left").await.unwrap();
+        let mut from_left = vec![0_u8; b"left-to-right".len()];
+        let mut from_right = vec![0_u8; b"right-to-left".len()];
+        right_client.read_exact(&mut from_left).await.unwrap();
+        left_client.read_exact(&mut from_right).await.unwrap();
+
+        assert_eq!(from_left, b"left-to-right");
+        assert_eq!(from_right, b"right-to-left");
+
+        drop(left_client);
+        drop(right_client);
+        pipe.await.unwrap();
+    }
+}

@@ -79,11 +79,13 @@
 - 最新核心新增：隧道后端状态事件必须匹配非终态隧道标签和规则名，已断开/失败标签不再接收迟到 Running/Failed/Stopped 事件，避免终态标签污染 runtime。
 - 最新核心新增：`Failed` / `Disconnected` 的会话状态、SFTP 浏览器、传输任务和隧道 runtime 收敛下沉到 `SessionManager`，reducer 不再手写跨模块清理步骤。
 - 最新核心新增：动态隧道 SOCKS5 CONNECT 握手解析从 `TcpStream` 解耦为 `AsyncRead + AsyncWrite` 协议函数，覆盖 IPv4、域名、IPv6、非 CONNECT、未知地址类型和成功响应字节。
+- 最新核心新增：隧道 TCP 基础层补齐离线测试，覆盖监听绑定失败时携带规则名、accept tick 空闲超时返回 `None`、双向复制同时转发两个方向数据。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：解耦 SOCKS5 握手解析
+- 本轮待提交：补齐隧道 TCP 基础测试
+- `6fc8a14 解耦 SOCKS5 握手解析`
 - `c9f6281 集中会话终止收敛`
 - `54999ce 隔离终态隧道事件`
 - `7b598ba 隔离连接生命周期事件`
@@ -102,8 +104,11 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 152 个提交；本轮提交后预计领先 153 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 153 个提交；本轮提交后预计领先 154 个提交
 - 最近验证：
+  - `cargo test tunnel::tcp -- --nocapture` 通过，`3 passed`
+  - `cargo test` 通过，`489 passed, 2 ignored`
+  - `cargo fmt --check` 通过
   - `cargo test socks5 -- --nocapture` 通过，`6 passed`
   - `cargo test` 通过，`486 passed, 2 ignored`
   - `cargo fmt --check` 通过
