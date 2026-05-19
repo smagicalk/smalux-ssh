@@ -71,6 +71,55 @@ fn connected_event_ignores_terminal_session() {
 }
 
 #[test]
+fn remote_connection_events_ignore_local_shell_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_local_shell_tab(session_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Connecting {
+            session_id,
+            endpoint: "example.com:22".to_owned(),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Authenticating {
+            session_id,
+            username: "deploy".to_owned(),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+}
+
+#[test]
+fn connected_event_accepts_local_shell_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_local_shell_tab(session_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Connected { session_id },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+}
+
+#[test]
 fn connection_lifecycle_events_update_session_status() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

@@ -182,6 +182,54 @@ impl SessionManager {
         self.set_status(id, status)
     }
 
+    /// 将远程连接标签页标记为正在连接，忽略本地 shell、缺失或终态标签页。
+    pub fn mark_remote_connecting(&mut self, id: SessionId) -> bool {
+        if !self.can_update_remote_connection_status(id) {
+            return false;
+        }
+
+        self.set_status(id, SessionStatus::Connecting)
+    }
+
+    /// 将远程连接标签页标记为认证中，忽略本地 shell、缺失或终态标签页。
+    pub fn mark_remote_authenticating(&mut self, id: SessionId) -> bool {
+        if !self.can_update_remote_connection_status(id) {
+            return false;
+        }
+
+        self.set_status(id, SessionStatus::Authenticating)
+    }
+
+    /// 将远程连接标签页标记为认证完成，忽略本地 shell、缺失或终态标签页。
+    pub fn mark_remote_authenticated(&mut self, id: SessionId) -> bool {
+        if !self.can_update_remote_connection_status(id) {
+            return false;
+        }
+
+        self.set_status(id, SessionStatus::Connected)
+    }
+
+    /// 将后端已连接事件写入标签页，允许本地 shell 和远程连接标签页。
+    pub fn mark_backend_connected(&mut self, id: SessionId) -> bool {
+        let Some(tab) = self.tabs.iter().find(|tab| tab.id == id) else {
+            return false;
+        };
+
+        if !matches!(
+            tab.kind,
+            SessionKind::LocalShell
+                | SessionKind::Shell
+                | SessionKind::RemoteCommand { .. }
+                | SessionKind::Sftp
+                | SessionKind::Tunnel { .. }
+        ) || tab.status.is_terminal()
+        {
+            return false;
+        }
+
+        self.set_status(id, SessionStatus::Connected)
+    }
+
     /// 判断连接命令是否仍允许发往后端执行器。
     pub fn can_execute_connect_command(&self, id: SessionId, host_id: HostId) -> bool {
         self.tabs
@@ -236,6 +284,23 @@ impl SessionManager {
         } else if !self.active.contains(&id) {
             self.active.push(id);
         }
+    }
+
+    fn can_update_remote_connection_status(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| {
+                tab.host_id.is_some()
+                    && matches!(
+                        tab.kind,
+                        SessionKind::Shell
+                            | SessionKind::RemoteCommand { .. }
+                            | SessionKind::Sftp
+                            | SessionKind::Tunnel { .. }
+                    )
+                    && !tab.status.is_terminal()
+            })
     }
 }
 
@@ -576,6 +641,54 @@ mod tests {
         assert!(matches!(sessions.tabs[2].status, SessionStatus::Created));
 
         assert!(!sessions.mark_process_exited(shell_id, Some(0)));
+    }
+
+    #[test]
+    fn remote_connection_status_requires_non_terminal_remote_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let sftp_id = session_id();
+        let local_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_shell_tab(shell_id, host_id, "production");
+        sessions.open_sftp_tab(sftp_id, host_id, "/home/ops");
+        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+
+        assert!(sessions.mark_remote_connecting(shell_id));
+        assert!(matches!(sessions.tabs[0].status, SessionStatus::Connecting));
+
+        assert!(sessions.mark_remote_authenticating(sftp_id));
+        assert!(matches!(
+            sessions.tabs[1].status,
+            SessionStatus::Authenticating
+        ));
+
+        assert!(!sessions.mark_remote_connecting(local_id));
+        assert!(matches!(sessions.tabs[2].status, SessionStatus::Connected));
+
+        assert!(sessions.set_status(sftp_id, SessionStatus::Disconnected));
+        assert!(!sessions.mark_remote_authenticated(sftp_id));
+    }
+
+    #[test]
+    fn backend_connected_status_accepts_local_and_remote_non_terminal_tabs() {
+        let mut sessions = SessionManager::default();
+        let local_id = session_id();
+        let command_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_remote_command_tab(command_id, host_id, "uptime", None);
+
+        assert!(sessions.mark_backend_connected(local_id));
+        assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+
+        assert!(sessions.mark_backend_connected(command_id));
+        assert!(matches!(sessions.tabs[1].status, SessionStatus::Connected));
+
+        assert!(sessions.set_status(command_id, SessionStatus::Disconnected));
+        assert!(!sessions.mark_backend_connected(command_id));
     }
 
     #[test]
