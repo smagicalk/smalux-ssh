@@ -138,28 +138,28 @@ impl SessionManager {
         self.fail_tunnel(session_id, &rule_name, reason)
     }
 
-    /// 按会话标签页和规则名同步隧道运行态，避免迟到事件污染同名新会话。
+    /// 按非终态会话标签页和规则名同步隧道运行态，避免迟到事件污染同名新会话。
     pub fn set_tunnel_status_for_session(
         &mut self,
         session_id: SessionId,
         rule_name: &str,
         status: TunnelStatus,
     ) -> bool {
-        if !self.tunnel_tab_matches_rule(session_id, rule_name) {
+        if !self.tunnel_tab_matches_active_rule(session_id, rule_name) {
             return false;
         }
 
         self.set_tunnel_status(session_id, rule_name, status)
     }
 
-    /// 按会话标签页和规则名标记隧道失败。
+    /// 按非终态会话标签页和规则名标记隧道失败。
     pub fn fail_tunnel_for_session_rule(
         &mut self,
         session_id: SessionId,
         rule_name: &str,
         reason: impl Into<String>,
     ) -> bool {
-        if !self.tunnel_tab_matches_rule(session_id, rule_name) {
+        if !self.tunnel_tab_matches_active_rule(session_id, rule_name) {
             return false;
         }
 
@@ -204,18 +204,6 @@ impl SessionManager {
                 state.last_error = None;
             }
             state.status = status;
-        })
-    }
-
-    fn tunnel_tab_matches_rule(&self, session_id: SessionId, rule_name: &str) -> bool {
-        self.tabs.iter().any(|tab| {
-            tab.id == session_id
-                && matches!(
-                    &tab.kind,
-                    SessionKind::Tunnel {
-                        rule_name: tab_rule_name,
-                    } if tab_rule_name == rule_name
-                )
         })
     }
 
@@ -458,6 +446,17 @@ mod tests {
             TunnelStatus::Running
         ));
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
+
+        assert!(sessions.set_status(
+            current_session_id,
+            crate::model::SessionStatus::Disconnected
+        ));
+        assert!(!sessions.set_tunnel_status_for_session(
+            current_session_id,
+            "local-db",
+            TunnelStatus::Stopped
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
     }
 
     #[test]
@@ -493,6 +492,18 @@ mod tests {
             sessions.tunnels[0].last_error.as_deref(),
             Some("bind failed")
         );
+
+        sessions.start_tunnel(current_session_id, &rule, Some(host_id), 20);
+        assert!(sessions.set_status(
+            current_session_id,
+            crate::model::SessionStatus::Disconnected
+        ));
+        assert!(!sessions.fail_tunnel_for_session_rule(
+            current_session_id,
+            "local-db",
+            "late bind failed"
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Starting));
     }
 
     #[test]

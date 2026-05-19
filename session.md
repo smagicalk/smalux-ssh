@@ -76,10 +76,12 @@
 - 最新核心新增：`ShellOpened` 后端事件只会标记非终态 shell 标签为 Connected，串台到远程命令/SFTP/隧道标签时会被忽略，避免迟到事件污染标签类型状态。
 - 最新核心新增：`CommandExited` 后端事件只会终结非终态 shell / 远程命令标签，串台到 SFTP/隧道等非进程标签时会被忽略，避免迟到退出事件污染标签状态。
 - 最新核心新增：远程连接生命周期事件改由会话模块按标签类型收敛，`Connecting` / `Authenticating` / `Authenticated` 不再污染本地 shell，`Connected` 仍允许本地 shell 与远程标签接收。
+- 最新核心新增：隧道后端状态事件必须匹配非终态隧道标签和规则名，已断开/失败标签不再接收迟到 Running/Failed/Stopped 事件，避免终态标签污染 runtime。
 
 ## 最近提交
 
-- 本轮待提交：隔离连接生命周期事件
+- 本轮待提交：隔离终态隧道事件
+- `7b598ba 隔离连接生命周期事件`
 - `3552506 隔离命令退出事件`
 - `fa19a04 隔离 shell 打开事件`
 - `9596e61 隔离远程命令启动事件`
@@ -95,18 +97,17 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 150 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 151 个提交
 - 最近验证：
-  - `cargo test remote_connection_events_ignore_local_shell_session -- --nocapture` 通过，`1 passed`
-  - `cargo test connected_event_accepts_local_shell_session -- --nocapture` 通过，`1 passed`
-  - `cargo test remote_connection_status_requires_non_terminal_remote_tab -- --nocapture` 通过，`1 passed`
-  - `cargo test backend_connected_status_accepts_local_and_remote_non_terminal_tabs -- --nocapture` 通过，`1 passed`
-  - `cargo test backend::reducer::tests` 通过，`33 passed`
-  - `cargo test session::tabs::tests` 通过，`19 passed`
+  - `cargo test tunnel_status_event_ignores_terminal_tunnel_session -- --nocapture` 通过，`1 passed`
+  - `cargo test set_tunnel_status_for_session_requires_matching_tunnel_tab -- --nocapture` 通过，`1 passed`
+  - `cargo test fail_tunnel_for_session_rule_requires_matching_tunnel_tab -- --nocapture` 通过，`1 passed`
+  - `cargo test backend::reducer::tests` 通过，`34 passed`
+  - `cargo test session::tunnels::tests` 通过，`13 passed`
   - `cargo fmt --check` 通过
   - `cargo check` 通过
   - `cargo test model::app_state::backend_pump_tests` 通过，`33 passed`
-  - `cargo test` 通过，`477 passed, 2 ignored`
+  - `cargo test` 通过，`478 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 

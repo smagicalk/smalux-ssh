@@ -684,6 +684,36 @@ fn tunnel_status_event_ignores_rule_mismatch_for_session() {
 }
 
 #[test]
+fn tunnel_status_event_ignores_terminal_tunnel_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+    let host_id = host_id();
+    let rule = tunnel_rule("local-db");
+
+    sessions.open_tunnel_tab(session_id, host_id, &rule);
+    sessions.start_tunnel(session_id, &rule, Some(host_id), 10);
+    sessions.set_status(session_id, SessionStatus::Disconnected);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name: "local-db".to_owned(),
+            status: TunnelStatus::Running,
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Starting));
+    assert!(matches!(
+        sessions.tabs[0].status,
+        SessionStatus::Disconnected
+    ));
+}
+
+#[test]
 fn tunnel_stopped_event_marks_session_disconnected() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
