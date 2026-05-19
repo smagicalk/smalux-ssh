@@ -90,7 +90,11 @@ impl SessionManager {
         let Some(host_id) = self
             .tabs
             .iter()
-            .find(|tab| tab.id == session_id && matches!(tab.kind, SessionKind::Sftp))
+            .find(|tab| {
+                tab.id == session_id
+                    && matches!(tab.kind, SessionKind::Sftp)
+                    && (!loading || sftp_tab_can_accept_browser_owner(&tab.status))
+            })
             .and_then(|tab| tab.host_id)
         else {
             return false;

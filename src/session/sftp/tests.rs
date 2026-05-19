@@ -139,6 +139,33 @@ fn sftp_loading_by_session_requires_current_browser_owner() {
 }
 
 #[test]
+fn sftp_loading_by_session_rejects_terminal_owner_when_enabling() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id, "/home/ops");
+    sessions.set_status(session_id, SessionStatus::Disconnected);
+
+    assert!(!sessions.set_sftp_loading_for_session(session_id, true));
+    assert!(!sessions.sftp_browsers[0].loading);
+}
+
+#[test]
+fn sftp_loading_by_session_allows_terminal_owner_cleanup() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id, "/home/ops");
+    sessions.set_sftp_loading(host_id, true);
+    sessions.set_status(session_id, SessionStatus::Disconnected);
+
+    assert!(sessions.set_sftp_loading_for_session(session_id, false));
+    assert!(!sessions.sftp_browsers[0].loading);
+}
+
+#[test]
 fn sftp_selection_can_be_set_and_cleared() {
     let mut sessions = SessionManager::default();
     let current_host_id = host_id();
