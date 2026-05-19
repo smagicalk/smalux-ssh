@@ -89,6 +89,9 @@ impl AppState {
 impl AppState {
     fn can_execute_backend_command(&self, command: &BackendCommand) -> bool {
         match command {
+            BackendCommand::Connect { session_id, target } => self
+                .sessions
+                .can_execute_connect_command(*session_id, target.host_id),
             BackendCommand::SendShellInput { session_id, .. } => {
                 self.sessions.can_send_interactive_shell_input(*session_id)
             }

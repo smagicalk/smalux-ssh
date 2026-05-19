@@ -140,6 +140,24 @@ impl SessionManager {
             })
     }
 
+    /// 判断连接命令是否仍允许发往后端执行器。
+    pub fn can_execute_connect_command(&self, id: SessionId, host_id: HostId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| {
+                tab.host_id == Some(host_id)
+                    && matches!(
+                        tab.kind,
+                        SessionKind::Shell
+                            | SessionKind::RemoteCommand { .. }
+                            | SessionKind::Sftp
+                            | SessionKind::Tunnel { .. }
+                    )
+                    && !tab.status.is_terminal()
+            })
+    }
+
     /// 判断终端缓冲是否仍可被对应会话更新。
     pub fn can_update_terminal_buffer(&self, id: SessionId) -> bool {
         self.tabs
@@ -440,6 +458,37 @@ mod tests {
         ));
 
         assert!(!sessions.can_execute_remote_command(command_id));
+    }
+
+    #[test]
+    fn connect_command_acceptance_requires_matching_non_terminal_remote_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let command_id = session_id();
+        let local_id = session_id();
+        let remote_host_id = host_id();
+        let other_host_id = host_id();
+
+        sessions.open_shell_tab(shell_id, remote_host_id, "production");
+        sessions.open_remote_command_tab(command_id, remote_host_id, "uptime", None);
+        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+
+        assert!(sessions.can_execute_connect_command(shell_id, remote_host_id));
+        assert!(sessions.can_execute_connect_command(command_id, remote_host_id));
+        assert!(!sessions.can_execute_connect_command(local_id, remote_host_id));
+        assert!(!sessions.can_execute_connect_command(shell_id, other_host_id));
+        assert!(!sessions.can_execute_connect_command(session_id(), remote_host_id));
+
+        assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
+        assert!(sessions.set_status(
+            command_id,
+            SessionStatus::Failed {
+                reason: "network".to_owned(),
+            }
+        ));
+
+        assert!(!sessions.can_execute_connect_command(shell_id, remote_host_id));
+        assert!(!sessions.can_execute_connect_command(command_id, remote_host_id));
     }
 
     #[test]
