@@ -144,6 +144,24 @@ fn shell_opened_marks_shell_session_connected() {
 }
 
 #[test]
+fn shell_opened_ignores_non_shell_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_remote_command_tab(session_id, host_id(), "uptime", None);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::ShellOpened { session_id },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Created));
+}
+
+#[test]
 fn output_event_appends_to_terminal_buffer() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

@@ -130,6 +130,15 @@ impl SessionManager {
             .is_some_and(|tab| matches!(tab.kind, SessionKind::Shell) && !tab.status.is_terminal())
     }
 
+    /// 将交互式 shell 标签页标记为已打开，忽略其他类型或终态标签页的串台事件。
+    pub fn mark_shell_opened(&mut self, id: SessionId) -> bool {
+        if !self.can_execute_open_shell_command(id) {
+            return false;
+        }
+
+        self.set_status(id, SessionStatus::Connected)
+    }
+
     /// 判断远程命令执行请求是否仍允许发往后端执行器。
     pub fn can_execute_remote_command(&self, id: SessionId) -> bool {
         self.tabs
@@ -444,6 +453,26 @@ mod tests {
         assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
 
         assert!(!sessions.can_execute_open_shell_command(shell_id));
+    }
+
+    #[test]
+    fn shell_opened_status_requires_non_terminal_shell_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let command_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_shell_tab(shell_id, host_id, "production");
+        sessions.open_remote_command_tab(command_id, host_id, "uptime", None);
+
+        assert!(sessions.mark_shell_opened(shell_id));
+        assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+
+        assert!(!sessions.mark_shell_opened(command_id));
+        assert!(!matches!(sessions.tabs[1].status, SessionStatus::Connected));
+
+        assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
+        assert!(!sessions.mark_shell_opened(shell_id));
     }
 
     #[test]

@@ -40,12 +40,14 @@ pub fn apply_backend_event(
             session_updated: sessions.set_status(session_id, SessionStatus::Authenticating),
             terminal_updated: false,
         },
-        BackendEvent::Authenticated { session_id } | BackendEvent::ShellOpened { session_id } => {
-            BackendEventOutcome {
-                session_updated: sessions.set_status(session_id, SessionStatus::Connected),
-                terminal_updated: false,
-            }
-        }
+        BackendEvent::Authenticated { session_id } => BackendEventOutcome {
+            session_updated: sessions.set_status(session_id, SessionStatus::Connected),
+            terminal_updated: false,
+        },
+        BackendEvent::ShellOpened { session_id } => BackendEventOutcome {
+            session_updated: sessions.mark_shell_opened(session_id),
+            terminal_updated: false,
+        },
         BackendEvent::RemoteCommandStarted { session_id, .. } => BackendEventOutcome {
             session_updated: sessions.mark_remote_command_started(session_id),
             terminal_updated: false,
