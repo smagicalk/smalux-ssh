@@ -264,6 +264,28 @@ fn sftp_entries_event_updates_browser_by_session() {
 }
 
 #[test]
+fn sftp_entries_event_ignores_terminal_sftp_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id(), "/home/ops");
+    sessions.set_status(session_id, SessionStatus::Disconnected);
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::SftpEntries {
+            session_id,
+            remote_path: "/late-result".to_owned(),
+            entries: Vec::new(),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert_eq!(sessions.sftp_browsers[0].current_dir, "/home/ops");
+}
+
+#[test]
 fn transfer_progress_event_updates_existing_transfer() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

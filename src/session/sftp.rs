@@ -165,7 +165,11 @@ impl SessionManager {
     ) -> bool {
         self.tabs
             .iter()
-            .find(|tab| tab.id == session_id)
+            .find(|tab| {
+                tab.id == session_id
+                    && matches!(tab.kind, SessionKind::Sftp)
+                    && sftp_tab_can_accept_browser_owner(&tab.status)
+            })
             .and_then(|tab| tab.host_id)
             .filter(|host_id| self.sftp_browser_belongs_to_session(*host_id, session_id))
             .map(|host_id| self.set_sftp_entries(host_id, current_dir, entries))

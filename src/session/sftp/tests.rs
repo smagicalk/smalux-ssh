@@ -280,6 +280,32 @@ fn sftp_entries_by_session_ignore_stale_tab_for_same_host() {
 }
 
 #[test]
+fn sftp_entries_by_session_ignore_terminal_owner() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let owner_session_id = session_id();
+
+    sessions.open_sftp_tab(owner_session_id, host_id, "/home/ops");
+    sessions.set_status(owner_session_id, SessionStatus::Disconnected);
+
+    assert!(!sessions.set_sftp_entries_for_session(owner_session_id, "/late-result", Vec::new()));
+    assert_eq!(sessions.sftp_browsers[0].current_dir, "/home/ops");
+}
+
+#[test]
+fn sftp_entries_by_session_ignore_non_sftp_tabs() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let owner_session_id = session_id();
+
+    sessions.open_sftp_tab(owner_session_id, host_id, "/home/ops");
+    sessions.open_shell_tab(owner_session_id, host_id, "shell replacement");
+
+    assert!(!sessions.set_sftp_entries_for_session(owner_session_id, "/shell-result", Vec::new()));
+    assert_eq!(sessions.sftp_browsers[0].current_dir, "/home/ops");
+}
+
+#[test]
 fn sftp_browser_records_failure() {
     let mut sessions = SessionManager::default();
     let current_host_id = host_id();
