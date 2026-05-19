@@ -32,7 +32,7 @@ impl SessionManager {
             .iter_mut()
             .find(|task| task.id == id && task.session_id == session_id)
         {
-            if transfer_status_is_terminal(&task.status) {
+            if task.status.is_terminal() {
                 return false;
             }
             if total_bytes.is_some() {
@@ -54,7 +54,7 @@ impl SessionManager {
             .iter_mut()
             .find(|task| task.id == id && task.session_id == session_id)
         {
-            if !matches!(task.status, TransferStatus::Queued) {
+            if !task.status.is_queued() {
                 return false;
             }
 
@@ -74,9 +74,11 @@ impl SessionManager {
         let reason = reason.into();
         let mut updated = false;
 
-        for task in self.transfers.iter_mut().filter(|task| {
-            task.session_id == session_id && !transfer_status_is_terminal(&task.status)
-        }) {
+        for task in self
+            .transfers
+            .iter_mut()
+            .filter(|task| task.session_id == session_id && !task.status.is_terminal())
+        {
             task.status = TransferStatus::Failed {
                 reason: reason.clone(),
             };
@@ -85,13 +87,6 @@ impl SessionManager {
 
         updated
     }
-}
-
-fn transfer_status_is_terminal(status: &TransferStatus) -> bool {
-    matches!(
-        status,
-        TransferStatus::Completed | TransferStatus::Failed { .. } | TransferStatus::Cancelled
-    )
 }
 
 fn normalized_transferred_bytes(

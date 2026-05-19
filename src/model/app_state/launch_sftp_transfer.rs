@@ -152,7 +152,7 @@ impl AppState {
             }
         };
 
-        if !matches!(task.status, TransferStatus::Queued) {
+        if !task.status.is_queued() {
             return AppUpdateOutcome {
                 error: Some("只能取消尚未开始的 SFTP 传输".to_owned()),
                 ..AppUpdateOutcome::default()

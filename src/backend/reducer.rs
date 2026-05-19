@@ -189,7 +189,7 @@ fn apply_tunnel_status(
     rule_name: &str,
     status: TunnelStatus,
 ) -> bool {
-    if matches!(status, TunnelStatus::Failed) {
+    if status == TunnelStatus::Failed {
         sessions.fail_tunnel_for_session_rule(session_id, rule_name, "backend tunnel failed")
     } else {
         sessions.set_tunnel_status_for_session(session_id, rule_name, status)

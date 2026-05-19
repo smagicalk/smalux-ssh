@@ -69,6 +69,21 @@ pub enum TransferStatus {
     Cancelled,
 }
 
+impl TransferStatus {
+    /// 判断传输任务是否已经进入终态，终态不再接受迟到进度更新。
+    pub fn is_terminal(&self) -> bool {
+        matches!(
+            self,
+            TransferStatus::Completed | TransferStatus::Failed { .. } | TransferStatus::Cancelled
+        )
+    }
+
+    /// 判断传输任务是否仍在本地队列中，只有队列态可以被本地取消。
+    pub fn is_queued(&self) -> bool {
+        matches!(self, TransferStatus::Queued)
+    }
+}
+
 /// SFTP 上传或下载任务。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TransferTask {
@@ -137,6 +152,24 @@ mod tests {
         };
 
         assert_eq!(task.progress(), 1.0);
+    }
+
+    #[test]
+    fn transfer_status_lifecycle_helpers_are_centralized() {
+        assert!(!TransferStatus::Queued.is_terminal());
+        assert!(!TransferStatus::Running.is_terminal());
+        assert!(TransferStatus::Completed.is_terminal());
+        assert!(
+            TransferStatus::Failed {
+                reason: "network".to_owned()
+            }
+            .is_terminal()
+        );
+        assert!(TransferStatus::Cancelled.is_terminal());
+
+        assert!(TransferStatus::Queued.is_queued());
+        assert!(!TransferStatus::Running.is_queued());
+        assert!(!TransferStatus::Completed.is_queued());
     }
 
     #[test]

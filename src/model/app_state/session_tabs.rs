@@ -107,10 +107,7 @@ impl AppState {
         self.sessions.tunnels.iter().any(|tunnel| {
             tunnel.session_id == session_id
                 && tunnel.rule_name == rule_name
-                && matches!(
-                    tunnel.status,
-                    TunnelStatus::Starting | TunnelStatus::Running | TunnelStatus::Stopping
-                )
+                && !tunnel.status.is_terminal()
         })
     }
 
@@ -118,7 +115,7 @@ impl AppState {
         let runtime_is_starting = self.sessions.tunnels.iter().any(|tunnel| {
             tunnel.session_id == session_id
                 && tunnel.rule_name == rule_name
-                && matches!(tunnel.status, TunnelStatus::Starting)
+                && tunnel.status == TunnelStatus::Starting
         });
 
         runtime_is_starting

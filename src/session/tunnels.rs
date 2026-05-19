@@ -27,7 +27,7 @@ impl SessionManager {
     pub fn mark_tunnel_running(&mut self, session_id: SessionId, rule_name: &str) -> bool {
         if self
             .tunnel_status_for_session(session_id, rule_name)
-            .is_some_and(tunnel_status_is_terminal)
+            .is_some_and(TunnelStatus::is_terminal)
         {
             return false;
         }
@@ -63,7 +63,7 @@ impl SessionManager {
         let Some(status) = self.tunnel_status_for_session(session_id, rule_name) else {
             return false;
         };
-        if matches!(status, TunnelStatus::Stopped | TunnelStatus::Failed) {
+        if status.is_terminal() {
             return false;
         }
 
@@ -89,7 +89,7 @@ impl SessionManager {
     pub fn mark_tunnel_stopping(&mut self, session_id: SessionId, rule_name: &str) -> bool {
         if self
             .tunnel_status_for_session(session_id, rule_name)
-            .is_some_and(tunnel_status_is_terminal)
+            .is_some_and(TunnelStatus::is_terminal)
         {
             return false;
         }
@@ -110,7 +110,7 @@ impl SessionManager {
         let reason = reason.into();
         if self
             .tunnel_status_for_session(session_id, rule_name)
-            .is_some_and(tunnel_status_is_terminal)
+            .is_some_and(TunnelStatus::is_terminal)
         {
             return false;
         }
@@ -175,7 +175,7 @@ impl SessionManager {
     ) -> bool {
         if self
             .tunnel_status_for_session(session_id, rule_name)
-            .is_some_and(tunnel_status_is_terminal)
+            .is_some_and(TunnelStatus::is_terminal)
         {
             return false;
         }
@@ -202,10 +202,6 @@ impl SessionManager {
                 )
         })
     }
-}
-
-fn tunnel_status_is_terminal(status: &TunnelStatus) -> bool {
-    matches!(status, TunnelStatus::Stopped | TunnelStatus::Failed)
 }
 
 #[cfg(test)]

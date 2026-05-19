@@ -89,16 +89,22 @@ impl AppState {
             .sessions
             .tunnel_status_for_session(session_id, &rule_name)
         {
-            Some(TunnelStatus::Starting | TunnelStatus::Running) => {}
+            Some(status) if status.is_stoppable() => {}
             Some(TunnelStatus::Stopping) => {
                 return AppUpdateOutcome {
                     error: Some(format!("隧道 {rule_name} 正在停止，请等待后端确认")),
                     ..AppUpdateOutcome::default()
                 };
             }
-            Some(TunnelStatus::Stopped | TunnelStatus::Failed) => {
+            Some(status) if status.is_terminal() => {
                 return AppUpdateOutcome {
                     error: Some(format!("隧道 {rule_name} 已停止或失败，没有可停止的运行态")),
+                    ..AppUpdateOutcome::default()
+                };
+            }
+            Some(_) => {
+                return AppUpdateOutcome {
+                    error: Some(format!("隧道 {rule_name} 当前状态不可停止")),
                     ..AppUpdateOutcome::default()
                 };
             }

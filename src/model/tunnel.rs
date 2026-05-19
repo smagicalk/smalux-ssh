@@ -108,6 +108,18 @@ pub enum TunnelStatus {
     Failed,
 }
 
+impl TunnelStatus {
+    /// 判断隧道运行态是否已经结束，终态不再接受迟到后端状态覆盖。
+    pub fn is_terminal(&self) -> bool {
+        matches!(self, TunnelStatus::Stopped | TunnelStatus::Failed)
+    }
+
+    /// 判断隧道是否可以发起停止命令。
+    pub fn is_stoppable(&self) -> bool {
+        matches!(self, TunnelStatus::Starting | TunnelStatus::Running)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,5 +235,20 @@ mod tests {
             toml::from_str(&encoded).expect("隧道运行态应该可以从 TOML 反序列化");
 
         assert_eq!(decoded, state);
+    }
+
+    #[test]
+    fn tunnel_status_lifecycle_helpers_are_centralized() {
+        assert!(TunnelStatus::Stopped.is_terminal());
+        assert!(!TunnelStatus::Starting.is_terminal());
+        assert!(!TunnelStatus::Running.is_terminal());
+        assert!(!TunnelStatus::Stopping.is_terminal());
+        assert!(TunnelStatus::Failed.is_terminal());
+
+        assert!(!TunnelStatus::Stopped.is_stoppable());
+        assert!(TunnelStatus::Starting.is_stoppable());
+        assert!(TunnelStatus::Running.is_stoppable());
+        assert!(!TunnelStatus::Stopping.is_stoppable());
+        assert!(!TunnelStatus::Failed.is_stoppable());
     }
 }
