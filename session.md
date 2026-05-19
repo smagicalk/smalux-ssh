@@ -39,24 +39,25 @@
 - 最新核心新增：停止隧道时如果规则级运行态存在但当前会话运行态缺失，会返回明确错误，不再触发不可达分支 panic。
 - 最新核心新增：取消旧 SFTP 上传时清理浏览器 loading 必须匹配当前浏览器 owner，避免旧会话任务误清同主机新会话加载态。
 - 最新核心新增：SFTP 选择目录项前会先 claim 可用浏览器 owner，当前 owner 已断开时转交给同主机可用会话，否则明确拒绝选择。
+- 最新核心新增：SFTP 刷新和上传开启 loading 时改用会话归属 API，claim owner 后只允许匹配会话写入浏览器加载态。
 
 ## 最近提交
 
+- `d0e92dc 校验 SFTP 选择归属`
 - `ff0081f 校验 SFTP 加载态归属`
 - `1b383d2 防止停止隧道缺失运行态崩溃`
 - `23f0c0d 拒绝歧义 SFTP 传输取消`
 - `eb02eca 收窄 SFTP 传输入队归属`
-- `4a39f1c 绑定隧道运行态会话归属`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 113 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 114 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦 SFTP selection owner 测试通过
-  - `cargo test` 通过，`413 passed, 2 ignored`
+  - 聚焦 SFTP loading 写入归属测试通过
+  - `cargo test` 通过，`414 passed, 2 ignored`
   - `git diff --check` 通过
   - BOM 与中文抽样检查通过
 

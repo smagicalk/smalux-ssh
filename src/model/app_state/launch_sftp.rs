@@ -145,7 +145,7 @@ impl AppState {
             return missing_active_sftp_session(host_id);
         };
 
-        self.sessions.set_sftp_loading(host_id, true);
+        self.sessions.set_sftp_loading_for_session(session_id, true);
         self.backend_commands.push(BackendCommand::Sftp {
             session_id,
             request,
