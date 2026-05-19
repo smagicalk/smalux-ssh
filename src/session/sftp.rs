@@ -200,11 +200,64 @@ impl SessionManager {
             .unwrap_or(false)
     }
 
+    /// 当前 SFTP owner 失效后，转交给同主机可用 SFTP 会话。
+    pub fn reassign_sftp_browser_after_session_loss(&mut self, session_id: SessionId) -> bool {
+        let Some((host_id, owner_lost)) = self
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id && matches!(tab.kind, SessionKind::Sftp))
+            .and_then(|tab| {
+                tab.host_id
+                    .map(|host_id| (host_id, !sftp_tab_can_accept_browser_owner(&tab.status)))
+            })
+        else {
+            return false;
+        };
+        if !owner_lost || !self.sftp_browser_belongs_to_session(host_id, session_id) {
+            return false;
+        }
+
+        let Some(next_session_id) = self
+            .tabs
+            .iter()
+            .rev()
+            .find(|tab| {
+                tab.id != session_id
+                    && tab.host_id == Some(host_id)
+                    && matches!(tab.kind, SessionKind::Sftp)
+                    && sftp_tab_can_accept_browser_owner(&tab.status)
+            })
+            .map(|tab| tab.id)
+        else {
+            return false;
+        };
+
+        let Some(browser) = self
+            .sftp_browsers
+            .iter_mut()
+            .find(|browser| browser.host_id == host_id && browser.session_id == session_id)
+        else {
+            return false;
+        };
+
+        browser.session_id = next_session_id;
+        browser.loading = false;
+        browser.last_error = None;
+        true
+    }
+
     fn sftp_browser_belongs_to_session(&self, host_id: HostId, session_id: SessionId) -> bool {
         self.sftp_browsers
             .iter()
             .any(|browser| browser.host_id == host_id && browser.session_id == session_id)
     }
+}
+
+fn sftp_tab_can_accept_browser_owner(status: &SessionStatus) -> bool {
+    !matches!(
+        status,
+        SessionStatus::Disconnected | SessionStatus::Failed { .. }
+    )
 }
 
 #[cfg(test)]

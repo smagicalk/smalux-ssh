@@ -172,6 +172,32 @@ fn sftp_browser_owner_can_be_reassigned() {
 }
 
 #[test]
+fn sftp_browser_owner_reassigns_after_session_loss() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let fallback_session_id = session_id();
+    let failed_session_id = session_id();
+
+    sessions.open_sftp_tab(fallback_session_id, host_id, "/home/ops");
+    sessions.set_status(fallback_session_id, SessionStatus::Connected);
+    sessions.open_sftp_tab(failed_session_id, host_id, "/var/log");
+    sessions.set_sftp_loading(host_id, true);
+    sessions.fail_sftp_browser(host_id, "previous error");
+    sessions.set_status(
+        failed_session_id,
+        SessionStatus::Failed {
+            reason: "network".to_owned(),
+        },
+    );
+
+    assert!(sessions.reassign_sftp_browser_after_session_loss(failed_session_id));
+    assert_eq!(sessions.sftp_browsers[0].session_id, fallback_session_id);
+    assert!(!sessions.sftp_browsers[0].loading);
+    assert!(sessions.sftp_browsers[0].last_error.is_none());
+    assert!(!sessions.reassign_sftp_browser_after_session_loss(failed_session_id));
+}
+
+#[test]
 fn sftp_entries_can_update_by_session_id() {
     let mut sessions = SessionManager::default();
     let host_id = host_id();

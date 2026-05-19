@@ -602,6 +602,33 @@ fn disconnected_sftp_event_stops_browser_loading() {
 }
 
 #[test]
+fn disconnected_sftp_event_reassigns_browser_to_available_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let host_id = host_id();
+    let fallback_session_id = session_id();
+    let disconnected_session_id = session_id();
+
+    sessions.open_sftp_tab(fallback_session_id, host_id, "/home/ops");
+    sessions.set_status(fallback_session_id, SessionStatus::Connected);
+    sessions.open_sftp_tab(disconnected_session_id, host_id, "/var/log");
+    sessions.set_status(disconnected_session_id, SessionStatus::Connected);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Disconnected {
+            session_id: disconnected_session_id,
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert_eq!(sessions.sftp_browsers[0].session_id, fallback_session_id);
+    assert!(!sessions.sftp_browsers[0].loading);
+    assert!(sessions.sftp_browsers[0].last_error.is_none());
+}
+
+#[test]
 fn disconnected_tunnel_event_stops_runtime_and_marks_session_disconnected() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

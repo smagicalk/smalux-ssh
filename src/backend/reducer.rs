@@ -220,7 +220,8 @@ fn fail_sftp_runtime_for_session(
     reason: impl Into<String>,
 ) -> bool {
     let reason = reason.into();
-    let browser_updated = sessions.fail_sftp_browser_for_session(session_id, reason.clone());
+    let browser_updated = sessions.reassign_sftp_browser_after_session_loss(session_id)
+        || sessions.fail_sftp_browser_for_session(session_id, reason.clone());
     let transfers_updated = sessions.fail_transfers_for_session(session_id, reason);
 
     browser_updated || transfers_updated

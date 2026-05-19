@@ -47,25 +47,27 @@
 - 最新核心新增：SFTP 面板投影优先绑定当前 active tab 的主机，当前主机没有浏览器时展示该主机空态，不再回退展示其他主机浏览器。
 - 最新核心新增：激活 SFTP 标签页时会同步转交同主机浏览器 owner，避免后续刷新、上传等按 host 调度的命令继续落到旧会话。
 - 最新核心新增：激活断开/失败的 SFTP 标签页不会抢占同主机可用浏览器 owner，避免不可用会话重新接管 SFTP 浏览器。
+- 最新核心新增：当前 SFTP owner 收到连接级断开/失败事件后会立即转交给同主机可用会话，并清理 loading 和错误态，避免 stale owner 长时间残留。
 
 ## 最近提交
 
+- `4f6bfbd 限制断开 SFTP 抢占 owner`
 - `62fbaff 激活 SFTP 标签转交 owner`
 - `d0b2dfa 绑定 SFTP 面板当前主机`
 - `c81f4d2 只转交可用 SFTP owner`
 - `b35f904 清理关闭 SFTP owner 状态`
-- `8b4f901 收窄 SFTP 刷新保留 loading`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 121 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 122 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦激活断开 SFTP tab 保留可用 owner 测试通过
-  - `cargo test model::app_state::tests` 通过，`33 passed`
-  - `cargo test` 通过，`423 passed, 2 ignored`
+  - 聚焦断开 SFTP owner 转交可用会话测试通过
+  - `cargo test backend::reducer::tests` 通过，`25 passed`
+  - `cargo test session::sftp::tests` 通过，`15 passed`
+  - `cargo test` 通过，`425 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 
