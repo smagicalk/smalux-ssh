@@ -116,10 +116,11 @@ impl AppState {
         let Some(host_id) = tab.host_id else {
             return false;
         };
-        let has_other_sftp_tab =
-            self.sessions.tabs.iter().any(|other| {
-                other.host_id == Some(host_id) && matches!(other.kind, SessionKind::Sftp)
-            });
+        let has_other_sftp_tab = self.sessions.tabs.iter().any(|other| {
+            other.host_id == Some(host_id)
+                && matches!(other.kind, SessionKind::Sftp)
+                && sftp_tab_can_accept_browser_owner(&other.status)
+        });
 
         if has_other_sftp_tab {
             return self.reassign_sftp_browser_after_tab_close(tab);
@@ -155,6 +156,7 @@ impl AppState {
                 other.id != tab.id
                     && other.host_id == Some(host_id)
                     && matches!(other.kind, SessionKind::Sftp)
+                    && sftp_tab_can_accept_browser_owner(&other.status)
             })
             .map(|other| other.id)
         else {
@@ -227,6 +229,13 @@ fn should_disconnect_on_close(tab: &SessionTab, cleanup: &PendingCloseCommandCle
             tab.status,
             SessionStatus::Disconnected | SessionStatus::Failed { .. }
         )
+}
+
+fn sftp_tab_can_accept_browser_owner(status: &SessionStatus) -> bool {
+    !matches!(
+        status,
+        SessionStatus::Disconnected | SessionStatus::Failed { .. }
+    )
 }
 
 fn sftp_transfer_id(command: &BackendCommand) -> Option<TransferId> {
