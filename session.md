@@ -82,11 +82,13 @@
 - 最新核心新增：隧道 TCP 基础层补齐离线测试，覆盖监听绑定失败时携带规则名、accept tick 空闲超时返回 `None`、双向复制同时转发两个方向数据。
 - 最新核心新增：SFTP 上传/下载共用私有 `copy_transfer_with_progress` 传输循环，分块复制、进度事件和 IO 错误映射集中到单一职责 helper，并用纯内存 IO 覆盖分块、空流和写入错误路径。
 - 最新核心新增：动态隧道 SOCKS5 握手会校验客户端是否提供 no-auth 方法，缺失时回写 `0x05 0xFF` 并拒绝请求，避免无认证方法协商失败时仍继续 CONNECT。
+- 最新核心新增：本地 PTY reader 将字节读取、终端流解码、关闭事件收敛到私有 `read_events_from_stream`，线程入口只负责转发事件；新增纯内存 reader 测试覆盖普通输出、ANSI clear 和读错误路径。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：收紧 SOCKS5 方法协商
+- 本轮待提交：抽出本地 PTY reader 读取逻辑
+- `b4cfe55 收紧 SOCKS5 方法协商`
 - `1fa813e 集中 SFTP 传输进度复制`
 - `e0f74d9 补齐隧道 TCP 基础测试`
 - `6fc8a14 解耦 SOCKS5 握手解析`
@@ -108,8 +110,11 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 155 个提交；本轮提交后预计领先 156 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 156 个提交；本轮提交后预计领先 157 个提交
 - 最近验证：
+  - `cargo test read_events_from_stream -- --nocapture` 通过，`3 passed`
+  - `cargo test` 通过，`496 passed, 2 ignored`
+  - `cargo fmt --check` 通过
   - `cargo test socks5 -- --nocapture` 通过，`7 passed`
   - `cargo test` 通过，`493 passed, 2 ignored`
   - `cargo fmt --check` 通过
