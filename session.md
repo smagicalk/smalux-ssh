@@ -57,26 +57,27 @@
 - 最新核心新增：保存 SFTP 书签前会先 claim 同主机可用浏览器 owner，唯一 owner 已断开/失败时不会把旧目录保存为书签。
 - 最新核心新增：SFTP 传输和隧道运行态生命周期判断集中到 `TransferStatus` / `TunnelStatus`，队列取消、迟到进度、隧道停止和标签关闭复用同一终态口径。
 - 最新核心新增：后端 pump 收到 SFTP 操作错误后只保留同会话浏览读取，裁剪后续上传/下载/删除/建目录写操作，避免失败后继续执行排队写请求。
+- 最新核心新增：远程 shell drain 终止事件必须匹配当前 `session_id` 才会丢弃缓存 shell，错会话 `Disconnected` 不再影响当前交互通道。
 
 ## 最近提交
 
+- `2e2665c 裁剪失败后 SFTP 写队列`
 - `a31b44b 集中传输隧道终态判断`
 - `66b4a24 约束 SFTP 书签 owner`
 - `869abdd 集中会话终态判断`
 - `6e00653 限制终态 SFTP 重启加载`
-- `4772b4c 隔离迟到 SFTP 操作错误`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 131 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 132 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test backend_queue_pump_discards_pending_sftp_writes_after_sftp_error -- --nocapture` 通过，`1 passed`
-  - `cargo test model::app_state::backend_pump_tests` 通过，`15 passed`
+  - `cargo test remote_shell_cache_drop_follows_shell_terminal_events -- --nocapture` 通过，`1 passed`
+  - `cargo test backend::ssh::executor::tests` 通过，`31 passed`
   - `cargo test backend::reducer::tests` 通过，`27 passed`
-  - `cargo test model::app_state::launch_tests::sftp` 通过，`36 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`15 passed`
   - `cargo test` 通过，`440 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过

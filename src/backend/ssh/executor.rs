@@ -139,7 +139,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             REMOTE_SHELL_DRAIN_POLL_TIMEOUT,
         ));
 
-        if remote_shell_events_require_cache_drop(&events) {
+        if remote_shell_events_require_cache_drop(session_id, &events) {
             self.shells.remove(&session_id);
         }
 
@@ -338,11 +338,17 @@ fn connected_session_error(operation: &str) -> BackendExecutionError {
     }
 }
 
-fn remote_shell_events_require_cache_drop(events: &[BackendEvent]) -> bool {
-    events.iter().any(remote_shell_event_requires_cache_drop)
+fn remote_shell_events_require_cache_drop(session_id: SessionId, events: &[BackendEvent]) -> bool {
+    events
+        .iter()
+        .any(|event| remote_shell_event_requires_cache_drop(session_id, event))
 }
 
-fn remote_shell_event_requires_cache_drop(event: &BackendEvent) -> bool {
+fn remote_shell_event_requires_cache_drop(session_id: SessionId, event: &BackendEvent) -> bool {
+    if event.session_id() != session_id {
+        return false;
+    }
+
     matches!(
         event,
         BackendEvent::CommandExited { .. }
