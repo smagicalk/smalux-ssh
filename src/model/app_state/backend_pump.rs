@@ -134,6 +134,29 @@ impl AppState {
 
     fn skip_stale_backend_command(&mut self, command: &BackendCommand) -> AppUpdateOutcome {
         match command {
+            BackendCommand::Connect { session_id, .. } => {
+                let reason = "连接命令已失效，后续启动命令未执行".to_owned();
+                let event_outcome = self.apply_backend_event(BackendEvent::Failed {
+                    session_id: *session_id,
+                    reason: reason.clone(),
+                });
+                let discarded = discard_pending_commands_for_failed_session(
+                    &mut self.backend_commands,
+                    *session_id,
+                    &reason,
+                );
+                let mut outcome = AppUpdateOutcome {
+                    state_changed: event_outcome.state_changed || discarded.removed_count > 0,
+                    applied_backend_events: event_outcome.applied_backend_events,
+                    ..AppUpdateOutcome::default()
+                };
+                for event in discarded.failure_events {
+                    let event_outcome = self.apply_backend_event(event);
+                    outcome.state_changed |= event_outcome.state_changed;
+                    outcome.applied_backend_events += event_outcome.applied_backend_events;
+                }
+                outcome
+            }
             BackendCommand::Sftp {
                 session_id,
                 request: SftpRequest::ListDir { .. },
