@@ -101,6 +101,10 @@ impl AppState {
             } => self.sessions.can_execute_sftp_browser_command(*session_id),
             BackendCommand::Sftp {
                 session_id,
+                request: SftpRequest::RemoveFile { .. } | SftpRequest::CreateDir { .. },
+            } => self.sessions.can_execute_sftp_browser_command(*session_id),
+            BackendCommand::Sftp {
+                session_id,
                 request: SftpRequest::Upload { .. } | SftpRequest::Download { .. },
             } => self.sessions.can_execute_sftp_transfer_command(*session_id),
             _ => true,
@@ -116,6 +120,15 @@ impl AppState {
                 state_changed: self
                     .sessions
                     .set_sftp_loading_for_session(*session_id, false),
+                ..AppUpdateOutcome::default()
+            },
+            BackendCommand::Sftp {
+                session_id,
+                request: SftpRequest::RemoveFile { .. } | SftpRequest::CreateDir { .. },
+            } => AppUpdateOutcome {
+                state_changed: self
+                    .sessions
+                    .fail_sftp_browser_for_session(*session_id, "SFTP 会话已结束，操作未执行"),
                 ..AppUpdateOutcome::default()
             },
             BackendCommand::Sftp { session_id, .. } => {
