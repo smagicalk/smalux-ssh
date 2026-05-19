@@ -48,7 +48,7 @@ impl AppState {
         self.drain_backend_queue(&mut **executor)
     }
 
-    fn finish_remote_command_history(
+    pub(super) fn finish_remote_command_history(
         &mut self,
         session_id: SessionId,
         exit_code: Option<i32>,

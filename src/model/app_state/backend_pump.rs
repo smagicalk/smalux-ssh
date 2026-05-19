@@ -192,6 +192,10 @@ impl AppState {
                     ..AppUpdateOutcome::default()
                 }
             }
+            BackendCommand::RunCommand { session_id, .. } => AppUpdateOutcome {
+                state_changed: self.finish_remote_command_history(*session_id, None),
+                ..AppUpdateOutcome::default()
+            },
             _ => AppUpdateOutcome::default(),
         }
     }
