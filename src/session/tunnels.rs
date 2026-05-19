@@ -174,6 +174,14 @@ impl SessionManager {
                 .is_some_and(|status| !status.is_terminal())
     }
 
+    /// 判断停止隧道命令是否仍允许发往后端执行器。
+    pub fn can_execute_tunnel_stop_command(&self, session_id: SessionId, rule_name: &str) -> bool {
+        self.tunnel_tab_matches_rule(session_id, rule_name)
+            && self
+                .tunnel_status_for_session(session_id, rule_name)
+                .is_some_and(|status| !status.is_terminal())
+    }
+
     /// 按后端事件同步隧道运行态。
     pub fn set_tunnel_status(
         &mut self,
@@ -496,5 +504,29 @@ mod tests {
         ));
 
         assert!(!sessions.can_execute_tunnel_start_command(current_session_id, "local-db"));
+    }
+
+    #[test]
+    fn tunnel_stop_command_acceptance_requires_matching_non_terminal_runtime() {
+        let mut sessions = SessionManager::default();
+        let rule = tunnel_rule("local-db");
+        let current_session_id = session_id();
+        let stale_session_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_tunnel_tab(current_session_id, host_id, &rule);
+        sessions.start_tunnel(current_session_id, &rule, Some(host_id), 10);
+        sessions.mark_tunnel_running(current_session_id, "local-db");
+
+        assert!(sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
+        assert!(!sessions.can_execute_tunnel_stop_command(stale_session_id, "local-db"));
+        assert!(!sessions.can_execute_tunnel_stop_command(current_session_id, "metrics"));
+
+        assert!(sessions.mark_tunnel_stopping(current_session_id, "local-db"));
+        assert!(sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
+
+        assert!(sessions.stop_tunnel(current_session_id, "local-db"));
+
+        assert!(!sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
     }
 }

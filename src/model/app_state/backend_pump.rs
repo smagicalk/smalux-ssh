@@ -113,6 +113,12 @@ impl AppState {
             } => self
                 .sessions
                 .can_execute_tunnel_start_command(*session_id, &request.rule.name),
+            BackendCommand::StopTunnel {
+                session_id,
+                request,
+            } => self
+                .sessions
+                .can_execute_tunnel_stop_command(*session_id, &request.rule_name),
             _ => true,
         }
     }
