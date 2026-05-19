@@ -2,6 +2,7 @@ use super::sftp::{join_remote_path, parent_remote_dir, sftp_entry_from_parts, tr
 use super::*;
 use crate::model::{SftpEntryKind, TransferId, TransferStatus};
 use russh::CryptoVec;
+use russh::Sig;
 use russh_sftp::protocol::FileAttributes;
 use uuid::Uuid;
 
@@ -147,6 +148,52 @@ fn shell_close_message_maps_to_disconnected() {
     let event = shell_message_to_event(session_id, ChannelMsg::Close);
 
     assert_eq!(event, Some(BackendEvent::Disconnected { session_id }));
+}
+
+#[test]
+fn command_exit_signal_message_maps_to_output_event() {
+    let session_id = session_id();
+    let signal_name = Sig::TERM;
+    let expected_line = format!("远程进程收到信号退出：{signal_name:?}");
+    let mut events = Vec::new();
+    let mut exit_code = None;
+
+    let should_stop = collect_command_message(
+        session_id,
+        ChannelMsg::ExitSignal {
+            signal_name,
+            core_dumped: false,
+            error_message: String::new(),
+            lang_tag: String::new(),
+        },
+        &mut events,
+        &mut exit_code,
+    )
+    .expect("退出信号应该可以记录");
+
+    assert!(!should_stop);
+    assert_eq!(
+        events,
+        vec![BackendEvent::Output {
+            session_id,
+            line: expected_line,
+        }]
+    );
+    assert_eq!(exit_code, None);
+}
+
+#[test]
+fn shell_message_ignores_non_terminal_control_messages() {
+    let session_id = session_id();
+
+    assert_eq!(
+        shell_message_to_event(session_id, ChannelMsg::WindowAdjusted { new_size: 80 }),
+        None
+    );
+    assert_eq!(
+        shell_message_to_event(session_id, ChannelMsg::Success),
+        None
+    );
 }
 
 #[test]

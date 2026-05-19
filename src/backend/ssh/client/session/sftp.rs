@@ -436,7 +436,35 @@ mod tests {
         ));
     }
 
+    #[tokio::test]
+    async fn copy_transfer_with_progress_maps_read_errors() {
+        let mut reader = FailingReader;
+        let mut writer = Vec::new();
+
+        let error = copy_transfer_with_progress(
+            session_id(),
+            transfer_id(),
+            Some(0),
+            &mut reader,
+            &mut writer,
+            "read payload",
+            "write payload",
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            BackendExecutionError::SftpFailed {
+                operation,
+                reason,
+            } if operation == "read payload" && reason.contains("injected read failure")
+        ));
+    }
+
     struct FailingWriter;
+
+    struct FailingReader;
 
     impl AsyncWrite for FailingWriter {
         fn poll_write(
@@ -462,6 +490,34 @@ mod tests {
             _cx: &mut Context<'_>,
             _buf: &mut ReadBuf<'_>,
         ) -> Poll<Result<(), Error>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncRead for FailingReader {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<Result<(), Error>> {
+            Poll::Ready(Err(Error::new(ErrorKind::Other, "injected read failure")))
+        }
+    }
+
+    impl AsyncWrite for FailingReader {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &[u8],
+        ) -> Poll<Result<usize, Error>> {
+            Poll::Ready(Ok(0))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
             Poll::Ready(Ok(()))
         }
     }

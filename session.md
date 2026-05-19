@@ -7,6 +7,7 @@
 - 当前优先级：继续完成核心，UI 先不扩展。
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
+- 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
 
 ## 当前进度
 
@@ -85,11 +86,14 @@
 - 最新核心新增：本地 PTY reader 将字节读取、终端流解码、关闭事件收敛到私有 `read_events_from_stream`，线程入口只负责转发事件；新增纯内存 reader 测试覆盖普通输出、ANSI clear 和读错误路径。
 - 最新核心新增：本地 PTY fallback 状态机补齐离线测试，覆盖等待未到期保持 Waiting、运行中无结果保留 receiver、收到结果返回事件并清空状态、worker 断开时静默清理状态。
 - 最新核心新增：本地 PTY 执行器补齐无会话和不支持命令边界测试，覆盖缺失会话 drain 空返回、缺失会话 disconnect 幂等返回 Disconnected、远程命令请求被本地执行器拒绝且不创建 session。
+- 最新核心新增：`client/tests.rs` 补齐主机密钥策略、算法 hint、认证错误和 `host_key_or_connection_error` 的纯离线测试。
+- 最新核心新增：`client/session/tests.rs` 补齐 `collect_command_message` 的 `ExitSignal` 输出映射和非终态消息忽略测试。
+- 最新核心新增：`client/session/sftp.rs` 的 `copy_transfer_with_progress` 补齐读取错误映射测试。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：补齐本地 PTY 执行器边界测试
+- 本轮待提交：补齐 SSH client/session/SFTP 纯离线边界测试并整理恢复记录
 - `9d2ec1b 补齐本地 PTY fallback 状态测试`
 - `a8280cb 抽出本地 PTY reader 读取逻辑`
 - `b4cfe55 收紧 SOCKS5 方法协商`
@@ -147,10 +151,15 @@
   - `cargo test session::transfers::tests` 通过，`8 passed`
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test model::app_state::backend_pump_tests` 通过，`33 passed`
-  - `cargo test` 通过，`480 passed, 2 ignored`
-  - `git diff --check` 通过，仅 Windows CRLF 提示
-  - BOM 与中文抽样检查通过
+- `cargo test model::app_state::backend_pump_tests` 通过，`33 passed`
+- `cargo test` 通过，`480 passed, 2 ignored`
+- `cargo test backend::ssh::client::tests -- --nocapture` 通过，`15 passed`
+- `cargo test backend::ssh::client::session::tests -- --nocapture` 通过，`13 passed`
+- `cargo test backend::ssh::client::session::sftp -- --nocapture` 通过，`4 passed`
+- `cargo fmt --check` 通过
+- `cargo test` 通过，`512 passed, 2 ignored`
+- `git diff --check` 通过，仅 Windows CRLF 提示
+- BOM 与中文抽样检查通过
 
 ## 提交要求
 
