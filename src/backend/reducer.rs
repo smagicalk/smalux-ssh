@@ -133,7 +133,7 @@ pub fn apply_backend_event(
             terminal_updated: false,
         },
         BackendEvent::SftpFailed { session_id, reason } => BackendEventOutcome {
-            session_updated: sessions.fail_sftp_browser_for_session(session_id, reason),
+            session_updated: sessions.fail_sftp_operation_for_session(session_id, reason),
             terminal_updated: false,
         },
         BackendEvent::TunnelStatusChanged {

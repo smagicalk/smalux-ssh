@@ -51,27 +51,29 @@
 - 最新核心新增：底层 SFTP owner 转交 API 会校验目标 session 必须是同主机 SFTP 标签页，避免误把 shell、错主机或缺失 session 设为 owner。
 - 最新核心新增：底层 SFTP owner 转交 API 同时要求目标 session 处于可接管状态，断开/失败的 SFTP 标签页不会被设为 owner。
 - 最新核心新增：SFTP 目录结果按 session 写入时会校验来源仍是可用 SFTP owner，断开/失败 owner 或同 ID 非 SFTP 标签页的迟到目录结果不再覆盖浏览器状态。
+- 最新核心新增：普通 `SftpFailed` 操作错误只写入仍可用的当前 SFTP owner，迟到操作错误不会覆盖连接级断开/失败留下的浏览器错误。
 
 ## 最近提交
 
+- `59f64d4 忽略迟到 SFTP 目录结果`
 - `49c533a 校验 SFTP owner 可用状态`
 - `d82ee5b 校验 SFTP owner 转交目标`
 - `e15a284 断开 SFTP owner 立即转交`
 - `4f6bfbd 限制断开 SFTP 抢占 owner`
-- `62fbaff 激活 SFTP 标签转交 owner`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 125 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 126 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦 SFTP 迟到目录结果防污染测试通过
-  - `cargo test session::sftp::tests` 通过，`18 passed`
-  - `cargo test backend::reducer::tests` 通过，`26 passed`
+  - 聚焦 SFTP 迟到操作错误防覆盖测试通过
+  - `cargo test session::sftp::tests` 通过，`20 passed`
+  - `cargo test backend::reducer::tests` 通过，`27 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`14 passed`
   - `cargo test model::app_state::launch_tests::sftp` 通过，`34 passed`
-  - `cargo test` 通过，`429 passed, 2 ignored`
+  - `cargo test` 通过，`432 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 

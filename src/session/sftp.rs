@@ -208,6 +208,27 @@ impl SessionManager {
             .unwrap_or(false)
     }
 
+    /// 按会话标签页记录 SFTP 操作错误，忽略已经失效的迟到操作结果。
+    pub fn fail_sftp_operation_for_session(
+        &mut self,
+        session_id: SessionId,
+        reason: impl Into<String>,
+    ) -> bool {
+        let reason = reason.into();
+
+        self.tabs
+            .iter()
+            .find(|tab| {
+                tab.id == session_id
+                    && matches!(tab.kind, SessionKind::Sftp)
+                    && sftp_tab_can_accept_browser_owner(&tab.status)
+            })
+            .and_then(|tab| tab.host_id)
+            .filter(|host_id| self.sftp_browser_belongs_to_session(*host_id, session_id))
+            .map(|host_id| self.fail_sftp_browser(host_id, reason))
+            .unwrap_or(false)
+    }
+
     /// 当前 SFTP owner 失效后，转交给同主机可用 SFTP 会话。
     pub fn reassign_sftp_browser_after_session_loss(&mut self, session_id: SessionId) -> bool {
         let Some((host_id, owner_lost)) = self

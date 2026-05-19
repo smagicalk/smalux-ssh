@@ -445,6 +445,36 @@ fn sftp_failed_event_records_browser_error_without_failing_transfers() {
 }
 
 #[test]
+fn sftp_failed_event_ignores_terminal_sftp_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id(), "/home/ops");
+    sessions.set_sftp_loading(sessions.tabs[0].host_id.unwrap(), true);
+    apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::Disconnected { session_id },
+    );
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::SftpFailed {
+            session_id,
+            reason: "late permission denied".to_owned(),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("SFTP 会话已断开")
+    );
+}
+
+#[test]
 fn tunnel_status_event_updates_runtime_state() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();

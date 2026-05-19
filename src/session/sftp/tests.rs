@@ -368,3 +368,37 @@ fn sftp_failure_by_session_ignores_non_sftp_tabs() {
     assert!(!sessions.fail_sftp_browser_for_session(shell_session_id, "shell failed"));
     assert!(sessions.sftp_browsers[0].last_error.is_none());
 }
+
+#[test]
+fn sftp_operation_failure_ignores_terminal_owner() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id, "/home/ops");
+    sessions.set_sftp_loading(host_id, true);
+    sessions.fail_sftp_browser_for_session(session_id, "SFTP 会话已断开");
+    sessions.set_status(session_id, SessionStatus::Disconnected);
+
+    assert!(!sessions.fail_sftp_operation_for_session(session_id, "late permission denied"));
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("SFTP 会话已断开")
+    );
+}
+
+#[test]
+fn sftp_operation_failure_records_current_owner_error() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id, "/home/ops");
+    sessions.set_status(session_id, SessionStatus::Connected);
+
+    assert!(sessions.fail_sftp_operation_for_session(session_id, "permission denied"));
+    assert_eq!(
+        sessions.sftp_browsers[0].last_error.as_deref(),
+        Some("permission denied")
+    );
+}
