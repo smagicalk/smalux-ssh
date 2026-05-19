@@ -95,6 +95,12 @@ impl AppState {
             BackendCommand::DrainSessionOutput { session_id } => {
                 self.sessions.can_drain_interactive_shell(*session_id)
             }
+            BackendCommand::OpenShell { session_id, .. } => {
+                self.sessions.can_execute_open_shell_command(*session_id)
+            }
+            BackendCommand::RunCommand { session_id, .. } => {
+                self.sessions.can_execute_remote_command(*session_id)
+            }
             BackendCommand::Sftp {
                 session_id,
                 request: SftpRequest::ListDir { .. },

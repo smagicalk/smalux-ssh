@@ -122,6 +122,24 @@ impl SessionManager {
             .is_some_and(SessionTab::can_accept_terminal_input)
     }
 
+    /// 判断打开 shell 命令是否仍允许发往后端执行器。
+    pub fn can_execute_open_shell_command(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| matches!(tab.kind, SessionKind::Shell) && !tab.status.is_terminal())
+    }
+
+    /// 判断远程命令执行请求是否仍允许发往后端执行器。
+    pub fn can_execute_remote_command(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| {
+                matches!(tab.kind, SessionKind::RemoteCommand { .. }) && !tab.status.is_terminal()
+            })
+    }
+
     /// 判断终端缓冲是否仍可被对应会话更新。
     pub fn can_update_terminal_buffer(&self, id: SessionId) -> bool {
         self.tabs
@@ -378,6 +396,50 @@ mod tests {
         assert!(sessions.can_send_interactive_shell_input(local_id));
         assert!(sessions.can_send_interactive_shell_input(shell_id));
         assert!(!sessions.can_send_interactive_shell_input(command_id));
+    }
+
+    #[test]
+    fn shell_open_command_acceptance_requires_non_terminal_shell_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let command_id = session_id();
+        let local_id = session_id();
+
+        sessions.open_shell_tab(shell_id, host_id(), "production");
+        sessions.open_remote_command_tab(command_id, host_id(), "uptime", None);
+        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+
+        assert!(sessions.can_execute_open_shell_command(shell_id));
+        assert!(!sessions.can_execute_open_shell_command(command_id));
+        assert!(!sessions.can_execute_open_shell_command(local_id));
+        assert!(!sessions.can_execute_open_shell_command(session_id()));
+
+        assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
+
+        assert!(!sessions.can_execute_open_shell_command(shell_id));
+    }
+
+    #[test]
+    fn remote_command_execution_acceptance_requires_non_terminal_command_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let command_id = session_id();
+
+        sessions.open_shell_tab(shell_id, host_id(), "production");
+        sessions.open_remote_command_tab(command_id, host_id(), "uptime", None);
+
+        assert!(sessions.can_execute_remote_command(command_id));
+        assert!(!sessions.can_execute_remote_command(shell_id));
+        assert!(!sessions.can_execute_remote_command(session_id()));
+
+        assert!(sessions.set_status(
+            command_id,
+            SessionStatus::Failed {
+                reason: "network".to_owned(),
+            }
+        ));
+
+        assert!(!sessions.can_execute_remote_command(command_id));
     }
 
     #[test]
