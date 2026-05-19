@@ -47,6 +47,24 @@ async fn parse_socks5_target_from_client_bytes(
     Ok((target.host, target.port, response))
 }
 
+async fn reject_socks5_greeting_from_client_bytes(bytes: &'static [u8]) -> Result<Vec<u8>, String> {
+    let (mut client, mut server) = tokio::io::duplex(128);
+    let client_task = tokio::spawn(async move {
+        client.write_all(bytes).await.unwrap();
+        let mut response = [0_u8; 2];
+        client.read_exact(&mut response).await.unwrap();
+        response.to_vec()
+    });
+
+    let error = match read_socks5_target(&mut server).await {
+        Ok(_) => panic!("SOCKS5 greeting without no-auth should be rejected"),
+        Err(error) => error,
+    };
+    let response = client_task.await.unwrap();
+    assert_eq!(error, "SOCKS5 no-auth method is required");
+    Ok(response)
+}
+
 #[tokio::test]
 async fn socks5_target_reads_ipv4_connect_request() {
     let (host, port, response) = parse_socks5_target_from_client_bytes(&[
@@ -90,6 +108,17 @@ async fn socks5_target_reads_ipv6_connect_request() {
     assert_eq!(host, "2001:db8::1");
     assert_eq!(port, 443);
     assert_eq!(response, vec![0x05, 0x00]);
+}
+
+#[tokio::test]
+async fn socks5_target_rejects_clients_without_no_auth_method() {
+    let response = reject_socks5_greeting_from_client_bytes(&[
+        0x05, 0x01, 0x02, // greeting: username/password only
+    ])
+    .await
+    .unwrap();
+
+    assert_eq!(response, vec![0x05, 0xFF]);
 }
 
 #[tokio::test]

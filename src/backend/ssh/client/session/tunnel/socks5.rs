@@ -27,6 +27,14 @@ where
         .read_exact(&mut methods)
         .await
         .map_err(|error| error.to_string())?;
+    if !methods.contains(&0x00) {
+        stream
+            .write_all(&[0x05, 0xFF])
+            .await
+            .map_err(|error| error.to_string())?;
+        return Err("SOCKS5 no-auth method is required".to_owned());
+    }
+
     stream
         .write_all(&[0x05, 0x00])
         .await
