@@ -146,32 +146,14 @@ pub fn apply_backend_event(
                 terminal_updated: false,
             }
         }
-        BackendEvent::Failed { session_id, reason } => {
-            let session_updated = sessions.set_status(
-                session_id,
-                SessionStatus::Failed {
-                    reason: reason.clone(),
-                },
-            );
-            let sftp_updated = fail_sftp_runtime_for_session(sessions, session_id, reason.clone());
-            let tunnel_updated = sessions.fail_tunnel_for_session(session_id, reason);
-
-            BackendEventOutcome {
-                session_updated: session_updated || sftp_updated || tunnel_updated,
-                terminal_updated: false,
-            }
-        }
-        BackendEvent::Disconnected { session_id } => {
-            let session_updated = sessions.set_status(session_id, SessionStatus::Disconnected);
-            let sftp_updated =
-                fail_sftp_runtime_for_session(sessions, session_id, "SFTP 会话已断开");
-            let tunnel_updated = sessions.stop_tunnel_for_session(session_id);
-
-            BackendEventOutcome {
-                session_updated: session_updated || sftp_updated || tunnel_updated,
-                terminal_updated: false,
-            }
-        }
+        BackendEvent::Failed { session_id, reason } => BackendEventOutcome {
+            session_updated: sessions.mark_session_failed(session_id, reason),
+            terminal_updated: false,
+        },
+        BackendEvent::Disconnected { session_id } => BackendEventOutcome {
+            session_updated: sessions.mark_session_disconnected(session_id),
+            terminal_updated: false,
+        },
     }
 }
 
@@ -204,19 +186,6 @@ fn apply_tunnel_session_status(
         ),
         TunnelStatus::Starting | TunnelStatus::Stopping => false,
     }
-}
-
-fn fail_sftp_runtime_for_session(
-    sessions: &mut SessionManager,
-    session_id: SessionId,
-    reason: impl Into<String>,
-) -> bool {
-    let reason = reason.into();
-    let browser_updated = sessions.reassign_sftp_browser_after_session_loss(session_id)
-        || sessions.fail_sftp_browser_for_session(session_id, reason.clone());
-    let transfers_updated = sessions.fail_transfers_for_session(session_id, reason);
-
-    browser_updated || transfers_updated
 }
 
 #[cfg(test)]

@@ -230,6 +230,30 @@ impl SessionManager {
         self.set_status(id, SessionStatus::Connected)
     }
 
+    /// 标记会话失败，并集中收敛 SFTP、传输和隧道运行态。
+    pub fn mark_session_failed(&mut self, id: SessionId, reason: impl Into<String>) -> bool {
+        let reason = reason.into();
+        let session_updated = self.set_status(
+            id,
+            SessionStatus::Failed {
+                reason: reason.clone(),
+            },
+        );
+        let sftp_updated = self.fail_sftp_runtime_for_session(id, reason.clone());
+        let tunnel_updated = self.fail_tunnel_for_session(id, reason);
+
+        session_updated || sftp_updated || tunnel_updated
+    }
+
+    /// 标记会话断开，并集中收敛 SFTP、传输和隧道运行态。
+    pub fn mark_session_disconnected(&mut self, id: SessionId) -> bool {
+        let session_updated = self.set_status(id, SessionStatus::Disconnected);
+        let sftp_updated = self.fail_sftp_runtime_for_session(id, "SFTP 会话已断开");
+        let tunnel_updated = self.stop_tunnel_for_session(id);
+
+        session_updated || sftp_updated || tunnel_updated
+    }
+
     /// 判断连接命令是否仍允许发往后端执行器。
     pub fn can_execute_connect_command(&self, id: SessionId, host_id: HostId) -> bool {
         self.tabs
@@ -302,12 +326,23 @@ impl SessionManager {
                     && !tab.status.is_terminal()
             })
     }
+
+    fn fail_sftp_runtime_for_session(&mut self, id: SessionId, reason: impl Into<String>) -> bool {
+        let reason = reason.into();
+        let browser_updated = self.reassign_sftp_browser_after_session_loss(id)
+            || self.fail_sftp_browser_for_session(id, reason.clone());
+        let transfers_updated = self.fail_transfers_for_session(id, reason);
+
+        browser_updated || transfers_updated
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::TunnelKind;
+    use crate::model::{
+        TransferDirection, TransferId, TransferStatus, TransferTask, TunnelKind, TunnelStatus,
+    };
     use uuid::Uuid;
 
     fn host_id() -> HostId {
@@ -327,6 +362,20 @@ mod tests {
             target_host: "10.0.0.5".to_owned(),
             target_port: 5432,
             auto_start: false,
+        }
+    }
+
+    fn transfer_task(id: TransferId, session_id: SessionId, host_id: HostId) -> TransferTask {
+        TransferTask {
+            id,
+            session_id,
+            host_id,
+            direction: TransferDirection::Download,
+            local_path: "C:/tmp/syslog".to_owned(),
+            remote_path: "/var/log/syslog".to_owned(),
+            total_bytes: Some(100),
+            transferred_bytes: 0,
+            status: TransferStatus::Queued,
         }
     }
 
@@ -689,6 +738,88 @@ mod tests {
 
         assert!(sessions.set_status(command_id, SessionStatus::Disconnected));
         assert!(!sessions.mark_backend_connected(command_id));
+    }
+
+    #[test]
+    fn failed_session_status_collects_sftp_and_tunnel_runtime() {
+        let mut sessions = SessionManager::default();
+        let sftp_id = session_id();
+        let tunnel_id = session_id();
+        let host_id = host_id();
+        let rule = tunnel_rule("local-db");
+        let transfer_id = TransferId(Uuid::new_v4());
+
+        sessions.open_sftp_tab(sftp_id, host_id, "/home/ops");
+        sessions.set_sftp_loading(host_id, true);
+        sessions.enqueue_transfer(transfer_task(transfer_id, sftp_id, host_id));
+        sessions.open_tunnel_tab(tunnel_id, host_id, &rule);
+        sessions.start_tunnel(tunnel_id, &rule, Some(host_id), 10);
+
+        assert!(sessions.mark_session_failed(sftp_id, "connection reset"));
+        assert!(matches!(
+            &sessions.tabs[0].status,
+            SessionStatus::Failed { reason } if reason == "connection reset"
+        ));
+        assert_eq!(
+            sessions.sftp_browsers[0].last_error.as_deref(),
+            Some("connection reset")
+        );
+        assert!(matches!(
+            &sessions.transfers[0].status,
+            TransferStatus::Failed { reason } if reason == "connection reset"
+        ));
+
+        assert!(sessions.mark_session_failed(tunnel_id, "bind failed"));
+        assert!(matches!(
+            &sessions.tabs[1].status,
+            SessionStatus::Failed { reason } if reason == "bind failed"
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Failed));
+        assert_eq!(
+            sessions.tunnels[0].last_error.as_deref(),
+            Some("bind failed")
+        );
+    }
+
+    #[test]
+    fn disconnected_session_status_collects_sftp_and_tunnel_runtime() {
+        let mut sessions = SessionManager::default();
+        let sftp_id = session_id();
+        let fallback_sftp_id = session_id();
+        let tunnel_id = session_id();
+        let host_id = host_id();
+        let rule = tunnel_rule("local-db");
+        let transfer_id = TransferId(Uuid::new_v4());
+
+        sessions.open_sftp_tab(fallback_sftp_id, host_id, "/home/ops");
+        sessions.set_status(fallback_sftp_id, SessionStatus::Connected);
+        sessions.open_sftp_tab(sftp_id, host_id, "/var/log");
+        sessions.set_status(sftp_id, SessionStatus::Connected);
+        sessions.set_sftp_loading(host_id, true);
+        sessions.enqueue_transfer(transfer_task(transfer_id, sftp_id, host_id));
+        sessions.open_tunnel_tab(tunnel_id, host_id, &rule);
+        sessions.start_tunnel(tunnel_id, &rule, Some(host_id), 10);
+        sessions.mark_tunnel_running(tunnel_id, "local-db");
+
+        assert!(sessions.mark_session_disconnected(sftp_id));
+        assert!(matches!(
+            sessions.tabs[1].status,
+            SessionStatus::Disconnected
+        ));
+        assert_eq!(sessions.sftp_browsers[0].session_id, fallback_sftp_id);
+        assert!(!sessions.sftp_browsers[0].loading);
+        assert!(sessions.sftp_browsers[0].last_error.is_none());
+        assert!(matches!(
+            &sessions.transfers[0].status,
+            TransferStatus::Failed { reason } if reason == "SFTP 会话已断开"
+        ));
+
+        assert!(sessions.mark_session_disconnected(tunnel_id));
+        assert!(matches!(
+            sessions.tabs[2].status,
+            SessionStatus::Disconnected
+        ));
+        assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Stopped));
     }
 
     #[test]
