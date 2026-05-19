@@ -168,7 +168,7 @@ impl SessionManager {
 
     /// 判断启动隧道命令是否仍允许发往后端执行器。
     pub fn can_execute_tunnel_start_command(&self, session_id: SessionId, rule_name: &str) -> bool {
-        self.tunnel_tab_matches_rule(session_id, rule_name)
+        self.tunnel_tab_matches_active_rule(session_id, rule_name)
             && self
                 .tunnel_status_for_session(session_id, rule_name)
                 .is_some_and(|status| !status.is_terminal())
@@ -176,7 +176,7 @@ impl SessionManager {
 
     /// 判断停止隧道命令是否仍允许发往后端执行器。
     pub fn can_execute_tunnel_stop_command(&self, session_id: SessionId, rule_name: &str) -> bool {
-        self.tunnel_tab_matches_rule(session_id, rule_name)
+        self.tunnel_tab_matches_active_rule(session_id, rule_name)
             && self
                 .tunnel_status_for_session(session_id, rule_name)
                 .is_some_and(|status| !status.is_terminal())
@@ -210,6 +210,19 @@ impl SessionManager {
     fn tunnel_tab_matches_rule(&self, session_id: SessionId, rule_name: &str) -> bool {
         self.tabs.iter().any(|tab| {
             tab.id == session_id
+                && matches!(
+                    &tab.kind,
+                    SessionKind::Tunnel {
+                        rule_name: tab_rule_name,
+                    } if tab_rule_name == rule_name
+                )
+        })
+    }
+
+    fn tunnel_tab_matches_active_rule(&self, session_id: SessionId, rule_name: &str) -> bool {
+        self.tabs.iter().any(|tab| {
+            tab.id == session_id
+                && !tab.status.is_terminal()
                 && matches!(
                     &tab.kind,
                     SessionKind::Tunnel {
@@ -504,6 +517,14 @@ mod tests {
         ));
 
         assert!(!sessions.can_execute_tunnel_start_command(current_session_id, "local-db"));
+
+        sessions.start_tunnel(current_session_id, &rule, Some(host_id), 20);
+        sessions.set_status(
+            current_session_id,
+            crate::model::SessionStatus::Disconnected,
+        );
+
+        assert!(!sessions.can_execute_tunnel_start_command(current_session_id, "local-db"));
     }
 
     #[test]
@@ -526,6 +547,16 @@ mod tests {
         assert!(sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
 
         assert!(sessions.stop_tunnel(current_session_id, "local-db"));
+
+        assert!(!sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
+
+        sessions.start_tunnel(current_session_id, &rule, Some(host_id), 20);
+        sessions.mark_tunnel_running(current_session_id, "local-db");
+        sessions.mark_tunnel_stopping(current_session_id, "local-db");
+        sessions.set_status(
+            current_session_id,
+            crate::model::SessionStatus::Disconnected,
+        );
 
         assert!(!sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
     }

@@ -71,10 +71,12 @@
 - 最新核心新增：后端队列泵跳过失效 `Connect` 时会本地标记该会话失败，并裁剪同会话后续 pending 启动命令，避免连接未建立时继续打开 shell/SFTP/隧道。
 - 最新核心新增：关闭已连接但 `StartTunnel` 仍 pending 的隧道标签页时会取消启动命令但仍排 `Disconnect`，确保已建立的真实 SSH connection 继续进入后端资源清理；队列泵即使标签页已关闭也会执行 `Disconnect`。
 - 最新核心新增：后端队列泵跳过终态 `RunCommand` 时会复用远程命令历史收尾逻辑，避免后端请求未执行但命令历史长期停留在未完成状态。
+- 最新核心新增：隧道 `StartTunnel` / `StopTunnel` 执行许可现在同时要求会话标签页未终态，避免会话已断开但隧道 runtime 仍处于 Starting/Stopping 时继续触发真实后端。
 
 ## 最近提交
 
-- 本轮待提交：收尾跳过的命令历史
+- 本轮待提交：阻止终态隧道命令
+- `a1440a1 收尾跳过的命令历史`
 - `d66767a 锁住关闭隧道断开清理`
 - `e636b5c 裁剪失效连接尾部命令`
 - `e889118 跳过终态连接命令`
@@ -85,16 +87,18 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 145 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 146 个提交
 - 最近验证：
-  - `cargo test backend_queue_pump_finishes_history_for_skipped_terminal_remote_command -- --nocapture` 先失败于 `outcome.changed()`，确认 Red；实现后通过，`1 passed`
-  - `cargo test backend_queue_pump_skips_terminal_remote_command_requests -- --nocapture` 通过，`1 passed`
-  - `cargo test model::app_state::backend_pump_tests` 通过，`31 passed`
+  - `cargo test session::tunnels::tests::tunnel_start_command_acceptance_requires_matching_non_terminal_runtime -- --nocapture` 先失败于终态会话仍允许启动，确认 Red；实现后通过，`1 passed`
+  - `cargo test session::tunnels::tests::tunnel_stop_command_acceptance_requires_matching_non_terminal_runtime -- --nocapture` 先失败于终态会话仍允许停止，确认 Red；实现后通过，`1 passed`
+  - `cargo test backend_queue_pump_skips_tunnel_start_when_session_is_terminal -- --nocapture` 先失败于命令进入执行器，确认 Red；实现后通过，`1 passed`
+  - `cargo test backend_queue_pump_skips_tunnel_stop_when_session_is_terminal -- --nocapture` 先失败于命令进入执行器，确认 Red；实现后通过，`1 passed`
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test model::app_state::launch_tests::remote_command` 通过，`13 passed`
-  - `cargo test model::app_state::tests` 通过，`34 passed`
-  - `cargo test` 通过，`464 passed, 2 ignored`
+  - `cargo test session::tunnels::tests` 通过，`13 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`33 passed`
+  - `cargo test model::app_state::launch_tests::tunnel` 通过，`12 passed`
+  - `cargo test` 通过，`466 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 
