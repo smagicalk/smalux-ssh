@@ -92,20 +92,10 @@ pub fn apply_backend_event(
         BackendEvent::CommandExited {
             session_id,
             exit_code,
-        } => {
-            let status = match exit_code {
-                Some(0) => SessionStatus::Disconnected,
-                Some(code) => SessionStatus::Failed {
-                    reason: format!("remote command exited with {code}"),
-                },
-                None => SessionStatus::Disconnected,
-            };
-
-            BackendEventOutcome {
-                session_updated: sessions.set_status(session_id, status),
-                terminal_updated: false,
-            }
-        }
+        } => BackendEventOutcome {
+            session_updated: sessions.mark_process_exited(session_id, exit_code),
+            terminal_updated: false,
+        },
         BackendEvent::SftpEntries {
             session_id,
             remote_path,

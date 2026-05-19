@@ -158,6 +158,30 @@ impl SessionManager {
         self.set_status(id, SessionStatus::RunningCommand)
     }
 
+    /// 将会产生进程退出事件的标签页标记为完成，忽略其他类型或终态标签页的串台事件。
+    pub fn mark_process_exited(&mut self, id: SessionId, exit_code: Option<i32>) -> bool {
+        let Some(tab) = self.tabs.iter().find(|tab| tab.id == id) else {
+            return false;
+        };
+
+        if !matches!(
+            tab.kind,
+            SessionKind::Shell | SessionKind::RemoteCommand { .. }
+        ) || tab.status.is_terminal()
+        {
+            return false;
+        }
+
+        let status = match exit_code {
+            Some(0) | None => SessionStatus::Disconnected,
+            Some(code) => SessionStatus::Failed {
+                reason: format!("remote command exited with {code}"),
+            },
+        };
+
+        self.set_status(id, status)
+    }
+
     /// 判断连接命令是否仍允许发往后端执行器。
     pub fn can_execute_connect_command(&self, id: SessionId, host_id: HostId) -> bool {
         self.tabs
@@ -522,6 +546,36 @@ mod tests {
 
         assert!(sessions.set_status(command_id, SessionStatus::Disconnected));
         assert!(!sessions.mark_remote_command_started(command_id));
+    }
+
+    #[test]
+    fn process_exited_status_requires_non_terminal_process_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let command_id = session_id();
+        let sftp_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_shell_tab(shell_id, host_id, "production");
+        sessions.open_remote_command_tab(command_id, host_id, "uptime", None);
+        sessions.open_sftp_tab(sftp_id, host_id, "/home/ops");
+
+        assert!(sessions.mark_process_exited(shell_id, None));
+        assert!(matches!(
+            sessions.tabs[0].status,
+            SessionStatus::Disconnected
+        ));
+
+        assert!(sessions.mark_process_exited(command_id, Some(7)));
+        assert!(matches!(
+            &sessions.tabs[1].status,
+            SessionStatus::Failed { reason } if reason == "remote command exited with 7"
+        ));
+
+        assert!(!sessions.mark_process_exited(sftp_id, Some(0)));
+        assert!(matches!(sessions.tabs[2].status, SessionStatus::Created));
+
+        assert!(!sessions.mark_process_exited(shell_id, Some(0)));
     }
 
     #[test]

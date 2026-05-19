@@ -275,6 +275,49 @@ fn clear_terminal_event_ignores_terminal_session() {
 }
 
 #[test]
+fn command_exited_marks_process_session_terminal() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_remote_command_tab(session_id, host_id(), "uptime", None);
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(3),
+        },
+    );
+
+    assert!(outcome.session_updated);
+    assert!(matches!(
+        &sessions.tabs[0].status,
+        SessionStatus::Failed { reason } if reason == "remote command exited with 3"
+    ));
+}
+
+#[test]
+fn command_exited_ignores_non_process_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_sftp_tab(session_id, host_id(), "/home/ops");
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(0),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Created));
+}
+
+#[test]
 fn sftp_entries_event_updates_browser_by_session() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
