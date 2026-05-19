@@ -51,8 +51,12 @@ impl AppState {
 
     /// 将当前 SFTP 浏览目录保存为书签。
     pub(super) fn save_sftp_bookmark(&mut self, host_id: HostId) -> AppUpdateOutcome {
-        let Some(current_dir) = self.current_sftp_dir_for_host(host_id) else {
-            return missing_sftp_browser(host_id);
+        let current_dir = match self.claimed_current_sftp_dir_for_host(host_id) {
+            SftpCurrentDirLookup::Found(current_dir) => current_dir,
+            SftpCurrentDirLookup::MissingBrowser => return missing_sftp_browser(host_id),
+            SftpCurrentDirLookup::MissingActiveSession => {
+                return missing_active_sftp_session(host_id);
+            }
         };
 
         self.storage.upsert_sftp_bookmark(SftpBookmark {
@@ -162,6 +166,20 @@ impl AppState {
             .map(|browser| browser.current_dir.clone())
     }
 
+    fn claimed_current_sftp_dir_for_host(&mut self, host_id: HostId) -> SftpCurrentDirLookup {
+        if self.current_sftp_dir_for_host(host_id).is_none() {
+            return SftpCurrentDirLookup::MissingBrowser;
+        }
+
+        if self.claim_sftp_session_id_for_host(host_id).is_none() {
+            return SftpCurrentDirLookup::MissingActiveSession;
+        }
+
+        self.current_sftp_dir_for_host(host_id)
+            .map(SftpCurrentDirLookup::Found)
+            .unwrap_or(SftpCurrentDirLookup::MissingBrowser)
+    }
+
     pub(super) fn sftp_session_id_for_host(&self, host_id: HostId) -> Option<SessionId> {
         self.sftp_browser_owner_session_id(host_id)
             .filter(|session_id| self.sftp_session_can_accept_commands(*session_id, host_id))
@@ -217,6 +235,12 @@ fn sftp_bookmark_label(remote_path: &str) -> String {
         .find(|part| !part.is_empty())
         .unwrap_or(remote_path)
         .to_owned()
+}
+
+enum SftpCurrentDirLookup {
+    Found(String),
+    MissingBrowser,
+    MissingActiveSession,
 }
 
 pub(super) fn missing_sftp_browser(host_id: HostId) -> AppUpdateOutcome {

@@ -54,30 +54,29 @@
 - 最新核心新增：普通 `SftpFailed` 操作错误只写入仍可用的当前 SFTP owner，迟到操作错误不会覆盖连接级断开/失败留下的浏览器错误。
 - 最新核心新增：按 session 开启 SFTP loading 时要求当前 owner 仍可用，断开/失败 owner 不能重新进入 loading；关闭 loading 仍允许用于清理失效 owner。
 - 最新核心新增：会话终态判断集中到 `SessionStatus::is_terminal()`，SFTP owner、SFTP 命令、标签关闭和终端缓冲更新复用同一生命周期口径。
+- 最新核心新增：保存 SFTP 书签前会先 claim 同主机可用浏览器 owner，唯一 owner 已断开/失败时不会把旧目录保存为书签。
 
 ## 最近提交
 
+- `869abdd 集中会话终态判断`
 - `6e00653 限制终态 SFTP 重启加载`
 - `4772b4c 隔离迟到 SFTP 操作错误`
 - `59f64d4 忽略迟到 SFTP 目录结果`
 - `49c533a 校验 SFTP owner 可用状态`
-- `d82ee5b 校验 SFTP owner 转交目标`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 128 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 129 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦会话终态集中化测试通过
-  - `cargo test model::session::tests` 通过，`3 passed`
-  - `cargo test session::tabs::tests` 通过，`11 passed`
+  - `cargo test save_sftp_bookmark -- --nocapture` 通过，`4 passed`
   - `cargo test session::sftp::tests` 通过，`22 passed`
   - `cargo test model::app_state::tests` 通过，`33 passed`
   - `cargo test model::app_state::backend_pump_tests` 通过，`14 passed`
-  - `cargo test model::app_state::launch_tests::sftp` 通过，`34 passed`
-  - `cargo test` 通过，`435 passed, 2 ignored`
+  - `cargo test model::app_state::launch_tests::sftp` 通过，`36 passed`
+  - `cargo test` 通过，`437 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 
