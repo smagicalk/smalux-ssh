@@ -107,6 +107,12 @@ impl AppState {
                 session_id,
                 request: SftpRequest::Upload { .. } | SftpRequest::Download { .. },
             } => self.sessions.can_execute_sftp_transfer_command(*session_id),
+            BackendCommand::StartTunnel {
+                session_id,
+                request,
+            } => self
+                .sessions
+                .can_execute_tunnel_start_command(*session_id, &request.rule.name),
             _ => true,
         }
     }

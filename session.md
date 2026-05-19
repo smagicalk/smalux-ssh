@@ -64,28 +64,27 @@
 - 最新核心新增：后端队列泵执行 SFTP `ListDir` 前会复查会话仍是当前可用 SFTP 浏览器 owner，终态 owner 的迟到浏览命令会被跳过并清理 loading。
 - 最新核心新增：后端队列泵执行 SFTP 上传/下载前会复查对应 SFTP 标签页仍非终态，终态传输命令会在本地标记失败并清理 loading，不再触发真实后端请求。
 - 最新核心新增：后端队列泵执行 SFTP 删除/建目录前会复查当前 SFTP 浏览器 owner 仍可用，终态写命令会本地写入浏览器错误并清理 loading，不再触发真实后端请求。
+- 最新核心新增：后端队列泵执行 `StartTunnel` 前会复查会话仍是匹配规则的非终态隧道标签页，终态或串台启动命令会被静默跳过，不再触发真实后端请求。
 
 ## 最近提交
 
+- 本轮待提交：跳过终态隧道启动命令
+- `5d6ed6d 跳过终态 SFTP 写命令`
 - `3b5331f 跳过终态 SFTP 传输命令`
 - `1d04caf 跳过终态 SFTP 浏览命令`
 - `cc70f43 跳过终态 shell 输入命令`
-- `afaf65e 跳过终态 shell drain 命令`
-- `a6c7130 集中后端事件终态判断`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 138 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 139 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test backend_queue_pump_marks_terminal_sftp_write_commands_failed_without_executor -- --nocapture` 先失败后通过，`1 passed`
-  - `cargo test model::app_state::backend_pump_tests` 通过，`20 passed`
-  - `cargo test session::sftp::tests` 通过，`24 passed`
-  - `cargo test model::app_state::launch_tests::sftp` 通过，`36 passed`
-  - `cargo test model::app_state::ui_drafts_tests` 通过，`13 passed`
-  - `cargo test` 通过，`447 passed, 2 ignored`
+  - `cargo test model::app_state::launch_tests::tunnel` 通过，`12 passed`
+  - `cargo test session::tunnels::tests` 通过，`12 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`21 passed`
+  - `cargo test` 通过，`449 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 
