@@ -79,6 +79,32 @@ fn key_plan_resolves_optional_passphrase() {
 }
 
 #[test]
+fn key_plan_keeps_missing_passphrase_as_none() {
+    let mut store = MemorySecretStore::new();
+    let key = SecretRef("key:deploy".to_owned());
+    store
+        .set_secret(&key, "PRIVATE KEY")
+        .expect("私钥应该可以写入");
+    let target = target(BackendAuth::Key {
+        username: "deploy".to_owned(),
+        key,
+        passphrase: None,
+    });
+
+    let plan = SshConnectionPlan::from_target(&target, &store).expect("无口令私钥计划应该可以构建");
+
+    assert_eq!(plan.auth.method(), "key");
+    assert!(matches!(
+        plan.auth,
+        SshAuthPlan::Key {
+            private_key,
+            passphrase: None,
+            ..
+        } if private_key == "PRIVATE KEY"
+    ));
+}
+
+#[test]
 fn agent_plan_does_not_read_secret_store() {
     let store = MemorySecretStore::new();
     let target = target(BackendAuth::Agent {
@@ -135,6 +161,38 @@ fn certificate_plan_resolves_key_and_certificate() {
 }
 
 #[test]
+fn certificate_plan_keeps_missing_passphrase_as_none() {
+    let mut store = MemorySecretStore::new();
+    let key = SecretRef("key:cert".to_owned());
+    let certificate = SecretRef("cert:deploy".to_owned());
+    store
+        .set_secret(&key, "PRIVATE KEY")
+        .expect("私钥应该可以写入");
+    store
+        .set_secret(&certificate, "CERT")
+        .expect("证书应该可以写入");
+    let target = target(BackendAuth::Certificate {
+        username: "deploy".to_owned(),
+        key,
+        passphrase: None,
+        certificate,
+    });
+
+    let plan = SshConnectionPlan::from_target(&target, &store).expect("无口令证书计划应该可以构建");
+
+    assert_eq!(plan.auth.method(), "certificate");
+    assert!(matches!(
+        plan.auth,
+        SshAuthPlan::Certificate {
+            private_key,
+            passphrase: None,
+            certificate,
+            ..
+        } if private_key == "PRIVATE KEY" && certificate == "CERT"
+    ));
+}
+
+#[test]
 fn missing_secret_maps_to_authentication_failure() {
     let store = MemorySecretStore::new();
     let target = target(BackendAuth::Password {
@@ -151,5 +209,52 @@ fn missing_secret_maps_to_authentication_failure() {
             username,
             reason,
         } if username == "root" && reason.contains("找不到凭据引用")
+    ));
+}
+
+#[test]
+fn missing_key_secret_maps_to_authentication_failure_with_username() {
+    let store = MemorySecretStore::new();
+    let target = target(BackendAuth::Key {
+        username: "deploy".to_owned(),
+        key: SecretRef("missing-key".to_owned()),
+        passphrase: None,
+    });
+
+    let error =
+        SshConnectionPlan::from_target(&target, &store).expect_err("缺失私钥应该映射为认证失败");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::AuthenticationFailed {
+            username,
+            reason,
+        } if username == "deploy" && reason.contains("找不到凭据引用")
+    ));
+}
+
+#[test]
+fn missing_certificate_secret_maps_to_authentication_failure_with_username() {
+    let mut store = MemorySecretStore::new();
+    let key = SecretRef("key:cert".to_owned());
+    store
+        .set_secret(&key, "PRIVATE KEY")
+        .expect("私钥应该可以写入");
+    let target = target(BackendAuth::Certificate {
+        username: "cert-user".to_owned(),
+        key,
+        passphrase: None,
+        certificate: SecretRef("missing-cert".to_owned()),
+    });
+
+    let error =
+        SshConnectionPlan::from_target(&target, &store).expect_err("缺失证书应该映射为认证失败");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::AuthenticationFailed {
+            username,
+            reason,
+        } if username == "cert-user" && reason.contains("找不到凭据引用")
     ));
 }
