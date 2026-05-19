@@ -182,14 +182,28 @@ fn sftp_browser_owner_reassignment_requires_matching_sftp_tab() {
     let shell_session_id = session_id();
     let other_host_session_id = session_id();
     let missing_session_id = session_id();
+    let disconnected_session_id = session_id();
+    let failed_session_id = session_id();
 
     sessions.open_sftp_tab(first_session_id, current_host_id, "/home/ops");
     sessions.open_shell_tab(shell_session_id, current_host_id, "shell");
     sessions.open_sftp_tab(other_host_session_id, other_host_id, "/tmp");
+    sessions.open_sftp_tab(disconnected_session_id, current_host_id, "/old");
+    sessions.set_status(disconnected_session_id, SessionStatus::Disconnected);
+    sessions.open_sftp_tab(failed_session_id, current_host_id, "/failed");
+    sessions.set_status(
+        failed_session_id,
+        SessionStatus::Failed {
+            reason: "network".to_owned(),
+        },
+    );
+    sessions.reassign_sftp_browser_session(current_host_id, first_session_id);
 
     assert!(!sessions.reassign_sftp_browser_session(current_host_id, shell_session_id));
     assert!(!sessions.reassign_sftp_browser_session(current_host_id, other_host_session_id));
     assert!(!sessions.reassign_sftp_browser_session(current_host_id, missing_session_id));
+    assert!(!sessions.reassign_sftp_browser_session(current_host_id, disconnected_session_id));
+    assert!(!sessions.reassign_sftp_browser_session(current_host_id, failed_session_id));
     assert_eq!(sessions.sftp_browsers[0].session_id, first_session_id);
 }
 

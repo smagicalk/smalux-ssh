@@ -261,6 +261,7 @@ impl SessionManager {
             tab.id == session_id
                 && tab.host_id == Some(host_id)
                 && matches!(tab.kind, SessionKind::Sftp)
+                && sftp_tab_can_accept_browser_owner(&tab.status)
         })
     }
 }

@@ -49,19 +49,20 @@
 - 最新核心新增：激活断开/失败的 SFTP 标签页不会抢占同主机可用浏览器 owner，避免不可用会话重新接管 SFTP 浏览器。
 - 最新核心新增：当前 SFTP owner 收到连接级断开/失败事件后会立即转交给同主机可用会话，并清理 loading 和错误态，避免 stale owner 长时间残留。
 - 最新核心新增：底层 SFTP owner 转交 API 会校验目标 session 必须是同主机 SFTP 标签页，避免误把 shell、错主机或缺失 session 设为 owner。
+- 最新核心新增：底层 SFTP owner 转交 API 同时要求目标 session 处于可接管状态，断开/失败的 SFTP 标签页不会被设为 owner。
 
 ## 最近提交
 
+- `d82ee5b 校验 SFTP owner 转交目标`
 - `e15a284 断开 SFTP owner 立即转交`
 - `4f6bfbd 限制断开 SFTP 抢占 owner`
 - `62fbaff 激活 SFTP 标签转交 owner`
 - `d0b2dfa 绑定 SFTP 面板当前主机`
-- `c81f4d2 只转交可用 SFTP owner`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 123 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 124 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
