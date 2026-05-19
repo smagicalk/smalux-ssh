@@ -1,7 +1,7 @@
 use super::*;
 use crate::backend::{
-    BackendCommandKind, BackendEvent, BackendExecutionError, BackendExecutor, NoopBackendExecutor,
-    ScriptedBackendExecutor, ScriptedBackendResponse,
+    BackendCommand, BackendCommandKind, BackendEvent, BackendExecutionError, BackendExecutor,
+    NoopBackendExecutor, ScriptedBackendExecutor, ScriptedBackendResponse,
 };
 use crate::model::{
     AuthProfile, Host, HostKeyVerification, KeyAlgorithm, KnownHostEntry,
@@ -76,6 +76,29 @@ fn backend_queue_pump_executes_commands_and_applies_events() {
         SessionStatus::Connected
     ));
     assert_eq!(state.terminal.tabs[0].buffer, vec!["ready"]);
+}
+
+#[test]
+fn backend_queue_pump_executes_disconnect_for_closed_tabs() {
+    let mut state = AppState::default();
+    let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    state
+        .backend_commands
+        .push(BackendCommand::Disconnect { session_id });
+    let mut executor = ScriptedBackendExecutor::new();
+    executor.push_response(ScriptedBackendResponse::new(
+        BackendCommandKind::Disconnect,
+        vec![BackendEvent::Disconnected { session_id }],
+    ));
+
+    let outcome = state.drain_backend_queue(&mut executor);
+
+    assert!(!outcome.changed());
+    assert_eq!(outcome.executed_backend_commands, 1);
+    assert_eq!(outcome.applied_backend_events, 1);
+    assert!(outcome.error.is_none());
+    assert!(state.backend_commands.is_empty());
+    assert_eq!(executor.executed(), &[BackendCommandKind::Disconnect]);
 }
 
 #[test]

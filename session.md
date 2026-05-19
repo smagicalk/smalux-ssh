@@ -69,10 +69,12 @@
 - 最新核心新增：后端队列泵执行 `OpenShell` / `RunCommand` 前会复查会话仍是对应类型的非终态标签页，连接后迟到的 shell/命令启动请求会被静默跳过，不再触发真实后端请求。
 - 最新核心新增：后端队列泵执行 `Connect` 前会复查会话仍是目标 host 匹配的非终态远程标签页，终态、缺失、本地或错 host 连接命令会被静默跳过，不再创建真实后端连接。
 - 最新核心新增：后端队列泵跳过失效 `Connect` 时会本地标记该会话失败，并裁剪同会话后续 pending 启动命令，避免连接未建立时继续打开 shell/SFTP/隧道。
+- 最新核心新增：关闭已连接但 `StartTunnel` 仍 pending 的隧道标签页时会取消启动命令但仍排 `Disconnect`，确保已建立的真实 SSH connection 继续进入后端资源清理；队列泵即使标签页已关闭也会执行 `Disconnect`。
 
 ## 最近提交
 
-- 本轮待提交：裁剪失效连接尾部命令
+- 本轮待提交：锁住关闭隧道断开清理
+- `e636b5c 裁剪失效连接尾部命令`
 - `e889118 跳过终态连接命令`
 - `85e6ffd 跳过终态 shell 启动命令`
 - `dac789b 跳过终态隧道停止命令`
@@ -81,21 +83,17 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 143 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 144 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test backend_queue_pump_skips_terminal_connect_commands -- --nocapture` 通过，`1 passed`
-  - `cargo test backend_queue_pump_skips_mismatched_connect_commands -- --nocapture` 通过，`1 passed`
-  - `cargo test backend_queue_pump_prunes_tail_after_stale_connect_command -- --nocapture` 通过，`1 passed`
-  - `cargo test backend_queue_pump_keeps_other_session_tail_after_stale_connect_command -- --nocapture` 通过，`1 passed`
+  - `cargo test close_connected_pending_tunnel_tab_queues_disconnect_after_cancelling_launch -- --nocapture` 通过，`1 passed`
+  - `cargo test backend_queue_pump_executes_disconnect_for_closed_tabs -- --nocapture` 通过，`1 passed`
+  - `cargo test model::app_state::tests` 通过，`34 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`30 passed`
   - `cargo test session::tabs::tests` 通过，`14 passed`
-  - `cargo test model::app_state::backend_pump_tests` 通过，`29 passed`
-  - `cargo test model::app_state::launch_tests::shell` 通过，`5 passed`
-  - `cargo test model::app_state::launch_tests::remote_command` 通过，`13 passed`
-  - `cargo test model::app_state::launch_tests::sftp` 通过，`36 passed`
   - `cargo test model::app_state::launch_tests::tunnel` 通过，`12 passed`
-  - `cargo test` 通过，`461 passed, 2 ignored`
+  - `cargo test` 通过，`463 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 
