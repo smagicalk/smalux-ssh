@@ -29,6 +29,7 @@ fn executor_starts_with_empty_runtime_state() {
     assert_eq!(executor.connection_count(), 0);
     assert_eq!(executor.shell_count(), 0);
     assert_eq!(executor.sftp_count(), 0);
+    assert_eq!(executor.tunnel_count(), 0);
 }
 
 #[test]
@@ -198,6 +199,55 @@ fn taking_cached_session_runtime_resources_detaches_owned_tunnels() {
     assert!(sftps.is_empty());
     assert!(connections.is_empty());
     assert!(!tunnels.contains_key("proxy"));
+    assert_eq!(
+        tunnels.get("metrics"),
+        Some(&TestTunnel {
+            session_id: other_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        })
+    );
+}
+
+#[test]
+fn taking_cached_session_runtime_resources_is_idempotent_for_missing_session() {
+    let missing_session_id = session_id();
+    let other_session_id = session_id();
+    let mut shells = HashMap::from([(other_session_id, "other-shell")]);
+    let mut sftps = HashMap::from([(other_session_id, "other-sftp")]);
+    let mut connections = HashMap::from([(other_session_id, "other-connection")]);
+    let mut tunnels = HashMap::from([(
+        "metrics".to_owned(),
+        TestTunnel {
+            session_id: other_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        },
+    )]);
+
+    let resources = take_cached_session_runtime_resources(
+        &mut shells,
+        &mut sftps,
+        &mut connections,
+        &mut tunnels,
+        missing_session_id,
+    );
+
+    assert_eq!(
+        resources.cached_resources,
+        CachedSessionResources {
+            shell: None::<&str>,
+            sftp: None::<&str>,
+            connection: None::<&str>,
+        }
+    );
+    assert!(resources.tunnels.is_empty());
+    assert_eq!(shells.get(&other_session_id), Some(&"other-shell"));
+    assert_eq!(sftps.get(&other_session_id), Some(&"other-sftp"));
+    assert_eq!(
+        connections.get(&other_session_id),
+        Some(&"other-connection")
+    );
     assert_eq!(
         tunnels.get("metrics"),
         Some(&TestTunnel {
@@ -496,6 +546,32 @@ fn taking_tunnels_for_session_removes_only_owned_tunnels() {
     assert!(removed.iter().any(|tunnel| tunnel.rule_name == "db"));
     assert!(!tunnels.contains_key("proxy"));
     assert!(!tunnels.contains_key("db"));
+    assert_eq!(
+        tunnels.get("metrics"),
+        Some(&TestTunnel {
+            session_id: other_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        })
+    );
+}
+
+#[test]
+fn taking_tunnels_for_missing_session_keeps_all_tunnels() {
+    let missing_session_id = session_id();
+    let other_session_id = session_id();
+    let mut tunnels = HashMap::from([(
+        "metrics".to_owned(),
+        TestTunnel {
+            session_id: other_session_id,
+            rule_name: "metrics".to_owned(),
+            stopped: false,
+        },
+    )]);
+
+    let removed = take_tunnels_for_session(&mut tunnels, missing_session_id);
+
+    assert!(removed.is_empty());
     assert_eq!(
         tunnels.get("metrics"),
         Some(&TestTunnel {
@@ -916,4 +992,28 @@ fn start_tunnel_requires_connected_session() {
             reason,
         } if operation == "start tunnel" && reason == "session is not connected"
     ));
+}
+
+#[test]
+fn stop_tunnel_without_runtime_is_idempotent() {
+    let mut executor =
+        RusshBackendExecutor::new(MemorySecretStore::new()).expect("执行器应该可以创建 runtime");
+    let session_id = session_id();
+
+    let events = executor
+        .execute(BackendCommand::StopTunnel {
+            session_id,
+            request: crate::backend::TunnelStopRequest::by_name("proxy"),
+        })
+        .expect("停止缺失隧道应该保持幂等");
+
+    assert_eq!(
+        events,
+        vec![BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name: "proxy".to_owned(),
+            status: crate::model::TunnelStatus::Stopped,
+        }]
+    );
+    assert_eq!(executor.tunnel_count(), 0);
 }
