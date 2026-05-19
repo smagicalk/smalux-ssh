@@ -74,3 +74,96 @@ fn spawn_fallback_worker(
     });
     receiver
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::mpsc;
+
+    use uuid::Uuid;
+
+    use crate::backend::{LocalCommandFallbackResult, LocalShellKind};
+
+    use super::*;
+
+    fn session_id() -> SessionId {
+        SessionId(Uuid::new_v4())
+    }
+
+    fn shell_profile() -> LocalShellProfile {
+        LocalShellProfile {
+            kind: LocalShellKind::Posix,
+            program: "sh".to_owned(),
+            interactive_args: Vec::new(),
+            prompt: "$",
+        }
+    }
+
+    #[test]
+    fn waiting_fallback_before_due_keeps_state() {
+        let mut state = Some(PendingFallbackCommand::Waiting {
+            input: "echo delayed".to_owned(),
+            created_at: Instant::now(),
+        });
+
+        let events = drain_pending_fallback(session_id(), &shell_profile(), &mut state);
+
+        assert!(events.is_empty());
+        assert!(matches!(
+            state,
+            Some(PendingFallbackCommand::Waiting { ref input, .. }) if input == "echo delayed"
+        ));
+    }
+
+    #[test]
+    fn running_fallback_without_result_keeps_receiver() {
+        let (_sender, receiver) = mpsc::channel();
+        let mut state = Some(PendingFallbackCommand::Running { receiver });
+
+        let events = drain_pending_fallback(session_id(), &shell_profile(), &mut state);
+
+        assert!(events.is_empty());
+        assert!(matches!(
+            state,
+            Some(PendingFallbackCommand::Running { .. })
+        ));
+    }
+
+    #[test]
+    fn running_fallback_returns_ready_events_and_clears_state() {
+        let session_id = session_id();
+        let (sender, receiver) = mpsc::channel();
+        sender
+            .send(LocalCommandFallbackResult {
+                events: vec![BackendEvent::Output {
+                    session_id,
+                    line: "fallback output".to_owned(),
+                }],
+                exit_code: Some(0),
+            })
+            .unwrap();
+        let mut state = Some(PendingFallbackCommand::Running { receiver });
+
+        let events = drain_pending_fallback(session_id, &shell_profile(), &mut state);
+
+        assert_eq!(
+            events,
+            vec![BackendEvent::Output {
+                session_id,
+                line: "fallback output".to_owned(),
+            }]
+        );
+        assert!(state.is_none());
+    }
+
+    #[test]
+    fn disconnected_fallback_clears_state_without_events() {
+        let (sender, receiver) = mpsc::channel();
+        drop(sender);
+        let mut state = Some(PendingFallbackCommand::Running { receiver });
+
+        let events = drain_pending_fallback(session_id(), &shell_profile(), &mut state);
+
+        assert!(events.is_empty());
+        assert!(state.is_none());
+    }
+}
