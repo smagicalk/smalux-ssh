@@ -49,7 +49,7 @@ impl AppState {
                             outcome.applied_backend_events += event_outcome.applied_backend_events;
                         }
                     } else {
-                        let discarded = discard_pending_sftp_transfers_for_failed_session(
+                        let discarded = discard_pending_sftp_writes_for_failed_session(
                             &mut self.backend_commands,
                             session_id,
                             &reason,
@@ -150,7 +150,7 @@ fn discard_pending_commands_for_failed_session(
     }
 }
 
-fn discard_pending_sftp_transfers_for_failed_session(
+fn discard_pending_sftp_writes_for_failed_session(
     commands: &mut BackendCommandQueue,
     session_id: SessionId,
     reason: &str,
@@ -161,10 +161,12 @@ fn discard_pending_sftp_transfers_for_failed_session(
             return true;
         }
 
-        let Some(transfer) = failed_transfer_for_command(command) else {
+        if !is_sftp_write_command(command) {
             return true;
-        };
-        transfer_failures.push(transfer);
+        }
+        if let Some(transfer) = failed_transfer_for_command(command) {
+            transfer_failures.push(transfer);
+        }
         false
     });
     let failure_events = transfer_failures
@@ -222,4 +224,12 @@ fn failed_transfer_for_command(command: &BackendCommand) -> Option<FailedTransfe
         session_id: *session_id,
         transfer_id,
     })
+}
+
+fn is_sftp_write_command(command: &BackendCommand) -> bool {
+    let BackendCommand::Sftp { request, .. } = command else {
+        return false;
+    };
+
+    !matches!(request, SftpRequest::ListDir { .. })
 }
