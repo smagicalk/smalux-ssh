@@ -140,6 +140,15 @@ impl SessionManager {
             })
     }
 
+    /// 将远程命令标签页标记为运行中，忽略其他类型或终态标签页的串台事件。
+    pub fn mark_remote_command_started(&mut self, id: SessionId) -> bool {
+        if !self.can_execute_remote_command(id) {
+            return false;
+        }
+
+        self.set_status(id, SessionStatus::RunningCommand)
+    }
+
     /// 判断连接命令是否仍允许发往后端执行器。
     pub fn can_execute_connect_command(&self, id: SessionId, host_id: HostId) -> bool {
         self.tabs
@@ -458,6 +467,32 @@ mod tests {
         ));
 
         assert!(!sessions.can_execute_remote_command(command_id));
+    }
+
+    #[test]
+    fn remote_command_started_status_requires_non_terminal_command_tab() {
+        let mut sessions = SessionManager::default();
+        let shell_id = session_id();
+        let command_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_shell_tab(shell_id, host_id, "production");
+        sessions.open_remote_command_tab(command_id, host_id, "uptime", None);
+
+        assert!(sessions.mark_remote_command_started(command_id));
+        assert!(matches!(
+            sessions.tabs[1].status,
+            SessionStatus::RunningCommand
+        ));
+
+        assert!(!sessions.mark_remote_command_started(shell_id));
+        assert!(!matches!(
+            sessions.tabs[0].status,
+            SessionStatus::RunningCommand
+        ));
+
+        assert!(sessions.set_status(command_id, SessionStatus::Disconnected));
+        assert!(!sessions.mark_remote_command_started(command_id));
     }
 
     #[test]

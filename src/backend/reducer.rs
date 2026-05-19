@@ -47,7 +47,7 @@ pub fn apply_backend_event(
             }
         }
         BackendEvent::RemoteCommandStarted { session_id, .. } => BackendEventOutcome {
-            session_updated: sessions.set_status(session_id, SessionStatus::RunningCommand),
+            session_updated: sessions.mark_remote_command_started(session_id),
             terminal_updated: false,
         },
         BackendEvent::Output { session_id, line } => {

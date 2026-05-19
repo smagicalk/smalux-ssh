@@ -106,6 +106,28 @@ fn connection_lifecycle_events_update_session_status() {
 }
 
 #[test]
+fn remote_command_started_ignores_non_command_session() {
+    let mut sessions = SessionManager::default();
+    let mut terminal = TerminalManager::default();
+    let session_id = session_id();
+
+    sessions.open_shell_tab(session_id, host_id(), "production");
+    sessions.set_status(session_id, SessionStatus::Connected);
+
+    let outcome = apply_backend_event(
+        &mut sessions,
+        &mut terminal,
+        BackendEvent::RemoteCommandStarted {
+            session_id,
+            command: "uptime".to_owned(),
+        },
+    );
+
+    assert!(!outcome.changed());
+    assert!(matches!(sessions.tabs[0].status, SessionStatus::Connected));
+}
+
+#[test]
 fn shell_opened_marks_shell_session_connected() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
