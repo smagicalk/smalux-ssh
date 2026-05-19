@@ -45,25 +45,26 @@
 - 最新核心新增：关闭当前 SFTP 浏览器 owner 并转交给同主机标签页时会清理 loading 和错误态，避免已关闭会话状态泄漏给新 owner。
 - 最新核心新增：关闭当前 SFTP owner 时只会转交给可用同主机 SFTP 标签页，剩余标签页均断开/失败时移除浏览器运行态。
 - 最新核心新增：SFTP 面板投影优先绑定当前 active tab 的主机，当前主机没有浏览器时展示该主机空态，不再回退展示其他主机浏览器。
+- 最新核心新增：激活 SFTP 标签页时会同步转交同主机浏览器 owner，避免后续刷新、上传等按 host 调度的命令继续落到旧会话。
 
 ## 最近提交
 
+- `d0b2dfa 绑定 SFTP 面板当前主机`
 - `c81f4d2 只转交可用 SFTP owner`
 - `b35f904 清理关闭 SFTP owner 状态`
 - `8b4f901 收窄 SFTP 刷新保留 loading`
 - `731d0a1 避免失败 SFTP 传输改归属`
-- `f9e6866 校验 SFTP 加载写入归属`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 119 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 120 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦 SFTP 面板 active host 空态投影测试通过
-  - `cargo test app::view_model::tests` 通过，`4 passed`
-  - `cargo test` 通过，`421 passed, 2 ignored`
+  - 聚焦激活 SFTP tab 同步浏览器 owner 测试通过
+  - `cargo test model::app_state::tests` 通过，`32 passed`
+  - `cargo test` 通过，`422 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 
