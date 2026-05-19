@@ -86,6 +86,9 @@ impl AppState {
 impl AppState {
     fn can_execute_backend_command(&self, command: &BackendCommand) -> bool {
         match command {
+            BackendCommand::SendShellInput { session_id, .. } => {
+                self.sessions.can_send_interactive_shell_input(*session_id)
+            }
             BackendCommand::DrainSessionOutput { session_id } => {
                 self.sessions.can_drain_interactive_shell(*session_id)
             }

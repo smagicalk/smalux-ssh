@@ -114,6 +114,14 @@ impl SessionManager {
             })
     }
 
+    /// 判断该会话当前是否仍允许交互式 shell 输入命令发往后端。
+    pub fn can_send_interactive_shell_input(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(SessionTab::can_accept_terminal_input)
+    }
+
     /// 判断终端缓冲是否仍可被对应会话更新。
     pub fn can_update_terminal_buffer(&self, id: SessionId) -> bool {
         self.tabs
@@ -367,6 +375,9 @@ mod tests {
         assert!(sessions.can_drain_interactive_shell(local_id));
         assert!(sessions.can_drain_interactive_shell(shell_id));
         assert!(!sessions.can_drain_interactive_shell(command_id));
+        assert!(sessions.can_send_interactive_shell_input(local_id));
+        assert!(sessions.can_send_interactive_shell_input(shell_id));
+        assert!(!sessions.can_send_interactive_shell_input(command_id));
     }
 
     #[test]
