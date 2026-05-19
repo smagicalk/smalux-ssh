@@ -103,7 +103,10 @@ impl BackendEvent {
 
     /// 判断事件是否代表终止态。
     pub fn is_terminal(&self) -> bool {
-        matches!(self, Self::Failed { .. } | Self::Disconnected { .. })
+        matches!(
+            self,
+            Self::CommandExited { .. } | Self::Failed { .. } | Self::Disconnected { .. }
+        )
     }
 }
 
@@ -123,9 +126,14 @@ mod tests {
             session_id,
             reason: "network".to_owned(),
         };
+        let exited = BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(0),
+        };
 
         assert_eq!(output.session_id(), session_id);
         assert!(!output.is_terminal());
+        assert!(exited.is_terminal());
         assert!(failed.is_terminal());
     }
 

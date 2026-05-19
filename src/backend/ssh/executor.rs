@@ -349,12 +349,7 @@ fn remote_shell_event_requires_cache_drop(session_id: SessionId, event: &Backend
         return false;
     }
 
-    matches!(
-        event,
-        BackendEvent::CommandExited { .. }
-            | BackendEvent::Failed { .. }
-            | BackendEvent::Disconnected { .. }
-    )
+    event.is_terminal()
 }
 
 impl<S: SecretStore + Send> RusshBackendExecutor<S> {
