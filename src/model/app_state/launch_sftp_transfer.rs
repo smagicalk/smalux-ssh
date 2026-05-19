@@ -16,9 +16,6 @@ use super::{AppState, AppUpdateOutcome};
 impl AppState {
     /// 将本地文件上传到当前 SFTP 目录。
     pub(super) fn upload_sftp(&mut self, host_id: HostId) -> AppUpdateOutcome {
-        let Some(session_id) = self.claim_sftp_session_id_for_host(host_id) else {
-            return missing_active_sftp_session(host_id);
-        };
         let Some(current_dir) = self.current_sftp_dir_for_host(host_id) else {
             return missing_sftp_browser(host_id);
         };
@@ -51,6 +48,9 @@ impl AppState {
                 ..AppUpdateOutcome::default()
             };
         }
+        let Some(session_id) = self.claim_sftp_session_id_for_host(host_id) else {
+            return missing_active_sftp_session(host_id);
+        };
         let remote_path = join_remote_path(&current_dir, &remote_name);
         let transfer_id = TransferId(Uuid::new_v4());
 
@@ -84,9 +84,6 @@ impl AppState {
         host_id: HostId,
         remote_path: String,
     ) -> AppUpdateOutcome {
-        let Some(session_id) = self.claim_sftp_session_id_for_host(host_id) else {
-            return missing_active_sftp_session(host_id);
-        };
         let remote_path = remote_path.trim().to_owned();
         if remote_path.is_empty() || remote_path == "/" {
             return AppUpdateOutcome {
@@ -108,6 +105,9 @@ impl AppState {
             }
         } else {
             local_path
+        };
+        let Some(session_id) = self.claim_sftp_session_id_for_host(host_id) else {
+            return missing_active_sftp_session(host_id);
         };
         let transfer_id = TransferId(Uuid::new_v4());
 
