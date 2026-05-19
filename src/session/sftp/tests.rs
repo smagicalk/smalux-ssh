@@ -185,6 +185,29 @@ fn sftp_browser_command_acceptance_requires_current_non_terminal_owner() {
 }
 
 #[test]
+fn sftp_transfer_command_acceptance_requires_non_terminal_sftp_tab() {
+    let mut sessions = SessionManager::default();
+    let host_id = host_id();
+    let stale_session_id = session_id();
+    let current_session_id = session_id();
+    let shell_session_id = session_id();
+
+    sessions.open_sftp_tab(stale_session_id, host_id, "/old");
+    sessions.open_sftp_tab(current_session_id, host_id, "/new");
+    sessions.open_shell_tab(shell_session_id, host_id, "shell");
+    sessions.set_status(stale_session_id, SessionStatus::Connected);
+    sessions.set_status(current_session_id, SessionStatus::Connected);
+
+    assert!(sessions.can_execute_sftp_transfer_command(stale_session_id));
+    assert!(sessions.can_execute_sftp_transfer_command(current_session_id));
+    assert!(!sessions.can_execute_sftp_transfer_command(shell_session_id));
+
+    sessions.set_status(current_session_id, SessionStatus::Disconnected);
+
+    assert!(!sessions.can_execute_sftp_transfer_command(current_session_id));
+}
+
+#[test]
 fn sftp_selection_can_be_set_and_cleared() {
     let mut sessions = SessionManager::default();
     let current_host_id = host_id();

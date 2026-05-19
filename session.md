@@ -62,29 +62,30 @@
 - 最新核心新增：后端队列泵执行 `DrainSessionOutput` 前会复查会话仍是可轮询的交互式 shell，终态 shell 的迟到 drain 命令会被静默丢弃，不再触发后端错误。
 - 最新核心新增：后端队列泵执行 `SendShellInput` 前会复查会话仍可交互，终态 shell 的迟到输入命令会被静默丢弃，不再触发真实后端写入错误。
 - 最新核心新增：后端队列泵执行 SFTP `ListDir` 前会复查会话仍是当前可用 SFTP 浏览器 owner，终态 owner 的迟到浏览命令会被跳过并清理 loading。
+- 最新核心新增：后端队列泵执行 SFTP 上传/下载前会复查对应 SFTP 标签页仍非终态，终态传输命令会在本地标记失败并清理 loading，不再触发真实后端请求。
 
 ## 最近提交
 
+- `1d04caf 跳过终态 SFTP 浏览命令`
 - `cc70f43 跳过终态 shell 输入命令`
 - `afaf65e 跳过终态 shell drain 命令`
 - `a6c7130 集中后端事件终态判断`
 - `0b719b4 校验 shell drain 事件归属`
-- `2e2665c 裁剪失败后 SFTP 写队列`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 136 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 137 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test backend_queue_pump_skips_terminal_sftp_list_commands -- --nocapture` 先失败后通过，`1 passed`
-  - `cargo test session::sftp::tests::sftp_browser_command_acceptance_requires_current_non_terminal_owner -- --nocapture` 先失败后通过，`1 passed`
-  - `cargo test model::app_state::backend_pump_tests` 通过，`18 passed`
-  - `cargo test session::sftp::tests` 通过，`23 passed`
+  - `cargo test backend_queue_pump_marks_terminal_sftp_transfers_failed_without_executor -- --nocapture` 先失败后通过，`1 passed`
+  - `cargo test session::sftp::tests::sftp_transfer_command_acceptance_requires_non_terminal_sftp_tab -- --nocapture` 先失败后通过，`1 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`19 passed`
+  - `cargo test session::sftp::tests` 通过，`24 passed`
   - `cargo test model::app_state::launch_tests::sftp` 通过，`36 passed`
   - `cargo test model::app_state::ui_drafts_tests` 通过，`13 passed`
-  - `cargo test` 通过，`444 passed, 2 ignored`
+  - `cargo test` 通过，`446 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 

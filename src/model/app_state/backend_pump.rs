@@ -18,7 +18,9 @@ impl AppState {
 
         while let Some(command) = self.backend_commands.pop_front() {
             if !self.can_execute_backend_command(&command) {
-                outcome.state_changed |= self.skip_stale_backend_command(&command);
+                let skip_outcome = self.skip_stale_backend_command(&command);
+                outcome.state_changed |= skip_outcome.state_changed;
+                outcome.applied_backend_events += skip_outcome.applied_backend_events;
                 continue;
             }
 
@@ -97,21 +99,44 @@ impl AppState {
                 session_id,
                 request: SftpRequest::ListDir { .. },
             } => self.sessions.can_execute_sftp_browser_command(*session_id),
+            BackendCommand::Sftp {
+                session_id,
+                request: SftpRequest::Upload { .. } | SftpRequest::Download { .. },
+            } => self.sessions.can_execute_sftp_transfer_command(*session_id),
             _ => true,
         }
     }
 
-    fn skip_stale_backend_command(&mut self, command: &BackendCommand) -> bool {
-        let BackendCommand::Sftp {
-            session_id,
-            request: SftpRequest::ListDir { .. },
-        } = command
-        else {
-            return false;
-        };
-
-        self.sessions
-            .set_sftp_loading_for_session(*session_id, false)
+    fn skip_stale_backend_command(&mut self, command: &BackendCommand) -> AppUpdateOutcome {
+        match command {
+            BackendCommand::Sftp {
+                session_id,
+                request: SftpRequest::ListDir { .. },
+            } => AppUpdateOutcome {
+                state_changed: self
+                    .sessions
+                    .set_sftp_loading_for_session(*session_id, false),
+                ..AppUpdateOutcome::default()
+            },
+            BackendCommand::Sftp { session_id, .. } => {
+                let Some(transfer) = failed_transfer_for_command(command) else {
+                    return AppUpdateOutcome::default();
+                };
+                let event_outcome = self.apply_backend_event(transfer_failed_event(
+                    transfer,
+                    "SFTP 会话已结束，传输未执行".to_owned(),
+                ));
+                let loading_cleared = self
+                    .sessions
+                    .set_sftp_loading_for_session(*session_id, false);
+                AppUpdateOutcome {
+                    state_changed: event_outcome.state_changed || loading_cleared,
+                    applied_backend_events: event_outcome.applied_backend_events,
+                    ..AppUpdateOutcome::default()
+                }
+            }
+            _ => AppUpdateOutcome::default(),
+        }
     }
 }
 
