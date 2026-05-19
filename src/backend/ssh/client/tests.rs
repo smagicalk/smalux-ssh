@@ -200,6 +200,43 @@ async fn handler_records_host_key_verification_result() {
     assert_eq!(check.verification, HostKeyVerification::Unknown);
 }
 
+#[tokio::test]
+async fn handler_records_rejected_host_key_verification_result() {
+    let key = sample_public_key();
+    let shared = SharedHostKeyResult::default();
+    let mut handler = SshClientHandler::new(
+        "example.com".to_owned(),
+        2222,
+        HostKeyPolicy::default(),
+        shared.clone(),
+        SharedForwardedChannels::default(),
+    );
+
+    let accepted = client::Handler::check_server_key(&mut handler, &key)
+        .await
+        .expect("主机密钥拒绝结果也应该正常返回");
+
+    assert!(!accepted);
+    let check = shared.get().expect("处理器应该记录被拒绝的主机密钥结果");
+    assert!(!check.accepted);
+    assert_eq!(check.host, "example.com");
+    assert_eq!(check.port, 2222);
+    assert_eq!(check.verification, HostKeyVerification::Unknown);
+}
+
+#[tokio::test]
+async fn forwarded_channel_subscription_replaces_matching_endpoint() {
+    let shared = SharedForwardedChannels::default();
+    let mut stale_receiver = shared.subscribe("127.0.0.1", 8022);
+    let _current_receiver = shared.subscribe("127.0.0.1", 8022);
+
+    let stale_closed = tokio::time::timeout(Duration::from_millis(50), stale_receiver.recv())
+        .await
+        .expect("被替换的 forwarded channel 订阅应该立即关闭");
+
+    assert!(stale_closed.is_none());
+}
+
 #[test]
 fn host_key_algorithm_maps_public_key_algorithm() {
     let key = sample_public_key();
