@@ -65,6 +65,27 @@ async fn reject_socks5_greeting_from_client_bytes(bytes: &'static [u8]) -> Resul
     Ok(response)
 }
 
+async fn parse_socks5_target_with_error(
+    bytes: &'static [u8],
+    read_response: bool,
+) -> Result<String, String> {
+    let (mut client, mut server) = tokio::io::duplex(128);
+    let client_task = tokio::spawn(async move {
+        client.write_all(bytes).await.unwrap();
+        if read_response {
+            let mut response = [0_u8; 2];
+            client.read_exact(&mut response).await.unwrap();
+        }
+    });
+
+    let error = match read_socks5_target(&mut server).await {
+        Ok(_) => panic!("SOCKS5 target parsing should fail"),
+        Err(error) => error,
+    };
+    let _ = client_task.await.unwrap();
+    Ok(error)
+}
+
 #[tokio::test]
 async fn socks5_target_reads_ipv4_connect_request() {
     let (host, port, response) = parse_socks5_target_from_client_bytes(&[
@@ -152,6 +173,53 @@ async fn socks5_target_rejects_unknown_address_types() {
 }
 
 #[tokio::test]
+async fn socks5_target_rejects_unsupported_version() {
+    let error = parse_socks5_target_with_error(
+        &[
+            0x04, 0x01, 0x00, // unsupported version
+            0x05, 0x01, 0x00, 0x01, 127, 0, 0, 1, 0x00, 0x16,
+        ],
+        false,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(error, "unsupported SOCKS version".to_owned());
+}
+
+#[tokio::test]
+async fn socks5_target_rejects_invalid_domain_bytes() {
+    let error = parse_socks5_target_with_error(
+        &[
+            0x05, 0x01, 0x00, // greeting: no auth
+            0x05, 0x01, 0x00, 0x03, // CONNECT domain
+            3, 0xFF, 0xFF, 0xFF, 0x00, 0x16,
+        ],
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert!(error.contains("invalid"));
+}
+
+#[tokio::test]
+async fn socks5_target_rejects_short_port_read() {
+    let error = parse_socks5_target_with_error(
+        &[
+            0x05, 0x01, 0x00, // greeting: no auth
+            0x05, 0x01, 0x00, 0x01, // CONNECT IPv4
+            127, 0, 0, 1, 0x1F, // missing low byte of port
+        ],
+        true,
+    )
+    .await
+    .unwrap();
+
+    assert!(error.contains("early eof") || error.contains("unexpected end"));
+}
+
+#[tokio::test]
 async fn socks5_success_response_uses_ipv4_unspecified_endpoint() {
     let (mut client, mut server) = tokio::io::duplex(16);
     let client_task = tokio::spawn(async move {
@@ -166,4 +234,37 @@ async fn socks5_success_response_uses_ipv4_unspecified_endpoint() {
         client_task.await.unwrap(),
         [0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]
     );
+}
+
+#[tokio::test]
+async fn socks5_success_response_maps_write_failure() {
+    let error = write_socks5_success(&mut FailingWriter).await.unwrap_err();
+
+    assert_eq!(error.kind(), std::io::ErrorKind::Other);
+}
+
+struct FailingWriter;
+
+impl tokio::io::AsyncWrite for FailingWriter {
+    fn poll_write(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+        _buf: &[u8],
+    ) -> std::task::Poll<Result<usize, std::io::Error>> {
+        std::task::Poll::Ready(Err(std::io::Error::other("injected write failure")))
+    }
+
+    fn poll_flush(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        std::task::Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(
+        self: std::pin::Pin<&mut Self>,
+        _cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Result<(), std::io::Error>> {
+        std::task::Poll::Ready(Ok(()))
+    }
 }

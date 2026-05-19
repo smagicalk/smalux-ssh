@@ -90,11 +90,15 @@
 - 最新核心新增：`client/session/tests.rs` 补齐 `collect_command_message` 的 `ExitSignal` 输出映射和非终态消息忽略测试。
 - 最新核心新增：`client/session/sftp.rs` 的 `copy_transfer_with_progress` 补齐读取错误映射测试。
 - 最新核心新增：`executor/tests.rs` 补齐 `connected_session_error`、shell 输入缓存失效门和 SFTP 缓存失效门的离线测试。
+- 最新核心新增：`client/session/tunnel/tests.rs` 补齐 SOCKS5 unsupported version、非法域名字节、短端口读取和 success response 写失败的纯离线错误路径测试。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：补齐 SSH executor 纯 helper 边界测试并整理恢复记录
+- 本轮待提交：补齐 SOCKS5 隧道错误路径离线测试并整理恢复记录
+- `80238fd 继续收紧 SSH executor 纯 helper 边界`
+- `45b82dc 继续收紧 SSH client/session/SFTP 离线边界`
+- `64c6e12 补齐本地 PTY 执行器边界测试`
 - `9d2ec1b 补齐本地 PTY fallback 状态测试`
 - `a8280cb 抽出本地 PTY reader 读取逻辑`
 - `b4cfe55 收紧 SOCKS5 方法协商`
@@ -119,7 +123,7 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 158 个提交；本轮提交后预计领先 159 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 161 个提交；本轮提交后预计领先 162 个提交
 - 最近验证：
   - `cargo test local_pty -- --nocapture` 通过，`10 passed, 2 ignored`
   - `cargo test` 通过，`503 passed, 2 ignored`
@@ -160,6 +164,7 @@
 - `cargo fmt --check` 通过
 - `cargo test` 通过，`512 passed, 2 ignored`
 - `cargo test backend::ssh::executor::tests -- --nocapture` 通过，`34 passed`
+- `cargo test backend::ssh::client::session::tunnel::tests -- --nocapture` 通过，`12 passed`
 - `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过
