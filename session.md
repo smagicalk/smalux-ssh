@@ -42,25 +42,26 @@
 - 最新核心新增：SFTP 刷新和上传开启 loading 时改用会话归属 API，claim owner 后只允许匹配会话写入浏览器加载态。
 - 最新核心新增：SFTP 上传/下载会先完成输入校验，再 claim 浏览器 owner，避免失败请求改变同主机浏览器归属。
 - 最新核心新增：取消 SFTP 上传时 pending refresh 判断必须匹配当前浏览器 owner，旧会话刷新命令不再阻塞当前 loading 清理。
+- 最新核心新增：关闭当前 SFTP 浏览器 owner 并转交给同主机标签页时会清理 loading 和错误态，避免已关闭会话状态泄漏给新 owner。
 
 ## 最近提交
 
+- `8b4f901 收窄 SFTP 刷新保留 loading`
 - `731d0a1 避免失败 SFTP 传输改归属`
 - `f9e6866 校验 SFTP 加载写入归属`
 - `d0e92dc 校验 SFTP 选择归属`
 - `ff0081f 校验 SFTP 加载态归属`
-- `1b383d2 防止停止隧道缺失运行态崩溃`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 116 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 117 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - 聚焦 SFTP 取消上传 loading owner 测试通过
-  - `cargo test model::app_state::launch_tests::sftp` 通过，`34 passed`
-  - `cargo test` 通过，`417 passed, 2 ignored`
+  - 聚焦关闭 SFTP 当前 owner 转交测试通过
+  - `cargo test model::app_state::tests` 通过，`29 passed`
+  - `cargo test` 通过，`418 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 

@@ -162,6 +162,8 @@ impl AppState {
         };
 
         browser.session_id = next_session_id;
+        browser.loading = false;
+        browser.last_error = None;
         true
     }
 
