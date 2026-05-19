@@ -59,27 +59,29 @@
 - 最新核心新增：后端 pump 收到 SFTP 操作错误后只保留同会话浏览读取，裁剪后续上传/下载/删除/建目录写操作，避免失败后继续执行排队写请求。
 - 最新核心新增：远程 shell drain 终止事件必须匹配当前 `session_id` 才会丢弃缓存 shell，错会话 `Disconnected` 不再影响当前交互通道。
 - 最新核心新增：后端事件终态判断集中到 `BackendEvent::is_terminal()`，`CommandExited` / `Failed` / `Disconnected` 共用同一口径，shell drain 缓存丢弃复用该判断。
+- 最新核心新增：后端队列泵执行 `DrainSessionOutput` 前会复查会话仍是可轮询的交互式 shell，终态 shell 的迟到 drain 命令会被静默丢弃，不再触发后端错误。
 
 ## 最近提交
 
+- `a6c7130 集中后端事件终态判断`
 - `0b719b4 校验 shell drain 事件归属`
 - `2e2665c 裁剪失败后 SFTP 写队列`
 - `a31b44b 集中传输隧道终态判断`
 - `66b4a24 约束 SFTP 书签 owner`
-- `869abdd 集中会话终态判断`
 
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交后预计领先 `origin/dev` 133 个提交
+- 远端进度：本轮提交后预计领先 `origin/dev` 134 个提交
 - 最近验证：
   - `cargo fmt --check` 通过
   - `cargo check` 通过
-  - `cargo test backend::event::tests -- --nocapture` 通过，`3 passed`
-  - `cargo test remote_shell_cache_drop_follows_shell_terminal_events -- --nocapture` 通过，`1 passed`
-  - `cargo test backend::ssh::executor::tests` 通过，`31 passed`
-  - `cargo test backend::reducer::tests` 通过，`27 passed`
-  - `cargo test` 通过，`440 passed, 2 ignored`
+  - `cargo test backend_queue_pump_skips_terminal_shell_drain_commands -- --nocapture` 先失败后通过，`1 passed`
+  - `cargo test session::tabs::tests::interactive_shell_tab_ids_include_only_connected_shell_tabs -- --nocapture` 通过，`1 passed`
+  - `cargo test model::app_state::backend_pump_tests` 通过，`16 passed`
+  - `cargo test session::tabs::tests` 通过，`11 passed`
+  - `cargo test app::pump::tests` 通过，`2 passed`
+  - `cargo test` 通过，`441 passed, 2 ignored`
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 

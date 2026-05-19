@@ -98,12 +98,20 @@ impl SessionManager {
     pub fn interactive_shell_tab_ids(&self) -> Vec<SessionId> {
         self.tabs
             .iter()
-            .filter(|tab| {
+            .filter(|tab| self.can_drain_interactive_shell(tab.id))
+            .map(|tab| tab.id)
+            .collect()
+    }
+
+    /// 判断后台输出泵是否仍应抽取该会话的交互式 shell 输出。
+    pub fn can_drain_interactive_shell(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| {
                 matches!(tab.kind, SessionKind::LocalShell | SessionKind::Shell)
                     && matches!(tab.status, SessionStatus::Connected)
             })
-            .map(|tab| tab.id)
-            .collect()
     }
 
     /// 判断终端缓冲是否仍可被对应会话更新。
@@ -356,6 +364,9 @@ mod tests {
             sessions.interactive_shell_tab_ids(),
             vec![local_id, shell_id]
         );
+        assert!(sessions.can_drain_interactive_shell(local_id));
+        assert!(sessions.can_drain_interactive_shell(shell_id));
+        assert!(!sessions.can_drain_interactive_shell(command_id));
     }
 
     #[test]

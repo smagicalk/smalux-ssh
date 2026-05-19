@@ -17,6 +17,10 @@ impl AppState {
         let mut outcome = AppUpdateOutcome::default();
 
         while let Some(command) = self.backend_commands.pop_front() {
+            if !self.can_execute_backend_command(&command) {
+                continue;
+            }
+
             let session_id = command.session_id();
             let failed_transfer = failed_transfer_for_command(&command);
             let events = match executor.execute(command) {
@@ -76,6 +80,17 @@ impl AppState {
         }
 
         outcome
+    }
+}
+
+impl AppState {
+    fn can_execute_backend_command(&self, command: &BackendCommand) -> bool {
+        match command {
+            BackendCommand::DrainSessionOutput { session_id } => {
+                self.sessions.can_drain_interactive_shell(*session_id)
+            }
+            _ => true,
+        }
     }
 }
 
