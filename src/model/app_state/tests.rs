@@ -191,6 +191,37 @@ fn activate_sftp_tab_message_reassigns_browser_owner() {
 }
 
 #[test]
+fn activate_disconnected_sftp_tab_keeps_available_browser_owner() {
+    let mut state = AppState::default();
+    let connected_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let disconnected_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
+    let host_id = crate::model::HostId(uuid::Uuid::new_v4());
+    state
+        .sessions
+        .open_sftp_tab(disconnected_session_id, host_id, "/old");
+    state
+        .sessions
+        .set_status(disconnected_session_id, SessionStatus::Disconnected);
+    state
+        .sessions
+        .open_sftp_tab(connected_session_id, host_id, "/current");
+    state
+        .sessions
+        .set_status(connected_session_id, SessionStatus::Connected);
+
+    let outcome = state.apply(Message::ActivateTerminalTab {
+        session_id: disconnected_session_id,
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(state.sessions.active_tab, Some(disconnected_session_id));
+    assert_eq!(
+        state.sessions.sftp_browsers[0].session_id,
+        connected_session_id
+    );
+}
+
+#[test]
 fn close_session_tab_message_closes_shell_and_queues_disconnect() {
     let mut state = AppState::default();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());

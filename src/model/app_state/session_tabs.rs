@@ -91,7 +91,8 @@ impl AppState {
     }
 
     fn reassign_sftp_browser_on_tab_activation(&mut self, tab: &SessionTab) -> bool {
-        if !matches!(tab.kind, SessionKind::Sftp) {
+        if !matches!(tab.kind, SessionKind::Sftp) || !sftp_tab_can_accept_browser_owner(&tab.status)
+        {
             return false;
         }
 
