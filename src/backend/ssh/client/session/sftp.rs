@@ -2,7 +2,7 @@
 
 use russh_sftp::client::SftpSession;
 use russh_sftp::protocol::{FileAttributes, FileType as RusshSftpFileType};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 use crate::backend::{BackendEvent, BackendExecutionError, SftpRequest};
 use crate::model::{SessionId, SftpEntry, SftpEntryKind, TransferId, TransferStatus};
@@ -111,32 +111,17 @@ impl RemoteSftp {
             0,
             TransferStatus::Running,
         )];
-        let mut transferred_bytes = 0_u64;
-        let mut buffer = vec![0_u8; SFTP_TRANSFER_CHUNK_SIZE];
-
-        loop {
-            let bytes_read = local_file
-                .read(&mut buffer)
-                .await
-                .map_err(|error| sftp_io_error("upload read local", error))?;
-
-            if bytes_read == 0 {
-                break;
-            }
-
-            remote_file
-                .write_all(&buffer[..bytes_read])
-                .await
-                .map_err(|error| sftp_io_error("upload write remote", error))?;
-            transferred_bytes += bytes_read as u64;
-            events.push(transfer_event(
-                self.session_id,
-                id,
-                Some(total_bytes),
-                transferred_bytes,
-                TransferStatus::Running,
-            ));
-        }
+        let (transferred_bytes, progress_events) = copy_transfer_with_progress(
+            self.session_id,
+            id,
+            Some(total_bytes),
+            &mut local_file,
+            &mut remote_file,
+            "upload read local",
+            "upload write remote",
+        )
+        .await?;
+        events.extend(progress_events);
 
         remote_file
             .shutdown()
@@ -180,32 +165,17 @@ impl RemoteSftp {
             0,
             TransferStatus::Running,
         )];
-        let mut transferred_bytes = 0_u64;
-        let mut buffer = vec![0_u8; SFTP_TRANSFER_CHUNK_SIZE];
-
-        loop {
-            let bytes_read = remote_file
-                .read(&mut buffer)
-                .await
-                .map_err(|error| sftp_io_error("download read remote", error))?;
-
-            if bytes_read == 0 {
-                break;
-            }
-
-            local_file
-                .write_all(&buffer[..bytes_read])
-                .await
-                .map_err(|error| sftp_io_error("download write local", error))?;
-            transferred_bytes += bytes_read as u64;
-            events.push(transfer_event(
-                self.session_id,
-                id,
-                total_bytes,
-                transferred_bytes,
-                TransferStatus::Running,
-            ));
-        }
+        let (transferred_bytes, progress_events) = copy_transfer_with_progress(
+            self.session_id,
+            id,
+            total_bytes,
+            &mut remote_file,
+            &mut local_file,
+            "download read remote",
+            "download write local",
+        )
+        .await?;
+        events.extend(progress_events);
 
         local_file
             .flush()
@@ -307,10 +277,193 @@ pub(super) fn transfer_event(
     }
 }
 
+async fn copy_transfer_with_progress<R, W>(
+    session_id: SessionId,
+    transfer_id: TransferId,
+    total_bytes: Option<u64>,
+    reader: &mut R,
+    writer: &mut W,
+    read_operation: &str,
+    write_operation: &str,
+) -> Result<(u64, Vec<BackendEvent>), BackendExecutionError>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut transferred_bytes = 0_u64;
+    let mut events = Vec::new();
+    let mut buffer = vec![0_u8; SFTP_TRANSFER_CHUNK_SIZE];
+
+    loop {
+        let bytes_read = reader
+            .read(&mut buffer)
+            .await
+            .map_err(|error| sftp_io_error(read_operation, error))?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        writer
+            .write_all(&buffer[..bytes_read])
+            .await
+            .map_err(|error| sftp_io_error(write_operation, error))?;
+        transferred_bytes += bytes_read as u64;
+        events.push(transfer_event(
+            session_id,
+            transfer_id,
+            total_bytes,
+            transferred_bytes,
+            TransferStatus::Running,
+        ));
+    }
+
+    Ok((transferred_bytes, events))
+}
+
 fn sftp_error(operation: &str, error: impl std::fmt::Display) -> BackendExecutionError {
     BackendExecutionError::SftpFailed {
         operation: operation.to_owned(),
         reason: error.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::{Cursor, Error, ErrorKind};
+    use std::pin::Pin;
+    use std::task::{Context, Poll};
+
+    use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+
+    use super::*;
+
+    fn session_id() -> SessionId {
+        SessionId(uuid::Uuid::new_v4())
+    }
+
+    fn transfer_id() -> TransferId {
+        TransferId(uuid::Uuid::new_v4())
+    }
+
+    #[tokio::test]
+    async fn copy_transfer_with_progress_emits_chunk_progress() {
+        let session_id = session_id();
+        let transfer_id = transfer_id();
+        let mut reader = Cursor::new(vec![7_u8; SFTP_TRANSFER_CHUNK_SIZE + 3]);
+        let mut writer = Vec::new();
+
+        let (transferred, events) = copy_transfer_with_progress(
+            session_id,
+            transfer_id,
+            Some((SFTP_TRANSFER_CHUNK_SIZE + 3) as u64),
+            &mut reader,
+            &mut writer,
+            "read transfer",
+            "write transfer",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(transferred, (SFTP_TRANSFER_CHUNK_SIZE + 3) as u64);
+        assert_eq!(writer, vec![7_u8; SFTP_TRANSFER_CHUNK_SIZE + 3]);
+        assert_eq!(
+            events,
+            vec![
+                transfer_event(
+                    session_id,
+                    transfer_id,
+                    Some((SFTP_TRANSFER_CHUNK_SIZE + 3) as u64),
+                    SFTP_TRANSFER_CHUNK_SIZE as u64,
+                    TransferStatus::Running,
+                ),
+                transfer_event(
+                    session_id,
+                    transfer_id,
+                    Some((SFTP_TRANSFER_CHUNK_SIZE + 3) as u64),
+                    (SFTP_TRANSFER_CHUNK_SIZE + 3) as u64,
+                    TransferStatus::Running,
+                ),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn copy_transfer_with_progress_handles_empty_stream() {
+        let mut reader = Cursor::new(Vec::new());
+        let mut writer = Vec::new();
+
+        let (transferred, events) = copy_transfer_with_progress(
+            session_id(),
+            transfer_id(),
+            Some(0),
+            &mut reader,
+            &mut writer,
+            "read empty",
+            "write empty",
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(transferred, 0);
+        assert!(events.is_empty());
+        assert!(writer.is_empty());
+    }
+
+    #[tokio::test]
+    async fn copy_transfer_with_progress_maps_write_errors() {
+        let mut reader = Cursor::new(b"payload".to_vec());
+        let mut writer = FailingWriter;
+
+        let error = copy_transfer_with_progress(
+            session_id(),
+            transfer_id(),
+            Some(7),
+            &mut reader,
+            &mut writer,
+            "read payload",
+            "write payload",
+        )
+        .await
+        .unwrap_err();
+
+        assert!(matches!(
+            error,
+            BackendExecutionError::SftpFailed {
+                operation,
+                reason,
+            } if operation == "write payload" && reason.contains("injected write failure")
+        ));
+    }
+
+    struct FailingWriter;
+
+    impl AsyncWrite for FailingWriter {
+        fn poll_write(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &[u8],
+        ) -> Poll<Result<usize, Error>> {
+            Poll::Ready(Err(Error::new(ErrorKind::Other, "injected write failure")))
+        }
+
+        fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+            Poll::Ready(Ok(()))
+        }
+
+        fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+            Poll::Ready(Ok(()))
+        }
+    }
+
+    impl AsyncRead for FailingWriter {
+        fn poll_read(
+            self: Pin<&mut Self>,
+            _cx: &mut Context<'_>,
+            _buf: &mut ReadBuf<'_>,
+        ) -> Poll<Result<(), Error>> {
+            Poll::Ready(Ok(()))
+        }
     }
 }
 
