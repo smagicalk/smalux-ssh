@@ -2,14 +2,23 @@ use super::*;
 use russh::client;
 use std::time::Duration;
 
+use russh::ChannelMsg;
+use russh::CryptoVec;
+use russh::Sig;
 use russh::keys::PublicKey;
+use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::{HostKeyVerification, KeyAlgorithm, KnownHostEntry};
+use uuid::Uuid;
 
 fn sample_public_key() -> PublicKey {
     russh::keys::parse_public_key_base64(
         "AAAAC3NzaC1lZDI1NTE5AAAAILagOJFgwaMNhBWQINinKOXmqS4Gh5NgxgriXwdOoINJ",
     )
     .expect("测试公钥应该可以解析")
+}
+
+fn session_id() -> smagical_core::SessionId {
+    smagical_core::SessionId(Uuid::new_v4())
 }
 
 #[test]
@@ -238,4 +247,182 @@ async fn forwarded_channel_subscription_replaces_matching_endpoint() {
         .expect("被替换的 forwarded channel 订阅应该立即关闭");
 
     assert!(stale_closed.is_none());
+}
+
+#[test]
+fn command_data_message_becomes_output_event() {
+    let session_id = session_id();
+    let mut events = Vec::new();
+    let mut exit_code = None;
+
+    let should_stop = collect_command_message(
+        session_id,
+        ChannelMsg::Data {
+            data: CryptoVec::from_slice(b"hello\n"),
+        },
+        &mut events,
+        &mut exit_code,
+    )
+    .expect("数据消息应该可以转换为输出事件");
+
+    assert!(!should_stop);
+    assert_eq!(
+        events,
+        vec![BackendEvent::Output {
+            session_id,
+            line: "hello\n".to_owned(),
+        }]
+    );
+    assert_eq!(exit_code, None);
+}
+
+#[test]
+fn command_exit_status_is_recorded_without_stopping_collection() {
+    let session_id = session_id();
+    let mut events = Vec::new();
+    let mut exit_code = None;
+
+    let should_stop = collect_command_message(
+        session_id,
+        ChannelMsg::ExitStatus { exit_status: 127 },
+        &mut events,
+        &mut exit_code,
+    )
+    .expect("退出状态应该可以记录");
+
+    assert!(!should_stop);
+    assert!(events.is_empty());
+    assert_eq!(exit_code, Some(127));
+}
+
+#[test]
+fn command_close_message_stops_collection() {
+    let session_id = session_id();
+    let mut events = Vec::new();
+    let mut exit_code = None;
+
+    let should_stop =
+        collect_command_message(session_id, ChannelMsg::Close, &mut events, &mut exit_code)
+            .expect("关闭消息应该可以处理");
+
+    assert!(should_stop);
+    assert!(events.is_empty());
+}
+
+#[test]
+fn command_failure_message_reports_channel_error() {
+    let session_id = session_id();
+    let mut events = Vec::new();
+    let mut exit_code = None;
+
+    let error =
+        collect_command_message(session_id, ChannelMsg::Failure, &mut events, &mut exit_code)
+            .expect_err("服务端拒绝 channel 请求应该返回通道错误");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "channel request" && reason.contains("server rejected")
+    ));
+}
+
+#[test]
+fn shell_message_maps_output_and_exit_status() {
+    let session_id = session_id();
+
+    let output = shell_message_to_event(
+        session_id,
+        ChannelMsg::ExtendedData {
+            data: CryptoVec::from_slice(b"stderr"),
+            ext: 1,
+        },
+    );
+    let exit = shell_message_to_event(session_id, ChannelMsg::ExitStatus { exit_status: 0 });
+
+    assert_eq!(
+        output,
+        Some(BackendEvent::Output {
+            session_id,
+            line: "stderr".to_owned(),
+        })
+    );
+    assert_eq!(
+        exit,
+        Some(BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(0),
+        })
+    );
+}
+
+#[test]
+fn shell_failure_message_maps_to_failed_event() {
+    let session_id = session_id();
+
+    let event = shell_message_to_event(session_id, ChannelMsg::Failure);
+
+    assert_eq!(
+        event,
+        Some(BackendEvent::Failed {
+            session_id,
+            reason: "server rejected channel request".to_owned(),
+        })
+    );
+}
+
+#[test]
+fn shell_close_message_maps_to_disconnected() {
+    let session_id = session_id();
+
+    let event = shell_message_to_event(session_id, ChannelMsg::Close);
+
+    assert_eq!(event, Some(BackendEvent::Disconnected { session_id }));
+}
+
+#[test]
+fn command_exit_signal_message_maps_to_output_event() {
+    let session_id = session_id();
+    let signal_name = Sig::TERM;
+    let expected_line = format!("远程进程收到信号退出：{signal_name:?}");
+    let mut events = Vec::new();
+    let mut exit_code = None;
+
+    let should_stop = collect_command_message(
+        session_id,
+        ChannelMsg::ExitSignal {
+            signal_name,
+            core_dumped: false,
+            error_message: String::new(),
+            lang_tag: String::new(),
+        },
+        &mut events,
+        &mut exit_code,
+    )
+    .expect("退出信号应该可以记录");
+
+    assert!(!should_stop);
+    assert_eq!(
+        events,
+        vec![BackendEvent::Output {
+            session_id,
+            line: expected_line,
+        }]
+    );
+    assert_eq!(exit_code, None);
+}
+
+#[test]
+fn shell_message_ignores_non_terminal_control_messages() {
+    let session_id = session_id();
+
+    assert_eq!(
+        shell_message_to_event(session_id, ChannelMsg::WindowAdjusted { new_size: 80 }),
+        None
+    );
+    assert_eq!(
+        shell_message_to_event(session_id, ChannelMsg::Success),
+        None
+    );
 }

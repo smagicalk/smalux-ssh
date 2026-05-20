@@ -5661,8 +5661,10 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "russh",
+ "smagical-backend-core",
  "smagical-core",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
