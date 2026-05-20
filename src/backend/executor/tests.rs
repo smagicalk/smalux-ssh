@@ -69,6 +69,41 @@ fn scripted_executor_returns_matching_events() {
 }
 
 #[test]
+fn scripted_executor_consumes_responses_in_fifo_order() {
+    let mut executor = ScriptedBackendExecutor::new();
+    let session_id = session_id();
+    executor.push_response(ScriptedBackendResponse::new(
+        BackendCommandKind::Connect,
+        vec![BackendEvent::Connected { session_id }],
+    ));
+    executor.push_response(ScriptedBackendResponse::new(
+        BackendCommandKind::Disconnect,
+        vec![BackendEvent::Disconnected { session_id }],
+    ));
+
+    let connected = executor
+        .execute(BackendCommand::Connect {
+            session_id,
+            target: ConnectionTarget::from_host(&host()),
+        })
+        .expect("第一条脚本响应应该匹配连接命令");
+    let disconnected = executor
+        .execute(BackendCommand::Disconnect { session_id })
+        .expect("第二条脚本响应应该匹配断开命令");
+
+    assert_eq!(connected, vec![BackendEvent::Connected { session_id }]);
+    assert_eq!(
+        disconnected,
+        vec![BackendEvent::Disconnected { session_id }]
+    );
+    assert_eq!(
+        executor.executed(),
+        &[BackendCommandKind::Connect, BackendCommandKind::Disconnect]
+    );
+    assert_eq!(executor.remaining(), 0);
+}
+
+#[test]
 fn scripted_executor_rejects_unexpected_command_kind() {
     let mut executor = ScriptedBackendExecutor::new();
     let session_id = session_id();
@@ -106,6 +141,24 @@ fn scripted_executor_reports_missing_response_without_recording_command() {
 
     assert_eq!(error, BackendExecutionError::NoScriptedResponse);
     assert_eq!(executor.executed(), &[]);
+}
+
+#[test]
+fn noop_shared_backend_executor_rejects_commands_through_lock() {
+    let executor = noop_shared_backend_executor();
+    let session_id = session_id();
+    let mut guard = executor.lock().expect("共享执行器锁不应中毒");
+
+    let error = guard
+        .execute(BackendCommand::Disconnect { session_id })
+        .expect_err("占位共享执行器应该拒绝命令");
+
+    assert_eq!(
+        error,
+        BackendExecutionError::UnsupportedCommand {
+            kind: BackendCommandKind::Disconnect,
+        }
+    );
 }
 
 #[test]
