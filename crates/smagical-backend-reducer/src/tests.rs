@@ -1,9 +1,11 @@
 use super::*;
-use crate::model::{
-    HostId, SessionId, SftpEntry, SftpEntryKind, TransferDirection, TransferId, TransferStatus,
-    TransferTask, TunnelKind, TunnelRule,
+use smagical_backend_core::LocalShellProfile;
+use smagical_core::{
+    DEFAULT_LOCAL_TERMINAL_TITLE, HostId, LOCAL_TERMINAL_SESSION_ID, SessionId, SftpEntry,
+    SftpEntryKind, TransferDirection, TransferId, TransferStatus, TransferTask, TunnelKind,
+    TunnelRule,
 };
-use crate::terminal::TerminalTabState;
+use smagical_terminal::TerminalTabState;
 use uuid::Uuid;
 
 fn host_id() -> HostId {
@@ -76,7 +78,7 @@ fn remote_connection_events_ignore_local_shell_session() {
     let mut terminal = TerminalManager::default();
     let session_id = session_id();
 
-    sessions.open_local_shell_tab(session_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+    sessions.open_local_shell_tab(session_id, DEFAULT_LOCAL_TERMINAL_TITLE);
     let outcome = apply_backend_event(
         &mut sessions,
         &mut terminal,
@@ -108,7 +110,7 @@ fn connected_event_accepts_local_shell_session() {
     let mut terminal = TerminalManager::default();
     let session_id = session_id();
 
-    sessions.open_local_shell_tab(session_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+    sessions.open_local_shell_tab(session_id, DEFAULT_LOCAL_TERMINAL_TITLE);
     let outcome = apply_backend_event(
         &mut sessions,
         &mut terminal,
@@ -264,10 +266,10 @@ fn output_event_ignores_terminal_session() {
 fn local_terminal_output_drops_duplicate_shell_echo() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
-    let session_id = crate::model::LOCAL_TERMINAL_SESSION_ID;
-    let prompt = crate::backend::LocalShellProfile::default_for_platform().prompt;
+    let session_id = LOCAL_TERMINAL_SESSION_ID;
+    let prompt = LocalShellProfile::default_for_platform().prompt;
 
-    sessions.open_local_shell_tab(session_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+    sessions.open_local_shell_tab(session_id, DEFAULT_LOCAL_TERMINAL_TITLE);
     terminal.open_tab(TerminalTabState::new(session_id, "local"));
     terminal.append_local_echo(session_id, prompt, "ls\n");
     let outcome = apply_backend_event(

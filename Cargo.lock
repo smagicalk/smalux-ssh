@@ -5599,6 +5599,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-backend-reducer"
+version = "0.1.0"
+dependencies = [
+ "smagical-backend-core",
+ "smagical-core",
+ "smagical-session",
+ "smagical-terminal",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-config"
 version = "0.1.0"
 dependencies = [
@@ -5669,6 +5680,7 @@ dependencies = [
  "slint",
  "slint-build",
  "smagical-backend-core",
+ "smagical-backend-reducer",
  "smagical-config",
  "smagical-core",
  "smagical-security",

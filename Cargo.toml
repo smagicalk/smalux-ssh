@@ -14,11 +14,13 @@ members = [
     "crates/smagical-storage",
     "crates/smagical-security",
     "crates/smagical-backend-core",
+    "crates/smagical-backend-reducer",
 ]
 resolver = "3"
 
 [dependencies]
 smagical-backend-core = { path = "crates/smagical-backend-core" }
+smagical-backend-reducer = { path = "crates/smagical-backend-reducer" }
 smagical-config = { path = "crates/smagical-config" }
 smagical-core = { path = "crates/smagical-core" }
 smagical-security = { path = "crates/smagical-security" }
