@@ -18,7 +18,7 @@ mod socks5;
 mod tcp;
 
 pub use handle::RemoteTunnel;
-use handle::tunnel;
+use handle::remote_tunnel;
 use tcp::{
     accept_with_tick, bind_tcp_listener, pipe_direct_tcpip, pipe_forwarded_tcpip,
     serve_socks5_connection,
@@ -75,7 +75,7 @@ impl RusshConnection {
         });
 
         Ok((
-            tunnel(
+            remote_tunnel(
                 session_id,
                 rule.name,
                 running,
@@ -124,7 +124,7 @@ impl RusshConnection {
         });
 
         Ok((
-            tunnel(
+            remote_tunnel(
                 session_id,
                 rule.name,
                 running,
@@ -182,7 +182,7 @@ impl RusshConnection {
         });
 
         Ok((
-            tunnel(
+            remote_tunnel(
                 session_id,
                 rule.name,
                 running,
@@ -204,6 +204,3 @@ fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
         reason: error.to_string(),
     }
 }
-
-#[cfg(test)]
-mod tests;

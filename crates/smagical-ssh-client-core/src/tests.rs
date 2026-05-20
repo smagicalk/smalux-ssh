@@ -1,5 +1,9 @@
 use super::*;
 use russh::client;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use std::time::Duration;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -302,6 +306,25 @@ fn sftp_transfer_event_carries_total_and_progress_bytes() {
             status: TransferStatus::Running,
         }
     );
+}
+
+#[test]
+fn remote_tunnel_reports_endpoint_and_can_stop() {
+    let session_id = session_id();
+    let running = Arc::new(AtomicBool::new(true));
+    let tunnel = remote_tunnel(
+        session_id,
+        "proxy".to_owned(),
+        running.clone(),
+        "127.0.0.1".to_owned(),
+        1080,
+    );
+
+    assert_eq!(tunnel.session_id(), session_id);
+    assert_eq!(tunnel.rule_name(), "proxy");
+    assert_eq!(tunnel.bind_endpoint(), "127.0.0.1:1080");
+    tunnel.stop();
+    assert!(!running.load(Ordering::SeqCst));
 }
 
 async fn parse_socks5_target_from_client_bytes(
