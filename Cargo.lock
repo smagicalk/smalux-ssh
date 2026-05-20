@@ -5588,6 +5588,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-config"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "smagical-core",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-core"
 version = "0.1.0"
 dependencies = [
@@ -5628,6 +5637,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
+ "smagical-config",
  "smagical-core",
  "smagical-session",
  "smagical-terminal",

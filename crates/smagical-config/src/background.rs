@@ -2,7 +2,7 @@
 
 #[cfg(test)]
 mod tests {
-    use crate::model::{BackgroundProfile, ImageSource};
+    use smagical_core::{BackgroundProfile, ImageSource};
 
     #[test]
     fn background_normalization_clamps_render_parameters() {

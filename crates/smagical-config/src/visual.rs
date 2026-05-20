@@ -1,6 +1,6 @@
 //! 全局视觉配置与主机覆盖配置解析。
 
-use crate::model::Host;
+use smagical_core::Host;
 
 use super::{AppConfig, ResolvedVisualConfig};
 
@@ -22,7 +22,7 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{
+    use smagical_core::{
         AuthProfile, BackgroundProfile, HostId, ImageSource, SecretRef, ThemeProfile,
     };
     use uuid::Uuid;

@@ -1,6 +1,6 @@
 //! 应用启动默认配置。
 
-use crate::model::{BackgroundProfile, ThemeProfile};
+use smagical_core::{BackgroundProfile, ThemeProfile};
 
 use super::AppConfig;
 
