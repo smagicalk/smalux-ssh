@@ -1,6 +1,6 @@
 //! 终端标签页打开、关闭和尺寸调整。
 
-use crate::model::SessionId;
+use smagical_core::SessionId;
 
 use super::{TerminalManager, TerminalSize, TerminalTabState};
 

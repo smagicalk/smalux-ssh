@@ -1,0 +1,12 @@
+[package]
+name = "smagical-terminal"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[dependencies]
+alacritty_terminal = "0.25"
+smagical-core = { path = "../smagical-core" }
+
+[dev-dependencies]
+uuid = { version = "1", features = ["v4"] }

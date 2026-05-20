@@ -1,6 +1,6 @@
 //! 终端输出缓冲和搜索操作。
 
-use crate::model::SessionId;
+use smagical_core::SessionId;
 
 use super::{TerminalManager, TerminalSearchMatch};
 
@@ -76,7 +76,7 @@ impl TerminalManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::terminal::TerminalTabState;
+    use crate::TerminalTabState;
     use uuid::Uuid;
 
     fn session_id() -> SessionId {

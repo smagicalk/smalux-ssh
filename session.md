@@ -8,7 +8,7 @@
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
 - 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
-- 本轮新增：继续收口核心运行态，新增 `smagical-session` workspace crate 承载会话标签页、SFTP owner、传输队列和隧道运行态管理。
+- 本轮新增：继续收口终端核心，新增 `smagical-terminal` workspace crate 承载终端标签页、缓冲、选择、本地 shell profile 和 ANSI 流解析。
 
 ## 当前进度
 
@@ -106,18 +106,20 @@
 - 最新工程优化：新增 `smagical-core` workspace crate，迁移 `ids` / `security` / `history` / `visual` 四个纯模型模块，删除主 crate 中对应旧副本，并通过 `pub use smagical_core::*` 保持旧 API。
 - 最新工程优化：继续迁移 `host` / `session` / `sftp` / `snippet` / `tunnel` / `workspace` 到 `smagical-core`，主 crate `src/model.rs` 仅导出应用根状态、UI 状态和 core re-export。
 - 最新工程优化：新增 `smagical-session` workspace crate，迁移原 `src/session` 会话运行态管理；主 crate `src/session.rs` 改为 re-export，保持 `crate::session::*` 兼容。
+- 最新工程优化：新增 `smagical-terminal` workspace crate，迁移原 `src/terminal` 终端核心状态和流解析；主 crate `src/terminal.rs` 改为 re-export，保持 `crate::terminal::*` 兼容。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
 - 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
 - 编译速度事实：`smagical-core` 独立测试 `cargo test -p smagical-core` 通过，8 个纯模型测试全部成功；主 crate `cargo test --lib model::tests -- --nocapture` 也通过。
 - 编译速度事实：继续迁移纯模型后，`cargo test -p smagical-core` 通过，34 个纯模型测试全部成功；主 crate `cargo test` 通过，`509 passed, 2 ignored`，测试总量转移到 core crate 后分布发生变化。
 - 编译速度事实：迁移会话运行态后，`cargo test -p smagical-session` 通过，68 个会话运行态测试全部成功；主 crate `cargo test` 通过，`441 passed, 2 ignored`，测试总量继续按 crate 分布转移。
+- 编译速度事实：迁移终端核心后，`cargo test -p smagical-terminal` 通过，17 个终端核心测试全部成功；主 crate `cargo test` 通过，`424 passed, 2 ignored`，终端测试已转移到独立 crate。
 - 编译速度事实：本轮 `cargo check` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`git diff --check` 仅有 CRLF 提示，无实际 diff 错误。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：提交 `smagical-session` 会话运行态拆分并整理恢复记录
+- 本轮待提交：提交 `smagical-terminal` 终端核心拆分并整理恢复记录
 - `15de3d0 稳定 Slint 构建脚本监听输出`
 - `cb04901 收紧 Slint 构建脚本重跑范围`
 - `227d50f 补齐后端事件口径边界测试`
@@ -226,6 +228,10 @@
 - `cargo test --lib model::app_state::workspace -- --nocapture` 通过，`6 passed`
 - `cargo check` 通过，用时约 `13.47s`
 - `cargo test` 通过，`441 passed, 2 ignored`
+- `cargo test -p smagical-terminal` 通过，`17 passed`
+- `cargo test --lib terminal -- --nocapture` 通过，`54 passed`
+- `cargo check` 通过，用时约 `15.12s`
+- `cargo test` 通过，`424 passed, 2 ignored`
 - `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过

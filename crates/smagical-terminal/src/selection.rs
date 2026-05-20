@@ -1,6 +1,6 @@
 //! 终端选择文本和复制状态。
 
-use crate::model::SessionId;
+use smagical_core::SessionId;
 
 use super::TerminalManager;
 
@@ -27,7 +27,7 @@ impl TerminalManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::terminal::TerminalTabState;
+    use crate::TerminalTabState;
     use uuid::Uuid;
 
     fn session_id() -> SessionId {

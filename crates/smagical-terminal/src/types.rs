@@ -1,6 +1,6 @@
 //! 终端状态的基础数据类型。
 
-use crate::model::SessionId;
+use smagical_core::SessionId;
 
 pub(crate) const DEFAULT_COLUMNS: u16 = 120;
 pub(crate) const DEFAULT_ROWS: u16 = 32;

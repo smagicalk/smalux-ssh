@@ -5605,10 +5605,18 @@ dependencies = [
 ]
 
 [[package]]
-name = "smagicalssh"
+name = "smagical-terminal"
 version = "0.1.0"
 dependencies = [
  "alacritty_terminal",
+ "smagical-core",
+ "uuid",
+]
+
+[[package]]
+name = "smagicalssh"
+version = "0.1.0"
+dependencies = [
  "anyhow",
  "aws-lc-rs",
  "directories",
@@ -5622,6 +5630,7 @@ dependencies = [
  "slint-build",
  "smagical-core",
  "smagical-session",
+ "smagical-terminal",
  "thiserror 2.0.18",
  "tokio",
  "toml",

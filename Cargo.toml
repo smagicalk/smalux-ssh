@@ -5,12 +5,18 @@ edition = "2024"
 rust-version = "1.95"
 
 [workspace]
-members = [".", "crates/smagical-core", "crates/smagical-session"]
+members = [
+    ".",
+    "crates/smagical-core",
+    "crates/smagical-session",
+    "crates/smagical-terminal",
+]
 resolver = "3"
 
 [dependencies]
 smagical-core = { path = "crates/smagical-core" }
 smagical-session = { path = "crates/smagical-session" }
+smagical-terminal = { path = "crates/smagical-terminal" }
 slint = "1.15"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
 serde = { version = "1", features = ["derive"] }
@@ -24,7 +30,6 @@ directories = "6"
 keyring = "3"
 redb = "3"
 portable-pty = "0.9"
-alacritty_terminal = "0.25"
 aws-lc-rs = { version = "1.16", features = ["prebuilt-nasm"] }
 russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "flate2", "rsa"] }
 russh-sftp = "2"
