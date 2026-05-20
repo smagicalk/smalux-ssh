@@ -2,17 +2,16 @@ use super::*;
 use std::io;
 use std::time::Duration;
 
-use russh::client;
 use russh::keys::PublicKey;
 
 use super::auth::decode_private_key;
-use super::handler::{SharedForwardedChannels, SharedHostKeyResult};
+use super::handler::SharedHostKeyResult;
 use super::settings::test_constants::{
     DEFAULT_INACTIVITY_TIMEOUT_SECS, DEFAULT_KEEPALIVE_INTERVAL_SECS, DEFAULT_KEEPALIVE_MAX,
 };
 use crate::backend::BackendExecutionError;
 use crate::backend::ssh::{SshAuthPlan, SshConnectionPlan};
-use crate::model::{HostKeyVerification, KeyAlgorithm, KnownHostEntry};
+use crate::model::{KeyAlgorithm, KnownHostEntry};
 
 fn sample_public_key() -> PublicKey {
     russh::keys::parse_public_key_base64(
@@ -64,67 +63,6 @@ fn authentication_error_preserves_username_and_reason() {
             reason,
         } if username == "deploy" && reason == "boom"
     ));
-}
-
-#[tokio::test]
-async fn handler_records_host_key_verification_result() {
-    let key = sample_public_key();
-    let shared = SharedHostKeyResult::default();
-    let mut handler = SshClientHandler::new(
-        "example.com".to_owned(),
-        22,
-        HostKeyPolicy::AcceptAny,
-        shared.clone(),
-        SharedForwardedChannels::default(),
-    );
-
-    let accepted = client::Handler::check_server_key(&mut handler, &key)
-        .await
-        .expect("主机密钥检查不应失败");
-
-    assert!(accepted);
-    let check = shared.get().expect("处理器应该记录主机密钥检查结果");
-    assert_eq!(check.host, "example.com");
-    assert_eq!(check.port, 22);
-    assert_eq!(check.key_algorithm, KeyAlgorithm::Ed25519);
-    assert_eq!(check.verification, HostKeyVerification::Unknown);
-}
-
-#[tokio::test]
-async fn handler_records_rejected_host_key_verification_result() {
-    let key = sample_public_key();
-    let shared = SharedHostKeyResult::default();
-    let mut handler = SshClientHandler::new(
-        "example.com".to_owned(),
-        2222,
-        HostKeyPolicy::default(),
-        shared.clone(),
-        SharedForwardedChannels::default(),
-    );
-
-    let accepted = client::Handler::check_server_key(&mut handler, &key)
-        .await
-        .expect("主机密钥拒绝结果也应该正常返回");
-
-    assert!(!accepted);
-    let check = shared.get().expect("处理器应该记录被拒绝的主机密钥结果");
-    assert!(!check.accepted);
-    assert_eq!(check.host, "example.com");
-    assert_eq!(check.port, 2222);
-    assert_eq!(check.verification, HostKeyVerification::Unknown);
-}
-
-#[tokio::test]
-async fn forwarded_channel_subscription_replaces_matching_endpoint() {
-    let shared = SharedForwardedChannels::default();
-    let mut stale_receiver = shared.subscribe("127.0.0.1", 8022);
-    let _current_receiver = shared.subscribe("127.0.0.1", 8022);
-
-    let stale_closed = tokio::time::timeout(Duration::from_millis(50), stale_receiver.recv())
-        .await
-        .expect("被替换的 forwarded channel 订阅应该立即关闭");
-
-    assert!(stale_closed.is_none());
 }
 
 #[test]

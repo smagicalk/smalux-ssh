@@ -8,3 +8,7 @@ rust-version = "1.95"
 aws-lc-rs = { version = "1.16", features = ["prebuilt-nasm"] }
 russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "flate2", "rsa"] }
 smagical-core = { path = "../smagical-core" }
+tokio = { version = "1", features = ["sync"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt", "time"] }
