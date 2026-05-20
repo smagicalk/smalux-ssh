@@ -18,6 +18,7 @@ use russh_sftp::protocol::FileAttributes;
 use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::{
     HostKeyVerification, KeyAlgorithm, KnownHostEntry, SftpEntryKind, TransferId, TransferStatus,
+    TunnelStatus,
 };
 use smagical_terminal::TerminalSize;
 use uuid::Uuid;
@@ -451,6 +452,28 @@ fn tunnel_internal_names_are_stable() {
     assert_eq!(REMOTE_FORWARD_RULE_NAME, "remote-forward");
     assert_eq!(DYNAMIC_SOCKS5_RULE_NAME, "dynamic-socks5");
     assert_eq!(TUNNEL_ACCEPT_TICK, Duration::from_millis(250));
+}
+
+#[test]
+fn tunnel_status_events_preserve_session_rule_and_status() {
+    let session_id = session_id();
+
+    assert_eq!(
+        tunnel_running_event(session_id, "proxy".to_owned()),
+        BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name: "proxy".to_owned(),
+            status: TunnelStatus::Running,
+        }
+    );
+    assert_eq!(
+        tunnel_status_event(session_id, "proxy".to_owned(), TunnelStatus::Stopped),
+        BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name: "proxy".to_owned(),
+            status: TunnelStatus::Stopped,
+        }
+    );
 }
 
 #[tokio::test]

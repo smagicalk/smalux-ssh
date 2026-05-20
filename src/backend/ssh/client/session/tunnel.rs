@@ -9,8 +9,8 @@ use tokio::sync::Mutex as AsyncMutex;
 use tokio::time::timeout;
 
 use crate::backend::{BackendEvent, BackendExecutionError, TunnelStartRequest};
-use crate::model::{SessionId, TunnelKind, TunnelStatus};
-use smagical_ssh_client_core::{TUNNEL_ACCEPT_TICK, tunnel_error};
+use crate::model::{SessionId, TunnelKind};
+use smagical_ssh_client_core::{TUNNEL_ACCEPT_TICK, tunnel_error, tunnel_running_event};
 
 use super::super::RusshConnection;
 
@@ -83,11 +83,7 @@ impl RusshConnection {
                 rule.bind_host,
                 rule.bind_port,
             ),
-            vec![BackendEvent::TunnelStatusChanged {
-                session_id,
-                rule_name,
-                status: TunnelStatus::Running,
-            }],
+            vec![tunnel_running_event(session_id, rule_name)],
         ))
     }
 
@@ -132,11 +128,7 @@ impl RusshConnection {
                 rule.bind_host,
                 rule.bind_port,
             ),
-            vec![BackendEvent::TunnelStatusChanged {
-                session_id,
-                rule_name,
-                status: TunnelStatus::Running,
-            }],
+            vec![tunnel_running_event(session_id, rule_name)],
         ))
     }
 
@@ -189,11 +181,7 @@ impl RusshConnection {
                 rule.bind_host,
                 rule.bind_port,
             ),
-            vec![BackendEvent::TunnelStatusChanged {
-                session_id,
-                rule_name,
-                status: TunnelStatus::Running,
-            }],
+            vec![tunnel_running_event(session_id, rule_name)],
         ))
     }
 }

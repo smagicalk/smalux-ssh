@@ -6,8 +6,8 @@ use std::sync::{
 };
 use std::time::Duration;
 
-use smagical_backend_core::BackendExecutionError;
-use smagical_core::SessionId;
+use smagical_backend_core::{BackendEvent, BackendExecutionError};
+use smagical_core::{SessionId, TunnelStatus};
 use tokio::io::{AsyncRead, AsyncWrite};
 
 /// 本地端口转发打开 direct-tcpip channel 时的操作名。
@@ -74,6 +74,24 @@ pub fn remote_tunnel(
         bind_host,
         bind_port,
     }
+}
+
+/// 创建隧道状态事件。
+pub fn tunnel_status_event(
+    session_id: SessionId,
+    rule_name: String,
+    status: TunnelStatus,
+) -> BackendEvent {
+    BackendEvent::TunnelStatusChanged {
+        session_id,
+        rule_name,
+        status,
+    }
+}
+
+/// 创建隧道进入运行态事件。
+pub fn tunnel_running_event(session_id: SessionId, rule_name: String) -> BackendEvent {
+    tunnel_status_event(session_id, rule_name, TunnelStatus::Running)
 }
 
 /// 将 russh TCP forwarding 错误转换成后端 tunnel 错误。
