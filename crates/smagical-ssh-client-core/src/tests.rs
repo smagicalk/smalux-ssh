@@ -402,6 +402,7 @@ fn pty_dimensions_are_never_zero() {
 #[test]
 fn ssh_error_helpers_preserve_operation_and_reason() {
     let channel = channel_error("open shell", russh::Error::Inconsistent);
+    let missing_session = connected_session_error("run command");
     let connection = connection_error("example.com:22", russh::Error::Inconsistent);
     let rejected = host_key_rejected_error(HostKeyCheck {
         host: "example.com".to_owned(),
@@ -429,6 +430,13 @@ fn ssh_error_helpers_preserve_operation_and_reason() {
             operation,
             reason,
         } if operation == "open shell" && !reason.is_empty()
+    ));
+    assert!(matches!(
+        missing_session,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "run command" && reason == "session is not connected"
     ));
     assert!(matches!(
         connection,

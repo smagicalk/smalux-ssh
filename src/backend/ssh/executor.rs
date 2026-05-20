@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
-use smagical_ssh_client_core::{disconnected_event, tunnel_stopped_event};
+use smagical_ssh_client_core::{connected_session_error, disconnected_event, tunnel_stopped_event};
 
 use crate::backend::{
     BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, ConnectionTarget,
@@ -326,13 +326,6 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
             } => self.stop_tunnel(session_id, request),
             BackendCommand::Disconnect { session_id } => self.disconnect(session_id),
         }
-    }
-}
-
-fn connected_session_error(operation: &str) -> BackendExecutionError {
-    BackendExecutionError::ChannelFailed {
-        operation: operation.to_owned(),
-        reason: "session is not connected".to_owned(),
     }
 }
 

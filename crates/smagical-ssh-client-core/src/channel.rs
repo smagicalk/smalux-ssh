@@ -112,6 +112,14 @@ pub fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionEr
     }
 }
 
+/// 创建 SSH 会话未连接错误。
+pub fn connected_session_error(operation: &str) -> BackendExecutionError {
+    BackendExecutionError::ChannelFailed {
+        operation: operation.to_owned(),
+        reason: "session is not connected".to_owned(),
+    }
+}
+
 /// 将 russh 连接错误转换成后端执行错误。
 pub fn connection_error(endpoint: &str, error: russh::Error) -> BackendExecutionError {
     BackendExecutionError::ConnectionFailed {

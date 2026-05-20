@@ -667,19 +667,6 @@ fn send_shell_input_requires_connected_session() {
 }
 
 #[test]
-fn connected_session_error_reports_expected_context() {
-    let error = connected_session_error("open shell");
-
-    assert!(matches!(
-        error,
-        BackendExecutionError::ChannelFailed {
-            operation,
-            reason,
-        } if operation == "open shell" && reason == "session is not connected"
-    ));
-}
-
-#[test]
 fn shell_input_failure_drops_only_failed_cached_shell() {
     let failed_session_id = session_id();
     let other_session_id = session_id();
