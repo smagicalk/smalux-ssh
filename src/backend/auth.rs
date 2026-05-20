@@ -98,4 +98,65 @@ mod tests {
             } if value == "key:deploy"
         ));
     }
+
+    #[test]
+    fn backend_auth_preserves_password_secret_reference() {
+        let profile = AuthProfile::Password {
+            username: "root".to_owned(),
+            secret: SecretRef("password:root".to_owned()),
+        };
+
+        let auth = BackendAuth::from(&profile);
+
+        assert_eq!(auth.username(), "root");
+        assert_eq!(
+            auth,
+            BackendAuth::Password {
+                username: "root".to_owned(),
+                secret: SecretRef("password:root".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn backend_auth_preserves_agent_key_hint() {
+        let profile = AuthProfile::Agent {
+            username: "agent-user".to_owned(),
+            key_hint: Some("id_ed25519".to_owned()),
+        };
+
+        let auth = BackendAuth::from(&profile);
+
+        assert_eq!(auth.username(), "agent-user");
+        assert_eq!(
+            auth,
+            BackendAuth::Agent {
+                username: "agent-user".to_owned(),
+                key_hint: Some("id_ed25519".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn backend_auth_preserves_certificate_secret_references() {
+        let profile = AuthProfile::Certificate {
+            username: "cert-user".to_owned(),
+            key: SecretRef("key:cert".to_owned()),
+            passphrase: Some(SecretRef("passphrase:cert".to_owned())),
+            certificate: SecretRef("cert:deploy".to_owned()),
+        };
+
+        let auth = BackendAuth::from(&profile);
+
+        assert_eq!(auth.username(), "cert-user");
+        assert_eq!(
+            auth,
+            BackendAuth::Certificate {
+                username: "cert-user".to_owned(),
+                key: SecretRef("key:cert".to_owned()),
+                passphrase: Some(SecretRef("passphrase:cert".to_owned())),
+                certificate: SecretRef("cert:deploy".to_owned()),
+            }
+        );
+    }
 }
