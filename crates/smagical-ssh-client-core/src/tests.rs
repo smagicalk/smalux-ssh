@@ -1138,6 +1138,53 @@ fn channel_lifecycle_events_preserve_payloads() {
 }
 
 #[test]
+fn connection_lifecycle_events_preserve_payloads() {
+    let session_id = session_id();
+    let check = HostKeyCheck {
+        host: "example.com".to_owned(),
+        port: 2222,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        verification: HostKeyVerification::Trusted,
+        accepted: true,
+        fingerprint: "SHA256:test".to_owned(),
+    };
+
+    assert_eq!(
+        connecting_event(session_id, "example.com:2222".to_owned()),
+        BackendEvent::Connecting {
+            session_id,
+            endpoint: "example.com:2222".to_owned(),
+        }
+    );
+    assert_eq!(
+        host_key_verified_event(session_id, check),
+        BackendEvent::HostKeyVerified {
+            session_id,
+            host: "example.com".to_owned(),
+            port: 2222,
+            key_algorithm: KeyAlgorithm::Ed25519,
+            fingerprint: "SHA256:test".to_owned(),
+            result: HostKeyVerification::Trusted,
+        }
+    );
+    assert_eq!(
+        authenticating_event(session_id, "alice".to_owned()),
+        BackendEvent::Authenticating {
+            session_id,
+            username: "alice".to_owned(),
+        }
+    );
+    assert_eq!(
+        authenticated_event(session_id),
+        BackendEvent::Authenticated { session_id }
+    );
+    assert_eq!(
+        connected_event(session_id),
+        BackendEvent::Connected { session_id }
+    );
+}
+
+#[test]
 fn shell_failure_message_maps_to_failed_event() {
     let session_id = session_id();
 

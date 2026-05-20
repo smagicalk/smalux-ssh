@@ -5,6 +5,8 @@ use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::SessionId;
 use smagical_terminal::TerminalSize;
 
+use crate::HostKeyCheck;
+
 /// SSH channel request 消息的纯状态。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ChannelRequestStatus {
@@ -116,6 +118,44 @@ pub fn output_event(session_id: SessionId, data: &[u8]) -> BackendEvent {
         session_id,
         line: String::from_utf8_lossy(data).into_owned(),
     }
+}
+
+/// 创建 SSH 连接开始事件。
+pub fn connecting_event(session_id: SessionId, endpoint: String) -> BackendEvent {
+    BackendEvent::Connecting {
+        session_id,
+        endpoint,
+    }
+}
+
+/// 创建 SSH 主机密钥已校验事件。
+pub fn host_key_verified_event(session_id: SessionId, check: HostKeyCheck) -> BackendEvent {
+    BackendEvent::HostKeyVerified {
+        session_id,
+        host: check.host,
+        port: check.port,
+        key_algorithm: check.key_algorithm,
+        fingerprint: check.fingerprint,
+        result: check.verification,
+    }
+}
+
+/// 创建 SSH 认证开始事件。
+pub fn authenticating_event(session_id: SessionId, username: String) -> BackendEvent {
+    BackendEvent::Authenticating {
+        session_id,
+        username,
+    }
+}
+
+/// 创建 SSH 认证成功事件。
+pub fn authenticated_event(session_id: SessionId) -> BackendEvent {
+    BackendEvent::Authenticated { session_id }
+}
+
+/// 创建 SSH 连接可用事件。
+pub fn connected_event(session_id: SessionId) -> BackendEvent {
+    BackendEvent::Connected { session_id }
 }
 
 /// 创建远程 shell 已打开事件。

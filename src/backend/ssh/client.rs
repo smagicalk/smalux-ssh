@@ -3,6 +3,10 @@
 use std::sync::Arc;
 
 use russh::client;
+use smagical_ssh_client_core::{
+    authenticated_event, authenticating_event, connected_event, connecting_event,
+    host_key_verified_event,
+};
 use tokio::sync::mpsc;
 
 use crate::model::SessionId;
@@ -60,10 +64,7 @@ impl RusshConnector {
         session_id: SessionId,
         plan: SshConnectionPlan,
     ) -> Result<RusshConnectionReport, BackendExecutionError> {
-        let mut events = vec![BackendEvent::Connecting {
-            session_id,
-            endpoint: plan.endpoint.clone(),
-        }];
+        let mut events = vec![connecting_event(session_id, plan.endpoint.clone())];
         let host_key_result = SharedHostKeyResult::default();
         let forwarded_channels = SharedForwardedChannels::default();
         let handler = SshClientHandler::new(
@@ -83,23 +84,13 @@ impl RusshConnector {
             })?;
 
         if let Some(check) = host_key_result.get() {
-            events.push(BackendEvent::HostKeyVerified {
-                session_id,
-                host: check.host,
-                port: check.port,
-                key_algorithm: check.key_algorithm,
-                fingerprint: check.fingerprint,
-                result: check.verification,
-            });
+            events.push(host_key_verified_event(session_id, check));
         }
 
-        events.push(BackendEvent::Authenticating {
-            session_id,
-            username: plan.username().to_owned(),
-        });
+        events.push(authenticating_event(session_id, plan.username().to_owned()));
         authenticate(&mut handle, &plan.auth).await?;
-        events.push(BackendEvent::Authenticated { session_id });
-        events.push(BackendEvent::Connected { session_id });
+        events.push(authenticated_event(session_id));
+        events.push(connected_event(session_id));
 
         Ok(RusshConnectionReport {
             connection: RusshConnection {

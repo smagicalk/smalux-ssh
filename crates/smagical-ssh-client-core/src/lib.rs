@@ -14,9 +14,10 @@ pub use agent::{
     select_agent_identity,
 };
 pub use channel::{
-    ChannelRequestStatus, channel_error, channel_request_ended_error,
-    collect_channel_request_message, collect_command_message, command_exited_event,
-    disconnected_event, exit_status_to_i32, output_event, pty_columns, pty_rows,
+    ChannelRequestStatus, authenticated_event, authenticating_event, channel_error,
+    channel_request_ended_error, collect_channel_request_message, collect_command_message,
+    command_exited_event, connected_event, connecting_event, disconnected_event,
+    exit_status_to_i32, host_key_verified_event, output_event, pty_columns, pty_rows,
     remote_command_started_event, shell_message_to_event, shell_opened_event,
 };
 pub use handler::{
