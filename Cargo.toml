@@ -16,6 +16,7 @@ members = [
     "crates/smagical-backend-core",
     "crates/smagical-backend-reducer",
     "crates/smagical-local-backend",
+    "crates/smagical-ssh-plan",
 ]
 resolver = "3"
 
@@ -29,6 +30,7 @@ smagical-session = { path = "crates/smagical-session" }
 smagical-storage = { path = "crates/smagical-storage" }
 smagical-terminal = { path = "crates/smagical-terminal" }
 smagical-local-backend = { path = "crates/smagical-local-backend" }
+smagical-ssh-plan = { path = "crates/smagical-ssh-plan" }
 slint = "1.15"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
 serde = { version = "1", features = ["derive"] }

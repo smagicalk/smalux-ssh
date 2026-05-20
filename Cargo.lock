@@ -5656,6 +5656,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-ssh-plan"
+version = "0.1.0"
+dependencies = [
+ "smagical-backend-core",
+ "smagical-core",
+ "smagical-security",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-storage"
 version = "0.1.0"
 dependencies = [
@@ -5696,6 +5706,7 @@ dependencies = [
  "smagical-local-backend",
  "smagical-security",
  "smagical-session",
+ "smagical-ssh-plan",
  "smagical-storage",
  "smagical-terminal",
  "thiserror 2.0.18",

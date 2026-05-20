@@ -1,0 +1,13 @@
+[package]
+name = "smagical-ssh-plan"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[dependencies]
+smagical-backend-core = { path = "../smagical-backend-core" }
+smagical-core = { path = "../smagical-core" }
+smagical-security = { path = "../smagical-security" }
+
+[dev-dependencies]
+uuid = { version = "1", features = ["v4"] }

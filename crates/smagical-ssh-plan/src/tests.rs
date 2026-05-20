@@ -1,8 +1,8 @@
 use super::*;
-use crate::backend::{BackendAuth, ConnectionTarget};
-use crate::model::{HostId, KeyAlgorithm, KnownHostEntry, SecretRef};
-use crate::security::MemorySecretStore;
-use crate::security::SecretStore;
+use smagical_backend_core::{BackendAuth, ConnectionTarget};
+use smagical_core::{HostId, KeyAlgorithm, KnownHostEntry, SecretRef};
+use smagical_security::MemorySecretStore;
+use smagical_security::SecretStore;
 use uuid::Uuid;
 
 fn target(auth: BackendAuth) -> ConnectionTarget {
