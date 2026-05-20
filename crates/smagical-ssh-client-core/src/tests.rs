@@ -443,6 +443,32 @@ fn remote_tunnel_reports_endpoint_and_can_stop() {
     assert!(!running.load(Ordering::SeqCst));
 }
 
+#[tokio::test]
+async fn copy_bidirectional_moves_bytes_in_both_directions() {
+    let (mut left_client, mut left_server) = tokio::io::duplex(64);
+    let (mut right_client, mut right_server) = tokio::io::duplex(64);
+
+    let pipe = tokio::spawn(async move {
+        copy_bidirectional(&mut left_server, &mut right_server)
+            .await
+            .expect("双向复制应该成功");
+    });
+
+    left_client.write_all(b"left-to-right").await.unwrap();
+    right_client.write_all(b"right-to-left").await.unwrap();
+    let mut from_left = vec![0_u8; b"left-to-right".len()];
+    let mut from_right = vec![0_u8; b"right-to-left".len()];
+    right_client.read_exact(&mut from_left).await.unwrap();
+    left_client.read_exact(&mut from_right).await.unwrap();
+
+    assert_eq!(from_left, b"left-to-right");
+    assert_eq!(from_right, b"right-to-left");
+
+    drop(left_client);
+    drop(right_client);
+    pipe.await.unwrap();
+}
+
 fn transfer_id() -> TransferId {
     TransferId(Uuid::new_v4())
 }

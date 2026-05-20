@@ -7,6 +7,7 @@ use std::sync::{
 
 use smagical_backend_core::BackendExecutionError;
 use smagical_core::SessionId;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 /// 运行中的 SSH 隧道句柄。
 pub struct RemoteTunnel {
@@ -75,4 +76,14 @@ pub fn tunnel_reason_error(
         rule_name: rule_name.to_owned(),
         reason: reason.to_string(),
     }
+}
+
+/// 双向复制两个异步流，忽略成功时的字节统计。
+pub async fn copy_bidirectional<A, B>(left: &mut A, right: &mut B) -> std::io::Result<()>
+where
+    A: AsyncRead + AsyncWrite + Unpin,
+    B: AsyncRead + AsyncWrite + Unpin,
+{
+    let _ = tokio::io::copy_bidirectional(left, right).await?;
+    Ok(())
 }
