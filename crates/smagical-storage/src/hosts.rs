@@ -1,6 +1,6 @@
 //! 主机与分组的内存索引操作。
 
-use crate::model::{Host, HostGroup};
+use smagical_core::{Host, HostGroup};
 
 use super::StorageManager;
 
@@ -56,7 +56,7 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{AuthProfile, HostId, SecretRef};
+    use smagical_core::{AuthProfile, HostId, SecretRef};
     use uuid::Uuid;
 
     fn sample_host_with(id: HostId, name: &str, address: &str, tags: &[&str]) -> Host {

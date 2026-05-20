@@ -1,6 +1,6 @@
 //! Known Hosts 记录的内存索引和校验操作。
 
-use crate::model::{HostKeyVerification, KnownHostEntry};
+use smagical_core::{HostKeyVerification, KnownHostEntry};
 
 use super::StorageManager;
 
@@ -39,7 +39,7 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::KeyAlgorithm;
+    use smagical_core::KeyAlgorithm;
 
     #[test]
     fn known_hosts_can_be_upserted_verified_and_removed() {

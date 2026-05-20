@@ -1,6 +1,6 @@
 //! 隧道规则的内存索引操作。
 
-use crate::model::TunnelRule;
+use smagical_core::TunnelRule;
 
 use super::StorageManager;
 
@@ -35,7 +35,7 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{TunnelKind, TunnelRule};
+    use smagical_core::{TunnelKind, TunnelRule};
 
     fn sample_tunnel_rule() -> TunnelRule {
         TunnelRule {

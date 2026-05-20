@@ -1,6 +1,6 @@
 //! 快捷命令的内存索引操作。
 
-use crate::model::{Snippet, SnippetArgument, SnippetId, SnippetScope};
+use smagical_core::{Snippet, SnippetArgument, SnippetId, SnippetScope};
 
 use super::StorageManager;
 
@@ -80,7 +80,7 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{HostId, SnippetVariable};
+    use smagical_core::{HostId, SnippetVariable};
     use uuid::Uuid;
 
     #[test]

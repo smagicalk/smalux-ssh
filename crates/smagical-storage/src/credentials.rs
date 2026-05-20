@@ -1,6 +1,6 @@
 //! 凭据元数据的内存索引操作。
 
-use crate::model::CredentialMetadata;
+use smagical_core::CredentialMetadata;
 
 use super::StorageManager;
 
@@ -30,7 +30,7 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{CredentialKind, KeyAlgorithm, SecretRef};
+    use smagical_core::{CredentialKind, KeyAlgorithm, SecretRef};
 
     #[test]
     fn credentials_can_be_upserted_and_removed_by_name() {

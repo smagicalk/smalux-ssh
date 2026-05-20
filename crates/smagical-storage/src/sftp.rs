@@ -1,6 +1,6 @@
 //! SFTP 书签的内存索引操作。
 
-use crate::model::{HostId, SftpBookmark};
+use smagical_core::{HostId, SftpBookmark};
 
 use super::StorageManager;
 

@@ -5614,6 +5614,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-storage"
+version = "0.1.0"
+dependencies = [
+ "directories",
+ "redb",
+ "serde",
+ "smagical-config",
+ "smagical-core",
+ "thiserror 2.0.18",
+ "toml",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-terminal"
 version = "0.1.0"
 dependencies = [
@@ -5628,10 +5642,8 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
- "directories",
  "keyring",
  "portable-pty",
- "redb",
  "russh",
  "russh-sftp",
  "serde",
@@ -5640,6 +5652,7 @@ dependencies = [
  "smagical-config",
  "smagical-core",
  "smagical-session",
+ "smagical-storage",
  "smagical-terminal",
  "thiserror 2.0.18",
  "tokio",

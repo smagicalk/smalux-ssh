@@ -1,6 +1,6 @@
 //! 最近连接和命令历史的内存索引操作。
 
-use crate::model::{CommandHistoryItem, HostId, RecentConnection};
+use smagical_core::{CommandHistoryItem, HostId, RecentConnection};
 
 use super::{DEFAULT_COMMAND_HISTORY_LIMIT, DEFAULT_RECENT_LIMIT, StorageManager};
 
@@ -41,7 +41,7 @@ fn trim_command_history(history: &mut Vec<CommandHistoryItem>, limit: usize) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::CommandHistoryId;
+    use smagical_core::CommandHistoryId;
     use uuid::Uuid;
 
     #[test]

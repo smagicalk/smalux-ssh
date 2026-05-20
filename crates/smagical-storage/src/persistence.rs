@@ -10,8 +10,8 @@ use redb::{Database, ReadableDatabase, TableDefinition, TableError};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::config::AppConfig;
-use crate::model::{
+use smagical_config::AppConfig;
+use smagical_core::{
     CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
     SftpBookmark, Snippet, TunnelRule, WorkspaceState,
 };
@@ -186,7 +186,7 @@ pub enum StoragePersistenceError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{
+    use smagical_core::{
         AuthProfile, CommandHistoryId, HostId, ImageSource, RecentConnection, TunnelKind,
         TunnelRule,
     };

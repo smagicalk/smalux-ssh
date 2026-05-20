@@ -1,6 +1,6 @@
 //! 工作区快照的内存保存操作。
 
-use crate::model::WorkspaceState;
+use smagical_core::WorkspaceState;
 
 use super::StorageManager;
 
@@ -21,7 +21,7 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{HostId, SessionId, SessionKind, WorkspaceTabSnapshot};
+    use smagical_core::{HostId, SessionId, SessionKind, WorkspaceTabSnapshot};
     use uuid::Uuid;
 
     #[test]
