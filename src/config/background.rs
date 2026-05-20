@@ -1,29 +1,8 @@
 //! 背景图片参数归一化。
 
-use crate::model::BackgroundProfile;
-
-const MIN_BACKGROUND_ROTATION_SECS: u64 = 5;
-const MAX_BACKGROUND_BLUR: f32 = 64.0;
-
-impl BackgroundProfile {
-    /// 返回适合渲染层直接使用的背景配置。
-    pub fn normalized(&self) -> Self {
-        Self {
-            enabled: self.enabled && !self.sources.is_empty(),
-            sources: self.sources.clone(),
-            rotation_interval_secs: self
-                .rotation_interval_secs
-                .max(MIN_BACKGROUND_ROTATION_SECS),
-            opacity: self.opacity.clamp(0.0, 1.0),
-            blur: self.blur.clamp(0.0, MAX_BACKGROUND_BLUR),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::model::ImageSource;
+    use crate::model::{BackgroundProfile, ImageSource};
 
     #[test]
     fn background_normalization_clamps_render_parameters() {

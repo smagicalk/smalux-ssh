@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{CommandHistoryId, HostId};
+use crate::ids::{CommandHistoryId, HostId};
 
 /// 最近连接记录。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

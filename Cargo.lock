@@ -5588,6 +5588,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-core"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "toml",
+ "uuid",
+]
+
+[[package]]
 name = "smagicalssh"
 version = "0.1.0"
 dependencies = [
@@ -5603,6 +5612,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
+ "smagical-core",
  "thiserror 2.0.18",
  "tokio",
  "toml",

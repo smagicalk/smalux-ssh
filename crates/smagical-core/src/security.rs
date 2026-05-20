@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::SecretRef;
+use crate::ids::SecretRef;
 
 /// 凭据元数据。
 ///

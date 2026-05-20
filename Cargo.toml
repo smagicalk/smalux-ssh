@@ -4,7 +4,12 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.95"
 
+[workspace]
+members = [".", "crates/smagical-core"]
+resolver = "3"
+
 [dependencies]
+smagical-core = { path = "crates/smagical-core" }
 slint = "1.15"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
 serde = { version = "1", features = ["derive"] }
