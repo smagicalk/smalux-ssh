@@ -222,4 +222,67 @@ mod tests {
         assert_eq!(command.session_id(), session_id);
         assert_eq!(command.kind(), BackendCommandKind::DrainSessionOutput);
     }
+
+    #[test]
+    fn backend_commands_expose_session_id_and_kind_for_all_routes() {
+        let session_id = SessionId(Uuid::new_v4());
+        let tunnel_request = TunnelStartRequest::new(crate::model::TunnelRule {
+            name: "proxy".to_owned(),
+            kind: crate::model::TunnelKind::Dynamic,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 1080,
+            target_host: String::new(),
+            target_port: 0,
+            auto_start: false,
+        })
+        .expect("动态隧道规则应该有效");
+        let commands = vec![
+            (
+                BackendCommand::Connect {
+                    session_id,
+                    target: ConnectionTarget::from_host(&host()),
+                },
+                BackendCommandKind::Connect,
+            ),
+            (
+                BackendCommand::RunCommand {
+                    session_id,
+                    request: RemoteCommandRequest::exec("uptime"),
+                },
+                BackendCommandKind::RunCommand,
+            ),
+            (
+                BackendCommand::Sftp {
+                    session_id,
+                    request: SftpRequest::ListDir {
+                        remote_path: "/".to_owned(),
+                    },
+                },
+                BackendCommandKind::Sftp,
+            ),
+            (
+                BackendCommand::StartTunnel {
+                    session_id,
+                    request: tunnel_request,
+                },
+                BackendCommandKind::StartTunnel,
+            ),
+            (
+                BackendCommand::StopTunnel {
+                    session_id,
+                    request: TunnelStopRequest::by_name("proxy"),
+                },
+                BackendCommandKind::StopTunnel,
+            ),
+            (
+                BackendCommand::Disconnect { session_id },
+                BackendCommandKind::Disconnect,
+            ),
+        ];
+
+        for (command, expected_kind) in commands {
+            assert_eq!(command.session_id(), session_id);
+            assert_eq!(command.kind(), expected_kind);
+        }
+    }
 }
