@@ -5661,6 +5661,7 @@ version = "0.1.0"
 dependencies = [
  "aws-lc-rs",
  "russh",
+ "smagical-core",
 ]
 
 [[package]]

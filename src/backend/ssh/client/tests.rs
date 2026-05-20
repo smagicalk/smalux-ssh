@@ -7,7 +7,7 @@ use russh::keys::PublicKey;
 
 use super::auth::{decode_private_key, select_agent_identity};
 use super::handler::{SharedForwardedChannels, SharedHostKeyResult};
-use super::host_key::{host_key_algorithm, host_key_fingerprint};
+use super::host_key::host_key_fingerprint;
 use super::settings::test_constants::{
     DEFAULT_INACTIVITY_TIMEOUT_SECS, DEFAULT_KEEPALIVE_INTERVAL_SECS, DEFAULT_KEEPALIVE_MAX,
 };
@@ -38,87 +38,6 @@ fn russh_settings_build_expected_client_config() {
     );
     assert_eq!(config.keepalive_max, DEFAULT_KEEPALIVE_MAX);
     assert!(config.nodelay);
-}
-
-#[test]
-fn accept_any_policy_allows_unknown_key_explicitly() {
-    let key = sample_public_key();
-
-    let check = HostKeyPolicy::AcceptAny.check("example.com", 22, &key);
-
-    assert!(check.accepted);
-    assert_eq!(check.host, "example.com");
-    assert_eq!(check.port, 22);
-    assert_eq!(check.key_algorithm, KeyAlgorithm::Ed25519);
-    assert_eq!(check.verification, HostKeyVerification::Unknown);
-    assert!(check.fingerprint.starts_with("SHA256:"));
-}
-
-#[test]
-fn default_policy_rejects_unknown_key_for_first_trust() {
-    let key = sample_public_key();
-
-    let check = HostKeyPolicy::default().check("example.com", 22, &key);
-
-    assert!(!check.accepted);
-    assert_eq!(check.verification, HostKeyVerification::Unknown);
-    assert_eq!(check.key_algorithm, KeyAlgorithm::Ed25519);
-}
-
-#[test]
-fn known_hosts_policy_accepts_trusted_fingerprint() {
-    let key = sample_public_key();
-    let fingerprint = host_key_fingerprint(&key);
-    let policy = HostKeyPolicy::KnownHosts(vec![KnownHostEntry {
-        host: "example.com".to_owned(),
-        port: 22,
-        key_algorithm: KeyAlgorithm::Ed25519,
-        fingerprint: fingerprint.clone(),
-        trusted: true,
-    }]);
-
-    let check = policy.check("example.com", 22, &key);
-
-    assert!(check.accepted);
-    assert_eq!(check.verification, HostKeyVerification::Trusted);
-    assert_eq!(check.fingerprint, fingerprint);
-}
-
-#[test]
-fn known_hosts_policy_rejects_mismatch() {
-    let key = sample_public_key();
-    let policy = HostKeyPolicy::KnownHosts(vec![KnownHostEntry {
-        host: "example.com".to_owned(),
-        port: 22,
-        key_algorithm: KeyAlgorithm::Ed25519,
-        fingerprint: "SHA256:old".to_owned(),
-        trusted: true,
-    }]);
-
-    let check = policy.check("example.com", 22, &key);
-
-    assert!(!check.accepted);
-    assert!(matches!(
-        check.verification,
-        HostKeyVerification::Mismatch { .. }
-    ));
-}
-
-#[test]
-fn known_hosts_policy_treats_unmatched_host_or_port_as_unknown() {
-    let key = sample_public_key();
-    let policy = HostKeyPolicy::KnownHosts(vec![KnownHostEntry {
-        host: "example.com".to_owned(),
-        port: 22,
-        key_algorithm: KeyAlgorithm::Ed25519,
-        fingerprint: host_key_fingerprint(&key),
-        trusted: true,
-    }]);
-
-    let check = policy.check("example.com", 2222, &key);
-
-    assert!(!check.accepted);
-    assert_eq!(check.verification, HostKeyVerification::Unknown);
 }
 
 #[test]
@@ -235,13 +154,6 @@ async fn forwarded_channel_subscription_replaces_matching_endpoint() {
         .expect("被替换的 forwarded channel 订阅应该立即关闭");
 
     assert!(stale_closed.is_none());
-}
-
-#[test]
-fn host_key_algorithm_maps_public_key_algorithm() {
-    let key = sample_public_key();
-
-    assert_eq!(host_key_algorithm(&key), KeyAlgorithm::Ed25519);
 }
 
 #[test]
