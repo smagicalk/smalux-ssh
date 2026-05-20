@@ -149,3 +149,31 @@ fn host_key_algorithm_maps_public_key_algorithm() {
 
     assert_eq!(host_key_algorithm(&key), KeyAlgorithm::Ed25519);
 }
+
+#[test]
+fn agent_identity_can_be_selected_by_fingerprint_and_comment() {
+    let mut key = sample_public_key();
+    let fingerprint = host_key_fingerprint(&key);
+    key.set_comment("deploy-key");
+    let identities = vec![key.clone()];
+
+    let by_fingerprint = select_agent_identity(&identities, Some(&fingerprint));
+    let by_comment = select_agent_identity(&identities, Some("deploy"));
+    let first = select_agent_identity(&identities, None);
+
+    assert_eq!(by_fingerprint, Some(key.clone()));
+    assert_eq!(by_comment, Some(key.clone()));
+    assert_eq!(first, Some(key));
+}
+
+#[test]
+fn agent_identity_can_be_selected_by_algorithm_hint_and_missing_match_returns_none() {
+    let key = sample_public_key();
+    let identities = vec![key.clone()];
+
+    let by_algorithm = select_agent_identity(&identities, Some("Ed25519"));
+    let missing = select_agent_identity(&identities, Some("RSA"));
+
+    assert_eq!(by_algorithm, Some(key));
+    assert_eq!(missing, None);
+}

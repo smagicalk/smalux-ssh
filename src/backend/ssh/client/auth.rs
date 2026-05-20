@@ -4,7 +4,8 @@ use std::sync::Arc;
 
 use russh::client;
 use russh::keys::agent::client::{AgentClient, AgentStream};
-use russh::keys::{Certificate, HashAlg, PrivateKey, PrivateKeyWithHashAlg, PublicKey};
+use russh::keys::{Certificate, HashAlg, PrivateKey, PrivateKeyWithHashAlg};
+use smagical_ssh_client_core::select_agent_identity;
 
 use super::SshClientHandler;
 use crate::backend::BackendExecutionError;
@@ -138,26 +139,6 @@ async fn connect_agent() -> Result<DynamicAgentClient, russh::keys::Error> {
             "当前平台暂不支持 ssh-agent 自动发现",
         )))
     }
-}
-
-pub(super) fn select_agent_identity(
-    identities: &[PublicKey],
-    key_hint: Option<&str>,
-) -> Option<PublicKey> {
-    match key_hint {
-        Some(hint) => identities
-            .iter()
-            .find(|identity| agent_identity_matches(identity, hint))
-            .cloned(),
-        None => identities.first().cloned(),
-    }
-}
-
-fn agent_identity_matches(identity: &PublicKey, hint: &str) -> bool {
-    let fingerprint = super::host_key_fingerprint(identity);
-    identity.comment().contains(hint)
-        || fingerprint == hint
-        || format!("{:?}", identity.algorithm()).contains(hint)
 }
 
 fn agent_identity_error(key_hint: Option<&str>) -> String {
