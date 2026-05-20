@@ -1,11 +1,14 @@
 use super::*;
 use russh::client;
+use std::io::{Cursor, Error, ErrorKind};
+use std::pin::Pin;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+use std::task::{Context, Poll};
 use std::time::Duration;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, ReadBuf};
 
 use russh::ChannelMsg;
 use russh::CryptoVec;
@@ -17,6 +20,8 @@ use smagical_core::{
     HostKeyVerification, KeyAlgorithm, KnownHostEntry, SftpEntryKind, TransferId, TransferStatus,
 };
 use uuid::Uuid;
+
+const TEST_SFTP_TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
 
 fn sample_public_key() -> PublicKey {
     russh::keys::parse_public_key_base64(
@@ -325,6 +330,186 @@ fn remote_tunnel_reports_endpoint_and_can_stop() {
     assert_eq!(tunnel.bind_endpoint(), "127.0.0.1:1080");
     tunnel.stop();
     assert!(!running.load(Ordering::SeqCst));
+}
+
+fn transfer_id() -> TransferId {
+    TransferId(Uuid::new_v4())
+}
+
+#[tokio::test]
+async fn copy_transfer_with_progress_emits_chunk_progress() {
+    let session_id = session_id();
+    let transfer_id = transfer_id();
+    let mut reader = Cursor::new(vec![7_u8; TEST_SFTP_TRANSFER_CHUNK_SIZE + 3]);
+    let mut writer = Vec::new();
+
+    let (transferred, events) = copy_transfer_with_progress(
+        session_id,
+        transfer_id,
+        Some((TEST_SFTP_TRANSFER_CHUNK_SIZE + 3) as u64),
+        &mut reader,
+        &mut writer,
+        "read transfer",
+        "write transfer",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(transferred, (TEST_SFTP_TRANSFER_CHUNK_SIZE + 3) as u64);
+    assert_eq!(writer, vec![7_u8; TEST_SFTP_TRANSFER_CHUNK_SIZE + 3]);
+    assert_eq!(
+        events,
+        vec![
+            transfer_event(
+                session_id,
+                transfer_id,
+                Some((TEST_SFTP_TRANSFER_CHUNK_SIZE + 3) as u64),
+                TEST_SFTP_TRANSFER_CHUNK_SIZE as u64,
+                TransferStatus::Running,
+            ),
+            transfer_event(
+                session_id,
+                transfer_id,
+                Some((TEST_SFTP_TRANSFER_CHUNK_SIZE + 3) as u64),
+                (TEST_SFTP_TRANSFER_CHUNK_SIZE + 3) as u64,
+                TransferStatus::Running,
+            ),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn copy_transfer_with_progress_handles_empty_stream() {
+    let mut reader = Cursor::new(Vec::new());
+    let mut writer = Vec::new();
+
+    let (transferred, events) = copy_transfer_with_progress(
+        session_id(),
+        transfer_id(),
+        Some(0),
+        &mut reader,
+        &mut writer,
+        "read empty",
+        "write empty",
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(transferred, 0);
+    assert!(events.is_empty());
+    assert!(writer.is_empty());
+}
+
+#[tokio::test]
+async fn copy_transfer_with_progress_maps_write_errors() {
+    let mut reader = Cursor::new(b"payload".to_vec());
+    let mut writer = FailingTransferWriter;
+
+    let error = copy_transfer_with_progress(
+        session_id(),
+        transfer_id(),
+        Some(7),
+        &mut reader,
+        &mut writer,
+        "read payload",
+        "write payload",
+    )
+    .await
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::SftpFailed {
+            operation,
+            reason,
+        } if operation == "write payload" && reason.contains("injected write failure")
+    ));
+}
+
+#[tokio::test]
+async fn copy_transfer_with_progress_maps_read_errors() {
+    let mut reader = FailingTransferReader;
+    let mut writer = Vec::new();
+
+    let error = copy_transfer_with_progress(
+        session_id(),
+        transfer_id(),
+        Some(0),
+        &mut reader,
+        &mut writer,
+        "read payload",
+        "write payload",
+    )
+    .await
+    .unwrap_err();
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::SftpFailed {
+            operation,
+            reason,
+        } if operation == "read payload" && reason.contains("injected read failure")
+    ));
+}
+
+struct FailingTransferWriter;
+
+struct FailingTransferReader;
+
+impl AsyncWrite for FailingTransferWriter {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &[u8],
+    ) -> Poll<Result<usize, Error>> {
+        Poll::Ready(Err(Error::new(ErrorKind::Other, "injected write failure")))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncRead for FailingTransferWriter {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &mut ReadBuf<'_>,
+    ) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
+}
+
+impl AsyncRead for FailingTransferReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &mut ReadBuf<'_>,
+    ) -> Poll<Result<(), Error>> {
+        Poll::Ready(Err(Error::new(ErrorKind::Other, "injected read failure")))
+    }
+}
+
+impl AsyncWrite for FailingTransferReader {
+    fn poll_write(
+        self: Pin<&mut Self>,
+        _cx: &mut Context<'_>,
+        _buf: &[u8],
+    ) -> Poll<Result<usize, Error>> {
+        Poll::Ready(Ok(0))
+    }
+
+    fn poll_flush(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
+
+    fn poll_shutdown(self: Pin<&mut Self>, _cx: &mut Context<'_>) -> Poll<Result<(), Error>> {
+        Poll::Ready(Ok(()))
+    }
 }
 
 async fn parse_socks5_target_from_client_bytes(

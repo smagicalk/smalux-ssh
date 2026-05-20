@@ -1,8 +1,11 @@
 //! SFTP 纯映射 helper。
 
 use russh_sftp::protocol::{FileAttributes, FileType as RusshSftpFileType};
-use smagical_backend_core::BackendEvent;
+use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::{SessionId, SftpEntry, SftpEntryKind, TransferId, TransferStatus};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+const SFTP_TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
 
 /// 从 russh-sftp 目录项元数据创建领域 SFTP 目录项。
 pub fn sftp_entry_from_parts(
@@ -55,11 +58,63 @@ pub fn transfer_event(
     }
 }
 
+/// 复制 SFTP 传输流并为每个数据块生成进度事件。
+pub async fn copy_transfer_with_progress<R, W>(
+    session_id: SessionId,
+    transfer_id: TransferId,
+    total_bytes: Option<u64>,
+    reader: &mut R,
+    writer: &mut W,
+    read_operation: &str,
+    write_operation: &str,
+) -> Result<(u64, Vec<BackendEvent>), BackendExecutionError>
+where
+    R: AsyncRead + Unpin,
+    W: AsyncWrite + Unpin,
+{
+    let mut transferred_bytes = 0_u64;
+    let mut events = Vec::new();
+    let mut buffer = vec![0_u8; SFTP_TRANSFER_CHUNK_SIZE];
+
+    loop {
+        let bytes_read = reader
+            .read(&mut buffer)
+            .await
+            .map_err(|error| sftp_io_error(read_operation, error))?;
+
+        if bytes_read == 0 {
+            break;
+        }
+
+        writer
+            .write_all(&buffer[..bytes_read])
+            .await
+            .map_err(|error| sftp_io_error(write_operation, error))?;
+        transferred_bytes += bytes_read as u64;
+        events.push(transfer_event(
+            session_id,
+            transfer_id,
+            total_bytes,
+            transferred_bytes,
+            TransferStatus::Running,
+        ));
+    }
+
+    Ok((transferred_bytes, events))
+}
+
 fn sftp_entry_kind(file_type: RusshSftpFileType) -> SftpEntryKind {
     match file_type {
         RusshSftpFileType::Dir => SftpEntryKind::Directory,
         RusshSftpFileType::File => SftpEntryKind::File,
         RusshSftpFileType::Symlink => SftpEntryKind::Symlink,
         RusshSftpFileType::Other => SftpEntryKind::Other,
+    }
+}
+
+fn sftp_io_error(operation: &str, error: std::io::Error) -> BackendExecutionError {
+    BackendExecutionError::SftpFailed {
+        operation: operation.to_owned(),
+        reason: error.to_string(),
     }
 }

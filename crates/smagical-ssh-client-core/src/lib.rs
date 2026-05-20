@@ -21,7 +21,10 @@ pub use settings::{
     DEFAULT_INACTIVITY_TIMEOUT_SECS, DEFAULT_KEEPALIVE_INTERVAL_SECS, DEFAULT_KEEPALIVE_MAX,
     RusshClientSettings,
 };
-pub use sftp::{join_remote_path, parent_remote_dir, sftp_entry_from_parts, transfer_event};
+pub use sftp::{
+    copy_transfer_with_progress, join_remote_path, parent_remote_dir, sftp_entry_from_parts,
+    transfer_event,
+};
 pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
 pub use tunnel::{RemoteTunnel, remote_tunnel};
 
