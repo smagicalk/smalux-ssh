@@ -9,6 +9,21 @@ use smagical_backend_core::BackendExecutionError;
 use smagical_core::SessionId;
 use tokio::io::{AsyncRead, AsyncWrite};
 
+/// 本地端口转发打开 direct-tcpip channel 时的操作名。
+pub const DIRECT_TCPIP_OPERATION: &str = "direct tcpip";
+
+/// 动态 SOCKS5 打开 direct-tcpip channel 时的操作名。
+pub const DYNAMIC_SOCKS5_OPERATION: &str = "dynamic socks5";
+
+/// 本地 direct-tcpip 转发内部规则名。
+pub const DIRECT_TCPIP_RULE_NAME: &str = "direct-tcpip";
+
+/// 远端端口转发内部规则名。
+pub const REMOTE_FORWARD_RULE_NAME: &str = "remote-forward";
+
+/// 动态 SOCKS5 内部规则名。
+pub const DYNAMIC_SOCKS5_RULE_NAME: &str = "dynamic-socks5";
+
 /// 运行中的 SSH 隧道句柄。
 pub struct RemoteTunnel {
     session_id: SessionId,

@@ -443,6 +443,15 @@ fn remote_tunnel_reports_endpoint_and_can_stop() {
     assert!(!running.load(Ordering::SeqCst));
 }
 
+#[test]
+fn tunnel_internal_names_are_stable() {
+    assert_eq!(DIRECT_TCPIP_OPERATION, "direct tcpip");
+    assert_eq!(DYNAMIC_SOCKS5_OPERATION, "dynamic socks5");
+    assert_eq!(DIRECT_TCPIP_RULE_NAME, "direct-tcpip");
+    assert_eq!(REMOTE_FORWARD_RULE_NAME, "remote-forward");
+    assert_eq!(DYNAMIC_SOCKS5_RULE_NAME, "dynamic-socks5");
+}
+
 #[tokio::test]
 async fn copy_bidirectional_moves_bytes_in_both_directions() {
     let (mut left_client, mut left_server) = tokio::io::duplex(64);

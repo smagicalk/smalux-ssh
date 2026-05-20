@@ -9,7 +9,9 @@ use tokio::time::{Duration, timeout};
 
 use crate::backend::{BackendExecutionError, ssh::SshClientHandler};
 use smagical_ssh_client_core::{
-    channel_error, copy_bidirectional, tunnel_io_error, tunnel_reason_error,
+    DIRECT_TCPIP_OPERATION, DIRECT_TCPIP_RULE_NAME, DYNAMIC_SOCKS5_OPERATION,
+    DYNAMIC_SOCKS5_RULE_NAME, REMOTE_FORWARD_RULE_NAME, channel_error, copy_bidirectional,
+    tunnel_io_error, tunnel_reason_error,
 };
 
 use super::socks5::{read_socks5_target, write_socks5_success};
@@ -48,11 +50,11 @@ pub(super) async fn pipe_direct_tcpip(
             u32::from(originator.port()),
         )
         .await
-        .map_err(|error| channel_error("direct tcpip", error))?;
+        .map_err(|error| channel_error(DIRECT_TCPIP_OPERATION, error))?;
     let mut stream = channel.into_stream();
     copy_bidirectional(&mut socket, &mut stream)
         .await
-        .map_err(|error| tunnel_io_error("direct-tcpip", error))?;
+        .map_err(|error| tunnel_io_error(DIRECT_TCPIP_RULE_NAME, error))?;
     Ok(())
 }
 
@@ -63,11 +65,11 @@ pub(super) async fn pipe_forwarded_tcpip(
 ) -> Result<(), BackendExecutionError> {
     let mut socket = TcpStream::connect((target_host.as_str(), target_port))
         .await
-        .map_err(|error| tunnel_io_error("remote-forward", error))?;
+        .map_err(|error| tunnel_io_error(REMOTE_FORWARD_RULE_NAME, error))?;
     let mut stream = channel.into_stream();
     copy_bidirectional(&mut stream, &mut socket)
         .await
-        .map_err(|error| tunnel_io_error("remote-forward", error))?;
+        .map_err(|error| tunnel_io_error(REMOTE_FORWARD_RULE_NAME, error))?;
     Ok(())
 }
 
@@ -78,7 +80,7 @@ pub(super) async fn serve_socks5_connection(
 ) -> Result<(), BackendExecutionError> {
     let target = read_socks5_target(&mut socket)
         .await
-        .map_err(|error| tunnel_reason_error("dynamic-socks5", error))?;
+        .map_err(|error| tunnel_reason_error(DYNAMIC_SOCKS5_RULE_NAME, error))?;
     let channel = handle
         .channel_open_direct_tcpip(
             target.host.clone(),
@@ -87,16 +89,16 @@ pub(super) async fn serve_socks5_connection(
             u32::from(originator.port()),
         )
         .await
-        .map_err(|error| channel_error("dynamic socks5", error))?;
+        .map_err(|error| channel_error(DYNAMIC_SOCKS5_OPERATION, error))?;
 
     write_socks5_success(&mut socket)
         .await
-        .map_err(|error| tunnel_io_error("dynamic-socks5", error))?;
+        .map_err(|error| tunnel_io_error(DYNAMIC_SOCKS5_RULE_NAME, error))?;
 
     let mut stream = channel.into_stream();
     copy_bidirectional(&mut socket, &mut stream)
         .await
-        .map_err(|error| tunnel_io_error("dynamic-socks5", error))?;
+        .map_err(|error| tunnel_io_error(DYNAMIC_SOCKS5_RULE_NAME, error))?;
     Ok(())
 }
 
