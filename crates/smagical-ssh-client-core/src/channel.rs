@@ -85,10 +85,10 @@ pub fn shell_message_to_event(session_id: SessionId, message: ChannelMsg) -> Opt
         ChannelMsg::Data { data } | ChannelMsg::ExtendedData { data, .. } => {
             Some(output_event(session_id, data.as_ref()))
         }
-        ChannelMsg::ExitStatus { exit_status } => Some(BackendEvent::CommandExited {
+        ChannelMsg::ExitStatus { exit_status } => Some(command_exited_event(
             session_id,
-            exit_code: exit_status_to_i32(exit_status),
-        }),
+            exit_status_to_i32(exit_status),
+        )),
         ChannelMsg::Failure => Some(BackendEvent::Failed {
             session_id,
             reason: "server rejected channel request".to_owned(),
@@ -97,7 +97,7 @@ pub fn shell_message_to_event(session_id: SessionId, message: ChannelMsg) -> Opt
             session_id,
             reason: format!("{reason:?}"),
         }),
-        ChannelMsg::Close => Some(BackendEvent::Disconnected { session_id }),
+        ChannelMsg::Close => Some(disconnected_event(session_id)),
         _ => None,
     }
 }
@@ -116,6 +116,32 @@ pub fn output_event(session_id: SessionId, data: &[u8]) -> BackendEvent {
         session_id,
         line: String::from_utf8_lossy(data).into_owned(),
     }
+}
+
+/// 创建远程 shell 已打开事件。
+pub fn shell_opened_event(session_id: SessionId) -> BackendEvent {
+    BackendEvent::ShellOpened { session_id }
+}
+
+/// 创建远程命令已开始事件。
+pub fn remote_command_started_event(session_id: SessionId, command: String) -> BackendEvent {
+    BackendEvent::RemoteCommandStarted {
+        session_id,
+        command,
+    }
+}
+
+/// 创建命令退出事件。
+pub fn command_exited_event(session_id: SessionId, exit_code: Option<i32>) -> BackendEvent {
+    BackendEvent::CommandExited {
+        session_id,
+        exit_code,
+    }
+}
+
+/// 创建 SSH 会话断开事件。
+pub fn disconnected_event(session_id: SessionId) -> BackendEvent {
+    BackendEvent::Disconnected { session_id }
 }
 
 /// 将 SSH 退出码转换成状态层可存储的退出码。

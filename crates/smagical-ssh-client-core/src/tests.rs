@@ -1078,6 +1078,34 @@ fn shell_message_maps_output_and_exit_status() {
 }
 
 #[test]
+fn channel_lifecycle_events_preserve_payloads() {
+    let session_id = session_id();
+
+    assert_eq!(
+        shell_opened_event(session_id),
+        BackendEvent::ShellOpened { session_id }
+    );
+    assert_eq!(
+        remote_command_started_event(session_id, "uptime".to_owned()),
+        BackendEvent::RemoteCommandStarted {
+            session_id,
+            command: "uptime".to_owned(),
+        }
+    );
+    assert_eq!(
+        command_exited_event(session_id, Some(7)),
+        BackendEvent::CommandExited {
+            session_id,
+            exit_code: Some(7),
+        }
+    );
+    assert_eq!(
+        disconnected_event(session_id),
+        BackendEvent::Disconnected { session_id }
+    );
+}
+
+#[test]
 fn shell_failure_message_maps_to_failed_event() {
     let session_id = session_id();
 

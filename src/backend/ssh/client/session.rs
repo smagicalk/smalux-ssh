@@ -12,8 +12,9 @@ use crate::model::SessionId;
 use crate::terminal::TerminalSize;
 use smagical_ssh_client_core::{
     ChannelRequestStatus, channel_error, channel_request_ended_error,
-    collect_channel_request_message, collect_command_message, pty_columns, pty_rows,
-    shell_message_to_event,
+    collect_channel_request_message, collect_command_message, command_exited_event,
+    disconnected_event, pty_columns, pty_rows, remote_command_started_event,
+    shell_message_to_event, shell_opened_event,
 };
 
 use super::RusshConnection;
@@ -85,9 +86,7 @@ impl RemoteShell {
             };
 
             let Some(message) = message else {
-                events.push(BackendEvent::Disconnected {
-                    session_id: self.session_id,
-                });
+                events.push(disconnected_event(self.session_id));
                 break;
             };
 
@@ -132,7 +131,7 @@ impl RusshConnection {
                 session_id,
                 channel,
             },
-            events: vec![BackendEvent::ShellOpened { session_id }],
+            events: vec![shell_opened_event(session_id)],
         })
     }
 
@@ -153,10 +152,10 @@ impl RusshConnection {
             .map_err(|error| channel_error("exec command", error))?;
         wait_channel_request(&mut channel, "exec command").await?;
 
-        let mut events = vec![BackendEvent::RemoteCommandStarted {
+        let mut events = vec![remote_command_started_event(
             session_id,
-            command: request.command.clone(),
-        }];
+            request.command.clone(),
+        )];
         let mut exit_code = None;
 
         while let Some(message) = channel.wait().await {
@@ -165,10 +164,7 @@ impl RusshConnection {
             }
         }
 
-        events.push(BackendEvent::CommandExited {
-            session_id,
-            exit_code,
-        });
+        events.push(command_exited_event(session_id, exit_code));
 
         Ok(events)
     }

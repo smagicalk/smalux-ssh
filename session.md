@@ -8,7 +8,7 @@
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
 - 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
-- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 SSH 隧道状态事件 helper、SSH 隧道轮询 tick 常量、SSH 隧道内部名常量、SSH 隧道双向复制 helper、SSH 隧道错误 helper、SSH 认证拒绝 helper、SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
+- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 SSH channel 生命周期事件 helper、SSH 隧道状态事件 helper、SSH 隧道轮询 tick 常量、SSH 隧道内部名常量、SSH 隧道双向复制 helper、SSH 隧道错误 helper、SSH 认证拒绝 helper、SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
 
 ## 当前进度
 
@@ -134,6 +134,7 @@
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，集中 SSH 隧道内部 rule name 与 channel operation 常量；真实 TCP/SOCKS5 编排继续只引用核心常量，不再散落魔法字符串。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，集中 SSH 隧道监听/forwarded-channel 轮询 tick 常量；本地 listener accept 和远端 forwarded channel recv 使用统一空闲 tick。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 SSH 隧道状态事件 helper；Local/Dynamic/Remote 隧道启动分支复用 `tunnel_running_event` 构造运行态事件。
+- 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 SSH channel 生命周期事件 helper；`ShellOpened`、`RemoteCommandStarted`、`CommandExited` 和 `Disconnected` 事件构造集中到 core，真实 channel 打开、exec 和 drain 仍留在主 crate。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
 - 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
@@ -168,12 +169,14 @@
 - 编译速度事实：集中 SSH 隧道内部名常量后，`cargo test -p smagical-ssh-client-core` 通过，52 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::session::tunnel::tcp -- --nocapture` 通过，2 个主 crate tunnel TCP 调用面测试成功；`cargo check` 通过，用时约 `6.25s`；完整 `cargo test` 通过，`250 passed`。
 - 编译速度事实：集中 SSH 隧道轮询 tick 常量后，`cargo test -p smagical-ssh-client-core` 通过，52 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::session::tunnel -- --nocapture` 通过，2 个主 crate tunnel 调用面测试成功；`cargo check` 通过，用时约 `7.43s`；完整 `cargo test` 通过，`250 passed`。
 - 编译速度事实：迁移 SSH 隧道状态事件 helper 后，`cargo test -p smagical-ssh-client-core` 通过，53 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::session::tunnel -- --nocapture` 通过，2 个主 crate tunnel 调用面测试成功；`cargo check` 通过，用时约 `7.18s`；完整 `cargo test` 通过，`250 passed`。
+- 编译速度事实：迁移 SSH channel 生命周期事件 helper 后，`cargo test -p smagical-ssh-client-core` 通过，54 个客户端核心测试全部成功；`cargo check` 通过，用时约 `5.89s`；完整 `cargo test` 通过，`250 passed`。
 - 编译速度事实：本轮 `cargo check` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`git diff --check` 仅有 CRLF 提示，无实际 diff 错误。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮提交：拆出 SSH 隧道状态事件 helper 并整理恢复记录
+- 本轮提交：拆出 SSH channel 生命周期事件 helper 并整理恢复记录
+- `e737a4b 拆出 SSH 隧道状态事件 helper`
 - `565988c 集中 SSH 隧道轮询 tick 常量`
 - `3df39c5 集中 SSH 隧道内部名常量`
 - `d29ddb2 拆出 SSH 隧道双向复制 helper`
@@ -227,8 +230,14 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 203 个提交；本轮提交后预计领先 204 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 204 个提交；本轮提交后预计领先 205 个提交
 - 最近验证：
+  - `cargo test -p smagical-ssh-client-core channel_lifecycle_events -- --nocapture` 通过，`1 passed`
+  - `cargo test -p smagical-ssh-client-core` 通过，`54 passed`
+  - `cargo check` 通过，用时约 `5.89s`
+  - `cargo test` 通过，`250 passed`
+  - `cargo fmt --check` 通过
+  - `git diff --check` 通过，仅有 Windows CRLF 提示
   - `cargo test local_pty -- --nocapture` 通过，`10 passed, 2 ignored`
   - `cargo test` 通过，`503 passed, 2 ignored`
   - `cargo fmt --check` 通过
