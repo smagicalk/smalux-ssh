@@ -41,6 +41,19 @@ pub fn parent_remote_dir(remote_path: &str) -> String {
     }
 }
 
+/// 创建 SFTP 目录列表事件。
+pub fn sftp_entries_event(
+    session_id: SessionId,
+    remote_path: String,
+    entries: Vec<SftpEntry>,
+) -> BackendEvent {
+    BackendEvent::SftpEntries {
+        session_id,
+        remote_path,
+        entries,
+    }
+}
+
 /// 创建 SFTP 传输进度事件。
 pub fn transfer_event(
     session_id: SessionId,

@@ -2,8 +2,8 @@
 
 use russh_sftp::client::SftpSession;
 use smagical_ssh_client_core::{
-    copy_transfer_with_progress, parent_remote_dir, sftp_entry_from_parts, sftp_error,
-    sftp_io_error, transfer_event,
+    copy_transfer_with_progress, parent_remote_dir, sftp_entries_event, sftp_entry_from_parts,
+    sftp_error, sftp_io_error, transfer_event,
 };
 use tokio::io::AsyncWriteExt;
 
@@ -79,11 +79,11 @@ impl RemoteSftp {
             .map(|entry| sftp_entry_from_parts(&remote_path, entry.file_name(), entry.metadata()))
             .collect();
 
-        Ok(vec![BackendEvent::SftpEntries {
-            session_id: self.session_id,
+        Ok(vec![sftp_entries_event(
+            self.session_id,
             remote_path,
             entries,
-        }])
+        )])
     }
 
     async fn upload(

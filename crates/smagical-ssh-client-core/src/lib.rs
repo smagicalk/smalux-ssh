@@ -28,8 +28,8 @@ pub use settings::{
     RusshClientSettings,
 };
 pub use sftp::{
-    copy_transfer_with_progress, join_remote_path, parent_remote_dir, sftp_entry_from_parts,
-    sftp_error, sftp_io_error, transfer_event,
+    copy_transfer_with_progress, join_remote_path, parent_remote_dir, sftp_entries_event,
+    sftp_entry_from_parts, sftp_error, sftp_io_error, transfer_event,
 };
 pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
 pub use tunnel::{

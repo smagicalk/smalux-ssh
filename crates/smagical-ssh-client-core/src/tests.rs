@@ -17,8 +17,8 @@ use russh::keys::PublicKey;
 use russh_sftp::protocol::FileAttributes;
 use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::{
-    HostKeyVerification, KeyAlgorithm, KnownHostEntry, SftpEntryKind, TransferId, TransferStatus,
-    TunnelStatus,
+    HostKeyVerification, KeyAlgorithm, KnownHostEntry, SftpEntry, SftpEntryKind, TransferId,
+    TransferStatus, TunnelStatus,
 };
 use smagical_terminal::TerminalSize;
 use uuid::Uuid;
@@ -337,6 +337,30 @@ fn sftp_path_helpers_handle_root_and_nested_paths() {
     assert_eq!(parent_remote_dir("/var/log/syslog"), "/var/log");
     assert_eq!(parent_remote_dir("/tmp"), "/");
     assert_eq!(parent_remote_dir("/"), "/");
+}
+
+#[test]
+fn sftp_entries_event_preserves_path_and_entries() {
+    let session_id = session_id();
+    let entries = vec![SftpEntry {
+        remote_path: "/var/log/syslog".to_owned(),
+        name: "syslog".to_owned(),
+        kind: SftpEntryKind::File,
+        size: Some(4096),
+        modified_at_unix_secs: Some(1_700_000_000),
+        permissions: Some(0o100644),
+    }];
+
+    let event = sftp_entries_event(session_id, "/var/log".to_owned(), entries.clone());
+
+    assert_eq!(
+        event,
+        BackendEvent::SftpEntries {
+            session_id,
+            remote_path: "/var/log".to_owned(),
+            entries,
+        }
+    );
 }
 
 #[test]
