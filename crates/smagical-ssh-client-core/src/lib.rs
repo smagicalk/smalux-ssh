@@ -6,6 +6,7 @@ mod handler;
 mod host_key;
 mod settings;
 mod sftp;
+mod socks5;
 
 pub use agent::select_agent_identity;
 pub use channel::{
@@ -20,6 +21,7 @@ pub use settings::{
     RusshClientSettings,
 };
 pub use sftp::{join_remote_path, parent_remote_dir, sftp_entry_from_parts, transfer_event};
+pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
 
 #[cfg(test)]
 mod tests;
