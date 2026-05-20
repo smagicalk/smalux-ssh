@@ -5656,6 +5656,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-ssh-client-core"
+version = "0.1.0"
+dependencies = [
+ "aws-lc-rs",
+ "russh",
+]
+
+[[package]]
 name = "smagical-ssh-plan"
 version = "0.1.0"
 dependencies = [
@@ -5706,6 +5714,7 @@ dependencies = [
  "smagical-local-backend",
  "smagical-security",
  "smagical-session",
+ "smagical-ssh-client-core",
  "smagical-ssh-plan",
  "smagical-storage",
  "smagical-terminal",
