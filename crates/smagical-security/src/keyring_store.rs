@@ -1,6 +1,6 @@
 //! 系统凭据库适配。
 
-use crate::model::SecretRef;
+use smagical_core::SecretRef;
 
 use super::{SecretStore, SecurityError};
 

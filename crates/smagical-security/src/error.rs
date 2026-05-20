@@ -1,6 +1,6 @@
 //! 安全层错误类型。
 
-use crate::model::SecretRef;
+use smagical_core::SecretRef;
 
 /// 凭据解析和存取错误。
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]

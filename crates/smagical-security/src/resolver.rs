@@ -1,6 +1,6 @@
 //! SSH 认证材料解析。
 
-use crate::backend::BackendAuth;
+use crate::BackendAuth;
 
 use super::{SecretStore, SecurityError};
 
@@ -95,8 +95,8 @@ impl ResolvedAuth {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::SecretRef;
-    use crate::security::MemorySecretStore;
+    use crate::MemorySecretStore;
+    use smagical_core::SecretRef;
 
     #[test]
     fn resolver_reads_password_from_secret_store() {

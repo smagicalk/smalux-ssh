@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use crate::model::SecretRef;
+use smagical_core::SecretRef;
 
 use super::SecurityError;
 

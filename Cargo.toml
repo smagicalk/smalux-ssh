@@ -12,12 +12,14 @@ members = [
     "crates/smagical-terminal",
     "crates/smagical-config",
     "crates/smagical-storage",
+    "crates/smagical-security",
 ]
 resolver = "3"
 
 [dependencies]
 smagical-config = { path = "crates/smagical-config" }
 smagical-core = { path = "crates/smagical-core" }
+smagical-security = { path = "crates/smagical-security" }
 smagical-session = { path = "crates/smagical-session" }
 smagical-storage = { path = "crates/smagical-storage" }
 smagical-terminal = { path = "crates/smagical-terminal" }
@@ -30,7 +32,6 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"
 anyhow = "1"
-keyring = "3"
 portable-pty = "0.9"
 aws-lc-rs = { version = "1.16", features = ["prebuilt-nasm"] }
 russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "flate2", "rsa"] }
