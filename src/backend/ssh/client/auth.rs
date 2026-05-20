@@ -4,8 +4,10 @@ use std::sync::Arc;
 
 use russh::client;
 use russh::keys::agent::client::{AgentClient, AgentStream};
-use russh::keys::{Certificate, HashAlg, PrivateKey, PrivateKeyWithHashAlg};
-use smagical_ssh_client_core::select_agent_identity;
+use russh::keys::{Certificate, HashAlg, PrivateKeyWithHashAlg};
+use smagical_ssh_client_core::{
+    agent_identity_error, authentication_error, decode_private_key, select_agent_identity,
+};
 
 use super::SshClientHandler;
 use crate::backend::BackendExecutionError;
@@ -105,15 +107,6 @@ async fn best_supported_rsa_hash(
         .map_err(|error| authentication_error(username, error))
 }
 
-pub(super) fn decode_private_key(
-    private_key: &str,
-    passphrase: Option<&str>,
-    username: &str,
-) -> Result<PrivateKey, BackendExecutionError> {
-    russh::keys::decode_secret_key(private_key, passphrase)
-        .map_err(|error| authentication_error(username, error))
-}
-
 async fn connect_agent() -> Result<DynamicAgentClient, russh::keys::Error> {
     #[cfg(unix)]
     {
@@ -138,22 +131,5 @@ async fn connect_agent() -> Result<DynamicAgentClient, russh::keys::Error> {
         Err(russh::keys::Error::IO(std::io::Error::other(
             "当前平台暂不支持 ssh-agent 自动发现",
         )))
-    }
-}
-
-fn agent_identity_error(key_hint: Option<&str>) -> String {
-    match key_hint {
-        Some(hint) => format!("ssh-agent 中没有匹配的身份：{hint}"),
-        None => "ssh-agent 中没有可用身份".to_owned(),
-    }
-}
-
-pub(super) fn authentication_error(
-    username: &str,
-    error: impl std::error::Error,
-) -> BackendExecutionError {
-    BackendExecutionError::AuthenticationFailed {
-        username: username.to_owned(),
-        reason: error.to_string(),
     }
 }

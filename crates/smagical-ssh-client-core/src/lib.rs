@@ -9,7 +9,9 @@ mod sftp;
 mod socks5;
 mod tunnel;
 
-pub use agent::select_agent_identity;
+pub use agent::{
+    agent_identity_error, authentication_error, decode_private_key, select_agent_identity,
+};
 pub use channel::{
     channel_error, collect_command_message, exit_status_to_i32, output_event, pty_columns,
     pty_rows, shell_message_to_event,

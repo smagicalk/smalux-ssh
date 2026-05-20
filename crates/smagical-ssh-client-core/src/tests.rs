@@ -202,6 +202,42 @@ fn agent_identity_can_be_selected_by_algorithm_hint_and_missing_match_returns_no
     assert_eq!(missing, None);
 }
 
+#[test]
+fn invalid_private_key_maps_to_authentication_failure() {
+    let error = decode_private_key("not a private key", None, "deploy")
+        .expect_err("非法私钥应该映射为认证失败");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::AuthenticationFailed {
+            username,
+            reason,
+        } if username == "deploy" && !reason.is_empty()
+    ));
+}
+
+#[test]
+fn authentication_error_preserves_username_and_reason() {
+    let error = authentication_error("deploy", std::io::Error::other("boom"));
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::AuthenticationFailed {
+            username,
+            reason,
+        } if username == "deploy" && reason == "boom"
+    ));
+}
+
+#[test]
+fn agent_identity_error_reports_hint_or_empty_agent() {
+    assert_eq!(
+        agent_identity_error(Some("deploy-key")),
+        "ssh-agent 中没有匹配的身份：deploy-key"
+    );
+    assert_eq!(agent_identity_error(None), "ssh-agent 中没有可用身份");
+}
+
 #[tokio::test]
 async fn handler_records_host_key_verification_result() {
     let key = sample_public_key();
