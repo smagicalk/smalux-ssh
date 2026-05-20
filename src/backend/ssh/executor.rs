@@ -5,6 +5,8 @@ use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
+use smagical_ssh_client_core::{disconnected_event, tunnel_stopped_event};
+
 use crate::backend::{
     BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, ConnectionTarget,
     PtyRequest, RemoteCommandRequest, SftpRequest, TunnelStartRequest, TunnelStopRequest,
@@ -215,11 +217,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             tunnel.stop();
         }
 
-        Ok(vec![BackendEvent::TunnelStatusChanged {
-            session_id,
-            rule_name,
-            status: crate::model::TunnelStatus::Stopped,
-        }])
+        Ok(vec![tunnel_stopped_event(session_id, rule_name)])
     }
 
     fn disconnect(
@@ -236,7 +234,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         self.close_disconnected_session_resources(session_id, resources.cached_resources);
         stop_detached_tunnels(session_id, resources.tunnels, "disconnecting");
 
-        Ok(vec![BackendEvent::Disconnected { session_id }])
+        Ok(vec![disconnected_event(session_id)])
     }
 
     fn close_stale_session_resources(

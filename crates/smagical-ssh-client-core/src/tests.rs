@@ -498,6 +498,14 @@ fn tunnel_status_events_preserve_session_rule_and_status() {
             status: TunnelStatus::Stopped,
         }
     );
+    assert_eq!(
+        tunnel_stopped_event(session_id, "proxy".to_owned()),
+        BackendEvent::TunnelStatusChanged {
+            session_id,
+            rule_name: "proxy".to_owned(),
+            status: TunnelStatus::Stopped,
+        }
+    );
 }
 
 #[tokio::test]

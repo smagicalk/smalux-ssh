@@ -94,6 +94,11 @@ pub fn tunnel_running_event(session_id: SessionId, rule_name: String) -> Backend
     tunnel_status_event(session_id, rule_name, TunnelStatus::Running)
 }
 
+/// 创建隧道进入停止态事件。
+pub fn tunnel_stopped_event(session_id: SessionId, rule_name: String) -> BackendEvent {
+    tunnel_status_event(session_id, rule_name, TunnelStatus::Stopped)
+}
+
 /// 将 russh TCP forwarding 错误转换成后端 tunnel 错误。
 pub fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
     tunnel_reason_error(rule_name, error)
