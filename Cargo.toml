@@ -13,10 +13,12 @@ members = [
     "crates/smagical-config",
     "crates/smagical-storage",
     "crates/smagical-security",
+    "crates/smagical-backend-core",
 ]
 resolver = "3"
 
 [dependencies]
+smagical-backend-core = { path = "crates/smagical-backend-core" }
 smagical-config = { path = "crates/smagical-config" }
 smagical-core = { path = "crates/smagical-core" }
 smagical-security = { path = "crates/smagical-security" }

@@ -8,7 +8,7 @@
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
 - 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
-- 本轮新增：继续收口安全核心，新增 `smagical-security` workspace crate 承载凭据解析、SecretStore 和 BackendAuth。
+- 本轮新增：继续收口后端纯接口核心，新增 `smagical-backend-core` workspace crate 承载 BackendAuth、后端命令/事件、队列、请求模型和执行器抽象。
 
 ## 当前进度
 
@@ -110,6 +110,7 @@
 - 最新工程优化：新增 `smagical-config` workspace crate，迁移原 `src/config` 的 `AppConfig`、默认值、背景归一化测试和视觉配置解析；主 crate `src/config.rs` 改为 re-export，保持 `crate::config::*` 兼容。
 - 最新工程优化：新增 `smagical-storage` workspace crate，迁移原 `src/storage` 的 `StorageManager`、索引操作和 redb 快照持久化；主 crate `src/storage.rs` 改为 re-export，保持 `crate::storage::*` 兼容。
 - 最新工程优化：新增 `smagical-security` workspace crate，迁移原 `src/security` 和 `src/backend/auth.rs` 的凭据解析、SecretStore、KeyringSecretStore 和 BackendAuth；主 crate 保留 `src/security.rs` 与 `src/backend/auth.rs` re-export，保持旧调用兼容。
+- 最新工程优化：新增 `smagical-backend-core` workspace crate，迁移原 `src/backend` 的 BackendAuth、BackendCommand、BackendEvent、BackendCommandQueue、请求模型和 BackendExecutor 抽象；主 crate 保留同名 backend 模块 re-export，真实 SSH/PTY 执行器仍留在主 crate。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
 - 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
@@ -120,12 +121,13 @@
 - 编译速度事实：迁移配置核心后，`cargo test -p smagical-config` 通过，8 个配置测试全部成功；主 crate `cargo test` 通过，`416 passed, 2 ignored`，配置测试已转移到独立 crate。
 - 编译速度事实：迁移存储核心后，`cargo test -p smagical-storage` 通过，20 个存储测试全部成功；`cargo test --lib storage -- --nocapture` 通过，4 个主 crate 存储调用面测试成功；主 crate `cargo check` 通过，用时约 `13.26s`，完整 `cargo test` 通过，`396 passed, 2 ignored`。
 - 编译速度事实：迁移安全核心后，`cargo test -p smagical-security` 通过，15 个安全测试全部成功；`cargo test --lib backend::ssh::plan::tests -- --nocapture` 通过，9 个认证计划调用面测试成功；完整 `cargo test` 通过，`381 passed, 2 ignored`。
+- 编译速度事实：迁移后端纯接口后，`cargo test -p smagical-backend-core` 通过，29 个纯接口测试全部成功；`cargo test --lib backend::reducer::tests -- --nocapture` 通过，34 个主 crate 调用面测试成功；完整 `cargo test` 通过，`352 passed, 2 ignored`。
 - 编译速度事实：本轮 `cargo check` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`git diff --check` 仅有 CRLF 提示，无实际 diff 错误。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：提交 `smagical-security` 安全核心拆分并整理恢复记录
+- 本轮待提交：提交 `smagical-backend-core` 后端纯接口拆分并整理恢复记录
 - `15de3d0 稳定 Slint 构建脚本监听输出`
 - `cb04901 收紧 Slint 构建脚本重跑范围`
 - `227d50f 补齐后端事件口径边界测试`
@@ -252,6 +254,11 @@
 - `cargo test --lib backend::command::tests -- --nocapture` 通过，`6 passed`
 - `cargo fmt --check` 通过
 - `cargo test` 通过，`381 passed, 2 ignored`
+- `cargo test -p smagical-backend-core` 通过，`29 passed`
+- `cargo check` 通过，用时约 `13.09s`
+- `cargo test --lib backend::reducer::tests -- --nocapture` 通过，`34 passed`
+- `cargo fmt --check` 通过
+- `cargo test` 通过，`352 passed, 2 ignored`
 - `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过

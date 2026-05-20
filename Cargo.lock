@@ -5588,6 +5588,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-backend-core"
+version = "0.1.0"
+dependencies = [
+ "smagical-core",
+ "smagical-security",
+ "smagical-terminal",
+ "thiserror 2.0.18",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-config"
 version = "0.1.0"
 dependencies = [
@@ -5657,6 +5668,7 @@ dependencies = [
  "serde",
  "slint",
  "slint-build",
+ "smagical-backend-core",
  "smagical-config",
  "smagical-core",
  "smagical-security",

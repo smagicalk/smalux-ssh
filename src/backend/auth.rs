@@ -1,1 +1,1 @@
-pub use smagical_security::BackendAuth;
+pub use smagical_backend_core::BackendAuth;

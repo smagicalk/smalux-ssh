@@ -1,7 +1,7 @@
 use super::*;
-use crate::backend::{ConnectionTarget, PtyRequest};
-use crate::model::{AuthProfile, Host, HostId, SessionId};
-use crate::terminal::TerminalSize;
+use crate::{ConnectionTarget, PtyRequest};
+use smagical_core::{AuthProfile, Host, HostId, SessionId};
+use smagical_terminal::TerminalSize;
 use uuid::Uuid;
 
 fn session_id() -> SessionId {
