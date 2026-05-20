@@ -11,7 +11,7 @@ use crate::backend::{BackendEvent, BackendExecutionError, PtyRequest, RemoteComm
 use crate::model::SessionId;
 use crate::terminal::TerminalSize;
 use smagical_ssh_client_core::{
-    collect_command_message, pty_columns, pty_rows, shell_message_to_event,
+    channel_error, collect_command_message, pty_columns, pty_rows, shell_message_to_event,
 };
 
 use super::RusshConnection;
@@ -242,11 +242,4 @@ pub(super) async fn wait_channel_request(
         operation: operation.to_owned(),
         reason: "channel ended before request succeeded".to_owned(),
     })
-}
-
-pub(super) fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
-    BackendExecutionError::ChannelFailed {
-        operation: operation.to_owned(),
-        reason: error.to_string(),
-    }
 }

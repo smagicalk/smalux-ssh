@@ -10,6 +10,7 @@ use tokio::time::{Duration, timeout};
 
 use crate::backend::{BackendEvent, BackendExecutionError, TunnelStartRequest};
 use crate::model::{SessionId, TunnelKind, TunnelStatus};
+use smagical_ssh_client_core::tunnel_error;
 
 use super::super::RusshConnection;
 
@@ -195,12 +196,5 @@ impl RusshConnection {
                 status: TunnelStatus::Running,
             }],
         ))
-    }
-}
-
-fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
-    BackendExecutionError::TunnelFailed {
-        rule_name: rule_name.to_owned(),
-        reason: error.to_string(),
     }
 }

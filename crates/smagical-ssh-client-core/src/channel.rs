@@ -64,6 +64,14 @@ pub fn shell_message_to_event(session_id: SessionId, message: ChannelMsg) -> Opt
     }
 }
 
+/// 将 russh channel 错误转换成后端执行错误。
+pub fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
+    BackendExecutionError::ChannelFailed {
+        operation: operation.to_owned(),
+        reason: error.to_string(),
+    }
+}
+
 /// 创建终端输出事件。
 pub fn output_event(session_id: SessionId, data: &[u8]) -> BackendEvent {
     BackendEvent::Output {

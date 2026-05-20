@@ -5,6 +5,7 @@ use std::sync::{
     atomic::{AtomicBool, Ordering},
 };
 
+use smagical_backend_core::BackendExecutionError;
 use smagical_core::SessionId;
 
 /// 运行中的 SSH 隧道句柄。
@@ -52,5 +53,13 @@ pub fn remote_tunnel(
         running,
         bind_host,
         bind_port,
+    }
+}
+
+/// 将 russh TCP forwarding 错误转换成后端 tunnel 错误。
+pub fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
+    BackendExecutionError::TunnelFailed {
+        rule_name: rule_name.to_owned(),
+        reason: error.to_string(),
     }
 }

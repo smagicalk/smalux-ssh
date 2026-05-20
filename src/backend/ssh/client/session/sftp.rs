@@ -2,7 +2,8 @@
 
 use russh_sftp::client::SftpSession;
 use smagical_ssh_client_core::{
-    copy_transfer_with_progress, parent_remote_dir, sftp_entry_from_parts, transfer_event,
+    copy_transfer_with_progress, parent_remote_dir, sftp_entry_from_parts, sftp_error,
+    sftp_io_error, transfer_event,
 };
 use tokio::io::AsyncWriteExt;
 
@@ -218,19 +219,5 @@ impl RusshConnection {
             session_id,
             session,
         })
-    }
-}
-
-fn sftp_error(operation: &str, error: impl std::fmt::Display) -> BackendExecutionError {
-    BackendExecutionError::SftpFailed {
-        operation: operation.to_owned(),
-        reason: error.to_string(),
-    }
-}
-
-fn sftp_io_error(operation: &str, error: std::io::Error) -> BackendExecutionError {
-    BackendExecutionError::SftpFailed {
-        operation: operation.to_owned(),
-        reason: error.to_string(),
     }
 }

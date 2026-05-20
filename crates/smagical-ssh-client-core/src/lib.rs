@@ -11,8 +11,8 @@ mod tunnel;
 
 pub use agent::select_agent_identity;
 pub use channel::{
-    collect_command_message, exit_status_to_i32, output_event, pty_columns, pty_rows,
-    shell_message_to_event,
+    channel_error, collect_command_message, exit_status_to_i32, output_event, pty_columns,
+    pty_rows, shell_message_to_event,
 };
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,
@@ -24,10 +24,10 @@ pub use settings::{
 };
 pub use sftp::{
     copy_transfer_with_progress, join_remote_path, parent_remote_dir, sftp_entry_from_parts,
-    transfer_event,
+    sftp_error, sftp_io_error, transfer_event,
 };
 pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
-pub use tunnel::{RemoteTunnel, remote_tunnel};
+pub use tunnel::{RemoteTunnel, remote_tunnel, tunnel_error};
 
 #[cfg(test)]
 mod tests;

@@ -326,6 +326,44 @@ fn pty_dimensions_are_never_zero() {
 }
 
 #[test]
+fn ssh_error_helpers_preserve_operation_and_reason() {
+    let channel = channel_error("open shell", russh::Error::Inconsistent);
+    let sftp = sftp_error("list dir", "permission denied");
+    let io = sftp_io_error(
+        "upload local",
+        std::io::Error::new(std::io::ErrorKind::Other, "disk full"),
+    );
+    let tunnel = tunnel_error("proxy", russh::Error::Inconsistent);
+
+    assert!(matches!(
+        channel,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "open shell" && !reason.is_empty()
+    ));
+    assert!(matches!(
+        sftp,
+        BackendExecutionError::SftpFailed {
+            operation,
+            reason,
+        } if operation == "list dir" && reason == "permission denied"
+    ));
+    assert!(matches!(
+        io,
+        BackendExecutionError::SftpFailed {
+            operation,
+            reason,
+        } if operation == "upload local" && reason.contains("disk full")
+    ));
+    assert!(matches!(
+        tunnel,
+        BackendExecutionError::TunnelFailed { rule_name, reason }
+            if rule_name == "proxy" && !reason.is_empty()
+    ));
+}
+
+#[test]
 fn remote_tunnel_reports_endpoint_and_can_stop() {
     let session_id = session_id();
     let running = Arc::new(AtomicBool::new(true));

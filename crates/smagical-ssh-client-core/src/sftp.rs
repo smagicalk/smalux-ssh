@@ -103,18 +103,24 @@ where
     Ok((transferred_bytes, events))
 }
 
+/// 将 SFTP 协议错误转换成后端执行错误。
+pub fn sftp_error(operation: &str, error: impl std::fmt::Display) -> BackendExecutionError {
+    BackendExecutionError::SftpFailed {
+        operation: operation.to_owned(),
+        reason: error.to_string(),
+    }
+}
+
+/// 将 SFTP 本地 IO 错误转换成后端执行错误。
+pub fn sftp_io_error(operation: &str, error: std::io::Error) -> BackendExecutionError {
+    sftp_error(operation, error)
+}
+
 fn sftp_entry_kind(file_type: RusshSftpFileType) -> SftpEntryKind {
     match file_type {
         RusshSftpFileType::Dir => SftpEntryKind::Directory,
         RusshSftpFileType::File => SftpEntryKind::File,
         RusshSftpFileType::Symlink => SftpEntryKind::Symlink,
         RusshSftpFileType::Other => SftpEntryKind::Other,
-    }
-}
-
-fn sftp_io_error(operation: &str, error: std::io::Error) -> BackendExecutionError {
-    BackendExecutionError::SftpFailed {
-        operation: operation.to_owned(),
-        reason: error.to_string(),
     }
 }
