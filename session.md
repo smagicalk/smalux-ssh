@@ -99,12 +99,14 @@
 - 最新核心新增：`backend/command.rs` 补齐后端命令路由边界，覆盖 Connect、RunCommand、SFTP、StartTunnel、StopTunnel、Disconnect 的 `session_id()` 与 `kind()` 映射。
 - 最新核心新增：`backend/executor/tests.rs` 补齐执行器抽象边界，覆盖脚本执行器 FIFO 响应消费和共享 noop 执行器经锁调用仍返回 UnsupportedCommand。
 - 最新核心新增：`backend/event.rs` 补齐后端事件口径边界，覆盖 HostKeyVerified、SftpEntries、TransferProgress、TunnelStatusChanged 的 `session_id()` 映射和非终态判断，以及 Disconnected 终态判断。
+- 最新工程优化：`build.rs` 为 `ui/*.slint` 和 `build.rs` 显式输出 `cargo:rerun-if-changed`，减少后端代码/测试改动时误触发 Slint build script 的概率。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：补齐后端事件口径边界测试并整理恢复记录
+- 本轮待提交：收紧 Slint build script 重跑触发范围并整理恢复记录
+- `227d50f 补齐后端事件口径边界测试`
 - `cdfa259 补齐执行器抽象边界测试`
 - `1d09201 补齐后端命令路由边界测试`
 - `8ceffbc 补齐认证模型转换边界测试`
@@ -140,7 +142,7 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 169 个提交；本轮提交后预计领先 170 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 170 个提交；本轮提交后预计领先 171 个提交
 - 最近验证：
   - `cargo test local_pty -- --nocapture` 通过，`10 passed, 2 ignored`
   - `cargo test` 通过，`503 passed, 2 ignored`
@@ -190,6 +192,8 @@
 - `cargo test backend::command::tests -- --nocapture` 通过，`6 passed`
 - `cargo test backend::executor::tests -- --nocapture` 通过，`7 passed`
 - `cargo test backend::event::tests -- --nocapture` 通过，`5 passed`
+- `cargo check` 通过，用时约 `11.55s`
+- `cargo test backend::event::tests -- --nocapture` 通过，`5 passed`，测试构建用时约 `20.93s`
 - `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过
