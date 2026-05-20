@@ -230,6 +230,19 @@ fn authentication_error_preserves_username_and_reason() {
 }
 
 #[test]
+fn authentication_rejected_error_reports_method() {
+    let error = authentication_rejected_error("deploy", "password");
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::AuthenticationFailed {
+            username,
+            reason,
+        } if username == "deploy" && reason == "password 认证被服务器拒绝"
+    ));
+}
+
+#[test]
 fn agent_identity_error_reports_hint_or_empty_agent() {
     assert_eq!(
         agent_identity_error(Some("deploy-key")),

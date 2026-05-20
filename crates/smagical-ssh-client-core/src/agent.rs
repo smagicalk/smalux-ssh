@@ -48,6 +48,14 @@ pub fn authentication_error(
     }
 }
 
+/// 创建服务端拒绝认证时的后端执行错误。
+pub fn authentication_rejected_error(username: &str, method: &str) -> BackendExecutionError {
+    BackendExecutionError::AuthenticationFailed {
+        username: username.to_owned(),
+        reason: format!("{method} 认证被服务器拒绝"),
+    }
+}
+
 fn agent_identity_matches(identity: &PublicKey, hint: &str) -> bool {
     let fingerprint = host_key_fingerprint(identity);
     identity.comment().contains(hint)

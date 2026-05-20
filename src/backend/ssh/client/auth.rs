@@ -6,7 +6,8 @@ use russh::client;
 use russh::keys::agent::client::{AgentClient, AgentStream};
 use russh::keys::{Certificate, HashAlg, PrivateKeyWithHashAlg};
 use smagical_ssh_client_core::{
-    agent_identity_error, authentication_error, decode_private_key, select_agent_identity,
+    agent_identity_error, authentication_error, authentication_rejected_error, decode_private_key,
+    select_agent_identity,
 };
 
 use super::SshClientHandler;
@@ -63,10 +64,10 @@ pub(super) async fn authenticate(
     if result.success() {
         Ok(())
     } else {
-        Err(BackendExecutionError::AuthenticationFailed {
-            username: auth.username().to_owned(),
-            reason: format!("{} 认证被服务器拒绝", auth.method()),
-        })
+        Err(authentication_rejected_error(
+            auth.username(),
+            auth.method(),
+        ))
     }
 }
 
