@@ -6,11 +6,11 @@ use std::sync::{
 };
 
 use tokio::sync::Mutex as AsyncMutex;
-use tokio::time::{Duration, timeout};
+use tokio::time::timeout;
 
 use crate::backend::{BackendEvent, BackendExecutionError, TunnelStartRequest};
 use crate::model::{SessionId, TunnelKind, TunnelStatus};
-use smagical_ssh_client_core::tunnel_error;
+use smagical_ssh_client_core::{TUNNEL_ACCEPT_TICK, tunnel_error};
 
 use super::super::RusshConnection;
 
@@ -164,12 +164,11 @@ impl RusshConnection {
         let bind_port_for_cancel = rule.bind_port;
         tokio::spawn(async move {
             while running_loop.load(Ordering::SeqCst) {
-                let channel =
-                    match timeout(Duration::from_millis(250), forwarded_channels.recv()).await {
-                        Ok(Some(channel)) => channel,
-                        Ok(None) => break,
-                        Err(_) => continue,
-                    };
+                let channel = match timeout(TUNNEL_ACCEPT_TICK, forwarded_channels.recv()).await {
+                    Ok(Some(channel)) => channel,
+                    Ok(None) => break,
+                    Err(_) => continue,
+                };
                 let host = target_host.clone();
                 tokio::spawn(async move {
                     if let Err(error) = pipe_forwarded_tcpip(channel, host, target_port).await {

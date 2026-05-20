@@ -450,6 +450,7 @@ fn tunnel_internal_names_are_stable() {
     assert_eq!(DIRECT_TCPIP_RULE_NAME, "direct-tcpip");
     assert_eq!(REMOTE_FORWARD_RULE_NAME, "remote-forward");
     assert_eq!(DYNAMIC_SOCKS5_RULE_NAME, "dynamic-socks5");
+    assert_eq!(TUNNEL_ACCEPT_TICK, Duration::from_millis(250));
 }
 
 #[tokio::test]

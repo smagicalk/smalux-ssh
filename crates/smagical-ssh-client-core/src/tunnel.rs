@@ -4,6 +4,7 @@ use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
 };
+use std::time::Duration;
 
 use smagical_backend_core::BackendExecutionError;
 use smagical_core::SessionId;
@@ -23,6 +24,9 @@ pub const REMOTE_FORWARD_RULE_NAME: &str = "remote-forward";
 
 /// 动态 SOCKS5 内部规则名。
 pub const DYNAMIC_SOCKS5_RULE_NAME: &str = "dynamic-socks5";
+
+/// 隧道监听循环的空闲 tick 间隔。
+pub const TUNNEL_ACCEPT_TICK: Duration = Duration::from_millis(250);
 
 /// 运行中的 SSH 隧道句柄。
 pub struct RemoteTunnel {

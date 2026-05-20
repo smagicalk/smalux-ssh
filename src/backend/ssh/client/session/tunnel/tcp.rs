@@ -5,13 +5,13 @@ use std::net::SocketAddr;
 use russh::Channel;
 use russh::client;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::time::{Duration, timeout};
+use tokio::time::timeout;
 
 use crate::backend::{BackendExecutionError, ssh::SshClientHandler};
 use smagical_ssh_client_core::{
     DIRECT_TCPIP_OPERATION, DIRECT_TCPIP_RULE_NAME, DYNAMIC_SOCKS5_OPERATION,
-    DYNAMIC_SOCKS5_RULE_NAME, REMOTE_FORWARD_RULE_NAME, channel_error, copy_bidirectional,
-    tunnel_io_error, tunnel_reason_error,
+    DYNAMIC_SOCKS5_RULE_NAME, REMOTE_FORWARD_RULE_NAME, TUNNEL_ACCEPT_TICK, channel_error,
+    copy_bidirectional, tunnel_io_error, tunnel_reason_error,
 };
 
 use super::socks5::{read_socks5_target, write_socks5_success};
@@ -29,7 +29,7 @@ pub(super) async fn bind_tcp_listener(
 pub(super) async fn accept_with_tick(
     listener: &TcpListener,
 ) -> Result<Option<(TcpStream, SocketAddr)>, std::io::Error> {
-    match timeout(Duration::from_millis(250), listener.accept()).await {
+    match timeout(TUNNEL_ACCEPT_TICK, listener.accept()).await {
         Ok(result) => result.map(Some),
         Err(_) => Ok(None),
     }
