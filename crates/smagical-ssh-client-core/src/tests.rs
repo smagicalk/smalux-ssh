@@ -916,6 +916,55 @@ fn command_failure_message_reports_channel_error() {
 }
 
 #[test]
+fn channel_request_messages_map_to_status_or_error() {
+    assert_eq!(
+        collect_channel_request_message("request shell", ChannelMsg::Success)
+            .expect("成功消息应该被接受"),
+        ChannelRequestStatus::Accepted
+    );
+    assert_eq!(
+        collect_channel_request_message(
+            "request shell",
+            ChannelMsg::WindowAdjusted { new_size: 80 }
+        )
+        .expect("普通控制消息应该继续等待"),
+        ChannelRequestStatus::Pending
+    );
+
+    let rejected = collect_channel_request_message("request shell", ChannelMsg::Failure)
+        .expect_err("失败消息应该映射为通道错误");
+    assert!(matches!(
+        rejected,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "request shell" && reason == "server rejected channel request"
+    ));
+}
+
+#[test]
+fn channel_request_close_and_end_map_to_channel_error() {
+    let closed = collect_channel_request_message("request pty", ChannelMsg::Close)
+        .expect_err("关闭消息应该映射为请求失败");
+    assert!(matches!(
+        closed,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "request pty" && reason == "channel closed before request succeeded"
+    ));
+
+    let ended = channel_request_ended_error("request pty");
+    assert!(matches!(
+        ended,
+        BackendExecutionError::ChannelFailed {
+            operation,
+            reason,
+        } if operation == "request pty" && reason == "channel ended before request succeeded"
+    ));
+}
+
+#[test]
 fn shell_message_maps_output_and_exit_status() {
     let session_id = session_id();
 

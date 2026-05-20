@@ -5,6 +5,13 @@ use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::SessionId;
 use smagical_terminal::TerminalSize;
 
+/// SSH channel request 消息的纯状态。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ChannelRequestStatus {
+    Pending,
+    Accepted,
+}
+
 /// 收集一次远程命令 channel 消息。
 pub fn collect_command_message(
     session_id: SessionId,
@@ -38,6 +45,37 @@ pub fn collect_command_message(
             reason: format!("{reason:?}"),
         }),
         _ => Ok(false),
+    }
+}
+
+/// 收集一次 SSH channel request 响应消息。
+pub fn collect_channel_request_message(
+    operation: &str,
+    message: ChannelMsg,
+) -> Result<ChannelRequestStatus, BackendExecutionError> {
+    match message {
+        ChannelMsg::Success => Ok(ChannelRequestStatus::Accepted),
+        ChannelMsg::Failure => Err(BackendExecutionError::ChannelFailed {
+            operation: operation.to_owned(),
+            reason: "server rejected channel request".to_owned(),
+        }),
+        ChannelMsg::OpenFailure(reason) => Err(BackendExecutionError::ChannelFailed {
+            operation: operation.to_owned(),
+            reason: format!("{reason:?}"),
+        }),
+        ChannelMsg::Close => Err(BackendExecutionError::ChannelFailed {
+            operation: operation.to_owned(),
+            reason: "channel closed before request succeeded".to_owned(),
+        }),
+        _ => Ok(ChannelRequestStatus::Pending),
+    }
+}
+
+/// 创建 SSH channel request 等待结束错误。
+pub fn channel_request_ended_error(operation: &str) -> BackendExecutionError {
+    BackendExecutionError::ChannelFailed {
+        operation: operation.to_owned(),
+        reason: "channel ended before request succeeded".to_owned(),
     }
 }
 

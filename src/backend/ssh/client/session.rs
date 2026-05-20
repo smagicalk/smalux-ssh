@@ -3,15 +3,17 @@
 use std::io::Cursor;
 use std::time::Duration;
 
+use russh::Channel;
 use russh::client;
-use russh::{Channel, ChannelMsg};
 use tokio::time::timeout;
 
 use crate::backend::{BackendEvent, BackendExecutionError, PtyRequest, RemoteCommandRequest};
 use crate::model::SessionId;
 use crate::terminal::TerminalSize;
 use smagical_ssh_client_core::{
-    channel_error, collect_command_message, pty_columns, pty_rows, shell_message_to_event,
+    ChannelRequestStatus, channel_error, channel_request_ended_error,
+    collect_channel_request_message, collect_command_message, pty_columns, pty_rows,
+    shell_message_to_event,
 };
 
 use super::RusshConnection;
@@ -214,32 +216,10 @@ pub(super) async fn wait_channel_request(
     operation: &str,
 ) -> Result<(), BackendExecutionError> {
     while let Some(message) = channel.wait().await {
-        match message {
-            ChannelMsg::Success => return Ok(()),
-            ChannelMsg::Failure => {
-                return Err(BackendExecutionError::ChannelFailed {
-                    operation: operation.to_owned(),
-                    reason: "server rejected channel request".to_owned(),
-                });
-            }
-            ChannelMsg::OpenFailure(reason) => {
-                return Err(BackendExecutionError::ChannelFailed {
-                    operation: operation.to_owned(),
-                    reason: format!("{reason:?}"),
-                });
-            }
-            ChannelMsg::Close => {
-                return Err(BackendExecutionError::ChannelFailed {
-                    operation: operation.to_owned(),
-                    reason: "channel closed before request succeeded".to_owned(),
-                });
-            }
-            _ => {}
+        if collect_channel_request_message(operation, message)? == ChannelRequestStatus::Accepted {
+            return Ok(());
         }
     }
 
-    Err(BackendExecutionError::ChannelFailed {
-        operation: operation.to_owned(),
-        reason: "channel ended before request succeeded".to_owned(),
-    })
+    Err(channel_request_ended_error(operation))
 }

@@ -13,8 +13,9 @@ pub use agent::{
     agent_identity_error, authentication_error, decode_private_key, select_agent_identity,
 };
 pub use channel::{
-    channel_error, collect_command_message, exit_status_to_i32, output_event, pty_columns,
-    pty_rows, shell_message_to_event,
+    ChannelRequestStatus, channel_error, channel_request_ended_error,
+    collect_channel_request_message, collect_command_message, exit_status_to_i32, output_event,
+    pty_columns, pty_rows, shell_message_to_event,
 };
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,

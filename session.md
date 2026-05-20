@@ -8,7 +8,7 @@
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
 - 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
-- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
+- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
 
 ## 当前进度
 
@@ -127,6 +127,7 @@
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移原 `src/backend/ssh/client/session.rs` 的 SSH PTY columns/rows 尺寸转换；真实 session channel、PTY 请求和 resize 调用仍留在主 crate。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移原 `src/backend/ssh/client/session.rs`、`session/sftp.rs` 和 `session/tunnel.rs` 的 channel/sftp/tunnel 错误映射 helper；真实 request、SFTP 操作和 tunnel 启动仍留在主 crate。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移原 `src/backend/ssh/client/auth.rs` 的私钥解码、认证错误映射和 ssh-agent 身份缺失提示；真实认证流程、agent 连接和 russh handle 调用仍留在主 crate。
+- 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移原 `src/backend/ssh/client/session.rs` 的 channel request 响应状态和错误映射；真实 Channel 轮询、PTY、shell、exec 和 SFTP subsystem 请求仍留在主 crate。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
 - 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
@@ -154,12 +155,14 @@
 - 编译速度事实：迁移 SSH PTY 尺寸 helper 后，`cargo test -p smagical-ssh-client-core` 通过，43 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::session -- --nocapture` 通过，3 个主 crate session 调用面测试成功；`cargo check` 通过，用时约 `14.10s`；完整 `cargo test` 通过，`253 passed`。
 - 编译速度事实：迁移 SSH 错误映射 helper 后，`cargo test -p smagical-ssh-client-core` 通过，44 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client -- --nocapture` 通过，9 个主 crate SSH client 调用面测试成功；`cargo check` 通过，用时约 `6.69s`；完整 `cargo test` 通过，`253 passed`。
 - 编译速度事实：迁移 SSH 认证 helper 后，`cargo test -p smagical-ssh-client-core` 通过，47 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client -- --nocapture` 通过，7 个主 crate SSH client 调用面测试成功；`cargo check` 通过，用时约 `7.52s`；完整 `cargo test` 通过，`251 passed`。
+- 编译速度事实：迁移 SSH channel request helper 后，`cargo test -p smagical-ssh-client-core` 通过，49 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::session -- --nocapture` 通过，3 个主 crate session 调用面测试成功；`cargo check` 通过，用时约 `12.24s`；完整 `cargo test` 通过，`251 passed`。
 - 编译速度事实：本轮 `cargo check` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`git diff --check` 仅有 CRLF 提示，无实际 diff 错误。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮提交：拆出 SSH 认证 helper 并整理恢复记录
+- 本轮提交：拆出 SSH channel request helper 并整理恢复记录
+- `64dc788 拆出 SSH 认证 helper`
 - `1a03691 拆出 SSH 错误映射 helper`
 - `3785fda 拆出 SSH PTY 尺寸 helper`
 - `fa78a67 拆出 SFTP 传输复制 helper`
@@ -206,7 +209,7 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 196 个提交；本轮提交后预计领先 197 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 197 个提交；本轮提交后预计领先 198 个提交
 - 最近验证：
   - `cargo test local_pty -- --nocapture` 通过，`10 passed, 2 ignored`
   - `cargo test` 通过，`503 passed, 2 ignored`
@@ -364,6 +367,11 @@
 - `cargo test -p smagical-ssh-client-core` 通过，`47 passed`
 - `cargo test --lib backend::ssh::client -- --nocapture` 通过，`7 passed`
 - `cargo check` 通过，用时约 `7.52s`
+- `cargo test` 通过，`251 passed`
+- `cargo test -p smagical-ssh-client-core channel_request -- --nocapture` 通过，`2 passed`
+- `cargo test -p smagical-ssh-client-core` 通过，`49 passed`
+- `cargo test --lib backend::ssh::client::session -- --nocapture` 通过，`3 passed`
+- `cargo check` 通过，用时约 `12.24s`
 - `cargo test` 通过，`251 passed`
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过
