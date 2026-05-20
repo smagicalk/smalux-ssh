@@ -10,6 +10,7 @@ russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "
 russh-sftp = "2"
 smagical-backend-core = { path = "../smagical-backend-core" }
 smagical-core = { path = "../smagical-core" }
+smagical-terminal = { path = "../smagical-terminal" }
 tokio = { version = "1", features = ["io-util", "sync"] }
 
 [dev-dependencies]

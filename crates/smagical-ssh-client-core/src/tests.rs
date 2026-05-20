@@ -19,6 +19,7 @@ use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::{
     HostKeyVerification, KeyAlgorithm, KnownHostEntry, SftpEntryKind, TransferId, TransferStatus,
 };
+use smagical_terminal::TerminalSize;
 use uuid::Uuid;
 
 const TEST_SFTP_TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
@@ -311,6 +312,17 @@ fn sftp_transfer_event_carries_total_and_progress_bytes() {
             status: TransferStatus::Running,
         }
     );
+}
+
+#[test]
+fn pty_dimensions_are_never_zero() {
+    let size = TerminalSize {
+        columns: 0,
+        rows: 0,
+    };
+
+    assert_eq!(pty_columns(size), 1);
+    assert_eq!(pty_rows(size), 1);
 }
 
 #[test]

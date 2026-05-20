@@ -11,7 +11,8 @@ mod tunnel;
 
 pub use agent::select_agent_identity;
 pub use channel::{
-    collect_command_message, exit_status_to_i32, output_event, shell_message_to_event,
+    collect_command_message, exit_status_to_i32, output_event, pty_columns, pty_rows,
+    shell_message_to_event,
 };
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,

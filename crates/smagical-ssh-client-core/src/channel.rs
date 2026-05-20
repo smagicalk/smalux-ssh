@@ -3,6 +3,7 @@
 use russh::ChannelMsg;
 use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::SessionId;
+use smagical_terminal::TerminalSize;
 
 /// 收集一次远程命令 channel 消息。
 pub fn collect_command_message(
@@ -74,4 +75,14 @@ pub fn output_event(session_id: SessionId, data: &[u8]) -> BackendEvent {
 /// 将 SSH 退出码转换成状态层可存储的退出码。
 pub fn exit_status_to_i32(exit_status: u32) -> Option<i32> {
     i32::try_from(exit_status).ok()
+}
+
+/// 返回 SSH PTY 可接受的终端列数。
+pub fn pty_columns(size: TerminalSize) -> u32 {
+    u32::from(size.columns.max(1))
+}
+
+/// 返回 SSH PTY 可接受的终端行数。
+pub fn pty_rows(size: TerminalSize) -> u32 {
+    u32::from(size.rows.max(1))
 }

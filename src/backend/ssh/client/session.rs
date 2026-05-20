@@ -10,7 +10,9 @@ use tokio::time::timeout;
 use crate::backend::{BackendEvent, BackendExecutionError, PtyRequest, RemoteCommandRequest};
 use crate::model::SessionId;
 use crate::terminal::TerminalSize;
-use smagical_ssh_client_core::{collect_command_message, shell_message_to_event};
+use smagical_ssh_client_core::{
+    collect_command_message, pty_columns, pty_rows, shell_message_to_event,
+};
 
 use super::RusshConnection;
 
@@ -18,9 +20,6 @@ mod sftp;
 mod tunnel;
 pub use sftp::RemoteSftp;
 pub use tunnel::RemoteTunnel;
-
-#[cfg(test)]
-mod tests;
 
 /// 已打开的交互式远程 shell。
 pub struct RemoteShell {
@@ -53,7 +52,7 @@ impl RemoteShell {
     /// 同步终端窗口尺寸。
     pub async fn resize(&self, size: TerminalSize) -> Result<(), BackendExecutionError> {
         self.channel
-            .window_change(columns(size), rows(size), 0, 0)
+            .window_change(pty_columns(size), pty_rows(size), 0, 0)
             .await
             .map_err(|error| channel_error("shell resize", error))
     }
@@ -199,8 +198,8 @@ async fn prepare_pty(
         .request_pty(
             true,
             &pty.term,
-            columns(pty.size),
-            rows(pty.size),
+            pty_columns(pty.size),
+            pty_rows(pty.size),
             0,
             0,
             &[],
@@ -243,14 +242,6 @@ pub(super) async fn wait_channel_request(
         operation: operation.to_owned(),
         reason: "channel ended before request succeeded".to_owned(),
     })
-}
-
-fn columns(size: TerminalSize) -> u32 {
-    u32::from(size.columns.max(1))
-}
-
-fn rows(size: TerminalSize) -> u32 {
-    u32::from(size.rows.max(1))
 }
 
 pub(super) fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
