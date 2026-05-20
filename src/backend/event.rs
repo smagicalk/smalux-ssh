@@ -171,4 +171,56 @@ mod tests {
 
         assert!(events.iter().all(|event| event.session_id() == session_id));
     }
+
+    #[test]
+    fn backend_data_events_report_session_without_becoming_terminal() {
+        let session_id = SessionId(Uuid::new_v4());
+        let transfer_id = TransferId(Uuid::new_v4());
+        let events = [
+            BackendEvent::HostKeyVerified {
+                session_id,
+                host: "example.com".to_owned(),
+                port: 22,
+                key_algorithm: KeyAlgorithm::Ed25519,
+                fingerprint: "SHA256:demo".to_owned(),
+                result: HostKeyVerification::Trusted,
+            },
+            BackendEvent::SftpEntries {
+                session_id,
+                remote_path: "/home/ops".to_owned(),
+                entries: vec![SftpEntry {
+                    name: "deploy.sh".to_owned(),
+                    remote_path: "/home/ops/deploy.sh".to_owned(),
+                    kind: crate::model::SftpEntryKind::File,
+                    size: Some(2048),
+                    modified_at_unix_secs: Some(1_700_000_000),
+                    permissions: Some(0o755),
+                }],
+            },
+            BackendEvent::TransferProgress {
+                session_id,
+                transfer_id,
+                total_bytes: Some(4096),
+                transferred_bytes: 1024,
+                status: TransferStatus::Running,
+            },
+            BackendEvent::TunnelStatusChanged {
+                session_id,
+                rule_name: "proxy".to_owned(),
+                status: TunnelStatus::Running,
+            },
+        ];
+
+        assert!(events.iter().all(|event| event.session_id() == session_id));
+        assert!(events.iter().all(|event| !event.is_terminal()));
+    }
+
+    #[test]
+    fn disconnected_event_is_terminal() {
+        let session_id = SessionId(Uuid::new_v4());
+        let event = BackendEvent::Disconnected { session_id };
+
+        assert_eq!(event.session_id(), session_id);
+        assert!(event.is_terminal());
+    }
 }
