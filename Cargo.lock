@@ -5597,6 +5597,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-session"
+version = "0.1.0"
+dependencies = [
+ "smagical-core",
+ "uuid",
+]
+
+[[package]]
 name = "smagicalssh"
 version = "0.1.0"
 dependencies = [
@@ -5613,6 +5621,7 @@ dependencies = [
  "slint",
  "slint-build",
  "smagical-core",
+ "smagical-session",
  "thiserror 2.0.18",
  "tokio",
  "toml",

@@ -1,6 +1,6 @@
 //! SFTP 浏览器运行态操作。
 
-use crate::model::{
+use smagical_core::{
     HostId, SessionId, SessionKind, SessionStatus, SessionTab, SftpBrowserState, SftpEntry,
 };
 

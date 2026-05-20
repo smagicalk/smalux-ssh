@@ -1,6 +1,6 @@
 //! SSH 隧道运行态操作。
 
-use crate::model::{HostId, SessionId, SessionKind, TunnelRule, TunnelRuntimeState, TunnelStatus};
+use smagical_core::{HostId, SessionId, SessionKind, TunnelRule, TunnelRuntimeState, TunnelStatus};
 
 use super::SessionManager;
 
@@ -224,7 +224,7 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::TunnelKind;
+    use smagical_core::{SessionStatus, TunnelKind};
     use uuid::Uuid;
 
     fn host_id() -> HostId {
@@ -447,10 +447,7 @@ mod tests {
         ));
         assert!(matches!(sessions.tunnels[0].status, TunnelStatus::Running));
 
-        assert!(sessions.set_status(
-            current_session_id,
-            crate::model::SessionStatus::Disconnected
-        ));
+        assert!(sessions.set_status(current_session_id, SessionStatus::Disconnected));
         assert!(!sessions.set_tunnel_status_for_session(
             current_session_id,
             "local-db",
@@ -494,10 +491,7 @@ mod tests {
         );
 
         sessions.start_tunnel(current_session_id, &rule, Some(host_id), 20);
-        assert!(sessions.set_status(
-            current_session_id,
-            crate::model::SessionStatus::Disconnected
-        ));
+        assert!(sessions.set_status(current_session_id, SessionStatus::Disconnected));
         assert!(!sessions.fail_tunnel_for_session_rule(
             current_session_id,
             "local-db",
@@ -530,10 +524,7 @@ mod tests {
         assert!(!sessions.can_execute_tunnel_start_command(current_session_id, "local-db"));
 
         sessions.start_tunnel(current_session_id, &rule, Some(host_id), 20);
-        sessions.set_status(
-            current_session_id,
-            crate::model::SessionStatus::Disconnected,
-        );
+        sessions.set_status(current_session_id, SessionStatus::Disconnected);
 
         assert!(!sessions.can_execute_tunnel_start_command(current_session_id, "local-db"));
     }
@@ -564,10 +555,7 @@ mod tests {
         sessions.start_tunnel(current_session_id, &rule, Some(host_id), 20);
         sessions.mark_tunnel_running(current_session_id, "local-db");
         sessions.mark_tunnel_stopping(current_session_id, "local-db");
-        sessions.set_status(
-            current_session_id,
-            crate::model::SessionStatus::Disconnected,
-        );
+        sessions.set_status(current_session_id, SessionStatus::Disconnected);
 
         assert!(!sessions.can_execute_tunnel_stop_command(current_session_id, "local-db"));
     }

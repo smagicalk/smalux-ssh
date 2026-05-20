@@ -1,6 +1,6 @@
 //! 会话标签页的打开、状态更新和关闭操作。
 
-use crate::model::{
+use smagical_core::{
     CommandHistoryId, HostId, SessionId, SessionKind, SessionStatus, SessionTab, TunnelRule,
     WorkspaceTabSnapshot,
 };
@@ -340,8 +340,9 @@ impl SessionManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{
-        TransferDirection, TransferId, TransferStatus, TransferTask, TunnelKind, TunnelStatus,
+    use smagical_core::{
+        DEFAULT_LOCAL_TERMINAL_TITLE, TransferDirection, TransferId, TransferStatus, TransferTask,
+        TunnelKind, TunnelStatus,
     };
     use uuid::Uuid;
 
@@ -400,7 +401,7 @@ mod tests {
         let mut sessions = SessionManager::default();
         let id = session_id();
 
-        sessions.open_local_shell_tab(id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_local_shell_tab(id, DEFAULT_LOCAL_TERMINAL_TITLE);
 
         assert_eq!(sessions.tab_count(), 1);
         assert_eq!(sessions.active_tab, Some(id));
@@ -555,7 +556,7 @@ mod tests {
         let shell_id = session_id();
         let command_id = session_id();
 
-        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_local_shell_tab(local_id, DEFAULT_LOCAL_TERMINAL_TITLE);
         sessions.open_shell_tab(shell_id, host_id(), "production");
         sessions.open_remote_command_tab(command_id, host_id(), "uptime", None);
         sessions.set_status(shell_id, SessionStatus::Connected);
@@ -581,7 +582,7 @@ mod tests {
 
         sessions.open_shell_tab(shell_id, host_id(), "production");
         sessions.open_remote_command_tab(command_id, host_id(), "uptime", None);
-        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_local_shell_tab(local_id, DEFAULT_LOCAL_TERMINAL_TITLE);
 
         assert!(sessions.can_execute_open_shell_command(shell_id));
         assert!(!sessions.can_execute_open_shell_command(command_id));
@@ -702,7 +703,7 @@ mod tests {
 
         sessions.open_shell_tab(shell_id, host_id, "production");
         sessions.open_sftp_tab(sftp_id, host_id, "/home/ops");
-        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_local_shell_tab(local_id, DEFAULT_LOCAL_TERMINAL_TITLE);
 
         assert!(sessions.mark_remote_connecting(shell_id));
         assert!(matches!(sessions.tabs[0].status, SessionStatus::Connecting));
@@ -727,7 +728,7 @@ mod tests {
         let command_id = session_id();
         let host_id = host_id();
 
-        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_local_shell_tab(local_id, DEFAULT_LOCAL_TERMINAL_TITLE);
         sessions.open_remote_command_tab(command_id, host_id, "uptime", None);
 
         assert!(sessions.mark_backend_connected(local_id));
@@ -833,7 +834,7 @@ mod tests {
 
         sessions.open_shell_tab(shell_id, remote_host_id, "production");
         sessions.open_remote_command_tab(command_id, remote_host_id, "uptime", None);
-        sessions.open_local_shell_tab(local_id, crate::model::DEFAULT_LOCAL_TERMINAL_TITLE);
+        sessions.open_local_shell_tab(local_id, DEFAULT_LOCAL_TERMINAL_TITLE);
 
         assert!(sessions.can_execute_connect_command(shell_id, remote_host_id));
         assert!(sessions.can_execute_connect_command(command_id, remote_host_id));

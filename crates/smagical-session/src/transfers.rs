@@ -1,6 +1,6 @@
 //! SFTP 传输队列运行态操作。
 
-use crate::model::{SessionId, TransferId, TransferStatus, TransferTask};
+use smagical_core::{SessionId, TransferId, TransferStatus, TransferTask};
 
 use super::SessionManager;
 
@@ -104,7 +104,7 @@ fn normalized_transferred_bytes(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{HostId, TransferDirection};
+    use smagical_core::{HostId, TransferDirection};
     use uuid::Uuid;
 
     fn host_id() -> HostId {

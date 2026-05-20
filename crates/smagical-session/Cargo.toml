@@ -1,0 +1,11 @@
+[package]
+name = "smagical-session"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[dependencies]
+smagical-core = { path = "../smagical-core" }
+
+[dev-dependencies]
+uuid = { version = "1", features = ["v4"] }

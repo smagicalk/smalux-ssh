@@ -1,5 +1,5 @@
 use super::*;
-use crate::model::SftpEntryKind;
+use smagical_core::SftpEntryKind;
 use uuid::Uuid;
 
 fn host_id() -> HostId {
