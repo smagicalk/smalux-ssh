@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{GroupId, Host, HostId, SnippetId};
+use crate::{GroupId, Host, HostId, SnippetId};
 
 /// 快捷命令。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -290,7 +290,7 @@ mod tests {
             tags: Vec::new(),
             address: "staging.example.com".to_owned(),
             port: 22,
-            auth: super::super::AuthProfile::Agent {
+            auth: crate::AuthProfile::Agent {
                 username: "ops".to_owned(),
                 key_hint: None,
             },

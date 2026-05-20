@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{HostId, SessionId, TransferId};
+use crate::{HostId, SessionId, TransferId};
 
 /// SFTP 书签。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::HostId;
+use crate::{HostId, SessionId};
 
 /// 端口转发或动态隧道规则。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,7 +90,7 @@ pub enum TunnelKind {
 /// 单条隧道规则的运行态。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TunnelRuntimeState {
-    pub session_id: super::SessionId,
+    pub session_id: SessionId,
     pub rule_name: String,
     pub host_id: Option<HostId>,
     pub status: TunnelStatus,
@@ -123,7 +123,7 @@ impl TunnelStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{HostId, SessionId};
+    use crate::{HostId, SessionId};
     use uuid::Uuid;
 
     #[test]

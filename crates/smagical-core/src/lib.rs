@@ -3,14 +3,26 @@
 //! 本 crate 只承载不依赖 UI、终端、SSH 和本地存储的纯数据模型，方便主应用按功能边界拆分编译。
 
 pub mod history;
+pub mod host;
 pub mod ids;
 pub mod security;
+pub mod session;
+pub mod sftp;
+pub mod snippet;
+pub mod tunnel;
 pub mod visual;
+pub mod workspace;
 
 pub use history::*;
+pub use host::*;
 pub use ids::*;
 pub use security::*;
+pub use session::*;
+pub use sftp::*;
+pub use snippet::*;
+pub use tunnel::*;
 pub use visual::*;
+pub use workspace::*;
 
 #[cfg(test)]
 mod tests {

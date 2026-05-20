@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{BackgroundProfile, GroupId, HostId, SecretRef, ThemeProfile};
+use crate::{BackgroundProfile, GroupId, HostId, SecretRef, ThemeProfile};
 
 /// 可保存的 SSH 主机配置。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -69,7 +69,7 @@ pub struct JumpProfile {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::model::{ImageSource, SecretRef};
+    use crate::{ImageSource, SecretRef};
     use uuid::Uuid;
 
     fn secret(name: &str) -> SecretRef {

@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use super::{HostId, SessionId, SessionKind, WorkspaceId};
+use crate::{HostId, SessionId, SessionKind, WorkspaceId};
 
 /// 可持久化的工作区状态。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

@@ -4,22 +4,10 @@
 //! 并保留 Iced 应用根状态，避免单文件继续膨胀。
 
 mod app_state;
-mod host;
-mod session;
-mod sftp;
-mod snippet;
-mod tunnel;
 mod ui_state;
-mod workspace;
 
 pub use app_state::*;
-pub use host::*;
-pub use session::*;
-pub use sftp::*;
-pub use snippet::*;
-pub use tunnel::*;
 pub use ui_state::*;
-pub use workspace::*;
 
 pub use smagical_core::*;
 

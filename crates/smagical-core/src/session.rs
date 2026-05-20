@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use super::{CommandHistoryId, HostId, SessionId};
+use crate::{CommandHistoryId, HostId, SessionId};
 
 /// UI 中打开的会话标签页。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
