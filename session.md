@@ -101,13 +101,16 @@
 - 最新核心新增：`backend/event.rs` 补齐后端事件口径边界，覆盖 HostKeyVerified、SftpEntries、TransferProgress、TunnelStatusChanged 的 `session_id()` 映射和非终态判断，以及 Disconnected 终态判断。
 - 最新工程优化：`build.rs` 为 `ui/*.slint` 和 `build.rs` 显式输出 `cargo:rerun-if-changed`，减少后端代码/测试改动时误触发 Slint build script 的概率。
 - 最新工程优化：`build.rs` 对 `ui/*.slint` 路径排序后再输出 `cargo:rerun-if-changed`，避免文件系统枚举顺序抖动影响构建脚本输出。
+- 最新工程优化：新增 `src/lib.rs` 承接原 `main.rs` 模块导出，`main.rs` 缩为调用 `smagicalssh::app::run()`，完成 lib/bin 拆分第一步，后续可用 `cargo test --lib ...` 只跑库测试目标。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
+- 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮待提交：稳定 Slint build script 监听输出顺序并整理恢复记录
+- 本轮待提交：新增 lib/bin 入口拆分第一步并整理恢复记录
+- `15de3d0 稳定 Slint 构建脚本监听输出`
 - `cb04901 收紧 Slint 构建脚本重跑范围`
 - `227d50f 补齐后端事件口径边界测试`
 - `cdfa259 补齐执行器抽象边界测试`
@@ -145,7 +148,7 @@
 ## 当前仓库状态
 
 - 分支：`dev`
-- 远端进度：本轮提交前领先 `origin/dev` 171 个提交；本轮提交后预计领先 172 个提交
+- 远端进度：本轮提交前领先 `origin/dev` 172 个提交；本轮提交后预计领先 173 个提交
 - 最近验证：
   - `cargo test local_pty -- --nocapture` 通过，`10 passed, 2 ignored`
   - `cargo test` 通过，`503 passed, 2 ignored`
@@ -200,6 +203,9 @@
 - 无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 通过，`5 passed`，完成约 `1.10s`
 - `cargo check` 通过，用时约 `7.93s`
 - `cargo test backend::event::tests -- --nocapture` 通过，`5 passed`，本次 build.rs 排序改动后测试构建用时约 `14.01s`
+- `cargo check` 通过；本次与 `cargo test --lib` 并行运行，因 Cargo 文件锁等待总耗时约 `58.37s`
+- `cargo test --lib backend::event::tests -- --nocapture` 通过，`5 passed`；本次与 `cargo check` 并行运行，因 Cargo 文件锁等待总耗时约 `43.16s`
+- 顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 通过，`5 passed`，完成约 `1.06s`
 - `cargo fmt --check` 通过
 - `git diff --check` 通过，仅 Windows CRLF 提示
 - BOM 与中文抽样检查通过
