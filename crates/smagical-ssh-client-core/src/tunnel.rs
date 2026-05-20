@@ -58,8 +58,21 @@ pub fn remote_tunnel(
 
 /// 将 russh TCP forwarding 错误转换成后端 tunnel 错误。
 pub fn tunnel_error(rule_name: &str, error: russh::Error) -> BackendExecutionError {
+    tunnel_reason_error(rule_name, error)
+}
+
+/// 将 IO 错误转换成后端 tunnel 错误。
+pub fn tunnel_io_error(rule_name: &str, error: std::io::Error) -> BackendExecutionError {
+    tunnel_reason_error(rule_name, error)
+}
+
+/// 将错误原因转换成后端 tunnel 错误。
+pub fn tunnel_reason_error(
+    rule_name: &str,
+    reason: impl std::fmt::Display,
+) -> BackendExecutionError {
     BackendExecutionError::TunnelFailed {
         rule_name: rule_name.to_owned(),
-        reason: error.to_string(),
+        reason: reason.to_string(),
     }
 }

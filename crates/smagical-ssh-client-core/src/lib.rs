@@ -31,7 +31,7 @@ pub use sftp::{
     sftp_error, sftp_io_error, transfer_event,
 };
 pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
-pub use tunnel::{RemoteTunnel, remote_tunnel, tunnel_error};
+pub use tunnel::{RemoteTunnel, remote_tunnel, tunnel_error, tunnel_io_error, tunnel_reason_error};
 
 #[cfg(test)]
 mod tests;
