@@ -1,9 +1,9 @@
 use std::time::{Duration, Instant};
 
 use super::*;
-use crate::backend::PtyRequest;
-use crate::model::{LOCAL_TERMINAL_SESSION_ID, SessionId};
-use crate::terminal::TerminalSize;
+use smagical_backend_core::PtyRequest;
+use smagical_core::{LOCAL_TERMINAL_SESSION_ID, SessionId};
+use smagical_terminal::TerminalSize;
 use uuid::Uuid;
 
 fn session_id() -> SessionId {
@@ -44,7 +44,7 @@ fn local_pty_rejects_unsupported_commands_without_starting_session() {
     let error = executor
         .execute(BackendCommand::RunCommand {
             session_id,
-            request: crate::backend::RemoteCommandRequest {
+            request: smagical_backend_core::RemoteCommandRequest {
                 command: "whoami".to_owned(),
                 pty: None,
             },

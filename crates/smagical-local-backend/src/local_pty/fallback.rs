@@ -6,11 +6,10 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use crate::model::SessionId;
+use smagical_backend_core::{BackendEvent, LocalShellProfile};
+use smagical_core::SessionId;
 
-use crate::backend::{
-    BackendEvent, LocalCommandFallback, LocalCommandFallbackResult, LocalShellProfile,
-};
+use crate::{LocalCommandFallback, LocalCommandFallbackResult};
 
 pub(super) const LOCAL_PTY_FALLBACK_AFTER: Duration = Duration::from_millis(180);
 
@@ -81,7 +80,7 @@ mod tests {
 
     use uuid::Uuid;
 
-    use crate::backend::{LocalCommandFallbackResult, LocalShellKind};
+    use smagical_backend_core::LocalShellKind;
 
     use super::*;
 

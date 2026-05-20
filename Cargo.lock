@@ -5628,6 +5628,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-local-backend"
+version = "0.1.0"
+dependencies = [
+ "portable-pty",
+ "smagical-backend-core",
+ "smagical-core",
+ "smagical-terminal",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-security"
 version = "0.1.0"
 dependencies = [
@@ -5673,7 +5684,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "aws-lc-rs",
- "portable-pty",
  "russh",
  "russh-sftp",
  "serde",
@@ -5683,6 +5693,7 @@ dependencies = [
  "smagical-backend-reducer",
  "smagical-config",
  "smagical-core",
+ "smagical-local-backend",
  "smagical-security",
  "smagical-session",
  "smagical-storage",

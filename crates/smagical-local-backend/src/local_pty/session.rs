@@ -12,13 +12,14 @@ use std::time::{Duration, Instant};
 
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
 
-use crate::model::SessionId;
+use smagical_backend_core::{BackendEvent, BackendExecutionError, LocalShellProfile};
+use smagical_core::SessionId;
 
 use super::fallback::{
     PendingFallbackCommand, drain_pending_fallback, pending_fallback_from_input,
 };
+use super::local_pty_error;
 use super::reader::spawn_reader_thread;
-use super::{BackendEvent, BackendExecutionError, LocalShellProfile, local_pty_error};
 
 #[cfg(test)]
 const LOCAL_PTY_POLL_INTERVAL: Duration = Duration::from_millis(10);

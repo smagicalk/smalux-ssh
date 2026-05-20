@@ -6,10 +6,10 @@ use std::io::Read;
 use std::sync::mpsc::{self, Receiver};
 use std::thread;
 
-use crate::model::{DEFAULT_LOCAL_TERMINAL_TITLE, SessionId};
-use crate::terminal::{TerminalStreamDecoder, TerminalStreamEvent};
+use smagical_core::{DEFAULT_LOCAL_TERMINAL_TITLE, SessionId};
+use smagical_terminal::{TerminalStreamDecoder, TerminalStreamEvent};
 
-use super::BackendEvent;
+use smagical_backend_core::BackendEvent;
 
 pub(crate) fn spawn_reader_thread(
     session_id: SessionId,
