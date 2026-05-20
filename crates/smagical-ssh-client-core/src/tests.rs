@@ -402,6 +402,18 @@ fn pty_dimensions_are_never_zero() {
 #[test]
 fn ssh_error_helpers_preserve_operation_and_reason() {
     let channel = channel_error("open shell", russh::Error::Inconsistent);
+    let connection = connection_error("example.com:22", russh::Error::Inconsistent);
+    let rejected = host_key_rejected_error(HostKeyCheck {
+        host: "example.com".to_owned(),
+        port: 2222,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        verification: HostKeyVerification::Mismatch {
+            expected: "SHA256:old".to_owned(),
+            actual: "SHA256:test".to_owned(),
+        },
+        accepted: false,
+        fingerprint: "SHA256:test".to_owned(),
+    });
     let sftp = sftp_error("list dir", "permission denied");
     let io = sftp_io_error(
         "upload local",
@@ -417,6 +429,30 @@ fn ssh_error_helpers_preserve_operation_and_reason() {
             operation,
             reason,
         } if operation == "open shell" && !reason.is_empty()
+    ));
+    assert!(matches!(
+        connection,
+        BackendExecutionError::ConnectionFailed {
+            endpoint,
+            reason,
+        } if endpoint == "example.com:22" && !reason.is_empty()
+    ));
+    assert!(matches!(
+        rejected,
+        BackendExecutionError::HostKeyRejected {
+            host,
+            port,
+            key_algorithm,
+            fingerprint,
+            verification,
+        } if host == "example.com"
+            && port == 2222
+            && key_algorithm == KeyAlgorithm::Ed25519
+            && fingerprint == "SHA256:test"
+            && verification == HostKeyVerification::Mismatch {
+                expected: "SHA256:old".to_owned(),
+                actual: "SHA256:test".to_owned(),
+            }
     ));
     assert!(matches!(
         sftp,

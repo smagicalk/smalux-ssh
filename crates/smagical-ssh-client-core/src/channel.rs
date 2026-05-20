@@ -112,6 +112,25 @@ pub fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionEr
     }
 }
 
+/// 将 russh 连接错误转换成后端执行错误。
+pub fn connection_error(endpoint: &str, error: russh::Error) -> BackendExecutionError {
+    BackendExecutionError::ConnectionFailed {
+        endpoint: endpoint.to_owned(),
+        reason: error.to_string(),
+    }
+}
+
+/// 将被拒绝的主机密钥校验结果转换成后端执行错误。
+pub fn host_key_rejected_error(check: HostKeyCheck) -> BackendExecutionError {
+    BackendExecutionError::HostKeyRejected {
+        host: check.host,
+        port: check.port,
+        key_algorithm: check.key_algorithm,
+        fingerprint: check.fingerprint,
+        verification: check.verification,
+    }
+}
+
 /// 创建终端输出事件。
 pub fn output_event(session_id: SessionId, data: &[u8]) -> BackendEvent {
     BackendEvent::Output {

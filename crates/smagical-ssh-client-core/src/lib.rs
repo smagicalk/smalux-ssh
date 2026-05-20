@@ -16,9 +16,10 @@ pub use agent::{
 pub use channel::{
     ChannelRequestStatus, authenticated_event, authenticating_event, channel_error,
     channel_request_ended_error, collect_channel_request_message, collect_command_message,
-    command_exited_event, connected_event, connecting_event, disconnected_event,
-    exit_status_to_i32, host_key_verified_event, output_event, pty_columns, pty_rows,
-    remote_command_started_event, shell_message_to_event, shell_opened_event,
+    command_exited_event, connected_event, connecting_event, connection_error, disconnected_event,
+    exit_status_to_i32, host_key_rejected_error, host_key_verified_event, output_event,
+    pty_columns, pty_rows, remote_command_started_event, shell_message_to_event,
+    shell_opened_event,
 };
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,
