@@ -1028,3 +1028,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中大型测试模块，优先 `tests/close_tabs/sftp.rs`、`tests/close_tabs/tunnel.rs` 或 `backend_pump_tests/tunnel.rs`。
+
+## 本轮测试拆分：Close Tabs SFTP 能力模块
+
+- 目标：拆分 `tests/close_tabs/sftp.rs`，把 SFTP 标签关闭时的 browser 生命周期、owner 重分配和 pending transfer 清理分离。
+- 已完成：`tests/close_tabs/sftp.rs` 现在只保留 close tabs SFTP 测试模块入口。
+- 已完成：新增 `tests/close_tabs/sftp_lifecycle.rs`，迁移最后一个 browser 删除和同 host tab 保留 browser 测试。
+- 已完成：新增 `tests/close_tabs/sftp_pending.rs`，迁移 pending SFTP transfer 取消、队列清理和同 ID 跨 session 保留测试。
+- 已完成：新增 `tests/close_tabs/sftp_owner.rs`，迁移关闭当前/旧 SFTP tab 后的 browser owner 重分配、loading 清理和断连 fallback 测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::tests::close_tabs::sftp -- --nocapture` 通过，`9 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中大型测试模块，优先 `tests/close_tabs/tunnel.rs` 或 `backend_pump_tests/tunnel.rs`。
