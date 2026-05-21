@@ -5,7 +5,7 @@ use std::sync::Arc;
 use russh::client;
 use smagical_ssh_client_core::{
     authenticated_event, authenticating_event, connected_event, connecting_event, connection_error,
-    host_key_policy_for_known_hosts, host_key_rejected_error, host_key_verified_event,
+    host_key_or_connection_error, host_key_policy_for_known_hosts, host_key_verified_event,
 };
 use tokio::sync::mpsc;
 
@@ -150,18 +150,4 @@ impl RusshConnection {
             .await
             .map_err(|error| connection_error(&self.endpoint, error))
     }
-}
-
-fn host_key_or_connection_error(
-    endpoint: &str,
-    host_key_result: &SharedHostKeyResult,
-    error: russh::Error,
-) -> BackendExecutionError {
-    if let Some(check) = host_key_result.get()
-        && !check.accepted
-    {
-        return host_key_rejected_error(check);
-    }
-
-    connection_error(endpoint, error)
 }

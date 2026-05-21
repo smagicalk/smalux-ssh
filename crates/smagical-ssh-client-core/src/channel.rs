@@ -5,7 +5,7 @@ use smagical_backend_core::{BackendEvent, BackendExecutionError};
 use smagical_core::SessionId;
 use smagical_terminal::TerminalSize;
 
-use crate::HostKeyCheck;
+use crate::{HostKeyCheck, SharedHostKeyResult};
 
 /// SSH channel request 消息的纯状态。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -172,6 +172,21 @@ pub fn connection_error(endpoint: &str, error: russh::Error) -> BackendExecution
         endpoint: endpoint.to_owned(),
         reason: error.to_string(),
     }
+}
+
+/// 根据 host key 校验结果优先返回主机密钥拒绝错误，否则返回连接错误。
+pub fn host_key_or_connection_error(
+    endpoint: &str,
+    host_key_result: &SharedHostKeyResult,
+    error: russh::Error,
+) -> BackendExecutionError {
+    if let Some(check) = host_key_result.get()
+        && !check.accepted
+    {
+        return host_key_rejected_error(check);
+    }
+
+    connection_error(endpoint, error)
 }
 
 /// 将被拒绝的主机密钥校验结果转换成后端执行错误。
