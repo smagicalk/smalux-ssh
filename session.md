@@ -840,3 +840,22 @@
   - `cargo test --lib model::app_state::storage_admin -- --nocapture` 通过，`2 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：生产侧继续收尾 `launch.rs`；之后转入测试聚合文件拆分。
+
+## 本轮核心拆分：Launch 共享启动模块
+
+- 目标：继续拆 `launch.rs`，把交互式 shell 启动、主机/连接命令 helper、结果构造、远端路径处理和时间函数分离。
+- 已完成：`launch.rs` 变成薄模块入口，只挂载并 re-export 启动共享子模块。
+- 已完成：新增 `launch/shell.rs`，集中 shell tab、terminal tab、PTY、最近连接和 OpenShell 后端命令排队。
+- 已完成：新增 `launch/host.rs`，集中 host 查询、最近连接记录和带 Known Hosts 的 Connect 后端命令构造。
+- 已完成：新增 `launch/outcome.rs`，集中 queued outcome 和 missing host 错误结果。
+- 已完成：新增 `launch/path.rs`，集中远端目录归一化和远端路径拼接。
+- 已完成：新增 `launch/time.rs`，集中 Unix 秒时间读取。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `6.02s`
+  - `cargo test --lib model::app_state::launch_tests::shell -- --nocapture` 通过，`5 passed`
+  - `cargo test --lib model::app_state::launch_tests::sftp -- --nocapture` 通过，`36 passed`
+  - `cargo test --lib model::app_state::launch_tests::tunnel -- --nocapture` 通过，`12 passed`
+  - `cargo test --lib model::app_state::launch_tests::remote_command -- --nocapture` 通过，`13 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：生产侧核心入口基本收口；继续拆测试聚合文件，优先 `backend_pump_tests.rs`、`tests.rs` 或 `launch_tests/sftp.rs`。
