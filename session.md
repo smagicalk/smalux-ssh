@@ -924,3 +924,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
 - 下一步：继续审视剩余中型测试文件 `snippets_tests.rs`、`ui_drafts_tests.rs`，或转回生产侧中小模块收尾。
+
+## 本轮测试拆分：Snippets 测试能力模块
+
+- 目标：让 `snippets_tests.rs` 和生产侧 `snippets/{save,run,manage}` 对齐，按保存、运行、维护能力拆分。
+- 已完成：新增 `snippets_tests/save.rs`，迁移保存主机命令快捷命令、模板变量推断和空命令拒绝测试。
+- 已完成：新增 `snippets_tests/run.rs`，迁移快捷命令渲染执行、跨主机拒绝、缺变量、空渲染和参数化执行测试。
+- 已完成：新增 `snippets_tests/manage.rs`，迁移未知变量参数更新和删除快捷命令测试。
+- 已完成：`snippets_tests.rs` 现在只保留共享 fixture 和模块入口。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::snippets_tests -- --nocapture` 通过，`10 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
+- 下一步：继续拆 `ui_drafts_tests.rs`，按 quick host、terminal input、command draft、SFTP draft 等能力分组。
