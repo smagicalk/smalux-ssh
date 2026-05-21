@@ -120,6 +120,11 @@ pub fn connected_session_error(operation: &str) -> BackendExecutionError {
     }
 }
 
+/// 判断执行错误是否来自 SSH channel。
+pub fn is_channel_failure(error: &BackendExecutionError) -> bool {
+    matches!(error, BackendExecutionError::ChannelFailed { .. })
+}
+
 /// 将 russh 连接错误转换成后端执行错误。
 pub fn connection_error(endpoint: &str, error: russh::Error) -> BackendExecutionError {
     BackendExecutionError::ConnectionFailed {

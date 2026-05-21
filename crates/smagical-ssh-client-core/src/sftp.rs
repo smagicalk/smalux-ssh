@@ -129,6 +129,11 @@ pub fn sftp_io_error(operation: &str, error: std::io::Error) -> BackendExecution
     sftp_error(operation, error)
 }
 
+/// 判断执行错误是否来自 SFTP 子系统。
+pub fn is_sftp_failure(error: &BackendExecutionError) -> bool {
+    matches!(error, BackendExecutionError::SftpFailed { .. })
+}
+
 fn sftp_entry_kind(file_type: RusshSftpFileType) -> SftpEntryKind {
     match file_type {
         RusshSftpFileType::Dir => SftpEntryKind::Directory,

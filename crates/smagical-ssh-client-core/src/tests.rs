@@ -424,6 +424,13 @@ fn ssh_error_helpers_preserve_operation_and_reason() {
     let tunnel_io = tunnel_io_error("local-forward", std::io::Error::other("bind failed"));
     let tunnel_reason = tunnel_reason_error("dynamic-socks5", "missing no-auth method");
 
+    assert!(is_channel_failure(&channel));
+    assert!(!is_sftp_failure(&channel));
+    assert!(is_channel_failure(&missing_session));
+    assert!(!is_channel_failure(&connection));
+    assert!(is_sftp_failure(&sftp));
+    assert!(is_sftp_failure(&io));
+
     assert!(matches!(
         channel,
         BackendExecutionError::ChannelFailed {

@@ -5,7 +5,10 @@ use std::time::Duration;
 
 use tokio::runtime::Runtime;
 
-use smagical_ssh_client_core::{connected_session_error, disconnected_event, tunnel_stopped_event};
+use smagical_ssh_client_core::{
+    connected_session_error, disconnected_event, is_channel_failure, is_sftp_failure,
+    tunnel_stopped_event,
+};
 
 use crate::backend::{
     BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, ConnectionTarget,
@@ -577,7 +580,9 @@ fn drop_cached_shell_after_failed_input<T>(
 }
 
 fn shell_input_result_requires_session_drop(result: &Result<(), BackendExecutionError>) -> bool {
-    matches!(result, Err(BackendExecutionError::ChannelFailed { .. }))
+    result
+        .as_ref()
+        .is_err_and(|error| is_channel_failure(error))
 }
 
 fn drop_cached_sftp_after_failed_request<T>(
@@ -595,5 +600,5 @@ fn drop_cached_sftp_after_failed_request<T>(
 fn sftp_result_requires_session_drop(
     result: &Result<Vec<BackendEvent>, BackendExecutionError>,
 ) -> bool {
-    matches!(result, Err(BackendExecutionError::SftpFailed { .. }))
+    result.as_ref().is_err_and(|error| is_sftp_failure(error))
 }

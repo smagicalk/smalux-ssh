@@ -18,8 +18,8 @@ pub use channel::{
     channel_request_ended_error, collect_channel_request_message, collect_command_message,
     command_exited_event, connected_event, connected_session_error, connecting_event,
     connection_error, disconnected_event, exit_status_to_i32, host_key_rejected_error,
-    host_key_verified_event, output_event, pty_columns, pty_rows, remote_command_started_event,
-    shell_message_to_event, shell_opened_event,
+    host_key_verified_event, is_channel_failure, output_event, pty_columns, pty_rows,
+    remote_command_started_event, shell_message_to_event, shell_opened_event,
 };
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,
@@ -30,8 +30,8 @@ pub use settings::{
     RusshClientSettings,
 };
 pub use sftp::{
-    copy_transfer_with_progress, join_remote_path, parent_remote_dir, sftp_entries_event,
-    sftp_entry_from_parts, sftp_error, sftp_io_error, transfer_event,
+    copy_transfer_with_progress, is_sftp_failure, join_remote_path, parent_remote_dir,
+    sftp_entries_event, sftp_entry_from_parts, sftp_error, sftp_io_error, transfer_event,
 };
 pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
 pub use tunnel::{
