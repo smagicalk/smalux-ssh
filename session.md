@@ -1088,3 +1088,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中大型测试模块，优先 `launch_tests/sftp/bookmark.rs`、`launch_tests/sftp/cancel_upload_loading.rs` 或 `backend_pump_tests/connect.rs`。
+
+## 本轮测试拆分：SFTP 书签能力模块
+
+- 目标：拆分 `launch_tests/sftp/bookmark.rs`，把 SFTP 书签保存、打开和删除路径分离。
+- 已完成：`launch_tests/sftp/bookmark.rs` 现在只保留 SFTP bookmark 测试模块入口。
+- 已完成：新增 `launch_tests/sftp/bookmark_save.rs`，迁移保存当前目录、断连 browser 拒绝、owner 重分配后保存和缺失 browser 报错测试。
+- 已完成：新增 `launch_tests/sftp/bookmark_open.rs`，迁移无 browser 打开、已有 browser 导航和断连 browser 重开测试。
+- 已完成：新增 `launch_tests/sftp/bookmark_remove.rs`，迁移删除书签和缺失书签报错测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::bookmark -- --nocapture` 通过，`8 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/cancel_upload_loading.rs` 或 `backend_pump_tests/connect.rs`。
