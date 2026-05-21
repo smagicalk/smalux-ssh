@@ -812,3 +812,17 @@
   - `cargo test --lib model::app_state::snippets_tests -- --nocapture` 通过，`10 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：生产侧剩余聚合点主要是 `message.rs`、`launch_remote_command.rs`、`storage_admin.rs`、`launch.rs` 等中小文件；更大的维护压力已转向测试聚合文件，优先拆 `backend_pump_tests.rs` / `tests.rs`。
+
+## 本轮核心拆分：Remote command 启动与历史
+
+- 目标：继续拆 `launch_remote_command.rs`，把一次性远程命令启动、命令历史重跑/记录和后端请求构造分离。
+- 已完成：`launch_remote_command.rs` 变成薄模块入口，只挂载 remote command 子模块。
+- 已完成：新增 `launch_remote_command/run.rs`，集中命令空值校验、host 查询、远程命令标签页创建、terminal tab 创建、最近连接记录和 RunCommand 后端命令排队。
+- 已完成：新增 `launch_remote_command/history.rs`，集中命令历史记录和带主机历史重跑。
+- 已完成：新增 `launch_remote_command/request.rs`，集中 exec / PTY 远程命令请求构造。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `6.23s`
+  - `cargo test --lib model::app_state::launch_tests::remote_command -- --nocapture` 通过，`13 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：生产侧继续小步收尾 `storage_admin.rs` / `launch.rs`，或开始拆测试聚合文件。
