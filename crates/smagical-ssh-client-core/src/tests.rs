@@ -524,6 +524,11 @@ fn ssh_error_helpers_preserve_operation_and_reason() {
     assert!(!is_channel_failure(&connection));
     assert!(is_sftp_failure(&sftp));
     assert!(is_sftp_failure(&io));
+    assert_eq!(
+        tunnel_failure_parts(&tunnel).map(|(rule_name, _)| rule_name),
+        Some("proxy")
+    );
+    assert_eq!(tunnel_failure_parts(&channel), None);
 
     assert!(matches!(
         channel,

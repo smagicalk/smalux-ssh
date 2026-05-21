@@ -52,8 +52,9 @@ pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
 pub use tunnel::{
     DIRECT_TCPIP_OPERATION, DIRECT_TCPIP_RULE_NAME, DYNAMIC_SOCKS5_OPERATION,
     DYNAMIC_SOCKS5_RULE_NAME, REMOTE_FORWARD_RULE_NAME, RemoteTunnel, TUNNEL_ACCEPT_TICK,
-    copy_bidirectional, remote_tunnel, tunnel_error, tunnel_io_error, tunnel_is_running,
-    tunnel_reason_error, tunnel_running_event, tunnel_status_event, tunnel_stopped_event,
+    copy_bidirectional, remote_tunnel, tunnel_error, tunnel_failure_parts, tunnel_io_error,
+    tunnel_is_running, tunnel_reason_error, tunnel_running_event, tunnel_status_event,
+    tunnel_stopped_event,
 };
 
 #[cfg(test)]

@@ -525,3 +525,18 @@
 2. 继续补真实 SSH 执行适配层的可离线测试，优先 tunnel TCP/SOCKS5 数据转发、SFTP 传输执行路径和 local PTY 可测试边界。
 3. 做本地应用预览和核心烟测：本地终端、SSH shell、远程命令、SFTP、隧道。
 4. 烟测通过后再进入 UI 调整阶段。
+
+## 本轮恢复与提交前整理
+
+- 目标：继续核心模块化拆分，优先拆分和整理，保持模块化、功能化、单一职责。
+- 已完成：在 `smagical-ssh-client-core` 中补充 `tunnel_failure_parts`，统一提取隧道失败错误中的规则名和原因。
+- 已完成：主 crate 的 tunnel TCP 测试改为通过 core helper 判断错误，不再直接解构 `BackendExecutionError::TunnelFailed`。
+- 已完成：core 测试补充 `tunnel_failure_parts` 正反例，确认只识别隧道失败错误。
+- 验证记录：
+  - `cargo test -p smagical-ssh-client-core ssh_error_helpers -- --nocapture` 通过，`1 passed`
+  - `cargo test --lib backend::ssh::client::session::tunnel -- --nocapture` 通过，`2 passed`
+  - `cargo test -p smagical-ssh-client-core` 通过，`64 passed`
+  - `cargo check` 通过，约 `4.38s`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+- 下一步：完成差异检查、编码抽样和提交；后续继续整理主 crate 中剩余直接构造或匹配 backend 事件、错误的测试边界。

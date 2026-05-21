@@ -104,7 +104,7 @@ pub(super) async fn serve_socks5_connection(
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::BackendExecutionError;
+    use smagical_ssh_client_core::tunnel_failure_parts;
 
     use super::{accept_with_tick, bind_tcp_listener};
 
@@ -117,13 +117,9 @@ mod tests {
             .await
             .unwrap_err();
 
-        match error {
-            BackendExecutionError::TunnelFailed { rule_name, reason } => {
-                assert_eq!(rule_name, "duplicate");
-                assert!(!reason.is_empty());
-            }
-            other => panic!("unexpected error: {other:?}"),
-        }
+        let (rule_name, reason) = tunnel_failure_parts(&error).expect("监听失败应该映射为隧道错误");
+        assert_eq!(rule_name, "duplicate");
+        assert!(!reason.is_empty());
     }
 
     #[tokio::test]

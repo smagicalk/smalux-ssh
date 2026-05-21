@@ -125,6 +125,14 @@ pub fn tunnel_reason_error(
     }
 }
 
+/// 返回隧道错误中的规则名和原因。
+pub fn tunnel_failure_parts(error: &BackendExecutionError) -> Option<(&str, &str)> {
+    match error {
+        BackendExecutionError::TunnelFailed { rule_name, reason } => Some((rule_name, reason)),
+        _ => None,
+    }
+}
+
 /// 双向复制两个异步流，忽略成功时的字节统计。
 pub async fn copy_bidirectional<A, B>(left: &mut A, right: &mut B) -> std::io::Result<()>
 where
