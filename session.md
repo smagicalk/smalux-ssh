@@ -971,3 +971,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中大型测试模块，优先 `launch_tests/tunnel.rs` 或 `launch_tests/sftp/cancel.rs`。
+
+## 本轮测试拆分：隧道启动停止能力模块
+
+- 目标：拆分 `launch_tests/tunnel.rs`，把隧道启动和停止路径分成单一职责测试模块。
+- 已完成：`launch_tests/tunnel.rs` 现在只保留共享导入、`tunnel_rule` fixture 和模块入口。
+- 已完成：新增 `launch_tests/tunnel_start.rs`，迁移隧道启动、重复规则、规则规范化和无效规则拒绝测试。
+- 已完成：新增 `launch_tests/tunnel_stop.rs`，迁移隧道停止、会话匹配、运行态缺失、规则名规范化和重复停止拒绝测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::tunnel -- --nocapture` 通过，`12 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中大型测试模块，优先 `launch_tests/sftp/cancel.rs` 或 `launch_tests/sftp/transfer.rs`。
