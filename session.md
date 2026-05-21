@@ -954,3 +954,20 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且抽样文本正常
 - 下一步：剩余较大的测试文件已基本拆完；后续可继续审视 `launch_tests/remote_command.rs`、`launch_tests/tunnel.rs` 或转回生产侧中小模块收尾。
+
+## 本轮测试拆分：远程命令启动能力模块
+
+- 目标：拆分 `launch_tests/remote_command.rs`，把远程命令启动、历史重跑、后端事件落盘和输入校验分别放到单一职责测试模块。
+- 已完成：`launch_tests/remote_command.rs` 现在只保留共享导入和模块入口。
+- 已完成：新增 `launch_tests/remote_command_launch.rs`，迁移远程命令启动、命令裁剪、历史记录和 PTY 请求测试。
+- 已完成：新增 `launch_tests/remote_command_history.rs`，迁移命令历史重跑、缺失历史和无 host 全局历史拒绝测试。
+- 已完成：新增 `launch_tests/remote_command_backend_events.rs`，迁移命令退出、失败、断连和 legacy history fallback 的后端事件落盘测试。
+- 已完成：新增 `launch_tests/remote_command_validation.rs`，迁移空命令和缺失 host 的输入校验测试。
+- 约束记录：Windows 当前拒绝在 `launch_tests` 下创建新的 `remote_command` 目录，因此本轮采用同级子文件 + `#[path = "..."]` 聚合方式，仍保持薄入口和按能力拆分。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::remote_command -- --nocapture` 通过，`13 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中大型测试模块，优先 `launch_tests/tunnel.rs` 或 `launch_tests/sftp/cancel.rs`。
