@@ -731,3 +731,17 @@
   - `cargo test --lib model::app_state::workspace_ui -- --nocapture` 通过，`3 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：继续拆剩余生产聚合点，优先 `visual_settings.rs` 或 `dispatch.rs`；测试大文件后续再按领域小步迁移。
+
+## 本轮核心拆分：Visual settings 应用逻辑
+
+- 目标：继续拆 `visual_settings.rs`，把全局视觉设置、主机视觉覆盖和错误结果构造分离，保留消息分发入口不变。
+- 已完成：`visual_settings.rs` 变成薄模块入口，只挂载视觉设置子模块。
+- 已完成：新增 `visual_settings/global.rs`，集中全局视觉配置草稿更新、背景开关和应用到运行配置/持久化快照。
+- 已完成：新增 `visual_settings/host.rs`，集中主机视觉覆盖草稿、背景开关、应用覆盖、清除覆盖和 fallback 推断。
+- 已完成：新增 `visual_settings/outcome.rs`，集中视觉配置无效和主机缺失的错误结果构造。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `5.78s`
+  - `cargo test --lib model::app_state::visual_settings_tests -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：继续拆剩余核心聚合点；优先评估 `dispatch.rs` 的消息分发是否按领域拆到更小路由函数，或继续整理大测试文件。
