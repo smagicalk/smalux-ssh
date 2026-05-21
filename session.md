@@ -826,3 +826,17 @@
   - `cargo test --lib model::app_state::launch_tests::remote_command -- --nocapture` 通过，`13 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：生产侧继续小步收尾 `storage_admin.rs` / `launch.rs`，或开始拆测试聚合文件。
+
+## 本轮核心拆分：Storage admin 管理操作
+
+- 目标：继续拆 `storage_admin.rs`，把凭据元数据管理、Known Hosts 管理和测试分离。
+- 已完成：`storage_admin.rs` 变成薄模块入口，只挂载 storage admin 子模块。
+- 已完成：新增 `storage_admin/credential.rs`，集中凭据元数据删除和缺失错误结果。
+- 已完成：新增 `storage_admin/known_hosts.rs`，集中 Known Hosts 信任标记和删除逻辑。
+- 已完成：新增 `storage_admin/tests.rs`，迁移原有 storage admin 单元测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `6.29s`
+  - `cargo test --lib model::app_state::storage_admin -- --nocapture` 通过，`2 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：生产侧继续收尾 `launch.rs`；之后转入测试聚合文件拆分。
