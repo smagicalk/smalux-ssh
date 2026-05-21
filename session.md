@@ -1058,3 +1058,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中大型测试模块，优先 `backend_pump_tests/tunnel.rs` 或 `backend_pump_tests/basic.rs`。
+
+## 本轮测试拆分：Backend Pump 隧道能力模块
+
+- 目标：拆分 `backend_pump_tests/tunnel.rs`，把隧道队列泵的 executor error、start 跳过和 stop/stale 跳过分离。
+- 已完成：`backend_pump_tests/tunnel.rs` 现在只保留隧道队列泵测试模块入口。
+- 已完成：新增 `backend_pump_tests/tunnel_error.rs`，迁移隧道启动命令在 executor 不支持时标记失败的测试。
+- 已完成：新增 `backend_pump_tests/tunnel_start.rs`，迁移终态 start command 跳过和 session terminal 时保持 Starting 的测试。
+- 已完成：新增 `backend_pump_tests/tunnel_stop.rs`，迁移终态 stop command 跳过、session terminal 时保持 Stopping 和 stale stop 防串扰测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::tunnel -- --nocapture` 通过，`6 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中大型测试模块，优先 `backend_pump_tests/basic.rs` 或 `launch_tests/sftp/bookmark.rs`。
