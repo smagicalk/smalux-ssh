@@ -907,3 +907,20 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
 - 下一步：继续拆 `app_state/tests.rs`，优先按 close session、activate/select、backend event、terminal input 等能力分组。
+
+## 本轮测试拆分：AppState 消息行为测试
+
+- 目标：拆分 `app_state/tests.rs`，把根状态消息行为测试按基础状态、激活、关闭、终端输入和 SFTP 选择能力组织。
+- 已完成：新增 `tests/base.rs`，迁移默认状态、BackendEvent、credential 和 known host 消息测试。
+- 已完成：新增 `tests/activation.rs`，迁移 terminal/SFTP tab 激活和 SFTP browser owner 重分配测试。
+- 已完成：新增 `tests/terminal_input.rs`，迁移远程终端输入排队、空命令拒绝和不可交互状态拒绝测试。
+- 已完成：新增 `tests/sftp_selection.rs`，迁移 SFTP 条目选择、断连 owner 重分配和无可用会话拒绝测试。
+- 已完成：新增 `tests/close_tabs.rs` 入口，并继续拆分 `tests/close_tabs/shell.rs`、`tests/close_tabs/sftp.rs`、`tests/close_tabs/tunnel.rs`，分别承载 shell/remote、SFTP、tunnel 关闭路径测试。
+- 已完成：`app_state/tests.rs` 现在只保留共享 fixture 和模块入口。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::tests -- --nocapture` 通过，`34 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
+- 下一步：继续审视剩余中型测试文件 `snippets_tests.rs`、`ui_drafts_tests.rs`，或转回生产侧中小模块收尾。
