@@ -588,3 +588,20 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续检查其它大文件是否仍是多职责聚合点，优先拆测试或 app state/backend pump 中的功能模块。
+
+## 本轮模块细化：SSH executor cache 子模块
+
+- 目标：继续单一职责拆分，避免刚拆出的 `executor::cache` 重新变成多职责聚合点。
+- 已完成：`cache.rs` 变成薄模块入口，只负责声明和导出子模块。
+- 已完成：新增 `cache/resources.rs`，集中会话资源缓存取出、替换和 runtime resources 组合。
+- 已完成：新增 `cache/tunnels.rs`，集中隧道所有权、按会话取出、按规则移除、替换旧隧道和停止 detached tunnel。
+- 已完成：新增 `cache/drop_gates.rs`，集中 shell/SFTP 失败后的缓存清理判断，以及 shell terminal 事件后的缓存 drop 判断。
+- 已完成：对应单元测试迁入各自子模块，测试命名现在反映职责归属。
+- 验证记录：
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check` 通过，约 `9.26s`
+  - `cargo test` 通过，`246 passed`
+  - `cargo fmt --check` 通过
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续扫描大文件，优先拆 app_state/backend_pump 或 launch_tests 中仍然聚合的功能测试模块。
