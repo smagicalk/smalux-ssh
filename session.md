@@ -859,3 +859,15 @@
   - `cargo test --lib model::app_state::launch_tests::remote_command -- --nocapture` 通过，`13 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：生产侧核心入口基本收口；继续拆测试聚合文件，优先 `backend_pump_tests.rs`、`tests.rs` 或 `launch_tests/sftp.rs`。
+
+## 本轮测试拆分：Backend pump 基础测试
+
+- 目标：开始拆最大测试聚合文件 `backend_pump_tests.rs`，先迁移低风险基础队列泵测试。
+- 已完成：新增 `backend_pump_tests/basic.rs`，迁移基础执行、断开命令、失败裁剪、host key 拒绝、远程命令历史失败收尾和跨会话保留测试。
+- 已完成：`backend_pump_tests.rs` 保留共享 fixture/executor 和其余测试，后续可继续按 command eligibility、SFTP、tunnel、local terminal 分组迁移。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::basic -- --nocapture` 通过，`7 passed`
+  - `cargo test --lib model::app_state::backend_pump_tests -- --nocapture` 通过，`33 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：继续拆 `backend_pump_tests.rs`，优先迁移 terminal/stale command eligibility 相关测试。
