@@ -6,7 +6,7 @@ use crate::backend::{BackendCommand, SftpRequest};
 use crate::model::{HostId, TransferDirection, TransferId, TransferStatus, TransferTask};
 
 use super::super::launch::{join_remote_path, queued_outcome};
-use super::super::launch_sftp::{missing_active_sftp_session, missing_sftp_browser};
+use super::super::launch_sftp::session::{missing_active_sftp_session, missing_sftp_browser};
 use super::super::{AppState, AppUpdateOutcome};
 use super::path::{basename_local_path, is_plain_remote_name};
 

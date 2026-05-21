@@ -643,3 +643,20 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续拆 `launch_sftp.rs` 的 SFTP 浏览器/书签/会话归属逻辑，或拆 `session_tabs.rs` 的关闭、激活和运行态清理逻辑。
+
+## 本轮核心拆分：SFTP browser 调度
+
+- 目标：继续拆 `launch_sftp.rs`，把 SFTP 浏览器打开/导航、书签、可用会话选择从一个文件中拆开。
+- 已完成：`launch_sftp.rs` 变成薄模块入口，只声明并挂载 SFTP browser 子模块。
+- 已完成：新增 `sftp_browser/open.rs`，集中打开 SFTP、刷新目录、导航目录、选择条目和通用路径请求排队。
+- 已完成：新增 `sftp_browser/bookmarks.rs`，集中保存、打开、删除 SFTP 书签和书签 label 推断。
+- 已完成：新增 `sftp_browser/session.rs`，集中 SFTP browser owner、fallback session、claim session、错误构造和 terminal 状态判断。
+- 已完成：`sftp_transfer` 子模块改为依赖新的 `launch_sftp::session` helper，保持 transfer 与 browser 的调用 seam 清晰。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `5.57s`
+  - `cargo test --lib model::app_state::launch_tests::sftp -- --nocapture` 通过，`36 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续拆 `session_tabs.rs`，按关闭流程、激活流程、SFTP browser 清理、tunnel runtime 清理和 pending command 清理分模块。

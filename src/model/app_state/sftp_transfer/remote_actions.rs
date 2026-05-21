@@ -4,7 +4,7 @@ use crate::backend::SftpRequest;
 use crate::model::HostId;
 
 use super::super::launch::join_remote_path;
-use super::super::launch_sftp::missing_sftp_browser;
+use super::super::launch_sftp::session::missing_sftp_browser;
 use super::super::{AppState, AppUpdateOutcome};
 use super::path::is_plain_remote_name;
 
