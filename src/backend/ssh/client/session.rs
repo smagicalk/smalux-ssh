@@ -14,7 +14,7 @@ use smagical_ssh_client_core::{
     ChannelRequestStatus, channel_error, channel_request_ended_error,
     collect_channel_request_message, collect_command_message, command_exited_event,
     disconnected_event, pty_columns, pty_rows, remote_command_started_event,
-    shell_message_to_event, shell_opened_event,
+    shell_drain_should_stop, shell_message_to_event, shell_opened_event,
 };
 
 use super::RusshConnection;
@@ -94,9 +94,9 @@ impl RemoteShell {
                 continue;
             };
 
-            let disconnected = matches!(event, BackendEvent::Disconnected { .. });
+            let should_stop = shell_drain_should_stop(&event);
             events.push(event);
-            if disconnected {
+            if should_stop {
                 break;
             }
         }

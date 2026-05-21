@@ -104,6 +104,11 @@ pub fn shell_message_to_event(session_id: SessionId, message: ChannelMsg) -> Opt
     }
 }
 
+/// 判断远程 shell drain 是否应停止继续轮询。
+pub fn shell_drain_should_stop(event: &BackendEvent) -> bool {
+    matches!(event, BackendEvent::Disconnected { .. })
+}
+
 /// 将 russh channel 错误转换成后端执行错误。
 pub fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
     BackendExecutionError::ChannelFailed {

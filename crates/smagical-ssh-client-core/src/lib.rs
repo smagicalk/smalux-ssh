@@ -19,7 +19,8 @@ pub use channel::{
     command_exited_event, connected_event, connected_session_error, connecting_event,
     connection_error, disconnected_event, exit_status_to_i32, host_key_rejected_error,
     host_key_verified_event, is_channel_failure, output_event, pty_columns, pty_rows,
-    remote_command_started_event, shell_message_to_event, shell_opened_event,
+    remote_command_started_event, shell_drain_should_stop, shell_message_to_event,
+    shell_opened_event,
 };
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,

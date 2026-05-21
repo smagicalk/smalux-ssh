@@ -1174,6 +1174,23 @@ fn shell_message_maps_output_and_exit_status() {
 }
 
 #[test]
+fn shell_drain_stops_only_on_disconnected_event() {
+    let session_id = session_id();
+    let output = output_event(session_id, b"still running");
+    let exited = command_exited_event(session_id, Some(0));
+    let failed = BackendEvent::Failed {
+        session_id,
+        reason: "server rejected channel request".to_owned(),
+    };
+    let disconnected = disconnected_event(session_id);
+
+    assert!(!shell_drain_should_stop(&output));
+    assert!(!shell_drain_should_stop(&exited));
+    assert!(!shell_drain_should_stop(&failed));
+    assert!(shell_drain_should_stop(&disconnected));
+}
+
+#[test]
 fn channel_lifecycle_events_preserve_payloads() {
     let session_id = session_id();
 
