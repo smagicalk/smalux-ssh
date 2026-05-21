@@ -1117,3 +1117,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `backend_pump_tests/connect.rs`、`launch_tests/sftp/transfer_upload.rs` 或 `launch_tests/sftp/browser.rs`。
+
+## 本轮测试拆分：Backend Pump 连接能力模块
+
+- 目标：拆分 `backend_pump_tests/connect.rs`，把连接命令终态跳过、host mismatch 和 stale connect 尾队列裁剪分离。
+- 已完成：`backend_pump_tests/connect.rs` 现在只保留连接队列泵测试模块入口。
+- 已完成：新增 `backend_pump_tests/connect_terminal.rs`，迁移终态 connect 命令跳过测试。
+- 已完成：新增 `backend_pump_tests/connect_mismatch.rs`，迁移 connect target host 与 tab host 不匹配时失败测试。
+- 已完成：新增 `backend_pump_tests/connect_stale.rs`，迁移 stale connect 后裁剪同 session 尾命令、保留其他 session 尾命令测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::connect -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/transfer_upload.rs` 或 `launch_tests/sftp/browser.rs`。
