@@ -147,9 +147,17 @@ pub fn shell_drain_should_stop(event: &BackendEvent) -> bool {
 
 /// 将 russh channel 错误转换成后端执行错误。
 pub fn channel_error(operation: &str, error: russh::Error) -> BackendExecutionError {
+    channel_reason_error(operation, error)
+}
+
+/// 将错误原因转换成后端 SSH channel 错误。
+pub fn channel_reason_error(
+    operation: &str,
+    reason: impl std::fmt::Display,
+) -> BackendExecutionError {
     BackendExecutionError::ChannelFailed {
         operation: operation.to_owned(),
-        reason: error.to_string(),
+        reason: reason.to_string(),
     }
 }
 
@@ -164,6 +172,14 @@ pub fn connected_session_error(operation: &str) -> BackendExecutionError {
 /// 判断执行错误是否来自 SSH channel。
 pub fn is_channel_failure(error: &BackendExecutionError) -> bool {
     matches!(error, BackendExecutionError::ChannelFailed { .. })
+}
+
+/// 返回 SSH channel 错误中的操作名和原因。
+pub fn channel_failure_parts(error: &BackendExecutionError) -> Option<(&str, &str)> {
+    match error {
+        BackendExecutionError::ChannelFailed { operation, reason } => Some((operation, reason)),
+        _ => None,
+    }
 }
 
 /// 将 russh 连接错误转换成后端执行错误。

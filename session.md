@@ -540,3 +540,19 @@
   - `cargo fmt --check` 通过
   - `cargo test` 通过，`246 passed`
 - 下一步：完成差异检查、编码抽样和提交；后续继续整理主 crate 中剩余直接构造或匹配 backend 事件、错误的测试边界。
+
+## 本轮核心拆分：错误详情提取 helper
+
+- 目标：继续收敛主 crate 对后端错误枚举结构的直接依赖，把可内存测试的错误构造和字段提取放回 core。
+- 已完成：在 `smagical-ssh-client-core` 增加 `channel_reason_error`，让通用 SSH channel reason 错误构造复用同一入口。
+- 已完成：在 `smagical-ssh-client-core` 增加 `channel_failure_parts` 和 `sftp_failure_parts`，统一提取 `operation` / `reason`。
+- 已完成：`src/backend/ssh/executor/tests.rs` 的未连接会话断言改用 `channel_failure_parts`，cache/drop gate 测试样本改用 `channel_reason_error` / `sftp_error`，不再直接构造 `ChannelFailed` / `SftpFailed`。
+- 验证记录：
+  - `cargo test -p smagical-ssh-client-core ssh_error_helpers -- --nocapture` 通过，`1 passed`
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check` 通过，约 `6.50s`
+  - `cargo test` 通过，`246 passed`
+  - `cargo fmt --check` 通过
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续清理主 crate 中剩余直接依赖 `BackendExecutionError` / `BackendEvent` 具体结构的测试断言；真实 SSH/SFTP/TCP IO 编排仍留在主 crate。

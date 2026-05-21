@@ -4,6 +4,7 @@ use crate::model::HostKeyVerification;
 use crate::model::{HostId, KeyAlgorithm, SecretRef};
 use crate::security::MemorySecretStore;
 use crate::terminal::TerminalSize;
+use smagical_ssh_client_core::{channel_failure_parts, channel_reason_error, sftp_error};
 use std::collections::HashMap;
 use uuid::Uuid;
 
@@ -19,6 +20,16 @@ fn target(auth: BackendAuth) -> ConnectionTarget {
         auth,
         known_hosts: Vec::new(),
     }
+}
+
+fn assert_channel_failure(
+    error: &BackendExecutionError,
+    expected_operation: &str,
+    expected_reason: &str,
+) {
+    let (operation, reason) = channel_failure_parts(error).expect("错误应该是 SSH channel 失败");
+    assert_eq!(operation, expected_operation);
+    assert_eq!(reason, expected_reason);
 }
 
 #[test]
@@ -635,13 +646,7 @@ fn open_shell_requires_connected_session() {
         })
         .expect_err("未连接会话不能打开 shell");
 
-    assert!(matches!(
-    error,
-    BackendExecutionError::ChannelFailed {
-        operation,
-        reason,
-    } if operation == "open shell" && reason == "session is not connected"
-    ));
+    assert_channel_failure(&error, "open shell", "session is not connected");
 }
 
 #[test]
@@ -657,23 +662,15 @@ fn send_shell_input_requires_connected_session() {
         })
         .expect_err("未连接会话不能发送 shell 输入");
 
-    assert!(matches!(
-        error,
-        BackendExecutionError::ChannelFailed {
-            operation,
-            reason,
-        } if operation == "send shell input" && reason == "session is not connected"
-    ));
+    assert_channel_failure(&error, "send shell input", "session is not connected");
 }
 
 #[test]
 fn shell_input_failure_drops_only_failed_cached_shell() {
     let failed_session_id = session_id();
     let other_session_id = session_id();
-    let result: Result<(), BackendExecutionError> = Err(BackendExecutionError::ChannelFailed {
-        operation: "shell input".to_owned(),
-        reason: "channel closed".to_owned(),
-    });
+    let result: Result<(), BackendExecutionError> =
+        Err(channel_reason_error("shell input", "channel closed"));
     let mut cached_shells = HashMap::from([
         (failed_session_id, "failed-shell"),
         (other_session_id, "other-shell"),
@@ -692,10 +689,8 @@ fn shell_input_cache_survives_success_and_non_channel_failures() {
     let success_session_id = session_id();
     let sftp_failure_session_id = session_id();
     let success: Result<(), BackendExecutionError> = Ok(());
-    let sftp_failure: Result<(), BackendExecutionError> = Err(BackendExecutionError::SftpFailed {
-        operation: "list dir".to_owned(),
-        reason: "permission denied".to_owned(),
-    });
+    let sftp_failure: Result<(), BackendExecutionError> =
+        Err(sftp_error("list dir", "permission denied"));
     let mut cached_shells = HashMap::from([
         (success_session_id, "success-shell"),
         (sftp_failure_session_id, "sftp-failure-shell"),
@@ -724,14 +719,9 @@ fn shell_input_cache_survives_success_and_non_channel_failures() {
 #[test]
 fn shell_input_drop_gate_is_strict_about_channel_failures_only() {
     let channel_failure: Result<(), BackendExecutionError> =
-        Err(BackendExecutionError::ChannelFailed {
-            operation: "shell input".to_owned(),
-            reason: "channel closed".to_owned(),
-        });
-    let sftp_failure: Result<(), BackendExecutionError> = Err(BackendExecutionError::SftpFailed {
-        operation: "list dir".to_owned(),
-        reason: "permission denied".to_owned(),
-    });
+        Err(channel_reason_error("shell input", "channel closed"));
+    let sftp_failure: Result<(), BackendExecutionError> =
+        Err(sftp_error("list dir", "permission denied"));
     let success: Result<(), BackendExecutionError> = Ok(());
 
     assert!(shell_input_result_requires_session_drop(&channel_failure));
@@ -828,13 +818,7 @@ fn run_command_requires_connected_session() {
         })
         .expect_err("未连接会话不能执行远程命令");
 
-    assert!(matches!(
-        error,
-        BackendExecutionError::ChannelFailed {
-            operation,
-            reason,
-        } if operation == "run command" && reason == "session is not connected"
-    ));
+    assert_channel_failure(&error, "run command", "session is not connected");
 }
 
 #[test]
@@ -865,13 +849,7 @@ fn sftp_requires_connected_session() {
         })
         .expect_err("未连接会话不能打开 SFTP");
 
-    assert!(matches!(
-        error,
-        BackendExecutionError::ChannelFailed {
-            operation,
-            reason,
-        } if operation == "sftp" && reason == "session is not connected"
-    ));
+    assert_channel_failure(&error, "sftp", "session is not connected");
 }
 
 #[test]
@@ -879,10 +857,7 @@ fn sftp_failure_drops_only_failed_cached_session() {
     let failed_session_id = session_id();
     let other_session_id = session_id();
     let result: Result<Vec<BackendEvent>, BackendExecutionError> =
-        Err(BackendExecutionError::SftpFailed {
-            operation: "list dir".to_owned(),
-            reason: "permission denied".to_owned(),
-        });
+        Err(sftp_error("list dir", "permission denied"));
     let mut cached_sftps = HashMap::from([
         (failed_session_id, "failed-session"),
         (other_session_id, "other-session"),
@@ -902,10 +877,7 @@ fn sftp_cache_survives_success_and_non_sftp_failures() {
     let channel_failure_session_id = session_id();
     let success: Result<Vec<BackendEvent>, BackendExecutionError> = Ok(Vec::new());
     let channel_failure: Result<Vec<BackendEvent>, BackendExecutionError> =
-        Err(BackendExecutionError::ChannelFailed {
-            operation: "read".to_owned(),
-            reason: "channel closed".to_owned(),
-        });
+        Err(channel_reason_error("read", "channel closed"));
     let mut cached_sftps = HashMap::from([
         (success_session_id, "success-session"),
         (channel_failure_session_id, "channel-failure-session"),
@@ -934,15 +906,9 @@ fn sftp_cache_survives_success_and_non_sftp_failures() {
 #[test]
 fn sftp_drop_gate_is_strict_about_sftp_failures_only() {
     let sftp_failure: Result<Vec<BackendEvent>, BackendExecutionError> =
-        Err(BackendExecutionError::SftpFailed {
-            operation: "list dir".to_owned(),
-            reason: "permission denied".to_owned(),
-        });
+        Err(sftp_error("list dir", "permission denied"));
     let channel_failure: Result<Vec<BackendEvent>, BackendExecutionError> =
-        Err(BackendExecutionError::ChannelFailed {
-            operation: "read".to_owned(),
-            reason: "channel closed".to_owned(),
-        });
+        Err(channel_reason_error("read", "channel closed"));
     let success: Result<Vec<BackendEvent>, BackendExecutionError> = Ok(Vec::new());
 
     assert!(sftp_result_requires_session_drop(&sftp_failure));
@@ -972,13 +938,7 @@ fn start_tunnel_requires_connected_session() {
         })
         .expect_err("未连接会话不能启动隧道");
 
-    assert!(matches!(
-        error,
-        BackendExecutionError::ChannelFailed {
-            operation,
-            reason,
-        } if operation == "start tunnel" && reason == "session is not connected"
-    ));
+    assert_channel_failure(&error, "start tunnel", "session is not connected");
 }
 
 #[test]

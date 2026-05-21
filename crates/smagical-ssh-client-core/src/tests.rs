@@ -496,6 +496,7 @@ fn pty_dimensions_are_never_zero() {
 #[test]
 fn ssh_error_helpers_preserve_operation_and_reason() {
     let channel = channel_error("open shell", russh::Error::Inconsistent);
+    let channel_reason = channel_reason_error("shell input", "channel closed");
     let missing_session = connected_session_error("run command");
     let connection = connection_error("example.com:22", russh::Error::Inconsistent);
     let rejected = host_key_rejected_error(HostKeyCheck {
@@ -524,6 +525,20 @@ fn ssh_error_helpers_preserve_operation_and_reason() {
     assert!(!is_channel_failure(&connection));
     assert!(is_sftp_failure(&sftp));
     assert!(is_sftp_failure(&io));
+    assert_eq!(
+        channel_failure_parts(&channel).map(|(operation, _)| operation),
+        Some("open shell")
+    );
+    assert_eq!(
+        channel_failure_parts(&channel_reason),
+        Some(("shell input", "channel closed"))
+    );
+    assert_eq!(channel_failure_parts(&sftp), None);
+    assert_eq!(
+        sftp_failure_parts(&sftp),
+        Some(("list dir", "permission denied"))
+    );
+    assert_eq!(sftp_failure_parts(&channel), None);
     assert_eq!(
         tunnel_failure_parts(&tunnel).map(|(rule_name, _)| rule_name),
         Some("proxy")

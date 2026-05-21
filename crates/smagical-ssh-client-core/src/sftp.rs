@@ -197,6 +197,14 @@ pub fn is_sftp_failure(error: &BackendExecutionError) -> bool {
     matches!(error, BackendExecutionError::SftpFailed { .. })
 }
 
+/// 返回 SFTP 错误中的操作名和原因。
+pub fn sftp_failure_parts(error: &BackendExecutionError) -> Option<(&str, &str)> {
+    match error {
+        BackendExecutionError::SftpFailed { operation, reason } => Some((operation, reason)),
+        _ => None,
+    }
+}
+
 fn sftp_entry_kind(file_type: RusshSftpFileType) -> SftpEntryKind {
     match file_type {
         RusshSftpFileType::Dir => SftpEntryKind::Directory,
