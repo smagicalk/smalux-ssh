@@ -714,3 +714,20 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续扫描剩余生产聚合点，优先拆 `workspace_ui.rs`、`visual_settings.rs`、`dispatch.rs`，或者开始小步拆 `backend_pump_tests.rs` / `launch_tests/sftp.rs`。
+
+## 本轮核心拆分：Workspace UI 调度
+
+- 目标：继续拆 `workspace_ui.rs`，把工作区页面、分栏布局、工具面板、命令面板、背景轮播和测试分离，避免 UI 调度入口继续膨胀。
+- 已完成：`workspace_ui.rs` 变成薄模块入口，只挂载 Workspace UI 子模块。
+- 已完成：新增 `workspace_ui/page.rs`，集中工作区一级页面、Hosts 列表模式和 Hosts 搜索条件。
+- 已完成：新增 `workspace_ui/layout.rs`，集中 Hosts 面板、活动栏、工具分栏尺寸和右侧详情栏折叠。
+- 已完成：新增 `workspace_ui/tool_panel.rs`，集中 D 区域辅助分栏打开/关闭，以及 SFTP 工具面板切回 Terminal 工作区的联动。
+- 已完成：新增 `workspace_ui/command_palette.rs`，集中命令面板打开、查询更新和关闭。
+- 已完成：新增 `workspace_ui/background.rs`，集中背景轮播切换。
+- 已完成：新增 `workspace_ui/tests.rs`，迁移原有 Workspace UI 消息测试，生产入口不再混入测试实现。
+- 验证记录：
+  - `cargo fmt` 已执行
+  - `cargo check` 通过，约 `6.69s`
+  - `cargo test --lib model::app_state::workspace_ui -- --nocapture` 通过，`3 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：继续拆剩余生产聚合点，优先 `visual_settings.rs` 或 `dispatch.rs`；测试大文件后续再按领域小步迁移。
