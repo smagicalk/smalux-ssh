@@ -1103,3 +1103,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/cancel_upload_loading.rs` 或 `backend_pump_tests/connect.rs`。
+
+## 本轮测试拆分：SFTP 上传取消 Loading 能力模块
+
+- 目标：拆分 `launch_tests/sftp/cancel_upload_loading.rs`，把取消上传后应清理 loading 和应保留 loading 的场景分离。
+- 已完成：`launch_tests/sftp/cancel_upload_loading.rs` 现在只保留 upload loading 测试模块入口。
+- 已完成：新增 `launch_tests/sftp/cancel_upload_loading_clear.rs`，迁移 queued upload 被移除后清理 loading 和忽略 stale refresh 后清理 loading 测试。
+- 已完成：新增 `launch_tests/sftp/cancel_upload_loading_keep.rs`，迁移 stale upload 保留当前 browser loading 和另一个 refresh 请求仍存在时保留 loading 测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::cancel::upload_loading -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中型测试模块，优先 `backend_pump_tests/connect.rs`、`launch_tests/sftp/transfer_upload.rs` 或 `launch_tests/sftp/browser.rs`。
