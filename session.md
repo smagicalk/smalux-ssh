@@ -1132,3 +1132,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/transfer_upload.rs` 或 `launch_tests/sftp/browser.rs`。
+
+## 本轮测试拆分：SFTP 上传传输能力模块
+
+- 目标：拆分 `launch_tests/sftp/transfer_upload.rs`，把上传成功、browser owner 重分配和输入/连接校验场景分离。
+- 已完成：`launch_tests/sftp/transfer_upload.rs` 现在只保留上传传输测试模块入口。
+- 已完成：新增 `launch_tests/sftp/transfer_upload_success.rs`，迁移上传消息创建 transfer 并队列化 SFTP upload request 的成功路径测试。
+- 已完成：新增 `launch_tests/sftp/transfer_upload_owner.rs`，迁移断连 owner 重分配后设置 loading，以及无效输入不重分配 owner 的测试。
+- 已完成：新增 `launch_tests/sftp/transfer_upload_validation.rs`，迁移断连 session 拒绝上传和 remote name 包含路径分隔符拒绝上传的测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::transfer::upload -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/browser.rs`、`launch_tests/sftp/cancel_transfer.rs` 或 `launch_tests/sftp/transfer_download.rs`。
