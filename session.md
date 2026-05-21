@@ -939,3 +939,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
 - 下一步：继续拆 `ui_drafts_tests.rs`，按 quick host、terminal input、command draft、SFTP draft 等能力分组。
+
+## 本轮测试拆分：UI Draft 测试能力模块
+
+- 目标：拆分 `ui_drafts_tests.rs`，按 quick host、普通草稿字段和 terminal input 能力组织测试。
+- 已完成：新增 `ui_drafts_tests/quick_host.rs`，迁移 quick host 草稿、认证草稿和保存 quick host 测试。
+- 已完成：新增 `ui_drafts_tests/draft_fields.rs`，迁移远程命令、SFTP 初始目录和 SFTP action 草稿字段测试。
+- 已完成：新增 `ui_drafts_tests/terminal_input.rs`，迁移 terminal input 草稿编辑、本地终端可见输入、无 help banner 和空回车测试。
+- 已完成：`ui_drafts_tests.rs` 现在只保留共享导入和模块入口。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::ui_drafts_tests -- --nocapture` 通过，`13 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且抽样文本正常
+- 下一步：剩余较大的测试文件已基本拆完；后续可继续审视 `launch_tests/remote_command.rs`、`launch_tests/tunnel.rs` 或转回生产侧中小模块收尾。
