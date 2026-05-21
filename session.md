@@ -781,3 +781,19 @@
   - `cargo test --lib model::app_state::launch_tests::tunnel -- --nocapture` 通过，`12 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：生产侧核心聚合点继续收尾，优先评估 `backend_events.rs` 或 `snippets.rs`；测试聚合文件随后按领域迁移。
+
+## 本轮核心拆分：Backend events 归约入口
+
+- 目标：继续拆 `backend_events.rs`，把后端事件应用入口、共享执行器入口和远程命令历史回写分离。
+- 已完成：`backend_events.rs` 变成薄模块入口，只挂载后端事件子模块。
+- 已完成：新增 `backend_events/apply.rs`，集中 `BackendEvent` 应用、远程命令终结事件预处理和共享执行器队列泵入口。
+- 已完成：新增 `backend_events/remote_command_history.rs`，集中远程命令历史匹配、关闭标签页完成回写、后端事件完成回写和 duration 计算。
+- 验证记录：
+  - `cargo fmt` 已执行
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `6.15s`
+  - `cargo test --lib model::app_state::launch_tests::remote_command -- --nocapture` 通过，`13 passed`
+  - `cargo test --lib model::app_state::tests::backend_event -- --nocapture` 通过，`1 passed`
+  - `cargo test --lib model::app_state::tests::close_pending_remote_command_tab_finishes_history_without_exit_code -- --nocapture` 通过，`1 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：继续生产侧核心收尾，优先 `snippets.rs`，之后再系统拆测试聚合文件。
