@@ -889,3 +889,21 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
 - 下一步：继续拆剩余测试聚合文件，优先 `launch_tests/sftp.rs` 或 `app_state/tests.rs`。
+
+## 本轮测试拆分：Launch SFTP 能力模块
+
+- 目标：拆分最大启动测试聚合文件 `launch_tests/sftp.rs`，让 SFTP 启动测试按浏览器、书签、传输、取消和文件操作能力组织。
+- 已完成：新增 `launch_tests/sftp/browser.rs`，迁移 OpenSftp、RefreshSftp 和 NavigateSftp 测试。
+- 已完成：新增 `launch_tests/sftp/bookmark.rs`，迁移保存、打开、重开和删除 SFTP 书签测试。
+- 已完成：新增 `launch_tests/sftp/transfer.rs`，迁移上传、下载、输入校验、owner 重分配和 loading 状态测试。
+- 已完成：新增 `launch_tests/sftp/cancel.rs`，迁移取消 queued transfer、同 ID 防串扰、歧义拒绝和取消后 loading 清理测试。
+- 已完成：新增 `launch_tests/sftp/file_actions.rs`，迁移创建目录、删除文件和路径校验测试。
+- 已完成：`launch_tests/sftp.rs` 现在只保留 SFTP launch 测试模块入口。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::browser -- --nocapture` 通过，`7 passed`
+  - `cargo test --lib model::app_state::launch_tests::sftp -- --nocapture` 通过，`36 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
+- 下一步：继续拆 `app_state/tests.rs`，优先按 close session、activate/select、backend event、terminal input 等能力分组。
