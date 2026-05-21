@@ -402,6 +402,31 @@ fn sftp_transfer_event_carries_total_and_progress_bytes() {
 }
 
 #[test]
+fn sftp_operation_names_are_stable() {
+    assert_eq!(SFTP_SUBSYSTEM_NAME, "sftp");
+    assert_eq!(OPEN_SFTP_SESSION_OPERATION, "open sftp session");
+    assert_eq!(REQUEST_SFTP_OPERATION, "request sftp");
+    assert_eq!(OPEN_SFTP_OPERATION, "open");
+    assert_eq!(CLOSE_SFTP_OPERATION, "close");
+    assert_eq!(LIST_DIR_OPERATION, "list dir");
+    assert_eq!(REMOVE_FILE_OPERATION, "remove file");
+    assert_eq!(CREATE_DIR_OPERATION, "create dir");
+    assert_eq!(UPLOAD_OPEN_LOCAL_OPERATION, "upload open local");
+    assert_eq!(UPLOAD_READ_LOCAL_OPERATION, "upload read local");
+    assert_eq!(UPLOAD_STAT_LOCAL_OPERATION, "upload stat local");
+    assert_eq!(UPLOAD_OPEN_REMOTE_OPERATION, "upload open remote");
+    assert_eq!(UPLOAD_WRITE_REMOTE_OPERATION, "upload write remote");
+    assert_eq!(UPLOAD_CLOSE_REMOTE_OPERATION, "upload close remote");
+    assert_eq!(DOWNLOAD_OPEN_REMOTE_OPERATION, "download open remote");
+    assert_eq!(DOWNLOAD_READ_REMOTE_OPERATION, "download read remote");
+    assert_eq!(DOWNLOAD_STAT_REMOTE_OPERATION, "download stat remote");
+    assert_eq!(DOWNLOAD_OPEN_LOCAL_OPERATION, "download open local");
+    assert_eq!(DOWNLOAD_WRITE_LOCAL_OPERATION, "download write local");
+    assert_eq!(DOWNLOAD_FLUSH_LOCAL_OPERATION, "download flush local");
+    assert_eq!(DOWNLOAD_CLOSE_REMOTE_OPERATION, "download close remote");
+}
+
+#[test]
 fn pty_dimensions_are_never_zero() {
     let size = TerminalSize {
         columns: 0,

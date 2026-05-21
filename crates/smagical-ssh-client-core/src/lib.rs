@@ -31,8 +31,15 @@ pub use settings::{
     RusshClientSettings,
 };
 pub use sftp::{
-    copy_transfer_with_progress, is_sftp_failure, join_remote_path, parent_remote_dir,
-    sftp_entries_event, sftp_entry_from_parts, sftp_error, sftp_io_error, transfer_event,
+    CLOSE_SFTP_OPERATION, CREATE_DIR_OPERATION, DOWNLOAD_CLOSE_REMOTE_OPERATION,
+    DOWNLOAD_FLUSH_LOCAL_OPERATION, DOWNLOAD_OPEN_LOCAL_OPERATION, DOWNLOAD_OPEN_REMOTE_OPERATION,
+    DOWNLOAD_READ_REMOTE_OPERATION, DOWNLOAD_STAT_REMOTE_OPERATION, DOWNLOAD_WRITE_LOCAL_OPERATION,
+    LIST_DIR_OPERATION, OPEN_SFTP_OPERATION, OPEN_SFTP_SESSION_OPERATION, REMOVE_FILE_OPERATION,
+    REQUEST_SFTP_OPERATION, SFTP_SUBSYSTEM_NAME, UPLOAD_CLOSE_REMOTE_OPERATION,
+    UPLOAD_OPEN_LOCAL_OPERATION, UPLOAD_OPEN_REMOTE_OPERATION, UPLOAD_READ_LOCAL_OPERATION,
+    UPLOAD_STAT_LOCAL_OPERATION, UPLOAD_WRITE_REMOTE_OPERATION, copy_transfer_with_progress,
+    is_sftp_failure, join_remote_path, parent_remote_dir, sftp_entries_event,
+    sftp_entry_from_parts, sftp_error, sftp_io_error, transfer_event,
 };
 pub use socks5::{Socks5Target, read_socks5_target, write_socks5_success};
 pub use tunnel::{

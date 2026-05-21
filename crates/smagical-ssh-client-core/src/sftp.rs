@@ -7,6 +7,69 @@ use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 const SFTP_TRANSFER_CHUNK_SIZE: usize = 64 * 1024;
 
+/// SSH SFTP subsystem 名称。
+pub const SFTP_SUBSYSTEM_NAME: &str = "sftp";
+
+/// 打开 SFTP session channel 的操作名。
+pub const OPEN_SFTP_SESSION_OPERATION: &str = "open sftp session";
+
+/// 请求 SFTP subsystem 的操作名。
+pub const REQUEST_SFTP_OPERATION: &str = "request sftp";
+
+/// 初始化 SFTP 子系统的操作名。
+pub const OPEN_SFTP_OPERATION: &str = "open";
+
+/// 关闭 SFTP 子系统的操作名。
+pub const CLOSE_SFTP_OPERATION: &str = "close";
+
+/// SFTP 列目录操作名。
+pub const LIST_DIR_OPERATION: &str = "list dir";
+
+/// SFTP 删除文件操作名。
+pub const REMOVE_FILE_OPERATION: &str = "remove file";
+
+/// SFTP 创建目录操作名。
+pub const CREATE_DIR_OPERATION: &str = "create dir";
+
+/// SFTP 上传打开本地文件操作名。
+pub const UPLOAD_OPEN_LOCAL_OPERATION: &str = "upload open local";
+
+/// SFTP 上传读取本地文件操作名。
+pub const UPLOAD_READ_LOCAL_OPERATION: &str = "upload read local";
+
+/// SFTP 上传读取本地文件元数据操作名。
+pub const UPLOAD_STAT_LOCAL_OPERATION: &str = "upload stat local";
+
+/// SFTP 上传打开远程文件操作名。
+pub const UPLOAD_OPEN_REMOTE_OPERATION: &str = "upload open remote";
+
+/// SFTP 上传写入远程文件操作名。
+pub const UPLOAD_WRITE_REMOTE_OPERATION: &str = "upload write remote";
+
+/// SFTP 上传关闭远程文件操作名。
+pub const UPLOAD_CLOSE_REMOTE_OPERATION: &str = "upload close remote";
+
+/// SFTP 下载打开远程文件操作名。
+pub const DOWNLOAD_OPEN_REMOTE_OPERATION: &str = "download open remote";
+
+/// SFTP 下载读取远程文件操作名。
+pub const DOWNLOAD_READ_REMOTE_OPERATION: &str = "download read remote";
+
+/// SFTP 下载读取远程文件元数据操作名。
+pub const DOWNLOAD_STAT_REMOTE_OPERATION: &str = "download stat remote";
+
+/// SFTP 下载打开本地文件操作名。
+pub const DOWNLOAD_OPEN_LOCAL_OPERATION: &str = "download open local";
+
+/// SFTP 下载写入本地文件操作名。
+pub const DOWNLOAD_WRITE_LOCAL_OPERATION: &str = "download write local";
+
+/// SFTP 下载 flush 本地文件操作名。
+pub const DOWNLOAD_FLUSH_LOCAL_OPERATION: &str = "download flush local";
+
+/// SFTP 下载关闭远程文件操作名。
+pub const DOWNLOAD_CLOSE_REMOTE_OPERATION: &str = "download close remote";
+
 /// 从 russh-sftp 目录项元数据创建领域 SFTP 目录项。
 pub fn sftp_entry_from_parts(
     remote_dir: &str,

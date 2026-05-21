@@ -2,8 +2,15 @@
 
 use russh_sftp::client::SftpSession;
 use smagical_ssh_client_core::{
-    copy_transfer_with_progress, parent_remote_dir, sftp_entries_event, sftp_entry_from_parts,
-    sftp_error, sftp_io_error, transfer_event,
+    CLOSE_SFTP_OPERATION, CREATE_DIR_OPERATION, DOWNLOAD_CLOSE_REMOTE_OPERATION,
+    DOWNLOAD_FLUSH_LOCAL_OPERATION, DOWNLOAD_OPEN_LOCAL_OPERATION, DOWNLOAD_OPEN_REMOTE_OPERATION,
+    DOWNLOAD_READ_REMOTE_OPERATION, DOWNLOAD_STAT_REMOTE_OPERATION, DOWNLOAD_WRITE_LOCAL_OPERATION,
+    LIST_DIR_OPERATION, OPEN_SFTP_OPERATION, OPEN_SFTP_SESSION_OPERATION, REMOVE_FILE_OPERATION,
+    REQUEST_SFTP_OPERATION, SFTP_SUBSYSTEM_NAME, UPLOAD_CLOSE_REMOTE_OPERATION,
+    UPLOAD_OPEN_LOCAL_OPERATION, UPLOAD_OPEN_REMOTE_OPERATION, UPLOAD_READ_LOCAL_OPERATION,
+    UPLOAD_STAT_LOCAL_OPERATION, UPLOAD_WRITE_REMOTE_OPERATION, copy_transfer_with_progress,
+    parent_remote_dir, sftp_entries_event, sftp_entry_from_parts, sftp_error, sftp_io_error,
+    transfer_event,
 };
 use tokio::io::AsyncWriteExt;
 
@@ -46,14 +53,14 @@ impl RemoteSftp {
                 self.session
                     .remove_file(remote_path.clone())
                     .await
-                    .map_err(|error| sftp_error("remove file", error))?;
+                    .map_err(|error| sftp_error(REMOVE_FILE_OPERATION, error))?;
                 self.list_dir(parent_remote_dir(&remote_path)).await
             }
             SftpRequest::CreateDir { remote_path } => {
                 self.session
                     .create_dir(remote_path.clone())
                     .await
-                    .map_err(|error| sftp_error("create dir", error))?;
+                    .map_err(|error| sftp_error(CREATE_DIR_OPERATION, error))?;
                 self.list_dir(parent_remote_dir(&remote_path)).await
             }
         }
@@ -64,7 +71,7 @@ impl RemoteSftp {
         self.session
             .close()
             .await
-            .map_err(|error| sftp_error("close", error))
+            .map_err(|error| sftp_error(CLOSE_SFTP_OPERATION, error))
     }
 
     async fn list_dir(
@@ -75,7 +82,7 @@ impl RemoteSftp {
             .session
             .read_dir(remote_path.clone())
             .await
-            .map_err(|error| sftp_error("list dir", error))?
+            .map_err(|error| sftp_error(LIST_DIR_OPERATION, error))?
             .map(|entry| sftp_entry_from_parts(&remote_path, entry.file_name(), entry.metadata()))
             .collect();
 
@@ -94,17 +101,17 @@ impl RemoteSftp {
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
         let mut local_file = tokio::fs::File::open(&local_path)
             .await
-            .map_err(|error| sftp_io_error("upload open local", error))?;
+            .map_err(|error| sftp_io_error(UPLOAD_OPEN_LOCAL_OPERATION, error))?;
         let total_bytes = local_file
             .metadata()
             .await
-            .map_err(|error| sftp_io_error("upload stat local", error))?
+            .map_err(|error| sftp_io_error(UPLOAD_STAT_LOCAL_OPERATION, error))?
             .len();
         let mut remote_file = self
             .session
             .create(remote_path.clone())
             .await
-            .map_err(|error| sftp_error("upload open remote", error))?;
+            .map_err(|error| sftp_error(UPLOAD_OPEN_REMOTE_OPERATION, error))?;
         let mut events = vec![transfer_event(
             self.session_id,
             id,
@@ -118,8 +125,8 @@ impl RemoteSftp {
             Some(total_bytes),
             &mut local_file,
             &mut remote_file,
-            "upload read local",
-            "upload write remote",
+            UPLOAD_READ_LOCAL_OPERATION,
+            UPLOAD_WRITE_REMOTE_OPERATION,
         )
         .await?;
         events.extend(progress_events);
@@ -127,7 +134,7 @@ impl RemoteSftp {
         remote_file
             .shutdown()
             .await
-            .map_err(|error| sftp_io_error("upload close remote", error))?;
+            .map_err(|error| sftp_io_error(UPLOAD_CLOSE_REMOTE_OPERATION, error))?;
 
         events.push(transfer_event(
             self.session_id,
@@ -150,15 +157,15 @@ impl RemoteSftp {
             .session
             .open(remote_path)
             .await
-            .map_err(|error| sftp_error("download open remote", error))?;
+            .map_err(|error| sftp_error(DOWNLOAD_OPEN_REMOTE_OPERATION, error))?;
         let total_bytes = remote_file
             .metadata()
             .await
-            .map_err(|error| sftp_error("download stat remote", error))?
+            .map_err(|error| sftp_error(DOWNLOAD_STAT_REMOTE_OPERATION, error))?
             .size;
         let mut local_file = tokio::fs::File::create(&local_path)
             .await
-            .map_err(|error| sftp_io_error("download open local", error))?;
+            .map_err(|error| sftp_io_error(DOWNLOAD_OPEN_LOCAL_OPERATION, error))?;
         let mut events = vec![transfer_event(
             self.session_id,
             id,
@@ -172,8 +179,8 @@ impl RemoteSftp {
             total_bytes,
             &mut remote_file,
             &mut local_file,
-            "download read remote",
-            "download write local",
+            DOWNLOAD_READ_REMOTE_OPERATION,
+            DOWNLOAD_WRITE_LOCAL_OPERATION,
         )
         .await?;
         events.extend(progress_events);
@@ -181,11 +188,11 @@ impl RemoteSftp {
         local_file
             .flush()
             .await
-            .map_err(|error| sftp_io_error("download flush local", error))?;
+            .map_err(|error| sftp_io_error(DOWNLOAD_FLUSH_LOCAL_OPERATION, error))?;
         remote_file
             .shutdown()
             .await
-            .map_err(|error| sftp_io_error("download close remote", error))?;
+            .map_err(|error| sftp_io_error(DOWNLOAD_CLOSE_REMOTE_OPERATION, error))?;
 
         events.push(transfer_event(
             self.session_id,
@@ -204,16 +211,18 @@ impl RusshConnection {
         &mut self,
         session_id: SessionId,
     ) -> Result<RemoteSftp, BackendExecutionError> {
-        let mut channel = self.open_session_channel("open sftp session").await?;
+        let mut channel = self
+            .open_session_channel(OPEN_SFTP_SESSION_OPERATION)
+            .await?;
         channel
-            .request_subsystem(true, "sftp")
+            .request_subsystem(true, SFTP_SUBSYSTEM_NAME)
             .await
-            .map_err(|error| channel_error("request sftp", error))?;
-        wait_channel_request(&mut channel, "request sftp").await?;
+            .map_err(|error| channel_error(REQUEST_SFTP_OPERATION, error))?;
+        wait_channel_request(&mut channel, REQUEST_SFTP_OPERATION).await?;
 
         let session = SftpSession::new(channel.into_stream())
             .await
-            .map_err(|error| sftp_error("open", error))?;
+            .map_err(|error| sftp_error(OPEN_SFTP_OPERATION, error))?;
 
         Ok(RemoteSftp {
             session_id,
