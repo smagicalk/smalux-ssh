@@ -797,3 +797,18 @@
   - `cargo test --lib model::app_state::tests::close_pending_remote_command_tab_finishes_history_without_exit_code -- --nocapture` 通过，`1 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：继续生产侧核心收尾，优先 `snippets.rs`，之后再系统拆测试聚合文件。
+
+## 本轮核心拆分：Snippets 应用行为
+
+- 目标：继续拆 `snippets.rs`，把快捷命令保存、执行、维护和错误结果构造分离。
+- 已完成：`snippets.rs` 变成薄模块入口，只挂载 snippets 子模块。
+- 已完成：新增 `snippets/save.rs`，集中从主机命令草稿保存快捷命令、名称截断和模板变量推断。
+- 已完成：新增 `snippets/run.rs`，集中快捷命令适用性检查、变量渲染、空命令防护和远程命令执行。
+- 已完成：新增 `snippets/manage.rs`，集中快捷命令删除和变量最近输入值更新。
+- 已完成：新增 `snippets/outcome.rs`，集中主机缺失和快捷命令缺失错误结果构造。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `5.80s`
+  - `cargo test --lib model::app_state::snippets_tests -- --nocapture` 通过，`10 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：生产侧剩余聚合点主要是 `message.rs`、`launch_remote_command.rs`、`storage_admin.rs`、`launch.rs` 等中小文件；更大的维护压力已转向测试聚合文件，优先拆 `backend_pump_tests.rs` / `tests.rs`。
