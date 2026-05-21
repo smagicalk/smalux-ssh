@@ -697,3 +697,20 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续拆 `workspace.rs` 的保存、恢复、SFTP browser 恢复和 terminal tab 恢复逻辑，或开始小步拆测试聚合文件。
+
+## 本轮核心拆分：Workspace 快照
+
+- 目标：继续拆 `workspace.rs`，把保存、恢复、清除和测试分离，让工作区快照逻辑更容易扩展。
+- 已完成：`workspace.rs` 变成薄模块入口，只保留默认 workspace 名称和模块挂载。
+- 已完成：新增 `workspace/save.rs`，集中保存当前会话标签页、工作目录和线性布局快照。
+- 已完成：新增 `workspace/restore.rs`，集中恢复 session tabs、terminal tabs 和 SFTP browsers。
+- 已完成：新增 `workspace/clear.rs`，集中清除已保存工作区快照。
+- 已完成：新增 `workspace/tests.rs`，迁移原有 workspace 单元测试，避免生产入口文件继续混入测试实现。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `6.57s`
+  - `cargo test --lib model::app_state::workspace -- --nocapture` 通过，`6 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续扫描剩余生产聚合点，优先拆 `workspace_ui.rs`、`visual_settings.rs`、`dispatch.rs`，或者开始小步拆 `backend_pump_tests.rs` / `launch_tests/sftp.rs`。
