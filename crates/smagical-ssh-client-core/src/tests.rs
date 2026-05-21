@@ -1216,6 +1216,22 @@ fn shell_drain_stops_only_on_disconnected_event() {
 }
 
 #[test]
+fn ssh_channel_operation_names_are_stable() {
+    assert_eq!(OPEN_SHELL_SESSION_OPERATION, "open shell session");
+    assert_eq!(REQUEST_SHELL_OPERATION, "request shell");
+    assert_eq!(SHELL_INPUT_OPERATION, "shell input");
+    assert_eq!(SHELL_EOF_OPERATION, "shell eof");
+    assert_eq!(SHELL_RESIZE_OPERATION, "shell resize");
+    assert_eq!(RUN_COMMAND_SESSION_OPERATION, "run command session");
+    assert_eq!(EXEC_COMMAND_OPERATION, "exec command");
+    assert_eq!(OPEN_SHELL_OPERATION, "open shell");
+    assert_eq!(SEND_SHELL_INPUT_OPERATION, "send shell input");
+    assert_eq!(RUN_COMMAND_OPERATION, "run command");
+    assert_eq!(SFTP_OPERATION, "sftp");
+    assert_eq!(START_TUNNEL_OPERATION, "start tunnel");
+}
+
+#[test]
 fn channel_lifecycle_events_preserve_payloads() {
     let session_id = session_id();
 

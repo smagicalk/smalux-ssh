@@ -14,6 +14,42 @@ pub enum ChannelRequestStatus {
     Accepted,
 }
 
+/// 打开交互式 shell 前的 session channel 操作名。
+pub const OPEN_SHELL_SESSION_OPERATION: &str = "open shell session";
+
+/// 请求交互式 shell 的操作名。
+pub const REQUEST_SHELL_OPERATION: &str = "request shell";
+
+/// 向远程 shell 写入输入的操作名。
+pub const SHELL_INPUT_OPERATION: &str = "shell input";
+
+/// 通知远程 shell 输入结束的操作名。
+pub const SHELL_EOF_OPERATION: &str = "shell eof";
+
+/// 调整远程 shell PTY 尺寸的操作名。
+pub const SHELL_RESIZE_OPERATION: &str = "shell resize";
+
+/// 执行远程命令前的 session channel 操作名。
+pub const RUN_COMMAND_SESSION_OPERATION: &str = "run command session";
+
+/// 请求执行远程命令的操作名。
+pub const EXEC_COMMAND_OPERATION: &str = "exec command";
+
+/// 执行器打开 shell 的前置会话操作名。
+pub const OPEN_SHELL_OPERATION: &str = "open shell";
+
+/// 执行器发送 shell 输入的前置会话操作名。
+pub const SEND_SHELL_INPUT_OPERATION: &str = "send shell input";
+
+/// 执行器运行远程命令的前置会话操作名。
+pub const RUN_COMMAND_OPERATION: &str = "run command";
+
+/// 执行器访问 SFTP 的前置会话操作名。
+pub const SFTP_OPERATION: &str = "sftp";
+
+/// 执行器启动隧道的前置会话操作名。
+pub const START_TUNNEL_OPERATION: &str = "start tunnel";
+
 /// 收集一次远程命令 channel 消息。
 pub fn collect_command_message(
     session_id: SessionId,

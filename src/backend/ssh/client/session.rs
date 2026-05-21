@@ -11,7 +11,10 @@ use crate::backend::{BackendEvent, BackendExecutionError, PtyRequest, RemoteComm
 use crate::model::SessionId;
 use crate::terminal::TerminalSize;
 use smagical_ssh_client_core::{
-    ChannelRequestStatus, channel_error, channel_request_ended_error,
+    ChannelRequestStatus, EXEC_COMMAND_OPERATION, OPEN_SHELL_OPERATION,
+    OPEN_SHELL_SESSION_OPERATION, REQUEST_SHELL_OPERATION, RUN_COMMAND_OPERATION,
+    RUN_COMMAND_SESSION_OPERATION, SHELL_EOF_OPERATION, SHELL_INPUT_OPERATION,
+    SHELL_RESIZE_OPERATION, channel_error, channel_request_ended_error,
     collect_channel_request_message, collect_command_message, command_exited_event,
     disconnected_event, pty_columns, pty_rows, remote_command_started_event,
     shell_drain_should_stop, shell_message_to_event, shell_opened_event,
@@ -41,7 +44,7 @@ impl RemoteShell {
         self.channel
             .data(Cursor::new(input.to_vec()))
             .await
-            .map_err(|error| channel_error("shell input", error))
+            .map_err(|error| channel_error(SHELL_INPUT_OPERATION, error))
     }
 
     /// 通知远程 shell 本地输入已经结束。
@@ -49,7 +52,7 @@ impl RemoteShell {
         self.channel
             .eof()
             .await
-            .map_err(|error| channel_error("shell eof", error))
+            .map_err(|error| channel_error(SHELL_EOF_OPERATION, error))
     }
 
     /// 同步终端窗口尺寸。
@@ -57,7 +60,7 @@ impl RemoteShell {
         self.channel
             .window_change(pty_columns(size), pty_rows(size), 0, 0)
             .await
-            .map_err(|error| channel_error("shell resize", error))
+            .map_err(|error| channel_error(SHELL_RESIZE_OPERATION, error))
     }
 
     /// 在给定时间预算内尽量抽干已经到达的远程 shell 输出。
@@ -118,13 +121,15 @@ impl RusshConnection {
         session_id: SessionId,
         pty: &PtyRequest,
     ) -> Result<OpenShellReport, BackendExecutionError> {
-        let mut channel = self.open_session_channel("open shell session").await?;
-        prepare_pty(&mut channel, pty, "open shell").await?;
+        let mut channel = self
+            .open_session_channel(OPEN_SHELL_SESSION_OPERATION)
+            .await?;
+        prepare_pty(&mut channel, pty, OPEN_SHELL_OPERATION).await?;
         channel
             .request_shell(true)
             .await
-            .map_err(|error| channel_error("request shell", error))?;
-        wait_channel_request(&mut channel, "request shell").await?;
+            .map_err(|error| channel_error(REQUEST_SHELL_OPERATION, error))?;
+        wait_channel_request(&mut channel, REQUEST_SHELL_OPERATION).await?;
 
         Ok(OpenShellReport {
             shell: RemoteShell {
@@ -141,16 +146,18 @@ impl RusshConnection {
         session_id: SessionId,
         request: &RemoteCommandRequest,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let mut channel = self.open_session_channel("run command session").await?;
+        let mut channel = self
+            .open_session_channel(RUN_COMMAND_SESSION_OPERATION)
+            .await?;
         if let Some(pty) = &request.pty {
-            prepare_pty(&mut channel, pty, "run command").await?;
+            prepare_pty(&mut channel, pty, RUN_COMMAND_OPERATION).await?;
         }
 
         channel
             .exec(true, request.command.clone())
             .await
-            .map_err(|error| channel_error("exec command", error))?;
-        wait_channel_request(&mut channel, "exec command").await?;
+            .map_err(|error| channel_error(EXEC_COMMAND_OPERATION, error))?;
+        wait_channel_request(&mut channel, EXEC_COMMAND_OPERATION).await?;
 
         let mut events = vec![remote_command_started_event(
             session_id,

@@ -6,8 +6,9 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 
 use smagical_ssh_client_core::{
-    connected_session_error, disconnected_event, is_channel_failure, is_sftp_failure,
-    tunnel_stopped_event,
+    OPEN_SHELL_OPERATION, RUN_COMMAND_OPERATION, SEND_SHELL_INPUT_OPERATION, SFTP_OPERATION,
+    START_TUNNEL_OPERATION, connected_session_error, disconnected_event, is_channel_failure,
+    is_sftp_failure, tunnel_stopped_event,
 };
 
 use crate::backend::{
@@ -108,7 +109,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let connection = self
             .connections
             .get_mut(&session_id)
-            .ok_or_else(|| connected_session_error("open shell"))?;
+            .ok_or_else(|| connected_session_error(OPEN_SHELL_OPERATION))?;
         let report = runtime.block_on(connection.open_shell(session_id, &pty))?;
         let previous_shell = replace_cached_shell(&mut self.shells, session_id, report.shell);
         self.close_detached_shell_input(session_id, previous_shell, "opening shell");
@@ -124,7 +125,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let shell = self
             .shells
             .get(&session_id)
-            .ok_or_else(|| connected_session_error("send shell input"))?;
+            .ok_or_else(|| connected_session_error(SEND_SHELL_INPUT_OPERATION))?;
         let result = runtime.block_on(shell.send_input(input.as_bytes()));
         drop_cached_shell_after_failed_input(&mut self.shells, session_id, &result);
         result?;
@@ -160,7 +161,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let connection = self
             .connections
             .get_mut(&session_id)
-            .ok_or_else(|| connected_session_error("run command"))?;
+            .ok_or_else(|| connected_session_error(RUN_COMMAND_OPERATION))?;
         runtime.block_on(connection.run_command(session_id, &request))
     }
 
@@ -174,7 +175,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             let connection = self
                 .connections
                 .get_mut(&session_id)
-                .ok_or_else(|| connected_session_error("sftp"))?;
+                .ok_or_else(|| connected_session_error(SFTP_OPERATION))?;
             let sftp = runtime.block_on(connection.open_sftp(session_id))?;
             let previous_sftp = replace_cached_sftp(&mut self.sftps, session_id, sftp);
             self.close_detached_sftp(session_id, previous_sftp, "opening sftp");
@@ -183,7 +184,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let sftp = self
             .sftps
             .get(&session_id)
-            .ok_or_else(|| connected_session_error("sftp"))?;
+            .ok_or_else(|| connected_session_error(SFTP_OPERATION))?;
         let result = self.runtime.block_on(sftp.execute(request));
         drop_cached_sftp_after_failed_request(&mut self.sftps, session_id, &result);
         result
@@ -197,7 +198,7 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
         let connection = self
             .connections
             .remove(&session_id)
-            .ok_or_else(|| connected_session_error("start tunnel"))?;
+            .ok_or_else(|| connected_session_error(START_TUNNEL_OPERATION))?;
         let stale_subresources =
             take_cached_session_subresources(&mut self.shells, &mut self.sftps, session_id);
         self.close_stale_session_subresources(session_id, stale_subresources, "starting tunnel");
