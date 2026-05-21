@@ -625,3 +625,21 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续优先拆大测试文件或 `launch_sftp` / `session_tabs` 等剩余聚合点；测试侧拆分建议改用 `apply_patch` 小步进行，避免 PowerShell 批量写入权限问题。
+
+## 本轮核心拆分：SFTP transfer 调度
+
+- 目标：继续拆生产核心聚合点，把 `launch_sftp_transfer.rs` 从上传、下载、取消、远端操作和路径 helper 混合文件拆成按功能组织的模块。
+- 已完成：`launch_sftp_transfer.rs` 变成薄模块入口，只声明并挂载 SFTP transfer 子模块。
+- 已完成：新增 `sftp_transfer/upload.rs`，集中上传输入校验、传输任务创建、上传请求排队和 loading 设置。
+- 已完成：新增 `sftp_transfer/download.rs`，集中下载路径校验、默认本地文件名推断、传输任务创建和下载请求排队。
+- 已完成：新增 `sftp_transfer/cancel.rs`，集中 queued transfer 唯一性查找、队列命令移除、取消任务和 loading 清理判断。
+- 已完成：新增 `sftp_transfer/remote_actions.rs`，集中删除远端文件和创建远端目录调度。
+- 已完成：新增 `sftp_transfer/path.rs`，集中本地 basename 推断和远端 plain name 校验。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `22.73s`
+  - `cargo test --lib model::app_state::launch_tests::sftp -- --nocapture` 通过，`36 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续拆 `launch_sftp.rs` 的 SFTP 浏览器/书签/会话归属逻辑，或拆 `session_tabs.rs` 的关闭、激活和运行态清理逻辑。
