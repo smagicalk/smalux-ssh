@@ -556,3 +556,18 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续清理主 crate 中剩余直接依赖 `BackendExecutionError` / `BackendEvent` 具体结构的测试断言；真实 SSH/SFTP/TCP IO 编排仍留在主 crate。
+
+## 本轮模块化拆分：SSH executor cache
+
+- 目标：回应“模块化、功能化、单一化”的要求，从 helper 拆分转向能力模块拆分；先拆 SSH executor 中最独立的运行态缓存管理。
+- 已完成：新增 `src/backend/ssh/executor/cache.rs`，集中管理连接、shell、SFTP、tunnel 缓存取出、替换、隧道所有权判断、失败后缓存清理和 shell terminal 事件 drop gate。
+- 已完成：`src/backend/ssh/executor.rs` 移除缓存内部实现，只通过 `cache` 模块调用，保留执行器入口、命令分发和真实 SSH/SFTP/tunnel 编排。
+- 已完成：缓存管理相关测试迁入 `executor::cache::tests`；`executor::tests` 只保留执行器对外行为测试。
+- 验证记录：
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check` 通过，约 `10.81s`
+  - `cargo test` 通过，`246 passed`
+  - `cargo fmt --check` 通过
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续按能力拆 `executor`，优先把 shell / SFTP / tunnel runtime 分别拆成单一职责模块，避免后续加功能继续堆到 `executor.rs`。

@@ -7,8 +7,7 @@ use tokio::runtime::Runtime;
 
 use smagical_ssh_client_core::{
     OPEN_SHELL_OPERATION, RUN_COMMAND_OPERATION, SEND_SHELL_INPUT_OPERATION, SFTP_OPERATION,
-    START_TUNNEL_OPERATION, connected_session_error, disconnected_event, is_channel_failure,
-    is_sftp_failure, tunnel_stopped_event,
+    START_TUNNEL_OPERATION, connected_session_error, disconnected_event, tunnel_stopped_event,
 };
 
 use crate::backend::{
@@ -20,6 +19,16 @@ use crate::security::SecretStore;
 
 use super::{
     RemoteSftp, RemoteShell, RemoteTunnel, RusshConnection, RusshConnector, SshConnectionPlan,
+};
+
+mod cache;
+
+use cache::{
+    CachedSessionResources, CachedSessionSubresources, drop_cached_sftp_after_failed_request,
+    drop_cached_shell_after_failed_input, remote_shell_events_require_cache_drop,
+    remove_tunnel_for_session_rule, replace_cached_sftp, replace_cached_shell,
+    replace_tunnel_stopping_previous, stop_detached_tunnels, take_cached_session_runtime_resources,
+    take_cached_session_subresources,
 };
 
 #[cfg(test)]
@@ -292,12 +301,6 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
-struct CachedSessionSubresources<TShell, TSftp> {
-    shell: Option<TShell>,
-    sftp: Option<TSftp>,
-}
-
 impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
     fn execute(
         &mut self,
@@ -331,20 +334,6 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
             BackendCommand::Disconnect { session_id } => self.disconnect(session_id),
         }
     }
-}
-
-fn remote_shell_events_require_cache_drop(session_id: SessionId, events: &[BackendEvent]) -> bool {
-    events
-        .iter()
-        .any(|event| remote_shell_event_requires_cache_drop(session_id, event))
-}
-
-fn remote_shell_event_requires_cache_drop(session_id: SessionId, event: &BackendEvent) -> bool {
-    if event.session_id() != session_id {
-        return false;
-    }
-
-    event.is_terminal()
 }
 
 impl<S: SecretStore + Send> RusshBackendExecutor<S> {
@@ -398,208 +387,4 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
             );
         }
     }
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct CachedSessionResources<TShell, TSftp, TConnection> {
-    shell: Option<TShell>,
-    sftp: Option<TSftp>,
-    connection: Option<TConnection>,
-}
-
-#[derive(Debug, PartialEq, Eq)]
-struct CachedSessionRuntimeResources<TShell, TSftp, TConnection, TTunnel> {
-    cached_resources: CachedSessionResources<TShell, TSftp, TConnection>,
-    tunnels: Vec<TTunnel>,
-}
-
-/// 一次性取出会话拥有的所有后端运行态，调用方随后负责关闭或停止。
-fn take_cached_session_runtime_resources<TShell, TSftp, TConnection, TTunnel>(
-    shells: &mut HashMap<SessionId, TShell>,
-    sftps: &mut HashMap<SessionId, TSftp>,
-    connections: &mut HashMap<SessionId, TConnection>,
-    tunnels: &mut HashMap<String, TTunnel>,
-    session_id: SessionId,
-) -> CachedSessionRuntimeResources<TShell, TSftp, TConnection, TTunnel>
-where
-    TTunnel: TunnelOwner,
-{
-    CachedSessionRuntimeResources {
-        cached_resources: take_cached_session_resources(shells, sftps, connections, session_id),
-        tunnels: take_tunnels_for_session(tunnels, session_id),
-    }
-}
-
-fn take_cached_session_subresources<TShell, TSftp>(
-    shells: &mut HashMap<SessionId, TShell>,
-    sftps: &mut HashMap<SessionId, TSftp>,
-    session_id: SessionId,
-) -> CachedSessionSubresources<TShell, TSftp> {
-    CachedSessionSubresources {
-        shell: shells.remove(&session_id),
-        sftp: sftps.remove(&session_id),
-    }
-}
-
-fn take_cached_session_resources<TShell, TSftp, TConnection>(
-    shells: &mut HashMap<SessionId, TShell>,
-    sftps: &mut HashMap<SessionId, TSftp>,
-    connections: &mut HashMap<SessionId, TConnection>,
-    session_id: SessionId,
-) -> CachedSessionResources<TShell, TSftp, TConnection> {
-    CachedSessionResources {
-        shell: shells.remove(&session_id),
-        sftp: sftps.remove(&session_id),
-        connection: connections.remove(&session_id),
-    }
-}
-
-fn replace_cached_shell<TShell>(
-    shells: &mut HashMap<SessionId, TShell>,
-    session_id: SessionId,
-    shell: TShell,
-) -> Option<TShell> {
-    shells.insert(session_id, shell)
-}
-
-fn replace_cached_sftp<TSftp>(
-    sftps: &mut HashMap<SessionId, TSftp>,
-    session_id: SessionId,
-    sftp: TSftp,
-) -> Option<TSftp> {
-    sftps.insert(session_id, sftp)
-}
-
-fn remove_tunnel_for_session_rule<TTunnel>(
-    tunnels: &mut HashMap<String, TTunnel>,
-    session_id: SessionId,
-    rule_name: &str,
-) -> Option<TTunnel>
-where
-    TTunnel: TunnelOwner,
-{
-    if !tunnels
-        .get(rule_name)
-        .is_some_and(|tunnel| tunnel.session_id() == session_id)
-    {
-        return None;
-    }
-
-    tunnels.remove(rule_name)
-}
-
-trait TunnelOwner {
-    fn session_id(&self) -> SessionId;
-}
-
-trait StoppableTunnel {
-    fn stop(&self);
-}
-
-impl TunnelOwner for RemoteTunnel {
-    fn session_id(&self) -> SessionId {
-        self.session_id()
-    }
-}
-
-impl StoppableTunnel for RemoteTunnel {
-    fn stop(&self) {
-        RemoteTunnel::stop(self);
-    }
-}
-
-fn replace_tunnel_stopping_previous<TTunnel>(
-    tunnels: &mut HashMap<String, TTunnel>,
-    tunnel: TTunnel,
-) where
-    TTunnel: RuleNamedTunnel + StoppableTunnel,
-{
-    if let Some(previous) = tunnels.insert(tunnel.rule_name().to_owned(), tunnel) {
-        previous.stop();
-    }
-}
-
-fn take_tunnels_for_session<TTunnel>(
-    tunnels: &mut HashMap<String, TTunnel>,
-    session_id: SessionId,
-) -> Vec<TTunnel>
-where
-    TTunnel: TunnelOwner,
-{
-    let rule_names = tunnels
-        .iter()
-        .filter_map(|(rule_name, tunnel)| {
-            (tunnel.session_id() == session_id).then(|| rule_name.clone())
-        })
-        .collect::<Vec<_>>();
-
-    rule_names
-        .into_iter()
-        .filter_map(|rule_name| tunnels.remove(&rule_name))
-        .collect()
-}
-
-fn stop_detached_tunnels<TTunnel>(
-    session_id: SessionId,
-    tunnels: Vec<TTunnel>,
-    operation: &'static str,
-) where
-    TTunnel: RuleNamedTunnel + StoppableTunnel,
-{
-    for tunnel in tunnels {
-        let rule_name = tunnel.rule_name().to_owned();
-        tunnel.stop();
-        tracing::warn!(
-            session_id = %session_id.0,
-            operation,
-            rule_name,
-            "stopped detached SSH tunnel"
-        );
-    }
-}
-
-trait RuleNamedTunnel {
-    fn rule_name(&self) -> &str;
-}
-
-impl RuleNamedTunnel for RemoteTunnel {
-    fn rule_name(&self) -> &str {
-        RemoteTunnel::rule_name(self)
-    }
-}
-
-fn drop_cached_shell_after_failed_input<T>(
-    shells: &mut HashMap<SessionId, T>,
-    session_id: SessionId,
-    result: &Result<(), BackendExecutionError>,
-) -> bool {
-    if !shell_input_result_requires_session_drop(result) {
-        return false;
-    }
-
-    shells.remove(&session_id).is_some()
-}
-
-fn shell_input_result_requires_session_drop(result: &Result<(), BackendExecutionError>) -> bool {
-    result
-        .as_ref()
-        .is_err_and(|error| is_channel_failure(error))
-}
-
-fn drop_cached_sftp_after_failed_request<T>(
-    sftps: &mut HashMap<SessionId, T>,
-    session_id: SessionId,
-    result: &Result<Vec<BackendEvent>, BackendExecutionError>,
-) -> bool {
-    if !sftp_result_requires_session_drop(result) {
-        return false;
-    }
-
-    sftps.remove(&session_id).is_some()
-}
-
-fn sftp_result_requires_session_drop(
-    result: &Result<Vec<BackendEvent>, BackendExecutionError>,
-) -> bool {
-    result.as_ref().is_err_and(|error| is_sftp_failure(error))
 }
