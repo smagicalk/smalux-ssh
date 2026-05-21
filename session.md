@@ -767,3 +767,17 @@
   - `cargo test --lib model::app_state::launch_tests::sftp -- --nocapture` 通过，`36 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：生产侧核心大聚合文件已基本拆完；继续按模块化原则整理测试聚合文件，优先 `backend_pump_tests.rs` 或 `tests.rs`。
+
+## 本轮核心拆分：Tunnel 启停调度
+
+- 目标：继续拆 `launch_tunnel.rs`，把隧道启动、隧道停止和标签页查询辅助函数分离。
+- 已完成：`launch_tunnel.rs` 变成薄模块入口，只挂载 tunnel 子模块。
+- 已完成：新增 `launch_tunnel/start.rs`，集中隧道规则校验、管理标签页创建、runtime 记录、最近连接记录和 StartTunnel 后端命令排队。
+- 已完成：新增 `launch_tunnel/stop.rs`，集中停止请求校验、运行态状态判断、Stopping 标记和 StopTunnel 后端命令排队。
+- 已完成：新增 `launch_tunnel/lookup.rs`，集中同名隧道标签页检测和停止目标标签页匹配。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `8.89s`
+  - `cargo test --lib model::app_state::launch_tests::tunnel -- --nocapture` 通过，`12 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：生产侧核心聚合点继续收尾，优先评估 `backend_events.rs` 或 `snippets.rs`；测试聚合文件随后按领域迁移。
