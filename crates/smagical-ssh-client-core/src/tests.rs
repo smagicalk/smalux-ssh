@@ -656,8 +656,18 @@ fn remote_tunnel_reports_endpoint_and_can_stop() {
     assert_eq!(tunnel.session_id(), session_id);
     assert_eq!(tunnel.rule_name(), "proxy");
     assert_eq!(tunnel.bind_endpoint(), "127.0.0.1:1080");
+    assert!(tunnel_is_running(&running));
     tunnel.stop();
-    assert!(!running.load(Ordering::SeqCst));
+    assert!(!tunnel_is_running(&running));
+}
+
+#[test]
+fn tunnel_running_flag_uses_shared_atomic_state() {
+    let running = AtomicBool::new(true);
+    assert!(tunnel_is_running(&running));
+
+    running.store(false, Ordering::SeqCst);
+    assert!(!tunnel_is_running(&running));
 }
 
 #[test]

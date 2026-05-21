@@ -1,16 +1,15 @@
 //! SSH 端口转发和隧道运行时。
 
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::sync::{Arc, atomic::AtomicBool};
 
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::time::timeout;
 
 use crate::backend::{BackendEvent, BackendExecutionError, TunnelStartRequest};
 use crate::model::{SessionId, TunnelKind};
-use smagical_ssh_client_core::{TUNNEL_ACCEPT_TICK, tunnel_error, tunnel_running_event};
+use smagical_ssh_client_core::{
+    TUNNEL_ACCEPT_TICK, tunnel_error, tunnel_is_running, tunnel_running_event,
+};
 
 use super::super::RusshConnection;
 
@@ -54,7 +53,7 @@ impl RusshConnection {
         let running_loop = running.clone();
 
         tokio::spawn(async move {
-            while running_loop.load(Ordering::SeqCst) {
+            while tunnel_is_running(&running_loop) {
                 let Ok(accepted) = accept_with_tick(&listener).await else {
                     break;
                 };
@@ -100,7 +99,7 @@ impl RusshConnection {
         let running_loop = running.clone();
 
         tokio::spawn(async move {
-            while running_loop.load(Ordering::SeqCst) {
+            while tunnel_is_running(&running_loop) {
                 let Ok(accepted) = accept_with_tick(&listener).await else {
                     break;
                 };
@@ -155,7 +154,7 @@ impl RusshConnection {
         let bind_host_for_cancel = rule.bind_host.clone();
         let bind_port_for_cancel = rule.bind_port;
         tokio::spawn(async move {
-            while running_loop.load(Ordering::SeqCst) {
+            while tunnel_is_running(&running_loop) {
                 let channel = match timeout(TUNNEL_ACCEPT_TICK, forwarded_channels.recv()).await {
                     Ok(Some(channel)) => channel,
                     Ok(None) => break,

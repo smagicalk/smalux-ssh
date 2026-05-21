@@ -76,6 +76,11 @@ pub fn remote_tunnel(
     }
 }
 
+/// 判断隧道循环是否仍应继续运行。
+pub fn tunnel_is_running(running: &AtomicBool) -> bool {
+    running.load(Ordering::SeqCst)
+}
+
 /// 创建隧道状态事件。
 pub fn tunnel_status_event(
     session_id: SessionId,

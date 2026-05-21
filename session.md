@@ -8,7 +8,7 @@
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
 - 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
-- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 host key/connection 错误分流 helper、主机密钥策略选择 helper、SSH channel/executor operation 常量、SFTP operation 常量、远程 shell drain 停止判断 helper、ssh-agent 身份缺失认证错误 helper、SSH/SFTP 错误分类 helper、SSH 未连接会话错误 helper、SSH 连接错误 helper、SSH 连接生命周期事件 helper、SSH executor 隧道停止事件 helper、SFTP 目录事件 helper、SSH channel 生命周期事件 helper、SSH 隧道状态事件 helper、SSH 隧道轮询 tick 常量、SSH 隧道内部名常量、SSH 隧道双向复制 helper、SSH 隧道错误 helper、SSH 认证拒绝 helper、SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
+- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 tunnel running 判断 helper、host key/connection 错误分流 helper、主机密钥策略选择 helper、SSH channel/executor operation 常量、SFTP operation 常量、远程 shell drain 停止判断 helper、ssh-agent 身份缺失认证错误 helper、SSH/SFTP 错误分类 helper、SSH 未连接会话错误 helper、SSH 连接错误 helper、SSH 连接生命周期事件 helper、SSH executor 隧道停止事件 helper、SFTP 目录事件 helper、SSH channel 生命周期事件 helper、SSH 隧道状态事件 helper、SSH 隧道轮询 tick 常量、SSH 隧道内部名常量、SSH 隧道双向复制 helper、SSH 隧道错误 helper、SSH 认证拒绝 helper、SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
 
 ## 当前进度
 
@@ -147,6 +147,7 @@
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，集中 SSH channel/session/executor operation 错误标签常量；真实 channel 打开、PTY、shell、exec 和 executor 资源查找仍留在主 crate，只复用 core 常量保持错误标签一致。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移主机密钥策略选择 helper；`RusshConnector` 不再持有计划 known_hosts 覆盖默认策略的纯 match，真实连接和认证编排仍留在主 crate。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 host key/connection 错误分流 helper；`RusshConnector` 不再保留被拒绝主机密钥优先于连接错误的纯分流逻辑，真实 `russh::client::connect` 调用仍留在主 crate。
+- 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 tunnel running 判断 helper；Local/Dynamic/Remote 隧道循环不再直接读取 `AtomicBool` 和 `Ordering`，真实监听、转发和 cancel 逻辑仍留在主 crate。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
 - 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
@@ -194,12 +195,14 @@
 - 编译速度事实：集中 SSH channel/executor operation 常量后，首次 `cargo fmt --check` 发现导出列表格式差异，已运行 `cargo fmt` 修复；`cargo test -p smagical-ssh-client-core ssh_channel_operation_names -- --nocapture` 通过，1 个常量稳定性测试成功；`cargo test -p smagical-ssh-client-core` 通过，60 个客户端核心测试全部成功；`cargo check` 通过，用时约 `5.65s`；`cargo fmt --check` 复验通过；完整 `cargo test` 通过，`249 passed`。
 - 编译速度事实：迁移主机密钥策略选择 helper 后，首次 `cargo fmt --check` 发现一个多余空行，已运行 `cargo fmt` 修复；`cargo test -p smagical-ssh-client-core host_key_policy_for_known_hosts -- --nocapture` 通过，3 个策略选择测试成功；`cargo test -p smagical-ssh-client-core` 通过，63 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::tests -- --nocapture` 通过，3 个 SSH client 调用面测试成功；`cargo check` 通过，用时约 `6.34s`；`cargo fmt --check` 复验通过；完整 `cargo test` 通过，`248 passed`，减少的 1 个主 crate 测试已迁入 core。
 - 编译速度事实：迁移 host key/connection 错误分流 helper 后，首次 `cargo fmt --check` 发现导出列表格式差异，已运行 `cargo fmt` 修复；首次 SSH client 调用面测试发现 `disconnect()` 仍需 `connection_error` 导入，已补回；`cargo test -p smagical-ssh-client-core ssh_error_helpers -- --nocapture` 通过，1 个错误 helper 聚焦测试成功；`cargo test -p smagical-ssh-client-core` 通过，63 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::tests -- --nocapture` 修复后通过，1 个 SSH client 调用面测试成功；`cargo check` 通过，用时约 `5.76s`；`cargo fmt --check` 复验通过；完整 `cargo test` 通过，`246 passed`，减少的 2 个主 crate 测试已迁入 core。
+- 编译速度事实：迁移 tunnel running 判断 helper 后，首次 `cargo fmt --check` 发现导出列表格式差异，已运行 `cargo fmt` 修复；`cargo test -p smagical-ssh-client-core tunnel_running -- --nocapture` 通过，1 个 running flag 测试成功；`cargo test -p smagical-ssh-client-core` 通过，64 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::session::tunnel -- --nocapture` 通过，2 个 tunnel 调用面测试成功；`cargo check` 通过，用时约 `6.30s`；`cargo fmt --check` 复验通过；完整 `cargo test` 通过，`246 passed`。
 - 编译速度事实：本轮 `cargo check` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`git diff --check` 仅有 CRLF 提示，无实际 diff 错误。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮提交：拆出 host key/connection 错误分流 helper 并整理恢复记录
+- 本轮提交：拆出 tunnel running 判断 helper 并整理恢复记录
+- `f378f36 拆出 host key 错误分流 helper`
 - `3498693 拆出主机密钥策略选择 helper`
 - `33f5c6f 集中 SSH operation 常量`
 - `1db177c 集中 SFTP operation 常量`
