@@ -52,6 +52,20 @@ impl HostKeyPolicy {
     }
 }
 
+/// 根据连接计划中的 Known Hosts 覆盖默认策略。
+pub fn host_key_policy_for_known_hosts(
+    configured_policy: &HostKeyPolicy,
+    plan_known_hosts: &[KnownHostEntry],
+) -> HostKeyPolicy {
+    match configured_policy {
+        HostKeyPolicy::AcceptAny => HostKeyPolicy::AcceptAny,
+        HostKeyPolicy::KnownHosts(configured) if plan_known_hosts.is_empty() => {
+            HostKeyPolicy::KnownHosts(configured.clone())
+        }
+        HostKeyPolicy::KnownHosts(_) => HostKeyPolicy::KnownHosts(plan_known_hosts.to_vec()),
+    }
+}
+
 /// 单次主机密钥校验结果。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostKeyCheck {

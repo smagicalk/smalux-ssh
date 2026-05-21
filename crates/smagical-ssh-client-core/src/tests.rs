@@ -169,6 +169,62 @@ fn known_hosts_policy_treats_unmatched_host_or_port_as_unknown() {
 }
 
 #[test]
+fn host_key_policy_for_known_hosts_prefers_plan_entries() {
+    let configured_policy = HostKeyPolicy::KnownHosts(vec![KnownHostEntry {
+        host: "configured.example.com".to_owned(),
+        port: 22,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        fingerprint: "SHA256:configured".to_owned(),
+        trusted: true,
+    }]);
+    let plan_known_hosts = vec![KnownHostEntry {
+        host: "example.com".to_owned(),
+        port: 22,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        fingerprint: "SHA256:plan".to_owned(),
+        trusted: true,
+    }];
+
+    assert_eq!(
+        host_key_policy_for_known_hosts(&configured_policy, &plan_known_hosts),
+        HostKeyPolicy::KnownHosts(plan_known_hosts)
+    );
+}
+
+#[test]
+fn host_key_policy_for_known_hosts_keeps_configured_policy_without_plan_entries() {
+    let configured_entries = vec![KnownHostEntry {
+        host: "configured.example.com".to_owned(),
+        port: 22,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        fingerprint: "SHA256:configured".to_owned(),
+        trusted: true,
+    }];
+    let configured_policy = HostKeyPolicy::KnownHosts(configured_entries.clone());
+
+    assert_eq!(
+        host_key_policy_for_known_hosts(&configured_policy, &[]),
+        HostKeyPolicy::KnownHosts(configured_entries)
+    );
+}
+
+#[test]
+fn host_key_policy_for_known_hosts_keeps_accept_any_policy() {
+    let plan_known_hosts = vec![KnownHostEntry {
+        host: "example.com".to_owned(),
+        port: 22,
+        key_algorithm: KeyAlgorithm::Ed25519,
+        fingerprint: "SHA256:plan".to_owned(),
+        trusted: true,
+    }];
+
+    assert_eq!(
+        host_key_policy_for_known_hosts(&HostKeyPolicy::AcceptAny, &plan_known_hosts),
+        HostKeyPolicy::AcceptAny
+    );
+}
+
+#[test]
 fn host_key_algorithm_maps_public_key_algorithm() {
     let key = sample_public_key();
 

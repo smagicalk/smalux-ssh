@@ -5,7 +5,7 @@ use std::sync::Arc;
 use russh::client;
 use smagical_ssh_client_core::{
     authenticated_event, authenticating_event, connected_event, connecting_event, connection_error,
-    host_key_rejected_error, host_key_verified_event,
+    host_key_policy_for_known_hosts, host_key_rejected_error, host_key_verified_event,
 };
 use tokio::sync::mpsc;
 
@@ -70,7 +70,7 @@ impl RusshConnector {
         let handler = SshClientHandler::new(
             plan.host.clone(),
             plan.port,
-            self.host_key_policy_for_plan(&plan),
+            host_key_policy_for_known_hosts(&self.host_key_policy, &plan.known_hosts),
             host_key_result.clone(),
             forwarded_channels.clone(),
         );
@@ -101,16 +101,6 @@ impl RusshConnector {
             },
             events,
         })
-    }
-
-    fn host_key_policy_for_plan(&self, plan: &SshConnectionPlan) -> HostKeyPolicy {
-        match &self.host_key_policy {
-            HostKeyPolicy::AcceptAny => HostKeyPolicy::AcceptAny,
-            HostKeyPolicy::KnownHosts(configured) if plan.known_hosts.is_empty() => {
-                HostKeyPolicy::KnownHosts(configured.clone())
-            }
-            HostKeyPolicy::KnownHosts(_) => HostKeyPolicy::KnownHosts(plan.known_hosts.clone()),
-        }
     }
 }
 

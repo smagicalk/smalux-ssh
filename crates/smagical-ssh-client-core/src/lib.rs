@@ -28,7 +28,10 @@ pub use channel::{
 pub use handler::{
     ForwardedChannel, SharedForwardedChannels, SharedHostKeyResult, SshClientHandler,
 };
-pub use host_key::{HostKeyCheck, HostKeyPolicy, host_key_algorithm, host_key_fingerprint};
+pub use host_key::{
+    HostKeyCheck, HostKeyPolicy, host_key_algorithm, host_key_fingerprint,
+    host_key_policy_for_known_hosts,
+};
 pub use settings::{
     DEFAULT_INACTIVITY_TIMEOUT_SECS, DEFAULT_KEEPALIVE_INTERVAL_SECS, DEFAULT_KEEPALIVE_MAX,
     RusshClientSettings,
