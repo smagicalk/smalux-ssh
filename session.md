@@ -1043,3 +1043,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中大型测试模块，优先 `tests/close_tabs/tunnel.rs` 或 `backend_pump_tests/tunnel.rs`。
+
+## 本轮测试拆分：Close Tabs 隧道能力模块
+
+- 目标：拆分 `tests/close_tabs/tunnel.rs`，把隧道标签关闭时的 pending launch 清理、关闭前保护和 runtime 清理分离。
+- 已完成：`tests/close_tabs/tunnel.rs` 现在只保留 close tabs tunnel 测试模块入口和共享 `tunnel_rule` fixture。
+- 已完成：新增 `tests/close_tabs/tunnel_pending.rs`，迁移 pending tunnel tab 关闭、取消 launch 命令和 connected pending 后补 disconnect 测试。
+- 已完成：新增 `tests/close_tabs/tunnel_guard.rs`，迁移 starting 无 pending launch 与 running tunnel 需要先停止的保护测试。
+- 已完成：新增 `tests/close_tabs/tunnel_runtime.rs`，迁移只移除匹配 session runtime 和忽略其他 session running 同名规则测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::tests::close_tabs::tunnel -- --nocapture` 通过，`6 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中大型测试模块，优先 `backend_pump_tests/tunnel.rs` 或 `backend_pump_tests/basic.rs`。
