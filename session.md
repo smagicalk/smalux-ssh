@@ -605,3 +605,23 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续扫描大文件，优先拆 app_state/backend_pump 或 launch_tests 中仍然聚合的功能测试模块。
+
+## 本轮核心拆分：AppState backend pump
+
+- 目标：继续按“模块化、功能化、单一化”拆分核心队列泵，让 `backend_pump.rs` 只保留队列循环和执行器分发。
+- 已完成：新增 `backend_pump/command_eligibility.rs`，集中判断后端命令是否仍可执行。
+- 已完成：新增 `backend_pump/stale_commands.rs`，集中处理过期命令的状态收尾和队列清理。
+- 已完成：新增 `backend_pump/execution_failure.rs`，集中执行器错误到 `AppUpdateOutcome`、UI error、backend event 的归约。
+- 已完成：新增 `backend_pump/pending.rs`，集中失败路径下待执行命令丢弃和传输失败事件生成。
+- 已完成：新增 `backend_pump/transfers.rs`，集中 SFTP 传输命令识别和传输失败事件构造。
+- 已完成：新增 `backend_pump/host_keys.rs`，集中 rejected host key 的 known host 记录策略。
+- 已完成：`backend_pump.rs` 从多职责实现文件瘦身为薄入口，只保留 `drain_backend_queue` 主流程。
+- 备注：尝试按功能拆分 `backend_pump_tests.rs` 时，PowerShell 对新增测试目录和重写测试入口返回访问拒绝；未留下测试侧半成品，本轮先收口生产核心拆分。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `6.97s`
+  - `cargo test --lib model::app_state::backend_pump -- --nocapture` 通过，`33 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续优先拆大测试文件或 `launch_sftp` / `session_tabs` 等剩余聚合点；测试侧拆分建议改用 `apply_patch` 小步进行，避免 PowerShell 批量写入权限问题。
