@@ -745,3 +745,25 @@
   - `cargo test --lib model::app_state::visual_settings_tests -- --nocapture` 通过，`4 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：继续拆剩余核心聚合点；优先评估 `dispatch.rs` 的消息分发是否按领域拆到更小路由函数，或继续整理大测试文件。
+
+## 本轮核心拆分：Dispatch 领域路由
+
+- 目标：继续拆 `dispatch.rs`，把单个巨大 `match` 分成按领域的路由函数，同时保留 `Message` 顶层穷尽检查。
+- 已完成：`dispatch.rs` 变成顶层 `apply`、错误同步和领域分流入口。
+- 已完成：新增 `dispatch/visual.rs`，集中视觉设置消息分发。
+- 已完成：新增 `dispatch/workspace.rs`，集中工作区快照消息分发。
+- 已完成：新增 `dispatch/ui.rs`，集中 quick host、Workspace UI、terminal input 和主机输入草稿消息分发。
+- 已完成：新增 `dispatch/storage.rs`，集中 credential 和 known host 存储管理消息分发。
+- 已完成：新增 `dispatch/session.rs`，集中会话标签页关闭/激活消息分发。
+- 已完成：新增 `dispatch/sftp.rs`，集中 SFTP 浏览器、书签和传输消息分发。
+- 已完成：新增 `dispatch/launch.rs`，集中 shell/SFTP/remote command/tunnel 启动类消息分发。
+- 已完成：新增 `dispatch/snippets.rs`，集中命令片段和历史命令消息分发。
+- 已完成：新增 `dispatch/backend.rs`，集中后台事件消息分发。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `7.48s`
+  - `cargo test --lib model::app_state::visual_settings_tests -- --nocapture` 通过，`4 passed`
+  - `cargo test --lib model::app_state::workspace_ui -- --nocapture` 通过，`3 passed`
+  - `cargo test --lib model::app_state::launch_tests::sftp -- --nocapture` 通过，`36 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：生产侧核心大聚合文件已基本拆完；继续按模块化原则整理测试聚合文件，优先 `backend_pump_tests.rs` 或 `tests.rs`。
