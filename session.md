@@ -660,3 +660,22 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续拆 `session_tabs.rs`，按关闭流程、激活流程、SFTP browser 清理、tunnel runtime 清理和 pending command 清理分模块。
+
+## 本轮核心拆分：Session tabs 生命周期
+
+- 目标：继续拆 `session_tabs.rs`，把关闭、激活、SFTP browser 清理、tunnel runtime 清理和 pending command 清理拆成单一职责模块。
+- 已完成：`session_tabs.rs` 变成薄模块入口，只挂载生命周期子模块。
+- 已完成：新增 `session_tabs/close.rs`，集中关闭标签页主流程和 disconnect 排队。
+- 已完成：新增 `session_tabs/activate.rs`，集中激活标签页和 SFTP browser owner 激活时重分配。
+- 已完成：新增 `session_tabs/sftp_cleanup.rs`，集中关闭 SFTP 标签页后的 browser 移除或转移。
+- 已完成：新增 `session_tabs/tunnel_cleanup.rs`，集中 tunnel close gate、pending launch 判断和 runtime 移除。
+- 已完成：新增 `session_tabs/pending.rs`，集中关闭标签页时待执行 backend command 移除、queued transfer 取消和是否断连判断。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，约 `10.30s`
+  - `cargo test --lib model::app_state::tests::close -- --nocapture` 通过，`19 passed`
+  - `cargo test --lib model::app_state::tests::activate -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续扫描生产核心剩余大文件；优先拆 `ui_drafts.rs`、`workspace.rs` 或开始用小步 `apply_patch` 拆大测试文件。
