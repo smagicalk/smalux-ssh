@@ -37,6 +37,17 @@ pub fn agent_identity_error(key_hint: Option<&str>) -> String {
     }
 }
 
+/// 创建 ssh-agent 身份缺失时的后端执行错误。
+pub fn agent_identity_authentication_error(
+    username: &str,
+    key_hint: Option<&str>,
+) -> BackendExecutionError {
+    BackendExecutionError::AuthenticationFailed {
+        username: username.to_owned(),
+        reason: agent_identity_error(key_hint),
+    }
+}
+
 /// 将认证错误转换成后端执行错误。
 pub fn authentication_error(
     username: &str,

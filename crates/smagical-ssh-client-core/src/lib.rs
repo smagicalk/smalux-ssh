@@ -10,8 +10,8 @@ mod socks5;
 mod tunnel;
 
 pub use agent::{
-    agent_identity_error, authentication_error, authentication_rejected_error, decode_private_key,
-    select_agent_identity,
+    agent_identity_authentication_error, agent_identity_error, authentication_error,
+    authentication_rejected_error, decode_private_key, select_agent_identity,
 };
 pub use channel::{
     ChannelRequestStatus, authenticated_event, authenticating_event, channel_error,

@@ -8,7 +8,7 @@
 - 核心范围：SSH shell/PTY、远程命令、SFTP、端口转发/隧道、命令历史、主机/分组/标签页/最近连接、Known Hosts、凭据安全存储、Snippets、工作区恢复。
 - 工程要求：模块化、功能化、单一职责，小文件，中文注释，完整测试。
 - 本轮推进：继续收紧真实 SSH 边界，优先补纯离线测试，再把真实网络烟测后置。
-- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 SSH/SFTP 错误分类 helper、SSH 未连接会话错误 helper、SSH 连接错误 helper、SSH 连接生命周期事件 helper、SSH executor 隧道停止事件 helper、SFTP 目录事件 helper、SSH channel 生命周期事件 helper、SSH 隧道状态事件 helper、SSH 隧道轮询 tick 常量、SSH 隧道内部名常量、SSH 隧道双向复制 helper、SSH 隧道错误 helper、SSH 认证拒绝 helper、SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
+- 本轮新增：继续收口 SSH 客户端核心，`smagical-ssh-client-core` 继续承载 ssh-agent 身份缺失认证错误 helper、SSH/SFTP 错误分类 helper、SSH 未连接会话错误 helper、SSH 连接错误 helper、SSH 连接生命周期事件 helper、SSH executor 隧道停止事件 helper、SFTP 目录事件 helper、SSH channel 生命周期事件 helper、SSH 隧道状态事件 helper、SSH 隧道轮询 tick 常量、SSH 隧道内部名常量、SSH 隧道双向复制 helper、SSH 隧道错误 helper、SSH 认证拒绝 helper、SSH channel request helper、SSH 认证 helper、SSH 错误映射 helper、SSH PTY 尺寸 helper、SFTP 传输复制 helper、RemoteTunnel 运行句柄、SOCKS5 握手解析、SFTP 纯映射 helper、channel 消息映射、handler、ssh-agent 身份选择、主机密钥校验策略和 `russh` 客户端配置。
 
 ## 当前进度
 
@@ -141,6 +141,7 @@
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 SSH 连接错误 helper；`ConnectionFailed` 和 `HostKeyRejected` 错误构造集中到 core，主 crate 的 `host_key_or_connection_error` 只保留共享 host key 结果分支判断。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 SSH 未连接会话错误 helper；executor 的 open shell、shell input、run command、SFTP 和 start tunnel 前置条件复用 `connected_session_error`，真实执行器资源查找仍留在主 crate。
 - 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 SSH/SFTP 错误分类 helper；executor 的 shell/SFTP 缓存丢弃门改用 `is_channel_failure` 和 `is_sftp_failure`，不再直接匹配错误枚举结构。
+- 最新工程优化：继续扩展 `smagical-ssh-client-core`，迁移 ssh-agent 身份缺失认证错误 helper；真实 agent 连接、身份读取和公钥认证仍留在主 crate，`auth.rs` 不再直接构造认证错误枚举结构。
 - 编译速度判断：当前 Rust 源文件约 138 个、总量约 904KB，文件数量不是主要慢点；更可能来自 `slint-build`、`russh`/`aws-lc-rs`、`keyring`/Windows 依赖、宏展开和测试二进制链接。
 - 编译速度事实：收紧 build script 后，无代码变更重跑 `cargo test backend::event::tests -- --nocapture` 已从约 `20.93s` 降到约 `1.10s`；单 crate 有源码变更时仍会重新构建测试二进制。
 - 编译速度事实：lib/bin 拆分第一步后，顺序复跑 `cargo test --lib backend::event::tests -- --nocapture` 约 `1.06s`；首次并行跑 `cargo check` 与 `cargo test --lib` 会因 Cargo 文件锁互相等待，耗时不代表缓存路径。
@@ -182,12 +183,14 @@
 - 编译速度事实：迁移 SSH 连接错误 helper 后，`cargo test -p smagical-ssh-client-core` 通过，56 个客户端核心测试全部成功；`cargo test --lib backend::ssh::client::tests -- --nocapture` 通过，4 个 SSH client 调用面测试成功；`cargo check` 通过，用时约 `7.18s`；完整 `cargo test` 通过，`250 passed`。
 - 编译速度事实：迁移 SSH 未连接会话错误 helper 后，`cargo test -p smagical-ssh-client-core` 通过，56 个客户端核心测试全部成功；`cargo test --lib backend::ssh::executor::tests -- --nocapture` 通过，36 个 executor 调用面测试成功；`cargo check` 通过，用时约 `6.93s`；完整 `cargo test` 通过，`249 passed`。
 - 编译速度事实：迁移 SSH/SFTP 错误分类 helper 后，`cargo test -p smagical-ssh-client-core` 通过，56 个客户端核心测试全部成功；`cargo test --lib backend::ssh::executor::tests -- --nocapture` 通过，36 个 executor 调用面测试成功；`cargo check` 通过，用时约 `7.90s`；完整 `cargo test` 通过，`249 passed`。
+- 编译速度事实：迁移 ssh-agent 身份缺失认证错误 helper 后，`cargo test -p smagical-ssh-client-core agent_identity -- --nocapture` 通过，4 个 agent 身份相关测试成功；`cargo test -p smagical-ssh-client-core` 通过，57 个客户端核心测试全部成功；`cargo check` 通过，用时约 `8.05s`；`cargo fmt --check` 通过；完整 `cargo test` 通过，`249 passed`。
 - 编译速度事实：本轮 `cargo check` 通过，`cargo test` 通过，`cargo fmt --check` 通过，`git diff --check` 仅有 CRLF 提示，无实际 diff 错误。
 - 覆盖率事实：本地 `llvm-cov` 有效 profile 合并后整体行覆盖率约 `85.72%`，不是 100%；核心状态管理、SessionManager、SFTP/transfer/tunnel 管理大多已接近 98%+，低覆盖主要集中在真实 SSH 执行适配层、tunnel TCP/SOCKS5 运行路径和交互式 local PTY。
 
 ## 最近提交
 
-- 本轮提交：拆出 SSH/SFTP 错误分类 helper 并整理恢复记录
+- 本轮提交：拆出 ssh-agent 身份缺失认证错误 helper 并整理恢复记录
+- `5c32e2c 拆出 SSH/SFTP 错误分类 helper`
 - `cc76e3a 拆出 SSH 未连接会话错误 helper`
 - `dcf9fb0 拆出 SSH 连接错误 helper`
 - `f537119 拆出 SSH 连接生命周期事件 helper`

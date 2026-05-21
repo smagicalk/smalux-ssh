@@ -6,8 +6,8 @@ use russh::client;
 use russh::keys::agent::client::{AgentClient, AgentStream};
 use russh::keys::{Certificate, HashAlg, PrivateKeyWithHashAlg};
 use smagical_ssh_client_core::{
-    agent_identity_error, authentication_error, authentication_rejected_error, decode_private_key,
-    select_agent_identity,
+    agent_identity_authentication_error, authentication_error, authentication_rejected_error,
+    decode_private_key, select_agent_identity,
 };
 
 use super::SshClientHandler;
@@ -83,12 +83,8 @@ async fn authenticate_agent(
         .request_identities()
         .await
         .map_err(|error| authentication_error(username, error))?;
-    let public_key = select_agent_identity(&identities, key_hint).ok_or_else(|| {
-        BackendExecutionError::AuthenticationFailed {
-            username: username.to_owned(),
-            reason: agent_identity_error(key_hint),
-        }
-    })?;
+    let public_key = select_agent_identity(&identities, key_hint)
+        .ok_or_else(|| agent_identity_authentication_error(username, key_hint))?;
     let hash_alg = best_supported_rsa_hash(handle, username).await?;
 
     handle

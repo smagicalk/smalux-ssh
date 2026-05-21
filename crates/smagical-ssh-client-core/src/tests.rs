@@ -252,6 +252,19 @@ fn agent_identity_error_reports_hint_or_empty_agent() {
     assert_eq!(agent_identity_error(None), "ssh-agent 中没有可用身份");
 }
 
+#[test]
+fn agent_identity_authentication_error_preserves_username_and_hint() {
+    let error = agent_identity_authentication_error("deploy", Some("deploy-key"));
+
+    assert!(matches!(
+        error,
+        BackendExecutionError::AuthenticationFailed {
+            username,
+            reason,
+        } if username == "deploy" && reason == "ssh-agent 中没有匹配的身份：deploy-key"
+    ));
+}
+
 #[tokio::test]
 async fn handler_records_host_key_verification_result() {
     let key = sample_public_key();
