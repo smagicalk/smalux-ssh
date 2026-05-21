@@ -1013,3 +1013,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/cancel_upload_loading.rs`、`launch_tests/sftp/bookmark.rs` 或 `launch_tests/sftp/browser.rs`。
+
+## 本轮测试拆分：Backend Pump SFTP 能力模块
+
+- 目标：拆分 `backend_pump_tests/sftp.rs`，把 SFTP 队列泵的终态会话跳过、传输失败收敛和 SFTP 操作错误裁剪分离。
+- 已完成：`backend_pump_tests/sftp.rs` 现在只保留 SFTP 队列泵测试模块入口和 `FailingSftpExecutor` helper。
+- 已完成：新增 `backend_pump_tests/sftp_terminal.rs`，迁移终态 SFTP list/write 命令跳过和 browser error/loading 清理测试。
+- 已完成：新增 `backend_pump_tests/sftp_transfer.rs`，迁移终态传输、terminal error 裁剪和 executor 不支持时的传输失败收敛测试。
+- 已完成：新增 `backend_pump_tests/sftp_error.rs`，迁移 SFTP 操作错误保持会话连接、裁剪 pending transfer/write 并保留刷新命令测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::sftp -- --nocapture` 通过，`8 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中大型测试模块，优先 `tests/close_tabs/sftp.rs`、`tests/close_tabs/tunnel.rs` 或 `backend_pump_tests/tunnel.rs`。
