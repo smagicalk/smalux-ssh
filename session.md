@@ -679,3 +679,21 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续扫描生产核心剩余大文件；优先拆 `ui_drafts.rs`、`workspace.rs` 或开始用小步 `apply_patch` 拆大测试文件。
+
+## 本轮核心拆分：UI drafts 输入草稿
+
+- 目标：继续拆 `ui_drafts.rs`，把 quick host、主机作用域输入、terminal input、本地终端初始化拆成单一职责模块。
+- 已完成：`ui_drafts.rs` 变成薄模块入口，只保留 `draft_changed` 和测试用 `ensure_local_terminal_tab` re-export。
+- 已完成：新增 `ui_drafts/quick_host.rs`，集中 quick host 表单、认证草稿和保存逻辑。
+- 已完成：新增 `ui_drafts/host_inputs.rs`，集中远程命令草稿、SFTP 初始目录草稿和 SFTP action 草稿。
+- 已完成：新增 `ui_drafts/terminal_input.rs`，集中 terminal input 草稿编辑、可打印字符过滤、发送输入、历史记录和本地 echo。
+- 已完成：新增 `ui_drafts/local_terminal.rs`，集中本地终端 session/tab 确保逻辑。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check` 通过，无 warning，约 `5.40s`
+  - `cargo test --lib model::app_state::ui_drafts_tests -- --nocapture` 通过，`13 passed`
+  - `cargo test --lib model::app_state::tests::send_terminal_input -- --nocapture` 通过，`2 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续拆 `workspace.rs` 的保存、恢复、SFTP browser 恢复和 terminal tab 恢复逻辑，或开始小步拆测试聚合文件。
