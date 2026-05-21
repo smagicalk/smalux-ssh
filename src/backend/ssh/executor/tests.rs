@@ -1,5 +1,7 @@
 use super::*;
-use crate::backend::{BackendAuth, SftpRequest};
+use crate::backend::{
+    BackendAuth, ConnectionTarget, PtyRequest, RemoteCommandRequest, SftpRequest,
+};
 use crate::model::HostKeyVerification;
 use crate::model::{HostId, KeyAlgorithm, SecretRef};
 use crate::security::MemorySecretStore;

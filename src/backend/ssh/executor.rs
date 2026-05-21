@@ -1,35 +1,19 @@
 //! `russh` 后端执行器。
 
 use std::collections::HashMap;
-use std::time::Duration;
-
 use tokio::runtime::Runtime;
 
-use smagical_ssh_client_core::{
-    OPEN_SHELL_OPERATION, RUN_COMMAND_OPERATION, SEND_SHELL_INPUT_OPERATION, SFTP_OPERATION,
-    START_TUNNEL_OPERATION, connected_session_error, disconnected_event, tunnel_stopped_event,
-};
-
-use crate::backend::{
-    BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, ConnectionTarget,
-    PtyRequest, RemoteCommandRequest, SftpRequest, TunnelStartRequest, TunnelStopRequest,
-};
+use crate::backend::{BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor};
 use crate::model::SessionId;
 use crate::security::SecretStore;
 
-use super::{
-    RemoteSftp, RemoteShell, RemoteTunnel, RusshConnection, RusshConnector, SshConnectionPlan,
-};
+use super::{RemoteSftp, RemoteShell, RemoteTunnel, RusshConnection, RusshConnector};
 
 mod cache;
-
-use cache::{
-    CachedSessionResources, CachedSessionSubresources, drop_cached_sftp_after_failed_request,
-    drop_cached_shell_after_failed_input, remote_shell_events_require_cache_drop,
-    remove_tunnel_for_session_rule, replace_cached_sftp, replace_cached_shell,
-    replace_tunnel_stopping_previous, stop_detached_tunnels, take_cached_session_runtime_resources,
-    take_cached_session_subresources,
-};
+mod session_runtime;
+mod sftp_runtime;
+mod shell_runtime;
+mod tunnel_runtime;
 
 #[cfg(test)]
 mod tests;
@@ -44,9 +28,6 @@ pub struct RusshBackendExecutor<S: SecretStore + Send> {
     sftps: HashMap<SessionId, RemoteSftp>,
     tunnels: HashMap<String, RemoteTunnel>,
 }
-
-const REMOTE_SHELL_DRAIN_MAX_EVENTS: usize = 64;
-const REMOTE_SHELL_DRAIN_POLL_TIMEOUT: Duration = Duration::from_millis(1);
 
 impl<S: SecretStore + Send> RusshBackendExecutor<S> {
     /// 创建使用默认连接器的真实 SSH 执行器。
@@ -86,219 +67,6 @@ impl<S: SecretStore + Send> RusshBackendExecutor<S> {
     pub fn tunnel_count(&self) -> usize {
         self.tunnels.len()
     }
-
-    fn connect(
-        &mut self,
-        session_id: SessionId,
-        target: ConnectionTarget,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let plan = SshConnectionPlan::from_target(&target, &self.secret_store)?;
-        let report = self
-            .runtime
-            .block_on(self.connector.connect(session_id, plan))?;
-        let stale_runtime = take_cached_session_runtime_resources(
-            &mut self.shells,
-            &mut self.sftps,
-            &mut self.connections,
-            &mut self.tunnels,
-            session_id,
-        );
-        self.close_stale_session_resources(session_id, stale_runtime.cached_resources);
-        stop_detached_tunnels(session_id, stale_runtime.tunnels, "reconnecting");
-        self.connections.insert(session_id, report.connection);
-        Ok(report.events)
-    }
-
-    fn open_shell(
-        &mut self,
-        session_id: SessionId,
-        pty: PtyRequest,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let runtime = &self.runtime;
-        let connection = self
-            .connections
-            .get_mut(&session_id)
-            .ok_or_else(|| connected_session_error(OPEN_SHELL_OPERATION))?;
-        let report = runtime.block_on(connection.open_shell(session_id, &pty))?;
-        let previous_shell = replace_cached_shell(&mut self.shells, session_id, report.shell);
-        self.close_detached_shell_input(session_id, previous_shell, "opening shell");
-        Ok(report.events)
-    }
-
-    fn send_shell_input(
-        &mut self,
-        session_id: SessionId,
-        input: String,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let runtime = &self.runtime;
-        let shell = self
-            .shells
-            .get(&session_id)
-            .ok_or_else(|| connected_session_error(SEND_SHELL_INPUT_OPERATION))?;
-        let result = runtime.block_on(shell.send_input(input.as_bytes()));
-        drop_cached_shell_after_failed_input(&mut self.shells, session_id, &result);
-        result?;
-        Ok(Vec::new())
-    }
-
-    fn drain_session_output(
-        &mut self,
-        session_id: SessionId,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let runtime = &self.runtime;
-        let Some(shell) = self.shells.get_mut(&session_id) else {
-            return Ok(Vec::new());
-        };
-        let events = runtime.block_on(shell.drain_ready_events(
-            REMOTE_SHELL_DRAIN_MAX_EVENTS,
-            REMOTE_SHELL_DRAIN_POLL_TIMEOUT,
-        ));
-
-        if remote_shell_events_require_cache_drop(session_id, &events) {
-            self.shells.remove(&session_id);
-        }
-
-        Ok(events)
-    }
-
-    fn run_command(
-        &mut self,
-        session_id: SessionId,
-        request: RemoteCommandRequest,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let runtime = &self.runtime;
-        let connection = self
-            .connections
-            .get_mut(&session_id)
-            .ok_or_else(|| connected_session_error(RUN_COMMAND_OPERATION))?;
-        runtime.block_on(connection.run_command(session_id, &request))
-    }
-
-    fn sftp(
-        &mut self,
-        session_id: SessionId,
-        request: SftpRequest,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        if !self.sftps.contains_key(&session_id) {
-            let runtime = &self.runtime;
-            let connection = self
-                .connections
-                .get_mut(&session_id)
-                .ok_or_else(|| connected_session_error(SFTP_OPERATION))?;
-            let sftp = runtime.block_on(connection.open_sftp(session_id))?;
-            let previous_sftp = replace_cached_sftp(&mut self.sftps, session_id, sftp);
-            self.close_detached_sftp(session_id, previous_sftp, "opening sftp");
-        }
-
-        let sftp = self
-            .sftps
-            .get(&session_id)
-            .ok_or_else(|| connected_session_error(SFTP_OPERATION))?;
-        let result = self.runtime.block_on(sftp.execute(request));
-        drop_cached_sftp_after_failed_request(&mut self.sftps, session_id, &result);
-        result
-    }
-
-    fn start_tunnel(
-        &mut self,
-        session_id: SessionId,
-        request: TunnelStartRequest,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let connection = self
-            .connections
-            .remove(&session_id)
-            .ok_or_else(|| connected_session_error(START_TUNNEL_OPERATION))?;
-        let stale_subresources =
-            take_cached_session_subresources(&mut self.shells, &mut self.sftps, session_id);
-        self.close_stale_session_subresources(session_id, stale_subresources, "starting tunnel");
-        let (tunnel, events) = self
-            .runtime
-            .block_on(connection.into_tunnel(session_id, request))?;
-        replace_tunnel_stopping_previous(&mut self.tunnels, tunnel);
-        Ok(events)
-    }
-
-    fn stop_tunnel(
-        &mut self,
-        session_id: SessionId,
-        request: TunnelStopRequest,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let rule_name = request.rule_name;
-        if let Some(tunnel) =
-            remove_tunnel_for_session_rule(&mut self.tunnels, session_id, &rule_name)
-        {
-            tunnel.stop();
-        }
-
-        Ok(vec![tunnel_stopped_event(session_id, rule_name)])
-    }
-
-    fn disconnect(
-        &mut self,
-        session_id: SessionId,
-    ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        let resources = take_cached_session_runtime_resources(
-            &mut self.shells,
-            &mut self.sftps,
-            &mut self.connections,
-            &mut self.tunnels,
-            session_id,
-        );
-        self.close_disconnected_session_resources(session_id, resources.cached_resources);
-        stop_detached_tunnels(session_id, resources.tunnels, "disconnecting");
-
-        Ok(vec![disconnected_event(session_id)])
-    }
-
-    fn close_stale_session_resources(
-        &self,
-        session_id: SessionId,
-        resources: CachedSessionResources<RemoteShell, RemoteSftp, RusshConnection>,
-    ) {
-        self.close_stale_session_subresources(
-            session_id,
-            CachedSessionSubresources {
-                shell: resources.shell,
-                sftp: resources.sftp,
-            },
-            "reconnecting",
-        );
-
-        if let Some(connection) = resources.connection
-            && let Err(error) = self.runtime.block_on(connection.disconnect())
-        {
-            tracing::warn!(
-                session_id = %session_id.0,
-                error = %error,
-                "failed to disconnect stale SSH connection before reconnect"
-            );
-        }
-    }
-
-    fn close_disconnected_session_resources(
-        &self,
-        session_id: SessionId,
-        resources: CachedSessionResources<RemoteShell, RemoteSftp, RusshConnection>,
-    ) {
-        self.close_stale_session_subresources(
-            session_id,
-            CachedSessionSubresources {
-                shell: resources.shell,
-                sftp: resources.sftp,
-            },
-            "disconnecting",
-        );
-
-        if let Some(connection) = resources.connection
-            && let Err(error) = self.runtime.block_on(connection.disconnect())
-        {
-            tracing::warn!(
-                session_id = %session_id.0,
-                error = %error,
-                "failed to disconnect SSH connection"
-            );
-        }
-    }
 }
 
 impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
@@ -332,59 +100,6 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
                 request,
             } => self.stop_tunnel(session_id, request),
             BackendCommand::Disconnect { session_id } => self.disconnect(session_id),
-        }
-    }
-}
-
-impl<S: SecretStore + Send> RusshBackendExecutor<S> {
-    fn close_stale_session_subresources(
-        &self,
-        session_id: SessionId,
-        resources: CachedSessionSubresources<RemoteShell, RemoteSftp>,
-        operation: &'static str,
-    ) {
-        self.close_detached_shell_input(session_id, resources.shell, operation);
-
-        self.close_detached_sftp(session_id, resources.sftp, operation);
-    }
-
-    fn close_detached_sftp(
-        &self,
-        session_id: SessionId,
-        sftp: Option<RemoteSftp>,
-        operation: &'static str,
-    ) {
-        let Some(sftp) = sftp else {
-            return;
-        };
-
-        if let Err(error) = self.runtime.block_on(sftp.close()) {
-            tracing::warn!(
-                session_id = %session_id.0,
-                operation,
-                error = %error,
-                "failed to close detached SFTP session"
-            );
-        }
-    }
-
-    fn close_detached_shell_input(
-        &self,
-        session_id: SessionId,
-        shell: Option<RemoteShell>,
-        operation: &'static str,
-    ) {
-        let Some(shell) = shell else {
-            return;
-        };
-
-        if let Err(error) = self.runtime.block_on(shell.close_input()) {
-            tracing::warn!(
-                session_id = %session_id.0,
-                operation,
-                error = %error,
-                "failed to close detached remote shell input"
-            );
         }
     }
 }

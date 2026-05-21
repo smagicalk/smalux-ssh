@@ -571,3 +571,20 @@
   - `git diff --check` 通过，仅 Windows CRLF 提示
   - BOM 与中文抽样检查通过
 - 下一步：继续按能力拆 `executor`，优先把 shell / SFTP / tunnel runtime 分别拆成单一职责模块，避免后续加功能继续堆到 `executor.rs`。
+
+## 本轮能力模块拆分：SSH executor runtime
+
+- 目标：继续按“模块化、功能化、单一化”拆分 executor，让 `executor.rs` 变成薄分发层。
+- 已完成：新增 `session_runtime.rs`，承载 connect / disconnect 和会话资源关闭生命周期。
+- 已完成：新增 `shell_runtime.rs`，承载 open shell、send shell input、drain output、run command 和 detached shell input 关闭。
+- 已完成：新增 `sftp_runtime.rs`，承载 SFTP 打开、请求执行、失败后缓存清理和 detached SFTP 关闭。
+- 已完成：新增 `tunnel_runtime.rs`，承载 start tunnel / stop tunnel 和启动隧道前的 shell/SFTP 子资源清理。
+- 已完成：`executor.rs` 现在只保留结构体、构造、缓存计数和 `BackendCommand` 分发；测试依赖改为显式导入后端请求类型。
+- 验证记录：
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check` 通过，约 `1.12s`
+  - `cargo test` 通过，`246 passed`
+  - `cargo fmt --check` 通过
+  - `git diff --check` 通过，仅 Windows CRLF 提示
+  - BOM 与中文抽样检查通过
+- 下一步：继续检查其它大文件是否仍是多职责聚合点，优先拆测试或 app state/backend pump 中的功能模块。
