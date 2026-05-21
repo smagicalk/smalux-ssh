@@ -871,3 +871,21 @@
   - `cargo test --lib model::app_state::backend_pump_tests -- --nocapture` 通过，`33 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：继续拆 `backend_pump_tests.rs`，优先迁移 terminal/stale command eligibility 相关测试。
+
+## 本轮测试拆分：Backend pump 能力模块
+
+- 目标：继续拆 `backend_pump_tests.rs`，按后端队列泵能力把终态命令、SFTP、隧道和本地终端测试模块化。
+- 已完成：新增 `backend_pump_tests/connect.rs`，迁移 Connect 终态跳过、host 不匹配和 stale connect 尾队列裁剪测试。
+- 已完成：新增 `backend_pump_tests/terminal.rs`，迁移 OpenShell、RunCommand、DrainSessionOutput 和 SendShellInput 终态跳过测试。
+- 已完成：新增 `backend_pump_tests/sftp.rs`，迁移 SFTP list、transfer/write 失败清理、SFTP 操作错误和 pending SFTP 命令裁剪测试，并把 `FailingSftpExecutor` 移入该模块。
+- 已完成：新增 `backend_pump_tests/tunnel.rs`，迁移隧道启动失败、终态 start/stop 跳过和 stale stop 保护测试。
+- 已完成：新增 `backend_pump_tests/local_terminal.rs`，迁移本地终端输入可见性和立即清空输入草稿测试。
+- 已完成：`backend_pump_tests.rs` 现在只保留共享 fixture、模块声明和空队列 no-op 测试，后续新增队列泵行为可以直接落到对应能力模块。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::connect -- --nocapture` 通过，`4 passed`
+  - `cargo test --lib model::app_state::backend_pump_tests -- --nocapture` 通过，`33 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且中文断言文本正常
+- 下一步：继续拆剩余测试聚合文件，优先 `launch_tests/sftp.rs` 或 `app_state/tests.rs`。
