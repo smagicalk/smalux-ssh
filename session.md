@@ -1176,3 +1176,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/transfer_download.rs`、`launch_tests/sftp/file_actions.rs` 或 `launch_tests/tunnel_stop.rs`。
+
+## 本轮测试拆分：SFTP 下载传输能力模块
+
+- 目标：拆分 `launch_tests/sftp/transfer_download.rs`，和上传传输测试保持同样的薄入口与能力子模块结构。
+- 已完成：`launch_tests/sftp/transfer_download.rs` 现在只保留下载传输测试模块入口。
+- 已完成：新增 `launch_tests/sftp/transfer_download_success.rs`，迁移下载消息创建 transfer 并队列化 SFTP download request 的成功路径测试。
+- 已完成：新增 `launch_tests/sftp/transfer_download_owner.rs`，迁移下载不改变 browser loading，以及无效 remote path 不重分配 owner 的测试。
+- 已完成：新增 `launch_tests/sftp/transfer_download_validation.rs`，迁移空 remote path 和根目录 remote path 拒绝下载测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::transfer::download -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/file_actions.rs`、`launch_tests/tunnel_stop.rs` 或 `backend_pump_tests/terminal.rs`。
