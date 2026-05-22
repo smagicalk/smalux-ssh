@@ -1250,3 +1250,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余 AppState 大模块，优先 `snippets_tests/run.rs`、`backend_pump_tests/sftp_error.rs` 或 `backend_pump_tests/sftp_transfer.rs`。
+
+## 本轮测试拆分：Snippets Run 能力模块
+
+- 目标：拆分 `snippets_tests/run.rs`，把快捷命令运行成功、运行校验和参数化变量场景分离。
+- 已完成：`snippets_tests/run.rs` 现在只保留 run snippets 测试模块入口。
+- 已完成：新增 `snippets_tests/run_success.rs`，迁移渲染并执行远程命令的成功路径测试。
+- 已完成：新增 `snippets_tests/run_validation.rs`，迁移跨 host snippet 拒绝和空渲染结果无副作用测试。
+- 已完成：新增 `snippets_tests/run_arguments.rs`，迁移缺失必填变量提示和更新变量后允许运行测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::snippets_tests::run -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余 AppState 大模块，优先 `backend_pump_tests/sftp_error.rs`、`backend_pump_tests/sftp_transfer.rs` 或生产侧 `ui_drafts/terminal_input.rs`。
