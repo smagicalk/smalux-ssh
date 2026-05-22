@@ -1405,3 +1405,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `ui_drafts_tests/terminal_input.rs`、`tests/activation.rs` 或 `tests/close_tabs/shell.rs`。
+
+## 本轮测试拆分：UI Draft Terminal Input 能力模块
+
+- 目标：拆分 `ui_drafts_tests/terminal_input.rs`，把终端输入草稿编辑和本地终端发送行为分离。
+- 已完成：`terminal_input.rs` 现在只保留 terminal input draft 测试聚合入口。
+- 已完成：新增 `terminal_input_draft.rs`，迁移输入草稿更新、追加和退格不触发 backend 副作用的测试。
+- 已完成：新增 `terminal_input_local.rs`，迁移本地终端初始化、非空输入发送和空回车发送换行的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::ui_drafts_tests::terminal_input -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `tests/activation.rs`、`tests/close_tabs/shell.rs` 或 `backend_pump_tests/terminal_shell.rs`。
