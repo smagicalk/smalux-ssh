@@ -1325,3 +1325,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余 AppState 大模块，优先 `tests/close_tabs/sftp_owner.rs`、`visual_settings/host.rs` 或 `dispatch.rs`。
+
+## 本轮测试拆分：Close Tabs SFTP Owner 能力模块
+
+- 目标：拆分 `tests/close_tabs/sftp_owner.rs`，把关闭 SFTP tab 后 browser owner 的 stale/current/pending/available 分支分离。
+- 已完成：`sftp_owner.rs` 现在只保留 SFTP owner 测试聚合入口。
+- 已完成：新增 `sftp_owner_stale.rs`，迁移关闭陈旧 SFTP tab 时保持当前 browser owner 的测试。
+- 已完成：新增 `sftp_owner_current.rs`，迁移关闭当前 SFTP tab 并重分配 browser owner 的基础测试。
+- 已完成：新增 `sftp_owner_pending.rs`，迁移关闭 pending SFTP tab 时重分配 browser 且清理 loading 的测试。
+- 已完成：新增 `sftp_owner_available.rs`，迁移优先分配到 connected session 和只剩 disconnected tabs 时移除 browser 的测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::tests::close_tabs::sftp::owner -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `visual_settings/host.rs`、`dispatch.rs` 或 `launch_tests/tunnel_start.rs`。
