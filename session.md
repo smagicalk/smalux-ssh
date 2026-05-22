@@ -1341,3 +1341,20 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `visual_settings/host.rs`、`dispatch.rs` 或 `launch_tests/tunnel_start.rs`。
+
+## 本轮测试拆分：Tunnel Start 能力模块
+
+- 目标：拆分 `launch_tests/tunnel_start.rs`，把启动隧道的成功路径、重复规则、规范化和校验失败分离。
+- 已完成：`tunnel_start.rs` 现在只保留 tunnel start 测试聚合入口。
+- 已完成：新增 `tunnel_start_success.rs`，迁移启动隧道创建 tab/runtime 并队列化 backend command 的测试。
+- 已完成：新增 `tunnel_start_duplicate.rs`，迁移打开重复规则和规范化后重复规则的拒绝测试。
+- 已完成：新增 `tunnel_start_normalize.rs`，迁移规则规范化后创建 runtime 与 backend request 的测试。
+- 已完成：新增 `tunnel_start_validation.rs`，迁移非法规则无副作用的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::tunnel::start -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文断言文案抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `backend_pump_tests/tunnel_stop.rs`、`connect_stale.rs` 或 `launch_tests/shell.rs`。
