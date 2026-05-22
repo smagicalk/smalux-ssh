@@ -1358,3 +1358,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文断言文案抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `backend_pump_tests/tunnel_stop.rs`、`connect_stale.rs` 或 `launch_tests/shell.rs`。
+
+## 本轮测试拆分：Backend Pump Tunnel Stop 能力模块
+
+- 目标：拆分 `backend_pump_tests/tunnel_stop.rs`，把 stop tunnel 队列泵的终态、断开 session 和 stale command 分支分离。
+- 已完成：`tunnel_stop.rs` 现在只保留 tunnel stop 队列泵测试聚合入口。
+- 已完成：新增 `tunnel_stop_terminal.rs`，迁移已停止 tunnel 的 terminal stop command 跳过测试。
+- 已完成：新增 `tunnel_stop_disconnected.rs`，迁移 session 已断开时 stop command 跳过且保留 stopping 状态的测试。
+- 已完成：新增 `tunnel_stop_stale.rs`，迁移同名规则陈旧 stop command 不影响当前运行 tunnel 的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::tunnel::stop -- --nocapture` 通过，`3 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `backend_pump_tests/connect_stale.rs`、`launch_tests/shell.rs` 或 `ui_drafts_tests/terminal_input.rs`。
