@@ -1651,3 +1651,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `backend/ssh/client/session/sftp.rs`、`app/projection.rs` 或 `backend/ssh/client/session.rs`。
+
+## 本轮核心拆分：RemoteSftp 操作与传输模块
+
+- 目标：拆分 `backend/ssh/client/session/sftp.rs`，让 RemoteSftp 主文件只保留请求分发、关闭和打开子系统流程。
+- 已完成：新增 `session/sftp/ops.rs`，承载目录读取、删除文件后刷新父目录、创建目录后刷新父目录。
+- 已完成：新增 `session/sftp/transfer.rs`，承载上传和下载传输、进度事件、完成事件和文件 flush/shutdown。
+- 已完成：`sftp.rs` 主文件现在聚焦 `RemoteSftp` 类型、`execute` 分发、`close`、`RusshConnection::open_sftp`。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib sftp -- --nocapture` 通过，`72 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `backend/ssh/client/session.rs`、`app/projection.rs` 或 `app/view_model/tabs.rs`。
