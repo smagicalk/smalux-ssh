@@ -1436,3 +1436,20 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `tests/close_tabs/shell.rs`、`backend_pump_tests/terminal_shell.rs` 或 `tests/terminal_input.rs`。
+
+## 本轮测试拆分：Close Tabs Shell 能力模块
+
+- 目标：拆分 `tests/close_tabs/shell.rs`，把 shell tab 关闭、pending shell、pending remote command 和 missing tab 错误分离。
+- 已完成：`shell.rs` 现在只保留 close tabs shell 测试聚合入口。
+- 已完成：新增 `shell_close.rs`，迁移 connected shell 关闭并队列化 disconnect 的测试。
+- 已完成：新增 `shell_pending.rs`，迁移 pending shell 关闭时移除 launch commands 且不 disconnect 的测试。
+- 已完成：新增 `shell_remote_command.rs`，迁移 pending remote command 关闭时结束 history 但无 exit code 的测试。
+- 已完成：新增 `shell_missing.rs`，迁移关闭不存在 tab 时记录 UI error 并可 dismiss 的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::tests::close_tabs::shell -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `backend_pump_tests/terminal_shell.rs`、`tests/terminal_input.rs` 或 `tests/sftp_selection.rs`。
