@@ -1236,3 +1236,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余 AppState 大模块，优先 `backend_pump_tests/terminal.rs`、`snippets_tests/run.rs` 或 `ui_drafts/terminal_input.rs`。
+
+## 本轮测试拆分：Backend Pump Terminal 能力模块
+
+- 目标：拆分 `backend_pump_tests/terminal.rs`，把终态 Shell 命令跳过和终态 Remote Command 历史收尾分离。
+- 已完成：`backend_pump_tests/terminal.rs` 现在只保留 terminal 队列泵测试模块入口。
+- 已完成：新增 `backend_pump_tests/terminal_shell.rs`，迁移 terminal open shell、shell drain 和 shell input command 跳过测试。
+- 已完成：新增 `backend_pump_tests/terminal_remote_command.rs`，迁移 terminal remote command 跳过和历史结束测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::terminal -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余 AppState 大模块，优先 `snippets_tests/run.rs`、`backend_pump_tests/sftp_error.rs` 或 `backend_pump_tests/sftp_transfer.rs`。
