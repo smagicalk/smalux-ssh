@@ -1680,3 +1680,16 @@
   - `cargo fmt --check` 通过
   - `cargo test --lib ssh -- --nocapture` 通过，`39 passed`
 - 下一步：继续跑全量测试，然后做 diff 检查和最终提交。
+
+## 本轮核心拆分：SSH Tunnel Local Dynamic 与 Remote
+
+- 目标：继续拆分 `backend/ssh/client/session/tunnel.rs`，让隧道入口、Local、Dynamic、Remote 运行时各自单一职责。
+- 已完成：新增 `session/tunnel/local.rs`，承载 Local 端口转发启动、监听接入和 direct-tcpip pipe 调度。
+- 已完成：新增 `session/tunnel/dynamic.rs`，承载 Dynamic SOCKS5 隧道启动、监听接入和 SOCKS5 pipe 调度。
+- 已完成：新增 `session/tunnel/remote.rs`，承载 Remote tcpip-forward 启动、forwarded channel 接收和 cancel_tcpip_forward 收尾。
+- 已完成：`tunnel.rs` 现在只保留子模块声明、`RemoteTunnel` 重导出和 `RusshConnection::into_tunnel` 分发入口。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib tunnel -- --nocapture` 通过，`35 passed`
+- 下一步：跑全量测试、diff 检查、BOM/中文抽样检查并提交。
