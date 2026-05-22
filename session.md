@@ -1191,3 +1191,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/file_actions.rs`、`launch_tests/tunnel_stop.rs` 或 `backend_pump_tests/terminal.rs`。
+
+## 本轮测试拆分：SFTP 文件操作能力模块
+
+- 目标：拆分 `launch_tests/sftp/file_actions.rs`，把创建/删除成功路径、删除路径校验和创建目录名校验分离。
+- 已完成：`launch_tests/sftp/file_actions.rs` 现在只保留文件操作测试模块入口。
+- 已完成：新增 `launch_tests/sftp/file_actions_success.rs`，迁移 create dir 与 remove file 队列化对应 SFTP path request 的成功路径测试。
+- 已完成：新增 `launch_tests/sftp/file_actions_remove_validation.rs`，迁移删除文件空路径和根目录路径拒绝测试。
+- 已完成：新增 `launch_tests/sftp/file_actions_create_validation.rs`，迁移创建目录名包含路径分隔符和父目录别名拒绝测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::file_actions -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：SFTP 测试入口已基本瘦身，继续拆剩余 AppState 大模块，优先 `launch_tests/remote_command_backend_events.rs`、`launch_tests/tunnel_stop.rs` 或 `backend_pump_tests/terminal.rs`。
