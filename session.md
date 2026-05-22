@@ -1389,3 +1389,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文失败原因抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `launch_tests/shell.rs`、`ui_drafts_tests/terminal_input.rs` 或 `tests/activation.rs`。
+
+## 本轮测试拆分：Shell Launch 能力模块
+
+- 目标：拆分 `launch_tests/shell.rs`，把 shell 打开流程、最近连接复用和密码认证目标分离。
+- 已完成：`shell.rs` 现在只保留 shell launch 测试聚合入口。
+- 已完成：新增 `shell_open.rs`，迁移 OpenShell 成功创建 tab/backend command 和缺失 host 拒绝测试。
+- 已完成：新增 `shell_recent.rs`，迁移 OpenRecentConnection 复用 shell 启动流程和 host 已删除报错测试。
+- 已完成：新增 `shell_auth.rs`，迁移密码认证 host 打开 shell 时 backend target 不泄露 secret 的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::shell -- --nocapture` 通过，`5 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `ui_drafts_tests/terminal_input.rs`、`tests/activation.rs` 或 `tests/close_tabs/shell.rs`。
