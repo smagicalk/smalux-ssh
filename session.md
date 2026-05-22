@@ -1453,3 +1453,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `backend_pump_tests/terminal_shell.rs`、`tests/terminal_input.rs` 或 `tests/sftp_selection.rs`。
+
+## 本轮生产拆分：Host Visual Settings 应用与清除
+
+- 目标：拆分 `visual_settings/host.rs`，把主机视觉配置草稿、应用覆盖和清除覆盖分离。
+- 已完成：`host.rs` 现在保留 host visual settings 草稿更新入口和 fallback helper。
+- 已完成：新增 `host_apply.rs`，承载 `apply_host_visual_settings`、draft 构建、theme/background 校验和 host override 写入。
+- 已完成：新增 `host_clear.rs`，承载 `clear_host_visual_settings` 和 host override 清除。
+- 修复记录：首次局部测试发现新子模块导入层级错误，已修正为从 `visual_settings` 父模块和 `app_state` 父模块导入。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib visual_settings -- --nocapture` 通过，`8 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
+- 下一步：继续生产侧小步拆分，优先 `sftp_transfer/cancel.rs`、`sftp_browser/open.rs` 或 `backend_pump/stale_commands.rs`。
