@@ -1575,3 +1575,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `backend/ssh/executor/cache/drop_gates.rs` 或 `model/ui_state/visual_settings.rs`。
+
+## 本轮核心整理：Cache Drop Gates 测试拆分
+
+- 目标：整理 `backend/ssh/executor/cache/drop_gates.rs`，让缓存清理判断生产模块只保留失败类型 gate 和事件 gate。
+- 已完成：`drop_gates.rs` 现在保留 shell input、SFTP request、remote shell terminal event 的缓存清理判断。
+- 已完成：新增 `drop_gates_tests.rs`，承载原缓存清理 7 个测试，保持测试模块路径仍在 `drop_gates::tests` 下。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib drop_gate -- --nocapture` 通过，`7 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `model/ui_state/visual_settings.rs`、`app/view_model/mod.rs` 或 `model/ui_state/workspace_ui.rs`。
