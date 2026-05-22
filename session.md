@@ -1589,3 +1589,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `model/ui_state/visual_settings.rs`、`app/view_model/mod.rs` 或 `model/ui_state/workspace_ui.rs`。
+
+## 本轮核心拆分：UiState Visual Settings Profiles 与 Drafts
+
+- 目标：拆分 `model/ui_state/visual_settings.rs`，把视觉配置草稿类型、配置转换/解析校验、UiState 草稿管理分离。
+- 已完成：`visual_settings.rs` 现在保留对外公开的 `VisualSettingsDraftField`、`VisualSettingsDraft` 和 `VisualSettingsDraftError`。
+- 已完成：新增 `visual_settings/profiles.rs`，承载 `VisualSettingsDraft` 与 `ThemeProfile`/`BackgroundProfile` 的互转、数值解析和背景来源解析。
+- 已完成：新增 `visual_settings/ui_drafts.rs`，承载全局视觉草稿更新、主机视觉草稿创建/更新/清除。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib visual_settings -- --nocapture` 通过，`8 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `app/view_model/mod.rs`、`model/ui_state/workspace_ui.rs` 或 `model/ui_state/quick_host.rs`。
