@@ -1295,3 +1295,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余 AppState 大模块，优先 `visual_settings_tests.rs`、`tests/close_tabs/sftp_owner.rs` 或生产侧 `ui_drafts/terminal_input.rs`。
+
+## 本轮生产拆分：Terminal Input 草稿与发送逻辑
+
+- 目标：拆分生产侧 `ui_drafts/terminal_input.rs`，把终端输入草稿编辑和发送到 Shell 后端的行为分离。
+- 已完成：`ui_drafts/terminal_input.rs` 现在只保留 update/append/backspace 草稿编辑逻辑和可见字符过滤 helper。
+- 已完成：新增 `ui_drafts/terminal_input_send.rs`，承载 `send_terminal_input`、本地终端 tab 确保、Shell 会话校验、命令历史写入、backend command 队列化和本地 echo 行为。
+- 已完成：`ui_drafts.rs` 增加 `terminal_input_send` 子模块声明，调用方接口保持不变。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib terminal_input -- --nocapture` 通过，`11 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文注释和错误文案抽样正常
+- 下一步：继续拆剩余 AppState 大模块，优先 `visual_settings_tests.rs`、`tests/close_tabs/sftp_owner.rs` 或 `visual_settings/host.rs`。

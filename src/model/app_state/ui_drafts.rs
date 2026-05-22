@@ -8,6 +8,8 @@ mod local_terminal;
 mod quick_host;
 #[path = "ui_drafts/terminal_input.rs"]
 mod terminal_input;
+#[path = "ui_drafts/terminal_input_send.rs"]
+mod terminal_input_send;
 
 use super::AppUpdateOutcome;
 
