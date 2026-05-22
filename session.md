@@ -1485,3 +1485,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
 - 下一步：继续生产侧小步拆分，优先 `sftp_browser/open.rs`、`backend_pump/stale_commands.rs` 或 `backend_events/remote_command_history.rs`。
+
+## 本轮生产拆分：SFTP Browser Open 调度
+
+- 目标：拆分 `sftp_browser/open.rs`，把打开 SFTP browser 的启动流程从目录导航/选择逻辑中分离。
+- 已完成：新增 `open_start.rs`，承载 `open_sftp`、session/tab 初始化、loading 设置、最近连接记录和 Connect/ListDir 队列化。
+- 已完成：`open.rs` 现在聚焦 refresh、navigate、select、path action 和 current dir 查询。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib open_sftp -- --nocapture` 通过，`6 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
+- 下一步：继续生产侧小步拆分，优先 `backend_pump/stale_commands.rs`、`backend_events/remote_command_history.rs` 或 `ui_drafts/terminal_input_send.rs`。
