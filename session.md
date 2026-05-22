@@ -1206,3 +1206,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：SFTP 测试入口已基本瘦身，继续拆剩余 AppState 大模块，优先 `launch_tests/remote_command_backend_events.rs`、`launch_tests/tunnel_stop.rs` 或 `backend_pump_tests/terminal.rs`。
+
+## 本轮测试拆分：远程命令 Backend Events 能力模块
+
+- 目标：拆分 `launch_tests/remote_command_backend_events.rs`，把远程命令历史对 exit、failure 和 disconnect 后端事件的响应分离。
+- 已完成：`launch_tests/remote_command_backend_events.rs` 现在只保留 backend events 测试模块入口。
+- 已完成：新增 `launch_tests/remote_command_backend_events_exit.rs`，迁移 exit code 更新最新历史、按 session history id 更新历史和 legacy fallback 测试。
+- 已完成：新增 `launch_tests/remote_command_backend_events_failure.rs`，迁移 failure 结束历史和 failure 后 late exit 不再覆盖历史测试。
+- 已完成：新增 `launch_tests/remote_command_backend_events_disconnect.rs`，迁移 disconnect 结束历史但不写 exit code 测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::remote_command::backend_events -- --nocapture` 通过，`6 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余 AppState 大模块，优先 `launch_tests/tunnel_stop.rs`、`backend_pump_tests/terminal.rs` 或 `snippets_tests/run.rs`。
