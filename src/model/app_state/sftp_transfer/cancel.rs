@@ -1,10 +1,18 @@
 //! SFTP 传输取消调度。
 
-use crate::backend::{BackendCommand, BackendCommandQueue, SftpRequest};
-use crate::model::{HostId, SessionId, TransferDirection, TransferId, TransferTask};
-use crate::session::SessionManager;
+use crate::model::TransferId;
 
 use super::super::{AppState, AppUpdateOutcome};
+use cancel_commands::{has_pending_sftp_browser_refresh, remove_queued_sftp_transfer_command};
+use cancel_loading::clear_loading_for_cancelled_transfer;
+use cancel_lookup::{TransferLookup, unique_transfer_task};
+
+#[path = "cancel_commands.rs"]
+mod cancel_commands;
+#[path = "cancel_loading.rs"]
+mod cancel_loading;
+#[path = "cancel_lookup.rs"]
+mod cancel_lookup;
 
 impl AppState {
     /// 取消尚未交给后端执行器的 SFTP 传输。
@@ -35,9 +43,11 @@ impl AppState {
             };
         }
 
-        let removed_commands = self
-            .backend_commands
-            .retain(|command| !is_sftp_transfer_command(command, task.session_id, transfer_id));
+        let removed_commands = remove_queued_sftp_transfer_command(
+            &mut self.backend_commands,
+            task.session_id,
+            transfer_id,
+        );
         if removed_commands == 0 {
             return AppUpdateOutcome {
                 error: Some("SFTP 传输已经开始，无法从队列取消".to_owned()),
@@ -65,78 +75,4 @@ impl AppState {
             ..AppUpdateOutcome::default()
         }
     }
-}
-
-fn unique_transfer_task(tasks: &[TransferTask], transfer_id: TransferId) -> TransferLookup {
-    let mut matches = tasks.iter().filter(|task| task.id == transfer_id);
-    let Some(task) = matches.next() else {
-        return TransferLookup::Missing;
-    };
-    if matches.next().is_some() {
-        return TransferLookup::Ambiguous;
-    }
-
-    TransferLookup::Found(task.clone())
-}
-
-enum TransferLookup {
-    Found(TransferTask),
-    Missing,
-    Ambiguous,
-}
-
-fn is_sftp_transfer_command(
-    command: &BackendCommand,
-    task_session_id: SessionId,
-    transfer_id: TransferId,
-) -> bool {
-    matches!(
-        command,
-        BackendCommand::Sftp {
-            session_id,
-            request:
-                SftpRequest::Upload { id, .. } | SftpRequest::Download { id, .. },
-            ..
-        } if *session_id == task_session_id && *id == transfer_id
-    )
-}
-
-fn clear_loading_for_cancelled_transfer(
-    sessions: &mut SessionManager,
-    task: &TransferTask,
-    has_pending_browser_refresh: bool,
-) -> bool {
-    if matches!(task.direction, TransferDirection::Upload) && !has_pending_browser_refresh {
-        sessions.set_sftp_loading_for_session(task.session_id, false)
-    } else {
-        false
-    }
-}
-
-fn has_pending_sftp_browser_refresh(
-    sessions: &SessionManager,
-    commands: &BackendCommandQueue,
-    host_id: HostId,
-    current_session_id: SessionId,
-) -> bool {
-    commands.iter().any(|command| {
-        let BackendCommand::Sftp {
-            session_id,
-            request,
-        } = command
-        else {
-            return false;
-        };
-
-        request.refreshes_browser()
-            && *session_id == current_session_id
-            && session_matches_host(sessions, *session_id, host_id)
-    })
-}
-
-fn session_matches_host(sessions: &SessionManager, session_id: SessionId, host_id: HostId) -> bool {
-    sessions
-        .tabs
-        .iter()
-        .any(|tab| tab.id == session_id && tab.host_id == Some(host_id))
 }

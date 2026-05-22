@@ -1469,3 +1469,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
 - 下一步：继续生产侧小步拆分，优先 `sftp_transfer/cancel.rs`、`sftp_browser/open.rs` 或 `backend_pump/stale_commands.rs`。
+
+## 本轮生产拆分：SFTP Cancel 任务定位与队列处理
+
+- 目标：拆分 `sftp_transfer/cancel.rs`，把取消传输调度、任务定位、队列命令移除和 loading 清理分离。
+- 已完成：`cancel.rs` 现在保留 `cancel_sftp_transfer` 调度入口和错误返回流程。
+- 已完成：新增 `cancel_lookup.rs`，承载唯一 transfer task 定位和 missing/ambiguous 结果。
+- 已完成：新增 `cancel_commands.rs`，承载 queued SFTP transfer command 移除、browser refresh pending 判断和 session-host 匹配。
+- 已完成：新增 `cancel_loading.rs`，承载上传取消后的 SFTP browser loading 清理。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib cancel_sftp -- --nocapture` 通过，`7 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
+- 下一步：继续生产侧小步拆分，优先 `sftp_browser/open.rs`、`backend_pump/stale_commands.rs` 或 `backend_events/remote_command_history.rs`。
