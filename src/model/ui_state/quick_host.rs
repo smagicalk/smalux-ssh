@@ -2,9 +2,12 @@
 
 use std::fmt;
 
-use crate::model::{AuthProfile, Host, HostId, SecretRef};
+use crate::model::{Host, HostId};
 
-use super::UiState;
+#[path = "quick_host/auth.rs"]
+mod auth;
+#[path = "quick_host/ui.rs"]
+mod ui;
 
 /// 快速新增主机表单草稿。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -92,12 +95,7 @@ pub enum QuickHostAuthKind {
 impl QuickHostAuthKind {
     /// 返回认证方式显示名。
     pub fn label(self) -> &'static str {
-        match self {
-            Self::Password => "Password",
-            Self::Key => "Key",
-            Self::Agent => "ssh-agent",
-            Self::Certificate => "Certificate",
-        }
+        auth::quick_host_auth_kind_label(self)
     }
 }
 
@@ -127,72 +125,11 @@ impl Default for QuickHostAuthDraft {
 
 impl QuickHostAuthDraft {
     /// 将认证草稿转换为主机认证配置。
-    fn build_auth(&self, username: &str) -> Result<AuthProfile, QuickHostDraftError> {
-        match self.kind {
-            QuickHostAuthKind::Password => {
-                let secret_ref = self.password_secret_ref.trim();
-                if secret_ref.is_empty() {
-                    return Err(QuickHostDraftError::MissingPasswordSecretRef);
-                }
-
-                Ok(AuthProfile::Password {
-                    username: username.to_owned(),
-                    secret: SecretRef(secret_ref.to_owned()),
-                })
-            }
-            QuickHostAuthKind::Key => {
-                let private_key_ref = self.private_key_ref.trim();
-                if private_key_ref.is_empty() {
-                    return Err(QuickHostDraftError::MissingPrivateKeyRef);
-                }
-
-                let passphrase_ref = self.passphrase_ref.trim();
-
-                Ok(AuthProfile::Key {
-                    username: username.to_owned(),
-                    key: SecretRef(private_key_ref.to_owned()),
-                    passphrase: if passphrase_ref.is_empty() {
-                        None
-                    } else {
-                        Some(SecretRef(passphrase_ref.to_owned()))
-                    },
-                })
-            }
-            QuickHostAuthKind::Agent => {
-                let key_hint = self.key_hint.trim();
-
-                Ok(AuthProfile::Agent {
-                    username: username.to_owned(),
-                    key_hint: if key_hint.is_empty() {
-                        None
-                    } else {
-                        Some(key_hint.to_owned())
-                    },
-                })
-            }
-            QuickHostAuthKind::Certificate => {
-                let private_key_ref = self.private_key_ref.trim();
-                if private_key_ref.is_empty() {
-                    return Err(QuickHostDraftError::MissingPrivateKeyRef);
-                }
-
-                let certificate_ref = self.certificate_ref.trim();
-                if certificate_ref.is_empty() {
-                    return Err(QuickHostDraftError::MissingCertificateRef);
-                }
-
-                Ok(AuthProfile::Certificate {
-                    username: username.to_owned(),
-                    key: SecretRef(private_key_ref.to_owned()),
-                    passphrase: if self.passphrase_ref.trim().is_empty() {
-                        None
-                    } else {
-                        Some(SecretRef(self.passphrase_ref.trim().to_owned()))
-                    },
-                    certificate: SecretRef(certificate_ref.to_owned()),
-                })
-            }
-        }
+    pub(super) fn build_auth(
+        &self,
+        username: &str,
+    ) -> Result<crate::model::AuthProfile, QuickHostDraftError> {
+        auth::build_quick_host_auth(self, username)
     }
 }
 
@@ -237,50 +174,6 @@ impl fmt::Display for QuickHostDraftError {
             Self::MissingPrivateKeyRef => f.write_str("私钥引用不能为空"),
             Self::MissingCertificateRef => f.write_str("证书引用不能为空"),
         }
-    }
-}
-
-impl UiState {
-    /// 更新快速新增主机表单字段。
-    pub fn set_quick_host_field(&mut self, field: QuickHostDraftField, value: impl Into<String>) {
-        let value = value.into();
-
-        match field {
-            QuickHostDraftField::Name => self.quick_host.name = value,
-            QuickHostDraftField::Address => self.quick_host.address = value,
-            QuickHostDraftField::Port => self.quick_host.port = value,
-            QuickHostDraftField::Username => self.quick_host.username = value,
-            QuickHostDraftField::Tags => self.quick_host.tags = value,
-        }
-    }
-
-    /// 更新快速新增主机的认证方式。
-    pub fn set_quick_host_auth_kind(&mut self, kind: QuickHostAuthKind) {
-        self.quick_host.auth.kind = kind;
-    }
-
-    /// 更新快速新增主机的认证字段。
-    pub fn set_quick_host_auth_field(
-        &mut self,
-        field: QuickHostAuthField,
-        value: impl Into<String>,
-    ) {
-        let value = value.into();
-
-        match field {
-            QuickHostAuthField::PasswordSecretRef => {
-                self.quick_host.auth.password_secret_ref = value
-            }
-            QuickHostAuthField::PrivateKeyRef => self.quick_host.auth.private_key_ref = value,
-            QuickHostAuthField::PassphraseRef => self.quick_host.auth.passphrase_ref = value,
-            QuickHostAuthField::KeyHint => self.quick_host.auth.key_hint = value,
-            QuickHostAuthField::CertificateRef => self.quick_host.auth.certificate_ref = value,
-        }
-    }
-
-    /// 清空快速新增主机表单，保留默认 SSH 端口。
-    pub fn reset_quick_host(&mut self) {
-        self.quick_host = QuickHostDraft::default();
     }
 }
 

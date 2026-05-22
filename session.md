@@ -1636,3 +1636,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `model/ui_state/quick_host.rs`、`backend/ssh/client/session/sftp.rs` 或 `app/projection.rs`。
+
+## 本轮核心拆分：Quick Host Auth 与 UI 更新
+
+- 目标：拆分 `model/ui_state/quick_host.rs`，把认证草稿转换和 UiState 字段更新拆到独立模块。
+- 已完成：新增 `quick_host/auth.rs`，承载认证方式 label 和 `QuickHostAuthDraft` 到 `AuthProfile` 的转换。
+- 已完成：新增 `quick_host/ui.rs`，承载 `UiState` 的快速主机表单字段更新、认证字段更新和 reset。
+- 已完成：`quick_host.rs` 主文件现在只保留公开草稿类型、枚举、错误和主机构建入口。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib quick_host -- --nocapture` 通过，`11 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `backend/ssh/client/session/sftp.rs`、`app/projection.rs` 或 `backend/ssh/client/session.rs`。
