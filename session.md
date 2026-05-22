@@ -1547,3 +1547,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM 检查通过，相关 Rust 文件与 `session.md` 均无 BOM
 - 下一步：继续生产侧小步拆分，优先 `sftp_browser/session.rs`、`sftp_transfer/upload.rs` 或剩余测试大文件。
+
+## 本轮核心整理：Cache Resources 测试拆分
+
+- 目标：整理 `backend/ssh/executor/cache/resources.rs`，让生产资源缓存模块只保留接口和实现，把测试移出主文件。
+- 已完成：`resources.rs` 现在只保留 cached session resources/subresources/runtime resources 类型，以及 take/replace 缓存操作。
+- 已完成：新增 `resources_tests.rs`，承载原资源缓存 11 个测试，保持测试模块路径仍在 `resources::tests` 下。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib cached_session -- --nocapture` 通过，`8 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `backend/ssh/executor/cache/tunnels.rs`、`backend/ssh/executor/cache/drop_gates.rs` 或 `model/ui_state/visual_settings.rs`。
