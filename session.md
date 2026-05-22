@@ -1310,3 +1310,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文注释和错误文案抽样正常
 - 下一步：继续拆剩余 AppState 大模块，优先 `visual_settings_tests.rs`、`tests/close_tabs/sftp_owner.rs` 或 `visual_settings/host.rs`。
+
+## 本轮测试拆分：Visual Settings 能力模块
+
+- 目标：拆分 `visual_settings_tests.rs`，把全局视觉配置、Host 级覆盖和校验错误场景分离。
+- 已完成：`visual_settings_tests.rs` 保留共享 `sample_host` helper，并只聚合三个能力子模块。
+- 已完成：新增 `visual_settings_tests_global.rs`，迁移全局 visual settings draft 更新并应用到 config/storage 的测试。
+- 已完成：新增 `visual_settings_tests_host.rs`，迁移 host visual settings 应用与清除 override 的测试。
+- 已完成：新增 `visual_settings_tests_validation.rs`，迁移无效全局配置不改变 config 和缺失 host 报错测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::visual_settings_tests -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余 AppState 大模块，优先 `tests/close_tabs/sftp_owner.rs`、`visual_settings/host.rs` 或 `dispatch.rs`。
