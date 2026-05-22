@@ -1620,3 +1620,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `model/ui_state/workspace_ui.rs`、`model/ui_state/quick_host.rs` 或 `backend/ssh/client/session/sftp.rs`。
+
+## 本轮核心拆分：Workspace UI 行为模块
+
+- 目标：拆分 `model/ui_state/workspace_ui.rs`，让主文件保留工作区状态类型和默认值，把行为按功能模块分离。
+- 已完成：新增 `workspace_ui/background.rs`，承载背景轮播切换和 active index 计算。
+- 已完成：新增 `workspace_ui/command_palette.rs`，承载命令面板打开/关闭状态操作。
+- 已完成：新增 `workspace_ui/language.rs`，承载语言模式 label 和 workspace language label。
+- 已完成：新增 `workspace_ui/layout.rs`，承载右侧栏折叠、Host 列表模式、搜索、面板宽度和工具分栏开关。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib workspace_ui -- --nocapture` 通过，`9 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `model/ui_state/quick_host.rs`、`backend/ssh/client/session/sftp.rs` 或 `app/projection.rs`。
