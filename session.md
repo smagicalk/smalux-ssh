@@ -1604,3 +1604,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `app/view_model/mod.rs`、`model/ui_state/workspace_ui.rs` 或 `model/ui_state/quick_host.rs`。
+
+## 本轮核心拆分：App ViewModel 工具分栏投影
+
+- 目标：拆分 `app/view_model/mod.rs`，把右侧工具分栏列表投影从 AppViewModel 汇总入口中分离。
+- 已完成：新增 `app/view_model/tools.rs`，承载 `ToolItemViewModel`、`KnownHostViewModel`、snippets/tunnels/known_hosts 列表投影。
+- 已完成：`app_view_model` 主入口现在只负责组装各子模块投影，工具分栏细节由 `tools` 模块提供。
+- 已完成：`tool_panel_mode_label` 移入 `labels.rs`，固定文案映射集中管理。
+- 修复记录：首次局部测试发现工具分栏 ViewModel 类型可见性不足，已改为 `pub(in crate::app)`，保持投影层内部边界不外扩。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib app_view_model -- --nocapture` 通过，`3 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
+- 下一步：继续核心模块化拆分，优先评估 `model/ui_state/workspace_ui.rs`、`model/ui_state/quick_host.rs` 或 `backend/ssh/client/session/sftp.rs`。

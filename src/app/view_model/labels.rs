@@ -1,7 +1,8 @@
 //! 展示层固定文案映射。
 
 use crate::model::{
-    AuthProfile, BuiltInTheme, HostListMode, SessionKind, SessionStatus, WorkspacePage,
+    AuthProfile, BuiltInTheme, HostListMode, SessionKind, SessionStatus, ToolPanelMode,
+    WorkspacePage,
 };
 
 pub(super) fn page_label(page: WorkspacePage) -> &'static str {
@@ -29,6 +30,17 @@ pub(super) fn host_list_mode_label(mode: HostListMode) -> &'static str {
     match mode {
         HostListMode::List => "List",
         HostListMode::Card => "Card",
+    }
+}
+
+pub(super) fn tool_panel_mode_label(mode: ToolPanelMode) -> &'static str {
+    match mode {
+        ToolPanelMode::Closed => "Closed",
+        ToolPanelMode::Sftp => "SFTP",
+        ToolPanelMode::Snippets => "Snippets",
+        ToolPanelMode::History => "History",
+        ToolPanelMode::Tunnels => "Tunnels",
+        ToolPanelMode::KnownHosts => "KnownHosts",
     }
 }
 
