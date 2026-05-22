@@ -1280,3 +1280,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余 AppState 大模块，优先 `backend_pump_tests/sftp_transfer.rs`、`visual_settings_tests.rs` 或生产侧 `ui_drafts/terminal_input.rs`。
+
+## 本轮测试拆分：Backend Pump SFTP Transfer 能力模块
+
+- 目标：拆分 `backend_pump_tests/sftp_transfer.rs`，把 SFTP transfer 在终态 session、terminal pruning 和 executor error 下的失败归约分离。
+- 已完成：`backend_pump_tests/sftp_transfer.rs` 现在只保留 SFTP transfer 队列泵测试模块入口。
+- 已完成：新增 `backend_pump_tests/sftp_transfer_terminal.rs`，迁移终态 SFTP session 下 upload/download transfer 标记失败测试。
+- 已完成：新增 `backend_pump_tests/sftp_transfer_pruned.rs`，迁移 terminal error 裁剪后 transfer 标记失败测试。
+- 已完成：新增 `backend_pump_tests/sftp_transfer_executor_error.rs`，迁移 executor 不支持 SFTP transfer 时失败并记录 browser last_error 测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::sftp::transfer -- --nocapture` 通过，`3 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余 AppState 大模块，优先 `visual_settings_tests.rs`、`tests/close_tabs/sftp_owner.rs` 或生产侧 `ui_drafts/terminal_input.rs`。
