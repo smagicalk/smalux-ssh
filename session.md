@@ -1516,3 +1516,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
 - 下一步：继续生产侧小步拆分，优先 `backend_events/remote_command_history.rs`、`ui_drafts/terminal_input_send.rs` 或 `sftp_browser/session.rs`。
+
+## 本轮生产拆分：Remote Command History 匹配与完成
+
+- 目标：拆分 `backend_events/remote_command_history.rs`，把 remote command history 匹配键提取和完成状态写回分离。
+- 已完成：`remote_command_history.rs` 保留 `finish_remote_command_history` 与 `finish_remote_command_history_for_closed_tab` 调度入口。
+- 已完成：新增 `remote_command_history_match.rs`，承载从 `SessionTab` 提取 host、command、history_id 匹配键。
+- 已完成：新增 `remote_command_history_finish.rs`，承载 exit code/duration 写回和已完成 history 的幂等判断。
+- 修复记录：首次局部测试发现新子模块导入 `unix_now_secs` 层级错误，已修正为从 app_state 父模块导入。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib remote_command -- --nocapture` 通过，`18 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
+- 下一步：继续生产侧小步拆分，优先 `ui_drafts/terminal_input_send.rs`、`sftp_browser/session.rs` 或 `sftp_transfer/upload.rs`。
