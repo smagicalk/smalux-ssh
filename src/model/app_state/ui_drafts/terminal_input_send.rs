@@ -1,12 +1,17 @@
 //! 终端输入发送处理。
 
-use uuid::Uuid;
-
 use crate::backend::BackendCommand;
 use crate::model::{SessionId, SessionKind};
 
 use super::super::{AppState, AppUpdateOutcome};
 use super::local_terminal::ensure_local_terminal_tab;
+use terminal_input_echo::echo_local_terminal_input;
+use terminal_input_history::record_terminal_input_history;
+
+#[path = "terminal_input_echo.rs"]
+mod terminal_input_echo;
+#[path = "terminal_input_history.rs"]
+mod terminal_input_history;
 
 impl AppState {
     /// 把当前终端输入草稿发送到 Shell 后端。
@@ -66,29 +71,14 @@ impl AppState {
         }
 
         if !trimmed.is_empty() {
-            self.storage
-                .add_command_history(crate::model::CommandHistoryItem {
-                    id: crate::model::CommandHistoryId(Uuid::new_v4()),
-                    host_id,
-                    command: input.clone(),
-                    working_directory: None,
-                    exit_code: None,
-                    started_at_unix_secs: unix_now_secs(),
-                    duration_ms: None,
-                });
+            record_terminal_input_history(&mut self.storage, host_id, input.clone());
         }
 
         self.backend_commands.push(BackendCommand::SendShellInput {
             session_id,
             input: format!("{input}\n"),
         });
-        if matches!(tab.kind, SessionKind::LocalShell) && !trimmed.is_empty() {
-            self.terminal.append_local_echo(
-                session_id,
-                crate::backend::LocalShellProfile::default_for_platform().prompt,
-                &input,
-            );
-        }
+        echo_local_terminal_input(&mut self.terminal, session_id, &tab.kind, &trimmed, &input);
         self.ui.clear_terminal_input(session_id);
 
         AppUpdateOutcome {
@@ -97,11 +87,4 @@ impl AppState {
             ..AppUpdateOutcome::default()
         }
     }
-}
-
-fn unix_now_secs() -> u64 {
-    std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|duration| duration.as_secs())
-        .unwrap_or_default()
 }

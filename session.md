@@ -1532,3 +1532,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
 - 下一步：继续生产侧小步拆分，优先 `ui_drafts/terminal_input_send.rs`、`sftp_browser/session.rs` 或 `sftp_transfer/upload.rs`。
+
+## 本轮生产拆分：Terminal Input Send History 与 Echo
+
+- 目标：拆分 `ui_drafts/terminal_input_send.rs`，把终端输入发送入口、命令历史记录和本地终端回显分离。
+- 已完成：`terminal_input_send.rs` 现在保留 `send_terminal_input` 主流程、会话校验、输入读取和后端命令队列化。
+- 已完成：新增 `terminal_input_history.rs`，承载 `record_terminal_input_history`、history id 创建和时间戳写入。
+- 已完成：新增 `terminal_input_echo.rs`，承载 local shell 输入回显判断和 append local echo。
+- 修复记录：首次局部测试发现新子模块类型导入路径错误，已修正为 `crate::storage::StorageManager` 和 `crate::terminal::TerminalManager`。
+- 验证记录：
+  - `cargo test --lib terminal_input -- --nocapture` 通过，`11 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM 检查通过，相关 Rust 文件与 `session.md` 均无 BOM
+- 下一步：继续生产侧小步拆分，优先 `sftp_browser/session.rs`、`sftp_transfer/upload.rs` 或剩余测试大文件。
