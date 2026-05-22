@@ -1499,3 +1499,20 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
 - 下一步：继续生产侧小步拆分，优先 `backend_pump/stale_commands.rs`、`backend_events/remote_command_history.rs` 或 `ui_drafts/terminal_input_send.rs`。
+
+## 本轮生产拆分：Backend Pump Stale Command 收尾
+
+- 目标：拆分 `backend_pump/stale_commands.rs`，把过期 Connect、SFTP 和远程命令的状态收尾分离。
+- 已完成：`stale_commands.rs` 现在只保留 stale backend command 的统一分派入口。
+- 已完成：新增 `stale_connect.rs`，承载过期 Connect command 的 Failed event 应用和同 session 尾部命令裁剪。
+- 已完成：新增 `stale_sftp.rs`，承载过期 SFTP ListDir、文件操作和 transfer command 的 loading/error/transfer failed 收尾。
+- 已完成：新增 `stale_remote_command.rs`，承载过期 RunCommand 的 history 结束收尾。
+- 修复记录：首次局部测试发现新子模块导入兄弟模块层级错误，已修正为从 `backend_pump` 父模块导入 `pending`/`transfers`。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo test --lib stale -- --nocapture` 通过，`6 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文模块注释抽样正常
+- 下一步：继续生产侧小步拆分，优先 `backend_events/remote_command_history.rs`、`ui_drafts/terminal_input_send.rs` 或 `sftp_browser/session.rs`。
