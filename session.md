@@ -1374,3 +1374,18 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `backend_pump_tests/connect_stale.rs`、`launch_tests/shell.rs` 或 `ui_drafts_tests/terminal_input.rs`。
+
+## 本轮测试拆分：Backend Pump Connect Stale 能力模块
+
+- 目标：拆分 `backend_pump_tests/connect_stale.rs`，把 stale connect command 对同 session 尾部命令和其他 session 尾部命令的处理分离。
+- 已完成：`connect_stale.rs` 现在只保留 stale connect 队列泵测试聚合入口。
+- 已完成：新增 `connect_stale_prune.rs`，迁移 stale connect 后裁剪同 session OpenShell 尾部命令并标记失败的测试。
+- 已完成：新增 `connect_stale_keep.rs`，迁移 stale connect 后保留并执行其他 session OpenShell 尾部命令的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::backend_pump_tests::connect::stale -- --nocapture` 通过，`2 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM，中文失败原因抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `launch_tests/shell.rs`、`ui_drafts_tests/terminal_input.rs` 或 `tests/activation.rs`。
