@@ -1420,3 +1420,19 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续按能力拆分剩余 AppState 大模块，优先 `tests/activation.rs`、`tests/close_tabs/shell.rs` 或 `backend_pump_tests/terminal_shell.rs`。
+
+## 本轮测试拆分：Activation 能力模块
+
+- 目标：拆分 `tests/activation.rs`，把 terminal tab 激活、SFTP tab 激活和 SFTP browser owner 归属分离。
+- 已完成：`activation.rs` 现在只保留 activation 测试聚合入口。
+- 已完成：新增 `activation_terminal.rs`，迁移 terminal tab 激活同步 sessions/terminal active tab 的测试。
+- 已完成：新增 `activation_sftp.rs`，迁移 SFTP tab 激活但没有 terminal tab 时只切换 session active tab 的测试。
+- 已完成：新增 `activation_sftp_owner.rs`，迁移 SFTP 激活重分配 browser owner 和 disconnected tab 保持可用 owner 的测试。
+- 验证记录：
+  - `cargo fmt` 已执行并修正格式
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::tests::activation -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM 检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续按能力拆分剩余 AppState 大模块，优先 `tests/close_tabs/shell.rs`、`backend_pump_tests/terminal_shell.rs` 或 `tests/terminal_input.rs`。
