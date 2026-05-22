@@ -1162,3 +1162,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
 - 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/cancel_transfer.rs`、`launch_tests/sftp/transfer_download.rs` 或 `launch_tests/sftp/file_actions.rs`。
+
+## 本轮测试拆分：SFTP 取消传输能力模块
+
+- 目标：拆分 `launch_tests/sftp/cancel_transfer.rs`，把取消成功路径和拒绝取消路径分离。
+- 已完成：`launch_tests/sftp/cancel_transfer.rs` 现在只保留取消传输测试模块入口。
+- 已完成：新增 `launch_tests/sftp/cancel_transfer_success.rs`，迁移 queued transfer 取消并移除 backend command，以及同 id 其他 session command 保留测试。
+- 已完成：新增 `launch_tests/sftp/cancel_transfer_reject.rs`，迁移同 id transfer 不唯一拒绝取消和 backend queue 已移除时拒绝取消测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state::launch_tests::sftp::cancel::transfer -- --nocapture` 通过，`4 passed`
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过，只有 Windows CRLF 提示
+  - BOM/中文抽样检查通过，相关 Rust 文件均无 BOM 且 `session.md` 中文抽样正常
+- 下一步：继续拆剩余中型测试模块，优先 `launch_tests/sftp/transfer_download.rs`、`launch_tests/sftp/file_actions.rs` 或 `launch_tests/tunnel_stop.rs`。
