@@ -3,14 +3,14 @@
 use russh_sftp::client::SftpSession;
 use smagical_ssh_client_core::{
     CLOSE_SFTP_OPERATION, OPEN_SFTP_OPERATION, OPEN_SFTP_SESSION_OPERATION, REQUEST_SFTP_OPERATION,
-    SFTP_SUBSYSTEM_NAME, sftp_error,
+    SFTP_SUBSYSTEM_NAME, channel_error, sftp_error,
 };
 
 use crate::backend::{BackendEvent, BackendExecutionError, SftpRequest};
 use crate::model::SessionId;
 
 use super::super::RusshConnection;
-use super::{channel_error, wait_channel_request};
+use super::{open_session_channel, wait_channel_request};
 
 #[path = "sftp/ops.rs"]
 mod ops;
@@ -70,9 +70,7 @@ impl RusshConnection {
         &mut self,
         session_id: SessionId,
     ) -> Result<RemoteSftp, BackendExecutionError> {
-        let mut channel = self
-            .open_session_channel(OPEN_SFTP_SESSION_OPERATION)
-            .await?;
+        let mut channel = open_session_channel(self, OPEN_SFTP_SESSION_OPERATION).await?;
         channel
             .request_subsystem(true, SFTP_SUBSYSTEM_NAME)
             .await

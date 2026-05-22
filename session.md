@@ -1666,3 +1666,17 @@
   - `git diff --check` 通过，只有 Windows CRLF 提示
   - BOM/中文抽样检查通过，相关 Rust 文件与 `session.md` 均无 BOM，中文模块注释抽样正常
 - 下一步：继续核心模块化拆分，优先评估 `backend/ssh/client/session.rs`、`app/projection.rs` 或 `app/view_model/tabs.rs`。
+
+## 本轮核心拆分：SSH Session Shell Command 与 Channel
+
+- 目标：把 `backend/ssh/client/session.rs` 收敛成模块入口，把 channel、一次性命令和交互式 shell 拆到独立文件。
+- 已完成：新增 `session/channel.rs`，承载 `open_session_channel`、`prepare_pty`、`wait_channel_request`。
+- 已完成：新增 `session/command.rs`，承载一次性远程命令执行和事件收集。
+- 已完成：新增 `session/shell.rs`，承载 `RemoteShell`、`OpenShellReport` 和交互式 shell 打开逻辑。
+- 已完成：`session.rs` 现在只保留子模块声明、类型重导出和 `RusshConnection::run_command` 入口。
+- 已完成：`sftp.rs` 复用新的 channel 工具，不再依赖旧的 session 内联实现。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib ssh -- --nocapture` 通过，`39 passed`
+- 下一步：继续跑全量测试，然后做 diff 检查和最终提交。
