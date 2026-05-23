@@ -1815,3 +1815,17 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：App Pump Drain
+
+- 目标：拆分 `app/pump.rs`，让后端输出刷新定时器、DrainSessionOutput 入队去重和相关测试各自单一职责。
+- 已完成：新增 `app/pump/drain.rs`，承载 `enqueue_drain_commands` 和 `has_pending_drain_command`。
+- 已完成：新增 `app/pump/tests.rs`，承载 pump 入队与去重测试。
+- 已完成：`pump.rs` 现在只保留定时器启动和窗口同步流程。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app::pump -- --nocapture` 通过，`2 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
