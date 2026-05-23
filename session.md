@@ -2026,3 +2026,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：UI State SFTP Action
+
+- 目标：拆分 `model/ui_state/sftp_action.rs`，让 SFTP 操作草稿类型、UI 状态访问和测试各自单一职责。
+- 已完成：新增 `model/ui_state/sftp_action/types.rs`，承载 `SftpActionDraft` 和 `SftpActionDraftField`。
+- 已完成：新增 `model/ui_state/sftp_action/ui.rs`，承载 `UiState` 上的 SFTP 操作草稿读取与更新方法。
+- 已完成：新增 `model/ui_state/sftp_action/tests.rs`，承载 SFTP 操作草稿和 UI 状态更新测试。
+- 已完成：`sftp_action.rs` 现在只保留模块声明和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib sftp_action -- --nocapture` 通过，`4 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
