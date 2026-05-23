@@ -1771,3 +1771,17 @@
   - `cargo test --lib view_model -- --nocapture` 通过，`12 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心拆分：App ViewModel Palette
+
+- 目标：拆分 `app/view_model/palette.rs`，让命令面板结果组合、匹配规则、历史副标题和测试各自单一职责。
+- 已完成：新增 `app/view_model/palette/history.rs`，承载 `command_history_subtitle`。
+- 已完成：新增 `app/view_model/palette/matching.rs`，承载 `command_matches_host` 和 `command_matches_text`。
+- 已完成：新增 `app/view_model/palette/tests.rs`，承载命令面板 ViewModel 离线测试。
+- 已完成：`palette.rs` 现在聚焦 `CommandPaletteItemViewModel` 和 `command_palette_results` 结果组合逻辑。
+- 验证记录：
+  - `cargo test --lib view_model -- --nocapture` 通过，`12 passed`
+  - `cargo fmt --check` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
