@@ -2253,3 +2253,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Tunnel Cache
+
+- 目标：拆分 `backend/ssh/executor/cache/tunnels.rs`，让隧道 trait 适配、缓存注册表操作和 detached tunnel 清理各自单一职责。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels/traits.rs`，承载 tunnel owner、rule name、stop trait 及 `RemoteTunnel` 适配。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels/registry.rs`，承载按 session/rule 移除、替换并停止旧 tunnel、按 session 批量取出。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels/cleanup.rs`，承载 detached tunnel 停止和告警日志。
+- 已完成：`tunnels.rs` 保留 tunnel cache 子模块组织和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::executor::cache::tunnels -- --nocapture` 通过，`6 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
