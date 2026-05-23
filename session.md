@@ -1999,3 +1999,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：Quick Host UI State
+
+- 目标：拆分 `model/ui_state/quick_host.rs`，让快速主机草稿构建、类型定义和错误展示各自单一职责，根文件只做模块门面。
+- 已完成：新增 `model/ui_state/quick_host/draft.rs`，承载 `QuickHostDraft`、主机构建和 tag 解析。
+- 已完成：新增 `model/ui_state/quick_host/types.rs`，承载认证草稿、认证方式和字段枚举。
+- 已完成：新增 `model/ui_state/quick_host/error.rs`，承载 `QuickHostDraftError` 及其展示文案。
+- 已完成：`quick_host.rs` 继续 re-export 原公开类型，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib quick_host -- --nocapture` 通过，`11 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
