@@ -1923,3 +1923,17 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Model UI State Visual Settings Profiles
+
+- 目标：拆分 `model/ui_state/visual_settings/profiles.rs`，让视觉配置 profile 转换、数字字段解析和背景来源解析各自单一职责。
+- 已完成：新增 `model/ui_state/visual_settings/profiles/parsing.rs`，承载字符串回退、字号、轮转间隔、透明度和模糊度解析。
+- 已完成：新增 `model/ui_state/visual_settings/profiles/background_sources.rs`，承载背景来源解析与格式化。
+- 已完成：`profiles.rs` 现在聚焦 `VisualSettingsDraft` 与 `ThemeProfile` / `BackgroundProfile` 的转换编排。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib visual_settings -- --nocapture` 通过，`8 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
