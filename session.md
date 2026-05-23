@@ -1732,3 +1732,17 @@
   - `cargo test --lib app -- --nocapture` 通过，`183 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心拆分：App Projection Sync Sections
+
+- 目标：继续拆分 `app/projection.rs`，把完整窗口同步里的 workspace、terminal、SFTP 和集合写入区域拆成独立函数。
+- 已完成：新增 `sync_workspace_state`，承载窗口顶层计数、页面、语言、主题、布局和命令面板状态写入。
+- 已完成：新增 `sync_terminal_model`，承载终端面板属性写入。
+- 已完成：新增 `sync_sftp_model`，承载 SFTP 面板属性写入。
+- 已完成：新增 `sync_collection_models`，承载 hosts、tabs、SFTP entries、activity、palette、recent、history、snippets、tunnels、known hosts 的列表模型写入。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app -- --nocapture` 通过，`183 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：执行 diff 检查、BOM/中文抽样检查并提交。

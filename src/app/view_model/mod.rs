@@ -19,6 +19,6 @@ pub(super) use hosts::HostViewModel;
 pub(super) use palette::CommandPaletteItemViewModel;
 pub(super) use root::{AppViewModel, app_view_model};
 pub(super) use sftp::SftpEntryViewModel;
-pub(super) use tabs::SessionTabViewModel;
 pub(super) use tabs::active_terminal;
+pub(super) use tabs::{SessionTabViewModel, TerminalViewModel};
 pub(super) use tools::{KnownHostViewModel, ToolItemViewModel};
