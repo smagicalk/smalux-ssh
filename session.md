@@ -2054,3 +2054,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：UI State Host Action
+
+- 目标：拆分 `model/ui_state/host_action.rs`，让主机操作草稿类型、默认值和 UI 状态访问各自单一职责。
+- 已完成：新增 `model/ui_state/host_action/types.rs`，承载 `HostActionDraft`、默认远程命令和默认 SFTP 初始目录。
+- 已完成：新增 `model/ui_state/host_action/ui.rs`，承载 `UiState` 上的主机远程命令和 SFTP 初始目录草稿访问方法。
+- 已完成：`host_action.rs` 现在只保留模块声明和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib host_action -- --nocapture` 通过，`1 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
