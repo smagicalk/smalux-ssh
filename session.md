@@ -2120,3 +2120,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：Host View Model
+
+- 目标：拆分 `app/view_model/hosts.rs`，让主机展示行类型、搜索过滤、状态标签和测试各自单一职责。
+- 已完成：新增 `app/view_model/hosts/types.rs`，承载 `HostViewModel` 展示行结构。
+- 已完成：新增 `app/view_model/hosts/filter.rs`，承载主机搜索查询匹配逻辑。
+- 已完成：新增 `app/view_model/hosts/status.rs`，承载主机连接状态到 UI 标签的映射逻辑。
+- 已完成：新增 `app/view_model/hosts/tests.rs`，承载主机展示模型测试；`hosts.rs` 保留聚合入口和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib hosts -- --nocapture` 通过，`6 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
