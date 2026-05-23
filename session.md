@@ -1693,3 +1693,17 @@
   - `cargo fmt --check` 通过
   - `cargo test --lib tunnel -- --nocapture` 通过，`35 passed`
 - 下一步：跑全量测试、diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心拆分：SSH Tunnel TCP Listener Pipe 与 SOCKS5
+
+- 目标：继续拆分 `backend/ssh/client/session/tunnel/tcp.rs`，让 TCP 监听、双向 pipe 和 SOCKS5 连接处理各自单一职责。
+- 已完成：新增 `session/tunnel/tcp/listener.rs`，承载 `bind_tcp_listener`、`accept_with_tick` 和对应离线测试。
+- 已完成：新增 `session/tunnel/tcp/pipe.rs`，承载 `pipe_direct_tcpip` 与 `pipe_forwarded_tcpip`。
+- 已完成：新增 `session/tunnel/tcp/socks5.rs`，承载 `serve_socks5_connection`。
+- 已完成：`tcp.rs` 现在只保留子模块声明和对上层 tunnel 运行时需要的函数重导出。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib tunnel -- --nocapture` 通过，`35 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
