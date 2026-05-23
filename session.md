@@ -2188,3 +2188,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：Projection Models
+
+- 目标：拆分 `app/projection/models.rs`，让 Slint 列表模型转换按 UI 列表类型独立维护。
+- 已完成：新增 `app/projection/models/hosts.rs`、`tabs.rs`、`sftp.rs`、`activity.rs`、`palette.rs`、`tools.rs`、`known_hosts.rs`，分别承载对应 row 模型转换。
+- 已完成：新增 `app/projection/models/common.rs`，承载通用字符串列表模型转换。
+- 已完成：`models.rs` 保留 models 子模块声明和转换函数 re-export，`collections.rs`、`terminal.rs` 调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app::view_model -- --nocapture` 通过，`12 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
