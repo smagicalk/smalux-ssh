@@ -2040,3 +2040,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：UI State Terminal Input
+
+- 目标：拆分 `model/ui_state/terminal_input.rs`，让终端输入草稿类型、UI 状态访问和测试各自单一职责。
+- 已完成：新增 `model/ui_state/terminal_input/types.rs`，承载 `TerminalInputDraft`。
+- 已完成：新增 `model/ui_state/terminal_input/ui.rs`，承载 `UiState` 上的终端输入草稿读取、追加、退格和清理方法。
+- 已完成：新增 `model/ui_state/terminal_input/tests.rs`，承载终端输入草稿和 UI 状态更新测试。
+- 已完成：`terminal_input.rs` 现在只保留模块声明和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib terminal_input -- --nocapture` 通过，`11 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
