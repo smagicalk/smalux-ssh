@@ -1,10 +1,48 @@
 //! 工作区布局与分栏状态操作。
 
-use super::{
-    HostListMode, MAX_ACTIVITY_PANEL_WIDTH, MAX_HOSTS_PANEL_WIDTH, MAX_TOOL_PANEL_WIDTH,
-    MIN_ACTIVITY_PANEL_WIDTH, MIN_HOSTS_PANEL_WIDTH, MIN_TOOL_PANEL_WIDTH, ToolPanelMode,
-    WorkspaceUiState,
-};
+use serde::{Deserialize, Serialize};
+
+use super::WorkspaceUiState;
+
+pub const DEFAULT_HOSTS_PANEL_WIDTH: i32 = 276;
+pub const MIN_HOSTS_PANEL_WIDTH: i32 = 196;
+pub const MAX_HOSTS_PANEL_WIDTH: i32 = 460;
+pub const DEFAULT_ACTIVITY_PANEL_WIDTH: i32 = 244;
+pub const MIN_ACTIVITY_PANEL_WIDTH: i32 = 184;
+pub const MAX_ACTIVITY_PANEL_WIDTH: i32 = 420;
+pub const DEFAULT_TOOL_PANEL_WIDTH: i32 = 328;
+pub const MIN_TOOL_PANEL_WIDTH: i32 = 220;
+pub const MAX_TOOL_PANEL_WIDTH: i32 = 560;
+
+/// Hosts 列表展示方式。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HostListMode {
+    List,
+    Card,
+}
+
+impl Default for HostListMode {
+    fn default() -> Self {
+        Self::List
+    }
+}
+
+/// D 区域右侧按需打开的辅助分栏。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ToolPanelMode {
+    Closed,
+    Sftp,
+    Snippets,
+    History,
+    Tunnels,
+    KnownHosts,
+}
+
+impl Default for ToolPanelMode {
+    fn default() -> Self {
+        Self::Closed
+    }
+}
 
 impl WorkspaceUiState {
     /// 切换右侧栏折叠状态。

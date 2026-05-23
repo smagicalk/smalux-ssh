@@ -1,6 +1,24 @@
 //! 工作区背景轮播状态操作。
 
+use serde::{Deserialize, Serialize};
+
 use super::WorkspaceUiState;
+
+/// 背景轮播运行态。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BackgroundCarouselState {
+    pub enabled: bool,
+    pub active_index: usize,
+}
+
+impl Default for BackgroundCarouselState {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            active_index: 0,
+        }
+    }
+}
 
 impl WorkspaceUiState {
     /// 切换到下一张背景。

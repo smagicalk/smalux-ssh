@@ -1785,3 +1785,19 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Model UI State Workspace UI
+
+- 目标：拆分 `model/ui_state/workspace_ui.rs`，让工作区 UI 聚合状态、页面类型、布局类型、命令面板、语言、主题、背景和测试各自单一职责。
+- 已完成：新增 `model/ui_state/workspace_ui/page.rs`，承载 `WorkspacePage`。
+- 已完成：新增 `model/ui_state/workspace_ui/theme.rs`，承载 `BuiltInTheme`。
+- 已完成：新增 `model/ui_state/workspace_ui/tests.rs`，承载 Workspace UI 状态离线测试。
+- 已完成：将 `BackgroundCarouselState`、`CommandPaletteState`、`LanguageMode`、`HostListMode`、`ToolPanelMode` 和布局宽度常量下沉到对应功能模块。
+- 已完成：`workspace_ui.rs` 现在聚焦模块声明、功能类型重导出和 `WorkspaceUiState` 聚合默认值。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib ui_state -- --nocapture` 通过，`27 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。

@@ -1,6 +1,24 @@
 //! 工作区命令面板状态操作。
 
+use serde::{Deserialize, Serialize};
+
 use super::WorkspaceUiState;
+
+/// 命令面板查询状态。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CommandPaletteState {
+    pub open: bool,
+    pub query: String,
+}
+
+impl Default for CommandPaletteState {
+    fn default() -> Self {
+        Self {
+            open: false,
+            query: String::new(),
+        }
+    }
+}
 
 impl WorkspaceUiState {
     /// 打开命令面板并设置查询文本。
