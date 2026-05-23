@@ -1893,3 +1893,18 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Backend SSH Executor Cache Drop Gates Tests
+
+- 目标：拆分 `backend/ssh/executor/cache/drop_gates_tests.rs`，让 shell 输入缓存丢弃、远程 shell 终态缓存丢弃和 SFTP 缓存丢弃测试各自单一职责。
+- 已完成：新增 `backend/ssh/executor/cache/drop_gates_tests/common.rs`，承载 session id 测试辅助。
+- 已完成：新增 `backend/ssh/executor/cache/drop_gates_tests/shell.rs`，承载 shell 输入失败丢弃和远程 shell 终态事件丢弃测试。
+- 已完成：新增 `backend/ssh/executor/cache/drop_gates_tests/sftp.rs`，承载 SFTP 请求失败丢弃测试。
+- 已完成：`drop_gates_tests.rs` 现在只保留测试子模块声明。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib drop_gates -- --nocapture` 通过，`7 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
