@@ -2107,3 +2107,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Client Boundary
+
+- 目标：拆分 `backend/ssh/client.rs`，让 `russh` 连接器和已认证连接句柄各自单一职责。
+- 已完成：新增 `backend/ssh/client/connector.rs`，承载 `RusshConnector`、连接建立、host key 校验事件和认证事件。
+- 已完成：新增 `backend/ssh/client/connection.rs`，承载 `RusshConnectionReport`、`RusshConnection`、连接句柄访问、forwarded channel 订阅和 disconnect。
+- 已完成：`client.rs` 现在只保留 SSH client 子模块声明和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::client -- --nocapture` 通过，`3 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
