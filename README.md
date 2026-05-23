@@ -789,13 +789,14 @@ struct BackgroundProfile {
 
 ## 当前状态
 
-需求已整理，最小 Rust + Iced 工程骨架已创建。
+需求已整理，当前实现已从早期骨架推进到 Slint 桌面应用与多 crate workspace 架构。
 
-- 已创建 `Cargo.toml`
-- 已创建首批 `src/` 模块
-- 已接入最新可用的核心依赖
-- 已补首批领域模型
-- 已通过 `cargo check`
+- 已切换为 `slint` UI 技术栈，并保留 `src/main.rs` / `src/lib.rs` 的应用入口分离。
+- 已建立 workspace crate：`smagical-core`、`smagical-session`、`smagical-terminal`、`smagical-config`、`smagical-storage`、`smagical-security`、`smagical-backend-core`、`smagical-backend-reducer`、`smagical-local-backend`、`smagical-ssh-plan`、`smagical-ssh-client-core`。
+- 已实现核心领域模型、会话/标签页状态、终端缓冲、本地终端、配置、存储、安全凭据、SSH 连接计划、真实 SSH/SFTP/tunnel 执行器和 Slint 投影层。
+- 已完成核心模块化收尾：`app`、`model/app_state`、`backend/ssh/client`、`backend/ssh/executor` 等核心目录已按功能域拆分，根文件主要保留模块组织与 re-export。
+- 当前质量基线：`cargo fmt --check`、`cargo check --lib`、`cargo test` 已通过，主 crate 当前测试为 `248 passed`。
+- 剩余主要工作已从架构拆分转向产品能力补全：分屏、完整终端交互细节、SFTP 高级操作、隧道状态监控、设置页、日志/监控、同步与扩展能力。
 
 ## 提交规范
 

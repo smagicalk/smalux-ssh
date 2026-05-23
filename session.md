@@ -2281,3 +2281,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 最终收尾审查
+
+- 目标：确认核心模块化是否可以标记完成，并同步 README / session 记录。
+- 已完成：审查 `app`、`backend/ssh/executor`、`model/app_state` 核心目录，根模块已基本收敛为模块组织和 re-export，具体行为分布到功能子模块。
+- 已完成：确认剩余大文件主要是测试文件和 `model/app_state/message.rs` 跨域消息 enum；不建议为了拆分而强拆消息入口。
+- 已完成：更新 README 当前状态，修正早期 “Iced 工程骨架” 描述，记录当前 Slint + workspace crate + 核心模块化状态。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo check --workspace` 通过
+  - `cargo test --workspace` 通过；主 crate `248 passed`，workspace 其余 crate 全部通过，现有本地 ConPTY 交互测试保持 `2 ignored`
+  - 待执行：`git diff --check`、BOM/中文抽样检查、审查 diff 并提交
+- 评估：核心模块化完成度约 99%，后续重点应转入产品能力补全和少量低收益测试整理。
