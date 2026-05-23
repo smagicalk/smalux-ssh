@@ -2241,3 +2241,15 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：Workspace Callback Layout
+
+- 目标：拆分 `app/callbacks/workspace.rs`，让基础布局回调、工具面板回调和 known hosts 回调各自单一职责。
+- 已完成：新增 `app/callbacks/workspace/layout.rs`，承载 host list、搜索、右侧栏、面板 resize 和背景切换回调绑定。
+- 已完成：`workspace.rs` 保留 workspace callback 组合入口，以及 tool panel 和 known hosts 回调绑定。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app::callbacks -- --nocapture` 通过，`1 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
