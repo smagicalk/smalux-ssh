@@ -1829,3 +1829,20 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Backend SSH Executor Tests
+
+- 目标：拆分 `backend/ssh/executor/tests.rs`，让连接、shell、SFTP、隧道测试各自单一职责。
+- 已完成：新增 `backend/ssh/executor/tests/common.rs`，承载测试公共辅助函数。
+- 已完成：新增 `backend/ssh/executor/tests/connection.rs`，承载连接与执行器基础测试。
+- 已完成：新增 `backend/ssh/executor/tests/shell.rs`，承载 shell 与远程命令测试。
+- 已完成：新增 `backend/ssh/executor/tests/sftp.rs`，承载 SFTP 测试。
+- 已完成：新增 `backend/ssh/executor/tests/tunnel.rs`，承载隧道测试。
+- 已完成：`tests.rs` 现在只保留测试子模块声明。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib executor -- --nocapture` 通过，`40 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
