@@ -1758,3 +1758,16 @@
   - `cargo test --lib app -- --nocapture` 通过，`183 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心拆分：App ViewModel Tabs Terminal
+
+- 目标：拆分 `app/view_model/tabs.rs`，让会话标签列表投影和当前终端投影各自单一职责。
+- 已完成：新增 `app/view_model/tabs/terminal.rs`，承载 `TerminalViewModel`、`active_terminal` 和终端 prompt 相关辅助函数。
+- 已完成：新增 `app/view_model/tabs/tests.rs`，承载当前终端投影离线测试。
+- 已完成：`tabs.rs` 从 6.8KB 收敛为入口与标签列表投影，只保留 `SessionTabViewModel`、`tabs(state)` 和终端子模块重导出。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib view_model -- --nocapture` 通过，`12 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
