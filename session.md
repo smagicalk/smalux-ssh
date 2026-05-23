@@ -2067,3 +2067,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：UI State Visual Settings Root
+
+- 目标：拆分 `model/ui_state/visual_settings.rs`，让视觉设置草稿字段、草稿结构和错误展示各自单一职责，根文件只做模块门面。
+- 已完成：新增 `model/ui_state/visual_settings/field.rs`，承载 `VisualSettingsDraftField`。
+- 已完成：新增 `model/ui_state/visual_settings/draft.rs`，承载 `VisualSettingsDraft`、字段更新、背景开关和 profile 构建入口。
+- 已完成：新增 `model/ui_state/visual_settings/error.rs`，承载 `VisualSettingsDraftError` 及其展示文案。
+- 已完成：`visual_settings.rs` 继续 re-export 原公开类型，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib visual_settings -- --nocapture` 通过，`8 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
