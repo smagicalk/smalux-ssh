@@ -1801,3 +1801,17 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Model UI State Host Action Draft
+
+- 目标：拆分 `model/ui_state.rs`，让 UI 状态入口聚合、错误提示状态和主机操作草稿各自单一职责。
+- 已完成：新增 `model/ui_state/host_action.rs`，承载 `HostActionDraft`、默认远程命令、默认 SFTP 初始目录，以及主机操作草稿读写方法。
+- 已完成：新增 `model/ui_state/tests.rs`，承载 `UiState` 默认值、错误提示和主机操作草稿作用域测试。
+- 已完成：`ui_state.rs` 现在聚焦功能模块声明、类型重导出、`UiState` 聚合结构、视觉配置初始化和错误提示状态。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib ui_state -- --nocapture` 通过，`27 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
