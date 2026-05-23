@@ -2013,3 +2013,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Client Agent Auth
+
+- 目标：拆分 `backend/ssh/client/auth.rs`，让 ssh-agent 连接、身份选择和平台差异从认证调度入口中独立出来。
+- 已完成：新增 `backend/ssh/client/auth/agent.rs`，承载 ssh-agent 认证、agent 连接和 agent identity 选择。
+- 已完成：`auth.rs` 保留 password、key、certificate 认证调度，以及共享的 RSA hash 协商辅助。
+- 已完成：`authenticate` 入口和返回错误类型保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::client -- --nocapture` 通过，`3 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
