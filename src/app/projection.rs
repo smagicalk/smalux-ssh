@@ -22,14 +22,7 @@ pub(super) fn sync_window(window: &AppWindow, state: &AppState) {
 /// 只同步当前终端面板，用于回车和本地 PTY 输出刷新。
 pub(super) fn sync_terminal_pane(window: &AppWindow, state: &AppState) {
     let model = active_terminal(state);
-    window.set_active_session_id(model.session_id.as_str().into());
-    window.set_active_tab_title(model.title.as_str().into());
-    window.set_active_tab_kind(model.kind.into());
-    window.set_active_tab_status(model.status.into());
-    window.set_terminal_input(model.input.as_str().into());
-    window.set_terminal_prompt(model.prompt.into());
-    window.set_terminal_output(string_model(&model.output_lines));
-    window.set_terminal_can_send_input(model.can_send_input);
+    sync_terminal_model(window, &model);
 }
 
 fn sync_view_model(window: &AppWindow, model: &AppViewModel) {

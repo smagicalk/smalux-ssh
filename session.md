@@ -1746,3 +1746,15 @@
   - `cargo test --lib app -- --nocapture` 通过，`183 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心整理：App Projection Terminal Sync 复用
+
+- 目标：消除 `app/projection.rs` 中当前终端面板同步与完整窗口同步之间的重复终端属性写入。
+- 已完成：`sync_terminal_pane` 现在复用 `sync_terminal_model`，终端 session、tab、input、prompt、output 和可输入状态只保留一处写入实现。
+- 说明：这里的 helper 指辅助函数，用于封装可复用的小块逻辑，降低重复和后续字段变更遗漏风险。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app -- --nocapture` 通过，`183 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
