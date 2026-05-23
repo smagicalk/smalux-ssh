@@ -2227,3 +2227,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SFTP View Model
+
+- 目标：拆分 `app/view_model/sftp.rs`，让 SFTP 展示类型、浏览器展示模型构建和标签映射各自单一职责。
+- 已完成：新增 `app/view_model/sftp/types.rs`，承载 `SftpEntryViewModel` 和 `SftpViewModel`。
+- 已完成：新增 `app/view_model/sftp/browser.rs`，承载 active SFTP 选择、browser view model 构建和 empty SFTP 状态构建。
+- 已完成：新增 `app/view_model/sftp/labels.rs`，承载 `SftpEntryKind` 到 UI 标签的映射。
+- 已完成：`sftp.rs` 保留模块声明、`active_sftp` 和展示类型 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app::view_model -- --nocapture` 通过，`12 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
