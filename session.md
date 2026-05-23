@@ -1720,3 +1720,15 @@
   - `cargo test --lib view_model -- --nocapture` 通过，`12 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心拆分：App Projection Models
+
+- 目标：拆分 `app/projection.rs`，让 Slint 窗口属性同步和 Slint 列表模型转换分离。
+- 已完成：新增 `app/projection/models.rs`，承载 hosts、tabs、activity、command palette、SFTP entries、tools、known hosts 和 string model 的 `ModelRc` 转换。
+- 已完成：`projection.rs` 现在聚焦 `sync_window`、`sync_terminal_pane` 和完整 ViewModel 到窗口属性写入。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app -- --nocapture` 通过，`183 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
