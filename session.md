@@ -2149,3 +2149,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Executor Root
+
+- 目标：拆分 `backend/ssh/executor.rs`，让执行器状态构造和 `BackendCommand` 分发各自单一职责，根文件只做模块门面。
+- 已完成：新增 `backend/ssh/executor/state.rs`，承载 `RusshBackendExecutor` 结构体、构造器和缓存计数访问方法。
+- 已完成：新增 `backend/ssh/executor/dispatch.rs`，承载 `BackendExecutor` trait 实现和命令分发 match。
+- 已完成：`executor.rs` 保留 executor 子模块声明和 `RusshBackendExecutor` re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
