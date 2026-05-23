@@ -1983,3 +1983,19 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮精修拆分：UI State Visual Settings Tests
+
+- 目标：拆分 `model/ui_state/visual_settings_tests.rs`，让视觉设置草稿转换、校验、全局 UI draft 更新和 host 作用域 draft 各自单一职责。
+- 已完成：新增 `model/ui_state/visual_settings_tests/common.rs`，承载 host id、默认 theme 和默认 background 测试辅助。
+- 已完成：新增 `model/ui_state/visual_settings_tests/profiles.rs`，承载 `VisualSettingsDraft` 与 profile 往返测试。
+- 已完成：新增 `model/ui_state/visual_settings_tests/validation.rs`，承载无效背景来源校验测试。
+- 已完成：新增 `model/ui_state/visual_settings_tests/ui.rs`，承载全局视觉设置 draft 消息更新测试。
+- 已完成：新增 `model/ui_state/visual_settings_tests/host_scope.rs`，承载 host 级视觉设置 draft 隔离测试。
+- 已完成：`visual_settings_tests.rs` 现在只保留测试子模块声明。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib visual_settings -- --nocapture` 通过，`8 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
