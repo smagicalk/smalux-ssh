@@ -2094,3 +2094,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Session Shell
+
+- 目标：拆分 `backend/ssh/client/session/shell.rs`，让远程 shell 句柄和打开 shell 流程各自单一职责。
+- 已完成：新增 `backend/ssh/client/session/shell/remote.rs`，承载 `RemoteShell`、输入、EOF、resize 和输出抽干逻辑。
+- 已完成：新增 `backend/ssh/client/session/shell/open.rs`，承载 `OpenShellReport` 和 `RusshConnection::open_shell` 打开流程。
+- 已完成：`shell.rs` 现在只保留模块声明和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib shell -- --nocapture` 通过，`29 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
