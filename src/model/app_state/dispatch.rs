@@ -14,6 +14,8 @@ mod sftp;
 mod snippets;
 #[path = "dispatch/storage.rs"]
 mod storage;
+#[path = "dispatch/target.rs"]
+mod target;
 #[path = "dispatch/ui.rs"]
 mod ui;
 #[path = "dispatch/visual.rs"]
@@ -22,6 +24,7 @@ mod visual;
 mod workspace;
 
 use super::{AppState, AppUpdateOutcome, Message};
+use target::MessageDispatchTarget;
 
 impl AppState {
     /// 将 UI 消息应用到根状态。
@@ -36,79 +39,16 @@ impl AppState {
     }
 
     fn dispatch_message(&mut self, message: Message) -> AppUpdateOutcome {
-        match &message {
-            Message::UpdateVisualSettingsDraft { .. }
-            | Message::SetVisualBackgroundEnabled { .. }
-            | Message::ApplyVisualSettings
-            | Message::UpdateHostVisualSettingsDraft { .. }
-            | Message::SetHostVisualBackgroundEnabled { .. }
-            | Message::ApplyHostVisualSettings { .. }
-            | Message::ClearHostVisualSettings { .. } => self.dispatch_visual_message(message),
-
-            Message::SaveWorkspaceSnapshot
-            | Message::RestoreWorkspaceSnapshot
-            | Message::ClearWorkspaceSnapshot => self.dispatch_workspace_message(message),
-
-            Message::UpdateQuickHostDraft { .. }
-            | Message::UpdateQuickHostAuthKind { .. }
-            | Message::UpdateQuickHostAuthField { .. }
-            | Message::SaveQuickHost
-            | Message::DismissUiError
-            | Message::SetWorkspacePage { .. }
-            | Message::ToggleHostListMode
-            | Message::UpdateHostSearchQuery { .. }
-            | Message::ResizeHostsPanel { .. }
-            | Message::ResizeActivityPanel { .. }
-            | Message::ResizeToolPanel { .. }
-            | Message::OpenToolPanel { .. }
-            | Message::CloseToolPanel
-            | Message::ToggleRightSidebar
-            | Message::OpenCommandPalette { .. }
-            | Message::UpdateCommandPaletteQuery { .. }
-            | Message::CloseCommandPalette
-            | Message::NextBackground
-            | Message::UpdateTerminalInputDraft { .. }
-            | Message::AppendTerminalInputDraft { .. }
-            | Message::BackspaceTerminalInputDraft { .. }
-            | Message::SendTerminalInput { .. }
-            | Message::UpdateHostCommandDraft { .. }
-            | Message::UpdateHostSftpInitialDirDraft { .. }
-            | Message::UpdateSftpActionDraft { .. } => self.dispatch_ui_message(message),
-
-            Message::RemoveCredential { .. }
-            | Message::TrustKnownHost { .. }
-            | Message::RemoveKnownHost { .. } => self.dispatch_storage_message(message),
-
-            Message::CloseSessionTab { .. } | Message::ActivateTerminalTab { .. } => {
-                self.dispatch_session_message(message)
-            }
-
-            Message::RefreshSftp { .. }
-            | Message::SaveSftpBookmark { .. }
-            | Message::OpenSftpBookmark { .. }
-            | Message::RemoveSftpBookmark { .. }
-            | Message::NavigateSftp { .. }
-            | Message::SelectSftpEntry { .. }
-            | Message::UploadSftp { .. }
-            | Message::DownloadSftp { .. }
-            | Message::CancelSftpTransfer { .. }
-            | Message::RemoveSftpFile { .. }
-            | Message::CreateSftpDir { .. } => self.dispatch_sftp_message(message),
-
-            Message::OpenShell { .. }
-            | Message::OpenRecentConnection { .. }
-            | Message::OpenSftp { .. }
-            | Message::RunRemoteCommand { .. }
-            | Message::StartTunnel { .. }
-            | Message::StopTunnel { .. } => self.dispatch_launch_message(message),
-
-            Message::SaveHostCommandSnippet { .. }
-            | Message::RunSnippet { .. }
-            | Message::UpdateSnippetArgument { .. }
-            | Message::RemoveSnippet { .. }
-            | Message::RunCommandHistory { .. } => self.dispatch_snippet_message(message),
-
-            Message::BackendEventReceived(_) => self.dispatch_backend_message(message),
+        match MessageDispatchTarget::for_message(&message) {
+            MessageDispatchTarget::Visual => self.dispatch_visual_message(message),
+            MessageDispatchTarget::Workspace => self.dispatch_workspace_message(message),
+            MessageDispatchTarget::Ui => self.dispatch_ui_message(message),
+            MessageDispatchTarget::Storage => self.dispatch_storage_message(message),
+            MessageDispatchTarget::Session => self.dispatch_session_message(message),
+            MessageDispatchTarget::Sftp => self.dispatch_sftp_message(message),
+            MessageDispatchTarget::Launch => self.dispatch_launch_message(message),
+            MessageDispatchTarget::Snippet => self.dispatch_snippet_message(message),
+            MessageDispatchTarget::Backend => self.dispatch_backend_message(message),
         }
     }
 

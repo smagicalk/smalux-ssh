@@ -1951,3 +1951,18 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Model App State Dispatch Target
+
+- 目标：拆分 `model/app_state/dispatch.rs` 的消息分类逻辑，让根分发只负责按目标调用具体领域模块。
+- 已完成：新增 `model/app_state/dispatch/target.rs`，承载 `MessageDispatchTarget` 和 `Message` 分类规则。
+- 已完成：`dispatch.rs` 的 `dispatch_message` 现在先分类再分发，避免根分发文件继续堆积巨型 match。
+- 已完成：新增代表性消息分类测试，覆盖 visual、workspace、ui、storage、session、sftp、launch、snippet、backend 目标。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib dispatch -- --nocapture` 通过，`2 passed`
+  - `cargo test --lib app_state -- --nocapture` 通过，`170 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
