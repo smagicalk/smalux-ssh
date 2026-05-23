@@ -1908,3 +1908,18 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Model UI State Quick Host Tests
+
+- 目标：拆分 `model/ui_state/quick_host_tests.rs`，让快速主机草稿构建/校验测试和 UI 表单状态测试各自单一职责。
+- 已完成：新增 `model/ui_state/quick_host_tests/common.rs`，承载 host id 测试辅助。
+- 已完成：新增 `model/ui_state/quick_host_tests/draft.rs`，承载 agent、password、key、certificate 主机构建和必填校验测试。
+- 已完成：新增 `model/ui_state/quick_host_tests/ui.rs`，承载 `UiState` 快速主机表单消息测试。
+- 已完成：`quick_host_tests.rs` 现在只保留测试子模块声明。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib quick_host -- --nocapture` 通过，`11 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
