@@ -1846,3 +1846,18 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Backend SSH Executor Cache Resources Tests
+
+- 目标：拆分 `backend/ssh/executor/cache/resources_tests.rs`，让资源取出测试、缓存替换测试和公共测试辅助各自单一职责。
+- 已完成：新增 `backend/ssh/executor/cache/resources_tests/common.rs`，承载 session id、测试 tunnel 和 HashMap 构造辅助。
+- 已完成：新增 `backend/ssh/executor/cache/resources_tests/take.rs`，承载会话资源、子资源和运行态资源取出测试。
+- 已完成：新增 `backend/ssh/executor/cache/resources_tests/replace.rs`，承载 shell/SFTP 缓存替换测试。
+- 已完成：`resources_tests.rs` 现在只保留测试子模块声明。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib resources -- --nocapture` 通过，`11 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
