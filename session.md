@@ -2162,3 +2162,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：App View Model Root
+
+- 目标：拆分 `app/view_model/root.rs`，让完整展示模型类型和从 `AppState` 构建展示模型的逻辑各自单一职责。
+- 已完成：新增 `app/view_model/root/types.rs`，承载 `AppViewModel` 字段结构。
+- 已完成：新增 `app/view_model/root/builder.rs`，承载 `app_view_model` 构建逻辑。
+- 已完成：`root.rs` 保留 root 子模块声明和公开 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib app::view_model -- --nocapture` 通过，`12 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
