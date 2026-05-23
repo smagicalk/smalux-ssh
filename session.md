@@ -2175,3 +2175,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：AppState Root
+
+- 目标：拆分 `model/app_state.rs`，让应用根状态和消息处理结果各自单一职责，根文件只保留模块组织和公开 re-export。
+- 已完成：新增 `model/app_state/state.rs`，承载 `AppState`、Debug、Default、执行器注入、存储后端注入和持久化方法。
+- 已完成：新增 `model/app_state/outcome.rs`，承载 `AppUpdateOutcome` 和 `changed` 判断。
+- 已完成：`app_state.rs` 保留 app_state 子模块声明，以及 `Message`、`AppUpdateOutcome`、`AppState` re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib model::app_state -- --nocapture` 通过，`170 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
