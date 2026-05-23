@@ -2134,3 +2134,18 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：Slint Projection Sync
+
+- 目标：拆分 `app/projection.rs`，让 Slint 属性写入按工作区、终端、SFTP 和集合模型分层维护。
+- 已完成：新增 `app/projection/workspace.rs`，承载工作区计数、页面、语言、主题、布局和命令面板属性写入。
+- 已完成：新增 `app/projection/terminal.rs`，承载当前终端面板属性和输出模型写入。
+- 已完成：新增 `app/projection/sftp.rs`，承载 SFTP 面板状态写入。
+- 已完成：新增 `app/projection/collections.rs`，承载主机、标签页、活动、命令面板结果、历史、片段、隧道和 known hosts 列表模型写入。
+- 已完成：`projection.rs` 保留 `sync_window` 和 `sync_terminal_pane` 两个外部入口，调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib view_model -- --nocapture` 通过，`12 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
