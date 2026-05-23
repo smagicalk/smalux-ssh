@@ -1876,3 +1876,20 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：Backend SSH Executor Cache Tunnels Tests
+
+- 目标：拆分 `backend/ssh/executor/cache/tunnels_tests.rs`，让隧道缓存的删除、替换、取出和停止测试各自单一职责。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels_tests/common.rs`，承载 session id、测试 tunnel、停止记录辅助。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels_tests/remove.rs`，承载按 session + rule 删除隧道测试。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels_tests/replace.rs`，承载替换同名隧道并停止旧隧道测试。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels_tests/take.rs`，承载按 session 取出隧道测试。
+- 已完成：新增 `backend/ssh/executor/cache/tunnels_tests/stop.rs`，承载停止已脱离隧道测试。
+- 已完成：`tunnels_tests.rs` 现在只保留测试子模块声明。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib tunnels -- --nocapture` 通过，`7 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
