@@ -4,11 +4,14 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 
-use crate::model::{Message, ToolPanelMode};
+use crate::model::Message;
 
-use super::{
-    AppWindow, SharedAppState, active_terminal_host_id, apply_and_sync, apply_messages_and_sync,
-};
+use super::{AppWindow, SharedAppState, apply_and_sync};
+
+#[path = "workspace/known_hosts.rs"]
+mod known_hosts;
+#[path = "workspace/tool_panel.rs"]
+mod tool_panel;
 
 pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     {
@@ -63,37 +66,7 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
         window.on_open_tool_panel(move |mode| {
-            let Some(mode) = super::parse_tool_panel_mode(&mode) else {
-                return;
-            };
-            let host_without_sftp = if matches!(mode, ToolPanelMode::Sftp) {
-                let state = state.borrow();
-                active_terminal_host_id(&state).filter(|host_id| {
-                    !state
-                        .sessions
-                        .sftp_browsers
-                        .iter()
-                        .any(|browser| browser.host_id == *host_id)
-                })
-            } else {
-                None
-            };
-
-            if let Some(host_id) = host_without_sftp {
-                apply_messages_and_sync(
-                    &weak,
-                    &state,
-                    [
-                        Message::OpenSftp {
-                            host_id,
-                            initial_dir: "/".to_owned(),
-                        },
-                        Message::OpenToolPanel { mode },
-                    ],
-                );
-            } else {
-                apply_and_sync(&weak, &state, Message::OpenToolPanel { mode });
-            }
+            tool_panel::open_tool_panel(&weak, &state, &mode);
         });
     }
     {
@@ -107,34 +80,20 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
         window.on_trust_known_host(move |host, port| {
-            let Some(port) = known_host_port(port) else {
+            let Some(message) = known_hosts::trust_known_host_message(&host, port) else {
                 return;
             };
-            apply_and_sync(
-                &weak,
-                &state,
-                Message::TrustKnownHost {
-                    host: host.to_string(),
-                    port,
-                },
-            );
+            apply_and_sync(&weak, &state, message);
         });
     }
     {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
         window.on_remove_known_host(move |host, port| {
-            let Some(port) = known_host_port(port) else {
+            let Some(message) = known_hosts::remove_known_host_message(&host, port) else {
                 return;
             };
-            apply_and_sync(
-                &weak,
-                &state,
-                Message::RemoveKnownHost {
-                    host: host.to_string(),
-                    port,
-                },
-            );
+            apply_and_sync(&weak, &state, message);
         });
     }
     {
@@ -142,22 +101,5 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
         window.on_next_background(move || {
             apply_and_sync(&weak, &state, Message::NextBackground);
         });
-    }
-}
-
-fn known_host_port(port: i32) -> Option<u16> {
-    u16::try_from(port).ok().filter(|port| *port > 0)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn known_host_port_rejects_invalid_values() {
-        assert_eq!(known_host_port(22), Some(22));
-        assert_eq!(known_host_port(0), None);
-        assert_eq!(known_host_port(-1), None);
-        assert_eq!(known_host_port(70_000), None);
     }
 }

@@ -1937,3 +1937,17 @@
   - `cargo test` 通过，`246 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮核心拆分：App Workspace Callbacks
+
+- 目标：拆分 `app/callbacks/workspace.rs`，让工作区回调注册、工具面板打开逻辑和 Known Hosts 消息构造各自单一职责。
+- 已完成：新增 `app/callbacks/workspace/tool_panel.rs`，承载工具面板打开和 SFTP 面板自动打开逻辑。
+- 已完成：新增 `app/callbacks/workspace/known_hosts.rs`，承载 Known Hosts 端口校验和信任/移除消息构造。
+- 已完成：`workspace.rs` 现在聚焦 Slint 工作区回调注册。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib workspace -- --nocapture` 通过，`13 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`246 passed`
+  - `git diff --check` 通过
+- 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
