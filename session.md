@@ -1967,3 +1967,19 @@
   - `cargo test` 通过，`248 passed`
   - `git diff --check` 通过
 - 下一步：执行 BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮精修拆分：Quick Host Draft Tests
+
+- 目标：继续拆分 `model/ui_state/quick_host_tests/draft.rs`，让快速主机草稿测试按认证类型和校验职责独立维护。
+- 已完成：`draft.rs` 现在只保留子模块声明，不再承载具体测试逻辑。
+- 已完成：新增 `model/ui_state/quick_host_tests/draft/agent.rs`，承载 agent 主机构建测试。
+- 已完成：新增 `model/ui_state/quick_host_tests/draft/password.rs`，承载 password 主机构建测试。
+- 已完成：新增 `model/ui_state/quick_host_tests/draft/key.rs`，承载 private key 主机构建测试。
+- 已完成：新增 `model/ui_state/quick_host_tests/draft/certificate.rs`，承载 certificate 主机构建测试。
+- 已完成：新增 `model/ui_state/quick_host_tests/draft/validation.rs`，承载必填字段与认证引用校验测试。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib quick_host -- --nocapture` 通过，`11 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
