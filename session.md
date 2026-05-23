@@ -2081,3 +2081,16 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SFTP Transfer Direction
+
+- 目标：拆分 `backend/ssh/client/session/sftp/transfer.rs`，让上传和下载传输流程按方向独立维护。
+- 已完成：新增 `backend/ssh/client/session/sftp/transfer/upload.rs`，承载 SFTP 上传、本地文件读取、远程写入、进度和上传后目录刷新。
+- 已完成：新增 `backend/ssh/client/session/sftp/transfer/download.rs`，承载 SFTP 下载、远程读取、本地写入、flush、关闭和完成事件。
+- 已完成：`transfer.rs` 现在只保留传输方向子模块声明，`RemoteSftp::upload/download` 调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib sftp::transfer -- --nocapture` 通过，`12 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
