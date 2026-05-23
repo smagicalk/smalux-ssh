@@ -1707,3 +1707,16 @@
   - `cargo test --lib tunnel -- --nocapture` 通过，`35 passed`
   - `cargo test` 通过，`246 passed`
 - 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
+
+## 本轮核心拆分：App ViewModel Root 与 Tests
+
+- 目标：拆分 `app/view_model/mod.rs`，让 ViewModel 模块入口只保留模块声明和对 Slint 投影层需要的重导出。
+- 已完成：新增 `app/view_model/root.rs`，承载 `AppViewModel` 聚合结构和 `app_view_model` 构建函数。
+- 已完成：新增 `app/view_model/tests.rs`，承载根 ViewModel 的离线投影测试。
+- 已完成：`mod.rs` 从 7.8KB 收敛到入口文件，只保留子模块声明和公开到 `app` 层的 ViewModel 类型/函数重导出。
+- 验证记录：
+  - `cargo check --lib` 通过
+  - `cargo fmt --check` 通过
+  - `cargo test --lib view_model -- --nocapture` 通过，`12 passed`
+  - `cargo test` 通过，`246 passed`
+- 下一步：执行 diff 检查、BOM/中文抽样检查并提交。
