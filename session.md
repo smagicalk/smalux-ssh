@@ -2201,3 +2201,15 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Session Runtime Cleanup
+
+- 目标：拆分 `backend/ssh/executor/session_runtime.rs`，让连接/断开入口和会话资源清理各自单一职责。
+- 已完成：新增 `backend/ssh/executor/session_runtime/cleanup.rs`，承载 stale/disconnected session 资源关闭、subresources 关闭和断开警告日志。
+- 已完成：`session_runtime.rs` 保留 `connect`、`disconnect` 生命周期入口，外部和 executor 内部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
