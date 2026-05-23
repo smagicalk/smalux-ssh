@@ -2213,3 +2213,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Shell Runtime
+
+- 目标：拆分 `backend/ssh/executor/shell_runtime.rs`，让远程 shell 打开、输入、输出抽干和远程命令运行各自单一职责。
+- 已完成：新增 `backend/ssh/executor/shell_runtime/open.rs`，承载 `open_shell` 和 shell 缓存替换后的旧输入关闭。
+- 已完成：新增 `backend/ssh/executor/shell_runtime/input.rs`，承载 `send_shell_input` 和 detached shell input 关闭逻辑。
+- 已完成：新增 `backend/ssh/executor/shell_runtime/output.rs`，承载 `drain_session_output`、抽干限制和失败后缓存移除。
+- 已完成：`shell_runtime.rs` 保留 `run_command` 入口和子模块声明，executor 分发调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::executor -- --nocapture` 通过，`36 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
