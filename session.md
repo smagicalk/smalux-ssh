@@ -2267,3 +2267,17 @@
   - `cargo check --lib` 通过
   - `cargo test` 通过，`248 passed`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 本轮生产拆分：SSH Cache Resources
+
+- 目标：拆分 `backend/ssh/executor/cache/resources.rs`，让会话缓存资源类型、资源取出逻辑和缓存替换逻辑各自单一职责。
+- 已完成：新增 `backend/ssh/executor/cache/resources/types.rs`，承载 cached session resources 相关结构体。
+- 已完成：新增 `backend/ssh/executor/cache/resources/take.rs`，承载 session subresources、session resources 和 runtime resources 的取出逻辑。
+- 已完成：新增 `backend/ssh/executor/cache/resources/replace.rs`，承载 cached shell 和 cached SFTP 替换逻辑。
+- 已完成：`resources.rs` 保留 resources 子模块组织和必要 re-export，外部调用路径保持不变。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test --lib backend::ssh::executor::cache::resources -- --nocapture` 通过，`11 passed`
+  - `cargo check --lib` 通过
+  - `cargo test` 通过，`248 passed`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
