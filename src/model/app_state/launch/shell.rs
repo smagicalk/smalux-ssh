@@ -3,7 +3,7 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, PtyRequest};
-use crate::model::{HostId, SessionId, SessionStatus, WorkspacePage};
+use crate::model::{HostId, SessionId, SessionKind, SessionStatus, WorkspacePage};
 use crate::terminal::TerminalTabState;
 
 use super::super::{AppState, AppUpdateOutcome};
@@ -42,5 +42,66 @@ impl AppState {
         host_id: HostId,
     ) -> AppUpdateOutcome {
         self.open_shell(host_id)
+    }
+
+    /// 复用已存在的远程 Shell 标签页重新建立连接。
+    pub(in crate::model::app_state) fn reconnect_shell(
+        &mut self,
+        session_id: SessionId,
+    ) -> AppUpdateOutcome {
+        let Some(tab) = self
+            .sessions
+            .tabs
+            .iter()
+            .find(|tab| tab.id == session_id)
+            .cloned()
+        else {
+            return AppUpdateOutcome {
+                error: Some(format!("找不到会话：{}", session_id.0)),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        if !matches!(tab.kind, SessionKind::Shell) {
+            return AppUpdateOutcome {
+                error: Some("只有远程 Shell 标签页支持重新连接".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let Some(host_id) = tab.host_id else {
+            return AppUpdateOutcome {
+                error: Some("Shell 会话缺少主机标识".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        };
+        let Some(host) = self.host_by_id(host_id) else {
+            return missing_host(host_id);
+        };
+
+        let pty = self
+            .terminal
+            .tabs
+            .iter()
+            .find(|terminal_tab| terminal_tab.session_id == session_id)
+            .map(|terminal_tab| PtyRequest::xterm(terminal_tab.size))
+            .unwrap_or_else(|| PtyRequest::xterm(crate::terminal::TerminalSize::default()));
+
+        if !self.sessions.mark_shell_reconnecting(session_id) {
+            return AppUpdateOutcome {
+                error: Some("只有已断开或失败的远程 Shell 标签页可以重新连接".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+        self.terminal.set_active_tab(session_id);
+        self.ui.workspace.active_page = WorkspacePage::Terminal;
+        self.record_recent_connection(&host);
+        let known_hosts = self.storage.known_hosts.clone();
+        self.backend_commands.extend([
+            connect_command_with_known_hosts(session_id, &host, known_hosts),
+            BackendCommand::OpenShell { session_id, pty },
+        ]);
+
+        queued_outcome(2)
     }
 }

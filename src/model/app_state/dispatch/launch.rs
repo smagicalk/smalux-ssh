@@ -7,6 +7,7 @@ impl AppState {
         match message {
             Message::OpenShell { host_id } => self.open_shell(host_id),
             Message::OpenRecentConnection { host_id } => self.open_recent_connection(host_id),
+            Message::ReconnectShell { session_id } => self.reconnect_shell(session_id),
             Message::OpenSftp {
                 host_id,
                 initial_dir,

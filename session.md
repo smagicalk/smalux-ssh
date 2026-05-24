@@ -2294,3 +2294,19 @@
   - `cargo test --workspace` 通过；主 crate `248 passed`，workspace 其余 crate 全部通过，现有本地 ConPTY 交互测试保持 `2 ignored`
   - 待执行：`git diff --check`、BOM/中文抽样检查、审查 diff 并提交
 - 评估：核心模块化完成度约 99%，后续重点应转入产品能力补全和少量低收益测试整理。
+
+## 本轮产品闭环：SSH Shell Reconnect
+
+- 目标：从架构拆分切到 SSH 终端闭环，先补非 UI 核心能力，UI 入口后续与用户一起设计。
+- 已完成：新增 `Message::ReconnectShell { session_id }`，归入 Launch 路由。
+- 已完成：新增 `SessionManager::mark_shell_reconnecting`，允许用户主动把已断开或失败的远程 Shell 标签页从终态拉回 `Reconnecting`，不破坏后台事件不能拉回终态的保护。
+- 已完成：`AppState::reconnect_shell` 复用原 session id、原终端标签和终端尺寸，重新排队 `Connect + OpenShell`，并激活 Terminal 页面。
+- 已完成：新增 shell reconnect 行为测试，覆盖断开 shell 可重连、活跃 shell 拒绝重连、remote command tab 拒绝重连。
+- UI 协作点：后续需要决定 `ReconnectShell` 入口放在标签右键、终端状态栏按钮、命令面板，或多个入口组合。
+- 验证记录：
+  - `cargo fmt --check` 通过
+  - `cargo test -p smagical-session shell_reconnecting_status_requires_terminal_shell_tab -- --nocapture` 通过，`1 passed`
+  - `cargo test --lib model::app_state::launch_tests::shell::reconnect -- --nocapture` 通过，`3 passed`
+  - `cargo check --workspace` 通过
+  - `cargo test --workspace` 通过；主 crate `251 passed`，workspace 其余 crate 全部通过，现有本地 ConPTY 交互测试保持 `2 ignored`
+- 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。

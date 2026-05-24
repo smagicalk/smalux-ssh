@@ -78,6 +78,7 @@ impl MessageDispatchTarget {
 
             Message::OpenShell { .. }
             | Message::OpenRecentConnection { .. }
+            | Message::ReconnectShell { .. }
             | Message::OpenSftp { .. }
             | Message::RunRemoteCommand { .. }
             | Message::StartTunnel { .. }

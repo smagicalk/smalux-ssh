@@ -191,6 +191,26 @@ impl SessionManager {
         self.set_status(id, SessionStatus::Connecting)
     }
 
+    /// 用户主动重连远程 Shell 时，允许终态标签页重新进入连接流程。
+    pub fn mark_shell_reconnecting(&mut self, id: SessionId) -> bool {
+        let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) else {
+            return false;
+        };
+
+        if !matches!(tab.kind, SessionKind::Shell)
+            || !matches!(
+                tab.status,
+                SessionStatus::Disconnected | SessionStatus::Failed { .. }
+            )
+        {
+            return false;
+        }
+
+        tab.status = SessionStatus::Reconnecting;
+        self.sync_active_index_for_status(id, false);
+        true
+    }
+
     /// 将远程连接标签页标记为认证中，忽略本地 shell、缺失或终态标签页。
     pub fn mark_remote_authenticating(&mut self, id: SessionId) -> bool {
         if !self.can_update_remote_connection_status(id) {
@@ -719,6 +739,49 @@ mod tests {
 
         assert!(sessions.set_status(sftp_id, SessionStatus::Disconnected));
         assert!(!sessions.mark_remote_authenticated(sftp_id));
+    }
+
+    #[test]
+    fn shell_reconnecting_status_requires_terminal_shell_tab() {
+        let mut sessions = SessionManager::default();
+        let disconnected_id = session_id();
+        let failed_id = session_id();
+        let connected_id = session_id();
+        let command_id = session_id();
+        let host_id = host_id();
+
+        sessions.open_shell_tab(disconnected_id, host_id, "disconnected");
+        sessions.open_shell_tab(failed_id, host_id, "failed");
+        sessions.open_shell_tab(connected_id, host_id, "connected");
+        sessions.open_remote_command_tab(command_id, host_id, "uptime", None);
+        assert!(sessions.set_status(disconnected_id, SessionStatus::Disconnected));
+        assert!(sessions.set_status(
+            failed_id,
+            SessionStatus::Failed {
+                reason: "network".to_owned()
+            }
+        ));
+        assert!(sessions.set_status(connected_id, SessionStatus::Connected));
+        assert!(sessions.set_status(command_id, SessionStatus::Disconnected));
+
+        assert!(sessions.mark_shell_reconnecting(disconnected_id));
+        assert!(sessions.mark_shell_reconnecting(failed_id));
+        assert!(!sessions.mark_shell_reconnecting(connected_id));
+        assert!(!sessions.mark_shell_reconnecting(command_id));
+
+        assert!(matches!(
+            sessions.tabs[0].status,
+            SessionStatus::Reconnecting
+        ));
+        assert!(matches!(
+            sessions.tabs[1].status,
+            SessionStatus::Reconnecting
+        ));
+        assert!(matches!(sessions.tabs[2].status, SessionStatus::Connected));
+        assert!(matches!(
+            sessions.tabs[3].status,
+            SessionStatus::Disconnected
+        ));
     }
 
     #[test]

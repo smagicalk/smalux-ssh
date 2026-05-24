@@ -6,3 +6,5 @@ mod auth;
 mod open;
 #[path = "shell_recent.rs"]
 mod recent;
+#[path = "shell_reconnect.rs"]
+mod reconnect;

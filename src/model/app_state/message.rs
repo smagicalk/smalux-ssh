@@ -167,6 +167,9 @@ pub enum Message {
     OpenRecentConnection {
         host_id: HostId,
     },
+    ReconnectShell {
+        session_id: SessionId,
+    },
     OpenSftp {
         host_id: HostId,
         initial_dir: String,

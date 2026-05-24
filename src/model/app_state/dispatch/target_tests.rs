@@ -50,6 +50,12 @@ fn classifies_representative_messages_by_dispatch_target() {
         MessageDispatchTarget::Launch
     );
     assert_eq!(
+        MessageDispatchTarget::for_message(&Message::ReconnectShell {
+            session_id: SessionId(uuid::Uuid::nil()),
+        }),
+        MessageDispatchTarget::Launch
+    );
+    assert_eq!(
         MessageDispatchTarget::for_message(&Message::RunCommandHistory {
             history_id: crate::model::CommandHistoryId(uuid::Uuid::nil()),
         }),
