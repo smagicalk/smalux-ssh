@@ -1,4 +1,7 @@
 //! 后端命令队列。
+//!
+//! 队列保持 FIFO 语义，状态层按顺序排队，后端泵按顺序消费。它只包装 `VecDeque`，把
+//! 常用操作集中起来，便于测试和过期命令清理统计。
 
 use std::collections::VecDeque;
 
@@ -7,12 +10,14 @@ use super::BackendCommand;
 /// UI 状态层等待提交给后端执行器的命令队列。
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BackendCommandQueue {
+    /// 待执行命令，队首是最早入队的命令。
     commands: VecDeque<BackendCommand>,
 }
 
 impl BackendCommandQueue {
     /// 追加一条待执行命令。
     pub fn push(&mut self, command: BackendCommand) {
+        // 新命令总是进入队尾，保证用户操作顺序不被打乱。
         self.commands.push_back(command);
     }
 
@@ -43,6 +48,7 @@ impl BackendCommandQueue {
 
     /// 保留满足条件的命令，并返回被移除的命令数量。
     pub fn retain(&mut self, mut keep: impl FnMut(&BackendCommand) -> bool) -> usize {
+        // VecDeque::retain 不返回移除数量，这里用前后长度差补出统计结果。
         let before = self.commands.len();
         self.commands.retain(|command| keep(command));
         before - self.commands.len()
@@ -77,7 +83,7 @@ mod tests {
         let session_id = session_id();
 
         queue.extend([
-            BackendCommand::OpenShell {
+            BackendCommand::OpenLocalShell {
                 session_id,
                 pty: PtyRequest::xterm(TerminalSize::default()),
             },
@@ -90,11 +96,11 @@ mod tests {
         assert_eq!(queue.pending_count(), 2);
         assert!(matches!(
             queue.front(),
-            Some(BackendCommand::OpenShell { .. })
+            Some(BackendCommand::OpenShell { .. }) | Some(BackendCommand::OpenLocalShell { .. })
         ));
         assert!(matches!(
             queue.pop_front(),
-            Some(BackendCommand::OpenShell { .. })
+            Some(BackendCommand::OpenShell { .. }) | Some(BackendCommand::OpenLocalShell { .. })
         ));
         assert!(matches!(
             queue.pop_front(),

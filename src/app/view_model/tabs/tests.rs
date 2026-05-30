@@ -25,6 +25,7 @@ fn active_terminal_projects_buffer_lines() {
 
     assert_eq!(terminal.output_lines, vec!["connected"]);
     assert!(terminal.can_send_input);
+    assert!(!terminal.can_reconnect_shell);
     assert_eq!(terminal.prompt, "$");
 }
 
@@ -87,4 +88,27 @@ fn active_terminal_disables_remote_shell_input_when_terminal() {
 
     assert_eq!(terminal.session_id, session_id.0.to_string());
     assert!(!terminal.can_send_input);
+    assert!(terminal.can_reconnect_shell);
+}
+
+#[test]
+fn active_terminal_reconnect_action_is_disabled_for_remote_command_tabs() {
+    let mut state = AppState::default();
+    let session_id = SessionId(Uuid::new_v4());
+    let host_id = HostId(Uuid::new_v4());
+    state
+        .sessions
+        .open_remote_command_tab(session_id, host_id, "uptime", None);
+    state
+        .sessions
+        .set_status(session_id, SessionStatus::Disconnected);
+    state
+        .terminal
+        .open_tab(TerminalTabState::new(session_id, "uptime"));
+
+    let terminal = active_terminal(&state);
+
+    assert_eq!(terminal.session_id, session_id.0.to_string());
+    assert!(!terminal.can_send_input);
+    assert!(!terminal.can_reconnect_shell);
 }

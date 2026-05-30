@@ -14,6 +14,7 @@ pub(in crate::app::projection) fn tab_model(
             id: tab.id.as_str().into(),
             title: tab.title.as_str().into(),
             kind: tab.kind.into(),
+            status_key: tab.status_key.into(),
             status: tab.status.into(),
             active: tab.active,
         })

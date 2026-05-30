@@ -4,6 +4,7 @@ use crate::model::{
     AppState, DEFAULT_LOCAL_TERMINAL_TITLE, LOCAL_TERMINAL_SESSION_ID, SessionKind,
 };
 
+use super::super::i18n::{locale_for_state, tr};
 use super::super::labels::{session_kind_label, session_status_label};
 
 /// 当前终端区域展示状态。
@@ -18,9 +19,11 @@ pub(in crate::app) struct TerminalViewModel {
     pub input: String,
     pub prompt: &'static str,
     pub can_send_input: bool,
+    pub can_reconnect_shell: bool,
 }
 
 pub(in crate::app) fn active_terminal(state: &AppState) -> TerminalViewModel {
+    let locale = locale_for_state(state);
     let active_tab = state
         .terminal
         .active_tab
@@ -49,8 +52,8 @@ pub(in crate::app) fn active_terminal(state: &AppState) -> TerminalViewModel {
             session_id: LOCAL_TERMINAL_SESSION_ID.0.to_string(),
             host_id: String::new(),
             title: DEFAULT_LOCAL_TERMINAL_TITLE.to_owned(),
-            kind: "Local",
-            status: "Ready",
+            kind: tr(locale, "session.kind.local"),
+            status: tr(locale, "session.status.ready"),
             output_lines,
             input: state
                 .ui
@@ -58,6 +61,7 @@ pub(in crate::app) fn active_terminal(state: &AppState) -> TerminalViewModel {
                 .to_owned(),
             prompt: local_terminal_prompt(),
             can_send_input: true,
+            can_reconnect_shell: false,
         };
     };
 
@@ -76,12 +80,13 @@ pub(in crate::app) fn active_terminal(state: &AppState) -> TerminalViewModel {
             .map(|host_id| host_id.0.to_string())
             .unwrap_or_default(),
         title: tab.title.clone(),
-        kind: session_kind_label(&tab.kind),
-        status: session_status_label(&tab.status),
+        kind: session_kind_label(&tab.kind, locale),
+        status: session_status_label(&tab.status, locale),
         output_lines,
         input: state.ui.terminal_input_for(tab.id).to_owned(),
         prompt: terminal_prompt_for_kind(&tab.kind),
         can_send_input: tab.can_accept_terminal_input(),
+        can_reconnect_shell: tab.can_reconnect_shell(),
     }
 }
 

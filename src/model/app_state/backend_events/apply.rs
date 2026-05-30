@@ -34,14 +34,4 @@ impl AppState {
             ..AppUpdateOutcome::default()
         }
     }
-
-    /// 使用当前共享执行器泵出已排队的后台命令。
-    pub fn drain_backend_queue_with_executor(&mut self) -> AppUpdateOutcome {
-        let backend_executor = self.backend_executor.clone();
-        let mut executor = backend_executor
-            .lock()
-            .unwrap_or_else(|poisoned| poisoned.into_inner());
-
-        self.drain_backend_queue(&mut **executor)
-    }
 }

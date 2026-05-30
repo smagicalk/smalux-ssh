@@ -1,7 +1,7 @@
 //! 本地持久化状态的内存入口。
 //!
-//! 当前先用轻量内存集合承接 UI 和测试；后续接入 redb 后，外部仍通过
-//! StorageManager 访问主机、分组、凭据元数据、Known Hosts、最近连接、命令历史、快捷命令、SFTP 书签、隧道规则和工作区，减少存储实现变化的影响。
+//! SQLite 是当前主存储后端，但应用内部仍通过 `StorageManager` 读写内存快照。这样 UI、
+//! 状态机和测试可以操作同一套结构，落盘、备份、导入导出由 storage backend 负责。
 
 mod credentials;
 mod history;
@@ -9,10 +9,14 @@ mod hosts;
 mod known_hosts;
 mod persistence;
 mod sftp;
+mod snapshot;
 mod snippets;
+mod sqlite;
+mod themes;
 mod tunnels;
 mod workspace;
 
+use serde::{Deserialize, Serialize};
 use smagical_config::AppConfig;
 use smagical_core::{
     CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
@@ -20,6 +24,7 @@ use smagical_core::{
 };
 
 pub use persistence::{RedbStorage, StoragePersistenceError};
+pub use sqlite::{LegacyImportOutcome, SqliteStorage};
 
 pub(crate) const DEFAULT_RECENT_LIMIT: usize = 20;
 pub(crate) const DEFAULT_COMMAND_HISTORY_LIMIT: usize = 500;
@@ -27,17 +32,41 @@ pub(crate) const DEFAULT_COMMAND_HISTORY_LIMIT: usize = 500;
 /// 主机资产与隧道规则的管理器。
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct StorageManager {
+    /// 应用配置快照，和业务数据一起保存，便于备份恢复。
     pub app_config: AppConfig,
+    /// 已保存主机。
     pub hosts: Vec<Host>,
+    /// 树形主机分组。
     pub groups: Vec<HostGroup>,
+    /// 凭据元数据，不包含明文秘密。
     pub credentials: Vec<CredentialMetadata>,
+    /// Known Hosts 安全记录。
     pub known_hosts: Vec<KnownHostEntry>,
+    /// 最近连接列表。
     pub recent_connections: Vec<RecentConnection>,
+    /// 命令历史。
     pub command_history: Vec<CommandHistoryItem>,
+    /// 快捷命令片段。
     pub snippets: Vec<Snippet>,
+    /// SFTP 书签。
     pub sftp_bookmarks: Vec<SftpBookmark>,
+    /// SSH 隧道规则。
     pub tunnel_rules: Vec<TunnelRule>,
+    /// 可导入/导出的主题资料。
+    pub themes: Vec<ThemeProfileRecord>,
+    /// 工作区恢复快照。
     pub workspace: Option<WorkspaceState>,
+}
+
+/// 可导入、导出和复用的主题资料。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ThemeProfileRecord {
+    /// 主题 profile 名称。
+    pub name: String,
+    /// 原始主题配置 TOML，保留导入文件的可导出形态。
+    pub profile_toml: String,
+    /// 是否为内置主题导出的记录。内置记录通常不允许删除。
+    pub builtin: bool,
 }
 
 impl StorageManager {
@@ -86,12 +115,34 @@ impl StorageManager {
         self.tunnel_rules.len()
     }
 
+    /// 已保存主题资料数量。
+    pub fn theme_count(&self) -> usize {
+        self.themes.len()
+    }
+
     /// 当前保存的工作区标签页数量。
     pub fn workspace_tab_count(&self) -> usize {
         self.workspace
             .as_ref()
             .map(|workspace| workspace.tabs.len())
             .unwrap_or(0)
+    }
+
+    /// 是否没有任何用户持久化数据。
+    pub fn is_empty(&self) -> bool {
+        // app_config 也纳入判断，避免旧数据迁移时误删只改过设置的存储。
+        self.hosts.is_empty()
+            && self.groups.is_empty()
+            && self.credentials.is_empty()
+            && self.known_hosts.is_empty()
+            && self.recent_connections.is_empty()
+            && self.command_history.is_empty()
+            && self.snippets.is_empty()
+            && self.sftp_bookmarks.is_empty()
+            && self.tunnel_rules.is_empty()
+            && self.themes.is_empty()
+            && self.workspace.is_none()
+            && self.app_config == AppConfig::default()
     }
 }
 
@@ -109,6 +160,7 @@ mod tests {
             id: HostId(Uuid::new_v4()),
             name: "staging".to_owned(),
             group_id: None,
+            icon_key: "server".to_owned(),
             tags: vec!["staging".to_owned(), "linux".to_owned()],
             address: "staging.example.com".to_owned(),
             port: 22,

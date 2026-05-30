@@ -6,12 +6,24 @@ fn workspace_ui_defaults_to_hosts_follow_system_language() {
 
     assert_eq!(state.active_page, WorkspacePage::Hosts);
     assert_eq!(state.language, LanguageMode::FollowSystem);
-    assert_eq!(state.host_list_mode, HostListMode::List);
+    assert_eq!(state.host_list_mode, HostListMode::Tree);
     assert!(state.host_search_query.is_empty());
+    assert!(!state.create_host_dialog_open);
     assert_eq!(state.hosts_panel_width, DEFAULT_HOSTS_PANEL_WIDTH);
     assert_eq!(state.activity_panel_width, DEFAULT_ACTIVITY_PANEL_WIDTH);
     assert_eq!(state.tool_panel_width, DEFAULT_TOOL_PANEL_WIDTH);
     assert_eq!(state.tool_panel_mode, ToolPanelMode::Closed);
+}
+
+#[test]
+fn create_host_dialog_can_open_and_close() {
+    let mut state = WorkspaceUiState::default();
+
+    state.create_host_dialog_open = true;
+    assert!(state.create_host_dialog_open);
+
+    state.create_host_dialog_open = false;
+    assert!(!state.create_host_dialog_open);
 }
 
 #[test]
@@ -71,4 +83,15 @@ fn background_carousel_wraps_index() {
     assert_eq!(state.active_background_index(2), Some(0));
     state.next_background(0);
     assert_eq!(state.active_background_index(0), None);
+}
+
+#[test]
+fn built_in_theme_cycles_through_configured_palettes() {
+    let mut state = WorkspaceUiState::default();
+
+    state.next_theme();
+    assert_eq!(state.theme, BuiltInTheme::CatppuccinMocha);
+
+    state.next_theme();
+    assert_eq!(state.theme, BuiltInTheme::NordDark);
 }

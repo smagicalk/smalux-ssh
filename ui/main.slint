@@ -1,43 +1,233 @@
-import { ActivityRow, CommandPaletteRow, HostRow, KnownHostRow, SessionTabRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { ActivityRow, CommandPaletteRow, GroupOptionRow, HostRow, HostTreeRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
+export { AppTheme } from "./theme.slint";
 import { ActivityPanel } from "./activity_panel.slint";
 import { CommandPaletteOverlay } from "./command_palette.slint";
-import { HostsPanel } from "./hosts_panel.slint";
+import { ConfirmDialog } from "./common.slint";
+import { CreateChoiceDialog, CreateGroupDialog, CreateGroupParentDialog, CreateHostDialog, HostsPanel } from "./hosts_panel.slint";
 import { MainWorkspace } from "./main_workspace.slint";
 import { NavRail } from "./rail.slint";
 import { VerticalSplitter } from "./splitter.slint";
-import { TopBar } from "./topbar.slint";
 
 export component AppWindow inherits Window {
     in property <string> host-count: "0";
     in property <string> tab-count: "0";
-    in property <string> active-page: "Hosts";
-    in property <string> language-label: "system";
-    in property <string> theme-name: "Professional Dark";
-    in property <string> background-summary: "0 sources";
-    in property <string> host-list-mode: "List";
+    in property <string> active-page-key: "Hosts";
+    in property <string> active-page: "";
+    in property <string> language-label: "";
+    in property <string> theme-name: "";
+    in property <string> background-summary: "";
+    in property <string> host-list-mode-key: "Tree";
+    in property <string> host-list-mode: "";
     in property <string> host-search-query: "";
+    in property <string> brand-short-label: "";
+    in property <string> brand-name-label: "";
+    in property <string> topbar-find-label: "";
+    in property <string> topbar-settings-label: "";
+    in property <string> nav-hosts-label: "";
+    in property <string> nav-terminal-label: "";
+    in property <string> nav-sftp-label: "";
+    in property <string> nav-tunnels-label: "";
+    in property <string> nav-snippets-label: "";
+    in property <string> nav-history-label: "";
+    in property <string> nav-security-label: "";
+    in property <string> nav-settings-label: "";
+    in property <string> nav-find-label: "";
+    in property <string> host-new-label: "";
+    in property <string> host-open-label: "";
+    in property <string> host-files-label: "";
+    in property <string> host-edit-label: "";
+    in property <string> host-delete-label: "";
+    in property <string> host-duplicate-label: "";
+    in property <string> host-delete-title-label: "";
+    in property <string> host-delete-caption-label: "";
+    in property <string> host-delete-confirm-label: "";
+    in property <string> host-delete-cancel-label: "";
+    in property <string> group-create-host-label: "";
+    in property <string> group-create-group-label: "";
+    in property <string> group-delete-title-label: "";
+    in property <string> group-delete-confirm-label: "";
+    in property <string> group-delete-cancel-label: "";
+    in property <string> tool-files-label: "";
+    in property <string> tool-snippets-label: "";
+    in property <string> tool-history-label: "";
+    in property <string> tool-tunnels-label: "";
+    in property <string> tool-keys-label: "";
+    in property <string> host-search-placeholder: "";
+    in property <string> hosts-section-title: "";
+    in property <string> hosts-empty-title: "";
+    in property <string> hosts-empty-caption: "";
+    in property <string> activity-title-label: "";
+    in property <string> recent-title-label: "";
+    in property <string> recent-empty-label: "";
+    in property <string> command-palette-title-label: "";
+    in property <string> command-palette-placeholder: "";
+    in property <string> command-palette-empty-label: "";
+    in property <string> command-palette-close-label: "";
+    in property <string> terminal-reconnect-label: "";
+    in property <string> tab-ready-label: "";
+    in property <string> sftp-loading-label: "";
+    in property <string> sftp-split-title: "";
+    in property <string> sftp-refresh-label: "";
+    in property <string> sftp-local-title: "";
+    in property <string> sftp-remote-title: "";
+    in property <string> sftp-workspace-label: "";
+    in property <string> sftp-queue-label: "";
+    in property <string> sftp-selected-label: "";
+    in property <string> sftp-path-label: "";
+    in property <string> sftp-entries-label: "";
+    in property <string> sftp-loading-entries-label: "";
+    in property <string> sftp-empty-entries-label: "";
+    in property <string> tool-pinned-label: "";
+    in property <string> tool-empty-value-label: "";
+    in property <string> snippets-empty-label: "";
+    in property <string> history-commands-label: "";
+    in property <string> history-saved-suffix-label: "";
+    in property <string> history-empty-label: "";
+    in property <string> history-run-label: "";
+    in property <string> tunnels-empty-label: "";
+    in property <string> known-hosts-empty-label: "";
+    in property <string> known-hosts-trust-label: "";
+    in property <string> known-hosts-delete-label: "";
+    in property <string> new-session-title-label: "";
+    in property <string> new-session-search-placeholder: "";
+    in property <string> new-session-local-title: "";
+    in property <string> new-session-local-subtitle: "";
+    in property <string> new-session-local-detail: "";
+    in property <string> new-session-local-tags: "";
+    in property <string> new-session-local-status: "";
+    in property <string> new-session-local-kind: "";
+    in property <string> new-session-remote-kind: "";
+    in property <string> new-session-ungrouped-detail: "";
+    in property <string> new-session-empty-title: "";
+    in property <string> new-session-empty-caption: "";
+    in property <bool> create-host-dialog-open: false;
+    in property <bool> create-group-dialog-open: false;
+    in property <bool> remove-host-dialog-open: false;
+    in property <string> remove-host-dialog-name: "";
+    in property <string> create-host-dialog-title: "";
+    in property <string> create-host-dialog-subtitle: "";
+    in property <string> create-host-connection-title: "";
+    in property <string> create-host-connection-caption: "";
+    in property <string> create-host-authentication-title: "";
+    in property <string> create-host-authentication-caption: "";
+    in property <string> create-host-credential-note: "";
+    in property <string> create-host-cancel-label: "";
+    in property <string> create-host-create-label: "";
+    in property <string> create-host-address-label: "";
+    in property <string> create-host-address-placeholder: "";
+    in property <string> create-host-port-label: "";
+    in property <string> create-host-port-placeholder: "22";
+    in property <string> create-host-username-label: "";
+    in property <string> create-host-username-placeholder: "";
+    in property <string> create-host-alias-label: "";
+    in property <string> create-host-alias-placeholder: "";
+    in property <string> create-host-tags-label: "";
+    in property <string> create-host-tags-placeholder: "";
+    in property <string> create-host-group-label: "";
+    in property <string> create-host-group-picker-title: "";
+    in property <string> create-host-auth-agent-label: "";
+    in property <string> create-host-auth-agent-caption: "";
+    in property <string> create-host-auth-password-label: "";
+    in property <string> create-host-auth-password-caption: "";
+    in property <string> create-host-auth-key-label: "";
+    in property <string> create-host-auth-key-caption: "";
+    in property <string> create-host-auth-certificate-label: "";
+    in property <string> create-host-auth-certificate-caption: "";
+    in property <string> create-host-agent-source-title: "";
+    in property <string> create-host-agent-auto-label: "";
+    in property <string> create-host-agent-auto-caption: "";
+    in property <string> create-host-agent-openssh-label: "";
+    in property <string> create-host-agent-openssh-caption: "";
+    in property <string> create-host-agent-pageant-label: "";
+    in property <string> create-host-agent-pageant-caption: "";
+    in property <string> create-host-agent-custom-label: "";
+    in property <string> create-host-agent-custom-caption: "";
+    in property <string> create-host-custom-agent-pipe-label: "";
+    in property <string> create-host-custom-agent-pipe-placeholder: "\\\\.\\pipe\\openssh-ssh-agent";
+    in property <string> create-host-agent-key-hint-label: "";
+    in property <string> create-host-agent-key-hint-placeholder: "";
+    in property <string> create-host-password-secret-label: "";
+    in property <string> create-host-password-secret-placeholder: "secret://hosts/prod/password";
+    in property <string> create-host-private-key-label: "";
+    in property <string> create-host-private-key-placeholder: "secret://keys/prod-api";
+    in property <string> create-host-passphrase-label: "";
+    in property <string> create-host-passphrase-placeholder: "";
+    in property <string> create-host-certificate-label: "";
+    in property <string> create-host-certificate-placeholder: "secret://certs/prod-api";
+    in property <string> create-host-icon-title: "";
+    in property <string> create-host-icon-server-label: "";
+    in property <string> create-host-icon-database-label: "";
+    in property <string> create-host-icon-cloud-label: "";
+    in property <string> create-host-icon-linux-label: "";
+    in property <string> create-host-icon-container-label: "";
+    in property <string> create-host-icon-shield-label: "";
+    property <bool> create-choice-dialog-open: false;
+    in property <string> create-choice-title: "";
+    in property <string> create-choice-subtitle: "";
+    in property <string> create-choice-host-label: "";
+    in property <string> create-choice-host-caption: "";
+    in property <string> create-choice-group-label: "";
+    in property <string> create-choice-group-caption: "";
+    in property <string> create-choice-cancel-label: "";
+    in property <bool> create-group-parent-dialog-open: false;
+    in property <string> create-group-dialog-title: "";
+    in property <string> create-group-dialog-subtitle: "";
+    in property <string> create-group-parent-picker-title: "";
+    in property <string> create-group-parent-picker-subtitle: "";
+    in property <string> create-group-name-label: "";
+    in property <string> create-group-name-placeholder: "";
+    in property <string> create-group-parent-label: "";
+    in property <string> create-group-cancel-label: "";
+    in property <string> create-group-save-label: "";
+    in property <string> create-group-next-label: "";
+    in property <string> quick-group-parent-path: "";
+    in property <[GroupOptionRow]> quick-group-parent-options: [];
+    in property <string> quick-group-name: "";
+    in property <string> quick-host-name: "";
+    in property <string> quick-host-address: "";
+    in property <string> quick-host-port: "22";
+    in property <string> quick-host-username: "";
+    in property <string> quick-host-group-path: "";
+    in property <string> quick-host-icon-key: "server";
+    in property <string> quick-host-tags: "";
+    in property <string> quick-host-auth-kind: "ssh-agent";
+    in property <string> quick-host-agent-source: "Auto";
+    in property <string> quick-host-agent-custom-pipe: "";
+    in property <string> quick-host-password-secret-ref: "";
+    in property <string> quick-host-private-key-ref: "";
+    in property <string> quick-host-passphrase-ref: "";
+    in property <string> quick-host-key-hint: "";
+    in property <string> quick-host-certificate-ref: "";
+    in property <bool> hosts-panel-collapsed: false;
     in property <int> hosts-panel-width: 276;
     in property <int> activity-panel-width: 244;
     in property <int> tool-panel-width: 328;
-    in property <string> tool-panel-mode: "Closed";
+    in property <string> tool-panel-mode-key: "Closed";
+    in property <string> tool-panel-mode: "";
     in property <bool> right-sidebar-collapsed: false;
-    property <length> rail-width: 44px;
+    property <length> rail-width: 58px;
     property <length> splitter-width: 6px;
     property <length> collapsed-activity-width: 34px;
-    property <length> left-content-width: root.rail-width + (root.hosts-panel-width * 1px) + root.splitter-width;
+    property <length> visible-hosts-panel-width: root.hosts-panel-collapsed ? 0px : (root.hosts-panel-width * 1px);
+    property <length> visible-left-splitter-width: root.hosts-panel-collapsed ? 0px : root.splitter-width;
+    property <length> left-content-width: root.rail-width + root.visible-hosts-panel-width + root.visible-left-splitter-width;
     property <length> right-panel-width: root.right-sidebar-collapsed ? root.collapsed-activity-width : (root.activity-panel-width * 1px);
     property <length> right-splitter-width: root.right-sidebar-collapsed ? 0px : root.splitter-width;
     in property <string> active-session-id: "";
-    in property <string> active-tab-title: "Local Shell";
-    in property <string> active-tab-kind: "Shell";
-    in property <string> active-tab-status: "Idle";
+    in property <string> active-tab-title: "";
+    in property <string> active-tab-kind: "";
+    in property <string> active-tab-status: "";
     in property <string> terminal-input: "";
     in property <string> terminal-prompt: ">";
     in property <[string]> terminal-output: [];
     in property <bool> terminal-can-send-input: false;
+    in property <bool> terminal-can-reconnect-shell: false;
+    in property <bool> remove-group-dialog-open: false;
+    in property <string> remove-group-dialog-name: "";
+    in property <string> remove-group-dialog-caption: "";
     in property <string> sftp-host-id: "";
-    in property <string> sftp-title: "SFTP Workspace";
+    in property <string> sftp-title: "";
     in property <string> sftp-current-dir: "/";
     in property <string> sftp-selected-path: "";
     in property <bool> sftp-loading: false;
@@ -46,15 +236,49 @@ export component AppWindow inherits Window {
     in property <bool> command-palette-open: false;
     in property <string> command-palette-query: "";
     in property <[HostRow]> hosts: [];
+    in property <[HostTreeRow]> host-tree: [];
+    in property <[GroupOptionRow]> quick-host-groups: [];
     in property <[SessionTabRow]> tabs: [];
     in property <[SftpEntryRow]> sftp-entries: [];
     in property <[ActivityRow]> activity: [];
     in property <[CommandPaletteRow]> command-palette-results: [];
     in property <[string]> recent: [];
+    in property <[HostRow]> new-session-hosts: [];
+    in property <string> new-session-search-query: "";
+    in property <bool> new-session-local-visible: true;
     in property <[string]> history: [];
     in property <[ToolItemRow]> snippets: [];
     in property <[ToolItemRow]> tunnels: [];
+    in property <[ToolItemRow]> credentials: [];
     in property <[KnownHostRow]> known-hosts: [];
+    in property <[SettingOptionRow]> settings-language-options: [];
+    in property <[SettingOptionRow]> settings-theme-options: [];
+    in property <[SettingsProfileRow]> settings-theme-profiles: [];
+    in property <[SettingsSummaryRow]> settings-storage-summary: [];
+    in property <[SettingsFileActionRow]> settings-file-actions: [];
+    in property <string> settings-title-label: "";
+    in property <string> settings-language-title-label: "";
+    in property <string> settings-theme-title-label: "";
+    in property <string> settings-custom-theme-title-label: "";
+    in property <string> settings-storage-title-label: "";
+    in property <string> settings-file-actions-title-label: "";
+    in property <string> settings-security-title-label: "";
+    in property <string> settings-apply-label: "";
+    in property <string> settings-remove-label: "";
+    in property <string> settings-run-label: "";
+    in property <string> settings-choose-file-label: "";
+    in property <string> settings-selected-label: "";
+    in property <string> settings-unavailable-label: "";
+    in property <string> settings-empty-custom-themes-label: "";
+    in property <string> settings-current-profile-name: "";
+    in property <string> settings-storage-summary-label: "";
+    in property <string> settings-storage-backend-label: "";
+    in property <string> settings-storage-database-path: "";
+    in property <string> settings-security-summary-label: "";
+    in property <string> settings-security-status-label: "";
+    in property <string> settings-security-detail-label: "";
+    in property <string> settings-security-kdf-label: "";
+    in property <string> settings-security-version-label: "";
 
     callback open-hosts();
     callback open-terminal();
@@ -62,35 +286,77 @@ export component AppWindow inherits Window {
     callback open-tunnels();
     callback open-snippets();
     callback open-history();
+    callback open-security();
     callback open-settings();
     callback toggle-host-list-mode();
+    callback toggle-host-tree-group(group-id: string);
     callback update-host-search(query: string);
+    callback open-create-host-dialog();
+    callback open-create-host-dialog-in-group(group-id: string);
+    callback open-create-group-parent-dialog(parent-id: string);
+    callback select-create-group-parent(group-id: string);
+    callback close-create-group-parent-dialog();
+    callback confirm-create-group-parent();
+    callback open-create-group-dialog(parent-id: string);
+    callback update-quick-group-name(name: string);
+    callback select-quick-group-parent(group-id: string);
+    callback close-create-group-dialog();
+    callback save-quick-group();
+    callback open-edit-host-dialog(host-id: string);
+    callback remove-host(host-id: string);
+    callback cancel-remove-host();
+    callback confirm-remove-host();
+    callback remove-group(group-id: string);
+    callback cancel-remove-group();
+    callback confirm-remove-group();
+    callback close-create-host-dialog();
+    callback update-quick-host-field(field: string, value: string);
+    callback select-quick-host-group(group-id: string);
+    callback update-quick-host-auth-kind(kind: string);
+    callback update-quick-host-auth-field(field: string, value: string);
+    callback save-quick-host();
     callback resize-hosts-panel(width: int);
     callback resize-activity-panel(width: int);
     callback resize-tool-panel(width: int);
     callback open-tool-panel(mode: string);
     callback close-tool-panel();
     callback toggle-right-sidebar();
+    callback next-theme();
+    callback set-language(language: string);
+    callback set-built-in-theme(theme: string);
+    callback export-built-in-theme(target-path: string, format: string);
+    callback import-theme(source-path: string);
+    callback apply-theme-profile(name: string);
+    callback remove-theme-profile(name: string);
+    callback backup-storage(target-path: string);
+    callback export-storage-snapshot(target-path: string);
+    callback import-storage-snapshot(source-path: string);
+    callback import-sqlite-backup(source-path: string);
+    callback choose-file-action-path(key: string, current-path: string, direction: string, extension: string) -> string;
     callback next-background();
     callback open-command-palette();
+    callback open-local-terminal();
+    callback update-new-session-search(query: string);
     callback update-command-palette(query: string);
     callback close-command-palette();
     callback activate-command-palette-item(item-id: string, kind: string);
     callback open-shell(host-id: string);
     callback open-host-sftp(host-id: string);
-    callback run-host-command(host-id: string);
+    callback duplicate-host(host-id: string);
     callback activate-session(session-id: string);
     callback close-session(session-id: string);
     callback append-terminal-input(session-id: string, text: string);
     callback backspace-terminal-input(session-id: string);
     callback update-terminal-input(session-id: string, text: string);
     callback send-terminal-input(session-id: string, text: string);
+    callback reconnect-shell(session-id: string);
     callback refresh-sftp(host-id: string);
     callback select-sftp-entry(host-id: string, path: string);
     callback trust-known-host(host: string, port: int);
     callback remove-known-host(host: string, port: int);
+    callback dismiss-ui-error();
 
-    title: "smagicalssh";
+    title: root.brand-name-label + " - " + root.active-page;
     preferred-width: 1280px;
     preferred-height: 820px;
     min-width: 940px;
@@ -100,61 +366,93 @@ export component AppWindow inherits Window {
     VerticalLayout {
         spacing: 0px;
 
-        TopBar {
-            active-page: root.active-page;
-            open-settings => { root.open-settings(); }
-            open-command-palette => { root.open-command-palette(); }
-        }
-
         Rectangle {
             horizontal-stretch: 1;
             vertical-stretch: 1;
             clip: true;
 
-            NavRail {
+        NavRail {
                 x: 0px;
                 y: 0px;
                 height: parent.height;
-                active-page: root.active-page;
+                active-page: root.active-page-key;
+                hosts-label: root.nav-hosts-label;
+                terminal-label: root.nav-terminal-label;
+                sftp-label: root.nav-sftp-label;
+                tunnels-label: root.nav-tunnels-label;
+                snippets-label: root.nav-snippets-label;
+                history-label: root.nav-history-label;
+                security-label: root.nav-security-label;
+                settings-label: root.nav-settings-label;
+                find-label: root.nav-find-label;
                 open-hosts => { root.open-hosts(); }
                 open-terminal => { root.open-terminal(); }
                 open-sftp => { root.open-sftp(); }
                 open-tunnels => { root.open-tunnels(); }
                 open-snippets => { root.open-snippets(); }
                 open-history => { root.open-history(); }
+                open-security => { root.open-security(); }
                 open-settings => { root.open-settings(); }
+                open-command-palette => { root.open-command-palette(); }
             }
 
             HostsPanel {
                 x: root.rail-width;
                 y: 0px;
+                visible: !root.hosts-panel-collapsed;
                 height: parent.height;
                 active-page: root.active-page;
                 host-list-mode: root.host-list-mode;
+                host-list-mode-key: root.host-list-mode-key;
                 host-search-query: root.host-search-query;
+                new-label: root.host-new-label;
+                open-label: root.host-open-label;
+                files-label: root.host-files-label;
+                edit-label: root.host-edit-label;
+                delete-label: root.host-delete-label;
+                duplicate-label: root.host-duplicate-label;
+                group-create-host-label: root.group-create-host-label;
+                group-create-group-label: root.group-create-group-label;
+                search-placeholder: root.host-search-placeholder;
+                section-title: root.hosts-section-title;
+                empty-title: root.hosts-empty-title;
+                empty-caption: root.hosts-empty-caption;
+                new-host-label: root.create-host-dialog-title;
+                new-group-label: root.create-group-dialog-title;
+                open-create-choice => { root.create-choice-dialog-open = true; }
                 panel-width: root.hosts-panel-width;
                 hosts: root.hosts;
+                host-tree: root.host-tree;
                 toggle-host-list-mode => { root.toggle-host-list-mode(); }
+                toggle-host-tree-group(group-id) => { root.toggle-host-tree-group(group-id); }
                 update-host-search(query) => { root.update-host-search(query); }
+                open-create-host-dialog => { root.open-create-host-dialog(); }
+                open-create-host-dialog-in-group(group-id) => { root.open-create-host-dialog-in-group(group-id); }
+                open-create-group-parent-dialog(parent-id) => { root.open-create-group-parent-dialog(parent-id); }
+                open-create-group-dialog(parent-id) => { root.open-create-group-dialog(parent-id); }
                 open-shell(host-id) => { root.open-shell(host-id); }
                 open-host-sftp(host-id) => { root.open-host-sftp(host-id); }
-                run-host-command(host-id) => { root.run-host-command(host-id); }
+                open-edit-host-dialog(host-id) => { root.open-edit-host-dialog(host-id); }
+                duplicate-host(host-id) => { root.duplicate-host(host-id); }
+                remove-host(host-id) => { root.remove-host(host-id); }
+                remove-group(group-id) => { root.remove-group(group-id); }
             }
 
             VerticalSplitter {
-                x: root.rail-width + (root.hosts-panel-width * 1px);
+                x: root.rail-width + root.visible-hosts-panel-width;
                 y: 0px;
+                visible: !root.hosts-panel-collapsed;
                 height: parent.height;
                 base-width: root.hosts-panel-width;
                 resize(width) => { root.resize-hosts-panel(width); }
             }
 
-            MainWorkspace {
+        MainWorkspace {
                 x: root.left-content-width;
                 y: 0px;
                 width: max(0px, parent.width - root.left-content-width - root.right-panel-width - root.right-splitter-width);
                 height: parent.height;
-                active-page: root.active-page;
+                active-page: root.active-page-key;
                 active-session-id: root.active-session-id;
                 active-tab-title: root.active-tab-title;
                 active-tab-kind: root.active-tab-kind;
@@ -163,6 +461,7 @@ export component AppWindow inherits Window {
                 terminal-prompt: root.terminal-prompt;
                 terminal-output: root.terminal-output;
                 terminal-can-send-input: root.terminal-can-send-input;
+                terminal-can-reconnect-shell: root.terminal-can-reconnect-shell;
                 sftp-host-id: root.sftp-host-id;
                 sftp-title: root.sftp-title;
                 sftp-current-dir: root.sftp-current-dir;
@@ -172,26 +471,120 @@ export component AppWindow inherits Window {
                 sftp-entries: root.sftp-entries;
                 tool-panel-width: root.tool-panel-width;
                 tool-panel-mode: root.tool-panel-mode;
+                tool-panel-mode-key: root.tool-panel-mode-key;
                 last-error: root.last-error;
                 history-count: root.history.length;
                 tabs: root.tabs;
+                hosts: root.hosts;
+                new-session-hosts: root.new-session-hosts;
+                new-session-search-query: root.new-session-search-query;
+                new-session-local-visible: root.new-session-local-visible;
                 history: root.history;
                 snippets: root.snippets;
                 tunnels: root.tunnels;
+                credentials: root.credentials;
                 known-hosts: root.known-hosts;
+                settings-language-options: root.settings-language-options;
+                settings-theme-options: root.settings-theme-options;
+                settings-theme-profiles: root.settings-theme-profiles;
+                settings-storage-summary: root.settings-storage-summary;
+                settings-file-actions: root.settings-file-actions;
+                settings-title-label: root.settings-title-label;
+                settings-language-title-label: root.settings-language-title-label;
+                settings-theme-title-label: root.settings-theme-title-label;
+                settings-custom-theme-title-label: root.settings-custom-theme-title-label;
+                settings-storage-title-label: root.settings-storage-title-label;
+                settings-file-actions-title-label: root.settings-file-actions-title-label;
+                settings-security-title-label: root.settings-security-title-label;
+                settings-apply-label: root.settings-apply-label;
+                settings-remove-label: root.settings-remove-label;
+                settings-run-label: root.settings-run-label;
+                settings-choose-file-label: root.settings-choose-file-label;
+                settings-selected-label: root.settings-selected-label;
+                settings-unavailable-label: root.settings-unavailable-label;
+                settings-empty-custom-themes-label: root.settings-empty-custom-themes-label;
+                settings-current-profile-name: root.settings-current-profile-name;
+                settings-storage-summary-label: root.settings-storage-summary-label;
+                settings-storage-backend-label: root.settings-storage-backend-label;
+                settings-storage-database-path: root.settings-storage-database-path;
+                settings-security-summary-label: root.settings-security-summary-label;
+                settings-security-status-label: root.settings-security-status-label;
+                settings-security-detail-label: root.settings-security-detail-label;
+                settings-security-kdf-label: root.settings-security-kdf-label;
+                settings-security-version-label: root.settings-security-version-label;
+                tool-files-label: root.tool-files-label;
+                tool-snippets-label: root.tool-snippets-label;
+                tool-tunnels-label: root.tool-tunnels-label;
+                tool-keys-label: root.tool-keys-label;
+                terminal-reconnect-label: root.terminal-reconnect-label;
+                tab-ready-label: root.tab-ready-label;
+                sftp-loading-label: root.sftp-loading-label;
+                sftp-split-title: root.sftp-split-title;
+                sftp-refresh-label: root.sftp-refresh-label;
+                sftp-local-title: root.sftp-local-title;
+                sftp-remote-title: root.sftp-remote-title;
+                sftp-workspace-label: root.sftp-workspace-label;
+                sftp-queue-label: root.sftp-queue-label;
+                sftp-selected-label: root.sftp-selected-label;
+                sftp-path-label: root.sftp-path-label;
+                sftp-entries-label: root.sftp-entries-label;
+                sftp-loading-entries-label: root.sftp-loading-entries-label;
+                sftp-empty-entries-label: root.sftp-empty-entries-label;
+                tool-pinned-label: root.tool-pinned-label;
+                tool-empty-value-label: root.tool-empty-value-label;
+                snippets-empty-label: root.snippets-empty-label;
+                history-commands-label: root.history-commands-label;
+                history-saved-suffix-label: root.history-saved-suffix-label;
+                history-empty-label: root.history-empty-label;
+                history-run-label: root.history-run-label;
+                tunnels-empty-label: root.tunnels-empty-label;
+                known-hosts-empty-label: root.known-hosts-empty-label;
+                known-hosts-trust-label: root.known-hosts-trust-label;
+                known-hosts-delete-label: root.known-hosts-delete-label;
+                new-session-title-label: root.new-session-title-label;
+                new-session-search-placeholder: root.new-session-search-placeholder;
+                new-session-local-title: root.new-session-local-title;
+                new-session-local-subtitle: root.new-session-local-subtitle;
+                new-session-local-detail: root.new-session-local-detail;
+                new-session-local-tags: root.new-session-local-tags;
+                new-session-local-status: root.new-session-local-status;
+                new-session-local-kind: root.new-session-local-kind;
+                new-session-remote-kind: root.new-session-remote-kind;
+                new-session-ungrouped-detail: root.new-session-ungrouped-detail;
+                new-session-empty-title: root.new-session-empty-title;
+                new-session-empty-caption: root.new-session-empty-caption;
                 activate-session(session-id) => { root.activate-session(session-id); }
                 close-session(session-id) => { root.close-session(session-id); }
                 append-terminal-input(session-id, text) => { root.append-terminal-input(session-id, text); }
                 backspace-terminal-input(session-id) => { root.backspace-terminal-input(session-id); }
                 update-terminal-input(session-id, text) => { root.update-terminal-input(session-id, text); }
                 send-terminal-input(session-id, text) => { root.send-terminal-input(session-id, text); }
+                reconnect-shell(session-id) => { root.reconnect-shell(session-id); }
                 refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
                 select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
                 trust-known-host(host, port) => { root.trust-known-host(host, port); }
                 remove-known-host(host, port) => { root.remove-known-host(host, port); }
+                dismiss-ui-error => { root.dismiss-ui-error(); }
+                set-language(language) => { root.set-language(language); }
+                set-built-in-theme(theme) => { root.set-built-in-theme(theme); }
+                export-built-in-theme(target-path, format) => { root.export-built-in-theme(target-path, format); }
+                import-theme(source-path) => { root.import-theme(source-path); }
+                apply-theme-profile(name) => { root.apply-theme-profile(name); }
+                remove-theme-profile(name) => { root.remove-theme-profile(name); }
+                backup-storage(target-path) => { root.backup-storage(target-path); }
+                export-storage-snapshot(target-path) => { root.export-storage-snapshot(target-path); }
+                import-storage-snapshot(source-path) => { root.import-storage-snapshot(source-path); }
+                import-sqlite-backup(source-path) => { root.import-sqlite-backup(source-path); }
+                choose-file-action-path(key, current-path, direction, extension) => {
+                    root.choose-file-action-path(key, current-path, direction, extension)
+                }
                 resize-tool-panel(width) => { root.resize-tool-panel(width); }
                 open-tool-panel(mode) => { root.open-tool-panel(mode); }
                 close-tool-panel => { root.close-tool-panel(); }
+                update-new-session-search(query) => { root.update-new-session-search(query); }
+                open-local-terminal => { root.open-local-terminal(); }
+                open-command-palette => { root.open-command-palette(); }
+                open-shell(host-id) => { root.open-shell(host-id); }
             }
 
             if !root.right-sidebar-collapsed: VerticalSplitter {
@@ -213,10 +606,52 @@ export component AppWindow inherits Window {
                 panel-width: root.activity-panel-width;
                 activity: root.activity;
                 recent: root.recent;
+                title-label: root.activity-title-label;
+                recent-title-label: root.recent-title-label;
+                recent-empty-label: root.recent-empty-label;
                 toggle => { root.toggle-right-sidebar(); }
-                next-background => { root.next-background(); }
             }
         }
+    }
+
+    if root.create-choice-dialog-open: CreateChoiceDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.create-choice-title;
+        subtitle: root.create-choice-subtitle;
+        host-label: root.create-choice-host-label;
+        host-caption: root.create-choice-host-caption;
+        group-label: root.create-choice-group-label;
+        group-caption: root.create-choice-group-caption;
+        cancel-label: root.create-choice-cancel-label;
+        create-host => {
+            root.create-choice-dialog-open = false;
+            root.open-create-host-dialog();
+        }
+        create-group => {
+            root.create-choice-dialog-open = false;
+            root.open-create-group-parent-dialog("");
+        }
+        close => { root.create-choice-dialog-open = false; }
+    }
+
+    if root.create-group-parent-dialog-open: CreateGroupParentDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-title: root.create-group-parent-picker-title;
+        dialog-subtitle: root.create-group-parent-picker-subtitle;
+        parent-label: root.create-group-parent-label;
+        parent-path: root.quick-group-parent-path;
+        parent-options: root.quick-group-parent-options;
+        cancel-label: root.create-group-cancel-label;
+        next-label: root.create-group-next-label;
+        select-parent(group-id) => { root.select-create-group-parent(group-id); }
+        confirm => { root.confirm-create-group-parent(); }
+        close => { root.close-create-group-parent-dialog(); }
     }
 
     if root.command-palette-open: CommandPaletteOverlay {
@@ -226,8 +661,146 @@ export component AppWindow inherits Window {
         height: root.height;
         query: root.command-palette-query;
         results: root.command-palette-results;
+        title-label: root.command-palette-title-label;
+        placeholder: root.command-palette-placeholder;
+        empty-label: root.command-palette-empty-label;
+        close-label: root.command-palette-close-label;
         update-query(query) => { root.update-command-palette(query); }
         close => { root.close-command-palette(); }
         activate-item(item-id, kind) => { root.activate-command-palette-item(item-id, kind); }
+    }
+
+    if root.create-host-dialog-open: CreateHostDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-title: root.create-host-dialog-title;
+        dialog-subtitle: root.create-host-dialog-subtitle;
+        connection-title: root.create-host-connection-title;
+        connection-caption: root.create-host-connection-caption;
+        authentication-title: root.create-host-authentication-title;
+        authentication-caption: root.create-host-authentication-caption;
+        credential-note: root.create-host-credential-note;
+        cancel-label: root.create-host-cancel-label;
+        create-label: root.create-host-create-label;
+        address-label: root.create-host-address-label;
+        address-placeholder: root.create-host-address-placeholder;
+        port-label: root.create-host-port-label;
+        port-placeholder: root.create-host-port-placeholder;
+        username-label: root.create-host-username-label;
+        username-placeholder: root.create-host-username-placeholder;
+        host-alias-label: root.create-host-alias-label;
+        host-alias-placeholder: root.create-host-alias-placeholder;
+        tags-label: root.create-host-tags-label;
+        tags-placeholder: root.create-host-tags-placeholder;
+        group-label: root.create-host-group-label;
+        group-picker-title: root.create-host-group-picker-title;
+        auth-agent-label: root.create-host-auth-agent-label;
+        auth-agent-caption: root.create-host-auth-agent-caption;
+        auth-password-label: root.create-host-auth-password-label;
+        auth-password-caption: root.create-host-auth-password-caption;
+        auth-key-label: root.create-host-auth-key-label;
+        auth-key-caption: root.create-host-auth-key-caption;
+        auth-certificate-label: root.create-host-auth-certificate-label;
+        auth-certificate-caption: root.create-host-auth-certificate-caption;
+        agent-source-title: root.create-host-agent-source-title;
+        agent-auto-label: root.create-host-agent-auto-label;
+        agent-auto-caption: root.create-host-agent-auto-caption;
+        agent-openssh-label: root.create-host-agent-openssh-label;
+        agent-openssh-caption: root.create-host-agent-openssh-caption;
+        agent-pageant-label: root.create-host-agent-pageant-label;
+        agent-pageant-caption: root.create-host-agent-pageant-caption;
+        agent-custom-label: root.create-host-agent-custom-label;
+        agent-custom-caption: root.create-host-agent-custom-caption;
+        custom-agent-pipe-label: root.create-host-custom-agent-pipe-label;
+        custom-agent-pipe-placeholder: root.create-host-custom-agent-pipe-placeholder;
+        agent-key-hint-label: root.create-host-agent-key-hint-label;
+        agent-key-hint-placeholder: root.create-host-agent-key-hint-placeholder;
+        password-secret-label: root.create-host-password-secret-label;
+        password-secret-placeholder: root.create-host-password-secret-placeholder;
+        private-key-label: root.create-host-private-key-label;
+        private-key-placeholder: root.create-host-private-key-placeholder;
+        passphrase-label: root.create-host-passphrase-label;
+        passphrase-placeholder: root.create-host-passphrase-placeholder;
+        certificate-label: root.create-host-certificate-label;
+        certificate-placeholder: root.create-host-certificate-placeholder;
+        icon-title: root.create-host-icon-title;
+        icon-server-label: root.create-host-icon-server-label;
+        icon-database-label: root.create-host-icon-database-label;
+        icon-cloud-label: root.create-host-icon-cloud-label;
+        icon-linux-label: root.create-host-icon-linux-label;
+        icon-container-label: root.create-host-icon-container-label;
+        icon-shield-label: root.create-host-icon-shield-label;
+        quick-host-name: root.quick-host-name;
+        quick-host-address: root.quick-host-address;
+        quick-host-port: root.quick-host-port;
+        quick-host-username: root.quick-host-username;
+        quick-host-group-path: root.quick-host-group-path;
+        quick-host-icon-key: root.quick-host-icon-key;
+        quick-host-tags: root.quick-host-tags;
+        quick-host-auth-kind: root.quick-host-auth-kind;
+        quick-host-agent-source: root.quick-host-agent-source;
+        quick-host-agent-custom-pipe: root.quick-host-agent-custom-pipe;
+        quick-host-password-secret-ref: root.quick-host-password-secret-ref;
+        quick-host-private-key-ref: root.quick-host-private-key-ref;
+        quick-host-passphrase-ref: root.quick-host-passphrase-ref;
+        quick-host-key-hint: root.quick-host-key-hint;
+        quick-host-certificate-ref: root.quick-host-certificate-ref;
+        quick-host-groups: root.quick-host-groups;
+        last-error: root.last-error;
+        update-field(field, value) => { root.update-quick-host-field(field, value); }
+        select-group(group-id) => { root.select-quick-host-group(group-id); }
+        update-auth-kind(kind) => { root.update-quick-host-auth-kind(kind); }
+        update-auth-field(field, value) => { root.update-quick-host-auth-field(field, value); }
+        save => { root.save-quick-host(); }
+        close => { root.close-create-host-dialog(); }
+    }
+
+    if root.create-group-dialog-open: CreateGroupDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-title: root.create-group-dialog-title;
+        dialog-subtitle: root.create-group-dialog-subtitle;
+        name-label: root.create-group-name-label;
+        name-placeholder: root.create-group-name-placeholder;
+        parent-label: root.create-group-parent-label;
+        parent-path: root.quick-group-parent-path;
+        cancel-label: root.create-group-cancel-label;
+        save-label: root.create-group-save-label;
+        group-name: root.quick-group-name;
+        update-name(name) => { root.update-quick-group-name(name); }
+        save => { root.save-quick-group(); }
+        close => { root.close-create-group-dialog(); }
+    }
+
+    if root.remove-host-dialog-open: ConfirmDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.host-delete-title-label;
+        message: root.host-delete-caption-label;
+        subject: root.remove-host-dialog-name;
+        cancel-label: root.host-delete-cancel-label;
+        confirm-label: root.host-delete-confirm-label;
+        cancel => { root.cancel-remove-host(); }
+        confirm => { root.confirm-remove-host(); }
+    }
+
+    if root.remove-group-dialog-open: ConfirmDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.group-delete-title-label;
+        message: root.remove-group-dialog-caption;
+        subject: root.remove-group-dialog-name;
+        cancel-label: root.group-delete-cancel-label;
+        confirm-label: root.group-delete-confirm-label;
+        cancel => { root.cancel-remove-group(); }
+        confirm => { root.confirm-remove-group(); }
     }
 }

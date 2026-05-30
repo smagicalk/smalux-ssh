@@ -3,32 +3,45 @@ import { RailButton } from "./nav.slint";
 
 export component NavRail inherits Rectangle {
     in property <string> active-page;
+    in property <string> hosts-label: "";
+    in property <string> terminal-label: "";
+    in property <string> sftp-label: "";
+    in property <string> tunnels-label: "";
+    in property <string> snippets-label: "";
+    in property <string> history-label: "";
+    in property <string> security-label: "";
+    in property <string> settings-label: "";
+    in property <string> find-label: "";
     callback open-hosts();
     callback open-terminal();
     callback open-sftp();
     callback open-tunnels();
     callback open-snippets();
     callback open-history();
+    callback open-security();
     callback open-settings();
+    callback open-command-palette();
 
-    width: 44px;
+    width: 58px;
     background: AppTheme.rail-bg;
     border-width: 1px;
     border-color: AppTheme.border-soft;
 
     VerticalLayout {
         padding-top: 8px;
-        padding-left: 5px;
-        padding-right: 5px;
-        spacing: 5px;
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-bottom: 16px;
+        spacing: 10px;
 
-        RailButton { label: "H"; active: root.active-page == "Hosts"; clicked => { root.open-hosts(); } }
-        RailButton { label: "T"; active: root.active-page == "Terminal"; clicked => { root.open-terminal(); } }
-        RailButton { label: "F"; active: root.active-page == "SFTP"; clicked => { root.open-sftp(); } }
-        RailButton { label: "P"; active: root.active-page == "Tunnels"; clicked => { root.open-tunnels(); } }
-        RailButton { label: "S"; active: root.active-page == "Snippets"; clicked => { root.open-snippets(); } }
-        RailButton { label: "R"; active: root.active-page == "History"; clicked => { root.open-history(); } }
+        RailButton { label: root.hosts-label; icon-key: "Hosts"; active: root.active-page == "Hosts"; clicked => { root.open-hosts(); } }
+        RailButton { label: root.sftp-label; icon-key: "Sftp"; active: root.active-page == "SFTP"; clicked => { root.open-sftp(); } }
+        RailButton { label: root.snippets-label; icon-key: "Snippets"; active: root.active-page == "Snippets"; clicked => { root.open-snippets(); } }
+        RailButton { label: root.security-label; icon-key: "Security"; active: root.active-page == "Security"; clicked => { root.open-security(); } }
+        RailButton { label: root.history-label; icon-key: "History"; active: root.active-page == "History"; clicked => { root.open-history(); } }
+        Rectangle { height: 4px; }
+        RailButton { label: root.find-label; icon-key: "Search"; active: false; clicked => { root.open-command-palette(); } }
         Rectangle { vertical-stretch: 1; }
-        RailButton { label: "*"; active: root.active-page == "Settings"; clicked => { root.open-settings(); } }
+        RailButton { label: root.settings-label; icon-key: "Settings"; active: root.active-page == "Settings"; clicked => { root.open-settings(); } }
     }
 }

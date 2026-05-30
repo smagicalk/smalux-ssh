@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::model::GroupId;
+
 use super::WorkspaceUiState;
 
 pub const DEFAULT_HOSTS_PANEL_WIDTH: i32 = 276;
@@ -17,13 +19,14 @@ pub const MAX_TOOL_PANEL_WIDTH: i32 = 560;
 /// Hosts 列表展示方式。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HostListMode {
-    List,
+    #[serde(alias = "List")]
+    Tree,
     Card,
 }
 
 impl Default for HostListMode {
     fn default() -> Self {
-        Self::List
+        Self::Tree
     }
 }
 
@@ -53,8 +56,8 @@ impl WorkspaceUiState {
     /// 切换 Host 列表展示模式。
     pub fn toggle_host_list_mode(&mut self) {
         self.host_list_mode = match self.host_list_mode {
-            HostListMode::List => HostListMode::Card,
-            HostListMode::Card => HostListMode::List,
+            HostListMode::Tree => HostListMode::Card,
+            HostListMode::Card => HostListMode::Tree,
         };
     }
 
@@ -63,9 +66,38 @@ impl WorkspaceUiState {
         self.host_search_query = query.into();
     }
 
+    /// 折叠或展开主机树中的指定分组。
+    pub fn toggle_host_tree_group(&mut self, group_id: Option<GroupId>) {
+        let Some(group_id) = group_id else {
+            self.host_tree_root_collapsed = !self.host_tree_root_collapsed;
+            return;
+        };
+
+        if let Some(index) = self
+            .collapsed_host_tree_groups
+            .iter()
+            .position(|id| *id == group_id)
+        {
+            self.collapsed_host_tree_groups.remove(index);
+        } else {
+            self.collapsed_host_tree_groups.push(group_id);
+        }
+    }
+
+    /// 更新新建会话弹窗搜索条件。
+    pub fn set_new_session_search_query(&mut self, query: impl Into<String>) {
+        self.new_session_search_query = query.into();
+    }
+
     /// 更新 Hosts 面板宽度，限制在可用区间内。
     pub fn set_hosts_panel_width(&mut self, width: i32) {
         self.hosts_panel_width = width.clamp(MIN_HOSTS_PANEL_WIDTH, MAX_HOSTS_PANEL_WIDTH);
+        self.hosts_panel_collapsed = false;
+    }
+
+    /// 折叠或展开 Hosts 面板。
+    pub fn set_hosts_panel_collapsed(&mut self, collapsed: bool) {
+        self.hosts_panel_collapsed = collapsed;
     }
 
     /// 更新右侧活动栏宽度，限制在可用区间内。

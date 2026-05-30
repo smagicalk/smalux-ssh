@@ -1,7 +1,7 @@
 //! 后端事件到 UI 状态的归约逻辑。
 
 use smagical_backend_core::{BackendEvent, LocalShellProfile};
-use smagical_core::{LOCAL_TERMINAL_SESSION_ID, SessionId, SessionStatus, TunnelStatus};
+use smagical_core::{SessionId, SessionKind, SessionStatus, TunnelStatus};
 use smagical_session::SessionManager;
 use smagical_terminal::TerminalManager;
 
@@ -59,7 +59,11 @@ pub fn apply_backend_event(
                 };
             }
 
-            let is_duplicate_local_echo = session_id == LOCAL_TERMINAL_SESSION_ID
+            let is_duplicate_local_echo = sessions
+                .tabs
+                .iter()
+                .find(|tab| tab.id == session_id)
+                .is_some_and(|tab| matches!(tab.kind, SessionKind::LocalShell))
                 && terminal.suppress_duplicate_echo(
                     session_id,
                     LocalShellProfile::default_for_platform().prompt,

@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use super::*;
 use smagical_backend_core::PtyRequest;
-use smagical_core::{LOCAL_TERMINAL_SESSION_ID, SessionId};
+use smagical_core::SessionId;
 use smagical_terminal::TerminalSize;
 use uuid::Uuid;
 
@@ -65,10 +65,10 @@ fn local_pty_rejects_unsupported_commands_without_starting_session() {
 #[ignore = "requires interactive Windows ConPTY output in the test runner"]
 fn local_pty_starts_shell_and_accepts_input() {
     let mut executor = LocalPtyBackendExecutor::default();
-    let session_id = LOCAL_TERMINAL_SESSION_ID;
+    let session_id = session_id();
 
     let open = executor
-        .execute(BackendCommand::OpenShell {
+        .execute(BackendCommand::OpenLocalShell {
             session_id,
             pty: PtyRequest::xterm(TerminalSize::default()),
         })
@@ -132,11 +132,9 @@ fn local_echo_command(text: &str) -> String {
 #[test]
 #[ignore = "requires interactive Windows ConPTY output in the test runner"]
 fn due_fallback_starts_worker_without_blocking_drain() {
-    let mut session = session::LocalPtySession::spawn(
-        LOCAL_TERMINAL_SESSION_ID,
-        &LocalShellProfile::default_for_platform(),
-    )
-    .expect("local pty should open");
+    let mut session =
+        session::LocalPtySession::spawn(session_id(), &LocalShellProfile::default_for_platform())
+            .expect("local pty should open");
     session.remember_fallback(local_echo_command("smagicalssh-fallback-worker"));
 
     std::thread::sleep(fallback::LOCAL_PTY_FALLBACK_AFTER + Duration::from_millis(20));

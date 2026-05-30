@@ -3,11 +3,20 @@
 use slint::SharedString;
 use uuid::Uuid;
 
-use crate::model::{CommandHistoryId, HostId, SessionId};
+use crate::model::{CommandHistoryId, GroupId, HostId, SessionId};
 
 /// 解析 Slint 传回的主机 ID。
 pub(super) fn parse_host_id(id: &SharedString) -> Option<HostId> {
     parse_uuid(id).map(HostId)
+}
+
+/// 解析 Slint 传回的分组 ID，空字符串表示未分组。
+pub(super) fn parse_optional_group_id(id: &SharedString) -> Option<Option<GroupId>> {
+    if id.is_empty() {
+        return Some(None);
+    }
+
+    parse_uuid(id).map(GroupId).map(Some)
 }
 
 /// 解析 Slint 传回的会话 ID。

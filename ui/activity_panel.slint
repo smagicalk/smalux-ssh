@@ -10,8 +10,10 @@ export component ActivityPanel inherits Rectangle {
     in property <int> panel-width;
     in property <[ActivityRow]> activity;
     in property <[string]> recent;
+    in property <string> title-label: "";
+    in property <string> recent-title-label: "";
+    in property <string> recent-empty-label: "";
     callback toggle();
-    callback next-background();
 
     width: root.collapsed ? 34px : root.panel-width * 1px;
     background: AppTheme.topbar-bg;
@@ -25,6 +27,7 @@ export component ActivityPanel inherits Rectangle {
         spacing: 6px;
         CompactButton {
             label: ">";
+            compact: true;
             clicked => { root.toggle(); }
         }
         Text { text: root.tab-count; color: AppTheme.accent-blue; font-size: 10px; horizontal-alignment: center; }
@@ -37,7 +40,7 @@ export component ActivityPanel inherits Rectangle {
 
         HorizontalLayout {
             Text {
-                text: "Activity";
+                text: root.title-label;
                 color: AppTheme.text;
                 font-size: 13px;
                 font-weight: 700;
@@ -45,24 +48,21 @@ export component ActivityPanel inherits Rectangle {
             Rectangle { horizontal-stretch: 1; }
             CompactButton {
                 label: "<";
+                tone: "subtle";
+                compact: true;
                 clicked => { root.toggle(); }
             }
         }
 
         for metric in root.activity: ToolRow { label: metric.label; value: metric.value; }
 
-        CompactButton {
-            label: "Next background";
-            clicked => { root.next-background(); }
-        }
-
-        Text { text: "RECENT"; color: #5b6776; font-size: 9px; }
+        Text { text: root.recent-title-label; color: AppTheme.section-text; font-size: 9px; }
         ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                if root.recent.length == 0: Text { text: "Recent connections appear here."; color: AppTheme.text-muted; font-size: 10px; }
-                for recent-item in root.recent: Text { text: recent-item; color: #c7d0db; font-size: 11px; }
+                if root.recent.length == 0: Text { text: root.recent-empty-label; color: AppTheme.text-muted; font-size: 10px; }
+                for recent-item in root.recent: Text { text: recent-item; color: AppTheme.text-secondary; font-size: 11px; }
             }
         }
     }

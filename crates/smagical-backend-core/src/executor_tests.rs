@@ -1,6 +1,6 @@
 use super::*;
 use crate::{ConnectionTarget, PtyRequest};
-use smagical_core::{AuthProfile, Host, HostId, SessionId};
+use smagical_core::{AgentSource, AuthProfile, Host, HostId, SessionId};
 use smagical_terminal::TerminalSize;
 use uuid::Uuid;
 
@@ -13,11 +13,13 @@ fn host() -> Host {
         id: HostId(Uuid::new_v4()),
         name: "production".to_owned(),
         group_id: None,
+        icon_key: "server".to_owned(),
         tags: Vec::new(),
         address: "example.com".to_owned(),
         port: 22,
         auth: AuthProfile::Agent {
             username: "deploy".to_owned(),
+            source: AgentSource::Auto,
             key_hint: None,
         },
         proxy: None,

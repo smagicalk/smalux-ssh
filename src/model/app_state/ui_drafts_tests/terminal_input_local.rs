@@ -3,7 +3,12 @@ use super::*;
 #[test]
 fn local_terminal_input_is_visible_and_queues_on_enter() {
     let mut state = AppState::default();
-    let session_id = crate::model::LOCAL_TERMINAL_SESSION_ID;
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should open");
+    state.backend_commands.drain();
 
     let text = state.apply(Message::UpdateTerminalInputDraft {
         session_id,
@@ -39,12 +44,11 @@ fn local_terminal_input_is_visible_and_queues_on_enter() {
 #[test]
 fn local_terminal_starts_without_help_banner() {
     let mut state = AppState::default();
-    let session_id = crate::model::LOCAL_TERMINAL_SESSION_ID;
-
-    assert!(ui_drafts::ensure_local_terminal_tab(&mut state, session_id));
-    assert!(!ui_drafts::ensure_local_terminal_tab(
-        &mut state, session_id
-    ));
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should open");
 
     let tab = state
         .terminal
@@ -57,11 +61,126 @@ fn local_terminal_starts_without_help_banner() {
 }
 
 #[test]
+fn open_local_terminal_message_creates_and_activates_new_tab_each_time() {
+    let mut state = AppState::default();
+
+    let first = state.apply(Message::OpenLocalTerminal);
+    let first_session_id = state
+        .sessions
+        .active_tab
+        .expect("first tab should be active");
+    let second = state.apply(Message::OpenLocalTerminal);
+    let second_session_id = state
+        .sessions
+        .active_tab
+        .expect("second tab should be active");
+
+    assert!(first.changed());
+    assert!(second.changed());
+    assert_ne!(first_session_id, second_session_id);
+    assert_eq!(state.sessions.tab_count(), 2);
+    assert_eq!(state.terminal.tab_count(), 2);
+    assert_eq!(
+        state.sessions.tabs[0].title,
+        crate::model::DEFAULT_LOCAL_TERMINAL_TITLE
+    );
+    assert_eq!(state.sessions.tabs[1].title, "Local Shell 2");
+    assert_eq!(
+        state.terminal.tabs[0].title,
+        crate::model::DEFAULT_LOCAL_TERMINAL_TITLE
+    );
+    assert_eq!(state.terminal.tabs[1].title, "Local Shell 2");
+    assert_eq!(state.sessions.active_tab, Some(second_session_id));
+    assert_eq!(state.terminal.active_tab, Some(second_session_id));
+    assert_eq!(
+        state.ui.workspace.active_page,
+        crate::model::WorkspacePage::Terminal
+    );
+    assert!(matches!(
+        state.backend_commands.drain().as_slice(),
+        [
+            BackendCommand::OpenLocalShell {
+                session_id: first_queued,
+                ..
+            },
+            BackendCommand::OpenLocalShell {
+                session_id: second_queued,
+                ..
+            }
+        ] if *first_queued == first_session_id && *second_queued == second_session_id
+    ));
+}
+
+#[test]
+fn open_local_terminal_reuses_first_available_title_number() {
+    let mut state = AppState::default();
+    state.apply(Message::OpenLocalTerminal);
+    state.apply(Message::OpenLocalTerminal);
+    state.apply(Message::OpenLocalTerminal);
+    let second_session_id = state.sessions.tabs[1].id;
+
+    state.apply(Message::CloseSessionTab {
+        session_id: second_session_id,
+    });
+    state.apply(Message::OpenLocalTerminal);
+
+    let titles: Vec<&str> = state
+        .sessions
+        .tabs
+        .iter()
+        .map(|tab| tab.title.as_str())
+        .collect();
+    assert_eq!(
+        titles,
+        vec![
+            crate::model::DEFAULT_LOCAL_TERMINAL_TITLE,
+            "Local Shell 3",
+            "Local Shell 2"
+        ]
+    );
+}
+
+#[test]
+fn new_local_terminal_input_queues_to_its_own_session() {
+    let mut state = AppState::default();
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should be active");
+    state.backend_commands.drain();
+
+    state.apply(Message::UpdateTerminalInputDraft {
+        session_id,
+        input: "echo second-local".to_owned(),
+    });
+    let outcome = state.apply(Message::SendTerminalInput { session_id });
+
+    assert!(outcome.changed());
+    assert!(matches!(
+        state.backend_commands.front(),
+        Some(BackendCommand::SendShellInput { session_id: queued_session_id, input })
+            if *queued_session_id == session_id && input == "echo second-local\n"
+    ));
+    assert_eq!(
+        state.terminal.tabs[0].buffer,
+        vec![format!(
+            "{} echo second-local",
+            crate::backend::LocalShellProfile::default_for_platform().prompt
+        )]
+    );
+}
+
+#[test]
 fn local_terminal_empty_enter_queues_newline_without_history() {
     let mut state = AppState::default();
-    let session_id = crate::model::LOCAL_TERMINAL_SESSION_ID;
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should open");
+    state.backend_commands.drain();
 
-    ui_drafts::ensure_local_terminal_tab(&mut state, session_id);
     state.apply(Message::UpdateTerminalInputDraft {
         session_id,
         input: String::new(),
@@ -77,4 +196,30 @@ fn local_terminal_empty_enter_queues_newline_without_history() {
             if *queued_session_id == session_id && input == "\n"
     ));
     assert_eq!(state.storage.command_history_count(), 0);
+}
+
+#[test]
+fn local_terminal_repeated_send_after_clear_does_not_duplicate_echo() {
+    let mut state = AppState::default();
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should open");
+    state.backend_commands.drain();
+
+    state.apply(Message::UpdateTerminalInputDraft {
+        session_id,
+        input: "pwd".to_owned(),
+    });
+    state.apply(Message::SendTerminalInput { session_id });
+    state.apply(Message::SendTerminalInput { session_id });
+
+    assert_eq!(
+        state.terminal.tabs[0].buffer,
+        vec![format!(
+            "{} pwd",
+            crate::backend::LocalShellProfile::default_for_platform().prompt
+        )]
+    );
 }

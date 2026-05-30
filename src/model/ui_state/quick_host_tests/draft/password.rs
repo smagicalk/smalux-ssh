@@ -16,6 +16,7 @@ fn quick_host_draft_builds_password_host() {
             password_secret_ref: "password:root".to_owned(),
             ..QuickHostAuthDraft::default()
         },
+        ..QuickHostDraft::default()
     };
 
     let host = draft

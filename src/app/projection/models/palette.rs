@@ -14,6 +14,7 @@ pub(in crate::app::projection) fn command_palette_model(
             id: item.id.as_str().into(),
             title: item.title.as_str().into(),
             subtitle: item.subtitle.as_str().into(),
+            kind_key: item.kind_key.into(),
             kind: item.kind.into(),
         })
         .collect::<Vec<_>>();

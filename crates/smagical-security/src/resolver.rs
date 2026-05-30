@@ -1,25 +1,31 @@
 //! SSH 认证材料解析。
+//!
+//! 解析器是 SecretRef 变成临时明文的唯一入口。调用方拿到 `ResolvedAuth` 后应尽快交给
+//! SSH 执行器使用，不应把它写入日志、配置或持久化存储。
 
 use crate::BackendAuth;
+use smagical_core::AgentSource;
 
 use super::{SecretStore, SecurityError};
 
 /// 已解析的临时认证材料。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ResolvedAuth {
-    Password {
-        username: String,
-        password: String,
-    },
+    /// 已解析的密码认证。
+    Password { username: String, password: String },
+    /// 已解析的私钥认证。
     Key {
         username: String,
         private_key: String,
         passphrase: Option<String>,
     },
+    /// agent 认证不含明文，只保留来源和 key hint。
     Agent {
         username: String,
+        source: AgentSource,
         key_hint: Option<String>,
     },
+    /// 已解析的证书认证。
     Certificate {
         username: String,
         private_key: String,
@@ -30,6 +36,7 @@ pub enum ResolvedAuth {
 
 /// 把后端认证引用解析为临时明文材料。
 pub struct AuthResolver<'a, S: SecretStore> {
+    /// 抽象秘密存储，后续可以替换为加密 SQLite、系统钥匙串或内存测试存储。
     store: &'a S,
 }
 
@@ -41,6 +48,7 @@ impl<'a, S: SecretStore> AuthResolver<'a, S> {
 
     /// 解析认证引用。
     pub fn resolve(&self, auth: &BackendAuth) -> Result<ResolvedAuth, SecurityError> {
+        // 每个 SecretRef 都显式读取；可选口令使用 transpose 保留 None 和错误的区别。
         match auth {
             BackendAuth::Password { username, secret } => Ok(ResolvedAuth::Password {
                 username: username.clone(),
@@ -58,8 +66,13 @@ impl<'a, S: SecretStore> AuthResolver<'a, S> {
                     .map(|reference| self.store.get_secret(reference))
                     .transpose()?,
             }),
-            BackendAuth::Agent { username, key_hint } => Ok(ResolvedAuth::Agent {
+            BackendAuth::Agent {
+                username,
+                source,
+                key_hint,
+            } => Ok(ResolvedAuth::Agent {
                 username: username.clone(),
+                source: source.clone(),
                 key_hint: key_hint.clone(),
             }),
             BackendAuth::Certificate {
@@ -260,6 +273,7 @@ mod tests {
         let resolved = resolver
             .resolve(&BackendAuth::Agent {
                 username: "agent-user".to_owned(),
+                source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             })
             .expect("agent 认证不需要读取凭据");
@@ -268,6 +282,7 @@ mod tests {
             resolved,
             ResolvedAuth::Agent {
                 username: "agent-user".to_owned(),
+                source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             }
         );

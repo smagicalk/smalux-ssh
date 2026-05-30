@@ -2,16 +2,55 @@ export struct HostRow {
     id: string,
     name: string,
     endpoint: string,
+    icon_key: string,
     auth: string,
     group: string,
+    group_id: string,
+    group_header: string,
+    group_header_id: string,
     tags: string,
+    status_key: string,
     status: string,
+    accent_index: int,
+}
+
+export struct HostTreeRow {
+    id: string,
+    parent_id: string,
+    name: string,
+    endpoint: string,
+    icon_key: string,
+    kind: string,
+    host_id: string,
+    group_id: string,
+    depth: int,
+    expanded: bool,
+    status_key: string,
+    accent_index: int,
+    has_next_sibling: bool,
+    guide_0: bool,
+    guide_1: bool,
+    guide_2: bool,
+    guide_3: bool,
+    guide_4: bool,
+    guide_5: bool,
+    guide_6: bool,
+    guide_7: bool,
+}
+
+export struct GroupOptionRow {
+    id: string,
+    name: string,
+    path: string,
+    depth: int,
+    selected: bool,
 }
 
 export struct SessionTabRow {
     id: string,
     title: string,
     kind: string,
+    status_key: string,
     status: string,
     active: bool,
 }
@@ -25,6 +64,7 @@ export struct CommandPaletteRow {
     id: string,
     title: string,
     subtitle: string,
+    kind_key: string,
     kind: string,
 }
 
@@ -46,5 +86,41 @@ export struct KnownHostRow {
     host: string,
     port: int,
     fingerprint: string,
+    status_key: string,
     status: string,
+}
+
+export struct SettingOptionRow {
+    key: string,
+    label: string,
+    selected: bool,
+}
+
+export struct SettingsProfileRow {
+    name: string,
+    source_label: string,
+    selected: bool,
+    can_apply: bool,
+    can_remove: bool,
+}
+
+export struct SettingsSummaryRow {
+    key: string,
+    label: string,
+    count: int,
+}
+
+export struct SettingsFileActionRow {
+    key: string,
+    label: string,
+    category_key: string,
+    category_label: string,
+    direction: string,
+    direction_label: string,
+    format_key: string,
+    format_label: string,
+    default_file_name: string,
+    default_extension: string,
+    path_placeholder: string,
+    enabled: bool,
 }

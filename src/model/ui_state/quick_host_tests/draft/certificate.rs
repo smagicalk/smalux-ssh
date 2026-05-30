@@ -18,6 +18,7 @@ fn quick_host_draft_builds_certificate_host() {
             certificate_ref: "cert:cert-user".to_owned(),
             ..QuickHostAuthDraft::default()
         },
+        ..QuickHostDraft::default()
     };
 
     let host = draft

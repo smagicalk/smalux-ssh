@@ -16,6 +16,78 @@ pub struct AppConfig {
     pub app_name: String,
     pub theme: ThemeProfile,
     pub background: BackgroundProfile,
+    #[serde(default)]
+    pub workspace: WorkspacePreferences,
+    #[serde(default)]
+    pub security: SecurityPreferences,
+}
+
+/// 可跨启动保留的工作区偏好。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorkspacePreferences {
+    pub host_list_mode: HostListModePreference,
+    #[serde(default)]
+    pub language: LanguagePreference,
+    #[serde(default)]
+    pub built_in_theme: BuiltInThemePreference,
+}
+
+/// 可跨启动保留的安全偏好。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecurityPreferences {
+    #[serde(default)]
+    pub encryption: StorageEncryptionPreference,
+}
+
+/// 本地数据库加密偏好。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StorageEncryptionPreference {
+    Disabled,
+}
+
+impl Default for StorageEncryptionPreference {
+    fn default() -> Self {
+        Self::Disabled
+    }
+}
+
+/// 主机列表展示模式偏好。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum HostListModePreference {
+    Tree,
+    Card,
+}
+
+/// UI 语言偏好。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum LanguagePreference {
+    FollowSystem,
+    Chinese,
+    English,
+}
+
+impl Default for LanguagePreference {
+    fn default() -> Self {
+        Self::FollowSystem
+    }
+}
+
+/// 内置主题偏好。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum BuiltInThemePreference {
+    ProfessionalDark,
+    CatppuccinMocha,
+    NordDark,
+    Dracula,
+    SolarizedDark,
+    OceanDark,
+    ForestDark,
+}
+
+impl Default for BuiltInThemePreference {
+    fn default() -> Self {
+        Self::ProfessionalDark
+    }
 }
 
 /// 主机最终生效的视觉配置。

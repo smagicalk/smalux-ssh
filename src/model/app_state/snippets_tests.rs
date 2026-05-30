@@ -14,6 +14,7 @@ fn sample_host() -> Host {
         id: HostId(Uuid::new_v4()),
         name: "staging".to_owned(),
         group_id: None,
+        icon_key: "server".to_owned(),
         tags: vec!["linux".to_owned()],
         address: "staging.example.com".to_owned(),
         port: 22,

@@ -1,5 +1,6 @@
 use crate::model::ui_state::{
-    QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraft, QuickHostDraftError,
+    MAX_QUICK_HOST_NAME_CHARS, QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraft,
+    QuickHostDraftError,
 };
 
 use super::super::common::host_id;
@@ -64,4 +65,18 @@ fn quick_host_draft_validates_required_fields() {
         missing_certificate_ref.build_host(host_id()),
         Err(QuickHostDraftError::MissingCertificateRef)
     );
+}
+
+#[test]
+fn quick_host_draft_limits_alias_length() {
+    let draft = QuickHostDraft {
+        name: "一".repeat(MAX_QUICK_HOST_NAME_CHARS + 6),
+        address: "example.com".to_owned(),
+        username: "root".to_owned(),
+        ..QuickHostDraft::default()
+    };
+
+    let host = draft.build_host(host_id()).expect("host should be valid");
+
+    assert_eq!(host.name.chars().count(), MAX_QUICK_HOST_NAME_CHARS);
 }

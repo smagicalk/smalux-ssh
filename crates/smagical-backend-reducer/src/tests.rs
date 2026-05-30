@@ -1,9 +1,8 @@
 use super::*;
 use smagical_backend_core::LocalShellProfile;
 use smagical_core::{
-    DEFAULT_LOCAL_TERMINAL_TITLE, HostId, LOCAL_TERMINAL_SESSION_ID, SessionId, SftpEntry,
-    SftpEntryKind, TransferDirection, TransferId, TransferStatus, TransferTask, TunnelKind,
-    TunnelRule,
+    DEFAULT_LOCAL_TERMINAL_TITLE, HostId, SessionId, SftpEntry, SftpEntryKind, TransferDirection,
+    TransferId, TransferStatus, TransferTask, TunnelKind, TunnelRule,
 };
 use smagical_terminal::TerminalTabState;
 use uuid::Uuid;
@@ -266,7 +265,7 @@ fn output_event_ignores_terminal_session() {
 fn local_terminal_output_drops_duplicate_shell_echo() {
     let mut sessions = SessionManager::default();
     let mut terminal = TerminalManager::default();
-    let session_id = LOCAL_TERMINAL_SESSION_ID;
+    let session_id = session_id();
     let prompt = LocalShellProfile::default_for_platform().prompt;
 
     sessions.open_local_shell_tab(session_id, DEFAULT_LOCAL_TERMINAL_TITLE);

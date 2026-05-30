@@ -1,6 +1,15 @@
 //! Slint 属性写入层。
 //!
-//! 本模块只把 UI 展示模型写入 Slint 窗口，不直接读取核心领域细节。
+//! 本模块只把 view model 写入 Slint 窗口，不直接读取核心领域细节。
+//!
+//! 这层是当前 Slint UI 的“输出 Adapter”：
+//!
+//! - 输入是 `view_model::AppViewModel` 或局部 view model。
+//! - 输出是 `AppWindow` 上的属性、列表模型和终端缓冲。
+//! - 这里不做业务判断，不创建 `Message`，也不直接访问存储后端。
+//!
+//! 如果未来重写 UI，这个模块通常会被整体替换；核心 `model` 和
+//! `view_model` 可以继续保留。
 
 use crate::model::AppState;
 

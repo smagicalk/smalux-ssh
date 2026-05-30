@@ -3,11 +3,17 @@ import { AppTheme } from "./theme.slint";
 export component FilterChip inherits Rectangle {
     in property <string> label;
     in property <bool> active;
-    height: 20px;
-    border-radius: 9px;
+    callback clicked();
+    height: 22px;
+    border-radius: 8px;
     border-width: 1px;
-    border-color: active ? AppTheme.accent : AppTheme.border;
-    background: active ? #15352f : #141a23;
+    border-color: active ? AppTheme.accent : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: active ? AppTheme.badge-success-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.surface-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
     Text {
         text: label;
         color: active ? AppTheme.text : AppTheme.text-muted;
@@ -20,15 +26,15 @@ export component FilterChip inherits Rectangle {
 export component ToolRow inherits Rectangle {
     in property <string> label;
     in property <string> value;
-    height: 34px;
+    height: 30px;
     border-radius: 6px;
     border-width: 1px;
     border-color: AppTheme.border;
-    background: #121923;
+    background: AppTheme.card-bg;
 
     HorizontalLayout {
         padding: 8px;
-        Text { text: label; color: #c7d0db; font-size: 11px; }
+        Text { text: label; color: AppTheme.text-secondary; font-size: 11px; }
         Rectangle { horizontal-stretch: 1; }
         Text { text: value; color: AppTheme.text-muted; font-size: 10px; }
     }
@@ -37,25 +43,303 @@ export component ToolRow inherits Rectangle {
 export component CompactButton inherits Rectangle {
     in property <string> label;
     in property <bool> enabled: true;
+    in property <string> tone: "neutral";
+    in property <bool> compact: false;
     callback clicked();
 
-    height: 21px;
-    min-width: 24px;
-    border-radius: 4px;
-    border-width: 1px;
-    border-color: enabled ? AppTheme.border : AppTheme.border-soft;
-    background: enabled ? AppTheme.surface-bg : #0d1219;
+    property <bool> primary: tone == "primary";
+    property <bool> subtle: tone == "subtle";
+    property <bool> danger: tone == "danger";
 
-    TouchArea {
+    height: compact ? 22px : 24px;
+    min-width: compact ? (primary ? 34px : 24px) : (primary ? 46px : 30px);
+    border-radius: compact ? 5px : 6px;
+    border-width: 1px;
+    border-color: !enabled ? AppTheme.border-soft : primary ? (touch.pressed ? AppTheme.button-primary-border-pressed : touch.has-hover ? AppTheme.button-primary-border-hover : AppTheme.button-primary-border) : danger ? (touch.has-hover ? AppTheme.button-danger-border-hover : AppTheme.button-danger-border) : subtle ? (touch.has-hover ? AppTheme.border : AppTheme.transparent) : touch.pressed ? AppTheme.accent-blue : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: !enabled ? AppTheme.panel-bg : primary ? (touch.pressed ? AppTheme.button-primary-pressed : touch.has-hover ? AppTheme.button-primary-hover : AppTheme.button-primary-bg) : danger ? (touch.pressed ? AppTheme.button-danger-pressed : touch.has-hover ? AppTheme.button-danger-hover : AppTheme.button-danger-bg) : subtle ? (touch.pressed ? AppTheme.button-subtle-pressed : touch.has-hover ? AppTheme.button-subtle-hover : AppTheme.transparent) : touch.pressed ? AppTheme.button-secondary-pressed : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.raised-bg;
+
+    touch := TouchArea {
         enabled: root.enabled;
         clicked => { root.clicked(); }
     }
 
     Text {
         text: label;
-        color: enabled ? AppTheme.text : AppTheme.text-muted;
-        font-size: 10px;
+        color: !enabled ? AppTheme.text-muted : primary ? AppTheme.button-primary-text : danger ? AppTheme.button-danger-text : touch.pressed ? AppTheme.text-strong : subtle ? AppTheme.text-soft : AppTheme.text;
+        font-size: compact ? 9px : 10px;
+        font-weight: 700;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+}
+
+export component DialogButton inherits Rectangle {
+    in property <string> label;
+    in property <bool> primary;
+    in property <bool> danger: false;
+    in property <bool> enabled: true;
+    callback clicked();
+
+    height: 34px;
+    min-width: 104px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: !enabled ? AppTheme.border-soft : danger ? (touch.pressed ? AppTheme.button-danger-border-pressed : touch.has-hover ? AppTheme.button-danger-border-hover : AppTheme.button-danger-border) : primary ? (touch.pressed ? AppTheme.button-primary-border-pressed : touch.has-hover ? AppTheme.button-primary-border-hover : AppTheme.button-primary-border) : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: !enabled ? AppTheme.surface-bg : danger ? (touch.pressed ? AppTheme.button-danger-pressed : touch.has-hover ? AppTheme.button-danger-hover : AppTheme.button-danger-bg) : primary ? (touch.pressed ? AppTheme.button-primary-pressed : touch.has-hover ? AppTheme.button-primary-hover : AppTheme.button-primary-bg) : touch.pressed ? AppTheme.button-secondary-pressed : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.button-secondary-bg;
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: root.label;
+        color: !root.enabled ? AppTheme.text-muted : root.danger ? AppTheme.button-danger-text : root.primary ? AppTheme.button-primary-text : AppTheme.button-secondary-text;
+        font-size: 11px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component DialogCloseButton inherits Rectangle {
+    callback clicked();
+
+    width: 26px;
+    height: 26px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: touch.pressed ? AppTheme.button-danger-bg : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.surface-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: "x";
+        color: AppTheme.text-soft;
+        font-size: 12px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component DialogSectionHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> caption;
+
+    height: 28px;
+    background: AppTheme.transparent;
+
+    VerticalLayout {
+        spacing: 2px;
+        Text {
+            text: root.title;
+            color: AppTheme.text-strong;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        Text {
+            text: root.caption;
+            color: AppTheme.text-muted;
+            font-size: 9px;
+        }
+    }
+}
+
+export component DialogField inherits Rectangle {
+    in property <string> label;
+    in property <string> field-value;
+    in property <string> placeholder;
+    callback edited(value: string);
+    callback accepted(value: string);
+
+    height: 50px;
+    background: AppTheme.transparent;
+
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: root.label;
+            color: AppTheme.text-soft;
+            font-size: 10px;
+            font-weight: 700;
+        }
+        Rectangle {
+            height: 30px;
+            border-radius: 7px;
+            border-width: 1px;
+            border-color: AppTheme.border-soft;
+            background: AppTheme.input-bg;
+
+            Text {
+                x: 8px;
+                y: 0px;
+                width: parent.width - 16px;
+                height: parent.height;
+                text: root.placeholder;
+                color: AppTheme.input-placeholder;
+                font-size: 11px;
+                vertical-alignment: center;
+                visible: input.text == "";
+            }
+
+            input := TextInput {
+                x: 8px;
+                y: 0px;
+                width: parent.width - 16px;
+                height: parent.height;
+                text: root.field-value;
+                single-line: true;
+                color: AppTheme.text;
+                font-size: 11px;
+                text-cursor-width: 1px;
+                selection-background-color: AppTheme.input-selection;
+                selection-foreground-color: AppTheme.text-strong;
+                vertical-alignment: center;
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+            }
+        }
+    }
+}
+
+export component DialogAuthOption inherits Rectangle {
+    in property <string> label;
+    in property <string> caption;
+    in property <bool> active;
+    callback clicked();
+
+    height: 44px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: active ? AppTheme.accent : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: active ? AppTheme.badge-success-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.dialog-section-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    VerticalLayout {
+        padding: 7px;
+        spacing: 2px;
+        Text {
+            text: root.label;
+            color: root.active ? AppTheme.text-strong : AppTheme.text;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        Text {
+            text: root.caption;
+            color: root.active ? AppTheme.success-text-soft : AppTheme.text-muted;
+            font-size: 9px;
+        }
+    }
+}
+
+export component ConfirmDialog inherits Rectangle {
+    in property <string> title;
+    in property <string> message;
+    in property <string> subject;
+    in property <string> cancel-label;
+    in property <string> confirm-label;
+    callback cancel();
+    callback confirm();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 420px);
+        height: 190px;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    border-width: 1px;
+                    border-color: AppTheme.dialog-danger-icon-border;
+                    background: AppTheme.dialog-danger-icon-bg;
+
+                    Text {
+                        text: "!";
+                        color: AppTheme.button-danger-text;
+                        font-size: 17px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text {
+                        text: root.title;
+                        color: AppTheme.text-strong;
+                        font-size: 16px;
+                        font-weight: 700;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: root.message;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 40px;
+                border-radius: 7px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                Text {
+                    x: 10px;
+                    y: 0px;
+                    width: parent.width - 20px;
+                    height: parent.height;
+                    text: root.subject;
+                    color: AppTheme.text;
+                    font-size: 12px;
+                    font-weight: 700;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.cancel(); }
+                }
+                DialogButton {
+                    label: root.confirm-label;
+                    primary: false;
+                    danger: true;
+                    clicked => { root.confirm(); }
+                }
+            }
+        }
     }
 }

@@ -1,4 +1,7 @@
 //! 终端输出缓冲和搜索操作。
+//!
+//! 终端缓冲只保存已经投影给 UI 的文本行，不直接管理 PTY 或 SSH channel。所有输出都按
+//! session_id 归属到对应 `TerminalTabState`。
 
 use smagical_core::SessionId;
 
@@ -7,6 +10,7 @@ use super::{TerminalManager, TerminalSearchMatch};
 impl TerminalManager {
     /// 立即显示用户提交的终端输入，让交互反馈接近真实终端。
     pub fn append_local_echo(&mut self, session_id: SessionId, prompt: &str, input: &str) -> bool {
+        // 本地 echo 只写一行可见文本，真实 PTY 输出随后可能被去重。
         let line = format!("{prompt} {}", input.trim_end_matches(['\r', '\n']));
         self.append_output(session_id, line)
     }
@@ -15,6 +19,7 @@ impl TerminalManager {
     pub fn append_output(&mut self, session_id: SessionId, line: impl Into<String>) -> bool {
         if let Some(tab) = self.tab_mut(session_id) {
             tab.buffer.push(line.into());
+            // 每次追加后立即裁剪，避免长时间运行的终端无限增长内存。
             tab.trim_scrollback();
             true
         } else {
@@ -40,6 +45,7 @@ impl TerminalManager {
         prompt: &str,
         echoed_line: &str,
     ) -> bool {
+        // 本地终端先做了 UI echo，真实 shell 可能随后回显同一命令；此时直接丢弃。
         let Some(tab) = self.tab_mut(session_id) else {
             return false;
         };
@@ -50,7 +56,7 @@ impl TerminalManager {
             return false;
         };
 
-        if command == echoed_line.trim() {
+        if shell_echo_matches_command(prompt, echoed_line, command) {
             return true;
         }
 
@@ -71,6 +77,23 @@ impl TerminalManager {
             .map(|tab| tab.search(query))
             .unwrap_or_default()
     }
+}
+
+fn shell_echo_matches_command(prompt: &str, echoed_line: &str, command: &str) -> bool {
+    let echoed_line = echoed_line.trim();
+    if echoed_line == command {
+        return true;
+    }
+
+    // 兼容三类输出：纯命令、固定 prompt + 命令、PowerShell 当前路径 prompt + 命令。
+    echoed_line
+        .strip_prefix(prompt)
+        .map(str::trim_start)
+        .is_some_and(|echoed_command| echoed_command == command)
+        || echoed_line
+            .rsplit_once(['>', '$'])
+            .map(|(_, echoed_command)| echoed_command.trim_start() == command)
+            .unwrap_or(false)
 }
 
 #[cfg(test)]
@@ -125,6 +148,19 @@ mod tests {
         assert_eq!(terminal.tabs[0].buffer, vec!["PS> ls"]);
         assert!(terminal.suppress_duplicate_echo(id, "PS>", "ls"));
         assert!(!terminal.suppress_duplicate_echo(id, "PS>", "dir"));
+    }
+
+    #[test]
+    fn local_echo_suppression_accepts_prompt_prefixed_shell_echo() {
+        let mut terminal = TerminalManager::default();
+        let id = session_id();
+
+        terminal.open_tab(TerminalTabState::new(id, "local"));
+
+        assert!(terminal.append_local_echo(id, "PS>", "pwd\n"));
+        assert!(terminal.suppress_duplicate_echo(id, "PS>", "PS> pwd"));
+        assert!(terminal.suppress_duplicate_echo(id, "PS>", "PS C:\\Users\\dev> pwd"));
+        assert!(!terminal.suppress_duplicate_echo(id, "PS>", "PS> dir"));
     }
 
     #[test]

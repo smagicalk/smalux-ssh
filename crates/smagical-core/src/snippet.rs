@@ -1,4 +1,7 @@
 //! 快捷命令和变量渲染模型。
+//!
+//! 片段是可保存、可复用的命令模板。模板变量使用 `{{name}}` 语法，渲染时只替换显式声明
+//! 的变量，遇到未知占位符会报错，避免误把未填写的命令发到远端。
 
 use serde::{Deserialize, Serialize};
 
@@ -7,12 +10,19 @@ use crate::{GroupId, Host, HostId, SnippetId};
 /// 快捷命令。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Snippet {
+    /// 片段稳定 ID。
     pub id: SnippetId,
+    /// 显示名称。
     pub name: String,
+    /// 可选说明，给 UI 列表和编辑器展示。
     pub description: Option<String>,
+    /// 原始命令模板。
     pub command_template: String,
+    /// 可用范围：全局、指定主机或指定分组。
     pub scope: SnippetScope,
+    /// 模板变量定义。
     pub variables: Vec<SnippetVariable>,
+    /// 上一次使用的参数，便于下次打开时回填。
     pub last_arguments: Vec<SnippetArgument>,
 }
 
@@ -22,6 +32,7 @@ impl Snippet {
         let mut rendered = self.command_template.clone();
 
         for variable in &self.variables {
+            // 优先使用本次参数，其次使用默认值；必填变量空白值视为缺失。
             let argument_value = arguments
                 .iter()
                 .find(|argument| argument.name == variable.name)
@@ -34,6 +45,7 @@ impl Snippet {
             rendered = rendered.replace(&placeholder, value);
         }
 
+        // 显式检查残留占位符，防止拼错变量名时把 `{{name}}` 原样发到 shell。
         if let Some(unresolved) = find_unresolved_placeholder(&rendered) {
             return Err(SnippetRenderError::UnknownVariable(unresolved));
         }
@@ -48,6 +60,7 @@ pub fn variables_from_template(template: &str) -> Vec<SnippetVariable> {
     let mut rest = template;
 
     while let Some(start) = rest.find("{{") {
+        // 只接受完整闭合的 `{{name}}`；未闭合占位符交给渲染时报 UnknownVariable。
         let after_start = &rest[start + 2..];
         let Some(end) = after_start.find("}}") else {
             break;
@@ -57,6 +70,7 @@ pub fn variables_from_template(template: &str) -> Vec<SnippetVariable> {
             && is_valid_variable_name(name)
             && !variables.iter().any(|variable| variable.name == name)
         {
+            // 从模板自动提取的变量默认必填，用户可在编辑器里改成可选或加默认值。
             variables.push(SnippetVariable {
                 name: name.to_owned(),
                 default_value: None,
@@ -72,8 +86,11 @@ pub fn variables_from_template(template: &str) -> Vec<SnippetVariable> {
 /// 快捷命令作用域。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SnippetScope {
+    /// 所有主机都可用。
     Global,
+    /// 只对指定主机可用。
     Host(HostId),
+    /// 只对指定分组下的主机可用。
     Group(GroupId),
 }
 
@@ -91,26 +108,34 @@ impl SnippetScope {
 /// 快捷命令变量定义。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnippetVariable {
+    /// 变量名，对应模板中的 `{{name}}`。
     pub name: String,
+    /// 未提供参数时使用的默认值。
     pub default_value: Option<String>,
+    /// 必填变量不能使用空白参数。
     pub required: bool,
 }
 
 /// 快捷命令参数值。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SnippetArgument {
+    /// 参数名，对应变量名。
     pub name: String,
+    /// 用户本次输入的值。
     pub value: String,
 }
 
 /// 快捷命令渲染错误。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SnippetRenderError {
+    /// 声明的必填变量没有值。
     MissingVariable(String),
+    /// 模板中存在未声明的占位符。
     UnknownVariable(String),
 }
 
 fn find_unresolved_placeholder(input: &str) -> Option<String> {
+    // 这里只做轻量扫描；变量名合法性由 variables_from_template 控制。
     let start = input.find("{{")?;
     let rest = &input[start + 2..];
     let end = rest.find("}}")?;
@@ -118,6 +143,7 @@ fn find_unresolved_placeholder(input: &str) -> Option<String> {
 }
 
 fn non_empty_required_value<'a>(value: &'a str, variable: &SnippetVariable) -> Option<&'a str> {
+    // 必填变量中只有空白字符时视为未提供。
     if variable.required && value.trim().is_empty() {
         None
     } else {
@@ -126,6 +152,7 @@ fn non_empty_required_value<'a>(value: &'a str, variable: &SnippetVariable) -> O
 }
 
 fn is_valid_variable_name(name: &str) -> bool {
+    // 限制变量字符集，避免模板解析和 shell 命令之间出现歧义。
     !name.is_empty()
         && name
             .chars()
@@ -287,11 +314,13 @@ mod tests {
             id: host_id,
             name: "staging".to_owned(),
             group_id: Some(group_id),
+            icon_key: "server".to_owned(),
             tags: Vec::new(),
             address: "staging.example.com".to_owned(),
             port: 22,
             auth: crate::AuthProfile::Agent {
                 username: "ops".to_owned(),
+                source: crate::AgentSource::Auto,
                 key_hint: None,
             },
             proxy: None,

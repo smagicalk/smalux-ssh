@@ -1,8 +1,17 @@
 //! 快速新增主机认证草稿转换。
 
-use crate::model::{AuthProfile, SecretRef};
+use crate::model::{AgentSource, AuthProfile, SecretRef};
 
-use super::{QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraftError};
+use super::{QuickHostAgentSource, QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraftError};
+
+pub(super) fn quick_host_agent_source_label(source: QuickHostAgentSource) -> &'static str {
+    match source {
+        QuickHostAgentSource::Auto => "Auto",
+        QuickHostAgentSource::OpenSsh => "OpenSSH",
+        QuickHostAgentSource::Pageant => "Pageant",
+        QuickHostAgentSource::CustomNamedPipe => "Custom",
+    }
+}
 
 pub(super) fn quick_host_auth_kind_label(kind: QuickHostAuthKind) -> &'static str {
     match kind {
@@ -67,15 +76,32 @@ fn agent_auth(
     username: &str,
 ) -> Result<AuthProfile, QuickHostDraftError> {
     let key_hint = draft.key_hint.trim();
+    let source = agent_source(draft)?;
 
     Ok(AuthProfile::Agent {
         username: username.to_owned(),
+        source,
         key_hint: if key_hint.is_empty() {
             None
         } else {
             Some(key_hint.to_owned())
         },
     })
+}
+
+fn agent_source(draft: &QuickHostAuthDraft) -> Result<AgentSource, QuickHostDraftError> {
+    match draft.agent_source {
+        QuickHostAgentSource::Auto => Ok(AgentSource::Auto),
+        QuickHostAgentSource::OpenSsh => Ok(AgentSource::OpenSsh),
+        QuickHostAgentSource::Pageant => Ok(AgentSource::Pageant),
+        QuickHostAgentSource::CustomNamedPipe => {
+            let pipe = draft.agent_custom_pipe.trim();
+            if pipe.is_empty() {
+                return Err(QuickHostDraftError::MissingAgentPipePath);
+            }
+            Ok(AgentSource::CustomNamedPipe(pipe.to_owned()))
+        }
+    }
 }
 
 fn certificate_auth(

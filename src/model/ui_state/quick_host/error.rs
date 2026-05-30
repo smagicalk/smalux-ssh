@@ -11,6 +11,7 @@ pub enum QuickHostDraftError {
     MissingPasswordSecretRef,
     MissingPrivateKeyRef,
     MissingCertificateRef,
+    MissingAgentPipePath,
 }
 
 impl fmt::Display for QuickHostDraftError {
@@ -22,6 +23,7 @@ impl fmt::Display for QuickHostDraftError {
             Self::MissingPasswordSecretRef => f.write_str("密码引用不能为空"),
             Self::MissingPrivateKeyRef => f.write_str("私钥引用不能为空"),
             Self::MissingCertificateRef => f.write_str("证书引用不能为空"),
+            Self::MissingAgentPipePath => f.write_str("自定义 agent 管道不能为空"),
         }
     }
 }

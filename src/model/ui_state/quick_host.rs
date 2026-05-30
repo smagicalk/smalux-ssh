@@ -11,6 +11,9 @@ mod types;
 #[path = "quick_host/ui.rs"]
 mod ui;
 
-pub use draft::QuickHostDraft;
+pub use draft::{MAX_QUICK_HOST_NAME_CHARS, QuickHostDraft, truncate_host_name};
 pub use error::QuickHostDraftError;
-pub use types::{QuickHostAuthDraft, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField};
+pub use types::{
+    QuickHostAgentSource, QuickHostAuthDraft, QuickHostAuthField, QuickHostAuthKind,
+    QuickHostDraftField,
+};

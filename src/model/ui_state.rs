@@ -15,7 +15,7 @@ mod visual_settings;
 mod visual_settings_tests;
 mod workspace_ui;
 
-use super::{BackgroundProfile, HostId, ThemeProfile};
+use super::{BackgroundProfile, GroupId, HostId, ThemeProfile};
 
 pub use host_action::*;
 pub use quick_host::*;
@@ -29,6 +29,7 @@ pub use workspace_ui::*;
 pub struct UiState {
     pub last_error: Option<String>,
     pub quick_host: QuickHostDraft,
+    pub quick_group: QuickGroupDraft,
     pub visual_settings: VisualSettingsDraft,
     pub host_visual_settings_drafts: Vec<HostVisualSettingsDraft>,
     pub host_action_drafts: Vec<HostActionDraft>,
@@ -43,6 +44,7 @@ impl UiState {
         Self {
             last_error: None,
             quick_host: QuickHostDraft::default(),
+            quick_group: QuickGroupDraft::default(),
             visual_settings: VisualSettingsDraft::from_profiles(theme, background),
             host_visual_settings_drafts: Vec::new(),
             host_action_drafts: Vec::new(),
@@ -68,5 +70,21 @@ impl UiState {
         let had_error = self.last_error.is_some();
         self.last_error = None;
         had_error
+    }
+}
+
+/// 快速新增分组表单草稿。
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct QuickGroupDraft {
+    pub parent_id: Option<GroupId>,
+    pub name: String,
+}
+
+impl QuickGroupDraft {
+    pub fn with_parent(parent_id: Option<GroupId>) -> Self {
+        Self {
+            parent_id,
+            name: String::new(),
+        }
     }
 }

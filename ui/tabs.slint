@@ -4,57 +4,99 @@ export component TabChip inherits Rectangle {
     in property <string> session-id;
     in property <string> title;
     in property <string> kind;
+    in property <string> status-key;
     in property <string> status;
+    in property <string> ready-label: "";
     in property <bool> active-tab;
+    in property <length> tab-width: 168px;
     callback activate();
     callback close();
+    callback scroll(delta: length);
 
-    height: 25px;
-    width: 156px;
-    border-radius: 6px;
+    property <color> status-color: root.status-key == "Connected" || root.status-key == "Running" || root.status-key == "RunningCommand" ? AppTheme.accent : root.status-key == "Connecting" || root.status-key == "Authenticating" || root.status-key == "Reconnecting" || root.status-key == "Starting" || root.status-key == "Stopping" ? AppTheme.warning : root.status-key == "Failed" || root.status-key == "Disconnected" || root.status-key == "Stopped" ? AppTheme.danger : AppTheme.text-muted;
+
+    height: 30px;
+    width: root.tab-width;
+    border-radius: 7px;
     border-width: 1px;
-    border-color: active-tab ? AppTheme.accent-blue : AppTheme.border;
-    background: active-tab ? #142a36 : AppTheme.surface-bg;
+    border-color: active-tab ? AppTheme.border-strong : tab-touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: active-tab ? AppTheme.tab-active-bg : tab-touch.pressed ? AppTheme.tab-pressed-bg : tab-touch.has-hover ? AppTheme.tab-hover-bg : AppTheme.tab-bg;
+
+    tab-touch := TouchArea {
+        clicked => { root.activate(); }
+        scroll-event(event) => {
+            if (event.delta-x != 0px) {
+                root.scroll(event.delta-x);
+            } else {
+                root.scroll(event.delta-y);
+            }
+            accept
+        }
+    }
 
     HorizontalLayout {
-        padding-left: 7px;
-        padding-right: 4px;
-        spacing: 5px;
+        padding-left: 8px;
+        padding-right: 5px;
+        spacing: 6px;
 
-        TouchArea {
-            clicked => { root.activate(); }
-            HorizontalLayout {
-                spacing: 5px;
-                Text {
-                    text: kind;
-                    color: active-tab ? AppTheme.accent-blue : #9aa8ba;
-                    font-size: 9px;
-                    vertical-alignment: center;
-                }
-                Text {
-                    text: title;
-                    color: AppTheme.text;
-                    font-size: 10px;
-                    vertical-alignment: center;
-                    horizontal-stretch: 1;
-                }
+        Rectangle {
+            width: 9px;
+            height: 30px;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 1px;
+                y: (parent.height - self.height) / 2;
+                width: 7px;
+                height: 7px;
+                border-radius: 4px;
+                background: root.status-color;
             }
         }
 
+        Text {
+            text: title;
+            color: active-tab ? AppTheme.text-strong : AppTheme.text;
+            font-size: 11px;
+            font-weight: active-tab ? 700 : 500;
+            vertical-alignment: center;
+            horizontal-stretch: 1;
+            overflow: elide;
+        }
+
+        Text {
+            text: root.status-key == "Connected" ? root.ready-label : status;
+            color: active-tab ? AppTheme.text-soft : AppTheme.text-muted;
+            font-size: 9px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+
         Rectangle {
-            width: 19px;
-            height: 18px;
-            border-radius: 4px;
-            background: active-tab ? #1e3b4a : #1a222e;
-            TouchArea {
+            width: 18px;
+            height: 30px;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 0px;
+                y: (parent.height - self.height) / 2;
+                width: 18px;
+                height: 18px;
+            border-radius: 6px;
+            border-width: 1px;
+            border-color: close-touch.has-hover ? AppTheme.tab-close-border-hover : AppTheme.transparent;
+            background: close-touch.pressed ? AppTheme.tab-close-pressed-bg : close-touch.has-hover ? AppTheme.tab-close-hover-bg : AppTheme.transparent;
+            close-touch := TouchArea {
                 clicked => { root.close(); }
             }
             Text {
                 text: "x";
-                color: AppTheme.text-muted;
+                color: close-touch.has-hover ? AppTheme.text : AppTheme.text-muted;
                 font-size: 10px;
+                font-weight: 700;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+            }
             }
         }
     }

@@ -1,20 +1,199 @@
-import { LineEdit, ScrollView } from "std-widgets.slint";
-import { HostRow } from "./models.slint";
+import { ScrollView } from "std-widgets.slint";
+import { GroupOptionRow, HostRow, HostTreeRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
-import { CompactButton, FilterChip } from "./common.slint";
-import { HostCard } from "./hosts.slint";
+import { DialogAuthOption, DialogButton, DialogCloseButton, DialogField, DialogSectionHeader } from "./common.slint";
+import { HostAddButton, HostCard, HostIconOption, HostNodeIcon, HostTreeContextMenu, HostTreeGroupContextMenu, HostTreeGroup, HostTreeHost, HostViewModeToggle } from "./hosts.slint";
+
+component HostSearchField inherits Rectangle {
+    in property <string> value;
+    in property <string> placeholder;
+    callback edited(value: string);
+    callback accepted(value: string);
+
+    height: 26px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: input.has-focus ? AppTheme.border-strong : AppTheme.border-soft;
+    background: input.has-focus ? AppTheme.input-bg-focus : AppTheme.input-bg;
+
+    Text {
+        x: 9px;
+        y: 0px;
+        width: parent.width - 18px;
+        height: parent.height;
+        text: root.placeholder;
+        color: AppTheme.input-placeholder;
+        font-size: 10px;
+        vertical-alignment: center;
+        visible: input.text == "";
+    }
+
+    input := TextInput {
+        x: 9px;
+        y: 0px;
+        width: parent.width - 18px;
+        height: parent.height;
+        text: root.value;
+        single-line: true;
+        color: AppTheme.text;
+        font-size: 10px;
+        text-cursor-width: 1px;
+        selection-background-color: AppTheme.input-selection;
+        selection-foreground-color: AppTheme.text-strong;
+        vertical-alignment: center;
+        edited => { root.edited(self.text); }
+        accepted => { root.accepted(self.text); }
+    }
+}
+
+component AgentSourceOption inherits Rectangle {
+    in property <string> label;
+    in property <string> token;
+    in property <string> selected-token;
+    callback selected(token: string);
+
+    property <bool> active: root.token == root.selected-token;
+
+    height: 26px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.active ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: root.active ? AppTheme.button-secondary-bg : touch.pressed ? AppTheme.button-secondary-pressed : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.surface-bg;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.token); }
+    }
+
+    Text {
+        text: root.label;
+        color: root.active ? AppTheme.text-strong : AppTheme.text-muted;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component GroupPickerRow inherits Rectangle {
+    in property <GroupOptionRow> group;
+    callback selected(id: string);
+
+    height: 34px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.group.selected ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-soft : AppTheme.transparent;
+    background: root.group.selected ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.group.id); }
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 7px;
+
+        Rectangle {
+            width: root.group.depth * 14px;
+            height: parent.height;
+            background: AppTheme.transparent;
+        }
+
+        Rectangle {
+            width: 18px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 2px;
+                y: 11px;
+                width: 14px;
+                height: 11px;
+                border-radius: 3px;
+                border-width: 1px;
+                border-color: root.group.selected ? AppTheme.accent : AppTheme.border-soft;
+                background: root.group.selected ? AppTheme.badge-success-bg : AppTheme.card-bg;
+            }
+
+            Rectangle {
+                x: 4px;
+                y: 8px;
+                width: 8px;
+                height: 4px;
+                border-radius: 2px;
+                background: root.group.selected ? AppTheme.accent : AppTheme.border-soft;
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 1px;
+
+            Text {
+                text: root.group.name;
+                color: root.group.selected ? AppTheme.text-strong : AppTheme.text;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.group.path;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                overflow: elide;
+            }
+        }
+    }
+}
 
 export component HostsPanel inherits Rectangle {
     in property <string> active-page;
+    in property <string> host-list-mode-key;
     in property <string> host-list-mode;
     in property <string> host-search-query;
+    in property <string> new-label: "";
+    in property <string> new-host-label: "";
+    in property <string> new-group-label: "";
+    in property <string> open-label: "";
+    in property <string> files-label: "";
+    in property <string> edit-label: "";
+    in property <string> delete-label: "";
+    in property <string> duplicate-label: "";
+    in property <string> group-create-host-label: "";
+    in property <string> group-create-group-label: "";
+    in property <string> search-placeholder: "";
+    in property <string> section-title: "";
+    in property <string> empty-title: "";
+    in property <string> empty-caption: "";
     in property <int> panel-width;
     in property <[HostRow]> hosts;
+    in property <[HostTreeRow]> host-tree;
     callback toggle-host-list-mode();
+    callback toggle-host-tree-group(group-id: string);
+    callback open-create-choice();
     callback update-host-search(query: string);
+    callback open-create-host-dialog();
+    callback open-create-host-dialog-in-group(group-id: string);
+    callback open-create-group-parent-dialog(parent-id: string);
+    callback open-create-group-dialog(parent-id: string);
     callback open-shell(host-id: string);
     callback open-host-sftp(host-id: string);
-    callback run-host-command(host-id: string);
+    callback open-edit-host-dialog(host-id: string);
+    callback duplicate-host(host-id: string);
+    callback remove-host(host-id: string);
+    callback remove-group(group-id: string);
+
+    property <string> tree-context-host-id: "";
+    property <string> tree-context-group-id: "";
+    property <string> tree-context-root-token: "__root__";
+    property <string> tree-context-host-group-id: "";
+    property <string> selected-tree-host-id: "";
+    property <length> tree-context-menu-x: 10px;
+    property <length> tree-context-menu-y: 104px;
+    property <length> tree-scroll-x: 0px;
+    property <length> tree-content-width: max(root.width, 900px);
 
     width: root.panel-width * 1px;
     background: AppTheme.panel-bg;
@@ -34,53 +213,1179 @@ export component HostsPanel inherits Rectangle {
                 vertical-alignment: center;
             }
             Rectangle { horizontal-stretch: 1; }
-            CompactButton {
-                label: root.host-list-mode;
+            HostViewModeToggle {
+                mode-key: root.host-list-mode-key;
                 clicked => { root.toggle-host-list-mode(); }
             }
         }
 
-        LineEdit {
-            text: root.host-search-query;
-            placeholder-text: "host, address or tag";
-            height: 26px;
-            edited(query) => { root.update-host-search(query); }
-            accepted(query) => { root.update-host-search(query); }
-        }
-
         HorizontalLayout {
-            spacing: 5px;
-            FilterChip { label: "Group"; active: true; }
-            FilterChip { label: "Tags"; active: false; }
-            FilterChip { label: "Status"; active: false; }
+            spacing: 6px;
+            HostSearchField {
+                value: root.host-search-query;
+                placeholder: root.search-placeholder;
+                horizontal-stretch: 1;
+                edited(query) => { root.update-host-search(query); }
+                accepted(query) => { root.update-host-search(query); }
+            }
+            HostAddButton {
+                clicked => {
+                    root.tree-context-host-id = "";
+                    root.tree-context-group-id = "";
+                    root.open-create-choice();
+                }
+            }
         }
 
-        Text { text: "HOSTS"; color: #5b6776; font-size: 9px; }
+        Text { text: root.section-title; color: AppTheme.section-text; font-size: 9px; }
 
         ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                if root.hosts.length == 0: HostCard {
-                    host-id: "";
-                    name: "No saved hosts";
-                    endpoint: "Create one from Quick Connect.";
-                    auth: "Agent";
-                    group: "Default";
-                    tags: "ssh / sftp / tunnels";
-                    status: "Empty";
+                if root.hosts.length == 0: Rectangle {
+                    height: 54px;
+                    border-radius: 7px;
+                    border-width: 1px;
+                    border-color: AppTheme.border-soft;
+                    background: AppTheme.dialog-section-bg;
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 3px;
+                        Text {
+                            text: root.empty-title;
+                            color: AppTheme.text;
+                            font-size: 12px;
+                            font-weight: 700;
+                        }
+                        Text {
+                            text: root.empty-caption;
+                            color: AppTheme.text-muted;
+                            font-size: 10px;
+                        }
+                    }
                 }
-                for host in root.hosts: HostCard {
-                    host-id: host.id;
-                    name: host.name;
-                    endpoint: host.endpoint;
-                    auth: host.auth;
-                    group: host.group;
-                    tags: host.tags;
-                    status: host.status;
-                    open-shell => { root.open-shell(host.id); }
-                    open-sftp => { root.open-host-sftp(host.id); }
-                    run-command => { root.run-host-command(host.id); }
+                if root.hosts.length > 0 && root.host-list-mode-key == "Card": VerticalLayout {
+                    spacing: 6px;
+                    for host in root.hosts: HostCard {
+                        host-id: host.id;
+                        name: host.name;
+                        endpoint: host.endpoint;
+                        icon-key: host.icon_key;
+                        auth: host.auth;
+                        group: host.group;
+                        tags: host.tags;
+                        status-key: host.status_key;
+                        status: host.status;
+                        open-label: root.open-label;
+                        files-label: root.files-label;
+                        edit-label: root.edit-label;
+                        delete-label: root.delete-label;
+                        open-shell => { root.open-shell(host.id); }
+                        open-sftp => { root.open-host-sftp(host.id); }
+                        edit-host => { root.open-edit-host-dialog(host.id); }
+                        remove-host => { root.remove-host(host.id); }
+                    }
+                }
+                if root.host-tree.length > 0 && root.host-list-mode-key != "Card": Flickable {
+                    height: root.host-tree.length * 34px + 8px;
+                    viewport-width: root.tree-content-width;
+                    viewport-height: self.height;
+                    viewport-x <=> root.tree-scroll-x;
+
+                    VerticalLayout {
+                        width: root.tree-content-width;
+                        spacing: 0px;
+                        for node in root.host-tree: VerticalLayout {
+                            spacing: 0px;
+                            if node.kind == "Root" || node.kind == "Group": HostTreeGroup {
+                                label: node.name;
+                                expanded: node.expanded;
+                                depth: node.depth;
+                                accent-index: node.accent_index;
+                                has-next-sibling: node.has_next_sibling;
+                                guide0: node.guide_0;
+                                guide1: node.guide_1;
+                                guide2: node.guide_2;
+                                guide3: node.guide_3;
+                                guide4: node.guide_4;
+                                guide5: node.guide_5;
+                                guide6: node.guide_6;
+                                guide7: node.guide_7;
+                                toggle => {
+                                    root.tree-context-host-id = "";
+                                    root.tree-context-group-id = "";
+                                    root.toggle-host-tree-group(node.group_id);
+                                }
+                                open-context-menu(abs-x, abs-y) => {
+                                    root.tree-context-host-id = "";
+                                    root.tree-context-group-id = root.tree-context-group-id == (node.kind == "Root" ? root.tree-context-root-token : node.group_id) ? "" : (node.kind == "Root" ? root.tree-context-root-token : node.group_id);
+                                    root.tree-context-menu-x = min(max(10px, abs-x - root.absolute-position.x), max(10px, root.width - 156px));
+                                    root.tree-context-menu-y = min(max(10px, abs-y - root.absolute-position.y), max(10px, root.height - 134px));
+                                }
+                            }
+                            if node.kind == "Host": HostTreeHost {
+                                name: node.name;
+                                endpoint: node.endpoint;
+                                icon-key: node.icon_key;
+                                status-key: node.status_key;
+                                accent-index: node.accent_index;
+                                depth: node.depth;
+                                has-next-sibling: node.has_next_sibling;
+                                guide0: node.guide_0;
+                                guide1: node.guide_1;
+                                guide2: node.guide_2;
+                                guide3: node.guide_3;
+                                guide4: node.guide_4;
+                                guide5: node.guide_5;
+                                guide6: node.guide_6;
+                                guide7: node.guide_7;
+                                selected: root.selected-tree-host-id == node.host_id;
+                                select-host => {
+                                    root.selected-tree-host-id = node.host_id;
+                                    root.tree-context-host-id = "";
+                                }
+                                open-shell => {
+                                    root.tree-context-host-id = "";
+                                    root.selected-tree-host-id = node.host_id;
+                                    root.open-shell(node.host_id);
+                                }
+                                open-context-menu(abs-x, abs-y) => {
+                                    root.selected-tree-host-id = node.host_id;
+                                    root.tree-context-host-id = root.tree-context-host-id == node.host_id ? "" : node.host_id;
+                                    root.tree-context-host-group-id = node.group_id;
+                                    root.tree-context-group-id = "";
+                                    root.tree-context-menu-x = min(max(10px, abs-x - root.absolute-position.x), max(10px, root.width - 156px));
+                                    root.tree-context-menu-y = min(max(10px, abs-y - root.absolute-position.y), max(10px, root.height - 242px));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.tree-context-host-id != "": Rectangle {
+        x: root.tree-context-menu-x;
+        y: root.tree-context-menu-y;
+        width: 146px;
+        height: 232px;
+        background: AppTheme.transparent;
+
+        for node in root.host-tree: Rectangle {
+            if node.host_id == root.tree-context-host-id: HostTreeContextMenu {
+                new-group-label: root.new-group-label;
+                open-label: root.open-label;
+                files-label: root.files-label;
+                edit-label: root.edit-label;
+                delete-label: root.delete-label;
+                duplicate-label: root.duplicate-label;
+                create-group => {
+                    root.tree-context-host-id = "";
+                    root.selected-tree-host-id = node.host_id;
+                    root.open-create-group-dialog(root.tree-context-host-group-id);
+                }
+                open-shell => {
+                    root.tree-context-host-id = "";
+                    root.selected-tree-host-id = node.host_id;
+                    root.open-shell(node.host_id);
+                }
+                open-sftp => {
+                    root.tree-context-host-id = "";
+                    root.selected-tree-host-id = node.host_id;
+                    root.open-host-sftp(node.host_id);
+                }
+                edit-host => {
+                    root.tree-context-host-id = "";
+                    root.selected-tree-host-id = node.host_id;
+                    root.open-edit-host-dialog(node.host_id);
+                }
+                duplicate-host => {
+                    root.tree-context-host-id = "";
+                    root.selected-tree-host-id = node.host_id;
+                    root.duplicate-host(node.host_id);
+                }
+                remove-host => {
+                    root.tree-context-host-id = "";
+                    root.selected-tree-host-id = node.host_id;
+                    root.remove-host(node.host_id);
+                }
+            }
+        }
+    }
+
+    if root.tree-context-group-id != "": Rectangle {
+        x: root.tree-context-menu-x;
+        y: root.tree-context-menu-y;
+        width: 146px;
+        height: root.tree-context-group-id == root.tree-context-root-token ? 88px : 124px;
+        background: AppTheme.transparent;
+
+        for node in root.host-tree: Rectangle {
+            if ((root.tree-context-group-id == root.tree-context-root-token && node.kind == "Root") || (node.group_id == root.tree-context-group-id && node.kind == "Group")): HostTreeGroupContextMenu {
+                create-host-label: root.group-create-host-label;
+                create-group-label: root.group-create-group-label;
+                delete-label: root.delete-label;
+                show-delete: node.kind != "Root";
+                create-host => {
+                    root.tree-context-group-id = "";
+                    root.open-create-host-dialog-in-group(node.group_id);
+                }
+                create-group => {
+                    root.tree-context-group-id = "";
+                    root.open-create-group-dialog(node.group_id);
+                }
+                remove-group => {
+                    root.tree-context-group-id = "";
+                    root.remove-group(node.group_id);
+                }
+            }
+        }
+    }
+}
+
+export component CreateGroupDialog inherits Rectangle {
+    in property <string> dialog-title: "";
+    in property <string> dialog-subtitle: "";
+    in property <string> name-label: "";
+    in property <string> name-placeholder: "";
+    in property <string> parent-label: "";
+    in property <string> parent-path: "";
+    in property <string> cancel-label: "";
+    in property <string> save-label: "";
+    in property <string> group-name: "";
+    callback update-name(name: string);
+    callback save();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 420px);
+        height: 286px;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    spacing: 3px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.dialog-title;
+                        color: AppTheme.text-strong;
+                        font-size: 15px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: root.dialog-subtitle;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+                DialogCloseButton {
+                    clicked => { root.close(); }
+                }
+            }
+
+            Rectangle {
+                height: 56px;
+                background: AppTheme.transparent;
+
+                VerticalLayout {
+                    spacing: 5px;
+                    Text {
+                        text: root.parent-label;
+                        color: AppTheme.text-soft;
+                        font-size: 10px;
+                        font-weight: 700;
+                    }
+
+                    Rectangle {
+                        height: 34px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.input-bg;
+
+                        Text {
+                            x: 10px;
+                            y: 0px;
+                            width: parent.width - 36px;
+                            height: parent.height;
+                            text: root.parent-path;
+                            color: AppTheme.text;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            x: parent.width - 24px;
+                            y: 0px;
+                            width: 14px;
+                            height: parent.height;
+                            text: "";
+                            color: AppTheme.text-muted;
+                            font-size: 10px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            DialogField {
+                label: root.name-label;
+                field-value: root.group-name;
+                placeholder: root.name-placeholder;
+                edited(value) => { root.update-name(value); }
+                accepted(value) => { root.update-name(value); root.save(); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+                DialogButton {
+                    label: root.save-label;
+                    primary: true;
+                    enabled: root.group-name != "";
+                    clicked => { root.save(); }
+                }
+            }
+        }
+    }
+}
+
+export component CreateGroupParentDialog inherits Rectangle {
+    in property <string> dialog-title: "";
+    in property <string> dialog-subtitle: "";
+    in property <string> parent-label: "";
+    in property <string> parent-path: "";
+    in property <[GroupOptionRow]> parent-options: [];
+    in property <string> cancel-label: "";
+    in property <string> next-label: "";
+    callback select-parent(id: string);
+    callback confirm();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 430px);
+        height: 390px;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    spacing: 3px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.dialog-title;
+                        color: AppTheme.text-strong;
+                        font-size: 15px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: root.dialog-subtitle;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+                DialogCloseButton {
+                    clicked => { root.close(); }
+                }
+            }
+
+            Text {
+                text: root.parent-label;
+                color: AppTheme.text-soft;
+                font-size: 10px;
+                font-weight: 700;
+            }
+
+            Rectangle {
+                height: 34px;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.input-bg;
+
+                Text {
+                    x: 10px;
+                    y: 0px;
+                    width: parent.width - 20px;
+                    height: parent.height;
+                    text: root.parent-path;
+                    color: AppTheme.text;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                ScrollView {
+                    x: 6px;
+                    y: 6px;
+                    width: parent.width - 12px;
+                    height: parent.height - 12px;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        for group in root.parent-options: GroupPickerRow {
+                            group: group;
+                            selected(id) => {
+                                root.select-parent(id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+                DialogButton {
+                    label: root.next-label;
+                    primary: true;
+                    clicked => { root.confirm(); }
+                }
+            }
+        }
+    }
+}
+
+component CreateChoiceCard inherits Rectangle {
+    in property <string> label;
+    in property <string> caption;
+    in property <string> kind;
+    in property <int> accent-index: 0;
+    callback clicked();
+
+    height: 76px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.dialog-section-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 12px;
+
+        Rectangle {
+            width: 34px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            HostNodeIcon {
+                x: 6px;
+                y: (parent.height - self.height) / 2;
+                kind: root.kind;
+                accent-index: root.accent-index;
+                status-key: "";
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 4px;
+
+            Rectangle { vertical-stretch: 1; }
+
+            Text {
+                text: root.label;
+                color: AppTheme.text-strong;
+                font-size: 13px;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.caption;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                overflow: elide;
+            }
+
+            Rectangle { vertical-stretch: 1; }
+        }
+    }
+}
+
+export component CreateChoiceDialog inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <string> host-label: "";
+    in property <string> host-caption: "";
+    in property <string> group-label: "";
+    in property <string> group-caption: "";
+    in property <string> cancel-label: "";
+    callback create-host();
+    callback create-group();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: min(root.width - 48px, 430px);
+        height: 294px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 18px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text { text: root.title; color: AppTheme.text-strong; font-size: 17px; font-weight: 700; }
+                    Text { text: root.subtitle; color: AppTheme.text-muted; font-size: 10px; overflow: elide; }
+                }
+                DialogCloseButton { clicked => { root.close(); } }
+            }
+
+            CreateChoiceCard {
+                label: root.host-label;
+                caption: root.host-caption;
+                kind: "Host";
+                accent-index: 0;
+                clicked => { root.create-host(); }
+            }
+
+            CreateChoiceCard {
+                label: root.group-label;
+                caption: root.group-caption;
+                kind: "Group";
+                accent-index: 2;
+                clicked => { root.create-group(); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}
+
+export component CreateHostDialog inherits Rectangle {
+    in property <string> dialog-title: "";
+    in property <string> dialog-subtitle: "";
+    in property <string> connection-title: "";
+    in property <string> connection-caption: "";
+    in property <string> authentication-title: "";
+    in property <string> authentication-caption: "";
+    in property <string> credential-note: "";
+    in property <string> cancel-label: "";
+    in property <string> create-label: "";
+    in property <string> address-label: "";
+    in property <string> address-placeholder: "";
+    in property <string> port-label: "";
+    in property <string> port-placeholder: "22";
+    in property <string> username-label: "";
+    in property <string> username-placeholder: "";
+    in property <string> host-alias-label: "";
+    in property <string> host-alias-placeholder: "";
+    in property <string> tags-label: "";
+    in property <string> tags-placeholder: "";
+    in property <string> group-label: "";
+    in property <string> group-picker-title: "";
+    in property <string> auth-agent-label: "";
+    in property <string> auth-agent-caption: "";
+    in property <string> auth-password-label: "";
+    in property <string> auth-password-caption: "";
+    in property <string> auth-key-label: "";
+    in property <string> auth-key-caption: "";
+    in property <string> auth-certificate-label: "";
+    in property <string> auth-certificate-caption: "";
+    in property <string> agent-source-title: "";
+    in property <string> agent-auto-label: "";
+    in property <string> agent-auto-caption: "";
+    in property <string> agent-openssh-label: "";
+    in property <string> agent-openssh-caption: "";
+    in property <string> agent-pageant-label: "";
+    in property <string> agent-pageant-caption: "";
+    in property <string> agent-custom-label: "";
+    in property <string> agent-custom-caption: "";
+    in property <string> custom-agent-pipe-label: "";
+    in property <string> custom-agent-pipe-placeholder: "\\\\.\\pipe\\openssh-ssh-agent";
+    in property <string> agent-key-hint-label: "";
+    in property <string> agent-key-hint-placeholder: "";
+    in property <string> password-secret-label: "";
+    in property <string> password-secret-placeholder: "secret://hosts/prod/password";
+    in property <string> private-key-label: "";
+    in property <string> private-key-placeholder: "secret://keys/prod-api";
+    in property <string> passphrase-label: "";
+    in property <string> passphrase-placeholder: "";
+    in property <string> certificate-label: "";
+    in property <string> certificate-placeholder: "secret://certs/prod-api";
+    in property <string> icon-title: "";
+    in property <string> icon-server-label: "";
+    in property <string> icon-database-label: "";
+    in property <string> icon-cloud-label: "";
+    in property <string> icon-linux-label: "";
+    in property <string> icon-container-label: "";
+    in property <string> icon-shield-label: "";
+    in property <string> quick-host-name;
+    in property <string> quick-host-address;
+    in property <string> quick-host-port;
+    in property <string> quick-host-username;
+    in property <string> quick-host-group-path;
+    in property <string> quick-host-icon-key;
+    in property <string> quick-host-tags;
+    in property <string> quick-host-auth-kind;
+    in property <string> quick-host-agent-source;
+    in property <string> quick-host-agent-custom-pipe;
+    in property <string> quick-host-password-secret-ref;
+    in property <string> quick-host-private-key-ref;
+    in property <string> quick-host-passphrase-ref;
+    in property <string> quick-host-key-hint;
+    in property <string> quick-host-certificate-ref;
+    in property <[GroupOptionRow]> quick-host-groups;
+    in property <string> last-error;
+    property <bool> group-picker-open: false;
+    callback update-field(field: string, value: string);
+    callback select-group(group-id: string);
+    callback update-auth-kind(kind: string);
+    callback update-auth-field(field: string, value: string);
+    callback save();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(18px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 660px);
+        height: min(root.height - 36px, 660px);
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+
+            HorizontalLayout {
+                spacing: 12px;
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 8px;
+                    background: AppTheme.dialog-success-icon-bg;
+                    border-width: 1px;
+                    border-color: AppTheme.dialog-success-icon-border;
+                    Text {
+                        text: "+";
+                        color: AppTheme.accent;
+                        font-size: 20px;
+                        font-weight: 700;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+                Rectangle {
+                    height: 36px;
+                    horizontal-stretch: 1;
+                    Text {
+                        y: 0px;
+                        width: parent.width;
+                        height: 20px;
+                        text: root.dialog-title;
+                        color: AppTheme.text-strong;
+                        font-size: 17px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        y: 21px;
+                        width: parent.width;
+                        height: 15px;
+                        text: root.dialog-subtitle;
+                        color: AppTheme.text-muted;
+                        font-size: 11px;
+                        wrap: word-wrap;
+                    }
+                }
+                DialogCloseButton { clicked => { root.close(); } }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border-soft;
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding-right: 10px;
+                    spacing: 9px;
+                    DialogSectionHeader {
+                        title: root.connection-title;
+                        caption: root.connection-caption;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        DialogField {
+                            label: root.address-label;
+                            field-value: root.quick-host-address;
+                            placeholder: root.address-placeholder;
+                            horizontal-stretch: 1;
+                            edited(value) => { root.update-field("Address", value); }
+                            accepted(value) => { root.update-field("Address", value); }
+                        }
+                        DialogField {
+                            label: root.port-label;
+                            field-value: root.quick-host-port;
+                            placeholder: root.port-placeholder;
+                            width: 118px;
+                            edited(value) => { root.update-field("Port", value); }
+                            accepted(value) => { root.update-field("Port", value); }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        DialogField {
+                            label: root.username-label;
+                            field-value: root.quick-host-username;
+                            placeholder: root.username-placeholder;
+                            horizontal-stretch: 1;
+                            edited(value) => { root.update-field("Username", value); }
+                            accepted(value) => { root.update-field("Username", value); }
+                        }
+                        DialogField {
+                            label: root.host-alias-label;
+                            field-value: root.quick-host-name;
+                            placeholder: root.host-alias-placeholder;
+                            horizontal-stretch: 1;
+                            edited(value) => { root.update-field("Name", value); }
+                            accepted(value) => { root.update-field("Name", value); }
+                        }
+                    }
+
+                    Rectangle {
+                        height: root.group-picker-open ? 202px : 50px;
+                        background: AppTheme.transparent;
+
+                        VerticalLayout {
+                            spacing: 4px;
+
+                            Text {
+                                text: root.group-label;
+                                color: AppTheme.text-soft;
+                                font-size: 10px;
+                                font-weight: 700;
+                            }
+
+                            Rectangle {
+                                height: 30px;
+                                border-radius: 7px;
+                                border-width: 1px;
+                                border-color: group_touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+                                background: group_touch.pressed ? AppTheme.surface-pressed : group_touch.has-hover ? AppTheme.input-bg-focus : AppTheme.input-bg;
+
+                                group_touch := TouchArea {
+                                    clicked => { root.group-picker-open = !root.group-picker-open; }
+                                }
+
+                                Text {
+                                    x: 9px;
+                                    y: 0px;
+                                    width: parent.width - 34px;
+                                    height: parent.height;
+                                    text: root.quick-host-group-path;
+                                    color: AppTheme.text;
+                                    font-size: 11px;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+
+                                Text {
+                                    x: parent.width - 22px;
+                                    y: 0px;
+                                    width: 12px;
+                                    height: parent.height;
+                                    text: root.group-picker-open ? "^" : "v";
+                                    color: AppTheme.text-muted;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            if root.group-picker-open: Rectangle {
+                                height: 148px;
+                                border-radius: 8px;
+                                border-width: 1px;
+                                border-color: AppTheme.border-soft;
+                                background: AppTheme.dialog-section-bg;
+
+                                VerticalLayout {
+                                    padding: 6px;
+                                    spacing: 4px;
+
+                                    Text {
+                                        text: root.group-picker-title;
+                                        color: AppTheme.text-muted;
+                                        font-size: 9px;
+                                        font-weight: 700;
+                                    }
+
+                                    ScrollView {
+                                        vertical-stretch: 1;
+                                        VerticalLayout {
+                                            spacing: 2px;
+                                            for group in root.quick-host-groups: GroupPickerRow {
+                                                group: group;
+                                                selected(id) => {
+                                                    root.select-group(id);
+                                                    root.group-picker-open = false;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 72px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.dialog-section-bg;
+
+                        VerticalLayout {
+                            padding: 8px;
+                            spacing: 6px;
+
+                            Text {
+                                text: root.icon-title;
+                                color: AppTheme.text-strong;
+                                font-size: 11px;
+                                font-weight: 700;
+                            }
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                HostIconOption {
+                                    label: root.icon-server-label;
+                                    icon-key: "server";
+                                    selected-icon-key: root.quick-host-icon-key;
+                                    accent-index: 0;
+                                    horizontal-stretch: 1;
+                                    selected(key) => { root.update-field("IconKey", key); }
+                                }
+                                HostIconOption {
+                                    label: root.icon-database-label;
+                                    icon-key: "database";
+                                    selected-icon-key: root.quick-host-icon-key;
+                                    accent-index: 1;
+                                    horizontal-stretch: 1;
+                                    selected(key) => { root.update-field("IconKey", key); }
+                                }
+                                HostIconOption {
+                                    label: root.icon-cloud-label;
+                                    icon-key: "cloud";
+                                    selected-icon-key: root.quick-host-icon-key;
+                                    accent-index: 2;
+                                    horizontal-stretch: 1;
+                                    selected(key) => { root.update-field("IconKey", key); }
+                                }
+                                HostIconOption {
+                                    label: root.icon-linux-label;
+                                    icon-key: "linux";
+                                    selected-icon-key: root.quick-host-icon-key;
+                                    accent-index: 3;
+                                    horizontal-stretch: 1;
+                                    selected(key) => { root.update-field("IconKey", key); }
+                                }
+                                HostIconOption {
+                                    label: root.icon-container-label;
+                                    icon-key: "container";
+                                    selected-icon-key: root.quick-host-icon-key;
+                                    accent-index: 4;
+                                    horizontal-stretch: 1;
+                                    selected(key) => { root.update-field("IconKey", key); }
+                                }
+                                HostIconOption {
+                                    label: root.icon-shield-label;
+                                    icon-key: "shield";
+                                    selected-icon-key: root.quick-host-icon-key;
+                                    accent-index: 5;
+                                    horizontal-stretch: 1;
+                                    selected(key) => { root.update-field("IconKey", key); }
+                                }
+                            }
+                        }
+                    }
+
+                    DialogField {
+                        label: root.tags-label;
+                        field-value: root.quick-host-tags;
+                        placeholder: root.tags-placeholder;
+                        edited(value) => { root.update-field("Tags", value); }
+                        accepted(value) => { root.update-field("Tags", value); }
+                    }
+
+                    DialogSectionHeader {
+                        title: root.authentication-title;
+                        caption: root.authentication-caption;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        DialogAuthOption {
+                            label: root.auth-agent-label;
+                            caption: root.auth-agent-caption;
+                            active: root.quick-host-auth-kind == "ssh-agent";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("ssh-agent"); }
+                        }
+                        DialogAuthOption {
+                            label: root.auth-password-label;
+                            caption: root.auth-password-caption;
+                            active: root.quick-host-auth-kind == "Password";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("Password"); }
+                        }
+                        DialogAuthOption {
+                            label: root.auth-key-label;
+                            caption: root.auth-key-caption;
+                            active: root.quick-host-auth-kind == "Key";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("Key"); }
+                        }
+                        DialogAuthOption {
+                            label: root.auth-certificate-label;
+                            caption: root.auth-certificate-caption;
+                            active: root.quick-host-auth-kind == "Certificate";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("Certificate"); }
+                        }
+                    }
+
+                    if root.quick-host-auth-kind == "ssh-agent": Rectangle {
+                        height: root.quick-host-agent-source == "Custom" ? 138px : 88px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.dialog-section-bg;
+                        VerticalLayout {
+                            padding: 8px;
+                            spacing: 6px;
+                            VerticalLayout {
+                                spacing: 3px;
+                                Text {
+                                    text: root.agent-source-title;
+                                    color: AppTheme.text-strong;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                }
+                                Text {
+                                    text: root.quick-host-agent-source == "Auto" ? root.agent-auto-caption : root.quick-host-agent-source == "OpenSSH" ? root.agent-openssh-caption : root.quick-host-agent-source == "Pageant" ? root.agent-pageant-caption : root.agent-custom-caption;
+                                    color: AppTheme.text-muted;
+                                    font-size: 9px;
+                                    wrap: word-wrap;
+                                }
+                            }
+                            HorizontalLayout {
+                                spacing: 6px;
+                                AgentSourceOption {
+                                    label: root.agent-auto-label;
+                                    token: "Auto";
+                                    selected-token: root.quick-host-agent-source;
+                                    horizontal-stretch: 1;
+                                    selected(token) => { root.update-auth-field("AgentSource", token); }
+                                }
+                                AgentSourceOption {
+                                    label: root.agent-openssh-label;
+                                    token: "OpenSSH";
+                                    selected-token: root.quick-host-agent-source;
+                                    horizontal-stretch: 1;
+                                    selected(token) => { root.update-auth-field("AgentSource", token); }
+                                }
+                                AgentSourceOption {
+                                    label: root.agent-pageant-label;
+                                    token: "Pageant";
+                                    selected-token: root.quick-host-agent-source;
+                                    horizontal-stretch: 1;
+                                    selected(token) => { root.update-auth-field("AgentSource", token); }
+                                }
+                                AgentSourceOption {
+                                    label: root.agent-custom-label;
+                                    token: "Custom";
+                                    selected-token: root.quick-host-agent-source;
+                                    horizontal-stretch: 1;
+                                    selected(token) => { root.update-auth-field("AgentSource", token); }
+                                }
+                            }
+                            if root.quick-host-agent-source == "Custom": DialogField {
+                                label: root.custom-agent-pipe-label;
+                                field-value: root.quick-host-agent-custom-pipe;
+                                placeholder: root.custom-agent-pipe-placeholder;
+                                edited(value) => { root.update-auth-field("AgentCustomPipe", value); }
+                                accepted(value) => { root.update-auth-field("AgentCustomPipe", value); }
+                            }
+                        }
+                    }
+
+                    if root.quick-host-auth-kind == "ssh-agent": DialogField {
+                        label: root.agent-key-hint-label;
+                        field-value: root.quick-host-key-hint;
+                        placeholder: root.agent-key-hint-placeholder;
+                        edited(value) => { root.update-auth-field("KeyHint", value); }
+                        accepted(value) => { root.update-auth-field("KeyHint", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Password": DialogField {
+                        label: root.password-secret-label;
+                        field-value: root.quick-host-password-secret-ref;
+                        placeholder: root.password-secret-placeholder;
+                        edited(value) => { root.update-auth-field("PasswordSecretRef", value); }
+                        accepted(value) => { root.update-auth-field("PasswordSecretRef", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Key" || root.quick-host-auth-kind == "Certificate": DialogField {
+                        label: root.private-key-label;
+                        field-value: root.quick-host-private-key-ref;
+                        placeholder: root.private-key-placeholder;
+                        edited(value) => { root.update-auth-field("PrivateKeyRef", value); }
+                        accepted(value) => { root.update-auth-field("PrivateKeyRef", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Key" || root.quick-host-auth-kind == "Certificate": DialogField {
+                        label: root.passphrase-label;
+                        field-value: root.quick-host-passphrase-ref;
+                        placeholder: root.passphrase-placeholder;
+                        edited(value) => { root.update-auth-field("PassphraseRef", value); }
+                        accepted(value) => { root.update-auth-field("PassphraseRef", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Certificate": DialogField {
+                        label: root.certificate-label;
+                        field-value: root.quick-host-certificate-ref;
+                        placeholder: root.certificate-placeholder;
+                        edited(value) => { root.update-auth-field("CertificateRef", value); }
+                        accepted(value) => { root.update-auth-field("CertificateRef", value); }
+                    }
+
+                    if root.last-error != "": Rectangle {
+                        height: 36px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: AppTheme.dialog-error-border;
+                        background: AppTheme.dialog-error-bg;
+                        Text {
+                            x: 11px;
+                            y: 0px;
+                            width: parent.width - 22px;
+                            height: parent.height;
+                            text: root.last-error;
+                            color: AppTheme.danger-text-soft;
+                            font-size: 10px;
+                            wrap: word-wrap;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border-soft;
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle {
+                    height: 30px;
+                    horizontal-stretch: 1;
+                    Text {
+                        width: parent.width;
+                        height: parent.height;
+                        text: root.credential-note;
+                        color: AppTheme.text-muted;
+                        font-size: 9px;
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                    }
+                }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+                DialogButton {
+                    label: root.create-label;
+                    primary: true;
+                    enabled: root.quick-host-address != "" && root.quick-host-username != "";
+                    clicked => { root.save(); }
                 }
             }
         }

@@ -1,4 +1,170 @@
 import { AppTheme } from "./theme.slint";
+import { CompactButton } from "./common.slint";
+
+component TerminalHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> kind;
+    in property <string> status;
+    in property <string> reconnect-label: "";
+    in property <bool> can-reconnect-shell;
+    callback reconnect-shell();
+
+    height: 26px;
+
+    HorizontalLayout {
+        spacing: 6px;
+
+        Rectangle { horizontal-stretch: 1; }
+        if root.can-reconnect-shell: CompactButton {
+            width: 76px;
+            label: root.reconnect-label;
+            tone: "primary";
+            compact: true;
+            clicked => { root.reconnect-shell(); }
+        }
+        Text {
+            text: root.status == "" ? root.kind : root.kind + " / " + root.status;
+            color: AppTheme.terminal-muted;
+            font-size: 10px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+component TerminalOutputLine inherits Text {
+    height: 19px;
+    color: AppTheme.terminal-text;
+    font-size: 11px;
+    vertical-alignment: center;
+}
+
+component TerminalPromptLine inherits Rectangle {
+    in property <string> session-id;
+    in property <string> prompt;
+    in property <bool> can-send-input;
+    in-out property <string> input;
+    callback update-input(session-id: string, text: string);
+    callback send-input(session-id: string, text: string);
+
+    forward-focus: input-editor;
+
+    HorizontalLayout {
+        spacing: 7px;
+
+        Text {
+            text: root.can-send-input ? root.prompt : ">";
+            color: root.can-send-input ? AppTheme.terminal-text : AppTheme.terminal-muted;
+            font-size: 11px;
+            vertical-alignment: center;
+        }
+        input-editor := TextInput {
+            text <=> root.input;
+            enabled: root.can-send-input;
+            single-line: true;
+            color: root.can-send-input ? AppTheme.terminal-text : AppTheme.terminal-muted;
+            font-size: 11px;
+            text-cursor-width: 1px;
+            selection-background-color: AppTheme.terminal-selection;
+            selection-foreground-color: AppTheme.terminal-text;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            edited => {
+                root.update-input(root.session-id, self.text);
+            }
+            accepted => {
+                root.update-input(root.session-id, self.text);
+                root.send-input(root.session-id, self.text);
+                self.text = "";
+            }
+        }
+    }
+}
+
+component TerminalViewport inherits Rectangle {
+    in property <string> session-id;
+    in-out property <string> input;
+    in property <string> prompt;
+    in property <[string]> output-lines;
+    in property <bool> can-send-input;
+    in property <length> content-padding;
+    in property <length> terminal-line-height;
+    in property <length> content-height;
+    in-out property <length> viewport-height;
+    in-out property <length> terminal-scroll-y;
+    callback update-input(session-id: string, text: string);
+    callback send-input(session-id: string, text: string);
+
+    border-radius: 5px;
+    background: AppTheme.terminal-viewport-bg;
+    vertical-stretch: 1;
+    clip: true;
+    forward-focus: prompt-line;
+
+    terminal-scroll := Flickable {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        changed height => {
+            root.viewport-height = self.height;
+            root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
+        }
+        viewport-width: self.width;
+        viewport-height: root.content-height;
+        viewport-y <=> root.terminal-scroll-y;
+
+        for line[index] in root.output-lines: TerminalOutputLine {
+            x: root.content-padding;
+            y: root.content-padding + (index * root.terminal-line-height);
+            width: parent.width - (root.content-padding * 2);
+            text: line;
+        }
+        prompt-line := TerminalPromptLine {
+            x: root.content-padding;
+            y: root.content-padding + (root.output-lines.length * root.terminal-line-height);
+            width: parent.width - (root.content-padding * 2);
+            height: root.terminal-line-height;
+            session-id: root.session-id;
+            prompt: root.prompt;
+            input <=> root.input;
+            can-send-input: root.can-send-input;
+            update-input(session-id, text) => { root.update-input(session-id, text); }
+            send-input(session-id, text) => { root.send-input(session-id, text); }
+        }
+    }
+    TouchArea {
+        width: parent.width;
+        height: max(
+            0px,
+            min(
+                parent.height,
+                root.content-padding
+                    + (root.output-lines.length * root.terminal-line-height)
+                    + terminal-scroll.viewport-y,
+            ),
+        );
+        clicked => {
+            prompt-line.focus();
+        }
+    }
+    TouchArea {
+        y: max(
+            0px,
+            min(
+                parent.height,
+                root.content-padding
+                    + (root.output-lines.length * root.terminal-line-height)
+                    + root.terminal-line-height
+                    + terminal-scroll.viewport-y,
+            ),
+        );
+        width: parent.width;
+        height: max(0px, parent.height - self.y);
+        clicked => {
+            prompt-line.focus();
+        }
+    }
+}
 
 export component TerminalPane inherits Rectangle {
     in property <string> session-id;
@@ -9,6 +175,8 @@ export component TerminalPane inherits Rectangle {
     in property <string> prompt;
     in property <[string]> output-lines;
     in property <bool> can-send-input;
+    in property <bool> can-reconnect-shell;
+    in property <string> reconnect-label: "";
     property <length> content-padding: 9px;
     property <length> terminal-line-height: 19px;
     property <length> viewport-height: 0px;
@@ -21,14 +189,15 @@ export component TerminalPane inherits Rectangle {
     callback backspace-input(session-id: string);
     callback update-input(session-id: string, text: string);
     callback send-input(session-id: string, text: string);
+    callback reconnect-shell(session-id: string);
 
     border-radius: 7px;
     border-width: 1px;
-    border-color: #182724;
+    border-color: AppTheme.terminal-border;
     background: AppTheme.terminal-bg;
     horizontal-stretch: 1;
     vertical-stretch: 1;
-    forward-focus: input-editor;
+    forward-focus: terminal-viewport;
 
     changed output-lines => {
         root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
@@ -37,106 +206,27 @@ export component TerminalPane inherits Rectangle {
     VerticalLayout {
         padding: 9px;
         spacing: 6px;
-        HorizontalLayout {
-            Text { text: title; color: AppTheme.terminal-text; font-size: 12px; font-weight: 700; }
-            Rectangle { horizontal-stretch: 1; }
-            Text { text: kind + " / " + status; color: AppTheme.terminal-muted; font-size: 10px; }
+        TerminalHeader {
+            title: root.title;
+            kind: root.kind;
+            status: root.status;
+            reconnect-label: root.reconnect-label;
+            can-reconnect-shell: root.can-reconnect-shell;
+            reconnect-shell => { root.reconnect-shell(root.session-id); }
         }
-        Rectangle {
-            border-radius: 5px;
-            background: #03070a;
-            vertical-stretch: 1;
-            clip: true;
-
-            terminal-scroll := Flickable {
-                x: 0px;
-                y: 0px;
-                width: parent.width;
-                height: parent.height;
-                changed height => {
-                    root.viewport-height = self.height;
-                    root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
-                }
-                viewport-width: self.width;
-                viewport-height: root.content-height;
-                viewport-y <=> root.terminal-scroll-y;
-
-                for line[index] in root.output-lines: Text {
-                    x: root.content-padding;
-                    y: root.content-padding + (index * root.terminal-line-height);
-                    width: parent.width - (root.content-padding * 2);
-                    height: root.terminal-line-height;
-                    text: line;
-                    color: AppTheme.terminal-text;
-                    font-size: 11px;
-                    vertical-alignment: center;
-                }
-                HorizontalLayout {
-                    x: root.content-padding;
-                    y: root.content-padding + (root.output-lines.length * root.terminal-line-height);
-                    width: parent.width - (root.content-padding * 2);
-                    height: root.terminal-line-height;
-                    spacing: 7px;
-                    Text {
-                        text: root.can-send-input ? root.prompt : ">";
-                        color: root.can-send-input ? AppTheme.terminal-text : AppTheme.terminal-muted;
-                        font-size: 11px;
-                        vertical-alignment: center;
-                    }
-                    input-editor := TextInput {
-                        text <=> root.input;
-                        enabled: root.can-send-input;
-                        single-line: true;
-                        color: root.can-send-input ? AppTheme.terminal-text : AppTheme.terminal-muted;
-                        font-size: 11px;
-                        text-cursor-width: 1px;
-                        selection-background-color: #2c7068;
-                        selection-foreground-color: AppTheme.terminal-text;
-                        horizontal-stretch: 1;
-                        vertical-alignment: center;
-                        edited => {
-                            root.update-input(root.session-id, self.text);
-                        }
-                        accepted => {
-                            root.update-input(root.session-id, self.text);
-                            root.send-input(root.session-id, self.text);
-                            self.text = "";
-                        }
-                    }
-                }
-            }
-            TouchArea {
-                width: parent.width;
-                height: max(
-                    0px,
-                    min(
-                        parent.height,
-                        root.content-padding
-                            + (root.output-lines.length * root.terminal-line-height)
-                            + terminal-scroll.viewport-y,
-                    ),
-                );
-                clicked => {
-                    input-editor.focus();
-                }
-            }
-            TouchArea {
-                y: max(
-                    0px,
-                    min(
-                        parent.height,
-                        root.content-padding
-                            + (root.output-lines.length * root.terminal-line-height)
-                            + root.terminal-line-height
-                            + terminal-scroll.viewport-y,
-                    ),
-                );
-                width: parent.width;
-                height: max(0px, parent.height - self.y);
-                clicked => {
-                    input-editor.focus();
-                }
-            }
+        terminal-viewport := TerminalViewport {
+            session-id: root.session-id;
+            input <=> root.input;
+            prompt: root.prompt;
+            output-lines: root.output-lines;
+            can-send-input: root.can-send-input;
+            content-padding: root.content-padding;
+            terminal-line-height: root.terminal-line-height;
+            content-height: root.content-height;
+            viewport-height <=> root.viewport-height;
+            terminal-scroll-y <=> root.terminal-scroll-y;
+            update-input(session-id, text) => { root.update-input(session-id, text); }
+            send-input(session-id, text) => { root.send-input(session-id, text); }
         }
     }
 }

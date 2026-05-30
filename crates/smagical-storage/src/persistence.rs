@@ -1,24 +1,19 @@
-//! redb 持久化快照存储。
+//! 旧 redb 快照存储。
 //!
-//! 当前先用一个原子快照保存所有可持久化集合，后续可按主机、历史、隧道等领域拆表。
+//! SQLite 是当前主存储后端。本模块保留为兼容读取器：启动时可以把旧 redb 数据导入
+//! SQLite，然后安全删除旧文件。
 
 use std::fs;
 use std::path::{Path, PathBuf};
 
 use directories::ProjectDirs;
 use redb::{Database, ReadableDatabase, TableDefinition, TableError};
-use serde::{Deserialize, Serialize};
 use thiserror::Error;
-
-use smagical_config::AppConfig;
-use smagical_core::{
-    CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
-    SftpBookmark, Snippet, TunnelRule, WorkspaceState,
-};
 
 #[cfg(test)]
 use super::DEFAULT_COMMAND_HISTORY_LIMIT;
 use super::StorageManager;
+use super::snapshot::StorageSnapshot;
 
 const STORAGE_FILE_NAME: &str = "smagicalssh.redb";
 const SNAPSHOT_KEY: &str = "current";
@@ -27,6 +22,7 @@ const SNAPSHOT_TABLE: TableDefinition<&str, &[u8]> = TableDefinition::new("stora
 /// 本地 redb 存储入口。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RedbStorage {
+    /// 旧 redb 文件路径。
     path: PathBuf,
 }
 
@@ -52,6 +48,11 @@ impl RedbStorage {
         &self.path
     }
 
+    /// 判断旧 redb 文件是否存在。
+    pub fn exists(&self) -> bool {
+        self.path.exists()
+    }
+
     /// 从 redb 读取持久化快照；文件或表不存在时返回空存储。
     pub fn load(&self) -> Result<StorageManager, StoragePersistenceError> {
         if !self.path.exists() {
@@ -69,6 +70,7 @@ impl RedbStorage {
         let Some(bytes) = table.get(SNAPSHOT_KEY)? else {
             return Ok(StorageManager::default());
         };
+        // redb 里保存的是 TOML 快照，读取后再通过 into_storage 应用内存不变量。
         let snapshot: StorageSnapshot = toml::from_slice(bytes.value())?;
 
         Ok(snapshot.into_storage())
@@ -80,6 +82,7 @@ impl RedbStorage {
             fs::create_dir_all(parent)?;
         }
 
+        // 该方法主要供旧数据测试和兼容使用；新数据写入应走 SqliteStorage。
         let encoded = toml::to_string(&StorageSnapshot::from(storage))?;
         let db = open_or_create_database(&self.path)?;
         let write_txn = db.begin_write()?;
@@ -91,74 +94,24 @@ impl RedbStorage {
 
         Ok(())
     }
+
+    /// 删除旧 redb 文件；不存在时返回 false。
+    pub fn delete_file(&self) -> Result<bool, StoragePersistenceError> {
+        if !self.path.exists() {
+            return Ok(false);
+        }
+
+        fs::remove_file(&self.path)?;
+        Ok(true)
+    }
 }
 
 fn open_or_create_database(path: &Path) -> Result<Database, StoragePersistenceError> {
+    // redb 打开和创建是两个 API，按文件是否存在分支。
     if path.exists() {
         Ok(Database::open(path)?)
     } else {
         Ok(Database::create(path)?)
-    }
-}
-
-/// 持久化快照格式。
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-struct StorageSnapshot {
-    app_config: AppConfig,
-    hosts: Vec<Host>,
-    groups: Vec<HostGroup>,
-    credentials: Vec<CredentialMetadata>,
-    known_hosts: Vec<KnownHostEntry>,
-    recent_connections: Vec<RecentConnection>,
-    command_history: Vec<CommandHistoryItem>,
-    snippets: Vec<Snippet>,
-    sftp_bookmarks: Vec<SftpBookmark>,
-    tunnel_rules: Vec<TunnelRule>,
-    workspace: Option<WorkspaceState>,
-}
-
-impl From<&StorageManager> for StorageSnapshot {
-    fn from(storage: &StorageManager) -> Self {
-        Self {
-            app_config: storage.app_config.clone(),
-            hosts: storage.hosts.clone(),
-            groups: storage.groups.clone(),
-            credentials: storage.credentials.clone(),
-            known_hosts: storage.known_hosts.clone(),
-            recent_connections: storage.recent_connections.clone(),
-            command_history: storage.command_history.clone(),
-            snippets: storage.snippets.clone(),
-            sftp_bookmarks: storage.sftp_bookmarks.clone(),
-            tunnel_rules: storage.tunnel_rules.clone(),
-            workspace: storage.workspace.clone(),
-        }
-    }
-}
-
-impl StorageSnapshot {
-    fn into_storage(self) -> StorageManager {
-        let mut storage = StorageManager {
-            app_config: self.app_config,
-            hosts: self.hosts,
-            groups: self.groups,
-            credentials: self.credentials,
-            known_hosts: self.known_hosts,
-            recent_connections: self.recent_connections,
-            command_history: Vec::new(),
-            snippets: self.snippets,
-            sftp_bookmarks: self.sftp_bookmarks,
-            tunnel_rules: Vec::new(),
-            workspace: self.workspace,
-        };
-
-        for item in self.command_history {
-            storage.add_command_history(item);
-        }
-        for rule in self.tunnel_rules {
-            storage.upsert_tunnel_rule(rule);
-        }
-
-        storage
     }
 }
 
@@ -175,20 +128,24 @@ pub enum StoragePersistenceError {
     Commit(#[from] redb::CommitError),
     #[error("存储错误：{0}")]
     Storage(#[from] redb::StorageError),
+    #[error("SQLite 错误：{0}")]
+    Sqlite(#[from] sea_orm::DbErr),
     #[error("文件系统错误：{0}")]
     Io(#[from] std::io::Error),
     #[error("序列化错误：{0}")]
     Encode(#[from] toml::ser::Error),
     #[error("反序列化错误：{0}")]
     Decode(#[from] toml::de::Error),
+    #[error("数据格式错误：{0}")]
+    InvalidData(String),
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use smagical_core::{
-        AuthProfile, CommandHistoryId, HostId, ImageSource, RecentConnection, TunnelKind,
-        TunnelRule,
+        AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId, ImageSource,
+        RecentConnection, TunnelKind, TunnelRule,
     };
     use uuid::Uuid;
 
@@ -201,11 +158,13 @@ mod tests {
             id: HostId(Uuid::new_v4()),
             name: "production".to_owned(),
             group_id: None,
+            icon_key: "server".to_owned(),
             tags: vec!["prod".to_owned(), "linux".to_owned()],
             address: "prod.example.com".to_owned(),
             port: 22,
             auth: AuthProfile::Agent {
                 username: "deploy".to_owned(),
+                source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             },
             proxy: None,
@@ -243,6 +202,7 @@ mod tests {
         let store = RedbStorage::new(&path);
         let mut storage = StorageManager::default();
         storage.app_config.theme.name = "Solarized Dark".to_owned();
+        storage.app_config.workspace.host_list_mode = smagical_config::HostListModePreference::Card;
         storage.app_config.background.enabled = true;
         storage.app_config.background.sources =
             vec![ImageSource::LocalPath("wallpapers/a.jpg".to_owned())];
@@ -269,6 +229,10 @@ mod tests {
         let loaded = store.load().expect("存储快照应该可以从 redb 读取");
 
         assert_eq!(loaded, storage);
+        assert_eq!(
+            loaded.app_config.workspace.host_list_mode,
+            smagical_config::HostListModePreference::Card
+        );
         let _ = fs::remove_file(path);
     }
 

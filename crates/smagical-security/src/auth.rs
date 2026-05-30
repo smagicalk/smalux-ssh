@@ -1,25 +1,30 @@
 //! SSH 后端认证材料描述。
+//!
+//! 这里是后端执行器能理解的认证引用模型。它从核心 `AuthProfile` 转换而来，但仍然不包含
+//! 明文秘密；明文解析只允许发生在 `AuthResolver` 中。
 
-use smagical_core::{AuthProfile, SecretRef};
+use smagical_core::{AgentSource, AuthProfile, SecretRef};
 
 /// 后端执行器可解析的认证材料引用。
 ///
 /// 密码、私钥和证书仍然只通过 `SecretRef` 间接引用，真实明文读取由安全层负责。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackendAuth {
-    Password {
-        username: String,
-        secret: SecretRef,
-    },
+    /// 密码认证引用。
+    Password { username: String, secret: SecretRef },
+    /// 私钥认证引用。
     Key {
         username: String,
         key: SecretRef,
         passphrase: Option<SecretRef>,
     },
+    /// ssh-agent 认证，不需要读取 SecretStore。
     Agent {
         username: String,
+        source: AgentSource,
         key_hint: Option<String>,
     },
+    /// OpenSSH 证书认证引用。
     Certificate {
         username: String,
         key: SecretRef,
@@ -30,6 +35,7 @@ pub enum BackendAuth {
 
 impl From<&AuthProfile> for BackendAuth {
     fn from(profile: &AuthProfile) -> Self {
+        // 只复制引用和用户名，不在转换阶段读取任何秘密。
         match profile {
             AuthProfile::Password { username, secret } => Self::Password {
                 username: username.clone(),
@@ -44,8 +50,13 @@ impl From<&AuthProfile> for BackendAuth {
                 key: key.clone(),
                 passphrase: passphrase.clone(),
             },
-            AuthProfile::Agent { username, key_hint } => Self::Agent {
+            AuthProfile::Agent {
+                username,
+                source,
+                key_hint,
+            } => Self::Agent {
                 username: username.clone(),
+                source: source.clone(),
                 key_hint: key_hint.clone(),
             },
             AuthProfile::Certificate {
@@ -122,6 +133,7 @@ mod tests {
     fn backend_auth_preserves_agent_key_hint() {
         let profile = AuthProfile::Agent {
             username: "agent-user".to_owned(),
+            source: AgentSource::Auto,
             key_hint: Some("id_ed25519".to_owned()),
         };
 
@@ -132,6 +144,7 @@ mod tests {
             auth,
             BackendAuth::Agent {
                 username: "agent-user".to_owned(),
+                source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             }
         );

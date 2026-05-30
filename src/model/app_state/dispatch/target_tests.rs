@@ -80,3 +80,19 @@ fn workspace_page_message_stays_in_ui_target() {
         MessageDispatchTarget::Ui
     );
 }
+
+#[test]
+fn theme_profile_messages_stay_in_ui_target() {
+    assert_eq!(
+        MessageDispatchTarget::for_message(&Message::ApplyThemeProfile {
+            name: "Imported".to_owned(),
+        }),
+        MessageDispatchTarget::Ui
+    );
+    assert_eq!(
+        MessageDispatchTarget::for_message(&Message::RemoveThemeProfile {
+            name: "Imported".to_owned(),
+        }),
+        MessageDispatchTarget::Ui
+    );
+}

@@ -11,6 +11,7 @@ impl AppState {
         session_id: SessionId,
     ) -> PendingCloseCommandCleanup {
         let mut removed_connect = false;
+        let mut removed_open_local_shell = false;
         let mut removed_start_tunnel = false;
         let mut transfer_ids = Vec::new();
         let removed_count = self.backend_commands.retain(|command| {
@@ -19,6 +20,7 @@ impl AppState {
             }
 
             removed_connect |= matches!(command, BackendCommand::Connect { .. });
+            removed_open_local_shell |= matches!(command, BackendCommand::OpenLocalShell { .. });
             removed_start_tunnel |= matches!(command, BackendCommand::StartTunnel { .. });
             if let Some(transfer_id) = sftp_transfer_id(command) {
                 transfer_ids.push(transfer_id);
@@ -36,6 +38,7 @@ impl AppState {
         PendingCloseCommandCleanup {
             removed_count,
             removed_connect,
+            removed_open_local_shell,
             removed_start_tunnel,
             cancelled_transfer_count,
         }
@@ -47,11 +50,14 @@ pub(super) fn should_disconnect_on_close(
     cleanup: &PendingCloseCommandCleanup,
 ) -> bool {
     let closed_before_connect = cleanup.removed_connect;
+    let cancelled_pending_local_shell =
+        matches!(tab.kind, SessionKind::LocalShell) && cleanup.removed_open_local_shell;
     let cancelled_connected_tunnel_launch = matches!(tab.kind, SessionKind::Tunnel { .. })
         && cleanup.removed_start_tunnel
         && !closed_before_connect;
 
     (cancelled_connected_tunnel_launch || !matches!(tab.kind, SessionKind::Tunnel { .. }))
+        && !cancelled_pending_local_shell
         && !closed_before_connect
         && !tab.status.is_terminal()
 }
@@ -71,6 +77,7 @@ fn sftp_transfer_id(command: &BackendCommand) -> Option<TransferId> {
 pub(super) struct PendingCloseCommandCleanup {
     removed_count: usize,
     removed_connect: bool,
+    removed_open_local_shell: bool,
     removed_start_tunnel: bool,
     cancelled_transfer_count: usize,
 }

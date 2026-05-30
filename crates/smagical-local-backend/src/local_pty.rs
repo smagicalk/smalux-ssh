@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use smagical_backend_core::{
     BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor, LocalShellProfile,
 };
-use smagical_core::{LOCAL_TERMINAL_SESSION_ID, SessionId};
+use smagical_core::SessionId;
 
 use self::session::LocalPtySession;
 
@@ -19,7 +19,9 @@ pub(crate) use self::reader::terminal_event_to_backend;
 
 /// 同时承载本地 PTY 和远程后端的组合执行器。
 pub struct DesktopBackendExecutor<R> {
+    /// 本地 shell 执行器。
     local: LocalPtyBackendExecutor,
+    /// 远程 SSH/SFTP/隧道执行器。
     remote: R,
 }
 
@@ -41,7 +43,10 @@ where
         &mut self,
         command: BackendCommand,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
-        if command.session_id() == LOCAL_TERMINAL_SESSION_ID {
+        // 本地会话一旦创建，后续输入和 drain 都必须继续路由到本地执行器。
+        if matches!(command, BackendCommand::OpenLocalShell { .. })
+            || self.local.has_session(command.session_id())
+        {
             self.local.execute(command)
         } else {
             self.remote.execute(command)
@@ -51,7 +56,9 @@ where
 
 /// 本地 PTY 后端执行器。
 pub struct LocalPtyBackendExecutor {
+    /// 当前存活的 PTY 会话。
     sessions: HashMap<SessionId, LocalPtySession>,
+    /// 平台默认 shell profile。
     shell: LocalShellProfile,
 }
 
@@ -70,14 +77,21 @@ impl LocalPtyBackendExecutor {
         self.sessions.len()
     }
 
+    /// 判断指定会话是否由本地 PTY 执行器持有。
+    pub fn has_session(&self, session_id: SessionId) -> bool {
+        self.sessions.contains_key(&session_id)
+    }
+
     fn ensure_session(
         &mut self,
         session_id: SessionId,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
         if self.sessions.contains_key(&session_id) {
+            // 重复打开同一会话时不再 spawn，只抽取已有输出。
             return Ok(self.drain_output(session_id));
         }
 
+        // 成功 spawn 后立即发 Connected + ShellOpened，保持和远程 shell 的事件语义一致。
         let mut session = LocalPtySession::spawn(session_id, &self.shell)?;
         let mut events = vec![
             BackendEvent::Connected { session_id },
@@ -101,6 +115,7 @@ impl LocalPtyBackendExecutor {
 
         let mut events = startup_events;
         session.write_input(&input)?;
+        // fallback 用于某些平台读不到真实回显时补偿显示。
         session.remember_fallback(input);
         events.extend(session.drain_output());
 
@@ -111,6 +126,7 @@ impl LocalPtyBackendExecutor {
         &mut self,
         session_id: SessionId,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
+        // 移除 session 会释放 LocalPtySession，Drop 负责清理底层进程/句柄。
         self.sessions.remove(&session_id);
         Ok(vec![BackendEvent::Disconnected { session_id }])
     }
@@ -130,6 +146,7 @@ impl BackendExecutor for LocalPtyBackendExecutor {
         command: BackendCommand,
     ) -> Result<Vec<BackendEvent>, BackendExecutionError> {
         match command {
+            BackendCommand::OpenLocalShell { session_id, .. } => self.ensure_session(session_id),
             BackendCommand::OpenShell { session_id, .. } => self.ensure_session(session_id),
             BackendCommand::SendShellInput { session_id, input } => {
                 self.send_input(session_id, input)

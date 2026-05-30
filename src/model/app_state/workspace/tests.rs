@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::model::{
-    AuthProfile, Host, HostId, Message, SessionId, SessionKind, SplitAxis, WorkspaceState,
-    WorkspaceTabSnapshot,
+    AgentSource, AuthProfile, Host, HostId, Message, SessionId, SessionKind, SplitAxis,
+    WorkspaceState, WorkspaceTabSnapshot,
 };
 use crate::terminal::TerminalTabState;
 use uuid::Uuid;
@@ -11,11 +11,13 @@ fn host() -> Host {
         id: HostId(Uuid::new_v4()),
         name: "production".to_owned(),
         group_id: None,
+        icon_key: "server".to_owned(),
         tags: Vec::new(),
         address: "prod.example.com".to_owned(),
         port: 22,
         auth: AuthProfile::Agent {
             username: "deploy".to_owned(),
+            source: AgentSource::Auto,
             key_hint: None,
         },
         proxy: None,

@@ -1,6 +1,8 @@
 //! SSH executor 命令分发。
 
-use crate::backend::{BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor};
+use crate::backend::{
+    BackendCommand, BackendCommandKind, BackendEvent, BackendExecutionError, BackendExecutor,
+};
 use crate::security::SecretStore;
 
 use super::RusshBackendExecutor;
@@ -13,6 +15,11 @@ impl<S: SecretStore + Send> BackendExecutor for RusshBackendExecutor<S> {
         match command {
             BackendCommand::Connect { session_id, target } => self.connect(session_id, target),
             BackendCommand::OpenShell { session_id, pty } => self.open_shell(session_id, pty),
+            BackendCommand::OpenLocalShell { .. } => {
+                Err(BackendExecutionError::UnsupportedCommand {
+                    kind: BackendCommandKind::OpenShell,
+                })
+            }
             BackendCommand::RunCommand {
                 session_id,
                 request,

@@ -1,5 +1,8 @@
 use super::super::AppState;
-use crate::model::{HostId, Message, SessionId, ToolPanelMode, WorkspacePage};
+use crate::config::{BuiltInThemePreference, HostListModePreference, LanguagePreference};
+use crate::model::{
+    BuiltInTheme, HostId, LanguageMode, Message, SessionId, ToolPanelMode, WorkspacePage,
+};
 use crate::terminal::TerminalTabState;
 use uuid::Uuid;
 
@@ -24,12 +27,21 @@ fn workspace_ui_messages_update_layout_state_only() {
     state.apply(Message::OpenCommandPalette {
         query: "prod".to_owned(),
     });
+    state.apply(Message::OpenCreateHostDialog);
 
     assert_eq!(state.ui.workspace.active_page, WorkspacePage::Settings);
     assert!(matches!(
         state.ui.workspace.host_list_mode,
         crate::model::HostListMode::Card
     ));
+    assert_eq!(
+        state.config.workspace.host_list_mode,
+        HostListModePreference::Card
+    );
+    assert_eq!(
+        state.storage.app_config.workspace.host_list_mode,
+        HostListModePreference::Card
+    );
     assert_eq!(state.ui.workspace.host_search_query, "prod");
     assert_eq!(state.ui.workspace.hosts_panel_width, 260);
     assert_eq!(state.ui.workspace.activity_panel_width, 300);
@@ -38,6 +50,91 @@ fn workspace_ui_messages_update_layout_state_only() {
     assert!(state.ui.workspace.right_sidebar_collapsed);
     assert!(state.ui.workspace.command_palette.open);
     assert_eq!(state.ui.workspace.command_palette.query, "prod");
+    assert!(state.ui.workspace.create_host_dialog_open);
+    assert_eq!(state.backend_commands.pending_count(), 0);
+}
+
+#[test]
+fn repeated_navigation_toggles_hosts_panel_collapse() {
+    let mut state = AppState::default();
+
+    let collapse = state.apply(Message::NavigateWorkspacePage {
+        page: WorkspacePage::Hosts,
+    });
+    let expand = state.apply(Message::NavigateWorkspacePage {
+        page: WorkspacePage::Hosts,
+    });
+    state.apply(Message::NavigateWorkspacePage {
+        page: WorkspacePage::Terminal,
+    });
+
+    assert!(collapse.changed());
+    assert!(expand.changed());
+    assert_eq!(state.ui.workspace.active_page, WorkspacePage::Terminal);
+    assert!(!state.ui.workspace.hosts_panel_collapsed);
+}
+
+#[test]
+fn workspace_preferences_restore_host_list_mode() {
+    let mut state = AppState::default();
+    state.config.workspace.host_list_mode = HostListModePreference::Card;
+
+    state.apply_workspace_preferences();
+
+    assert!(matches!(
+        state.ui.workspace.host_list_mode,
+        crate::model::HostListMode::Card
+    ));
+}
+
+#[test]
+fn workspace_preferences_restore_settings_page_choices() {
+    let mut state = AppState::default();
+    state.config.workspace.language = LanguagePreference::English;
+    state.config.workspace.built_in_theme = BuiltInThemePreference::Dracula;
+
+    state.apply_workspace_preferences();
+
+    assert_eq!(state.ui.workspace.language, LanguageMode::English);
+    assert_eq!(state.ui.workspace.theme, BuiltInTheme::Dracula);
+}
+
+#[test]
+fn settings_messages_update_workspace_preferences() {
+    let mut state = AppState::default();
+
+    let language = state.apply(Message::SetLanguage {
+        language: LanguageMode::Chinese,
+    });
+    let theme = state.apply(Message::SetBuiltInTheme {
+        theme: BuiltInTheme::SolarizedDark,
+    });
+
+    assert!(language.changed());
+    assert!(theme.changed());
+    assert_eq!(state.ui.workspace.language, LanguageMode::Chinese);
+    assert_eq!(state.config.workspace.language, LanguagePreference::Chinese);
+    assert_eq!(state.ui.workspace.theme, BuiltInTheme::SolarizedDark);
+    assert_eq!(
+        state.config.workspace.built_in_theme,
+        BuiltInThemePreference::SolarizedDark
+    );
+    assert_eq!(state.storage.app_config, state.config);
+}
+
+#[test]
+fn create_host_dialog_messages_update_ui_state_only() {
+    let mut state = AppState::default();
+    state.ui.quick_host.name = "stale".to_owned();
+
+    let open = state.apply(Message::OpenCreateHostDialog);
+    let close = state.apply(Message::CloseCreateHostDialog);
+
+    assert!(open.changed());
+    assert!(close.changed());
+    assert!(!state.ui.workspace.create_host_dialog_open);
+    assert_eq!(state.ui.quick_host.name, "");
+    assert_eq!(state.storage.host_count(), 0);
     assert_eq!(state.backend_commands.pending_count(), 0);
 }
 

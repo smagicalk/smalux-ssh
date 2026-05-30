@@ -1,5 +1,5 @@
 use super::*;
-use crate::model::{AuthProfile, Host, HostId, ImageSource, Message};
+use crate::model::{AgentSource, AuthProfile, Host, HostId, ImageSource, Message};
 use uuid::Uuid;
 
 fn sample_host() -> Host {
@@ -7,11 +7,13 @@ fn sample_host() -> Host {
         id: HostId(Uuid::new_v4()),
         name: "production".to_owned(),
         group_id: None,
+        icon_key: "server".to_owned(),
         tags: Vec::new(),
         address: "prod.example.com".to_owned(),
         port: 22,
         auth: AuthProfile::Agent {
             username: "deploy".to_owned(),
+            source: AgentSource::Auto,
             key_hint: None,
         },
         proxy: None,

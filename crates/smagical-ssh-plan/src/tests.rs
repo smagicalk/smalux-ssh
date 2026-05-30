@@ -1,6 +1,6 @@
 use super::*;
 use smagical_backend_core::{BackendAuth, ConnectionTarget};
-use smagical_core::{HostId, KeyAlgorithm, KnownHostEntry, SecretRef};
+use smagical_core::{AgentSource, HostId, KeyAlgorithm, KnownHostEntry, SecretRef};
 use smagical_security::MemorySecretStore;
 use smagical_security::SecretStore;
 use uuid::Uuid;
@@ -109,6 +109,7 @@ fn agent_plan_does_not_read_secret_store() {
     let store = MemorySecretStore::new();
     let target = target(BackendAuth::Agent {
         username: "agent-user".to_owned(),
+        source: AgentSource::Auto,
         key_hint: Some("id_ed25519".to_owned()),
     });
 
@@ -118,6 +119,7 @@ fn agent_plan_does_not_read_secret_store() {
     assert!(matches!(
         plan.auth,
         SshAuthPlan::Agent {
+            source: AgentSource::Auto,
             key_hint: Some(key_hint),
             ..
         } if key_hint == "id_ed25519"

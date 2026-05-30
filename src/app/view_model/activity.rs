@@ -3,6 +3,7 @@
 use crate::model::AppState;
 
 use super::common::background_summary;
+use super::i18n::{locale_for_state, tr};
 use super::labels::theme_label;
 
 /// 活动侧栏指标。
@@ -13,22 +14,39 @@ pub(in crate::app) struct ActivityViewModel {
 }
 
 pub(super) fn activity(state: &AppState) -> Vec<ActivityViewModel> {
+    let locale = locale_for_state(state);
+
     vec![
-        metric("Hosts", state.storage.host_count()),
-        metric("Tabs", state.sessions.tab_count()),
-        metric("Active", state.sessions.active_count()),
-        metric("SFTP", state.sessions.sftp_browser_count()),
-        metric("Tunnels", state.sessions.tunnel_runtime_count()),
+        metric(
+            tr(locale, "activity.metric.hosts"),
+            state.storage.host_count(),
+        ),
+        metric(
+            tr(locale, "activity.metric.tabs"),
+            state.sessions.tab_count(),
+        ),
+        metric(
+            tr(locale, "activity.metric.active"),
+            state.sessions.active_count(),
+        ),
+        metric(
+            tr(locale, "activity.metric.sftp"),
+            state.sessions.sftp_browser_count(),
+        ),
+        metric(
+            tr(locale, "activity.metric.tunnels"),
+            state.sessions.tunnel_runtime_count(),
+        ),
         ActivityViewModel {
-            label: "Language",
+            label: tr(locale, "activity.metric.language"),
             value: state.ui.workspace.language_label().to_owned(),
         },
         ActivityViewModel {
-            label: "Theme",
-            value: theme_label(state.ui.workspace.theme).to_owned(),
+            label: tr(locale, "activity.metric.theme"),
+            value: theme_label(state.ui.workspace.theme, locale).to_owned(),
         },
         ActivityViewModel {
-            label: "Background",
+            label: tr(locale, "activity.metric.background"),
             value: background_summary(state),
         },
     ]

@@ -1,8 +1,8 @@
 use super::*;
 use crate::backend::BackendCommand;
 use crate::model::{
-    AuthProfile, Message, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SecretRef,
-    SessionId, SftpActionDraftField,
+    AuthProfile, Host, HostId, Message, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
+    SecretRef, SessionId, SftpActionDraftField, ThemeProfile,
 };
 use uuid::Uuid;
 

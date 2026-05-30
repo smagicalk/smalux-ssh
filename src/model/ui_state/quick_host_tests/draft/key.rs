@@ -17,6 +17,7 @@ fn quick_host_draft_builds_key_host_with_passphrase() {
             passphrase_ref: "passphrase:deploy".to_owned(),
             ..QuickHostAuthDraft::default()
         },
+        ..QuickHostDraft::default()
     };
 
     let host = draft

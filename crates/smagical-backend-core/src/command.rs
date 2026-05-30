@@ -1,4 +1,7 @@
 //! 后端执行命令模型。
+//!
+//! 后端命令是状态层和执行器之间的唯一协议。状态层只排队这些命令，执行器只返回
+//! `BackendEvent`，两边不互相读取内部结构，从而保持 UI、状态和 IO 解耦。
 
 use smagical_core::{Host, HostId, KnownHostEntry, SessionId};
 
@@ -10,60 +13,77 @@ use super::{
 /// 后端执行器接收的命令。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackendCommand {
+    /// 建立远程 SSH 连接。
     Connect {
         session_id: SessionId,
         target: ConnectionTarget,
     },
+    /// 在已连接 SSH 会话上打开交互式 shell。
     OpenShell {
         session_id: SessionId,
         pty: PtyRequest,
     },
+    /// 打开本地 PTY shell。
+    OpenLocalShell {
+        session_id: SessionId,
+        pty: PtyRequest,
+    },
+    /// 执行一次性远程命令。
     RunCommand {
         session_id: SessionId,
         request: RemoteCommandRequest,
     },
+    /// 向交互式 shell 写入输入。
     SendShellInput {
         session_id: SessionId,
         input: String,
     },
-    DrainSessionOutput {
-        session_id: SessionId,
-    },
+    /// 抽取交互式 shell 的增量输出。
+    DrainSessionOutput { session_id: SessionId },
+    /// 执行 SFTP 请求。
     Sftp {
         session_id: SessionId,
         request: SftpRequest,
     },
+    /// 启动 SSH 隧道。
     StartTunnel {
         session_id: SessionId,
         request: TunnelStartRequest,
     },
+    /// 停止 SSH 隧道。
     StopTunnel {
         session_id: SessionId,
         request: TunnelStopRequest,
     },
-    Disconnect {
-        session_id: SessionId,
-    },
+    /// 断开会话并释放后端资源。
+    Disconnect { session_id: SessionId },
 }
 
 /// SSH 连接目标。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnectionTarget {
+    /// 对应保存主机 ID，用于回写历史和状态。
     pub host_id: HostId,
+    /// SSH 目标地址。
     pub address: String,
+    /// SSH 端口。
     pub port: u16,
+    /// 后端可解析的认证引用。
     pub auth: BackendAuth,
+    /// 连接时使用的 Known Hosts 快照。
     pub known_hosts: Vec<KnownHostEntry>,
 }
 
 impl ConnectionTarget {
     /// 从已保存主机配置生成后端连接目标。
     pub fn from_host(host: &Host) -> Self {
+        // 默认不带 known_hosts，测试和简单调用可使用；正式连接通常使用 with_known_hosts。
         Self::from_host_with_known_hosts(host, Vec::new())
     }
 
     /// 从已保存主机配置和 Known Hosts 快照生成后端连接目标。
     pub fn from_host_with_known_hosts(host: &Host, known_hosts: Vec<KnownHostEntry>) -> Self {
+        // 这里只做数据转换，不读取 SecretRef 指向的明文。
         Self {
             host_id: host.id,
             address: host.address.clone(),
@@ -85,6 +105,7 @@ impl BackendCommand {
         match self {
             Self::Connect { session_id, .. }
             | Self::OpenShell { session_id, .. }
+            | Self::OpenLocalShell { session_id, .. }
             | Self::RunCommand { session_id, .. }
             | Self::SendShellInput { session_id, .. }
             | Self::DrainSessionOutput { session_id }
@@ -99,7 +120,7 @@ impl BackendCommand {
     pub fn kind(&self) -> BackendCommandKind {
         match self {
             Self::Connect { .. } => BackendCommandKind::Connect,
-            Self::OpenShell { .. } => BackendCommandKind::OpenShell,
+            Self::OpenShell { .. } | Self::OpenLocalShell { .. } => BackendCommandKind::OpenShell,
             Self::RunCommand { .. } => BackendCommandKind::RunCommand,
             Self::SendShellInput { .. } => BackendCommandKind::SendShellInput,
             Self::DrainSessionOutput { .. } => BackendCommandKind::DrainSessionOutput,
@@ -114,14 +135,23 @@ impl BackendCommand {
 /// 后端命令类型。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum BackendCommandKind {
+    /// 建立连接。
     Connect,
+    /// 打开 shell，本地和远程 shell 共用一种 kind。
     OpenShell,
+    /// 执行远程命令。
     RunCommand,
+    /// 发送 shell 输入。
     SendShellInput,
+    /// 抽取 shell 输出。
     DrainSessionOutput,
+    /// SFTP 请求。
     Sftp,
+    /// 启动隧道。
     StartTunnel,
+    /// 停止隧道。
     StopTunnel,
+    /// 断开连接。
     Disconnect,
 }
 
@@ -129,7 +159,7 @@ pub enum BackendCommandKind {
 mod tests {
     use super::*;
     use smagical_core::{
-        AuthProfile, KeyAlgorithm, KnownHostEntry, SecretRef, TunnelKind, TunnelRule,
+        AgentSource, AuthProfile, KeyAlgorithm, KnownHostEntry, SecretRef, TunnelKind, TunnelRule,
     };
     use smagical_terminal::TerminalSize;
     use uuid::Uuid;
@@ -139,11 +169,13 @@ mod tests {
             id: HostId(Uuid::new_v4()),
             name: "production".to_owned(),
             group_id: None,
+            icon_key: "server".to_owned(),
             tags: Vec::new(),
             address: "example.com".to_owned(),
             port: 2222,
             auth: AuthProfile::Agent {
                 username: "deploy".to_owned(),
+                source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             },
             proxy: None,
@@ -177,6 +209,18 @@ mod tests {
     fn backend_command_exposes_session_id() {
         let session_id = SessionId(Uuid::new_v4());
         let command = BackendCommand::OpenShell {
+            session_id,
+            pty: PtyRequest::xterm(TerminalSize::default()),
+        };
+
+        assert_eq!(command.session_id(), session_id);
+        assert_eq!(command.kind(), BackendCommandKind::OpenShell);
+    }
+
+    #[test]
+    fn local_shell_command_exposes_session_id() {
+        let session_id = SessionId(Uuid::new_v4());
+        let command = BackendCommand::OpenLocalShell {
             session_id,
             pty: PtyRequest::xterm(TerminalSize::default()),
         };

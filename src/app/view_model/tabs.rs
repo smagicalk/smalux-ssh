@@ -2,6 +2,7 @@
 
 use crate::model::AppState;
 
+use super::i18n::{english_locale, locale_for_state};
 use super::labels::{session_kind_label, session_status_label};
 
 mod terminal;
@@ -16,11 +17,14 @@ pub(in crate::app) struct SessionTabViewModel {
     pub id: String,
     pub title: String,
     pub kind: &'static str,
+    pub status_key: &'static str,
     pub status: &'static str,
     pub active: bool,
 }
 
 pub(super) fn tabs(state: &AppState) -> Vec<SessionTabViewModel> {
+    let locale = locale_for_state(state);
+
     state
         .sessions
         .tabs
@@ -28,8 +32,9 @@ pub(super) fn tabs(state: &AppState) -> Vec<SessionTabViewModel> {
         .map(|tab| SessionTabViewModel {
             id: tab.id.0.to_string(),
             title: tab.title.clone(),
-            kind: session_kind_label(&tab.kind),
-            status: session_status_label(&tab.status),
+            kind: session_kind_label(&tab.kind, locale),
+            status_key: session_status_label(&tab.status, english_locale()),
+            status: session_status_label(&tab.status, locale),
             active: state.sessions.active_tab == Some(tab.id),
         })
         .collect()

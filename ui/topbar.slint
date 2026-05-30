@@ -1,15 +1,17 @@
 import { AppTheme } from "./theme.slint";
-import { ToolbarButton } from "./nav.slint";
+import { TopbarIconButton } from "./nav.slint";
 
 export component TopBar inherits Rectangle {
     in property <string> active-page;
-    callback open-settings();
+    in property <string> brand-short-label: "";
+    in property <string> brand-name-label: "";
+    in property <string> find-label: "";
     callback open-command-palette();
 
     height: 26px;
     background: AppTheme.topbar-bg;
     border-width: 1px;
-    border-color: #273241;
+    border-color: AppTheme.topbar-border;
 
     HorizontalLayout {
         padding-left: 10px;
@@ -24,8 +26,8 @@ export component TopBar inherits Rectangle {
             border-radius: 4px;
             background: AppTheme.accent;
             Text {
-                text: "S";
-                color: #ffffff;
+                text: root.brand-short-label;
+                color: AppTheme.text-inverse;
                 font-size: 9px;
                 horizontal-alignment: center;
                 vertical-alignment: center;
@@ -33,7 +35,7 @@ export component TopBar inherits Rectangle {
         }
 
         Text {
-            text: "smagicalssh";
+            text: root.brand-name-label;
             color: AppTheme.text;
             font-size: 12px;
             vertical-alignment: center;
@@ -54,7 +56,9 @@ export component TopBar inherits Rectangle {
 
         Rectangle { horizontal-stretch: 1; }
 
-        ToolbarButton { label: "Find"; clicked => { root.open-command-palette(); } }
-        ToolbarButton { label: "Gear"; clicked => { root.open-settings(); } }
+        TopbarIconButton {
+            kind: "Search";
+            clicked => { root.open-command-palette(); }
+        }
     }
 }

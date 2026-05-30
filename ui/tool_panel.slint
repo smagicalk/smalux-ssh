@@ -5,14 +5,17 @@ import { CompactButton, FilterChip, ToolRow } from "./common.slint";
 import { SftpPane } from "./sftp_pane.slint";
 
 export component ToolDock inherits Rectangle {
+    in property <string> files-label: "";
+    in property <string> snippets-label: "";
+    in property <string> tunnels-label: "";
     callback open-tool(mode: string);
 
-    width: 160px;
-    height: 25px;
+    width: 134px;
+    height: 28px;
     border-radius: 6px;
     border-width: 1px;
     border-color: AppTheme.border;
-    background: #101721e6;
+    background: AppTheme.dock-bg;
 
     HorizontalLayout {
         padding-left: 4px;
@@ -21,16 +24,15 @@ export component ToolDock inherits Rectangle {
         padding-bottom: 2px;
         spacing: 4px;
 
-        CompactButton { label: "F"; clicked => { root.open-tool("SFTP"); } }
-        CompactButton { label: "{}"; clicked => { root.open-tool("Snippets"); } }
-        CompactButton { label: "H"; clicked => { root.open-tool("History"); } }
-        CompactButton { label: "Tun"; clicked => { root.open-tool("Tunnels"); } }
-        CompactButton { label: "KH"; clicked => { root.open-tool("KnownHosts"); } }
+        CompactButton { label: root.files-label; tone: "subtle"; compact: true; clicked => { root.open-tool("SFTP"); } }
+        CompactButton { label: root.snippets-label; tone: "subtle"; compact: true; clicked => { root.open-tool("Snippets"); } }
+        CompactButton { label: root.tunnels-label; tone: "subtle"; compact: true; clicked => { root.open-tool("Tunnels"); } }
     }
 }
 
 export component ToolPanel inherits Rectangle {
     in property <int> panel-width;
+    in property <string> mode-key: "Closed";
     in property <string> mode;
     in property <int> history-count;
     in property <string> sftp-host-id;
@@ -44,6 +46,28 @@ export component ToolPanel inherits Rectangle {
     in property <[ToolItemRow]> snippets;
     in property <[ToolItemRow]> tunnels;
     in property <[KnownHostRow]> known-hosts;
+    in property <string> loading-label: "";
+    in property <string> refresh-label: "";
+    in property <string> local-title: "";
+    in property <string> remote-title: "";
+    in property <string> workspace-label: "";
+    in property <string> queue-label: "";
+    in property <string> selected-label: "";
+    in property <string> path-label: "";
+    in property <string> entries-label: "";
+    in property <string> loading-entries-label: "";
+    in property <string> empty-entries-label: "";
+    in property <string> pinned-label: "";
+    in property <string> empty-value-label: "";
+    in property <string> snippets-empty-label: "";
+    in property <string> history-commands-label: "";
+    in property <string> history-saved-suffix-label: "";
+    in property <string> history-empty-label: "";
+    in property <string> history-run-label: "";
+    in property <string> tunnels-empty-label: "";
+    in property <string> known-hosts-empty-label: "";
+    in property <string> known-hosts-trust-label: "";
+    in property <string> known-hosts-delete-label: "";
     callback close();
     callback refresh-sftp(host-id: string);
     callback select-sftp-entry(host-id: string, path: string);
@@ -62,10 +86,10 @@ export component ToolPanel inherits Rectangle {
         HorizontalLayout {
             Text { text: root.mode; color: AppTheme.text; font-size: 12px; font-weight: 700; }
             Rectangle { horizontal-stretch: 1; }
-            FilterChip { label: "Pinned"; active: true; }
-            CompactButton { label: "x"; clicked => { root.close(); } }
+            FilterChip { label: root.pinned-label; active: true; }
+            CompactButton { label: "x"; tone: "subtle"; compact: true; clicked => { root.close(); } }
         }
-        if root.mode == "SFTP": SftpPane {
+        if root.mode-key == "SFTP": SftpPane {
             host-id: root.sftp-host-id;
             title: root.sftp-title;
             current-dir: root.sftp-current-dir;
@@ -73,45 +97,56 @@ export component ToolPanel inherits Rectangle {
             loading: root.sftp-loading;
             error: root.sftp-error;
             entries: root.sftp-entries;
+            loading-label: root.loading-label;
+            refresh-label: root.refresh-label;
+            local-title: root.local-title;
+            remote-title: root.remote-title;
+            workspace-label: root.workspace-label;
+            queue-label: root.queue-label;
+            selected-label: root.selected-label;
+            path-label: root.path-label;
+            entries-label: root.entries-label;
+            loading-entries-label: root.loading-entries-label;
+            empty-entries-label: root.empty-entries-label;
             refresh(host-id) => { root.refresh-sftp(host-id); }
             select-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
         }
-        if root.mode == "Snippets": ScrollView {
+        if root.mode-key == "Snippets": ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                if root.snippets.length == 0: ToolRow { label: "No snippets"; value: "empty"; }
+                if root.snippets.length == 0: ToolRow { label: root.snippets-empty-label; value: root.empty-value-label; }
                 for item in root.snippets: ToolRow {
                     label: item.title;
                     value: item.subtitle == "" ? item.meta : item.subtitle + " · " + item.meta;
                 }
             }
         }
-        if root.mode == "History": ScrollView {
+        if root.mode-key == "History": ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                ToolRow { label: "Commands"; value: root.history-count + " saved"; }
-                if root.history.length == 0: ToolRow { label: "No history"; value: "empty"; }
-                for command in root.history: ToolRow { label: command; value: "run"; }
+                ToolRow { label: root.history-commands-label; value: root.history-count + root.history-saved-suffix-label; }
+                if root.history.length == 0: ToolRow { label: root.history-empty-label; value: root.empty-value-label; }
+                for command in root.history: ToolRow { label: command; value: root.history-run-label; }
             }
         }
-        if root.mode == "Tunnels": ScrollView {
+        if root.mode-key == "Tunnels": ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                if root.tunnels.length == 0: ToolRow { label: "No tunnels"; value: "empty"; }
+                if root.tunnels.length == 0: ToolRow { label: root.tunnels-empty-label; value: root.empty-value-label; }
                 for item in root.tunnels: ToolRow {
                     label: item.title;
                     value: item.subtitle == "" ? item.meta : item.subtitle + " · " + item.meta;
                 }
             }
         }
-        if root.mode == "KnownHosts": ScrollView {
+        if root.mode-key == "KnownHosts": ScrollView {
             vertical-stretch: 1;
             VerticalLayout {
                 spacing: 6px;
-                if root.known-hosts.length == 0: ToolRow { label: "No known hosts"; value: "empty"; }
+                if root.known-hosts.length == 0: ToolRow { label: root.known-hosts-empty-label; value: root.empty-value-label; }
                 for item in root.known-hosts: Rectangle {
                     height: 58px;
                     border-radius: 6px;
@@ -139,19 +174,21 @@ export component ToolPanel inherits Rectangle {
                             }
                             Text {
                                 text: item.status;
-                                color: item.status == "trusted" ? AppTheme.accent : AppTheme.warning;
+                                color: item.status_key == "trusted" ? AppTheme.accent : AppTheme.warning;
                                 font-size: 10px;
                             }
                         }
                         VerticalLayout {
-                            width: 66px;
+                            width: 72px;
                             spacing: 4px;
                             CompactButton {
-                                label: "Trust";
+                                label: root.known-hosts-trust-label;
+                                tone: "primary";
                                 clicked => { root.trust-known-host(item.host, item.port); }
                             }
                             CompactButton {
-                                label: "Del";
+                                label: root.known-hosts-delete-label;
+                                tone: "danger";
                                 clicked => { root.remove-known-host(item.host, item.port); }
                             }
                         }

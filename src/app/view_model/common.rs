@@ -1,15 +1,24 @@
 //! 展示模型公共辅助函数。
 
-use crate::model::{AppState, Host, HostId};
+use crate::model::{AppState, BuiltInTheme, Host, HostId};
+use crate::theme::{ResolvedThemePalette, built_in_palette};
+
+use super::i18n::tr_for_state;
 
 pub(super) fn background_summary(state: &AppState) -> String {
     let background = state.config.background.normalized();
     format!(
-        "{} sources · {:.0}% · blur {:.0}px",
+        "{}{} · {:.0}% · {} {:.0}px",
         background.sources.len(),
+        tr_for_state(state, "common.background_sources_suffix"),
         background.opacity * 100.0,
+        tr_for_state(state, "common.background_blur"),
         background.blur
     )
+}
+
+pub(super) fn theme_palette(theme: BuiltInTheme) -> ResolvedThemePalette {
+    built_in_palette(theme)
 }
 
 pub(super) fn group_label(state: &AppState, host: &Host) -> String {
@@ -22,12 +31,12 @@ pub(super) fn group_label(state: &AppState, host: &Host) -> String {
                 .find(|group| group.id == group_id)
                 .map(|group| group.name.clone())
         })
-        .unwrap_or_else(|| "Default".to_owned())
+        .unwrap_or_else(|| tr_for_state(state, "common.default_group").to_owned())
 }
 
-pub(super) fn tags_label(host: &Host) -> String {
+pub(super) fn tags_label(state: &AppState, host: &Host) -> String {
     if host.tags.is_empty() {
-        "untagged".to_owned()
+        tr_for_state(state, "common.untagged").to_owned()
     } else {
         host.tags.join(" / ")
     }
@@ -40,7 +49,7 @@ pub(super) fn host_name(state: &AppState, host_id: HostId) -> String {
         .iter()
         .find(|host| host.id == host_id)
         .map(|host| host.name.clone())
-        .unwrap_or_else(|| "Unknown host".to_owned())
+        .unwrap_or_else(|| tr_for_state(state, "common.unknown_host").to_owned())
 }
 
 pub(super) fn bytes_label(size: Option<u64>) -> String {

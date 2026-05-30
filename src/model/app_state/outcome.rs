@@ -5,6 +5,7 @@
 pub struct AppUpdateOutcome {
     pub state_changed: bool,
     pub queued_backend_commands: usize,
+    pub worker_command: Option<crate::backend::BackendCommand>,
     pub executed_backend_commands: usize,
     pub applied_backend_events: usize,
     pub error: Option<String>,

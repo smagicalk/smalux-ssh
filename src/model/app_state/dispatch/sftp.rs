@@ -1,8 +1,15 @@
 //! SFTP 浏览器和传输消息路由。
+//!
+//! 这里处理一个已打开 SFTP 浏览器之后的操作：刷新、导航、书签、上传、下载、
+//! 取消传输和远端文件操作。打开 SFTP 会话本身属于 launch 路由。
 
 use super::super::{AppState, AppUpdateOutcome, Message};
 
 impl AppState {
+    /// 分发 SFTP 运行期消息。
+    ///
+    /// 大多数分支会先校验当前浏览器归属，再决定是否排队后端请求；这样 UI 不需要
+    /// 关心哪个 session 当前真正拥有 SFTP 浏览器。
     pub(super) fn dispatch_sftp_message(&mut self, message: Message) -> AppUpdateOutcome {
         match message {
             Message::RefreshSftp { host_id } => self.refresh_sftp(host_id),

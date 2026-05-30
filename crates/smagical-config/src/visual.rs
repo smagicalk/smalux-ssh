@@ -35,6 +35,7 @@ mod tests {
             id: HostId(Uuid::new_v4()),
             name: "visual-host".to_owned(),
             group_id: None,
+            icon_key: "server".to_owned(),
             tags: Vec::new(),
             address: "example.com".to_owned(),
             port: 22,

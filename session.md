@@ -2310,3 +2310,51 @@
   - `cargo check --workspace` 通过
   - `cargo test --workspace` 通过；主 crate `251 passed`，workspace 其余 crate 全部通过，现有本地 ConPTY 交互测试保持 `2 ignored`
 - 下一步：执行 `git diff --check`、BOM/中文抽样检查、审查 diff 并提交。
+
+## 当前 UI 阶段决策：先完成第一个页面
+
+- 用户确认：主题、多语言、主题导入/导出、自定义颜色、VSCode/Windows Terminal/Alacritty/iTerm2 等兼容导入导出，全部归入后续“设置页”配置，不继续塞到首页或创建主机弹窗。
+- 当前阶段目标：先把第一个页面做成可用闭环，重点是 Hosts 首页、创建主机弹窗、主机列表、搜索、创建后的基础操作入口和错误反馈。
+- 当前 UI 反馈：主机卡片左侧状态线应延长到按钮区域，否则视觉上割裂；顶部“新建”和视图切换距离太近；列表/卡片切换不应像普通按钮，更适合做成视图模式分段控件或图标化切换。
+- 已落地基础能力：`src/theme.rs` 已提供主题 schema、内置主题、颜色校验和多格式导出接口；`AppTheme` 已能由 Rust 投影颜色 token；这些保留为后续设置页能力基础。
+- 已落地基础能力：创建主机弹窗已接入 agent source，支持 Auto、OpenSSH、Pageant、Custom named pipe；Auto 优先 `\\.\pipe\openssh-ssh-agent`，再回退 Pageant。
+- 已落地基础能力：创建主机文案已从 Rust view-model 集中投影，支持中文、英文和 FollowSystem；后续设置页阶段再升级为完整 i18n catalog。
+- 首页职责边界：右侧 ActivityPanel 只展示活动、计数、最近连接和折叠控制；主题/背景切换入口应移到设置页，不再作为首页操作。
+- 后续设置页计划：主题配置分块包含 frame、workspace、border、text、state、input、button、dialog、tabs、terminal、terminal ANSI、background、font；需要支持内置主题、用户覆盖、自定义颜色、导入、导出和格式转换报告。
+- 后续设置页计划：补真实 importer，包括 VSCode `workbench.colorCustomizations` / `terminal.integrated.*`、Windows Terminal schemes、Alacritty TOML、iTerm2 plist/XML；当前 iTerm2 export 只是预留接口，不算完成。
+- 执行要求：继续保持模块化、功能化、单一职责；第一个页面不要提前承担设置页配置职责。
+
+## 本轮继续：本地终端多开收口
+
+- 目标：让本地终端和远程 shell 一样可多开，同时把关闭和路由语义拆清楚，避免本地 shell 与隧道启动逻辑混在一起。
+- 已完成：`Message::OpenLocalTerminal` 现在每次生成新的 `SessionId`，会创建新的本地终端 tab，而不是复用固定本地 session。
+- 已完成：新增 `BackendCommand::OpenLocalShell`，桌面后端把它路由到本地 PTY 执行器，远程 SSH 执行器明确拒绝该命令。
+- 已完成：`SessionManager` 增加本地 shell 的执行许可和状态标记入口，`mark_shell_opened` 可以同时接收远程 shell 和本地 shell。
+- 已完成：关闭标签页时的 pending 清理把 `OpenLocalShell` 和 `StartTunnel` 分开记录，不再把本地 shell 误记成隧道启动语义。
+- 已完成：本地终端标题现在会自动生成可区分名称，优先使用 `Local Shell`，后续按第一个未占用编号递增，支持关闭中间 tab 后继续复用空缺编号。
+- 已完成：新会话弹窗居中展示。
+- 已完成：补了本地终端多开、标题分配、关闭 pending、本地 PTY 路由和后端 reducer 的定向测试。
+- 验证记录：
+  - `cargo fmt --all --check` 通过
+  - `cargo check --workspace` 通过
+  - `cargo test -p smagicalssh model::app_state::ui_drafts_tests::terminal_input::local` 通过，`7 passed`
+  - `cargo test -p smagicalssh model::app_state::tests::close_tabs::shell::pending` 通过，`2 passed`
+  - `cargo test -p smagical-local-backend local_pty` 通过，`10 passed`，`2 ignored`
+  - `cargo test -p smagical-backend-core` 通过，`32 passed`
+  - `cargo test -p smagical-backend-reducer local_terminal_output_drops_duplicate_shell_echo` 通过，`1 passed`
+- 评估：这一轮本地终端多开链路已经收口，剩余工作更偏 UI 细节和首页交互打磨，不再属于底层语义修补。
+
+## 本轮文档化收口：UI/Core 边界注释
+
+- 目标：按“模块化、功能化、单一职责”补齐关键代码注释，方便后续用户自己改代码或重写 UI。
+- 已完成：确认核心层和 UI 层依赖方向仍保持清晰，`model`、`backend`、`crates` 不反向依赖 Slint UI。
+- 已完成：补充 `src/model/app_state/backend_pump*` 注释，说明后端命令队列、worker 执行、过期命令跳过、失败事件归约、Known Hosts、SFTP 传输失败和 pending 命令清理边界。
+- 已完成：补充 `src/model/app_state/ui_drafts*` 和 `storage_admin*` 注释，说明创建主机/分组、终端输入、本地终端、删除确认和安全资产管理如何保持 UI 草稿与业务保存分离。
+- 已完成：补充 `src/app/callbacks*`、`src/app/projection*`、`src/app/view_model*` 注释，明确 callbacks 是 Slint 输入 Adapter，projection 是 Slint 输出 Adapter，view_model 是可复用的纯展示模型。
+- 已完成：补充公共 crate 注释，覆盖 `smagical-core` 领域模型、`smagical-backend-core` 后端命令协议、`smagical-session` 会话生命周期、`smagical-terminal` 终端缓冲、`smagical-security` 认证解析和 `smagical-storage` SQLite/redb/snapshot 映射边界。
+- 已完成：补充 SQLite 存储层注释，说明 `entity` 只声明表，`migration` 只声明物理 schema，`mapper` 负责 `StorageManager` 与业务表互转并重新应用内存不变量。
+- 验证记录：
+  - `cargo fmt --all` 通过
+  - `cargo check` 通过
+  - `cargo test` 通过，`348 passed`
+- 当前评估：本轮注释和分层说明已经覆盖核心入口与主要扩展点；若以后要求“逐文件逐行注释”，还可以继续补测试文件和更底层 SSH cache 细节，但当前核心开发和 UI 重写所需的边界说明已足够。

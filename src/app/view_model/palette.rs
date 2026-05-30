@@ -6,6 +6,7 @@ mod matching;
 use crate::model::AppState;
 
 use super::common::tags_label;
+use super::i18n::{locale_for_state, tr};
 use history::command_history_subtitle;
 use matching::{command_matches_host, command_matches_text};
 
@@ -15,6 +16,7 @@ pub(in crate::app) struct CommandPaletteItemViewModel {
     pub id: String,
     pub title: String,
     pub subtitle: String,
+    pub kind_key: &'static str,
     pub kind: &'static str,
 }
 
@@ -27,6 +29,7 @@ pub(super) fn command_palette_results(state: &AppState) -> Vec<CommandPaletteIte
         .trim()
         .to_lowercase();
     let mut rows = Vec::new();
+    let locale = locale_for_state(state);
 
     rows.extend(
         state
@@ -38,8 +41,14 @@ pub(super) fn command_palette_results(state: &AppState) -> Vec<CommandPaletteIte
             .map(|host| CommandPaletteItemViewModel {
                 id: host.id.0.to_string(),
                 title: host.name.clone(),
-                subtitle: format!("{}:{} · {}", host.address, host.port, tags_label(host)),
-                kind: "Host",
+                subtitle: format!(
+                    "{}:{} · {}",
+                    host.address,
+                    host.port,
+                    tags_label(state, host)
+                ),
+                kind_key: "Host",
+                kind: tr(locale, "palette.kind.host"),
             }),
     );
 
@@ -53,8 +62,9 @@ pub(super) fn command_palette_results(state: &AppState) -> Vec<CommandPaletteIte
             .map(|recent| CommandPaletteItemViewModel {
                 id: recent.host_id.0.to_string(),
                 title: recent.label.clone(),
-                subtitle: "recent connection".to_owned(),
-                kind: "Recent",
+                subtitle: tr(locale, "palette.recent_subtitle").to_owned(),
+                kind_key: "Recent",
+                kind: tr(locale, "palette.kind.recent"),
             }),
     );
 
@@ -70,7 +80,8 @@ pub(super) fn command_palette_results(state: &AppState) -> Vec<CommandPaletteIte
                 id: item.id.0.to_string(),
                 title: item.command.clone(),
                 subtitle: command_history_subtitle(state, item.host_id),
-                kind: "History",
+                kind_key: "History",
+                kind: tr(locale, "palette.kind.history"),
             }),
     );
 

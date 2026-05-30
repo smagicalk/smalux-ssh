@@ -10,7 +10,7 @@ export component CommandPaletteItem inherits Rectangle {
     border-radius: 7px;
     border-width: 1px;
     border-color: AppTheme.border;
-    background: #101823;
+    background: AppTheme.card-bg;
 
     TouchArea {
         clicked => { root.activate(); }
@@ -25,7 +25,7 @@ export component CommandPaletteItem inherits Rectangle {
             width: 52px;
             height: 24px;
             border-radius: 6px;
-            background: item.kind == "Host" ? #15352f : item.kind == "Recent" ? #142a36 : #291f3c;
+            background: item.kind_key == "Host" ? AppTheme.badge-success-bg : item.kind_key == "Recent" ? AppTheme.badge-info-bg : AppTheme.badge-pending-bg;
             Text {
                 text: item.kind;
                 color: AppTheme.text;
@@ -38,7 +38,7 @@ export component CommandPaletteItem inherits Rectangle {
         VerticalLayout {
             spacing: 4px;
             Text { text: item.title; color: AppTheme.text-strong; font-size: 12px; font-weight: 700; }
-            Text { text: item.subtitle; color: #8b98aa; font-size: 10px; }
+            Text { text: item.subtitle; color: AppTheme.text-soft; font-size: 10px; }
         }
     }
 }
@@ -46,6 +46,10 @@ export component CommandPaletteItem inherits Rectangle {
 export component CommandPaletteOverlay inherits Rectangle {
     in property <string> query;
     in property <[CommandPaletteRow]> results;
+    in property <string> title-label: "";
+    in property <string> placeholder: "";
+    in property <string> empty-label: "";
+    in property <string> close-label: "";
     callback update-query(query: string);
     callback close();
     callback activate-item(item-id: string, kind: string);
@@ -53,6 +57,8 @@ export component CommandPaletteOverlay inherits Rectangle {
     background: AppTheme.overlay-bg;
 
     TouchArea {
+        width: root.width;
+        height: root.height;
         clicked => { root.close(); }
     }
 
@@ -71,14 +77,14 @@ export component CommandPaletteOverlay inherits Rectangle {
             spacing: 10px;
 
             HorizontalLayout {
-                Text { text: "Command Palette"; color: AppTheme.text-strong; font-size: 15px; font-weight: 700; }
+                Text { text: root.title-label; color: AppTheme.text-strong; font-size: 15px; font-weight: 700; }
                 Rectangle { horizontal-stretch: 1; }
-                Button { text: "Esc"; height: 24px; clicked => { root.close(); } }
+                Button { text: root.close-label; height: 24px; clicked => { root.close(); } }
             }
 
             LineEdit {
                 text: root.query;
-                placeholder-text: "Search hosts, recent connections, command history";
+                placeholder-text: root.placeholder;
                 height: 34px;
                 edited(query) => { root.update-query(query); }
                 accepted(query) => { root.update-query(query); }
@@ -89,13 +95,13 @@ export component CommandPaletteOverlay inherits Rectangle {
                 VerticalLayout {
                     spacing: 8px;
                     if root.results.length == 0: Text {
-                        text: "No matching command.";
+                        text: root.empty-label;
                         color: AppTheme.text-muted;
                         font-size: 12px;
                     }
                     for item in root.results: CommandPaletteItem {
                         item: item;
-                        activate => { root.activate-item(item.id, item.kind); }
+                        activate => { root.activate-item(item.id, item.kind_key); }
                     }
                 }
             }

@@ -1,8 +1,12 @@
 //! 工作区快照消息路由。
+//!
+//! 工作区快照保存的是可恢复标签页和布局，不负责自动重新连接 SSH。恢复时只重建
+//! 可见状态和本地结构，真实连接仍由用户显式触发。
 
 use super::super::{AppState, AppUpdateOutcome, Message};
 
 impl AppState {
+    /// 分发工作区快照消息。
     pub(super) fn dispatch_workspace_message(&mut self, message: Message) -> AppUpdateOutcome {
         match message {
             Message::SaveWorkspaceSnapshot => self.save_workspace_snapshot(),

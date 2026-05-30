@@ -1,76 +1,280 @@
 import { AppTheme } from "./theme.slint";
 
-export component NavButton inherits Rectangle {
-    in property <string> label;
+export component RailIcon inherits Rectangle {
+    in property <string> kind;
     in property <bool> active;
-    callback clicked();
+    property <color> icon-color: active ? AppTheme.text-strong : AppTheme.text-soft;
 
-    width: 64px;
-    height: 21px;
-    border-radius: 5px;
-    border-width: 1px;
-    border-color: active ? AppTheme.accent-blue : #00000000;
-    background: active ? #143044 : #00000000;
+    width: 22px;
+    height: 18px;
+    background: AppTheme.transparent;
 
-    TouchArea {
-        clicked => { root.clicked(); }
+    if root.kind == "Hosts": VerticalLayout {
+        padding-left: 3px;
+        padding-right: 3px;
+        padding-top: 2px;
+        padding-bottom: 2px;
+        spacing: 2px;
+
+        Rectangle { height: 3px; border-radius: 2px; background: root.icon-color; }
+        Rectangle { height: 3px; border-radius: 2px; background: root.icon-color; }
+        Rectangle { height: 3px; border-radius: 2px; background: root.icon-color; }
     }
 
-    Text {
-        text: label;
-        color: active ? AppTheme.text-strong : AppTheme.text-muted;
-        font-size: 10px;
+    if root.kind == "Terminal": Text {
+        text: ">_";
+        color: root.icon-color;
+        font-size: 13px;
+        font-weight: 700;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    if root.kind == "Sftp": Rectangle {
+        x: 4px;
+        y: 6px;
+        width: 15px;
+        height: 10px;
+        border-radius: 3px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+
+        Rectangle {
+            x: 1px;
+            y: -4px;
+            width: 8px;
+            height: 4px;
+            border-radius: 2px;
+            background: root.icon-color;
+        }
+    }
+
+    if root.kind == "Tunnels": Rectangle {
+        x: 3px;
+        y: 5px;
+        width: 11px;
+        height: 7px;
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Tunnels": Rectangle {
+        x: 8px;
+        y: 7px;
+        width: 11px;
+        height: 7px;
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Snippets": Text {
+        text: "{}";
+        color: root.icon-color;
+        font-size: 13px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.kind == "History": Rectangle {
+        x: 4px;
+        y: 1px;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+
+        Rectangle {
+            x: 6px;
+            y: 3px;
+            width: 2px;
+            height: 5px;
+            border-radius: 1px;
+            background: root.icon-color;
+        }
+
+        Rectangle {
+            x: 7px;
+            y: 7px;
+            width: 4px;
+            height: 2px;
+            border-radius: 1px;
+            background: root.icon-color;
+        }
+    }
+
+    if root.kind == "Search": Rectangle {
+        x: 4px;
+        y: 2px;
+        width: 11px;
+        height: 11px;
+        border-radius: 6px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Search": Rectangle {
+        x: 14px;
+        y: 12px;
+        width: 7px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.icon-color;
+    }
+
+    if root.kind == "Security": Rectangle {
+        x: 5px;
+        y: 1px;
+        width: 12px;
+        height: 15px;
+        border-radius: 5px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Security": Rectangle {
+        x: 9px;
+        y: 8px;
+        width: 4px;
+        height: 5px;
+        border-radius: 2px;
+        background: root.icon-color;
+    }
+
+    if root.kind == "Security": Rectangle {
+        x: 7px;
+        y: 0px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Settings": Rectangle {
+        x: 4px;
+        y: 2px;
+        width: 14px;
+        height: 14px;
+        border-radius: 7px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+
+        Rectangle {
+            x: 4px;
+            y: 4px;
+            width: 6px;
+            height: 6px;
+            border-radius: 3px;
+            background: root.icon-color;
+        }
+
+        Rectangle { x: 6px; y: -3px; width: 2px; height: 4px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { x: 6px; y: 13px; width: 2px; height: 4px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { x: -3px; y: 6px; width: 4px; height: 2px; border-radius: 1px; background: root.icon-color; }
+        Rectangle { x: 13px; y: 6px; width: 4px; height: 2px; border-radius: 1px; background: root.icon-color; }
     }
 }
 
 export component RailButton inherits Rectangle {
     in property <string> label;
+    in property <string> icon-key;
     in property <bool> active;
     callback clicked();
 
-    width: 30px;
-    height: 29px;
-    border-radius: 5px;
+    width: 42px;
+    height: 42px;
+    border-radius: 2px;
     border-width: 1px;
-    border-color: active ? AppTheme.accent : #00000000;
-    background: active ? #15352f : #111720;
+    border-color: active ? AppTheme.accent : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: active ? AppTheme.raised-bg : touch.pressed ? AppTheme.panel-bg : touch.has-hover ? AppTheme.surface-bg : AppTheme.rail-bg;
 
-    TouchArea {
+    touch := TouchArea {
         clicked => { root.clicked(); }
     }
 
-    Text {
-        text: label;
-        color: active ? AppTheme.text-strong : AppTheme.text-muted;
-        font-size: 11px;
-        font-weight: active ? 700 : 400;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    VerticalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        spacing: 1px;
+
+        HorizontalLayout {
+            height: 20px;
+            Rectangle { horizontal-stretch: 1; }
+            RailIcon {
+                kind: root.icon-key;
+                active: root.active;
+            }
+            Rectangle { horizontal-stretch: 1; }
+        }
+
+        Text {
+            text: label;
+            color: active ? AppTheme.text-strong : AppTheme.text-muted;
+            font-size: 8px;
+            font-weight: active ? 700 : 600;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+            overflow: elide;
+            height: 11px;
+        }
     }
 }
 
-export component ToolbarButton inherits Rectangle {
-    in property <string> label;
+export component TopbarIconButton inherits Rectangle {
+    in property <string> kind;
     callback clicked();
 
-    width: 46px;
+    width: 28px;
     height: 20px;
-    border-radius: 4px;
+    border-radius: 5px;
     border-width: 1px;
-    border-color: AppTheme.border;
-    background: AppTheme.surface-bg;
+    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: touch.pressed ? AppTheme.button-subtle-pressed : touch.has-hover ? AppTheme.button-subtle-hover : AppTheme.transparent;
 
-    TouchArea {
+    touch := TouchArea {
         clicked => { root.clicked(); }
     }
 
-    Text {
-        text: label;
-        color: AppTheme.text;
-        font-size: 10px;
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    if root.kind == "Search": Rectangle {
+        x: 8px;
+        y: 4px;
+        width: 8px;
+        height: 8px;
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: AppTheme.text-soft;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Search": Rectangle {
+        x: 15px;
+        y: 11px;
+        width: 5px;
+        height: 2px;
+        border-radius: 1px;
+        background: AppTheme.text-soft;
+    }
+
+    if root.kind == "Search": Rectangle {
+        x: 18px;
+        y: 13px;
+        width: 2px;
+        height: 4px;
+        border-radius: 1px;
+        background: AppTheme.text-soft;
     }
 }

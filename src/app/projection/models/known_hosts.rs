@@ -14,6 +14,7 @@ pub(in crate::app::projection) fn known_host_model(
             host: item.host.as_str().into(),
             port: i32::from(item.port),
             fingerprint: item.fingerprint.as_str().into(),
+            status_key: item.status_key.as_str().into(),
             status: item.status.as_str().into(),
         })
         .collect::<Vec<_>>();

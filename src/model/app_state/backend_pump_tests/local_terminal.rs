@@ -3,7 +3,12 @@ use super::*;
 #[test]
 fn local_terminal_input_reaches_backend_and_updates_terminal_buffer() {
     let mut state = AppState::default();
-    let session_id = LOCAL_TERMINAL_SESSION_ID;
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should be active");
+    state.backend_commands.drain();
     state.apply(Message::UpdateTerminalInputDraft {
         session_id,
         input: "echo smagicalssh-visible".to_owned(),
@@ -46,7 +51,12 @@ fn local_terminal_input_reaches_backend_and_updates_terminal_buffer() {
 #[test]
 fn local_terminal_send_clears_input_immediately_without_waiting_for_pump() {
     let mut state = AppState::default();
-    let session_id = LOCAL_TERMINAL_SESSION_ID;
+    state.apply(Message::OpenLocalTerminal);
+    let session_id = state
+        .sessions
+        .active_tab
+        .expect("local terminal should be active");
+    state.backend_commands.drain();
 
     state.apply(Message::UpdateTerminalInputDraft {
         session_id,

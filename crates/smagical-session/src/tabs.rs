@@ -1,4 +1,7 @@
 //! 会话标签页的打开、状态更新和关闭操作。
+//!
+//! `SessionManager` 只维护会话元数据和运行态索引，不执行网络 IO。后端事件进来后通过这些
+//! 方法更新状态，方法内部会过滤串台事件和终态后的迟到事件。
 
 use smagical_core::{
     CommandHistoryId, HostId, SessionId, SessionKind, SessionStatus, SessionTab, TunnelRule,
@@ -10,6 +13,7 @@ use super::SessionManager;
 impl SessionManager {
     /// 打开一个本地 Shell 标签页。
     pub fn open_local_shell_tab(&mut self, id: SessionId, title: impl Into<String>) {
+        // 本地 shell 不需要远程连接流程，创建后即可视为 Connected。
         self.push_tab(SessionTab {
             id,
             host_id: None,
@@ -21,6 +25,7 @@ impl SessionManager {
 
     /// 打开一个新的交互式 Shell 标签页。
     pub fn open_shell_tab(&mut self, id: SessionId, host_id: HostId, title: impl Into<String>) {
+        // 远程 shell 先进入 Created，等待后端连接命令推进状态。
         self.push_tab(SessionTab {
             id,
             host_id: Some(host_id),
@@ -68,12 +73,14 @@ impl SessionManager {
     /// 更新标签页状态。
     pub fn set_status(&mut self, id: SessionId, status: SessionStatus) -> bool {
         if let Some(tab) = self.tabs.iter_mut().find(|tab| tab.id == id) {
+            // 终态之后忽略迟到事件，避免断开后又被旧的 Connected 事件拉回。
             if tab.status.is_terminal() {
                 return false;
             }
 
             let is_terminal = status.is_terminal();
             tab.status = status;
+            // active 索引用来表示仍在运行/连接中的会话，终态需要移除。
             self.sync_active_index_for_status(id, is_terminal);
             true
         } else {
@@ -83,11 +90,13 @@ impl SessionManager {
 
     /// 关闭标签页，并同步活动连接索引。
     pub fn close_tab(&mut self, id: SessionId) -> bool {
+        // 关闭 tab 只改内存状态；后端资源释放由上层排队 Disconnect 命令负责。
         let before = self.tabs.len();
         self.tabs.retain(|tab| tab.id != id);
         self.active.retain(|active_id| *active_id != id);
 
         if self.active_tab == Some(id) {
+            // 当前 tab 被关闭时回退到最后一个标签页。
             self.active_tab = self.tabs.last().map(|tab| tab.id);
         }
 
@@ -96,6 +105,7 @@ impl SessionManager {
 
     /// 返回需要后台轮询输出的交互式 shell 标签页。
     pub fn interactive_shell_tab_ids(&self) -> Vec<SessionId> {
+        // 后端输出 pump 只轮询仍然连接的交互式 shell。
         self.tabs
             .iter()
             .filter(|tab| self.can_drain_interactive_shell(tab.id))
@@ -130,9 +140,22 @@ impl SessionManager {
             .is_some_and(|tab| matches!(tab.kind, SessionKind::Shell) && !tab.status.is_terminal())
     }
 
+    /// 判断打开本地 shell 命令是否仍允许发往本地 PTY 执行器。
+    pub fn can_execute_open_local_shell_command(&self, id: SessionId) -> bool {
+        self.tabs
+            .iter()
+            .find(|tab| tab.id == id)
+            .is_some_and(|tab| {
+                matches!(tab.kind, SessionKind::LocalShell) && !tab.status.is_terminal()
+            })
+    }
+
     /// 将交互式 shell 标签页标记为已打开，忽略其他类型或终态标签页的串台事件。
     pub fn mark_shell_opened(&mut self, id: SessionId) -> bool {
-        if !self.can_execute_open_shell_command(id) {
+        // OpenShell/OpenLocalShell 的成功事件都走这里，但会话类型必须匹配。
+        if !self.can_execute_open_shell_command(id)
+            && !self.can_execute_open_local_shell_command(id)
+        {
             return false;
         }
 
@@ -160,6 +183,7 @@ impl SessionManager {
 
     /// 将会产生进程退出事件的标签页标记为完成，忽略其他类型或终态标签页的串台事件。
     pub fn mark_process_exited(&mut self, id: SessionId, exit_code: Option<i32>) -> bool {
+        // 只有 shell 和 remote command 会产生进程退出语义。
         let Some(tab) = self.tabs.iter().find(|tab| tab.id == id) else {
             return false;
         };
@@ -173,6 +197,7 @@ impl SessionManager {
         }
 
         let status = match exit_code {
+            // None 用于后端没有提供退出码的正常断开。
             Some(0) | None => SessionStatus::Disconnected,
             Some(code) => SessionStatus::Failed {
                 reason: format!("remote command exited with {code}"),
@@ -197,12 +222,8 @@ impl SessionManager {
             return false;
         };
 
-        if !matches!(tab.kind, SessionKind::Shell)
-            || !matches!(
-                tab.status,
-                SessionStatus::Disconnected | SessionStatus::Failed { .. }
-            )
-        {
+        // 重连是少数允许终态重新进入非终态的路径，必须由用户主动触发。
+        if !tab.can_reconnect_shell() {
             return false;
         }
 
@@ -253,6 +274,7 @@ impl SessionManager {
     /// 标记会话失败，并集中收敛 SFTP、传输和隧道运行态。
     pub fn mark_session_failed(&mut self, id: SessionId, reason: impl Into<String>) -> bool {
         let reason = reason.into();
+        // 会话失败时，依附该会话的 SFTP/传输/隧道运行态也必须收尾。
         let session_updated = self.set_status(
             id,
             SessionStatus::Failed {
@@ -306,6 +328,7 @@ impl SessionManager {
         tabs: &[WorkspaceTabSnapshot],
         active_tab: Option<SessionId>,
     ) {
+        // 恢复只还原可见标签，不自动重连，避免启动应用就发起网络连接。
         self.tabs = tabs
             .iter()
             .map(|snapshot| SessionTab {
@@ -323,6 +346,7 @@ impl SessionManager {
     }
 
     fn sync_active_index_for_status(&mut self, id: SessionId, is_terminal: bool) {
+        // active 保存仍在活动生命周期中的 session_id，供状态栏和后台任务判断。
         if is_terminal {
             self.active.retain(|active_id| *active_id != id);
         } else if !self.active.contains(&id) {
@@ -349,6 +373,7 @@ impl SessionManager {
 
     fn fail_sftp_runtime_for_session(&mut self, id: SessionId, reason: impl Into<String>) -> bool {
         let reason = reason.into();
+        // SFTP 浏览器、传输列表都可能依附同一个会话，失败时统一收敛。
         let browser_updated = self.reassign_sftp_browser_after_session_loss(id)
             || self.fail_sftp_browser_for_session(id, reason.clone());
         let transfers_updated = self.fail_transfers_for_session(id, reason);
@@ -608,10 +633,16 @@ mod tests {
         assert!(!sessions.can_execute_open_shell_command(command_id));
         assert!(!sessions.can_execute_open_shell_command(local_id));
         assert!(!sessions.can_execute_open_shell_command(session_id()));
+        assert!(sessions.can_execute_open_local_shell_command(local_id));
+        assert!(!sessions.can_execute_open_local_shell_command(shell_id));
+        assert!(!sessions.can_execute_open_local_shell_command(command_id));
+        assert!(!sessions.can_execute_open_local_shell_command(session_id()));
 
         assert!(sessions.set_status(shell_id, SessionStatus::Disconnected));
+        assert!(sessions.set_status(local_id, SessionStatus::Disconnected));
 
         assert!(!sessions.can_execute_open_shell_command(shell_id));
+        assert!(!sessions.can_execute_open_local_shell_command(local_id));
     }
 
     #[test]

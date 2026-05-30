@@ -1,7 +1,7 @@
 //! SSH 连接执行计划。
 
 use smagical_backend_core::{BackendExecutionError, ConnectionTarget};
-use smagical_core::KnownHostEntry;
+use smagical_core::{AgentSource, KnownHostEntry};
 use smagical_security::{AuthResolver, ResolvedAuth, SecretStore, SecurityError};
 
 #[cfg(test)]
@@ -58,6 +58,7 @@ pub enum SshAuthPlan {
     },
     Agent {
         username: String,
+        source: AgentSource,
         key_hint: Option<String>,
     },
     Certificate {
@@ -103,7 +104,15 @@ impl From<ResolvedAuth> for SshAuthPlan {
                 private_key,
                 passphrase,
             },
-            ResolvedAuth::Agent { username, key_hint } => Self::Agent { username, key_hint },
+            ResolvedAuth::Agent {
+                username,
+                source,
+                key_hint,
+            } => Self::Agent {
+                username,
+                source,
+                key_hint,
+            },
             ResolvedAuth::Certificate {
                 username,
                 private_key,

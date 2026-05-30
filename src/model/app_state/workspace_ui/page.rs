@@ -1,6 +1,7 @@
 //! 工作区页面与 Hosts 列表状态。
 
-use crate::model::WorkspacePage;
+use crate::config::HostListModePreference;
+use crate::model::{HostListMode, WorkspacePage};
 
 use super::super::{AppState, AppUpdateOutcome, ui_drafts::draft_changed};
 
@@ -11,13 +12,38 @@ impl AppState {
         page: WorkspacePage,
     ) -> AppUpdateOutcome {
         self.ui.workspace.active_page = page;
+        self.ui.workspace.set_hosts_panel_collapsed(false);
+        draft_changed()
+    }
+
+    /// 通过左侧导航进入页面；重复点击当前页面会折叠或展开 Hosts 面板。
+    pub(in crate::model::app_state) fn navigate_workspace_page(
+        &mut self,
+        page: WorkspacePage,
+    ) -> AppUpdateOutcome {
+        if self.ui.workspace.active_page == page {
+            let collapsed = !self.ui.workspace.hosts_panel_collapsed;
+            self.ui.workspace.set_hosts_panel_collapsed(collapsed);
+        } else {
+            self.ui.workspace.active_page = page;
+            self.ui.workspace.set_hosts_panel_collapsed(false);
+        }
+
         draft_changed()
     }
 
     /// 切换 Hosts 列表展示方式。
     pub(in crate::model::app_state) fn toggle_host_list_mode(&mut self) -> AppUpdateOutcome {
         self.ui.workspace.toggle_host_list_mode();
-        draft_changed()
+        let preference = host_list_mode_preference(self.ui.workspace.host_list_mode);
+        let changed = self.config.workspace.host_list_mode != preference;
+        self.config.workspace.host_list_mode = preference;
+        self.storage.app_config = self.config.clone();
+
+        AppUpdateOutcome {
+            state_changed: changed,
+            ..AppUpdateOutcome::default()
+        }
     }
 
     /// 更新 Hosts 面板搜索条件。
@@ -27,5 +53,21 @@ impl AppState {
     ) -> AppUpdateOutcome {
         self.ui.workspace.set_host_search_query(query);
         draft_changed()
+    }
+
+    /// 更新新建会话弹窗搜索条件。
+    pub(in crate::model::app_state) fn update_new_session_search_query(
+        &mut self,
+        query: String,
+    ) -> AppUpdateOutcome {
+        self.ui.workspace.set_new_session_search_query(query);
+        draft_changed()
+    }
+}
+
+fn host_list_mode_preference(mode: HostListMode) -> HostListModePreference {
+    match mode {
+        HostListMode::Tree => HostListModePreference::Tree,
+        HostListMode::Card => HostListModePreference::Card,
     }
 }

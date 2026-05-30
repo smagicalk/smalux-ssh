@@ -39,9 +39,11 @@ pub(super) async fn authenticate(
                 .await
                 .map_err(|error| authentication_error(username, error))?
         }
-        SshAuthPlan::Agent { username, key_hint } => {
-            agent::authenticate_agent(handle, username, key_hint.as_deref()).await?
-        }
+        SshAuthPlan::Agent {
+            username,
+            source,
+            key_hint,
+        } => agent::authenticate_agent(handle, username, source, key_hint.as_deref()).await?,
         SshAuthPlan::Certificate {
             username,
             private_key,

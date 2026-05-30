@@ -2,6 +2,7 @@
 
 use russh::client;
 use russh::keys::agent::client::{AgentClient, AgentStream};
+use smagical_core::AgentSource;
 use smagical_ssh_client_core::{
     agent_identity_authentication_error, authentication_error, select_agent_identity,
 };
@@ -16,9 +17,10 @@ type DynamicAgentClient = AgentClient<Box<dyn AgentStream + Send + Unpin + 'stat
 pub(super) async fn authenticate_agent(
     handle: &mut client::Handle<SshClientHandler>,
     username: &str,
+    source: &AgentSource,
     key_hint: Option<&str>,
 ) -> Result<client::AuthResult, BackendExecutionError> {
-    let mut agent = connect_agent()
+    let mut agent = connect_agent(source)
         .await
         .map_err(|error| authentication_error(username, error))?;
     let identities = agent
@@ -35,22 +37,38 @@ pub(super) async fn authenticate_agent(
         .map_err(|error| authentication_error(username, error))
 }
 
-async fn connect_agent() -> Result<DynamicAgentClient, russh::keys::Error> {
+async fn connect_agent(source: &AgentSource) -> Result<DynamicAgentClient, russh::keys::Error> {
     #[cfg(unix)]
     {
+        let _ = source;
         AgentClient::connect_env().await.map(AgentClient::dynamic)
     }
 
     #[cfg(windows)]
     {
-        match AgentClient::connect_named_pipe(WINDOWS_OPENSSH_AGENT_PIPE).await {
-            Ok(agent) => Ok(agent.dynamic()),
-            Err(named_pipe_error) => match AgentClient::connect_pageant().await {
-                Ok(agent) => Ok(agent.dynamic()),
-                Err(pageant_error) => Err(russh::keys::Error::IO(std::io::Error::other(format!(
-                    "OpenSSH agent 连接失败：{named_pipe_error}; Pageant 连接失败：{pageant_error}"
-                )))),
-            },
+        match source {
+            AgentSource::Auto => {
+                match AgentClient::connect_named_pipe(WINDOWS_OPENSSH_AGENT_PIPE).await {
+                    Ok(agent) => Ok(agent.dynamic()),
+                    Err(named_pipe_error) => match AgentClient::connect_pageant().await {
+                        Ok(agent) => Ok(agent.dynamic()),
+                        Err(pageant_error) => {
+                            Err(russh::keys::Error::IO(std::io::Error::other(format!(
+                                "OpenSSH agent 连接失败：{named_pipe_error}; Pageant 连接失败：{pageant_error}"
+                            ))))
+                        }
+                    },
+                }
+            }
+            AgentSource::OpenSsh => AgentClient::connect_named_pipe(WINDOWS_OPENSSH_AGENT_PIPE)
+                .await
+                .map(AgentClient::dynamic),
+            AgentSource::Pageant => AgentClient::connect_pageant()
+                .await
+                .map(AgentClient::dynamic),
+            AgentSource::CustomNamedPipe(path) => AgentClient::connect_named_pipe(path)
+                .await
+                .map(AgentClient::dynamic),
         }
     }
 
