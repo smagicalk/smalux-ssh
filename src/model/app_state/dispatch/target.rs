@@ -91,7 +91,8 @@ impl MessageDispatchTarget {
             | Message::NextTheme
             | Message::SetLanguage { .. }
             | Message::SetBuiltInTheme { .. }
-            | Message::ExportBuiltInTheme { .. }
+            | Message::ExportCurrentTheme { .. }
+            | Message::CopyCurrentBuiltInTheme
             | Message::ImportTheme { .. }
             | Message::ApplyThemeProfile { .. }
             | Message::RemoveThemeProfile { .. }

@@ -339,6 +339,7 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
     assert_eq!(settings.text.custom_theme_title, "主题资料");
     assert_eq!(settings.text.file_actions_title, "文件操作");
     assert_eq!(settings.text.apply_label, "应用");
+    assert_eq!(settings.text.copy_label, "复制");
     assert_eq!(settings.text.choose_file_label, "选择");
     assert_eq!(settings.text.no_custom_themes_label, "暂无导入主题");
     assert!(
@@ -368,7 +369,7 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
     assert!(settings.theme.custom_theme_profiles[0].can_apply);
     assert!(settings.theme.custom_theme_profiles[0].can_remove);
     assert!(settings.theme.can_import);
-    assert!(settings.theme.can_export_current_builtin);
+    assert!(settings.theme.can_export_current_theme);
     assert_eq!(settings.theme.import_formats.len(), 5);
     assert_eq!(settings.theme.import_formats[0].key, "NativeToml");
     assert_eq!(settings.theme.import_formats[0].extension, "toml");
@@ -452,7 +453,7 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
         "输入要导入的文件路径"
     );
     assert!(settings.file_actions[0].enabled);
-    assert_eq!(settings.file_actions[1].key, "ExportBuiltInTheme");
+    assert_eq!(settings.file_actions[1].key, "ExportCurrentTheme");
     assert_eq!(settings.file_actions[1].label, "导出当前主题");
     assert_eq!(settings.file_actions[1].category_key, "Theme");
     assert_eq!(settings.file_actions[1].direction, "Export");
@@ -559,6 +560,10 @@ fn app_view_model_marks_current_custom_theme_profile_selected() {
     let settings = app_view_model(&state).settings;
 
     assert_eq!(settings.theme.current_profile_name, "Imported");
+    assert_eq!(
+        settings.theme.default_export_file_name,
+        "Imported.smagical-theme.toml"
+    );
     assert_eq!(settings.theme.custom_theme_profiles.len(), 1);
     assert!(settings.theme.custom_theme_profiles[0].selected);
     assert!(!settings.theme.custom_theme_profiles[0].can_apply);

@@ -1,12 +1,12 @@
 //! Slint 工作区状态写入。
 
-use slint::{Color, ComponentHandle};
-
+use crate::app::AppWindow;
 use crate::app::view_model::AppViewModel;
-use crate::app::{AppTheme, AppWindow};
+
+use super::theme::sync_theme_palette;
 
 pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
-    sync_theme_palette(window, model);
+    sync_theme_palette(window, model.theme_palette);
     window.set_host_count(model.host_count.as_str().into());
     window.set_tab_count(model.tab_count.as_str().into());
     window.set_active_page_key(model.active_page_key.into());
@@ -103,6 +103,7 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_settings_file_actions_title_label(settings.text.file_actions_title.into());
     window.set_settings_security_title_label(settings.text.security_title.into());
     window.set_settings_apply_label(settings.text.apply_label.into());
+    window.set_settings_copy_label(settings.text.copy_label.into());
     window.set_settings_remove_label(settings.text.remove_label.into());
     window.set_settings_run_label(settings.text.run_label.into());
     window.set_settings_choose_file_label(settings.text.choose_file_label.into());
@@ -242,110 +243,4 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_command_palette_query(model.command_palette_query.as_str().into());
     window.set_new_session_search_query(model.new_session_search_query.as_str().into());
     window.set_new_session_local_visible(model.new_session_local_visible);
-}
-
-fn sync_theme_palette(window: &AppWindow, model: &AppViewModel) {
-    let theme = window.global::<AppTheme>();
-    let palette = model.theme_palette;
-
-    theme.set_window_bg(color(palette.window_bg));
-    theme.set_topbar_bg(color(palette.topbar_bg));
-    theme.set_rail_bg(color(palette.rail_bg));
-    theme.set_panel_bg(color(palette.panel_bg));
-    theme.set_surface_bg(color(palette.surface_bg));
-    theme.set_surface_hover(color(palette.surface_hover));
-    theme.set_surface_pressed(color(palette.surface_pressed));
-    theme.set_raised_bg(color(palette.raised_bg));
-    theme.set_card_bg(color(palette.card_bg));
-    theme.set_card_hover(color(palette.card_hover));
-    theme.set_inset_bg(color(palette.inset_bg));
-    theme.set_dock_bg(color(palette.dock_bg));
-    theme.set_terminal_bg(color(palette.terminal_bg));
-    theme.set_overlay_bg(color(palette.overlay_bg));
-    theme.set_border(color(palette.border));
-    theme.set_border_soft(color(palette.border_soft));
-    theme.set_border_strong(color(palette.border_strong));
-    theme.set_border_focus(color(palette.border_focus));
-    theme.set_border_danger(color(palette.border_danger));
-    theme.set_accent(color(palette.accent));
-    theme.set_accent_blue(color(palette.accent_blue));
-    theme.set_accent_violet(color(palette.accent_violet));
-    theme.set_warning(color(palette.warning));
-    theme.set_danger(color(palette.danger));
-    theme.set_text(color(palette.text));
-    theme.set_text_strong(color(palette.text_strong));
-    theme.set_text_muted(color(palette.text_muted));
-    theme.set_text_soft(color(palette.text_soft));
-    theme.set_text_secondary(color(palette.text_secondary));
-    theme.set_text_disabled(color(palette.text_disabled));
-    theme.set_text_inverse(color(palette.text_inverse));
-    theme.set_section_text(color(palette.section_text));
-    theme.set_status_muted(color(palette.status_muted));
-    theme.set_success_text(color(palette.success_text));
-    theme.set_success_text_soft(color(palette.success_text_soft));
-    theme.set_info_text(color(palette.info_text));
-    theme.set_danger_text(color(palette.danger_text));
-    theme.set_danger_text_soft(color(palette.danger_text_soft));
-    theme.set_badge_success_bg(color(palette.badge_success_bg));
-    theme.set_badge_info_bg(color(palette.badge_info_bg));
-    theme.set_badge_pending_bg(color(palette.badge_pending_bg));
-    theme.set_badge_warning_bg(color(palette.badge_warning_bg));
-    theme.set_selection_bg(color(palette.selection_bg));
-    theme.set_input_bg(color(palette.input_bg));
-    theme.set_input_bg_focus(color(palette.input_bg_focus));
-    theme.set_input_placeholder(color(palette.input_placeholder));
-    theme.set_input_selection(color(palette.input_selection));
-    theme.set_button_primary_bg(color(palette.button_primary_bg));
-    theme.set_button_primary_hover(color(palette.button_primary_hover));
-    theme.set_button_primary_pressed(color(palette.button_primary_pressed));
-    theme.set_button_primary_border(color(palette.button_primary_border));
-    theme.set_button_primary_border_hover(color(palette.button_primary_border_hover));
-    theme.set_button_primary_border_pressed(color(palette.button_primary_border_pressed));
-    theme.set_button_primary_text(color(palette.button_primary_text));
-    theme.set_button_secondary_bg(color(palette.button_secondary_bg));
-    theme.set_button_secondary_hover(color(palette.button_secondary_hover));
-    theme.set_button_secondary_pressed(color(palette.button_secondary_pressed));
-    theme.set_button_secondary_border(color(palette.button_secondary_border));
-    theme.set_button_secondary_text(color(palette.button_secondary_text));
-    theme.set_button_subtle_hover(color(palette.button_subtle_hover));
-    theme.set_button_subtle_pressed(color(palette.button_subtle_pressed));
-    theme.set_button_danger_bg(color(palette.button_danger_bg));
-    theme.set_button_danger_hover(color(palette.button_danger_hover));
-    theme.set_button_danger_pressed(color(palette.button_danger_pressed));
-    theme.set_button_danger_border(color(palette.button_danger_border));
-    theme.set_button_danger_border_hover(color(palette.button_danger_border_hover));
-    theme.set_button_danger_border_pressed(color(palette.button_danger_border_pressed));
-    theme.set_button_danger_text(color(palette.button_danger_text));
-    theme.set_dialog_bg(color(palette.dialog_bg));
-    theme.set_dialog_section_bg(color(palette.dialog_section_bg));
-    theme.set_dialog_success_icon_bg(color(palette.dialog_success_icon_bg));
-    theme.set_dialog_success_icon_border(color(palette.dialog_success_icon_border));
-    theme.set_dialog_danger_icon_bg(color(palette.dialog_danger_icon_bg));
-    theme.set_dialog_danger_icon_border(color(palette.dialog_danger_icon_border));
-    theme.set_dialog_error_bg(color(palette.dialog_error_bg));
-    theme.set_dialog_error_border(color(palette.dialog_error_border));
-    theme.set_tab_bg(color(palette.tab_bg));
-    theme.set_tab_hover_bg(color(palette.tab_hover_bg));
-    theme.set_tab_pressed_bg(color(palette.tab_pressed_bg));
-    theme.set_tab_active_bg(color(palette.tab_active_bg));
-    theme.set_tab_active_border(color(palette.tab_active_border));
-    theme.set_tab_accent_hover(color(palette.tab_accent_hover));
-    theme.set_tab_close_hover_bg(color(palette.tab_close_hover_bg));
-    theme.set_tab_close_pressed_bg(color(palette.tab_close_pressed_bg));
-    theme.set_tab_close_border_hover(color(palette.tab_close_border_hover));
-    theme.set_terminal_viewport_bg(color(palette.terminal_viewport_bg));
-    theme.set_terminal_border(color(palette.terminal_border));
-    theme.set_terminal_selection(color(palette.terminal_selection));
-    theme.set_topbar_border(color(palette.topbar_border));
-    theme.set_terminal_text(color(palette.terminal_text));
-    theme.set_terminal_muted(color(palette.terminal_muted));
-}
-
-fn color(argb: u32) -> Color {
-    Color::from_argb_u8(
-        ((argb >> 24) & 0xff) as u8,
-        ((argb >> 16) & 0xff) as u8,
-        ((argb >> 8) & 0xff) as u8,
-        (argb & 0xff) as u8,
-    )
 }

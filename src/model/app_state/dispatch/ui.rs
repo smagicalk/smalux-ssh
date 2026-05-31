@@ -73,10 +73,11 @@ impl AppState {
             Message::NextTheme => self.next_theme(),
             Message::SetLanguage { language } => self.set_language(language),
             Message::SetBuiltInTheme { theme } => self.set_built_in_theme(theme),
-            Message::ExportBuiltInTheme {
+            Message::ExportCurrentTheme {
                 target_path,
                 format,
-            } => self.export_built_in_theme(&target_path, format),
+            } => self.export_current_theme(&target_path, format),
+            Message::CopyCurrentBuiltInTheme => self.copy_current_built_in_theme(),
             Message::ImportTheme { source_path } => self.import_theme(&source_path),
             Message::ApplyThemeProfile { name } => self.apply_theme_profile(&name),
             Message::RemoveThemeProfile { name } => self.remove_theme_profile(&name),

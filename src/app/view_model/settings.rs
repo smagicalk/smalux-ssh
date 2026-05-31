@@ -47,6 +47,7 @@ pub(in crate::app) struct SettingsTextViewModel {
     pub file_actions_title: &'static str,
     pub security_title: &'static str,
     pub apply_label: &'static str,
+    pub copy_label: &'static str,
     pub remove_label: &'static str,
     pub run_label: &'static str,
     pub choose_file_label: &'static str,
@@ -64,7 +65,7 @@ pub(in crate::app) struct SettingsThemeViewModel {
     pub custom_theme_names: Vec<String>,
     pub custom_theme_profiles: Vec<CustomThemeProfileViewModel>,
     pub can_import: bool,
-    pub can_export_current_builtin: bool,
+    pub can_export_current_theme: bool,
     pub import_formats: Vec<ThemeFormatViewModel>,
     pub export_formats: Vec<ThemeFormatViewModel>,
     pub default_import_extension: &'static str,
@@ -166,6 +167,7 @@ fn settings_text(locale: Locale) -> SettingsTextViewModel {
         file_actions_title: tr(locale, "settings.section_file_actions"),
         security_title: tr(locale, "settings.section_security"),
         apply_label: tr(locale, "settings.action_apply"),
+        copy_label: tr(locale, "settings.action_copy"),
         remove_label: tr(locale, "settings.action_remove"),
         run_label: tr(locale, "settings.action_run"),
         choose_file_label: tr(locale, "settings.action_choose_file"),
@@ -230,11 +232,49 @@ fn theme_status(state: &AppState, locale: Locale) -> SettingsThemeViewModel {
             .collect(),
         custom_theme_profiles: custom_theme_profiles(state, locale),
         can_import: true,
-        can_export_current_builtin: true,
+        can_export_current_theme: true,
         import_formats: theme_import_formats(locale),
         export_formats: theme_export_formats(locale),
         default_import_extension: "toml",
-        default_export_file_name: format!("{}.smagical-theme.toml", state.ui.workspace.theme.key()),
+        default_export_file_name: current_theme_export_file_name(state),
+    }
+}
+
+fn current_theme_export_file_name(state: &AppState) -> String {
+    let stem = state
+        .storage
+        .theme_by_name(&state.config.theme.name)
+        .map(|theme| file_stem_from_theme_name(&theme.name))
+        .unwrap_or_else(|| state.ui.workspace.theme.key().to_owned());
+    format!("{stem}.smagical-theme.toml")
+}
+
+fn file_stem_from_theme_name(name: &str) -> String {
+    let mut stem = String::new();
+    let mut last_was_separator = false;
+    for ch in name.trim().chars() {
+        let separator = ch.is_whitespace()
+            || ch.is_control()
+            || matches!(ch, '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*');
+        if separator {
+            if !stem.is_empty() && !last_was_separator {
+                stem.push('-');
+            }
+            last_was_separator = true;
+        } else if ch.is_alphanumeric() || matches!(ch, '-' | '_' | '.') {
+            stem.push(ch);
+            last_was_separator = false;
+        } else if !stem.is_empty() && !last_was_separator {
+            stem.push('-');
+            last_was_separator = true;
+        }
+    }
+
+    let stem = stem.trim_matches(&['-', '.'][..]);
+    if stem.is_empty() {
+        "custom-theme".to_owned()
+    } else {
+        stem.to_owned()
     }
 }
 
@@ -380,12 +420,12 @@ fn file_actions(
             locale,
         ),
         file_action(
-            "ExportBuiltInTheme",
+            "ExportCurrentTheme",
             tr(locale, "settings.file_action_export_current_theme"),
             "Theme",
             "Export",
             "NativeToml",
-            format!("{}.smagical-theme.toml", state.ui.workspace.theme.key()),
+            current_theme_export_file_name(state),
             "toml",
             true,
             locale,

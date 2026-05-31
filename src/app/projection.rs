@@ -20,6 +20,7 @@ mod collections;
 mod models;
 mod sftp;
 mod terminal;
+mod theme;
 mod workspace;
 
 use collections::sync_collection_models;

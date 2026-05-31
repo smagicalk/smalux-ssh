@@ -41,18 +41,25 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
-        window.on_export_built_in_theme(move |target_path, format| {
+        window.on_export_current_theme(move |target_path, format| {
             let Some(format) = parse_theme_exchange_format(&format) else {
                 return;
             };
             apply_and_sync(
                 &weak,
                 &state,
-                Message::ExportBuiltInTheme {
+                Message::ExportCurrentTheme {
                     target_path: target_path.to_string(),
                     format,
                 },
             );
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_copy_current_built_in_theme(move || {
+            apply_and_sync(&weak, &state, Message::CopyCurrentBuiltInTheme);
         });
     }
     {

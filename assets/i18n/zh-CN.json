@@ -207,6 +207,7 @@
     "settings.section_file_actions": "文件操作",
     "settings.section_security": "安全",
     "settings.action_apply": "应用",
+    "settings.action_copy": "复制",
     "settings.action_remove": "删除",
     "settings.action_run": "执行",
     "settings.action_choose_file": "选择",

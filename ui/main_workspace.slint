@@ -635,6 +635,7 @@ component SettingsPage inherits Rectangle {
     in property <string> file-actions-title-label;
     in property <string> security-title-label;
     in property <string> apply-label;
+    in property <string> copy-label;
     in property <string> remove-label;
     in property <string> run-label;
     in property <string> choose-file-label;
@@ -652,6 +653,7 @@ component SettingsPage inherits Rectangle {
     in property <string> security-version-label;
     callback set-language(language: string);
     callback set-built-in-theme(theme: string);
+    callback copy-current-built-in-theme();
     callback apply-theme-profile(name: string);
     callback remove-theme-profile(name: string);
     callback run-file-action(key: string, path: string, format: string);
@@ -690,6 +692,11 @@ component SettingsPage inherits Rectangle {
                     option: option;
                     selected-label: root.selected-label;
                     clicked(key) => { root.set-built-in-theme(key); }
+                }
+                CompactButton {
+                    label: root.copy-label;
+                    compact: true;
+                    clicked => { root.copy-current-built-in-theme(); }
                 }
             }
 
@@ -782,6 +789,7 @@ export component MainWorkspace inherits Rectangle {
     in property <string> settings-file-actions-title-label: "";
     in property <string> settings-security-title-label: "";
     in property <string> settings-apply-label: "";
+    in property <string> settings-copy-label: "";
     in property <string> settings-remove-label: "";
     in property <string> settings-run-label: "";
     in property <string> settings-choose-file-label: "";
@@ -854,7 +862,8 @@ export component MainWorkspace inherits Rectangle {
     callback dismiss-ui-error();
     callback set-language(language: string);
     callback set-built-in-theme(theme: string);
-    callback export-built-in-theme(target-path: string, format: string);
+    callback copy-current-built-in-theme();
+    callback export-current-theme(target-path: string, format: string);
     callback import-theme(source-path: string);
     callback apply-theme-profile(name: string);
     callback remove-theme-profile(name: string);
@@ -1025,6 +1034,7 @@ export component MainWorkspace inherits Rectangle {
             file-actions-title-label: root.settings-file-actions-title-label;
             security-title-label: root.settings-security-title-label;
             apply-label: root.settings-apply-label;
+            copy-label: root.settings-copy-label;
             remove-label: root.settings-remove-label;
             run-label: root.settings-run-label;
             choose-file-label: root.settings-choose-file-label;
@@ -1042,14 +1052,15 @@ export component MainWorkspace inherits Rectangle {
             security-version-label: root.settings-security-version-label;
             set-language(language) => { root.set-language(language); }
             set-built-in-theme(theme) => { root.set-built-in-theme(theme); }
+            copy-current-built-in-theme => { root.copy-current-built-in-theme(); }
             apply-theme-profile(name) => { root.apply-theme-profile(name); }
             remove-theme-profile(name) => { root.remove-theme-profile(name); }
             choose-file-action-path(key, current-path, direction, extension) => {
                 root.choose-file-action-path(key, current-path, direction, extension)
             }
             run-file-action(key, path, format) => {
-                if (key == "ExportBuiltInTheme") {
-                    root.export-built-in-theme(path, format);
+                if (key == "ExportCurrentTheme") {
+                    root.export-current-theme(path, format);
                 } else if (key == "ImportTheme") {
                     root.import-theme(path);
                 } else if (key == "BackupSqlite") {

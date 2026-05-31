@@ -115,7 +115,7 @@ fn settings_theme_export_writes_current_builtin_theme_document() {
         theme: BuiltInTheme::Dracula,
     });
 
-    let outcome = state.apply(Message::ExportBuiltInTheme {
+    let outcome = state.apply(Message::ExportCurrentTheme {
         target_path: export_path.to_string_lossy().into_owned(),
         format: ThemeExchangeFormat::NativeToml,
     });
@@ -135,7 +135,7 @@ fn settings_theme_export_supports_common_external_formats() {
         theme: BuiltInTheme::Dracula,
     });
 
-    let outcome = state.apply(Message::ExportBuiltInTheme {
+    let outcome = state.apply(Message::ExportCurrentTheme {
         target_path: export_path.to_string_lossy().into_owned(),
         format: ThemeExchangeFormat::VsCodeJson,
     });
@@ -151,13 +151,79 @@ fn settings_theme_export_reports_unsupported_iterm2() {
     let export_path = temp_path("theme-export-iterm", "itermcolors");
     let mut state = AppState::default();
 
-    let outcome = state.apply(Message::ExportBuiltInTheme {
+    let outcome = state.apply(Message::ExportCurrentTheme {
         target_path: export_path.to_string_lossy().into_owned(),
         format: ThemeExchangeFormat::ItermColors,
     });
 
     assert!(outcome.error.is_some());
     assert!(!export_path.exists());
+}
+
+#[test]
+fn settings_theme_export_current_profile_uses_stored_custom_theme() {
+    let export_path = temp_path("theme-export-custom", "toml");
+    let mut document = built_in_theme_document(BuiltInTheme::NordDark);
+    document.name = "Stored Nord".to_owned();
+    document.font.terminal.family = "Maple Mono".to_owned();
+    document.font.terminal.size = 17;
+    let mut state = AppState::default();
+    state
+        .storage
+        .upsert_theme(crate::storage::ThemeProfileRecord {
+            name: "Stored Nord".to_owned(),
+            profile_toml: document.to_toml().expect("theme should encode"),
+            builtin: false,
+        });
+    state.apply(Message::ApplyThemeProfile {
+        name: "Stored Nord".to_owned(),
+    });
+
+    let outcome = state.apply(Message::ExportCurrentTheme {
+        target_path: export_path.to_string_lossy().into_owned(),
+        format: ThemeExchangeFormat::NativeToml,
+    });
+
+    assert!(outcome.error.is_none());
+    let content = fs::read_to_string(&export_path).expect("exported theme should read");
+    assert!(content.contains("name = \"Stored Nord\""));
+    assert!(content.contains("family = \"Maple Mono\""));
+    let _ = fs::remove_file(export_path);
+}
+
+#[test]
+fn copy_current_built_in_theme_creates_custom_profile_and_applies_it() {
+    let mut state = AppState::default();
+    state.apply(Message::SetBuiltInTheme {
+        theme: BuiltInTheme::Dracula,
+    });
+
+    let outcome = state.apply(Message::CopyCurrentBuiltInTheme);
+
+    assert!(outcome.changed());
+    assert_eq!(state.storage.theme_count(), 1);
+    assert_eq!(state.config.theme.name, "Dracula 自定义");
+    assert_eq!(state.storage.app_config.theme, state.config.theme);
+    let stored = state
+        .storage
+        .theme_by_name("Dracula 自定义")
+        .expect("copied theme should be stored");
+    assert!(!stored.builtin);
+    assert!(stored.profile_toml.contains("id = \"dracula-custom\""));
+
+    let second = state.apply(Message::CopyCurrentBuiltInTheme);
+
+    assert!(second.changed());
+    assert_eq!(state.storage.theme_count(), 2);
+    let stored_second = state
+        .storage
+        .theme_by_name("Dracula 自定义 2")
+        .expect("second copied theme should be stored");
+    assert!(
+        stored_second
+            .profile_toml
+            .contains("id = \"dracula-custom-2\"")
+    );
 }
 
 #[test]
@@ -192,6 +258,45 @@ fn settings_theme_import_updates_global_theme_profile() {
         Some(false)
     );
     assert_eq!(state.ui.visual_settings.theme_name, "Imported Nord");
+    let _ = fs::remove_file(import_path);
+}
+
+#[test]
+fn settings_theme_import_accepts_partial_native_toml() {
+    let import_path = temp_path("theme-import-partial", "toml");
+    fs::write(
+        &import_path,
+        r##"
+schema_version = 1
+id = "partial-nord"
+name = "Partial Nord"
+extends = "nord-dark"
+
+[font.terminal]
+family = "Maple Mono"
+size = 16
+
+[overrides]
+"terminal.background" = "#010203"
+"button.primary.background_hover" = "#223344"
+"##,
+    )
+    .expect("partial theme fixture should write");
+    let mut state = AppState::default();
+
+    let outcome = state.apply(Message::ImportTheme {
+        source_path: import_path.to_string_lossy().into_owned(),
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(state.config.theme.name, "Partial Nord");
+    assert_eq!(state.config.theme.font_family, "Maple Mono");
+    assert_eq!(state.config.theme.font_size, 16.0);
+    let stored = state
+        .storage
+        .theme_by_name("Partial Nord")
+        .expect("partial theme should be stored");
+    assert!(stored.profile_toml.contains("background = \"#010203\""));
     let _ = fs::remove_file(import_path);
 }
 

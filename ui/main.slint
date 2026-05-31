@@ -264,6 +264,7 @@ export component AppWindow inherits Window {
     in property <string> settings-file-actions-title-label: "";
     in property <string> settings-security-title-label: "";
     in property <string> settings-apply-label: "";
+    in property <string> settings-copy-label: "";
     in property <string> settings-remove-label: "";
     in property <string> settings-run-label: "";
     in property <string> settings-choose-file-label: "";
@@ -324,7 +325,8 @@ export component AppWindow inherits Window {
     callback next-theme();
     callback set-language(language: string);
     callback set-built-in-theme(theme: string);
-    callback export-built-in-theme(target-path: string, format: string);
+    callback copy-current-built-in-theme();
+    callback export-current-theme(target-path: string, format: string);
     callback import-theme(source-path: string);
     callback apply-theme-profile(name: string);
     callback remove-theme-profile(name: string);
@@ -497,6 +499,7 @@ export component AppWindow inherits Window {
                 settings-file-actions-title-label: root.settings-file-actions-title-label;
                 settings-security-title-label: root.settings-security-title-label;
                 settings-apply-label: root.settings-apply-label;
+                settings-copy-label: root.settings-copy-label;
                 settings-remove-label: root.settings-remove-label;
                 settings-run-label: root.settings-run-label;
                 settings-choose-file-label: root.settings-choose-file-label;
@@ -567,7 +570,8 @@ export component AppWindow inherits Window {
                 dismiss-ui-error => { root.dismiss-ui-error(); }
                 set-language(language) => { root.set-language(language); }
                 set-built-in-theme(theme) => { root.set-built-in-theme(theme); }
-                export-built-in-theme(target-path, format) => { root.export-built-in-theme(target-path, format); }
+                copy-current-built-in-theme => { root.copy-current-built-in-theme(); }
+                export-current-theme(target-path, format) => { root.export-current-theme(target-path, format); }
                 import-theme(source-path) => { root.import-theme(source-path); }
                 apply-theme-profile(name) => { root.apply-theme-profile(name); }
                 remove-theme-profile(name) => { root.remove-theme-profile(name); }

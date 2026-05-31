@@ -5,16 +5,42 @@ use std::path::Path;
 use super::{AppState, AppUpdateOutcome};
 
 impl AppState {
-    pub(in crate::model::app_state) fn export_built_in_theme(
+    pub(in crate::model::app_state) fn export_current_theme(
         &mut self,
         target_path: &str,
         format: crate::theme::ThemeExchangeFormat,
     ) -> AppUpdateOutcome {
-        let document = crate::theme::built_in_theme_document(self.ui.workspace.theme);
+        let document = match self.current_theme_document() {
+            Ok(document) => document,
+            Err(error) => return settings_error(format!("导出主题失败：{error}")),
+        };
         match document.export(format) {
             Ok(exported) => write_text_file(normalized_path(target_path), exported.content)
                 .map_or_else(settings_error, |_| AppUpdateOutcome::default()),
             Err(error) => settings_error(format!("导出主题失败：{error}")),
+        }
+    }
+
+    pub(in crate::model::app_state) fn copy_current_built_in_theme(&mut self) -> AppUpdateOutcome {
+        let mut document = crate::theme::built_in_theme_document(self.ui.workspace.theme);
+        document.name = unique_theme_name(self, &format!("{} 自定义", document.name));
+        document.id = unique_theme_id(self.ui.workspace.theme.key(), &document.name);
+
+        let profile_toml = match document.to_toml() {
+            Ok(profile_toml) => profile_toml,
+            Err(error) => return settings_error(format!("复制主题失败：{error}")),
+        };
+        self.storage
+            .upsert_theme(crate::storage::ThemeProfileRecord {
+                name: document.name.clone(),
+                profile_toml,
+                builtin: false,
+            });
+        self.apply_theme_document(document);
+
+        AppUpdateOutcome {
+            state_changed: true,
+            ..AppUpdateOutcome::default()
         }
     }
 
@@ -194,6 +220,57 @@ impl AppState {
         self.config.theme.name != document.name
             || self.config.theme.font_family != document.font.terminal.family
             || self.config.theme.font_size != document.font.terminal.size as f32
+    }
+
+    fn current_theme_document(
+        &self,
+    ) -> Result<crate::theme::ThemeDocument, crate::theme::ThemeError> {
+        if let Some(theme) = self.storage.theme_by_name(&self.config.theme.name) {
+            parse_theme_document(&theme.profile_toml, &theme.name)
+        } else {
+            Ok(crate::theme::built_in_theme_document(
+                self.ui.workspace.theme,
+            ))
+        }
+    }
+}
+
+fn unique_theme_name(state: &AppState, base: &str) -> String {
+    if state.storage.theme_by_name(base).is_none() {
+        return base.to_owned();
+    }
+
+    let mut index = 2;
+    loop {
+        let candidate = format!("{base} {index}");
+        if state.storage.theme_by_name(&candidate).is_none() {
+            return candidate;
+        }
+        index += 1;
+    }
+}
+
+fn unique_theme_id(theme_key: &str, theme_name: &str) -> String {
+    let mut id = String::new();
+    for ch in theme_key.chars() {
+        if ch.is_ascii_uppercase() && !id.is_empty() {
+            id.push('-');
+        }
+        if ch.is_ascii_alphanumeric() {
+            id.push(ch.to_ascii_lowercase());
+        }
+    }
+    let base = if id.is_empty() {
+        "custom-theme".to_owned()
+    } else {
+        format!("{id}-custom")
+    };
+    match theme_name
+        .rsplit_once(' ')
+        .and_then(|(_, suffix)| suffix.parse::<usize>().ok())
+    {
+        Some(index) => format!("{base}-{index}"),
+        None => base,
     }
 }
 

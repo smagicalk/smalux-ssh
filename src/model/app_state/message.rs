@@ -161,10 +161,11 @@ pub enum Message {
     SetBuiltInTheme {
         theme: BuiltInTheme,
     },
-    ExportBuiltInTheme {
+    ExportCurrentTheme {
         target_path: String,
         format: ThemeExchangeFormat,
     },
+    CopyCurrentBuiltInTheme,
     ImportTheme {
         source_path: String,
     },

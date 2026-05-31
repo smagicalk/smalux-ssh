@@ -84,6 +84,17 @@ fn workspace_page_message_stays_in_ui_target() {
 #[test]
 fn theme_profile_messages_stay_in_ui_target() {
     assert_eq!(
+        MessageDispatchTarget::for_message(&Message::ExportCurrentTheme {
+            target_path: "theme.toml".to_owned(),
+            format: crate::theme::ThemeExchangeFormat::NativeToml,
+        }),
+        MessageDispatchTarget::Ui
+    );
+    assert_eq!(
+        MessageDispatchTarget::for_message(&Message::CopyCurrentBuiltInTheme),
+        MessageDispatchTarget::Ui
+    );
+    assert_eq!(
         MessageDispatchTarget::for_message(&Message::ApplyThemeProfile {
             name: "Imported".to_owned(),
         }),

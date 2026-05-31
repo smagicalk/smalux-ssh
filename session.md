@@ -2358,3 +2358,20 @@
   - `cargo check` 通过
   - `cargo test` 通过，`348 passed`
 - 当前评估：本轮注释和分层说明已经覆盖核心入口与主要扩展点；若以后要求“逐文件逐行注释”，还可以继续补测试文件和更底层 SSH cache 细节，但当前核心开发和 UI 重写所需的边界说明已足够。
+
+## 本轮主题设置收口：Theme Adapter + Settings 管理
+
+- 目标：把主题能力从基础 schema 推进到设置页可管理能力，同时保持 UI 与核心分层，方便后续继续手工打磨 Slint UI。
+- 已完成：`src/theme.rs` 拆为 `document`、`color`、`builtin`、`resolve`、`exchange`、`partial`、`tests` 子模块，避免单文件继续膨胀。
+- 已完成：新增 `src/app/projection/theme.rs`，由 Rust 统一把主题 token 同步到 Slint `AppTheme`，并增加 token 同步测试，防止 UI 主题变量遗漏。
+- 已完成：原生主题 TOML 支持精简手写格式，允许 `extends/base` 继承内置主题，并通过 `[overrides]` 覆盖细分 token。
+- 已完成：设置页支持导入精简主题 TOML、导出当前主题、复制当前内置主题为自定义主题；导出会优先使用当前已应用的自定义主题资料。
+- 已完成：连续复制同一内置主题时会生成唯一名称和唯一主题 id，例如 `dracula-custom-2`，避免后续导出/导入时 id 重复。
+- 已完成：新增 `assets/theme-examples/hand-tuned.smagical-theme.toml`，作为以后手写主题和自定义颜色分块的示例。
+- 已完成：i18n 补齐设置页复制按钮文案，Slint 回调从旧的“导出内置主题”改为“导出当前主题”。
+- 验证记录：
+  - `cargo fmt --all -- --check` 通过
+  - `git diff --check` 通过，只有 Windows LF/CRLF 提示
+  - `cargo check` 通过
+  - `cargo test theme::` 通过，`11 passed`
+  - `cargo test` 通过，`354 passed`

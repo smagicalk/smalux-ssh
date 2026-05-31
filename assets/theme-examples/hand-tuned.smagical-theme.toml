@@ -1,0 +1,35 @@
+schema_version = 1
+id = "hand-tuned"
+name = "Hand Tuned"
+kind = "dark"
+extends = "nord-dark"
+
+[frame]
+window = "#101418"
+titlebar = "#121820"
+rail = "#121820"
+left_sidebar = "#151b22"
+
+[workspace]
+surface = "#151b22"
+panel = "#111820"
+card = "#111820"
+
+[text]
+normal = "#dce7f2"
+muted = "#8796a8"
+strong = "#f4f8fb"
+
+[state]
+success = "#5ed49f"
+warning = "#f0c674"
+danger = "#f7768e"
+
+[terminal]
+background = "#05080c"
+foreground = "#dce7f2"
+selection = "#334455"
+
+[overrides]
+"button.primary.background_hover" = "#223344"
+"tabs.active_background" = "#1f2a36"

@@ -207,6 +207,7 @@
     "settings.section_file_actions": "File actions",
     "settings.section_security": "Security",
     "settings.action_apply": "Apply",
+    "settings.action_copy": "Copy",
     "settings.action_remove": "Remove",
     "settings.action_run": "Run",
     "settings.action_choose_file": "Choose",

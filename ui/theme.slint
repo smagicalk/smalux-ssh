@@ -1,9 +1,28 @@
+// AppTheme 是 Slint 组件唯一直接使用的颜色入口。
+// 写组件时按语义选择 token，不在组件里硬编码 #rrggbb。
+//
+// 常用规则：
+// - 页面/框架：window-bg、topbar-bg、rail-bg、panel-bg
+// - 区块/卡片：surface-bg、raised-bg、card-bg、inset-bg
+// - 文字：text、text-strong、text-muted、text-soft
+// - 交互：surface-hover、surface-pressed、selection-bg
+// - 状态：accent、warning、danger、success-text、info-text
+// - 控件：input-*、button-*、dialog-*、tab-*
+// - 终端：terminal-*
 export global AppTheme {
+    // 基础透明色保留在 Slint 默认值中，不由 Rust 主题投影覆盖。
     in-out property <color> transparent: #00000000;
+
+    // 框架层：窗口、标题栏、左侧栏、面板和遮罩。
     in-out property <color> window-bg: #080d12;
     in-out property <color> topbar-bg: #0e131a;
     in-out property <color> rail-bg: #090e14;
     in-out property <color> panel-bg: #0d1219;
+    in-out property <color> dock-bg: #101721e6;
+    in-out property <color> overlay-bg: #00000099;
+    in-out property <color> topbar-border: #273241;
+
+    // 表面层：普通区块、悬停、按下、卡片和内嵌区域。
     in-out property <color> surface-bg: #111721;
     in-out property <color> surface-hover: #17212d;
     in-out property <color> surface-pressed: #101822;
@@ -11,19 +30,22 @@ export global AppTheme {
     in-out property <color> card-bg: #0f1721;
     in-out property <color> card-hover: #111b26;
     in-out property <color> inset-bg: #0b1119;
-    in-out property <color> dock-bg: #101721e6;
-    in-out property <color> terminal-bg: #05090d;
-    in-out property <color> overlay-bg: #00000099;
+
+    // 边框和焦点。
     in-out property <color> border: #2f3a4a;
     in-out property <color> border-soft: #202b38;
     in-out property <color> border-strong: #33405a;
     in-out property <color> border-focus: #4cc9f0;
     in-out property <color> border-danger: #74444c;
+
+    // 品牌强调色和通用状态色。
     in-out property <color> accent: #35c88f;
     in-out property <color> accent-blue: #4cc9f0;
     in-out property <color> accent-violet: #c58cff;
     in-out property <color> warning: #f4b860;
     in-out property <color> danger: #f46060;
+
+    // 文本层。
     in-out property <color> text: #ecf0f6;
     in-out property <color> text-strong: #f3f6fb;
     in-out property <color> text-muted: #7f8b99;
@@ -38,15 +60,21 @@ export global AppTheme {
     in-out property <color> info-text: #92b7ff;
     in-out property <color> danger-text: #ffd9d9;
     in-out property <color> danger-text-soft: #ffb4bd;
+
+    // 徽标和选择状态。
     in-out property <color> badge-success-bg: #15352f;
     in-out property <color> badge-info-bg: #142a36;
     in-out property <color> badge-pending-bg: #291f3c;
     in-out property <color> badge-warning-bg: #2b2313;
     in-out property <color> selection-bg: #173044;
+
+    // 输入框。
     in-out property <color> input-bg: #0f1620;
     in-out property <color> input-bg-focus: #111b26;
     in-out property <color> input-placeholder: #5f6b78;
     in-out property <color> input-selection: #2c7068;
+
+    // 按钮。
     in-out property <color> button-primary-bg: #173247;
     in-out property <color> button-primary-hover: #1b3b51;
     in-out property <color> button-primary-pressed: #132a3a;
@@ -68,6 +96,8 @@ export global AppTheme {
     in-out property <color> button-danger-border-hover: #84424d;
     in-out property <color> button-danger-border-pressed: #9a525d;
     in-out property <color> button-danger-text: #ffd5da;
+
+    // 弹窗。
     in-out property <color> dialog-bg: #0f151e;
     in-out property <color> dialog-section-bg: #101720;
     in-out property <color> dialog-success-icon-bg: #12362d;
@@ -76,6 +106,8 @@ export global AppTheme {
     in-out property <color> dialog-danger-icon-border: #65323c;
     in-out property <color> dialog-error-bg: #24151a;
     in-out property <color> dialog-error-border: #74444c;
+
+    // 标签页。
     in-out property <color> tab-bg: #0c121a;
     in-out property <color> tab-hover-bg: #141e2a;
     in-out property <color> tab-pressed-bg: #0d141d;
@@ -85,10 +117,12 @@ export global AppTheme {
     in-out property <color> tab-close-hover-bg: #223040;
     in-out property <color> tab-close-pressed-bg: #2d1a21;
     in-out property <color> tab-close-border-hover: #5b6a7d;
+
+    // 终端。
+    in-out property <color> terminal-bg: #05090d;
     in-out property <color> terminal-viewport-bg: #03070a;
     in-out property <color> terminal-border: #182724;
     in-out property <color> terminal-selection: #2c7068;
-    in-out property <color> topbar-border: #273241;
     in-out property <color> terminal-text: #c6eed6;
     in-out property <color> terminal-muted: #5f7870;
 }
