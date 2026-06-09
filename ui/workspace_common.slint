@@ -1,0 +1,174 @@
+import { ScrollView } from "std-widgets.slint";
+import { ToolItemRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+
+export component WorkspaceListItem inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    in property <string> meta;
+
+    height: 50px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.card-bg;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+
+        VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 3px;
+            Text {
+                text: root.title;
+                color: AppTheme.text;
+                font-size: 12px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.subtitle;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+        Text {
+            text: root.meta;
+            color: AppTheme.text-soft;
+            font-size: 10px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+export component WorkspaceListPage inherits Rectangle {
+    in property <string> title;
+    in property <string> empty-label;
+    in property <[ToolItemRow]> items;
+
+    background: AppTheme.window-bg;
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+
+        Text {
+            text: root.title;
+            color: AppTheme.text-strong;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 7px;
+                if root.items.length == 0: WorkspaceListItem {
+                    title: root.empty-label;
+                    subtitle: "";
+                    meta: "";
+                }
+                for item in root.items: WorkspaceListItem {
+                    title: item.title;
+                    subtitle: item.subtitle;
+                    meta: item.meta;
+                }
+            }
+        }
+    }
+}
+
+export component ProxyPlaceholderPage inherits Rectangle {
+    in property <string> title;
+    in property <string> empty-label;
+
+    background: AppTheme.window-bg;
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+
+        Text {
+            text: root.title;
+            color: AppTheme.text-strong;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        Rectangle {
+            height: 78px;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: AppTheme.border-soft;
+            background: AppTheme.card-bg;
+
+            HorizontalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                spacing: 10px;
+
+                Rectangle {
+                    width: 34px;
+                    height: 34px;
+                    border-radius: 8px;
+                    border-width: 1px;
+                    border-color: AppTheme.border-strong;
+                    background: AppTheme.surface-bg;
+
+                    Rectangle {
+                        x: 8px;
+                        y: 8px;
+                        width: 7px;
+                        height: 7px;
+                        border-radius: 4px;
+                        background: AppTheme.accent;
+                    }
+
+                    Rectangle {
+                        x: 20px;
+                        y: 8px;
+                        width: 7px;
+                        height: 7px;
+                        border-radius: 4px;
+                        background: AppTheme.accent-blue;
+                    }
+
+                    Rectangle {
+                        x: 14px;
+                        y: 21px;
+                        width: 7px;
+                        height: 7px;
+                        border-radius: 4px;
+                        background: AppTheme.warning;
+                    }
+
+                    Rectangle { x: 12px; y: 16px; width: 12px; height: 2px; border-radius: 1px; background: AppTheme.text-soft; }
+                    Rectangle { x: 17px; y: 16px; width: 2px; height: 8px; border-radius: 1px; background: AppTheme.text-soft; }
+                }
+
+                VerticalLayout {
+                    vertical-stretch: 1;
+
+                    Text {
+                        text: root.empty-label;
+                        color: AppTheme.text;
+                        font-size: 12px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+
+        Rectangle { vertical-stretch: 1; }
+    }
+}

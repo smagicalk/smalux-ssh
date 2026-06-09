@@ -1,0 +1,344 @@
+import { AppTheme } from "./theme.slint";
+import { HostNodeIcon } from "./host_icons.slint";
+component HostTreeMenuItem inherits Rectangle {
+    in property <string> label;
+    in property <bool> danger: false;
+    callback clicked();
+
+    height: 34px;
+    border-radius: 6px;
+    background: touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? (root.danger ? AppTheme.button-danger-bg : AppTheme.surface-hover) : AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        x: 13px;
+        width: parent.width - 26px;
+        height: parent.height;
+        text: root.label;
+        color: root.danger ? AppTheme.danger-text-soft : AppTheme.text-secondary;
+        font-size: 10px;
+        font-weight: 700;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+}
+
+component HostTreeGuides inherits Rectangle {
+    in property <bool> guide0: false;
+    in property <bool> guide1: false;
+    in property <bool> guide2: false;
+    in property <bool> guide3: false;
+    in property <bool> guide4: false;
+    in property <bool> guide5: false;
+    in property <bool> guide6: false;
+    in property <bool> guide7: false;
+
+    background: AppTheme.transparent;
+
+    if root.guide0: Rectangle { x: 11px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide1: Rectangle { x: 29px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide2: Rectangle { x: 47px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide3: Rectangle { x: 65px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide4: Rectangle { x: 83px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide5: Rectangle { x: 101px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide6: Rectangle { x: 119px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+    if root.guide7: Rectangle { x: 137px; y: 0px; width: 1px; height: parent.height; background: AppTheme.border-soft; }
+}
+
+component HostTreeBranch inherits Rectangle {
+    in property <int> depth: 0;
+    in property <bool> has-next-sibling: false;
+    in property <bool> guide0: false;
+    in property <bool> guide1: false;
+    in property <bool> guide2: false;
+    in property <bool> guide3: false;
+    in property <bool> guide4: false;
+    in property <bool> guide5: false;
+    in property <bool> guide6: false;
+    in property <bool> guide7: false;
+
+    background: AppTheme.transparent;
+
+    HostTreeGuides {
+        width: parent.width;
+        height: parent.height;
+        guide0: root.guide0;
+        guide1: root.guide1;
+        guide2: root.guide2;
+        guide3: root.guide3;
+        guide4: root.guide4;
+        guide5: root.guide5;
+        guide6: root.guide6;
+        guide7: root.guide7;
+    }
+
+    if root.depth > 0: Rectangle {
+        x: root.depth * 18px + 11px;
+        y: 0px;
+        width: 1px;
+        height: root.has-next-sibling ? parent.height : parent.height / 2;
+        background: AppTheme.border-soft;
+    }
+
+    if root.depth > 0: Rectangle {
+        x: root.depth * 18px + 11px;
+        y: parent.height / 2;
+        width: 11px;
+        height: 1px;
+        background: AppTheme.border-soft;
+    }
+}
+
+export component HostTreeContextMenu inherits Rectangle {
+    in property <string> new-group-label: "";
+    in property <string> open-label: "";
+    in property <string> files-label: "";
+    in property <string> edit-label: "";
+    in property <string> delete-label: "";
+    in property <string> duplicate-label: "";
+    callback open-shell();
+    callback create-group();
+    callback open-sftp();
+    callback edit-host();
+    callback duplicate-host();
+    callback remove-host();
+
+    height: 244px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-strong;
+    background: AppTheme.dialog-bg;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 4px;
+        HostTreeMenuItem { label: root.new-group-label; clicked => { root.create-group(); } }
+        HostTreeMenuItem { label: root.open-label; clicked => { root.open-shell(); } }
+        HostTreeMenuItem { label: root.files-label; clicked => { root.open-sftp(); } }
+        HostTreeMenuItem { label: root.edit-label; clicked => { root.edit-host(); } }
+        HostTreeMenuItem { label: root.duplicate-label; clicked => { root.duplicate-host(); } }
+        HostTreeMenuItem { label: root.delete-label; danger: true; clicked => { root.remove-host(); } }
+    }
+}
+
+export component HostTreeGroupContextMenu inherits Rectangle {
+    in property <string> create-host-label: "";
+    in property <string> create-group-label: "";
+    in property <string> delete-label: "";
+    in property <bool> show-delete: true;
+    callback create-host();
+    callback create-group();
+    callback remove-group();
+
+    height: root.show-delete ? 132px : 94px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-strong;
+    background: AppTheme.dialog-bg;
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 4px;
+        HostTreeMenuItem { label: root.create-host-label; clicked => { root.create-host(); } }
+        HostTreeMenuItem { label: root.create-group-label; clicked => { root.create-group(); } }
+        if root.show-delete: HostTreeMenuItem { label: root.delete-label; danger: true; clicked => { root.remove-group(); } }
+    }
+}
+
+export component HostTreeGroup inherits Rectangle {
+    in property <string> label;
+    in property <bool> expanded: true;
+    in property <int> depth: 0;
+    in property <int> accent-index: 0;
+    in property <bool> has-next-sibling: false;
+    in property <bool> guide0: false;
+    in property <bool> guide1: false;
+    in property <bool> guide2: false;
+    in property <bool> guide3: false;
+    in property <bool> guide4: false;
+    in property <bool> guide5: false;
+    in property <bool> guide6: false;
+    in property <bool> guide7: false;
+    callback toggle();
+    callback open-context-menu(abs-x: length, abs-y: length);
+
+    width: 320px + root.depth * 18px;
+    height: 36px;
+    background: AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.toggle(); }
+        pointer-event(event) => {
+            if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
+                root.open-context-menu(root.absolute-position.x + touch.mouse-x, root.absolute-position.y + touch.mouse-y);
+            }
+        }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        border-radius: 7px;
+        background: touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
+    }
+
+    HorizontalLayout {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        padding-left: 6px;
+        padding-right: 8px;
+        spacing: 7px;
+
+        Rectangle {
+            width: root.depth * 18px + 22px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            HostTreeBranch {
+                width: parent.width;
+                height: parent.height;
+                depth: root.depth;
+                has-next-sibling: root.has-next-sibling;
+                guide0: root.guide0;
+                guide1: root.guide1;
+                guide2: root.guide2;
+                guide3: root.guide3;
+                guide4: root.guide4;
+                guide5: root.guide5;
+                guide6: root.guide6;
+                guide7: root.guide7;
+            }
+
+            HostNodeIcon {
+                x: root.depth * 18px;
+                y: (parent.height - self.height) / 2;
+                kind: "Group";
+                expanded: root.expanded;
+                accent-index: root.accent-index;
+            }
+        }
+
+        Text {
+            height: parent.height;
+            horizontal-stretch: 1;
+            text: root.label;
+            color: AppTheme.text-secondary;
+            font-size: 11px;
+            font-weight: 700;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component HostTreeHost inherits Rectangle {
+    in property <string> name;
+    in property <string> endpoint: "";
+    in property <string> icon-key: "server";
+    in property <string> status-key;
+    in property <int> accent-index: 0;
+    in property <int> depth: 0;
+    in property <bool> selected: false;
+    in property <bool> has-next-sibling: false;
+    in property <bool> guide0: false;
+    in property <bool> guide1: false;
+    in property <bool> guide2: false;
+    in property <bool> guide3: false;
+    in property <bool> guide4: false;
+    in property <bool> guide5: false;
+    in property <bool> guide6: false;
+    in property <bool> guide7: false;
+    callback select-host();
+    callback open-shell();
+    callback open-context-menu(abs-x: length, abs-y: length);
+
+    width: 320px + root.depth * 18px;
+    height: 36px;
+    background: AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.select-host(); }
+        double-clicked => { root.open-shell(); }
+        pointer-event(event) => {
+            if event.button == PointerEventButton.right && event.kind == PointerEventKind.down {
+                root.open-context-menu(root.absolute-position.x + touch.mouse-x, root.absolute-position.y + touch.mouse-y);
+            }
+        }
+    }
+
+    Rectangle {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        border-radius: 7px;
+        border-width: 1px;
+        border-color: root.selected ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-soft : AppTheme.transparent;
+        background: root.selected ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
+    }
+
+    HorizontalLayout {
+        x: 0px;
+        y: 3px;
+        width: parent.width;
+        height: parent.height - 6px;
+        padding-left: 6px;
+        padding-right: 7px;
+        spacing: 7px;
+
+        Rectangle {
+            width: root.depth * 18px + 22px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            HostTreeBranch {
+                width: parent.width;
+                height: parent.height;
+                depth: root.depth;
+                has-next-sibling: root.has-next-sibling;
+                guide0: root.guide0;
+                guide1: root.guide1;
+                guide2: root.guide2;
+                guide3: root.guide3;
+                guide4: root.guide4;
+                guide5: root.guide5;
+                guide6: root.guide6;
+                guide7: root.guide7;
+            }
+
+            HostNodeIcon {
+                x: root.depth * 18px;
+                y: (parent.height - self.height) / 2;
+                kind: "Host";
+                icon-key: root.icon-key;
+                status-key: root.status-key;
+                accent-index: root.accent-index;
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            Text {
+                y: 0px;
+                width: parent.width;
+                height: parent.height;
+                text: root.name;
+                color: AppTheme.text-strong;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

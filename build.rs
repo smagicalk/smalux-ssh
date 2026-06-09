@@ -20,6 +20,10 @@ fn main() {
     println!("cargo:rerun-if-changed=assets/i18n");
     println!("cargo:rerun-if-changed=build.rs");
 
+    // DragArea/DropArea 在 Slint 1.16 仍属于实验内建项；这里限定在 UI 编译阶段开启。
+    unsafe {
+        std::env::set_var("SLINT_ENABLE_EXPERIMENTAL_FEATURES", "1");
+    }
     slint_build::compile("ui/main.slint").expect("Slint UI 应该可以编译");
 }
 

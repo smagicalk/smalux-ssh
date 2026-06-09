@@ -1,0 +1,42 @@
+import { ScrollView } from "std-widgets.slint";
+import { AppTheme } from "./theme.slint";
+import { WorkspaceListItem } from "./workspace_common.slint";
+
+export component HistoryListPage inherits Rectangle {
+    in property <string> title;
+    in property <string> empty-label;
+    in property <[string]> history;
+
+    background: AppTheme.window-bg;
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        padding: 12px;
+        spacing: 10px;
+
+        Text {
+            text: root.title;
+            color: AppTheme.text-strong;
+            font-size: 15px;
+            font-weight: 700;
+        }
+
+        ScrollView {
+            vertical-stretch: 1;
+            VerticalLayout {
+                spacing: 7px;
+                if root.history.length == 0: WorkspaceListItem {
+                    title: root.empty-label;
+                    subtitle: "";
+                    meta: "";
+                }
+                for command in root.history: WorkspaceListItem {
+                    title: command;
+                    subtitle: "";
+                    meta: "";
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,351 @@
+import { CredentialOptionRow, GroupOptionRow } from "./models.slint";
+import { CreateChoiceDialog, CreateGroupDialog, CreateGroupParentDialog, CreateHostDialog } from "./host_create_dialogs.slint";
+import { ConfirmDialog } from "./common.slint";
+
+export component HostDialogFlow inherits Rectangle {
+    in-out property <bool> create-choice-dialog-open;
+    in property <bool> create-host-dialog-open;
+    in property <bool> create-group-dialog-open;
+    in property <bool> create-group-parent-dialog-open;
+    in property <bool> remove-host-dialog-open;
+    in property <bool> remove-group-dialog-open;
+    in property <string> create-choice-title;
+    in property <string> create-choice-subtitle;
+    in property <string> create-choice-host-label;
+    in property <string> create-choice-host-caption;
+    in property <string> create-choice-group-label;
+    in property <string> create-choice-group-caption;
+    in property <string> create-choice-cancel-label;
+    in property <string> create-group-dialog-title;
+    in property <string> create-group-dialog-subtitle;
+    in property <string> create-group-parent-picker-title;
+    in property <string> create-group-parent-picker-subtitle;
+    in property <string> create-group-name-label;
+    in property <string> create-group-name-placeholder;
+    in property <string> create-group-parent-label;
+    in property <string> create-group-cancel-label;
+    in property <string> create-group-save-label;
+    in property <string> create-group-next-label;
+    in property <string> quick-group-parent-path;
+    in property <[GroupOptionRow]> quick-group-parent-options;
+    in property <string> quick-group-name;
+    in property <string> create-host-dialog-title;
+    in property <string> create-host-dialog-subtitle;
+    in property <string> create-host-connection-title;
+    in property <string> create-host-connection-caption;
+    in property <string> create-host-authentication-title;
+    in property <string> create-host-authentication-caption;
+    in property <string> create-host-credential-note;
+    in property <string> create-host-cancel-label;
+    in property <string> create-host-create-label;
+    in property <string> create-host-address-label;
+    in property <string> create-host-address-placeholder;
+    in property <string> create-host-port-label;
+    in property <string> create-host-port-placeholder;
+    in property <string> create-host-username-label;
+    in property <string> create-host-username-placeholder;
+    in property <string> create-host-alias-label;
+    in property <string> create-host-alias-placeholder;
+    in property <string> create-host-tags-label;
+    in property <string> create-host-tags-placeholder;
+    in property <string> create-host-group-label;
+    in property <string> create-host-group-picker-title;
+    in property <string> create-host-auth-agent-label;
+    in property <string> create-host-auth-agent-caption;
+    in property <string> create-host-auth-password-label;
+    in property <string> create-host-auth-password-caption;
+    in property <string> create-host-auth-key-label;
+    in property <string> create-host-auth-key-caption;
+    in property <string> create-host-auth-certificate-label;
+    in property <string> create-host-auth-certificate-caption;
+    in property <string> create-host-agent-source-title;
+    in property <string> create-host-agent-auto-label;
+    in property <string> create-host-agent-auto-caption;
+    in property <string> create-host-agent-openssh-label;
+    in property <string> create-host-agent-openssh-caption;
+    in property <string> create-host-agent-pageant-label;
+    in property <string> create-host-agent-pageant-caption;
+    in property <string> create-host-agent-custom-label;
+    in property <string> create-host-agent-custom-caption;
+    in property <string> create-host-custom-agent-pipe-label;
+    in property <string> create-host-custom-agent-pipe-placeholder;
+    in property <string> create-host-agent-key-hint-label;
+    in property <string> create-host-agent-key-hint-placeholder;
+    in property <string> create-host-password-secret-label;
+    in property <string> create-host-password-secret-placeholder;
+    in property <string> create-host-private-key-label;
+    in property <string> create-host-private-key-placeholder;
+    in property <string> create-host-add-private-key-label;
+    in property <string> create-host-add-private-key-caption;
+    in property <string> create-host-passphrase-label;
+    in property <string> create-host-passphrase-placeholder;
+    in property <string> create-host-certificate-label;
+    in property <string> create-host-certificate-placeholder;
+    in property <string> create-host-add-certificate-label;
+    in property <string> create-host-add-certificate-caption;
+    in property <string> create-host-credential-name-label;
+    in property <string> create-host-credential-name-placeholder;
+    in property <string> create-host-credential-secret-label;
+    in property <string> create-host-credential-secret-placeholder;
+    in property <string> create-host-credential-algorithm-label;
+    in property <string> create-host-credential-save-label;
+    in property <string> create-host-icon-title;
+    in property <string> create-host-icon-server-label;
+    in property <string> create-host-icon-database-label;
+    in property <string> create-host-icon-cloud-label;
+    in property <string> create-host-icon-linux-label;
+    in property <string> create-host-icon-container-label;
+    in property <string> create-host-icon-shield-label;
+    in property <string> create-host-icon-router-label;
+    in property <string> create-host-icon-terminal-label;
+    in property <string> create-host-icon-globe-label;
+    in property <string> create-host-icon-key-label;
+    in property <string> create-host-icon-chip-label;
+    in property <string> create-host-icon-cluster-label;
+    in property <string> quick-host-name;
+    in property <string> quick-host-address;
+    in property <string> quick-host-port;
+    in property <string> quick-host-username;
+    in property <string> quick-host-group-path;
+    in property <string> quick-host-icon-key;
+    in property <string> quick-host-tags;
+    in property <string> quick-host-auth-kind;
+    in property <string> quick-host-agent-source;
+    in property <string> quick-host-agent-custom-pipe;
+    in property <string> quick-host-password-secret-ref;
+    in property <string> quick-host-private-key-ref;
+    in property <string> quick-host-passphrase-ref;
+    in property <string> quick-host-key-hint;
+    in property <string> quick-host-certificate-ref;
+    in property <[GroupOptionRow]> quick-host-groups;
+    in property <[CredentialOptionRow]> quick-host-private-key-options;
+    in property <[CredentialOptionRow]> quick-host-certificate-options;
+    in property <string> last-error;
+    in property <string> host-delete-title-label;
+    in property <string> host-delete-caption-label;
+    in property <string> remove-host-dialog-name;
+    in property <string> host-delete-cancel-label;
+    in property <string> host-delete-confirm-label;
+    in property <string> group-delete-title-label;
+    in property <string> remove-group-dialog-caption;
+    in property <string> remove-group-dialog-name;
+    in property <string> group-delete-cancel-label;
+    in property <string> group-delete-confirm-label;
+    callback open-create-host-dialog();
+    callback open-create-group-dialog(parent-id: string);
+    callback select-create-group-parent(group-id: string);
+    callback close-create-group-parent-dialog();
+    callback confirm-create-group-parent();
+    callback update-quick-group-name(name: string);
+    callback select-quick-group-parent(group-id: string);
+    callback close-create-group-dialog();
+    callback save-quick-group();
+    callback close-create-host-dialog();
+    callback update-quick-host-field(field: string, value: string);
+    callback select-quick-host-group(group-id: string);
+    callback update-quick-host-auth-kind(kind: string);
+    callback update-quick-host-auth-field(field: string, value: string);
+    callback create-credential(kind: string, name: string, secret-ref: string, algorithm: string);
+    callback save-quick-host();
+    callback cancel-remove-host();
+    callback confirm-remove-host();
+    callback cancel-remove-group();
+    callback confirm-remove-group();
+
+    if root.create-choice-dialog-open: CreateChoiceDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.create-choice-title;
+        subtitle: root.create-choice-subtitle;
+        host-label: root.create-choice-host-label;
+        host-caption: root.create-choice-host-caption;
+        group-label: root.create-choice-group-label;
+        group-caption: root.create-choice-group-caption;
+        cancel-label: root.create-choice-cancel-label;
+        create-host => {
+            root.create-choice-dialog-open = false;
+            root.open-create-host-dialog();
+        }
+        create-group => {
+            root.create-choice-dialog-open = false;
+            root.open-create-group-dialog("");
+        }
+        close => { root.create-choice-dialog-open = false; }
+    }
+
+    if root.create-group-parent-dialog-open: CreateGroupParentDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-title: root.create-group-dialog-title;
+        dialog-subtitle: root.create-group-dialog-subtitle;
+        parent-label: root.create-group-parent-label;
+        parent-path: root.quick-group-parent-path;
+        parent-options: root.quick-group-parent-options;
+        cancel-label: root.create-group-cancel-label;
+        next-label: root.create-group-next-label;
+        select-parent(id) => { root.select-create-group-parent(id); }
+        confirm => { root.confirm-create-group-parent(); }
+        close => { root.close-create-group-parent-dialog(); }
+    }
+
+    if root.create-group-dialog-open: CreateGroupDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-title: root.create-group-dialog-title;
+        dialog-subtitle: root.create-group-dialog-subtitle;
+        parent-picker-title: root.create-group-parent-picker-title;
+        parent-picker-subtitle: root.create-group-parent-picker-subtitle;
+        name-label: root.create-group-name-label;
+        name-placeholder: root.create-group-name-placeholder;
+        parent-label: root.create-group-parent-label;
+        parent-path: root.quick-group-parent-path;
+        parent-options: root.quick-group-parent-options;
+        cancel-label: root.create-group-cancel-label;
+        save-label: root.create-group-save-label;
+        group-name: root.quick-group-name;
+        update-name(name) => { root.update-quick-group-name(name); }
+        select-parent(id) => { root.select-quick-group-parent(id); }
+        save => { root.save-quick-group(); }
+        close => { root.close-create-group-dialog(); }
+    }
+
+    if root.create-host-dialog-open: CreateHostDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-title: root.create-host-dialog-title;
+        dialog-subtitle: root.create-host-dialog-subtitle;
+        connection-title: root.create-host-connection-title;
+        connection-caption: root.create-host-connection-caption;
+        authentication-title: root.create-host-authentication-title;
+        authentication-caption: root.create-host-authentication-caption;
+        credential-note: root.create-host-credential-note;
+        cancel-label: root.create-host-cancel-label;
+        create-label: root.create-host-create-label;
+        address-label: root.create-host-address-label;
+        address-placeholder: root.create-host-address-placeholder;
+        port-label: root.create-host-port-label;
+        port-placeholder: root.create-host-port-placeholder;
+        username-label: root.create-host-username-label;
+        username-placeholder: root.create-host-username-placeholder;
+        host-alias-label: root.create-host-alias-label;
+        host-alias-placeholder: root.create-host-alias-placeholder;
+        tags-label: root.create-host-tags-label;
+        tags-placeholder: root.create-host-tags-placeholder;
+        group-label: root.create-host-group-label;
+        group-picker-title: root.create-host-group-picker-title;
+        auth-agent-label: root.create-host-auth-agent-label;
+        auth-agent-caption: root.create-host-auth-agent-caption;
+        auth-password-label: root.create-host-auth-password-label;
+        auth-password-caption: root.create-host-auth-password-caption;
+        auth-key-label: root.create-host-auth-key-label;
+        auth-key-caption: root.create-host-auth-key-caption;
+        auth-certificate-label: root.create-host-auth-certificate-label;
+        auth-certificate-caption: root.create-host-auth-certificate-caption;
+        agent-source-title: root.create-host-agent-source-title;
+        agent-auto-label: root.create-host-agent-auto-label;
+        agent-auto-caption: root.create-host-agent-auto-caption;
+        agent-openssh-label: root.create-host-agent-openssh-label;
+        agent-openssh-caption: root.create-host-agent-openssh-caption;
+        agent-pageant-label: root.create-host-agent-pageant-label;
+        agent-pageant-caption: root.create-host-agent-pageant-caption;
+        agent-custom-label: root.create-host-agent-custom-label;
+        agent-custom-caption: root.create-host-agent-custom-caption;
+        custom-agent-pipe-label: root.create-host-custom-agent-pipe-label;
+        custom-agent-pipe-placeholder: root.create-host-custom-agent-pipe-placeholder;
+        agent-key-hint-label: root.create-host-agent-key-hint-label;
+        agent-key-hint-placeholder: root.create-host-agent-key-hint-placeholder;
+        password-secret-label: root.create-host-password-secret-label;
+        password-secret-placeholder: root.create-host-password-secret-placeholder;
+        private-key-label: root.create-host-private-key-label;
+        private-key-placeholder: root.create-host-private-key-placeholder;
+        add-private-key-label: root.create-host-add-private-key-label;
+        add-private-key-caption: root.create-host-add-private-key-caption;
+        passphrase-label: root.create-host-passphrase-label;
+        passphrase-placeholder: root.create-host-passphrase-placeholder;
+        certificate-label: root.create-host-certificate-label;
+        certificate-placeholder: root.create-host-certificate-placeholder;
+        add-certificate-label: root.create-host-add-certificate-label;
+        add-certificate-caption: root.create-host-add-certificate-caption;
+        credential-name-label: root.create-host-credential-name-label;
+        credential-name-placeholder: root.create-host-credential-name-placeholder;
+        credential-secret-label: root.create-host-credential-secret-label;
+        credential-secret-placeholder: root.create-host-credential-secret-placeholder;
+        credential-algorithm-label: root.create-host-credential-algorithm-label;
+        credential-save-label: root.create-host-credential-save-label;
+        icon-title: root.create-host-icon-title;
+        icon-server-label: root.create-host-icon-server-label;
+        icon-database-label: root.create-host-icon-database-label;
+        icon-cloud-label: root.create-host-icon-cloud-label;
+        icon-linux-label: root.create-host-icon-linux-label;
+        icon-container-label: root.create-host-icon-container-label;
+        icon-shield-label: root.create-host-icon-shield-label;
+        icon-router-label: root.create-host-icon-router-label;
+        icon-terminal-label: root.create-host-icon-terminal-label;
+        icon-globe-label: root.create-host-icon-globe-label;
+        icon-key-label: root.create-host-icon-key-label;
+        icon-chip-label: root.create-host-icon-chip-label;
+        icon-cluster-label: root.create-host-icon-cluster-label;
+        quick-host-name: root.quick-host-name;
+        quick-host-address: root.quick-host-address;
+        quick-host-port: root.quick-host-port;
+        quick-host-username: root.quick-host-username;
+        quick-host-group-path: root.quick-host-group-path;
+        quick-host-icon-key: root.quick-host-icon-key;
+        quick-host-tags: root.quick-host-tags;
+        quick-host-auth-kind: root.quick-host-auth-kind;
+        quick-host-agent-source: root.quick-host-agent-source;
+        quick-host-agent-custom-pipe: root.quick-host-agent-custom-pipe;
+        quick-host-password-secret-ref: root.quick-host-password-secret-ref;
+        quick-host-private-key-ref: root.quick-host-private-key-ref;
+        quick-host-passphrase-ref: root.quick-host-passphrase-ref;
+        quick-host-key-hint: root.quick-host-key-hint;
+        quick-host-certificate-ref: root.quick-host-certificate-ref;
+        quick-host-groups: root.quick-host-groups;
+        private-key-options: root.quick-host-private-key-options;
+        certificate-options: root.quick-host-certificate-options;
+        last-error: root.last-error;
+        update-field(field, value) => { root.update-quick-host-field(field, value); }
+        select-group(group-id) => { root.select-quick-host-group(group-id); }
+        update-auth-kind(kind) => { root.update-quick-host-auth-kind(kind); }
+        update-auth-field(field, value) => { root.update-quick-host-auth-field(field, value); }
+        create-credential(kind, name, secret-ref, algorithm) => { root.create-credential(kind, name, secret-ref, algorithm); }
+        save => { root.save-quick-host(); }
+        close => { root.close-create-host-dialog(); }
+    }
+
+    if root.remove-host-dialog-open: ConfirmDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.host-delete-title-label;
+        message: root.host-delete-caption-label;
+        subject: root.remove-host-dialog-name;
+        cancel-label: root.host-delete-cancel-label;
+        confirm-label: root.host-delete-confirm-label;
+        cancel => { root.cancel-remove-host(); }
+        confirm => { root.confirm-remove-host(); }
+    }
+
+    if root.remove-group-dialog-open: ConfirmDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.group-delete-title-label;
+        message: root.remove-group-dialog-caption;
+        subject: root.remove-group-dialog-name;
+        cancel-label: root.group-delete-cancel-label;
+        confirm-label: root.group-delete-confirm-label;
+        cancel => { root.cancel-remove-group(); }
+        confirm => { root.confirm-remove-group(); }
+    }
+}

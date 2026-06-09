@@ -12,6 +12,7 @@ pub enum WorkspacePage {
     Snippets,
     History,
     Security,
+    Proxy,
     Settings,
 }
 

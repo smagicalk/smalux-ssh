@@ -10,12 +10,15 @@ impl AppState {
         target_path: &str,
         format: crate::theme::ThemeExchangeFormat,
     ) -> AppUpdateOutcome {
+        let Some(target_path) = normalized_path(target_path) else {
+            return settings_error("导出目标路径不能为空");
+        };
         let document = match self.current_theme_document() {
             Ok(document) => document,
             Err(error) => return settings_error(format!("导出主题失败：{error}")),
         };
         match document.export(format) {
-            Ok(exported) => write_text_file(normalized_path(target_path), exported.content)
+            Ok(exported) => write_text_file(target_path, exported.content)
                 .map_or_else(settings_error, |_| AppUpdateOutcome::default()),
             Err(error) => settings_error(format!("导出主题失败：{error}")),
         }
@@ -48,7 +51,9 @@ impl AppState {
         &mut self,
         source_path: &str,
     ) -> AppUpdateOutcome {
-        let source_path = normalized_path(source_path);
+        let Some(source_path) = normalized_path(source_path) else {
+            return settings_error("导入源路径不能为空");
+        };
         let content = match std::fs::read_to_string(source_path) {
             Ok(content) => content,
             Err(error) => return settings_error(format!("读取主题失败：{error}")),
@@ -117,6 +122,9 @@ impl AppState {
         &mut self,
         target_path: &str,
     ) -> AppUpdateOutcome {
+        let Some(target_path) = normalized_path(target_path) else {
+            return settings_error("备份目标路径不能为空");
+        };
         let Some(backend) = self.storage_backend.as_ref() else {
             return settings_error("没有可用的 SQLite 存储后端");
         };
@@ -125,7 +133,7 @@ impl AppState {
             return settings_error(format!("备份前保存存储失败：{error}"));
         }
 
-        match backend.backup_to(normalized_path(target_path)) {
+        match backend.backup_to(target_path) {
             Ok(()) => AppUpdateOutcome::default(),
             Err(error) => settings_error(format!("备份数据库失败：{error}")),
         }
@@ -135,6 +143,9 @@ impl AppState {
         &mut self,
         target_path: &str,
     ) -> AppUpdateOutcome {
+        let Some(target_path) = normalized_path(target_path) else {
+            return settings_error("导出目标路径不能为空");
+        };
         let Some(backend) = self.storage_backend.as_ref() else {
             return settings_error("没有可用的 SQLite 存储后端");
         };
@@ -143,7 +154,7 @@ impl AppState {
             return settings_error(format!("导出前保存存储失败：{error}"));
         }
 
-        match backend.export_snapshot_to(normalized_path(target_path)) {
+        match backend.export_snapshot_to(target_path) {
             Ok(()) => AppUpdateOutcome::default(),
             Err(error) => settings_error(format!("导出快照失败：{error}")),
         }
@@ -153,11 +164,14 @@ impl AppState {
         &mut self,
         source_path: &str,
     ) -> AppUpdateOutcome {
+        let Some(source_path) = normalized_path(source_path) else {
+            return settings_error("导入源路径不能为空");
+        };
         let Some(backend) = self.storage_backend.as_ref() else {
             return settings_error("没有可用的 SQLite 存储后端");
         };
 
-        let import_result = backend.import_snapshot_from(normalized_path(source_path));
+        let import_result = backend.import_snapshot_from(source_path);
 
         match import_result {
             Ok(()) => self.reload_storage_after_import(),
@@ -169,11 +183,14 @@ impl AppState {
         &mut self,
         source_path: &str,
     ) -> AppUpdateOutcome {
+        let Some(source_path) = normalized_path(source_path) else {
+            return settings_error("导入源路径不能为空");
+        };
         let Some(backend) = self.storage_backend.as_ref() else {
             return settings_error("没有可用的 SQLite 存储后端");
         };
 
-        let import_result = backend.import_sqlite_backup_from(normalized_path(source_path));
+        let import_result = backend.import_sqlite_backup_from(source_path);
 
         match import_result {
             Ok(()) => self.reload_storage_after_import(),
@@ -274,8 +291,9 @@ fn unique_theme_id(theme_key: &str, theme_name: &str) -> String {
     }
 }
 
-fn normalized_path(value: &str) -> &Path {
-    Path::new(value.trim())
+fn normalized_path(value: &str) -> Option<&Path> {
+    let trimmed = value.trim();
+    (!trimmed.is_empty()).then(|| Path::new(trimmed))
 }
 
 fn write_text_file(path: &Path, content: String) -> Result<(), String> {

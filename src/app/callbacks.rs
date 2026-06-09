@@ -34,6 +34,9 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
 
 mod command_palette;
 mod host_actions;
+mod host_actions_credentials;
+mod host_actions_helpers;
+mod host_actions_quick_host;
 mod navigation;
 mod session_actions;
 mod settings_actions;
@@ -43,6 +46,37 @@ mod workspace;
 
 fn apply_and_sync(weak: &slint::Weak<AppWindow>, state: &SharedAppState, message: Message) {
     apply_messages_and_sync(weak, state, [message]);
+}
+
+fn apply_and_sync_success(
+    weak: &slint::Weak<AppWindow>,
+    state: &SharedAppState,
+    message: Message,
+) -> bool {
+    let Some(window) = weak.upgrade() else {
+        return false;
+    };
+
+    let mut success = true;
+    {
+        let mut state = state.borrow_mut();
+        let storage_before = state.storage.clone();
+        let outcome = state.apply(message);
+        success &= outcome.error.is_none();
+
+        if state.storage != storage_before {
+            if let Err(error) = state.persist_storage() {
+                tracing::error!(error = %error, "保存本地存储失败");
+                state
+                    .ui
+                    .set_last_error(format!("保存本地存储失败：{error}"));
+                success = false;
+            }
+        }
+    }
+
+    sync_window(&window, &state.borrow());
+    success
 }
 
 /// 只提交消息，不立即刷新 Slint。

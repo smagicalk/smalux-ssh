@@ -1,0 +1,101 @@
+import { SnippetRow } from "./models.slint";
+import { SnippetDetailPage } from "./snippet_detail_page.slint";
+
+// 片段工作区页面包装层：只聚合片段详情页参数，避免 MainWorkspace 承担页面内部转发细节。
+export component SnippetWorkspacePage inherits Rectangle {
+    in property <string> title-label: "";
+    in property <string> selected-id: "";
+    in property <string> selected-name: "";
+    in property <string> selected-description: "";
+    in property <string> selected-command-template: "";
+    in property <string> selected-scope: "";
+    in property <string> selected-scope-key: "";
+    in property <string> selected-variables: "";
+    in property <string> selected-arguments: "";
+    in property <string> selected-meta: "";
+    in property <string> selected-icon-key: "code";
+    in property <string> selected-node-kind: "";
+    in property <int> selected-accent-index: 0;
+    in property <[SnippetRow]> snippet-rows: [];
+    in property <string> empty-title-label: "";
+    in property <string> empty-caption-label: "";
+    in property <string> field-scope-label: "";
+    in property <string> field-variables-label: "";
+    in property <string> field-arguments-label: "";
+    in property <string> command-template-label: "";
+    in property <string> group-caption-label: "";
+    in property <string> description-empty-label: "";
+    in property <string> new-target-label: "";
+    in property <string> split-target-label: "";
+    in property <string> group-contents-title-label: "";
+    in property <string> target-variant-title-label: "";
+    in property <string> script-relation-label: "";
+    in property <string> script-shared-label: "";
+    in property <string> script-independent-label: "";
+    in property <string> edit-label: "";
+    in property <string> delete-label: "";
+    in property <string> copy-label: "";
+    in property <string> copy-success-label: "";
+    in property <string> copy-failed-label: "";
+    in property <string> run-label: "";
+    in property <string> move-label: "";
+
+    callback create-target();
+    callback split-target();
+    callback edit-selected();
+    callback delete-selected();
+    callback move-selected();
+    callback copy-command(content: string) -> bool;
+    callback run-selected();
+
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    SnippetDetailPage {
+        width: root.width;
+        height: root.height;
+        title-label: root.title-label;
+        selected-id: root.selected-id;
+        selected-name: root.selected-name;
+        selected-description: root.selected-description;
+        selected-command-template: root.selected-command-template;
+        selected-scope: root.selected-scope;
+        selected-scope-key: root.selected-scope-key;
+        selected-variables: root.selected-variables;
+        selected-arguments: root.selected-arguments;
+        selected-meta: root.selected-meta;
+        selected-icon-key: root.selected-icon-key;
+        selected-node-kind: root.selected-node-kind;
+        selected-accent-index: root.selected-accent-index;
+        snippet-rows: root.snippet-rows;
+        empty-title-label: root.empty-title-label;
+        empty-caption-label: root.empty-caption-label;
+        field-scope-label: root.field-scope-label;
+        field-variables-label: root.field-variables-label;
+        field-arguments-label: root.field-arguments-label;
+        command-template-label: root.command-template-label;
+        group-caption-label: root.group-caption-label;
+        description-empty-label: root.description-empty-label;
+        new-target-label: root.new-target-label;
+        split-target-label: root.split-target-label;
+        group-contents-title-label: root.group-contents-title-label;
+        target-variant-title-label: root.target-variant-title-label;
+        script-relation-label: root.script-relation-label;
+        script-shared-label: root.script-shared-label;
+        script-independent-label: root.script-independent-label;
+        edit-label: root.edit-label;
+        delete-label: root.delete-label;
+        copy-label: root.copy-label;
+        copy-success-label: root.copy-success-label;
+        copy-failed-label: root.copy-failed-label;
+        run-label: root.run-label;
+        move-label: root.move-label;
+        create-target => { root.create-target(); }
+        split-target => { root.split-target(); }
+        edit-selected => { root.edit-selected(); }
+        delete-selected => { root.delete-selected(); }
+        move-selected => { root.move-selected(); }
+        copy-command(content) => { root.copy-command(content) }
+        run-selected => { root.run-selected(); }
+    }
+}

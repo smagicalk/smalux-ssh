@@ -1,0 +1,142 @@
+import { KnownHostRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { TerminalPane, ToolPanel } from "./workspace.slint";
+import { VerticalSplitter } from "./splitter.slint";
+
+// 终端工作区页面包装层：把终端、分隔条、右侧工具面板合成一个页面模块。
+export component TerminalWorkspacePage inherits Rectangle {
+    in property <string> active-session-id: "";
+    in property <string> active-tab-title: "";
+    in property <string> active-tab-kind: "";
+    in property <string> active-tab-status: "";
+    in property <string> terminal-input: "";
+    in property <string> terminal-prompt: "";
+    in property <[string]> terminal-output: [];
+    in property <bool> terminal-can-send-input: false;
+    in property <bool> terminal-can-reconnect-shell: false;
+    in property <string> terminal-reconnect-label: "";
+    in property <int> tool-panel-width: 0;
+    in property <string> tool-panel-mode-key: "Closed";
+    in property <string> tool-panel-mode: "";
+    in property <int> history-count: 0;
+    in property <string> sftp-host-id: "";
+    in property <string> sftp-title: "";
+    in property <string> sftp-current-dir: "";
+    in property <string> sftp-selected-path: "";
+    in property <bool> sftp-loading: false;
+    in property <string> sftp-error: "";
+    in property <[SftpEntryRow]> sftp-entries: [];
+    in property <string> loading-label: "";
+    in property <string> refresh-label: "";
+    in property <string> local-title: "";
+    in property <string> remote-title: "";
+    in property <string> workspace-label: "";
+    in property <string> queue-label: "";
+    in property <string> selected-label: "";
+    in property <string> path-label: "";
+    in property <string> entries-label: "";
+    in property <string> loading-entries-label: "";
+    in property <string> empty-entries-label: "";
+    in property <string> pinned-label: "";
+    in property <string> empty-value-label: "";
+    in property <string> snippets-empty-label: "";
+    in property <string> history-commands-label: "";
+    in property <string> history-saved-suffix-label: "";
+    in property <string> history-empty-label: "";
+    in property <string> history-run-label: "";
+    in property <string> tunnels-empty-label: "";
+    in property <string> known-hosts-empty-label: "";
+    in property <string> known-hosts-trust-label: "";
+    in property <string> known-hosts-delete-label: "";
+    in property <[string]> history: [];
+    in property <[ToolItemRow]> snippets: [];
+    in property <[ToolItemRow]> tunnels: [];
+    in property <[KnownHostRow]> known-hosts: [];
+
+    callback append-terminal-input(session-id: string, text: string);
+    callback backspace-terminal-input(session-id: string);
+    callback update-terminal-input(session-id: string, text: string);
+    callback send-terminal-input(session-id: string, text: string);
+    callback reconnect-shell(session-id: string);
+    callback resize-tool-panel(width: int);
+    callback close-tool-panel();
+    callback refresh-sftp(host-id: string);
+    callback select-sftp-entry(host-id: string, path: string);
+    callback trust-known-host(host: string, port: int);
+    callback remove-known-host(host: string, port: int);
+
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    HorizontalLayout {
+        spacing: 7px;
+
+        TerminalPane {
+            session-id: root.active-session-id;
+            title: root.active-tab-title;
+            kind: root.active-tab-kind;
+            status: root.active-tab-status;
+            input: root.terminal-input;
+            prompt: root.terminal-prompt;
+            output-lines: root.terminal-output;
+            can-send-input: root.terminal-can-send-input;
+            can-reconnect-shell: root.terminal-can-reconnect-shell;
+            reconnect-label: root.terminal-reconnect-label;
+            append-input(session-id, text) => { root.append-terminal-input(session-id, text); }
+            backspace-input(session-id) => { root.backspace-terminal-input(session-id); }
+            update-input(session-id, text) => { root.update-terminal-input(session-id, text); }
+            send-input(session-id, text) => { root.send-terminal-input(session-id, text); }
+            reconnect-shell(session-id) => { root.reconnect-shell(session-id); }
+        }
+
+        if root.tool-panel-mode-key != "Closed": VerticalSplitter {
+            base-width: root.tool-panel-width;
+            reverse: true;
+            resize(width) => { root.resize-tool-panel(width); }
+        }
+
+        if root.tool-panel-mode-key != "Closed": ToolPanel {
+            panel-width: root.tool-panel-width;
+            mode-key: root.tool-panel-mode-key;
+            mode: root.tool-panel-mode;
+            history-count: root.history-count;
+            sftp-host-id: root.sftp-host-id;
+            sftp-title: root.sftp-title;
+            sftp-current-dir: root.sftp-current-dir;
+            sftp-selected-path: root.sftp-selected-path;
+            sftp-loading: root.sftp-loading;
+            sftp-error: root.sftp-error;
+            sftp-entries: root.sftp-entries;
+            loading-label: root.loading-label;
+            refresh-label: root.refresh-label;
+            local-title: root.local-title;
+            remote-title: root.remote-title;
+            workspace-label: root.workspace-label;
+            queue-label: root.queue-label;
+            selected-label: root.selected-label;
+            path-label: root.path-label;
+            entries-label: root.entries-label;
+            loading-entries-label: root.loading-entries-label;
+            empty-entries-label: root.empty-entries-label;
+            pinned-label: root.pinned-label;
+            empty-value-label: root.empty-value-label;
+            snippets-empty-label: root.snippets-empty-label;
+            history-commands-label: root.history-commands-label;
+            history-saved-suffix-label: root.history-saved-suffix-label;
+            history-empty-label: root.history-empty-label;
+            history-run-label: root.history-run-label;
+            tunnels-empty-label: root.tunnels-empty-label;
+            known-hosts-empty-label: root.known-hosts-empty-label;
+            known-hosts-trust-label: root.known-hosts-trust-label;
+            known-hosts-delete-label: root.known-hosts-delete-label;
+            history: root.history;
+            snippets: root.snippets;
+            tunnels: root.tunnels;
+            known-hosts: root.known-hosts;
+            close => { root.close-tool-panel(); }
+            refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
+            select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+            trust-known-host(host, port) => { root.trust-known-host(host, port); }
+            remove-known-host(host, port) => { root.remove-known-host(host, port); }
+        }
+    }
+}

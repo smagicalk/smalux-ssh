@@ -1,0 +1,298 @@
+import { AppTheme } from "./theme.slint";
+import { HostIcon } from "./host_icons.slint";
+export component HostSearchField inherits Rectangle {
+    in property <string> value;
+    in property <string> placeholder;
+    callback edited(value: string);
+    callback accepted(value: string);
+
+    height: 28px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.input-bg;
+
+    Text {
+        x: 10px;
+        y: 0px;
+        width: parent.width - 20px;
+        height: parent.height;
+        text: root.placeholder;
+        color: AppTheme.input-placeholder;
+        font-size: 11px;
+        vertical-alignment: center;
+        visible: input.text == "";
+    }
+
+    input := TextInput {
+        x: 10px;
+        y: 0px;
+        width: parent.width - 20px;
+        height: parent.height;
+        text: root.value;
+        single-line: true;
+        color: AppTheme.text;
+        font-size: 11px;
+        text-cursor-width: 1px;
+        selection-background-color: AppTheme.input-selection;
+        selection-foreground-color: AppTheme.text-strong;
+        vertical-alignment: center;
+        edited => { root.edited(self.text); }
+        accepted => { root.accepted(self.text); }
+    }
+}
+
+export component HostActionButton inherits Rectangle {
+    in property <string> label;
+    callback clicked();
+
+    height: 25px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: touch.pressed ? AppTheme.accent-blue : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: touch.pressed ? AppTheme.button-secondary-pressed : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.button-secondary-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        text: root.label;
+        color: touch.pressed ? AppTheme.text-strong : AppTheme.button-secondary-text;
+        font-size: 9px;
+        font-weight: 700;
+        overflow: elide;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component HostCard inherits Rectangle {
+    in property <string> host-id;
+    in property <string> name;
+    in property <string> endpoint;
+    in property <string> icon-key: "server";
+    in property <string> auth;
+    in property <string> group;
+    in property <string> tags;
+    in property <string> status-key;
+    in property <string> status;
+    in property <int> accent-index: 0;
+    in property <string> open-label: "";
+    in property <string> files-label: "";
+    in property <string> edit-label: "";
+    in property <string> delete-label: "";
+    callback open-shell();
+    callback open-sftp();
+    callback edit-host();
+    callback remove-host();
+
+    property <color> accent-color: root.accent-index == 0 ? AppTheme.accent : root.accent-index == 1 ? AppTheme.accent-violet : root.accent-index == 2 ? AppTheme.warning : root.accent-index == 3 ? AppTheme.info-text : root.accent-index == 4 ? AppTheme.danger-text-soft : AppTheme.success-text;
+    property <color> state-color: root.status-key == "Connected" ? AppTheme.accent : root.status-key == "Connecting" ? AppTheme.warning : root.status-key == "Failed" ? AppTheme.danger : root.accent-color;
+
+    height: 104px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: root.status-key == "Connected" ? AppTheme.accent : AppTheme.border-soft;
+    background: AppTheme.card-bg;
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 7px;
+
+        Rectangle {
+            width: 28px;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 0px;
+                y: 0px;
+                width: 3px;
+                height: parent.height;
+                border-radius: 3px;
+                background: root.state-color;
+            }
+
+            HostIcon {
+                x: 6px;
+                y: 2px;
+                icon-key: root.icon-key;
+                status-key: root.status-key;
+                accent-index: root.accent-index;
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 6px;
+
+                VerticalLayout {
+                    spacing: 3px;
+                    horizontal-stretch: 1;
+                    Text { text: name; color: AppTheme.text-strong; font-size: 12px; font-weight: 700; height: 16px; overflow: elide; }
+                    Text { text: endpoint; color: AppTheme.text-soft; font-size: 10px; height: 13px; overflow: elide; }
+                    Text { text: tags; color: root.accent-color; font-size: 9px; height: 12px; overflow: elide; }
+                }
+
+                VerticalLayout {
+                    width: 66px;
+                    spacing: 3px;
+                    Text {
+                        text: status;
+                        color: root.status-key == "Connected" ? AppTheme.success-text : root.state-color;
+                        font-size: 9px;
+                        horizontal-alignment: right;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: auth;
+                        color: AppTheme.accent-violet;
+                        font-size: 9px;
+                        horizontal-alignment: right;
+                        overflow: elide;
+                    }
+                    Text {
+                        text: group;
+                        color: AppTheme.text-muted;
+                        font-size: 9px;
+                        horizontal-alignment: right;
+                        overflow: elide;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 4px;
+                HostActionButton { label: root.open-label; horizontal-stretch: 1; clicked => { root.open-shell(); } }
+                HostActionButton { label: root.files-label; horizontal-stretch: 1; clicked => { root.open-sftp(); } }
+                HostActionButton { label: root.edit-label; horizontal-stretch: 1; clicked => { root.edit-host(); } }
+                HostActionButton { label: root.delete-label; horizontal-stretch: 1; clicked => { root.remove-host(); } }
+            }
+        }
+    }
+}
+
+export component HostViewModeToggle inherits Rectangle {
+    in property <string> mode-key: "Tree";
+    callback clicked();
+
+    width: 76px;
+    height: 28px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: touch.has-hover ? AppTheme.surface-hover : AppTheme.raised-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding: 2px;
+        spacing: 2px;
+
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: 4px;
+            background: root.mode-key == "Tree" ? AppTheme.selection-bg : AppTheme.transparent;
+
+            VerticalLayout {
+                padding-left: 7px;
+                padding-right: 7px;
+                padding-top: 5px;
+                padding-bottom: 5px;
+                spacing: 2px;
+
+                Rectangle {
+                    height: 2px;
+                    border-radius: 2px;
+                    background: root.mode-key == "Tree" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+                Rectangle {
+                    height: 2px;
+                    border-radius: 2px;
+                    background: root.mode-key == "Tree" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+                Rectangle {
+                    height: 2px;
+                    border-radius: 2px;
+                    background: root.mode-key == "Tree" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: 4px;
+            background: root.mode-key == "Card" ? AppTheme.selection-bg : AppTheme.transparent;
+
+            GridLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-top: 5px;
+                padding-bottom: 5px;
+                spacing: 3px;
+
+                Rectangle {
+                    row: 0;
+                    col: 0;
+                    border-radius: 2px;
+                    background: root.mode-key == "Card" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+                Rectangle {
+                    row: 0;
+                    col: 1;
+                    border-radius: 2px;
+                    background: root.mode-key == "Card" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+                Rectangle {
+                    row: 1;
+                    col: 0;
+                    border-radius: 2px;
+                    background: root.mode-key == "Card" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+                Rectangle {
+                    row: 1;
+                    col: 1;
+                    border-radius: 2px;
+                    background: root.mode-key == "Card" ? AppTheme.text-strong : AppTheme.text-muted;
+                }
+            }
+        }
+    }
+}
+
+export component HostAddButton inherits Rectangle {
+    in property <string> label: "";
+    callback clicked();
+
+    width: 54px;
+    height: 28px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: touch.has-hover ? AppTheme.button-primary-border-hover : AppTheme.button-primary-border;
+    background: touch.pressed ? AppTheme.button-primary-pressed : touch.has-hover ? AppTheme.button-primary-hover : AppTheme.button-primary-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        x: 8px;
+        width: parent.width - 16px;
+        height: parent.height;
+        text: root.label;
+        color: AppTheme.button-primary-text;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}

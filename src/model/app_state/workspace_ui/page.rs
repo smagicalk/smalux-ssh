@@ -55,6 +55,42 @@ impl AppState {
         draft_changed()
     }
 
+    /// 更新密钥页分组树搜索条件。
+    pub(in crate::model::app_state) fn update_credential_search_query(
+        &mut self,
+        query: String,
+    ) -> AppUpdateOutcome {
+        self.ui.workspace.set_credential_search_query(query);
+        draft_changed()
+    }
+
+    /// 更新片段页分组树搜索条件。
+    pub(in crate::model::app_state) fn update_snippet_search_query(
+        &mut self,
+        query: String,
+    ) -> AppUpdateOutcome {
+        self.ui.workspace.set_snippet_search_query(query);
+        draft_changed()
+    }
+
+    /// 折叠或展开密钥页分组树节点。
+    pub(in crate::model::app_state) fn toggle_credential_tree_node(
+        &mut self,
+        node_id: String,
+    ) -> AppUpdateOutcome {
+        self.ui.workspace.toggle_credential_tree_node(node_id);
+        draft_changed()
+    }
+
+    /// 折叠或展开片段页分组树节点。
+    pub(in crate::model::app_state) fn toggle_snippet_tree_node(
+        &mut self,
+        node_id: String,
+    ) -> AppUpdateOutcome {
+        self.ui.workspace.toggle_snippet_tree_node(node_id);
+        draft_changed()
+    }
+
     /// 更新新建会话弹窗搜索条件。
     pub(in crate::model::app_state) fn update_new_session_search_query(
         &mut self,

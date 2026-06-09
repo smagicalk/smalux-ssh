@@ -57,6 +57,12 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     );
     bind_page(
         window,
+        Rc::clone(&state),
+        WindowCallback::Proxy,
+        WorkspacePage::Proxy,
+    );
+    bind_page(
+        window,
         state,
         WindowCallback::Settings,
         WorkspacePage::Settings,
@@ -83,6 +89,7 @@ fn bind_page(
         WindowCallback::Snippets => window.on_open_snippets(handler),
         WindowCallback::History => window.on_open_history(handler),
         WindowCallback::Security => window.on_open_security(handler),
+        WindowCallback::Proxy => window.on_open_proxy(handler),
         WindowCallback::Settings => window.on_open_settings(handler),
     }
 }
@@ -95,5 +102,6 @@ enum WindowCallback {
     Snippets,
     History,
     Security,
+    Proxy,
     Settings,
 }

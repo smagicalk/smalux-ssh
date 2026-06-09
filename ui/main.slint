@@ -1,15 +1,20 @@
-import { ActivityRow, CommandPaletteRow, GroupOptionRow, HostRow, HostTreeRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { ActivityRow, CommandPaletteRow, CredentialDetailFieldRow, CredentialGroupContentRow, CredentialOptionRow, CredentialRow, GroupOptionRow, HostRow, HostTreeRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 export { AppTheme } from "./theme.slint";
 import { ActivityPanel } from "./activity_panel.slint";
 import { CommandPaletteOverlay } from "./command_palette.slint";
-import { ConfirmDialog } from "./common.slint";
-import { CreateChoiceDialog, CreateGroupDialog, CreateGroupParentDialog, CreateHostDialog, HostsPanel } from "./hosts_panel.slint";
+import { CredentialDialogFlow } from "./credential_dialogs.slint";
+import { CredentialsPanel } from "./credential_panel.slint";
+import { SnippetDialogFlow } from "./snippet_dialogs.slint";
+import { SnippetsPanel } from "./snippet_panel.slint";
+import { HostDialogFlow } from "./host_dialog_flow.slint";
+import { HostsPanel } from "./hosts_panel.slint";
 import { MainWorkspace } from "./main_workspace.slint";
 import { NavRail } from "./rail.slint";
 import { VerticalSplitter } from "./splitter.slint";
 
 export component AppWindow inherits Window {
+    // 全局状态和导航文案：Rust 生成绑定会直接写入这些字段，名称保持稳定。
     in property <string> host-count: "0";
     in property <string> tab-count: "0";
     in property <string> active-page-key: "Hosts";
@@ -20,6 +25,8 @@ export component AppWindow inherits Window {
     in property <string> host-list-mode-key: "Tree";
     in property <string> host-list-mode: "";
     in property <string> host-search-query: "";
+    in property <string> credential-search-query: "";
+    in property <string> snippet-search-query: "";
     in property <string> brand-short-label: "";
     in property <string> brand-name-label: "";
     in property <string> topbar-find-label: "";
@@ -31,8 +38,11 @@ export component AppWindow inherits Window {
     in property <string> nav-snippets-label: "";
     in property <string> nav-history-label: "";
     in property <string> nav-security-label: "";
+    in property <string> nav-proxy-label: "";
     in property <string> nav-settings-label: "";
     in property <string> nav-find-label: "";
+
+    // 主机页文案和分组删除弹窗文案。
     in property <string> host-new-label: "";
     in property <string> host-open-label: "";
     in property <string> host-files-label: "";
@@ -48,11 +58,128 @@ export component AppWindow inherits Window {
     in property <string> group-delete-title-label: "";
     in property <string> group-delete-confirm-label: "";
     in property <string> group-delete-cancel-label: "";
+
+    // 工具页、凭据页和凭据弹窗文案。
     in property <string> tool-files-label: "";
     in property <string> tool-snippets-label: "";
     in property <string> tool-history-label: "";
     in property <string> tool-tunnels-label: "";
     in property <string> tool-keys-label: "";
+    in property <string> tool-proxy-label: "";
+    in property <string> proxy-empty-label: "";
+    in property <string> security-tree-title-label: "";
+    in property <string> security-search-placeholder-label: "";
+    in property <string> security-new-label: "";
+    in property <string> security-create-action-title-label: "";
+    in property <string> security-create-action-create-label: "";
+    in property <string> security-create-action-create-caption-label: "";
+    in property <string> security-create-action-import-label: "";
+    in property <string> security-create-action-import-caption-label: "";
+    in property <string> security-create-action-group-caption-label: "";
+    in property <string> security-create-type-title-label: "";
+    in property <string> security-create-type-create-caption-label: "";
+    in property <string> security-create-type-import-caption-label: "";
+    in property <string> security-group-new-label: "";
+    in property <string> security-group-edit-label: "";
+    in property <string> security-group-delete-label: "";
+    in property <string> security-private-keys-label: "";
+    in property <string> security-certificates-label: "";
+    in property <string> security-passwords-label: "";
+    in property <string> security-agents-label: "";
+    in property <string> security-private-key-create-label: "";
+    in property <string> security-private-key-import-label: "";
+    in property <string> security-certificate-create-label: "";
+    in property <string> security-certificate-import-label: "";
+    in property <string> security-password-create-label: "";
+    in property <string> security-agent-create-label: "";
+    in property <string> security-private-key-create-title-label: "";
+    in property <string> security-private-key-import-title-label: "";
+    in property <string> security-certificate-create-title-label: "";
+    in property <string> security-certificate-import-title-label: "";
+    in property <string> security-password-create-title-label: "";
+    in property <string> security-agent-create-title-label: "";
+    in property <string> security-credential-name-label: "";
+    in property <string> security-credential-name-placeholder: "";
+    in property <string> security-credential-secret-label: "";
+    in property <string> security-private-key-secret-placeholder: "";
+    in property <string> security-certificate-secret-placeholder: "";
+    in property <string> security-password-secret-label: "";
+    in property <string> security-password-secret-placeholder: "";
+    in property <string> security-password-show-label: "";
+    in property <string> security-password-hide-label: "";
+    in property <string> security-agent-secret-label: "";
+    in property <string> security-agent-secret-placeholder: "";
+    in property <string> security-private-key-source-label: "";
+    in property <string> security-private-key-source-placeholder: "";
+    in property <string> security-private-key-import-file-label: "";
+    in property <string> security-private-key-import-text-label: "";
+    in property <string> security-private-key-text-label: "";
+    in property <string> security-private-key-text-placeholder: "";
+    in property <string> security-certificate-source-label: "";
+    in property <string> security-certificate-source-placeholder: "";
+    in property <string> security-certificate-text-label: "";
+    in property <string> security-certificate-text-placeholder: "";
+    in property <string> security-certificate-ca-key-label: "";
+    in property <string> security-certificate-ca-key-placeholder: "";
+    in property <string> security-certificate-subject-key-label: "";
+    in property <string> security-certificate-subject-key-placeholder: "";
+    in property <string> security-certificate-type-label: "";
+    in property <string> security-certificate-type-user-label: "";
+    in property <string> security-certificate-type-host-label: "";
+    in property <string> security-certificate-principals-label: "";
+    in property <string> security-certificate-principals-placeholder: "";
+    in property <string> security-certificate-valid-days-label: "";
+    in property <string> security-certificate-valid-days-placeholder: "";
+    in property <string> security-certificate-key-id-label: "";
+    in property <string> security-certificate-key-id-placeholder: "";
+    in property <string> security-certificate-serial-label: "";
+    in property <string> security-certificate-serial-placeholder: "";
+    in property <string> security-certificate-key-picker-title-label: "";
+    in property <string> security-certificate-empty-private-keys-label: "";
+    in property <string> security-credential-algorithm-label: "";
+    in property <string> security-credential-save-label: "";
+    in property <string> security-credential-generating-private-key-label: "";
+    in property <string> security-credential-edit-label: "";
+    in property <string> security-credential-edit-private-key-label: "";
+    in property <string> security-credential-edit-certificate-label: "";
+    in property <string> security-credential-edit-password-label: "";
+    in property <string> security-credential-move-label: "";
+    in property <string> security-credential-duplicate-label: "";
+    in property <string> security-credential-export-label: "";
+    in property <string> security-credential-replace-secret-label: "";
+    in property <string> security-credential-delete-label: "";
+    in property <string> security-credential-delete-title-label: "";
+    in property <string> security-credential-delete-caption-label: "";
+    in property <string> security-credential-delete-confirm-label: "";
+    in property <string> security-credential-delete-cancel-label: "";
+    in property <string> security-credential-export-title-label: "";
+    in property <string> security-credential-export-path-label: "";
+    in property <string> security-credential-export-path-placeholder: "";
+    in property <string> security-credential-replace-secret-title-label: "";
+    in property <string> security-credential-replace-secret-field-label: "";
+    in property <string> security-credential-replace-secret-placeholder: "";
+    in property <string> security-credential-replace-secret-confirm-title-label: "";
+    in property <string> security-credential-replace-secret-confirm-caption-label: "";
+    in property <string> security-credential-replace-secret-confirm-label: "";
+    in property <string> security-view-content-label: "";
+    in property <string> security-view-private-key-label: "";
+    in property <string> security-view-certificate-label: "";
+    in property <string> security-view-password-label: "";
+    in property <string> security-secret-copy-label: "";
+    in property <string> security-secret-copy-success-label: "";
+    in property <string> security-secret-copy-failed-label: "";
+    in property <string> security-secret-content-missing-label: "";
+    in property <string> security-detail-empty-title-label: "";
+    in property <string> security-detail-empty-caption-label: "";
+    in property <string> security-field-type-label: "";
+    in property <string> security-field-username-label: "";
+    in property <string> security-field-algorithm-label: "";
+    in property <string> security-field-fingerprint-label: "";
+    in property <string> security-field-secret-ref-label: "";
+    in property <string> security-field-group-label: "";
+    in property <string> security-group-caption-label: "";
+
+    // 主机列表、活动栏、命令面板和终端/SFTP 文案。
     in property <string> host-search-placeholder: "";
     in property <string> hosts-section-title: "";
     in property <string> hosts-empty-title: "";
@@ -80,6 +207,79 @@ export component AppWindow inherits Window {
     in property <string> sftp-empty-entries-label: "";
     in property <string> tool-pinned-label: "";
     in property <string> tool-empty-value-label: "";
+
+    // 片段页、片段弹窗和片段运行文案。
+    in property <string> snippets-tree-title-label: "";
+    in property <string> snippets-search-placeholder-label: "";
+    in property <string> snippets-detail-empty-title-label: "";
+    in property <string> snippets-detail-empty-caption-label: "";
+    in property <string> snippets-field-scope-label: "";
+    in property <string> snippets-field-variables-label: "";
+    in property <string> snippets-field-arguments-label: "";
+    in property <string> snippets-command-template-label: "";
+    in property <string> snippets-group-caption-label: "";
+    in property <string> snippets-description-empty-label: "";
+    in property <string> snippets-new-label: "";
+    in property <string> snippets-new-snippet-label: "";
+    in property <string> snippets-new-snippet-caption-label: "";
+    in property <string> snippets-new-target-label: "";
+    in property <string> snippets-new-group-label: "";
+    in property <string> snippets-new-group-caption-label: "";
+    in property <string> snippets-create-choice-title-label: "";
+    in property <string> snippets-group-contents-title-label: "";
+    in property <string> snippets-target-variant-title-label: "";
+    in property <string> snippets-script-relation-label: "";
+    in property <string> snippets-script-shared-label: "";
+    in property <string> snippets-script-independent-label: "";
+    in property <string> snippets-create-snippet-title-label: "";
+    in property <string> snippets-create-target-title-label: "";
+    in property <string> snippets-create-group-title-label: "";
+    in property <string> snippets-edit-snippet-title-label: "";
+    in property <string> snippets-edit-target-title-label: "";
+    in property <string> snippets-edit-group-title-label: "";
+    in property <string> snippets-edit-label: "";
+    in property <string> snippets-delete-label: "";
+    in property <string> snippets-delete-title-label: "";
+    in property <string> snippets-delete-snippet-caption-label: "";
+    in property <string> snippets-delete-group-caption-label: "";
+    in property <string> snippets-delete-confirm-label: "";
+    in property <string> snippets-copy-label: "";
+    in property <string> snippets-copy-success-label: "";
+    in property <string> snippets-copy-failed-label: "";
+    in property <string> snippets-run-label: "";
+    in property <string> snippets-run-title-label: "";
+    in property <string> snippets-run-host-label: "";
+    in property <string> snippets-run-arguments-label: "";
+    in property <string> snippets-run-arguments-placeholder-label: "";
+    in property <string> snippets-run-no-hosts-label: "";
+    in property <string> snippets-move-label: "";
+    in property <string> snippets-move-title-label: "";
+    in property <string> snippets-move-root-label: "";
+    in property <string> snippets-name-label: "";
+    in property <string> snippets-name-placeholder-label: "";
+    in property <string> snippets-group-name-placeholder-label: "";
+    in property <string> snippets-description-label: "";
+    in property <string> snippets-description-placeholder-label: "";
+    in property <string> snippets-target-key-label: "";
+    in property <string> snippets-target-key-placeholder-label: "";
+    in property <string> snippets-target-picker-placeholder-label: "";
+    in property <string> snippets-target-linux-label: "";
+    in property <string> snippets-target-debian-label: "";
+    in property <string> snippets-target-rhel-label: "";
+    in property <string> snippets-target-macos-label: "";
+    in property <string> snippets-target-powershell-label: "";
+    in property <string> snippets-target-cmd-label: "";
+    in property <string> snippets-command-placeholder-label: "";
+    in property <string> snippets-target-mode-new-label: "";
+    in property <string> snippets-target-mode-new-caption-label: "";
+    in property <string> snippets-target-mode-share-label: "";
+    in property <string> snippets-target-mode-share-caption-label: "";
+    in property <string> snippets-shared-target-label: "";
+    in property <string> snippets-split-target-label: "";
+    in property <string> snippets-delete-target-caption-label: "";
+    in property <string> snippets-cancel-label: "";
+    in property <string> snippets-create-label: "";
+    in property <string> snippets-save-label: "";
     in property <string> snippets-empty-label: "";
     in property <string> history-commands-label: "";
     in property <string> history-saved-suffix-label: "";
@@ -89,6 +289,8 @@ export component AppWindow inherits Window {
     in property <string> known-hosts-empty-label: "";
     in property <string> known-hosts-trust-label: "";
     in property <string> known-hosts-delete-label: "";
+
+    // 新建会话弹窗文案。
     in property <string> new-session-title-label: "";
     in property <string> new-session-search-placeholder: "";
     in property <string> new-session-local-title: "";
@@ -101,8 +303,14 @@ export component AppWindow inherits Window {
     in property <string> new-session-ungrouped-detail: "";
     in property <string> new-session-empty-title: "";
     in property <string> new-session-empty-caption: "";
+
+    // 主机创建/编辑弹窗状态和文案。
     in property <bool> create-host-dialog-open: false;
     in property <bool> create-group-dialog-open: false;
+    property <bool> security-create-action-dialog-open: false;
+    property <bool> security-create-type-dialog-open: false;
+    property <string> security-create-flow-action: "Create";
+    property <bool> create-credential-group-dialog-open: false;
     in property <bool> remove-host-dialog-open: false;
     in property <string> remove-host-dialog-name: "";
     in property <string> create-host-dialog-title: "";
@@ -151,10 +359,20 @@ export component AppWindow inherits Window {
     in property <string> create-host-password-secret-placeholder: "secret://hosts/prod/password";
     in property <string> create-host-private-key-label: "";
     in property <string> create-host-private-key-placeholder: "secret://keys/prod-api";
+    in property <string> create-host-add-private-key-label: "";
+    in property <string> create-host-add-private-key-caption: "";
     in property <string> create-host-passphrase-label: "";
     in property <string> create-host-passphrase-placeholder: "";
     in property <string> create-host-certificate-label: "";
     in property <string> create-host-certificate-placeholder: "secret://certs/prod-api";
+    in property <string> create-host-add-certificate-label: "";
+    in property <string> create-host-add-certificate-caption: "";
+    in property <string> create-host-credential-name-label: "";
+    in property <string> create-host-credential-name-placeholder: "";
+    in property <string> create-host-credential-secret-label: "";
+    in property <string> create-host-credential-secret-placeholder: "";
+    in property <string> create-host-credential-algorithm-label: "";
+    in property <string> create-host-credential-save-label: "";
     in property <string> create-host-icon-title: "";
     in property <string> create-host-icon-server-label: "";
     in property <string> create-host-icon-database-label: "";
@@ -162,6 +380,12 @@ export component AppWindow inherits Window {
     in property <string> create-host-icon-linux-label: "";
     in property <string> create-host-icon-container-label: "";
     in property <string> create-host-icon-shield-label: "";
+    in property <string> create-host-icon-router-label: "";
+    in property <string> create-host-icon-terminal-label: "";
+    in property <string> create-host-icon-globe-label: "";
+    in property <string> create-host-icon-key-label: "";
+    in property <string> create-host-icon-chip-label: "";
+    in property <string> create-host-icon-cluster-label: "";
     property <bool> create-choice-dialog-open: false;
     in property <string> create-choice-title: "";
     in property <string> create-choice-subtitle: "";
@@ -184,6 +408,57 @@ export component AppWindow inherits Window {
     in property <string> quick-group-parent-path: "";
     in property <[GroupOptionRow]> quick-group-parent-options: [];
     in property <string> quick-group-name: "";
+
+    // 凭据创建、编辑、导入导出和证书生成弹窗状态。
+    property <string> quick-credential-group-name: "";
+    property <string> quick-credential-group-parent-id: "";
+    property <string> quick-credential-group-parent-path: "";
+    property <string> quick-credential-group-edit-id: "";
+    property <string> quick-credential-group-kind-key: "PrivateKey";
+    property <bool> quick-security-credential-save-ok: false;
+    property <bool> quick-security-credential-busy: false;
+    property <bool> quick-security-credential-generate-pending: false;
+    property <int> quick-security-credential-busy-frame: 0;
+    property <bool> create-security-credential-dialog-open: false;
+    property <bool> quick-security-credential-import-mode: false;
+    property <string> quick-security-credential-import-source-key: "File";
+    property <string> quick-security-credential-kind-key: "PrivateKey";
+    property <bool> quick-security-certificate-mode: root.quick-security-credential-kind-key == "Certificate";
+    property <bool> quick-security-password-mode: root.quick-security-credential-kind-key == "Password";
+    property <bool> quick-security-agent-mode: root.quick-security-credential-kind-key == "Agent";
+    property <string> quick-security-credential-root-group-path: root.quick-security-certificate-mode ? root.security-certificates-label : root.quick-security-password-mode ? root.security-passwords-label : root.quick-security-agent-mode ? root.security-agents-label : root.security-private-keys-label;
+    property <string> quick-security-credential-group-id: "";
+    property <string> quick-security-credential-group-path: "";
+    property <string> quick-security-credential-name: "";
+    property <string> quick-security-credential-secret-ref: "";
+    property <string> quick-security-credential-algorithm: "Ed25519";
+    property <string> quick-security-credential-edit-id: "";
+    property <bool> create-certificate-credential-dialog-open: false;
+    property <bool> certificate-key-picker-open: false;
+    property <string> certificate-key-picker-target: "Ca";
+    property <string> quick-security-certificate-ca-key-ref: "";
+    property <string> quick-security-certificate-ca-key-name: "";
+    property <string> quick-security-certificate-subject-key-ref: "";
+    property <string> quick-security-certificate-subject-key-name: "";
+    property <string> quick-security-certificate-type: "User";
+    property <string> quick-security-certificate-principals: "";
+    property <string> quick-security-certificate-valid-days: "365";
+    property <string> quick-security-certificate-key-id: "";
+    property <string> quick-security-certificate-serial: "";
+    property <bool> security-credential-group-picker-open: false;
+    property <bool> move-credential-group-picker-open: false;
+    property <string> move-credential-source-id: "";
+    property <bool> credential-group-parent-picker-open: false;
+    property <bool> remove-security-credential-dialog-open: false;
+    property <string> remove-security-credential-dialog-id: "";
+    property <string> remove-security-credential-dialog-name: "";
+    property <bool> export-security-credential-dialog-open: false;
+    property <string> export-security-credential-name: "";
+    property <string> export-security-credential-path: "";
+    property <string> export-security-credential-kind-key: "";
+    property <string> quick-credential-group-root-path: root.quick-credential-group-kind-key == "Certificate" ? root.security-certificates-label : root.quick-credential-group-kind-key == "Password" ? root.security-passwords-label : root.security-private-keys-label;
+
+    // 主机表单草稿和工作区布局尺寸。
     in property <string> quick-host-name: "";
     in property <string> quick-host-address: "";
     in property <string> quick-host-port: "22";
@@ -206,14 +481,86 @@ export component AppWindow inherits Window {
     in property <string> tool-panel-mode-key: "Closed";
     in property <string> tool-panel-mode: "";
     in property <bool> right-sidebar-collapsed: false;
+
+    // 当前选中的凭据详情投影。
+    property <string> selected-credential-id: "";
+    property <string> selected-credential-name: "";
+    property <string> selected-credential-group-id: "";
+    property <string> selected-credential-group-path: "";
+    property <string> selected-credential-kind: "";
+    property <string> selected-credential-kind-key: "";
+    property <string> selected-credential-username: "";
+    property <string> selected-credential-secret-ref: "";
+    property <bool> selected-credential-secret-available: false;
+    property <string> selected-credential-algorithm: "";
+    property <string> selected-credential-algorithm-key: "";
+    property <string> selected-credential-fingerprint: "";
+    property <string> selected-credential-meta: "";
+    property <string> selected-credential-icon-key: "key";
+    property <string> selected-credential-node-kind: "";
+    property <int> selected-credential-accent-index: 0;
+    property <bool> security-page: root.active-page-key == "Security";
+    property <bool> snippets-page: root.active-page-key == "Snippets";
+    property <bool> proxy-page: root.active-page-key == "Proxy";
+
+    // 当前选中的片段和片段弹窗草稿。
+    property <string> selected-snippet-id: "";
+    property <string> selected-snippet-parent-id: "snippet-folder:all";
+    property <string> selected-snippet-name: "";
+    property <string> selected-snippet-description: "";
+    property <string> selected-snippet-command-template: "";
+    property <string> selected-snippet-scope: "";
+    property <string> selected-snippet-scope-key: "";
+    property <string> selected-snippet-variables: "";
+    property <string> selected-snippet-variable-names: "";
+    property <string> selected-snippet-arguments: "";
+    property <string> selected-snippet-argument-values: "";
+    property <string> selected-snippet-meta: "";
+    property <string> selected-snippet-icon-key: "code";
+    property <string> selected-snippet-node-kind: "";
+    property <int> selected-snippet-accent-index: 0;
+    property <bool> create-snippet-choice-dialog-open: false;
+    property <bool> create-snippet-dialog-open: false;
+    property <bool> create-snippet-group-dialog-open: false;
+    property <string> quick-snippet-choice-parent-node-id: "snippet-folder:all";
+    property <string> quick-snippet-parent-node-id: "";
+    property <bool> quick-snippet-edit-mode: false;
+    property <string> quick-snippet-dialog-kind: "Snippet";
+    property <string> quick-snippet-edit-id: "";
+    property <string> quick-snippet-name: "";
+    property <string> quick-snippet-description: "";
+    property <string> quick-snippet-command: "";
+    property <string> quick-snippet-target-mode: "New";
+    property <string> quick-snippet-share-target-id: "";
+    property <string> quick-snippet-group-name: "";
+    property <bool> quick-snippet-target-linux-selected: true;
+    property <bool> quick-snippet-target-debian-selected: false;
+    property <bool> quick-snippet-target-rhel-selected: false;
+    property <bool> quick-snippet-target-macos-selected: false;
+    property <bool> quick-snippet-target-powershell-selected: false;
+    property <bool> quick-snippet-target-cmd-selected: false;
+    property <bool> remove-snippet-dialog-open: false;
+    property <string> remove-snippet-dialog-id: "";
+    property <string> remove-snippet-dialog-name: "";
+    property <string> remove-snippet-dialog-kind: "";
+    property <bool> run-snippet-dialog-open: false;
+    property <string> run-snippet-dialog-host-id: "";
+    property <string> run-snippet-dialog-arguments: "";
+    property <bool> move-snippet-dialog-open: false;
+    property <string> move-snippet-target-group-id: "";
+
+    // 左右布局派生尺寸：只由当前页面和折叠状态计算，不从 Rust 写入。
+    property <bool> left-tree-visible: root.security-page || root.snippets-page || (!root.proxy-page && !root.hosts-panel-collapsed);
     property <length> rail-width: 58px;
     property <length> splitter-width: 6px;
     property <length> collapsed-activity-width: 34px;
-    property <length> visible-hosts-panel-width: root.hosts-panel-collapsed ? 0px : (root.hosts-panel-width * 1px);
-    property <length> visible-left-splitter-width: root.hosts-panel-collapsed ? 0px : root.splitter-width;
+    property <length> visible-hosts-panel-width: root.left-tree-visible ? (root.hosts-panel-width * 1px) : 0px;
+    property <length> visible-left-splitter-width: root.left-tree-visible ? root.splitter-width : 0px;
     property <length> left-content-width: root.rail-width + root.visible-hosts-panel-width + root.visible-left-splitter-width;
-    property <length> right-panel-width: root.right-sidebar-collapsed ? root.collapsed-activity-width : (root.activity-panel-width * 1px);
-    property <length> right-splitter-width: root.right-sidebar-collapsed ? 0px : root.splitter-width;
+    property <length> right-panel-width: root.security-page || root.snippets-page || root.proxy-page ? 0px : (root.right-sidebar-collapsed ? root.collapsed-activity-width : (root.activity-panel-width * 1px));
+    property <length> right-splitter-width: root.security-page || root.snippets-page || root.proxy-page || root.right-sidebar-collapsed ? 0px : root.splitter-width;
+
+    // 终端、SFTP、集合数据和设置页数据，由 Rust view model 批量投影。
     in property <string> active-session-id: "";
     in property <string> active-tab-title: "";
     in property <string> active-tab-kind: "";
@@ -238,6 +585,13 @@ export component AppWindow inherits Window {
     in property <[HostRow]> hosts: [];
     in property <[HostTreeRow]> host-tree: [];
     in property <[GroupOptionRow]> quick-host-groups: [];
+    in property <[CredentialOptionRow]> quick-host-private-key-options: [];
+    in property <[CredentialOptionRow]> quick-host-certificate-options: [];
+    in property <[CredentialRow]> credential-rows: [];
+    in property <[CredentialGroupContentRow]> credential-group-contents: [];
+    in property <[CredentialDetailFieldRow]> credential-detail-fields: [];
+    in property <[SnippetRow]> snippet-rows: [];
+    in property <[SnippetRow]> snippet-target-options: [];
     in property <[SessionTabRow]> tabs: [];
     in property <[SftpEntryRow]> sftp-entries: [];
     in property <[ActivityRow]> activity: [];
@@ -281,6 +635,7 @@ export component AppWindow inherits Window {
     in property <string> settings-security-kdf-label: "";
     in property <string> settings-security-version-label: "";
 
+    // 导航、搜索和树展开回调。
     callback open-hosts();
     callback open-terminal();
     callback open-sftp();
@@ -288,10 +643,30 @@ export component AppWindow inherits Window {
     callback open-snippets();
     callback open-history();
     callback open-security();
+    callback open-proxy();
     callback open-settings();
     callback toggle-host-list-mode();
     callback toggle-host-tree-group(group-id: string);
+    callback toggle-credential-tree-node(node-id: string);
+    callback toggle-snippet-tree-node(node-id: string);
     callback update-host-search(query: string);
+    callback update-credential-search(query: string);
+    callback update-snippet-search(query: string);
+
+    // 片段核心操作回调。
+    callback create-snippet(parent-node-id: string, name: string, description: string, command-template: string) -> bool;
+    callback update-snippet(snippet-row-id: string, name: string, description: string, command-template: string) -> bool;
+    callback create-snippet-target(snippet-row-id: string, target-key: string, display-name: string, command-template: string, share-target-row-id: string) -> bool;
+    callback update-snippet-target(snippet-row-id: string, target-key: string, display-name: string, command-template: string) -> bool;
+    callback split-snippet-target(snippet-row-id: string) -> bool;
+    callback create-snippet-group(parent-node-id: string, name: string) -> bool;
+    callback rename-snippet-group(group-node-id: string, name: string) -> bool;
+    callback delete-snippet-node(node-id: string, node-kind: string);
+    callback run-snippet-on-active-host(snippet-row-id: string);
+    callback run-snippet-with-arguments(snippet-row-id: string, host-id: string, arguments-text: string) -> bool;
+    callback move-snippet-node(node-id: string, node-kind: string, target-group-id: string) -> bool;
+
+    // 主机和主机分组操作回调。
     callback open-create-host-dialog();
     callback open-create-host-dialog-in-group(group-id: string);
     callback open-create-group-parent-dialog(parent-id: string);
@@ -303,6 +678,12 @@ export component AppWindow inherits Window {
     callback select-quick-group-parent(group-id: string);
     callback close-create-group-dialog();
     callback save-quick-group();
+    callback create-credential-group(name: string, parent-id: string, kind-key: string) -> bool;
+    callback rename-credential-group(group-id: string, name: string) -> bool;
+    callback remove-credential-group(group-id: string);
+    callback duplicate-credential(credential-id: string);
+    callback remove-credential(credential-id: string);
+    callback move-credential-tree-node(source-id: string, target-id: string) -> bool;
     callback open-edit-host-dialog(host-id: string);
     callback remove-host(host-id: string);
     callback cancel-remove-host();
@@ -315,7 +696,26 @@ export component AppWindow inherits Window {
     callback select-quick-host-group(group-id: string);
     callback update-quick-host-auth-kind(kind: string);
     callback update-quick-host-auth-field(field: string, value: string);
+
+    // 凭据、密钥、证书和文件选择操作回调。
+    callback create-credential-metadata(kind: string, name: string, group-id: string, secret-ref: string, algorithm: string) -> bool;
+    callback update-credential-metadata(credential-id: string, name: string, group-id: string, algorithm: string) -> bool;
+    callback update-credential-secret(credential-id: string, secret-text: string) -> bool;
+    callback generate-private-key-credential(name: string, group-id: string, algorithm: string) -> bool;
+    callback save-password-credential(name: string, group-id: string, password: string) -> bool;
+    callback import-private-key-credential(name: string, group-id: string, source-path: string, algorithm: string) -> bool;
+    callback import-private-key-text-credential(name: string, group-id: string, private-key-text: string, algorithm: string) -> bool;
+    callback import-certificate-credential(name: string, group-id: string, source-path: string, algorithm: string) -> bool;
+    callback import-certificate-text-credential(name: string, group-id: string, certificate-text: string, algorithm: string) -> bool;
+    callback generate-certificate-credential(name: string, group-id: string, ca-private-key-ref: string, subject-private-key-ref: string, cert-type: string, principals: string, valid-days: string, key-id: string, serial: string) -> bool;
+    callback export-credential-secret(name: string, target-path: string) -> bool;
+    callback read-credential-secret(credential-id: string) -> string;
+    callback copy-text-to-clipboard(text: string) -> bool;
+    callback choose-security-credential-file-path(current-path: string) -> string;
+    callback choose-security-credential-export-path(current-path: string, kind-key: string) -> string;
     callback save-quick-host();
+
+    // 工作区布局、主题、设置和文件动作回调。
     callback resize-hosts-panel(width: int);
     callback resize-activity-panel(width: int);
     callback resize-tool-panel(width: int);
@@ -336,6 +736,8 @@ export component AppWindow inherits Window {
     callback import-sqlite-backup(source-path: string);
     callback choose-file-action-path(key: string, current-path: string, direction: string, extension: string) -> string;
     callback next-background();
+
+    // 命令面板、新建会话、终端、SFTP 和错误处理回调。
     callback open-command-palette();
     callback open-local-terminal();
     callback update-new-session-search(query: string);
@@ -365,6 +767,43 @@ export component AppWindow inherits Window {
     min-height: 600px;
     background: AppTheme.window-bg;
 
+    Timer {
+        interval: 160ms;
+        running: root.quick-security-credential-busy;
+        triggered => {
+            root.quick-security-credential-busy-frame = root.quick-security-credential-busy-frame >= 2 ? 0 : root.quick-security-credential-busy-frame + 1;
+        }
+    }
+
+    Timer {
+        interval: 60ms;
+        running: root.quick-security-credential-generate-pending;
+        triggered => {
+            root.quick-security-credential-generate-pending = false;
+            root.quick-security-credential-save-ok = root.generate-private-key-credential(
+                root.quick-security-credential-name,
+                root.quick-security-credential-group-id,
+                root.quick-security-credential-algorithm,
+            );
+            root.quick-security-credential-busy = false;
+            root.quick-security-credential-busy-frame = 0;
+            if !root.quick-security-credential-save-ok {
+                return;
+            }
+            root.create-security-credential-dialog-open = false;
+            root.security-credential-group-picker-open = false;
+            root.quick-security-credential-name = "";
+            root.quick-security-credential-secret-ref = "";
+            root.quick-security-credential-algorithm = "Ed25519";
+            root.quick-security-credential-group-id = "";
+            root.quick-security-credential-group-path = "";
+            root.quick-security-credential-kind-key = "PrivateKey";
+            root.quick-security-credential-import-mode = false;
+            root.quick-security-credential-import-source-key = "File";
+            root.quick-security-credential-edit-id = "";
+        }
+    }
+
     VerticalLayout {
         spacing: 0px;
 
@@ -385,6 +824,7 @@ export component AppWindow inherits Window {
                 snippets-label: root.nav-snippets-label;
                 history-label: root.nav-history-label;
                 security-label: root.nav-security-label;
+                proxy-label: root.nav-proxy-label;
                 settings-label: root.nav-settings-label;
                 find-label: root.nav-find-label;
                 open-hosts => { root.open-hosts(); }
@@ -394,6 +834,7 @@ export component AppWindow inherits Window {
                 open-snippets => { root.open-snippets(); }
                 open-history => { root.open-history(); }
                 open-security => { root.open-security(); }
+                open-proxy => { root.open-proxy(); }
                 open-settings => { root.open-settings(); }
                 open-command-palette => { root.open-command-palette(); }
             }
@@ -401,7 +842,7 @@ export component AppWindow inherits Window {
             HostsPanel {
                 x: root.rail-width;
                 y: 0px;
-                visible: !root.hosts-panel-collapsed;
+                visible: !root.security-page && !root.snippets-page && !root.proxy-page && !root.hosts-panel-collapsed;
                 height: parent.height;
                 active-page: root.active-page;
                 host-list-mode: root.host-list-mode;
@@ -440,10 +881,274 @@ export component AppWindow inherits Window {
                 remove-group(group-id) => { root.remove-group(group-id); }
             }
 
+            if root.security-page: CredentialsPanel {
+                x: root.rail-width;
+                y: 0px;
+                height: parent.height;
+                title-label: root.security-tree-title-label;
+                search-query: root.credential-search-query;
+                search-placeholder: root.security-search-placeholder-label;
+                new-label: root.security-new-label;
+                new-group-label: root.security-group-new-label;
+                edit-group-label: root.security-group-edit-label;
+                delete-group-label: root.security-group-delete-label;
+                private-keys-label: root.security-private-keys-label;
+                certificates-label: root.security-certificates-label;
+                passwords-label: root.security-passwords-label;
+                create-private-key-label: root.security-private-key-create-label;
+                import-private-key-label: root.security-private-key-import-label;
+                create-certificate-label: root.security-certificate-create-label;
+                import-certificate-label: root.security-certificate-import-label;
+                create-password-label: root.security-password-create-label;
+                create-agent-label: root.security-agent-create-label;
+                edit-credential-label: root.security-credential-edit-label;
+                move-credential-label: root.security-credential-move-label;
+                duplicate-credential-label: root.security-credential-duplicate-label;
+                export-credential-label: root.security-credential-export-label;
+                delete-credential-label: root.security-credential-delete-label;
+                panel-width: root.hosts-panel-width;
+                credentials: root.credential-rows;
+                selected-id: root.selected-credential-id;
+                update-search(query) => { root.update-credential-search(query); }
+                toggle-tree-node(node-id) => { root.toggle-credential-tree-node(node-id); }
+                open-create-dialog => {
+                    root.security-create-action-dialog-open = true;
+                }
+                create-credential(kind-key, group-id, group-path, import-mode) => {
+                    root.quick-security-credential-edit-id = "";
+                    root.quick-security-credential-kind-key = kind-key;
+                    root.quick-security-credential-group-id = group-id;
+                    root.quick-security-credential-group-path = group-path == "" ? root.quick-security-credential-root-group-path : group-path;
+                    root.quick-security-credential-import-mode = import-mode;
+                    root.quick-security-credential-import-source-key = "File";
+                    root.quick-security-credential-name = "";
+                    root.quick-security-credential-secret-ref = "";
+                    root.quick-security-credential-algorithm = "Ed25519";
+                    if kind-key == "Certificate" && !import-mode {
+                        root.quick-security-certificate-ca-key-ref = "";
+                        root.quick-security-certificate-ca-key-name = "";
+                        root.quick-security-certificate-subject-key-ref = "";
+                        root.quick-security-certificate-subject-key-name = "";
+                        root.quick-security-certificate-type = "User";
+                        root.quick-security-certificate-principals = "";
+                        root.quick-security-certificate-valid-days = "365";
+                        root.quick-security-certificate-key-id = "";
+                        root.quick-security-certificate-serial = "";
+                        root.create-certificate-credential-dialog-open = true;
+                    } else {
+                        root.create-security-credential-dialog-open = true;
+                    }
+                }
+                edit-credential(credential-id, name, group-id, group-path, kind-key, algorithm-key) => {
+                    root.quick-security-credential-edit-id = credential-id;
+                    root.quick-security-credential-kind-key = kind-key;
+                    root.quick-security-credential-group-id = group-id;
+                    root.quick-security-credential-group-path = group-path == "" ? root.quick-security-credential-root-group-path : group-path;
+                    root.quick-security-credential-import-mode = false;
+                    root.quick-security-credential-import-source-key = "File";
+                    root.quick-security-credential-name = name;
+                    root.quick-security-credential-secret-ref = root.read-credential-secret(credential-id);
+                    root.quick-security-credential-algorithm = algorithm-key;
+                    root.create-security-credential-dialog-open = true;
+                }
+                create-group(parent-id, parent-path, kind-key) => {
+                    root.quick-credential-group-name = "";
+                    root.quick-credential-group-parent-id = parent-id;
+                    root.quick-credential-group-parent-path = parent-path;
+                    root.quick-credential-group-edit-id = "";
+                    root.quick-credential-group-kind-key = kind-key;
+                    root.create-credential-group-dialog-open = true;
+                }
+                open-move-picker(source-id, kind-key, group-id) => {
+                    root.move-credential-source-id = source-id;
+                    root.quick-security-credential-kind-key = kind-key;
+                    root.quick-security-credential-group-id = group-id;
+                    root.move-credential-group-picker-open = true;
+                }
+                edit-group(group-id, name) => {
+                    root.quick-credential-group-name = name;
+                    root.quick-credential-group-parent-id = "";
+                    root.quick-credential-group-parent-path = "";
+                    root.quick-credential-group-edit-id = group-id;
+                    root.quick-credential-group-kind-key = "PrivateKey";
+                    root.create-credential-group-dialog-open = true;
+                }
+                remove-group(group-id) => { root.remove-credential-group(group-id); }
+                duplicate-credential(credential-id) => { root.duplicate-credential(credential-id); }
+                export-credential(credential-id, name, kind-key) => {
+                    root.export-security-credential-name = credential-id;
+                    root.export-security-credential-kind-key = kind-key;
+                    root.export-security-credential-path = kind-key == "Certificate" ? (name + "-cert.pub") : kind-key == "Password" ? (name + ".txt") : name;
+                    root.export-security-credential-dialog-open = true;
+                }
+                request-remove-credential(credential-id, name) => {
+                    root.remove-security-credential-dialog-id = credential-id;
+                    root.remove-security-credential-dialog-name = name;
+                    root.remove-security-credential-dialog-open = true;
+                }
+                remove-credential(credential-id) => { root.remove-credential(credential-id); }
+                move-node(source-id, target-id) => { root.move-credential-tree-node(source-id, target-id) }
+                select-credential(id, name, group-id, group-path, kind, kind-key, username, secret-ref, secret-available, algorithm, algorithm-key, fingerprint, meta, icon-key, node-kind, accent-index) => {
+                    root.selected-credential-name = name;
+                    root.selected-credential-group-id = group-id;
+                    root.selected-credential-group-path = group-path;
+                    root.selected-credential-kind = kind;
+                    root.selected-credential-kind-key = kind-key;
+                    root.selected-credential-username = username;
+                    root.selected-credential-secret-ref = secret-ref;
+                    root.selected-credential-secret-available = secret-available;
+                    root.selected-credential-algorithm = algorithm;
+                    root.selected-credential-algorithm-key = algorithm-key;
+                    root.selected-credential-fingerprint = fingerprint;
+                    root.selected-credential-meta = meta;
+                    root.selected-credential-icon-key = icon-key;
+                    root.selected-credential-node-kind = node-kind;
+                    root.selected-credential-accent-index = accent-index;
+                    root.selected-credential-id = id;
+                }
+            }
+
+            if root.snippets-page: SnippetsPanel {
+                x: root.rail-width;
+                y: 0px;
+                height: parent.height;
+                title-label: root.snippets-tree-title-label;
+                search-query: root.snippet-search-query;
+                search-placeholder: root.snippets-search-placeholder-label;
+                new-label: root.snippets-new-label;
+                new-target-label: root.snippets-new-target-label;
+                new-group-label: root.snippets-new-group-label;
+                edit-label: root.snippets-edit-label;
+                delete-label: root.snippets-delete-label;
+                move-label: root.snippets-move-label;
+                run-label: root.snippets-run-label;
+                split-target-label: root.snippets-split-target-label;
+                panel-width: root.hosts-panel-width;
+                snippets: root.snippet-rows;
+                selected-id: root.selected-snippet-id;
+                selected-parent-id: root.selected-snippet-parent-id;
+                selected-node-kind: root.selected-snippet-node-kind;
+                update-search(query) => { root.update-snippet-search(query); }
+                toggle-tree-node(node-id) => { root.toggle-snippet-tree-node(node-id); }
+                open-create-choice(parent-node-id) => {
+                    root.quick-snippet-choice-parent-node-id = parent-node-id;
+                    root.create-snippet-choice-dialog-open = true;
+                }
+                open-create-target(parent-node-id) => {
+                    root.create-snippet-dialog-open = false;
+                    root.quick-snippet-parent-node-id = parent-node-id;
+                    root.quick-snippet-dialog-kind = "Target";
+                    root.quick-snippet-edit-mode = false;
+                    root.quick-snippet-edit-id = parent-node-id;
+                    root.quick-snippet-name = "";
+                    root.quick-snippet-description = "linux";
+                    root.quick-snippet-command = "";
+                    root.quick-snippet-target-mode = "New";
+                    root.quick-snippet-share-target-id = "";
+                    root.quick-snippet-target-linux-selected = true;
+                    root.quick-snippet-target-debian-selected = false;
+                    root.quick-snippet-target-rhel-selected = false;
+                    root.quick-snippet-target-macos-selected = false;
+                    root.quick-snippet-target-powershell-selected = false;
+                    root.quick-snippet-target-cmd-selected = false;
+                    root.create-snippet-dialog-open = true;
+                }
+                open-create-group(parent-node-id) => {
+                    root.quick-snippet-parent-node-id = parent-node-id;
+                    root.quick-snippet-edit-mode = false;
+                    root.quick-snippet-edit-id = "";
+                    root.quick-snippet-group-name = "";
+                    root.create-snippet-group-dialog-open = true;
+                }
+                edit-snippet => {
+                    if root.selected-snippet-id != "" {
+                        root.create-snippet-dialog-open = false;
+                        if root.selected-snippet-node-kind == "Snippet" {
+                            root.quick-snippet-dialog-kind = "Snippet";
+                            root.quick-snippet-edit-mode = true;
+                            root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-name = root.selected-snippet-name;
+                            root.quick-snippet-description = root.selected-snippet-description;
+                            root.quick-snippet-command = root.selected-snippet-command-template;
+                            root.quick-snippet-target-mode = "New";
+                            root.quick-snippet-share-target-id = "";
+                            root.quick-snippet-target-linux-selected = true;
+                            root.quick-snippet-target-debian-selected = false;
+                            root.quick-snippet-target-rhel-selected = false;
+                            root.quick-snippet-target-macos-selected = false;
+                            root.quick-snippet-target-powershell-selected = false;
+                            root.quick-snippet-target-cmd-selected = false;
+                            root.create-snippet-dialog-open = true;
+                        } else if root.selected-snippet-node-kind == "SnippetTarget" {
+                            root.quick-snippet-dialog-kind = "Target";
+                            root.quick-snippet-edit-mode = true;
+                            root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-name = root.selected-snippet-name;
+                            root.quick-snippet-description = root.selected-snippet-scope;
+                            root.quick-snippet-command = root.selected-snippet-command-template;
+                            root.quick-snippet-target-mode = "New";
+                            root.quick-snippet-share-target-id = "";
+                            root.quick-snippet-target-linux-selected = root.selected-snippet-scope == "linux";
+                            root.quick-snippet-target-debian-selected = root.selected-snippet-scope == "debian-ubuntu";
+                            root.quick-snippet-target-rhel-selected = root.selected-snippet-scope == "rhel-centos";
+                            root.quick-snippet-target-macos-selected = root.selected-snippet-scope == "macos";
+                            root.quick-snippet-target-powershell-selected = root.selected-snippet-scope == "windows-powershell" || root.selected-snippet-scope == "windows" || root.selected-snippet-scope == "powershell" || root.selected-snippet-scope == "pwsh";
+                            root.quick-snippet-target-cmd-selected = root.selected-snippet-scope == "windows-cmd" || root.selected-snippet-scope == "cmd";
+                            root.create-snippet-dialog-open = true;
+                        } else if root.selected-snippet-node-kind == "Group" {
+                            root.quick-snippet-edit-mode = true;
+                            root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-group-name = root.selected-snippet-name;
+                            root.create-snippet-group-dialog-open = true;
+                        }
+                    }
+                }
+                delete-snippet => {
+                    if root.selected-snippet-id != "" && root.selected-snippet-id != "snippet-folder:all" {
+                        root.remove-snippet-dialog-id = root.selected-snippet-id;
+                        root.remove-snippet-dialog-name = root.selected-snippet-name;
+                        root.remove-snippet-dialog-kind = root.selected-snippet-node-kind;
+                        root.remove-snippet-dialog-open = true;
+                    }
+                }
+                move-snippet => {
+                    if root.selected-snippet-id != "" && root.selected-snippet-id != "snippet-folder:all" && root.selected-snippet-node-kind != "SnippetTarget" {
+                        root.move-snippet-target-group-id = root.selected-snippet-parent-id;
+                        root.move-snippet-dialog-open = true;
+                    }
+                }
+                run-snippet => {
+                    if root.selected-snippet-id != "" && (root.selected-snippet-node-kind == "Snippet" || root.selected-snippet-node-kind == "SnippetTarget") {
+                        root.run-snippet-dialog-host-id = root.hosts.length > 0 ? root.hosts[0].id : "";
+                        root.run-snippet-dialog-arguments = root.selected-snippet-argument-values;
+                        root.run-snippet-dialog-open = true;
+                    }
+                }
+                split-target => { root.split-snippet-target(root.selected-snippet-id); }
+                move-node(source-id, target-id) => { root.move-snippet-node(source-id, "Snippet", target-id) }
+                select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
+                    root.selected-snippet-parent-id = parent-id;
+                    root.selected-snippet-name = name;
+                    root.selected-snippet-description = description;
+                    root.selected-snippet-command-template = command-template;
+                    root.selected-snippet-scope = scope;
+                    root.selected-snippet-scope-key = scope-key;
+                    root.selected-snippet-variables = variables;
+                    root.selected-snippet-variable-names = variable-names;
+                    root.selected-snippet-arguments = arguments;
+                    root.selected-snippet-argument-values = argument-values;
+                    root.selected-snippet-meta = meta;
+                    root.selected-snippet-icon-key = icon-key;
+                    root.selected-snippet-node-kind = node-kind;
+                    root.selected-snippet-accent-index = accent-index;
+                    root.selected-snippet-id = id;
+                }
+            }
+
             VerticalSplitter {
                 x: root.rail-width + root.visible-hosts-panel-width;
                 y: 0px;
-                visible: !root.hosts-panel-collapsed;
+                visible: root.left-tree-visible;
                 height: parent.height;
                 base-width: root.hosts-panel-width;
                 resize(width) => { root.resize-hosts-panel(width); }
@@ -485,6 +1190,38 @@ export component AppWindow inherits Window {
                 snippets: root.snippets;
                 tunnels: root.tunnels;
                 credentials: root.credentials;
+                selected-snippet-id: root.selected-snippet-id;
+                selected-snippet-name: root.selected-snippet-name;
+                selected-snippet-description: root.selected-snippet-description;
+                selected-snippet-command-template: root.selected-snippet-command-template;
+                selected-snippet-scope: root.selected-snippet-scope;
+                selected-snippet-scope-key: root.selected-snippet-scope-key;
+                selected-snippet-variables: root.selected-snippet-variables;
+                selected-snippet-arguments: root.selected-snippet-arguments;
+                selected-snippet-meta: root.selected-snippet-meta;
+                selected-snippet-icon-key: root.selected-snippet-icon-key;
+                selected-snippet-node-kind: root.selected-snippet-node-kind;
+                selected-snippet-accent-index: root.selected-snippet-accent-index;
+                snippet-rows: root.snippet-rows;
+                credential-rows: root.credential-rows;
+                credential-group-contents: root.credential-group-contents;
+                credential-detail-fields: root.credential-detail-fields;
+                selected-credential-id: root.selected-credential-id;
+                selected-credential-name: root.selected-credential-name;
+                selected-credential-group-id: root.selected-credential-group-id;
+                selected-credential-group-path: root.selected-credential-group-path;
+                selected-credential-kind: root.selected-credential-kind;
+                selected-credential-kind-key: root.selected-credential-kind-key;
+                selected-credential-username: root.selected-credential-username;
+                selected-credential-secret-ref: root.selected-credential-secret-ref;
+                selected-credential-secret-available: root.selected-credential-secret-available;
+                selected-credential-algorithm: root.selected-credential-algorithm;
+                selected-credential-algorithm-key: root.selected-credential-algorithm-key;
+                selected-credential-fingerprint: root.selected-credential-fingerprint;
+                selected-credential-meta: root.selected-credential-meta;
+                selected-credential-icon-key: root.selected-credential-icon-key;
+                selected-credential-node-kind: root.selected-credential-node-kind;
+                selected-credential-accent-index: root.selected-credential-accent-index;
                 known-hosts: root.known-hosts;
                 settings-language-options: root.settings-language-options;
                 settings-theme-options: root.settings-theme-options;
@@ -519,6 +1256,30 @@ export component AppWindow inherits Window {
                 tool-snippets-label: root.tool-snippets-label;
                 tool-tunnels-label: root.tool-tunnels-label;
                 tool-keys-label: root.tool-keys-label;
+                tool-proxy-label: root.tool-proxy-label;
+                proxy-empty-label: root.proxy-empty-label;
+                security-view-content-label: root.security-view-content-label;
+                security-view-private-key-label: root.security-view-private-key-label;
+                security-view-certificate-label: root.security-view-certificate-label;
+                security-view-password-label: root.security-view-password-label;
+                security-secret-copy-label: root.security-secret-copy-label;
+                security-secret-copy-success-label: root.security-secret-copy-success-label;
+                security-secret-copy-failed-label: root.security-secret-copy-failed-label;
+                security-secret-content-missing-label: root.security-secret-content-missing-label;
+                security-credential-edit-label: root.security-credential-edit-label;
+                security-credential-edit-private-key-label: root.security-credential-edit-private-key-label;
+                security-credential-edit-certificate-label: root.security-credential-edit-certificate-label;
+                security-credential-edit-password-label: root.security-credential-edit-password-label;
+                security-certificate-create-label: root.security-certificate-create-label;
+                security-detail-empty-title-label: root.security-detail-empty-title-label;
+                security-detail-empty-caption-label: root.security-detail-empty-caption-label;
+                security-field-type-label: root.security-field-type-label;
+                security-field-username-label: root.security-field-username-label;
+                security-field-algorithm-label: root.security-field-algorithm-label;
+                security-field-fingerprint-label: root.security-field-fingerprint-label;
+                security-field-secret-ref-label: root.security-field-secret-ref-label;
+                security-field-group-label: root.security-field-group-label;
+                security-group-caption-label: root.security-group-caption-label;
                 terminal-reconnect-label: root.terminal-reconnect-label;
                 tab-ready-label: root.tab-ready-label;
                 sftp-loading-label: root.sftp-loading-label;
@@ -535,6 +1296,28 @@ export component AppWindow inherits Window {
                 sftp-empty-entries-label: root.sftp-empty-entries-label;
                 tool-pinned-label: root.tool-pinned-label;
                 tool-empty-value-label: root.tool-empty-value-label;
+                snippets-detail-empty-title-label: root.snippets-detail-empty-title-label;
+                snippets-detail-empty-caption-label: root.snippets-detail-empty-caption-label;
+                snippets-field-scope-label: root.snippets-field-scope-label;
+                snippets-field-variables-label: root.snippets-field-variables-label;
+                snippets-field-arguments-label: root.snippets-field-arguments-label;
+                snippets-command-template-label: root.snippets-command-template-label;
+                snippets-group-caption-label: root.snippets-group-caption-label;
+                snippets-description-empty-label: root.snippets-description-empty-label;
+                snippets-new-target-label: root.snippets-new-target-label;
+                snippets-split-target-label: root.snippets-split-target-label;
+                snippets-group-contents-title-label: root.snippets-group-contents-title-label;
+                snippets-target-variant-title-label: root.snippets-target-variant-title-label;
+                snippets-script-relation-label: root.snippets-script-relation-label;
+                snippets-script-shared-label: root.snippets-script-shared-label;
+                snippets-script-independent-label: root.snippets-script-independent-label;
+                snippets-edit-label: root.snippets-edit-label;
+                snippets-delete-label: root.snippets-delete-label;
+                snippets-copy-label: root.snippets-copy-label;
+                snippets-copy-success-label: root.snippets-copy-success-label;
+                snippets-copy-failed-label: root.snippets-copy-failed-label;
+                snippets-run-label: root.snippets-run-label;
+                snippets-move-label: root.snippets-move-label;
                 snippets-empty-label: root.snippets-empty-label;
                 history-commands-label: root.history-commands-label;
                 history-saved-suffix-label: root.history-saved-suffix-label;
@@ -589,9 +1372,166 @@ export component AppWindow inherits Window {
                 open-local-terminal => { root.open-local-terminal(); }
                 open-command-palette => { root.open-command-palette(); }
                 open-shell(host-id) => { root.open-shell(host-id); }
+                create-snippet-target => {
+                    if root.selected-snippet-id != "" && root.selected-snippet-node-kind == "Snippet" {
+                        root.quick-snippet-dialog-kind = "Target";
+                        root.quick-snippet-edit-mode = false;
+                        root.quick-snippet-edit-id = root.selected-snippet-id;
+                        root.quick-snippet-name = "";
+                        root.quick-snippet-description = "linux";
+                        root.quick-snippet-command = "";
+                        root.quick-snippet-target-mode = "New";
+                        root.quick-snippet-share-target-id = "";
+                        root.quick-snippet-target-linux-selected = true;
+                        root.quick-snippet-target-debian-selected = false;
+                        root.quick-snippet-target-rhel-selected = false;
+                        root.quick-snippet-target-macos-selected = false;
+                        root.quick-snippet-target-powershell-selected = false;
+                        root.quick-snippet-target-cmd-selected = false;
+                        root.create-snippet-dialog-open = true;
+                    }
+                }
+                split-snippet-target(snippet-row-id) => {
+                    root.split-snippet-target(snippet-row-id);
+                }
+                edit-selected-snippet => {
+                    if root.selected-snippet-id != "" {
+                        root.create-snippet-dialog-open = false;
+                        if root.selected-snippet-node-kind == "Snippet" {
+                            root.quick-snippet-dialog-kind = "Snippet";
+                            root.quick-snippet-edit-mode = true;
+                            root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-name = root.selected-snippet-name;
+                            root.quick-snippet-description = root.selected-snippet-description;
+                            root.quick-snippet-command = root.selected-snippet-command-template;
+                            root.quick-snippet-target-mode = "New";
+                            root.quick-snippet-share-target-id = "";
+                            root.quick-snippet-target-linux-selected = true;
+                            root.quick-snippet-target-debian-selected = false;
+                            root.quick-snippet-target-rhel-selected = false;
+                            root.quick-snippet-target-macos-selected = false;
+                            root.quick-snippet-target-powershell-selected = false;
+                            root.quick-snippet-target-cmd-selected = false;
+                            root.create-snippet-dialog-open = true;
+                        } else if root.selected-snippet-node-kind == "SnippetTarget" {
+                            root.quick-snippet-dialog-kind = "Target";
+                            root.quick-snippet-edit-mode = true;
+                            root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-name = root.selected-snippet-name;
+                            root.quick-snippet-description = root.selected-snippet-scope;
+                            root.quick-snippet-command = root.selected-snippet-command-template;
+                            root.quick-snippet-target-mode = "New";
+                            root.quick-snippet-share-target-id = "";
+                            root.quick-snippet-target-linux-selected = root.selected-snippet-scope == "linux";
+                            root.quick-snippet-target-debian-selected = root.selected-snippet-scope == "debian-ubuntu";
+                            root.quick-snippet-target-rhel-selected = root.selected-snippet-scope == "rhel-centos";
+                            root.quick-snippet-target-macos-selected = root.selected-snippet-scope == "macos";
+                            root.quick-snippet-target-powershell-selected = root.selected-snippet-scope == "windows-powershell" || root.selected-snippet-scope == "windows" || root.selected-snippet-scope == "powershell" || root.selected-snippet-scope == "pwsh";
+                            root.quick-snippet-target-cmd-selected = root.selected-snippet-scope == "windows-cmd" || root.selected-snippet-scope == "cmd";
+                            root.create-snippet-dialog-open = true;
+                        } else if root.selected-snippet-node-kind == "Group" {
+                            root.quick-snippet-edit-mode = true;
+                            root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-group-name = root.selected-snippet-name;
+                            root.create-snippet-group-dialog-open = true;
+                        }
+                    }
+                }
+                delete-selected-snippet => {
+                    if root.selected-snippet-id != "" && root.selected-snippet-id != "snippet-folder:all" {
+                        root.remove-snippet-dialog-id = root.selected-snippet-id;
+                        root.remove-snippet-dialog-name = root.selected-snippet-name;
+                        root.remove-snippet-dialog-kind = root.selected-snippet-node-kind;
+                        root.remove-snippet-dialog-open = true;
+                    }
+                }
+                move-selected-snippet => {
+                    if root.selected-snippet-id != "" && root.selected-snippet-id != "snippet-folder:all" && root.selected-snippet-node-kind != "SnippetTarget" {
+                        root.move-snippet-target-group-id = root.selected-snippet-parent-id;
+                        root.move-snippet-dialog-open = true;
+                    }
+                }
+                select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
+                    root.selected-snippet-parent-id = parent-id;
+                    root.selected-snippet-name = name;
+                    root.selected-snippet-description = description;
+                    root.selected-snippet-command-template = command-template;
+                    root.selected-snippet-scope = scope;
+                    root.selected-snippet-scope-key = scope-key;
+                    root.selected-snippet-variables = variables;
+                    root.selected-snippet-variable-names = variable-names;
+                    root.selected-snippet-arguments = arguments;
+                    root.selected-snippet-argument-values = argument-values;
+                    root.selected-snippet-meta = meta;
+                    root.selected-snippet-icon-key = icon-key;
+                    root.selected-snippet-node-kind = node-kind;
+                    root.selected-snippet-accent-index = accent-index;
+                    root.selected-snippet-id = id;
+                }
+                copy-snippet-command(content) => { root.copy-text-to-clipboard(content) }
+                run-selected-snippet => {
+                    if root.selected-snippet-id != "" && (root.selected-snippet-node-kind == "Snippet" || root.selected-snippet-node-kind == "SnippetTarget") {
+                        root.run-snippet-dialog-host-id = root.hosts.length > 0 ? root.hosts[0].id : "";
+                        root.run-snippet-dialog-arguments = root.selected-snippet-argument-values;
+                        root.run-snippet-dialog-open = true;
+                    }
+                }
+                read-credential-secret(credential-id) => { root.read-credential-secret(credential-id); }
+                copy-secret-content(content) => { root.copy-text-to-clipboard(content) }
+                select-credential(id, name, group-id, group-path, kind, kind-key, username, secret-ref, secret-available, algorithm, algorithm-key, fingerprint, meta, icon-key, node-kind, accent-index) => {
+                    root.selected-credential-name = name;
+                    root.selected-credential-group-id = group-id;
+                    root.selected-credential-group-path = group-path;
+                    root.selected-credential-kind = kind;
+                    root.selected-credential-kind-key = kind-key;
+                    root.selected-credential-username = username;
+                    root.selected-credential-secret-ref = secret-ref;
+                    root.selected-credential-secret-available = secret-available;
+                    root.selected-credential-algorithm = algorithm;
+                    root.selected-credential-algorithm-key = algorithm-key;
+                    root.selected-credential-fingerprint = fingerprint;
+                    root.selected-credential-meta = meta;
+                    root.selected-credential-icon-key = icon-key;
+                    root.selected-credential-node-kind = node-kind;
+                    root.selected-credential-accent-index = accent-index;
+                    root.selected-credential-id = id;
+                }
+                edit-credential(credential-id, name, group-id, group-path, kind-key, algorithm-key) => {
+                    root.quick-security-credential-edit-id = credential-id;
+                    root.quick-security-credential-kind-key = kind-key;
+                    root.quick-security-credential-group-id = group-id;
+                    root.quick-security-credential-group-path = group-path == "" ? root.quick-security-credential-root-group-path : group-path;
+                    root.quick-security-credential-import-mode = false;
+                    root.quick-security-credential-import-source-key = "File";
+                    root.quick-security-credential-name = name;
+                    root.quick-security-credential-secret-ref = root.read-credential-secret(credential-id);
+                    root.quick-security-credential-algorithm = algorithm-key;
+                    root.create-security-credential-dialog-open = true;
+                }
+                create-certificate(group-id, group-path) => {
+                    root.quick-security-credential-edit-id = "";
+                    root.quick-security-credential-kind-key = "Certificate";
+                    root.quick-security-credential-group-id = group-id;
+                    root.quick-security-credential-group-path = group-path == "" ? root.quick-security-credential-root-group-path : group-path;
+                    root.quick-security-credential-import-mode = false;
+                    root.quick-security-credential-import-source-key = "File";
+                    root.quick-security-credential-name = "";
+                    root.quick-security-credential-secret-ref = "";
+                    root.quick-security-credential-algorithm = "Ed25519";
+                    root.quick-security-certificate-ca-key-ref = "";
+                    root.quick-security-certificate-ca-key-name = "";
+                    root.quick-security-certificate-subject-key-ref = "";
+                    root.quick-security-certificate-subject-key-name = "";
+                    root.quick-security-certificate-type = "User";
+                    root.quick-security-certificate-principals = "";
+                    root.quick-security-certificate-valid-days = "365";
+                    root.quick-security-certificate-key-id = "";
+                    root.quick-security-certificate-serial = "";
+                    root.create-certificate-credential-dialog-open = true;
+                }
             }
 
-            if !root.right-sidebar-collapsed: VerticalSplitter {
+            if !root.security-page && !root.snippets-page && !root.right-sidebar-collapsed: VerticalSplitter {
                 x: parent.width - root.right-panel-width - root.splitter-width;
                 y: 0px;
                 height: parent.height;
@@ -600,7 +1540,7 @@ export component AppWindow inherits Window {
                 resize(width) => { root.resize-activity-panel(width); }
             }
 
-            ActivityPanel {
+            if !root.security-page && !root.snippets-page: ActivityPanel {
                 x: parent.width - root.right-panel-width;
                 y: 0px;
                 height: parent.height;
@@ -618,124 +1558,110 @@ export component AppWindow inherits Window {
         }
     }
 
-    if root.create-choice-dialog-open: CreateChoiceDialog {
+    HostDialogFlow {
         x: 0px;
         y: 0px;
         width: root.width;
         height: root.height;
-        title: root.create-choice-title;
-        subtitle: root.create-choice-subtitle;
-        host-label: root.create-choice-host-label;
-        host-caption: root.create-choice-host-caption;
-        group-label: root.create-choice-group-label;
-        group-caption: root.create-choice-group-caption;
-        cancel-label: root.create-choice-cancel-label;
-        create-host => {
-            root.create-choice-dialog-open = false;
-            root.open-create-host-dialog();
-        }
-        create-group => {
-            root.create-choice-dialog-open = false;
-            root.open-create-group-parent-dialog("");
-        }
-        close => { root.create-choice-dialog-open = false; }
-    }
-
-    if root.create-group-parent-dialog-open: CreateGroupParentDialog {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        dialog-title: root.create-group-parent-picker-title;
-        dialog-subtitle: root.create-group-parent-picker-subtitle;
-        parent-label: root.create-group-parent-label;
-        parent-path: root.quick-group-parent-path;
-        parent-options: root.quick-group-parent-options;
-        cancel-label: root.create-group-cancel-label;
-        next-label: root.create-group-next-label;
-        select-parent(group-id) => { root.select-create-group-parent(group-id); }
-        confirm => { root.confirm-create-group-parent(); }
-        close => { root.close-create-group-parent-dialog(); }
-    }
-
-    if root.command-palette-open: CommandPaletteOverlay {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        query: root.command-palette-query;
-        results: root.command-palette-results;
-        title-label: root.command-palette-title-label;
-        placeholder: root.command-palette-placeholder;
-        empty-label: root.command-palette-empty-label;
-        close-label: root.command-palette-close-label;
-        update-query(query) => { root.update-command-palette(query); }
-        close => { root.close-command-palette(); }
-        activate-item(item-id, kind) => { root.activate-command-palette-item(item-id, kind); }
-    }
-
-    if root.create-host-dialog-open: CreateHostDialog {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        dialog-title: root.create-host-dialog-title;
-        dialog-subtitle: root.create-host-dialog-subtitle;
-        connection-title: root.create-host-connection-title;
-        connection-caption: root.create-host-connection-caption;
-        authentication-title: root.create-host-authentication-title;
-        authentication-caption: root.create-host-authentication-caption;
-        credential-note: root.create-host-credential-note;
-        cancel-label: root.create-host-cancel-label;
-        create-label: root.create-host-create-label;
-        address-label: root.create-host-address-label;
-        address-placeholder: root.create-host-address-placeholder;
-        port-label: root.create-host-port-label;
-        port-placeholder: root.create-host-port-placeholder;
-        username-label: root.create-host-username-label;
-        username-placeholder: root.create-host-username-placeholder;
-        host-alias-label: root.create-host-alias-label;
-        host-alias-placeholder: root.create-host-alias-placeholder;
-        tags-label: root.create-host-tags-label;
-        tags-placeholder: root.create-host-tags-placeholder;
-        group-label: root.create-host-group-label;
-        group-picker-title: root.create-host-group-picker-title;
-        auth-agent-label: root.create-host-auth-agent-label;
-        auth-agent-caption: root.create-host-auth-agent-caption;
-        auth-password-label: root.create-host-auth-password-label;
-        auth-password-caption: root.create-host-auth-password-caption;
-        auth-key-label: root.create-host-auth-key-label;
-        auth-key-caption: root.create-host-auth-key-caption;
-        auth-certificate-label: root.create-host-auth-certificate-label;
-        auth-certificate-caption: root.create-host-auth-certificate-caption;
-        agent-source-title: root.create-host-agent-source-title;
-        agent-auto-label: root.create-host-agent-auto-label;
-        agent-auto-caption: root.create-host-agent-auto-caption;
-        agent-openssh-label: root.create-host-agent-openssh-label;
-        agent-openssh-caption: root.create-host-agent-openssh-caption;
-        agent-pageant-label: root.create-host-agent-pageant-label;
-        agent-pageant-caption: root.create-host-agent-pageant-caption;
-        agent-custom-label: root.create-host-agent-custom-label;
-        agent-custom-caption: root.create-host-agent-custom-caption;
-        custom-agent-pipe-label: root.create-host-custom-agent-pipe-label;
-        custom-agent-pipe-placeholder: root.create-host-custom-agent-pipe-placeholder;
-        agent-key-hint-label: root.create-host-agent-key-hint-label;
-        agent-key-hint-placeholder: root.create-host-agent-key-hint-placeholder;
-        password-secret-label: root.create-host-password-secret-label;
-        password-secret-placeholder: root.create-host-password-secret-placeholder;
-        private-key-label: root.create-host-private-key-label;
-        private-key-placeholder: root.create-host-private-key-placeholder;
-        passphrase-label: root.create-host-passphrase-label;
-        passphrase-placeholder: root.create-host-passphrase-placeholder;
-        certificate-label: root.create-host-certificate-label;
-        certificate-placeholder: root.create-host-certificate-placeholder;
-        icon-title: root.create-host-icon-title;
-        icon-server-label: root.create-host-icon-server-label;
-        icon-database-label: root.create-host-icon-database-label;
-        icon-cloud-label: root.create-host-icon-cloud-label;
-        icon-linux-label: root.create-host-icon-linux-label;
-        icon-container-label: root.create-host-icon-container-label;
-        icon-shield-label: root.create-host-icon-shield-label;
+        create-choice-dialog-open <=> root.create-choice-dialog-open;
+        create-host-dialog-open: root.create-host-dialog-open;
+        create-group-dialog-open: root.create-group-dialog-open;
+        create-group-parent-dialog-open: root.create-group-parent-dialog-open;
+        remove-host-dialog-open: root.remove-host-dialog-open;
+        remove-group-dialog-open: root.remove-group-dialog-open;
+        create-choice-title: root.create-choice-title;
+        create-choice-subtitle: root.create-choice-subtitle;
+        create-choice-host-label: root.create-choice-host-label;
+        create-choice-host-caption: root.create-choice-host-caption;
+        create-choice-group-label: root.create-choice-group-label;
+        create-choice-group-caption: root.create-choice-group-caption;
+        create-choice-cancel-label: root.create-choice-cancel-label;
+        create-group-dialog-title: root.create-group-dialog-title;
+        create-group-dialog-subtitle: root.create-group-dialog-subtitle;
+        create-group-parent-picker-title: root.create-group-parent-picker-title;
+        create-group-parent-picker-subtitle: root.create-group-parent-picker-subtitle;
+        create-group-name-label: root.create-group-name-label;
+        create-group-name-placeholder: root.create-group-name-placeholder;
+        create-group-parent-label: root.create-group-parent-label;
+        create-group-cancel-label: root.create-group-cancel-label;
+        create-group-save-label: root.create-group-save-label;
+        create-group-next-label: root.create-group-next-label;
+        quick-group-parent-path: root.quick-group-parent-path;
+        quick-group-parent-options: root.quick-group-parent-options;
+        quick-group-name: root.quick-group-name;
+        create-host-dialog-title: root.create-host-dialog-title;
+        create-host-dialog-subtitle: root.create-host-dialog-subtitle;
+        create-host-connection-title: root.create-host-connection-title;
+        create-host-connection-caption: root.create-host-connection-caption;
+        create-host-authentication-title: root.create-host-authentication-title;
+        create-host-authentication-caption: root.create-host-authentication-caption;
+        create-host-credential-note: root.create-host-credential-note;
+        create-host-cancel-label: root.create-host-cancel-label;
+        create-host-create-label: root.create-host-create-label;
+        create-host-address-label: root.create-host-address-label;
+        create-host-address-placeholder: root.create-host-address-placeholder;
+        create-host-port-label: root.create-host-port-label;
+        create-host-port-placeholder: root.create-host-port-placeholder;
+        create-host-username-label: root.create-host-username-label;
+        create-host-username-placeholder: root.create-host-username-placeholder;
+        create-host-alias-label: root.create-host-alias-label;
+        create-host-alias-placeholder: root.create-host-alias-placeholder;
+        create-host-tags-label: root.create-host-tags-label;
+        create-host-tags-placeholder: root.create-host-tags-placeholder;
+        create-host-group-label: root.create-host-group-label;
+        create-host-group-picker-title: root.create-host-group-picker-title;
+        create-host-auth-agent-label: root.create-host-auth-agent-label;
+        create-host-auth-agent-caption: root.create-host-auth-agent-caption;
+        create-host-auth-password-label: root.create-host-auth-password-label;
+        create-host-auth-password-caption: root.create-host-auth-password-caption;
+        create-host-auth-key-label: root.create-host-auth-key-label;
+        create-host-auth-key-caption: root.create-host-auth-key-caption;
+        create-host-auth-certificate-label: root.create-host-auth-certificate-label;
+        create-host-auth-certificate-caption: root.create-host-auth-certificate-caption;
+        create-host-agent-source-title: root.create-host-agent-source-title;
+        create-host-agent-auto-label: root.create-host-agent-auto-label;
+        create-host-agent-auto-caption: root.create-host-agent-auto-caption;
+        create-host-agent-openssh-label: root.create-host-agent-openssh-label;
+        create-host-agent-openssh-caption: root.create-host-agent-openssh-caption;
+        create-host-agent-pageant-label: root.create-host-agent-pageant-label;
+        create-host-agent-pageant-caption: root.create-host-agent-pageant-caption;
+        create-host-agent-custom-label: root.create-host-agent-custom-label;
+        create-host-agent-custom-caption: root.create-host-agent-custom-caption;
+        create-host-custom-agent-pipe-label: root.create-host-custom-agent-pipe-label;
+        create-host-custom-agent-pipe-placeholder: root.create-host-custom-agent-pipe-placeholder;
+        create-host-agent-key-hint-label: root.create-host-agent-key-hint-label;
+        create-host-agent-key-hint-placeholder: root.create-host-agent-key-hint-placeholder;
+        create-host-password-secret-label: root.create-host-password-secret-label;
+        create-host-password-secret-placeholder: root.create-host-password-secret-placeholder;
+        create-host-private-key-label: root.create-host-private-key-label;
+        create-host-private-key-placeholder: root.create-host-private-key-placeholder;
+        create-host-add-private-key-label: root.create-host-add-private-key-label;
+        create-host-add-private-key-caption: root.create-host-add-private-key-caption;
+        create-host-passphrase-label: root.create-host-passphrase-label;
+        create-host-passphrase-placeholder: root.create-host-passphrase-placeholder;
+        create-host-certificate-label: root.create-host-certificate-label;
+        create-host-certificate-placeholder: root.create-host-certificate-placeholder;
+        create-host-add-certificate-label: root.create-host-add-certificate-label;
+        create-host-add-certificate-caption: root.create-host-add-certificate-caption;
+        create-host-credential-name-label: root.create-host-credential-name-label;
+        create-host-credential-name-placeholder: root.create-host-credential-name-placeholder;
+        create-host-credential-secret-label: root.create-host-credential-secret-label;
+        create-host-credential-secret-placeholder: root.create-host-credential-secret-placeholder;
+        create-host-credential-algorithm-label: root.create-host-credential-algorithm-label;
+        create-host-credential-save-label: root.create-host-credential-save-label;
+        create-host-icon-title: root.create-host-icon-title;
+        create-host-icon-server-label: root.create-host-icon-server-label;
+        create-host-icon-database-label: root.create-host-icon-database-label;
+        create-host-icon-cloud-label: root.create-host-icon-cloud-label;
+        create-host-icon-linux-label: root.create-host-icon-linux-label;
+        create-host-icon-container-label: root.create-host-icon-container-label;
+        create-host-icon-shield-label: root.create-host-icon-shield-label;
+        create-host-icon-router-label: root.create-host-icon-router-label;
+        create-host-icon-terminal-label: root.create-host-icon-terminal-label;
+        create-host-icon-globe-label: root.create-host-icon-globe-label;
+        create-host-icon-key-label: root.create-host-icon-key-label;
+        create-host-icon-chip-label: root.create-host-icon-chip-label;
+        create-host-icon-cluster-label: root.create-host-icon-cluster-label;
         quick-host-name: root.quick-host-name;
         quick-host-address: root.quick-host-address;
         quick-host-port: root.quick-host-port;
@@ -752,59 +1678,459 @@ export component AppWindow inherits Window {
         quick-host-key-hint: root.quick-host-key-hint;
         quick-host-certificate-ref: root.quick-host-certificate-ref;
         quick-host-groups: root.quick-host-groups;
+        quick-host-private-key-options: root.quick-host-private-key-options;
+        quick-host-certificate-options: root.quick-host-certificate-options;
         last-error: root.last-error;
-        update-field(field, value) => { root.update-quick-host-field(field, value); }
-        select-group(group-id) => { root.select-quick-host-group(group-id); }
-        update-auth-kind(kind) => { root.update-quick-host-auth-kind(kind); }
-        update-auth-field(field, value) => { root.update-quick-host-auth-field(field, value); }
-        save => { root.save-quick-host(); }
-        close => { root.close-create-host-dialog(); }
+        host-delete-title-label: root.host-delete-title-label;
+        host-delete-caption-label: root.host-delete-caption-label;
+        remove-host-dialog-name: root.remove-host-dialog-name;
+        host-delete-cancel-label: root.host-delete-cancel-label;
+        host-delete-confirm-label: root.host-delete-confirm-label;
+        group-delete-title-label: root.group-delete-title-label;
+        remove-group-dialog-caption: root.remove-group-dialog-caption;
+        remove-group-dialog-name: root.remove-group-dialog-name;
+        group-delete-cancel-label: root.group-delete-cancel-label;
+        group-delete-confirm-label: root.group-delete-confirm-label;
+        open-create-host-dialog => { root.open-create-host-dialog(); }
+        open-create-group-dialog(parent-id) => { root.open-create-group-dialog(parent-id); }
+        select-create-group-parent(group-id) => { root.select-create-group-parent(group-id); }
+        close-create-group-parent-dialog => { root.close-create-group-parent-dialog(); }
+        confirm-create-group-parent => { root.confirm-create-group-parent(); }
+        update-quick-group-name(name) => { root.update-quick-group-name(name); }
+        select-quick-group-parent(group-id) => { root.select-quick-group-parent(group-id); }
+        close-create-group-dialog => { root.close-create-group-dialog(); }
+        save-quick-group => { root.save-quick-group(); }
+        close-create-host-dialog => { root.close-create-host-dialog(); }
+        update-quick-host-field(field, value) => { root.update-quick-host-field(field, value); }
+        select-quick-host-group(group-id) => { root.select-quick-host-group(group-id); }
+        update-quick-host-auth-kind(kind) => { root.update-quick-host-auth-kind(kind); }
+        update-quick-host-auth-field(field, value) => { root.update-quick-host-auth-field(field, value); }
+        create-credential(kind, name, secret-ref, algorithm) => { root.create-credential-metadata(kind, name, "", secret-ref, algorithm); }
+        save-quick-host => { root.save-quick-host(); }
+        cancel-remove-host => { root.cancel-remove-host(); }
+        confirm-remove-host => { root.confirm-remove-host(); }
+        cancel-remove-group => { root.cancel-remove-group(); }
+        confirm-remove-group => { root.confirm-remove-group(); }
     }
 
-    if root.create-group-dialog-open: CreateGroupDialog {
+    CredentialDialogFlow {
         x: 0px;
         y: 0px;
         width: root.width;
         height: root.height;
-        dialog-title: root.create-group-dialog-title;
-        dialog-subtitle: root.create-group-dialog-subtitle;
-        name-label: root.create-group-name-label;
-        name-placeholder: root.create-group-name-placeholder;
-        parent-label: root.create-group-parent-label;
-        parent-path: root.quick-group-parent-path;
-        cancel-label: root.create-group-cancel-label;
-        save-label: root.create-group-save-label;
-        group-name: root.quick-group-name;
-        update-name(name) => { root.update-quick-group-name(name); }
-        save => { root.save-quick-group(); }
-        close => { root.close-create-group-dialog(); }
+        certificate-key-picker-open <=> root.certificate-key-picker-open;
+        certificate-key-picker-target <=> root.certificate-key-picker-target;
+        create-certificate-credential-dialog-open <=> root.create-certificate-credential-dialog-open;
+        create-credential-group-dialog-open <=> root.create-credential-group-dialog-open;
+        create-group-cancel-label: root.create-group-cancel-label;
+        create-group-name-label: root.create-group-name-label;
+        create-group-name-placeholder: root.create-group-name-placeholder;
+        create-group-save-label: root.create-group-save-label;
+        create-security-credential-dialog-open <=> root.create-security-credential-dialog-open;
+        credential-group-parent-picker-open <=> root.credential-group-parent-picker-open;
+        credential-rows: root.credential-rows;
+        export-security-credential-dialog-open <=> root.export-security-credential-dialog-open;
+        export-security-credential-kind-key <=> root.export-security-credential-kind-key;
+        export-security-credential-name <=> root.export-security-credential-name;
+        export-security-credential-path <=> root.export-security-credential-path;
+        move-credential-group-picker-open <=> root.move-credential-group-picker-open;
+        move-credential-source-id <=> root.move-credential-source-id;
+        quick-credential-group-edit-id <=> root.quick-credential-group-edit-id;
+        quick-credential-group-kind-key <=> root.quick-credential-group-kind-key;
+        quick-credential-group-name <=> root.quick-credential-group-name;
+        quick-credential-group-parent-id <=> root.quick-credential-group-parent-id;
+        quick-credential-group-parent-path <=> root.quick-credential-group-parent-path;
+        quick-credential-group-root-path <=> root.quick-credential-group-root-path;
+        quick-host-private-key-options: root.quick-host-private-key-options;
+        quick-security-agent-mode <=> root.quick-security-agent-mode;
+        quick-security-certificate-ca-key-name <=> root.quick-security-certificate-ca-key-name;
+        quick-security-certificate-ca-key-ref <=> root.quick-security-certificate-ca-key-ref;
+        quick-security-certificate-key-id <=> root.quick-security-certificate-key-id;
+        quick-security-certificate-mode <=> root.quick-security-certificate-mode;
+        quick-security-certificate-principals <=> root.quick-security-certificate-principals;
+        quick-security-certificate-serial <=> root.quick-security-certificate-serial;
+        quick-security-certificate-subject-key-name <=> root.quick-security-certificate-subject-key-name;
+        quick-security-certificate-subject-key-ref <=> root.quick-security-certificate-subject-key-ref;
+        quick-security-certificate-type <=> root.quick-security-certificate-type;
+        quick-security-certificate-valid-days <=> root.quick-security-certificate-valid-days;
+        quick-security-credential-algorithm <=> root.quick-security-credential-algorithm;
+        quick-security-credential-busy <=> root.quick-security-credential-busy;
+        quick-security-credential-busy-frame <=> root.quick-security-credential-busy-frame;
+        quick-security-credential-edit-id <=> root.quick-security-credential-edit-id;
+        quick-security-credential-generate-pending <=> root.quick-security-credential-generate-pending;
+        quick-security-credential-group-id <=> root.quick-security-credential-group-id;
+        quick-security-credential-group-path <=> root.quick-security-credential-group-path;
+        quick-security-credential-import-mode <=> root.quick-security-credential-import-mode;
+        quick-security-credential-import-source-key <=> root.quick-security-credential-import-source-key;
+        quick-security-credential-kind-key <=> root.quick-security-credential-kind-key;
+        quick-security-credential-name <=> root.quick-security-credential-name;
+        quick-security-credential-root-group-path <=> root.quick-security-credential-root-group-path;
+        quick-security-credential-save-ok <=> root.quick-security-credential-save-ok;
+        quick-security-credential-secret-ref <=> root.quick-security-credential-secret-ref;
+        quick-security-password-mode <=> root.quick-security-password-mode;
+        remove-security-credential-dialog-id <=> root.remove-security-credential-dialog-id;
+        remove-security-credential-dialog-name <=> root.remove-security-credential-dialog-name;
+        remove-security-credential-dialog-open <=> root.remove-security-credential-dialog-open;
+        security-agent-create-title-label: root.security-agent-create-title-label;
+        security-agent-secret-label: root.security-agent-secret-label;
+        security-agent-secret-placeholder: root.security-agent-secret-placeholder;
+        security-certificate-ca-key-label: root.security-certificate-ca-key-label;
+        security-certificate-ca-key-placeholder: root.security-certificate-ca-key-placeholder;
+        security-certificate-create-label: root.security-certificate-create-label;
+        security-certificate-create-title-label: root.security-certificate-create-title-label;
+        security-certificate-empty-private-keys-label: root.security-certificate-empty-private-keys-label;
+        security-certificate-import-label: root.security-certificate-import-label;
+        security-certificate-import-title-label: root.security-certificate-import-title-label;
+        security-certificate-key-id-label: root.security-certificate-key-id-label;
+        security-certificate-key-id-placeholder: root.security-certificate-key-id-placeholder;
+        security-certificate-key-picker-title-label: root.security-certificate-key-picker-title-label;
+        security-certificate-principals-label: root.security-certificate-principals-label;
+        security-certificate-principals-placeholder: root.security-certificate-principals-placeholder;
+        security-certificate-secret-placeholder: root.security-certificate-secret-placeholder;
+        security-certificate-serial-label: root.security-certificate-serial-label;
+        security-certificate-serial-placeholder: root.security-certificate-serial-placeholder;
+        security-certificates-label: root.security-certificates-label;
+        security-certificate-source-label: root.security-certificate-source-label;
+        security-certificate-source-placeholder: root.security-certificate-source-placeholder;
+        security-certificate-subject-key-label: root.security-certificate-subject-key-label;
+        security-certificate-subject-key-placeholder: root.security-certificate-subject-key-placeholder;
+        security-certificate-text-label: root.security-certificate-text-label;
+        security-certificate-text-placeholder: root.security-certificate-text-placeholder;
+        security-certificate-type-host-label: root.security-certificate-type-host-label;
+        security-certificate-type-label: root.security-certificate-type-label;
+        security-certificate-type-user-label: root.security-certificate-type-user-label;
+        security-certificate-valid-days-label: root.security-certificate-valid-days-label;
+        security-certificate-valid-days-placeholder: root.security-certificate-valid-days-placeholder;
+        security-create-action-create-caption-label: root.security-create-action-create-caption-label;
+        security-create-action-create-label: root.security-create-action-create-label;
+        security-create-action-dialog-open <=> root.security-create-action-dialog-open;
+        security-create-action-group-caption-label: root.security-create-action-group-caption-label;
+        security-create-action-import-caption-label: root.security-create-action-import-caption-label;
+        security-create-action-import-label: root.security-create-action-import-label;
+        security-create-action-title-label: root.security-create-action-title-label;
+        security-create-flow-action <=> root.security-create-flow-action;
+        security-create-type-create-caption-label: root.security-create-type-create-caption-label;
+        security-create-type-dialog-open <=> root.security-create-type-dialog-open;
+        security-create-type-import-caption-label: root.security-create-type-import-caption-label;
+        security-create-type-title-label: root.security-create-type-title-label;
+        security-credential-algorithm-label: root.security-credential-algorithm-label;
+        security-credential-delete-cancel-label: root.security-credential-delete-cancel-label;
+        security-credential-delete-caption-label: root.security-credential-delete-caption-label;
+        security-credential-delete-confirm-label: root.security-credential-delete-confirm-label;
+        security-credential-delete-title-label: root.security-credential-delete-title-label;
+        security-credential-edit-label: root.security-credential-edit-label;
+        security-credential-export-path-label: root.security-credential-export-path-label;
+        security-credential-export-path-placeholder: root.security-credential-export-path-placeholder;
+        security-credential-export-title-label: root.security-credential-export-title-label;
+        security-credential-generating-private-key-label: root.security-credential-generating-private-key-label;
+        security-credential-group-picker-open <=> root.security-credential-group-picker-open;
+        security-credential-move-label: root.security-credential-move-label;
+        security-credential-name-label: root.security-credential-name-label;
+        security-credential-name-placeholder: root.security-credential-name-placeholder;
+        security-credential-replace-secret-field-label: root.security-credential-replace-secret-field-label;
+        security-credential-replace-secret-placeholder: root.security-credential-replace-secret-placeholder;
+        security-credential-save-label: root.security-credential-save-label;
+        security-credential-secret-label: root.security-credential-secret-label;
+        security-field-group-label: root.security-field-group-label;
+        security-field-type-label: root.security-field-type-label;
+        security-group-edit-label: root.security-group-edit-label;
+        security-group-new-label: root.security-group-new-label;
+        security-password-create-label: root.security-password-create-label;
+        security-password-create-title-label: root.security-password-create-title-label;
+        security-password-hide-label: root.security-password-hide-label;
+        security-password-secret-label: root.security-password-secret-label;
+        security-password-secret-placeholder: root.security-password-secret-placeholder;
+        security-password-show-label: root.security-password-show-label;
+        security-passwords-label: root.security-passwords-label;
+        security-private-key-create-label: root.security-private-key-create-label;
+        security-private-key-create-title-label: root.security-private-key-create-title-label;
+        security-private-key-import-file-label: root.security-private-key-import-file-label;
+        security-private-key-import-label: root.security-private-key-import-label;
+        security-private-key-import-text-label: root.security-private-key-import-text-label;
+        security-private-key-import-title-label: root.security-private-key-import-title-label;
+        security-private-key-secret-placeholder: root.security-private-key-secret-placeholder;
+        security-private-keys-label: root.security-private-keys-label;
+        security-private-key-source-label: root.security-private-key-source-label;
+        security-private-key-source-placeholder: root.security-private-key-source-placeholder;
+        security-private-key-text-label: root.security-private-key-text-label;
+        security-private-key-text-placeholder: root.security-private-key-text-placeholder;
+        selected-credential-accent-index <=> root.selected-credential-accent-index;
+        selected-credential-algorithm <=> root.selected-credential-algorithm;
+        selected-credential-algorithm-key <=> root.selected-credential-algorithm-key;
+        selected-credential-fingerprint <=> root.selected-credential-fingerprint;
+        selected-credential-group-id <=> root.selected-credential-group-id;
+        selected-credential-group-path <=> root.selected-credential-group-path;
+        selected-credential-icon-key <=> root.selected-credential-icon-key;
+        selected-credential-id <=> root.selected-credential-id;
+        selected-credential-kind <=> root.selected-credential-kind;
+        selected-credential-kind-key <=> root.selected-credential-kind-key;
+        selected-credential-meta <=> root.selected-credential-meta;
+        selected-credential-name <=> root.selected-credential-name;
+        selected-credential-node-kind <=> root.selected-credential-node-kind;
+        selected-credential-secret-available <=> root.selected-credential-secret-available;
+        selected-credential-secret-ref <=> root.selected-credential-secret-ref;
+        selected-credential-username <=> root.selected-credential-username;
+        settings-choose-file-label: root.settings-choose-file-label;
+        choose-security-credential-export-path(current-path, kind-key) => { root.choose-security-credential-export-path(current-path, kind-key) }
+        choose-security-credential-file-path(current-path) => { root.choose-security-credential-file-path(current-path) }
+        create-credential-group(name, parent-id, kind-key) => { root.create-credential-group(name, parent-id, kind-key) }
+        rename-credential-group(group-id, name) => { root.rename-credential-group(group-id, name) }
+        generate-certificate-credential(name, group-id, ca-private-key-ref, subject-private-key-ref, cert-type, principals, valid-days, key-id, serial) => { root.generate-certificate-credential(name, group-id, ca-private-key-ref, subject-private-key-ref, cert-type, principals, valid-days, key-id, serial) }
+        update-credential-secret(credential-id, secret-text) => { root.update-credential-secret(credential-id, secret-text) }
+        update-credential-metadata(credential-id, name, group-id, algorithm) => { root.update-credential-metadata(credential-id, name, group-id, algorithm) }
+        import-certificate-text-credential(name, group-id, certificate-text, algorithm) => { root.import-certificate-text-credential(name, group-id, certificate-text, algorithm) }
+        import-certificate-credential(name, group-id, source-path, algorithm) => { root.import-certificate-credential(name, group-id, source-path, algorithm) }
+        import-private-key-text-credential(name, group-id, private-key-text, algorithm) => { root.import-private-key-text-credential(name, group-id, private-key-text, algorithm) }
+        import-private-key-credential(name, group-id, source-path, algorithm) => { root.import-private-key-credential(name, group-id, source-path, algorithm) }
+        save-password-credential(name, group-id, password) => { root.save-password-credential(name, group-id, password) }
+        create-credential-metadata(kind, name, group-id, secret-ref, algorithm) => { root.create-credential-metadata(kind, name, group-id, secret-ref, algorithm) }
+        move-credential-tree-node(source-id, target-id) => { root.move-credential-tree-node(source-id, target-id) }
+        export-credential-secret(name, target-path) => { root.export-credential-secret(name, target-path) }
+        remove-credential(credential-id) => { root.remove-credential(credential-id); }
     }
 
-    if root.remove-host-dialog-open: ConfirmDialog {
+        SnippetDialogFlow {
         x: 0px;
         y: 0px;
         width: root.width;
         height: root.height;
-        title: root.host-delete-title-label;
-        message: root.host-delete-caption-label;
-        subject: root.remove-host-dialog-name;
-        cancel-label: root.host-delete-cancel-label;
-        confirm-label: root.host-delete-confirm-label;
-        cancel => { root.cancel-remove-host(); }
-        confirm => { root.confirm-remove-host(); }
-    }
-
-    if root.remove-group-dialog-open: ConfirmDialog {
-        x: 0px;
-        y: 0px;
-        width: root.width;
-        height: root.height;
-        title: root.group-delete-title-label;
-        message: root.remove-group-dialog-caption;
-        subject: root.remove-group-dialog-name;
-        cancel-label: root.group-delete-cancel-label;
-        confirm-label: root.group-delete-confirm-label;
-        cancel => { root.cancel-remove-group(); }
-        confirm => { root.confirm-remove-group(); }
+        remove-dialog-open: root.remove-snippet-dialog-open;
+        remove-dialog-id: root.remove-snippet-dialog-id;
+        remove-dialog-name: root.remove-snippet-dialog-name;
+        remove-dialog-kind: root.remove-snippet-dialog-kind;
+        run-dialog-open: root.run-snippet-dialog-open;
+        run-host-id: root.run-snippet-dialog-host-id;
+        run-arguments: root.run-snippet-dialog-arguments;
+        move-dialog-open: root.move-snippet-dialog-open;
+        move-target-group-id: root.move-snippet-target-group-id;
+        create-choice-dialog-open: root.create-snippet-choice-dialog-open;
+        create-dialog-open: root.create-snippet-dialog-open;
+        create-group-dialog-open: root.create-snippet-group-dialog-open;
+        choice-parent-node-id: root.quick-snippet-choice-parent-node-id;
+        selected-snippet-id: root.selected-snippet-id;
+        selected-node-kind: root.selected-snippet-node-kind;
+        selected-command-template: root.selected-snippet-command-template;
+        selected-variable-names: root.selected-snippet-variable-names;
+        hosts: root.hosts;
+        snippet-rows: root.snippet-rows;
+        snippet-target-options: root.snippet-target-options;
+        quick-edit-mode: root.quick-snippet-edit-mode;
+        quick-dialog-kind: root.quick-snippet-dialog-kind;
+        quick-edit-id: root.quick-snippet-edit-id;
+        quick-parent-node-id: root.quick-snippet-parent-node-id;
+        quick-name: root.quick-snippet-name;
+        quick-description: root.quick-snippet-description;
+        quick-command: root.quick-snippet-command;
+        quick-target-mode: root.quick-snippet-target-mode;
+        quick-share-target-id: root.quick-snippet-share-target-id;
+        quick-group-name: root.quick-snippet-group-name;
+        quick-target-linux-selected <=> root.quick-snippet-target-linux-selected;
+        quick-target-debian-selected <=> root.quick-snippet-target-debian-selected;
+        quick-target-rhel-selected <=> root.quick-snippet-target-rhel-selected;
+        quick-target-macos-selected <=> root.quick-snippet-target-macos-selected;
+        quick-target-powershell-selected <=> root.quick-snippet-target-powershell-selected;
+        quick-target-cmd-selected <=> root.quick-snippet-target-cmd-selected;
+        delete-title-label: root.snippets-delete-title-label;
+        delete-snippet-caption-label: root.snippets-delete-snippet-caption-label;
+        delete-group-caption-label: root.snippets-delete-group-caption-label;
+        delete-target-caption-label: root.snippets-delete-target-caption-label;
+        delete-confirm-label: root.snippets-delete-confirm-label;
+        cancel-label: root.snippets-cancel-label;
+        run-title-label: root.snippets-run-title-label;
+        command-template-label: root.snippets-command-template-label;
+        run-host-label: root.snippets-run-host-label;
+        run-arguments-label: root.snippets-run-arguments-label;
+        run-arguments-placeholder-label: root.snippets-run-arguments-placeholder-label;
+        run-no-hosts-label: root.snippets-run-no-hosts-label;
+        run-label: root.snippets-run-label;
+        move-title-label: root.snippets-move-title-label;
+        move-root-label: root.snippets-move-root-label;
+        move-label: root.snippets-move-label;
+        create-choice-title-label: root.snippets-create-choice-title-label;
+        create-snippet-title-label: root.snippets-create-snippet-title-label;
+        create-target-title-label: root.snippets-create-target-title-label;
+        create-group-title-label: root.snippets-create-group-title-label;
+        edit-snippet-title-label: root.snippets-edit-snippet-title-label;
+        edit-target-title-label: root.snippets-edit-target-title-label;
+        edit-group-title-label: root.snippets-edit-group-title-label;
+        name-label: root.snippets-name-label;
+        name-placeholder-label: root.snippets-name-placeholder-label;
+        group-name-placeholder-label: root.snippets-group-name-placeholder-label;
+        description-label: root.snippets-description-label;
+        description-placeholder-label: root.snippets-description-placeholder-label;
+        target-key-label: root.snippets-target-key-label;
+        target-key-placeholder-label: root.snippets-target-key-placeholder-label;
+        target-picker-placeholder-label: root.snippets-target-picker-placeholder-label;
+        target-linux-label: root.snippets-target-linux-label;
+        target-debian-label: root.snippets-target-debian-label;
+        target-rhel-label: root.snippets-target-rhel-label;
+        target-macos-label: root.snippets-target-macos-label;
+        target-powershell-label: root.snippets-target-powershell-label;
+        target-cmd-label: root.snippets-target-cmd-label;
+        command-placeholder-label: root.snippets-command-placeholder-label;
+        target-mode-new-label: root.snippets-target-mode-new-label;
+        target-mode-new-caption-label: root.snippets-target-mode-new-caption-label;
+        target-mode-share-label: root.snippets-target-mode-share-label;
+        target-mode-share-caption-label: root.snippets-target-mode-share-caption-label;
+        new-snippet-caption-label: root.snippets-new-snippet-caption-label;
+        new-group-label: root.snippets-new-group-label;
+        new-group-caption-label: root.snippets-new-group-caption-label;
+        shared-target-label: root.snippets-shared-target-label;
+        create-label: root.snippets-create-label;
+        save-label: root.snippets-save-label;
+        remove-cancel => {
+            root.remove-snippet-dialog-open = false;
+            root.remove-snippet-dialog-id = "";
+            root.remove-snippet-dialog-name = "";
+            root.remove-snippet-dialog-kind = "";
+        }
+        remove-confirm(id, kind) => {
+            root.delete-snippet-node(id, kind);
+            if root.selected-snippet-id == id {
+                root.selected-snippet-id = "";
+                root.selected-snippet-parent-id = "snippet-folder:all";
+                root.selected-snippet-name = "";
+                root.selected-snippet-description = "";
+                root.selected-snippet-command-template = "";
+                root.selected-snippet-scope = "";
+                root.selected-snippet-scope-key = "";
+                root.selected-snippet-variables = "";
+                root.selected-snippet-variable-names = "";
+                root.selected-snippet-arguments = "";
+                root.selected-snippet-argument-values = "";
+                root.selected-snippet-meta = "";
+                root.selected-snippet-icon-key = "code";
+                root.selected-snippet-node-kind = "";
+                root.selected-snippet-accent-index = 0;
+            }
+            root.remove-snippet-dialog-open = false;
+            root.remove-snippet-dialog-id = "";
+            root.remove-snippet-dialog-name = "";
+            root.remove-snippet-dialog-kind = "";
+        }
+        select-run-host(host-id) => { root.run-snippet-dialog-host-id = host-id; }
+        run-arguments-edited(value) => { root.run-snippet-dialog-arguments = value; }
+        run-close => {
+            root.run-snippet-dialog-open = false;
+            root.run-snippet-dialog-host-id = "";
+            root.run-snippet-dialog-arguments = "";
+        }
+        run-snippet(snippet-row-id, host-id, arguments-text) => { root.run-snippet-with-arguments(snippet-row-id, host-id, arguments-text) }
+        select-move-group(group-id) => { root.move-snippet-target-group-id = group-id; }
+        move-close => {
+            root.move-snippet-dialog-open = false;
+            root.move-snippet-target-group-id = "";
+        }
+        move-snippet(node-id, node-kind, target-group-id) => { root.move-snippet-node(node-id, node-kind, target-group-id) }
+        create-choice-close => {
+            root.create-snippet-choice-dialog-open = false;
+            root.quick-snippet-choice-parent-node-id = "snippet-folder:all";
+        }
+        open-create-snippet(parent-node-id) => {
+            root.create-snippet-dialog-open = false;
+            root.quick-snippet-parent-node-id = parent-node-id;
+            root.quick-snippet-dialog-kind = "Snippet";
+            root.quick-snippet-edit-mode = false;
+            root.quick-snippet-edit-id = "";
+            root.quick-snippet-name = "";
+            root.quick-snippet-description = "";
+            root.quick-snippet-command = "";
+            root.quick-snippet-target-mode = "New";
+            root.quick-snippet-share-target-id = "";
+            root.quick-snippet-target-linux-selected = true;
+            root.quick-snippet-target-debian-selected = false;
+            root.quick-snippet-target-rhel-selected = false;
+            root.quick-snippet-target-macos-selected = false;
+            root.quick-snippet-target-powershell-selected = false;
+            root.quick-snippet-target-cmd-selected = false;
+            root.create-snippet-dialog-open = true;
+        }
+        open-create-target(parent-node-id) => {
+            root.create-snippet-dialog-open = false;
+            root.quick-snippet-parent-node-id = parent-node-id;
+            root.quick-snippet-dialog-kind = "Target";
+            root.quick-snippet-edit-mode = false;
+            root.quick-snippet-edit-id = parent-node-id;
+            root.quick-snippet-name = "";
+            root.quick-snippet-description = "linux";
+            root.quick-snippet-command = "";
+            root.quick-snippet-target-mode = "New";
+            root.quick-snippet-share-target-id = "";
+            root.quick-snippet-target-linux-selected = true;
+            root.quick-snippet-target-debian-selected = false;
+            root.quick-snippet-target-rhel-selected = false;
+            root.quick-snippet-target-macos-selected = false;
+            root.quick-snippet-target-powershell-selected = false;
+            root.quick-snippet-target-cmd-selected = false;
+            root.create-snippet-dialog-open = true;
+        }
+        open-create-group(parent-node-id) => {
+            root.quick-snippet-parent-node-id = parent-node-id;
+            root.quick-snippet-edit-mode = false;
+            root.quick-snippet-edit-id = "";
+            root.quick-snippet-group-name = "";
+            root.create-snippet-group-dialog-open = true;
+        }
+        name-edited(value) => { root.quick-snippet-name = value; }
+        description-edited(value) => { root.quick-snippet-description = value; }
+        command-edited(value) => { root.quick-snippet-command = value; }
+        target-mode-selected(value) => {
+            root.quick-snippet-target-mode = value;
+            if value == "New" {
+                root.quick-snippet-share-target-id = "";
+            }
+        }
+        share-target-selected(value) => { root.quick-snippet-share-target-id = value; }
+        create-close => {
+            root.create-snippet-dialog-open = false;
+            root.quick-snippet-edit-mode = false;
+            root.quick-snippet-edit-id = "";
+            root.quick-snippet-name = "";
+            root.quick-snippet-description = "";
+            root.quick-snippet-command = "";
+            root.quick-snippet-target-mode = "New";
+            root.quick-snippet-share-target-id = "";
+            root.quick-snippet-target-linux-selected = true;
+            root.quick-snippet-target-debian-selected = false;
+            root.quick-snippet-target-rhel-selected = false;
+            root.quick-snippet-target-macos-selected = false;
+            root.quick-snippet-target-powershell-selected = false;
+            root.quick-snippet-target-cmd-selected = false;
+        }
+        save-snippet(dialog-kind, edit-mode, edit-id, parent-node-id, name, description, command-template, share-target-id) => {
+            if dialog-kind == "Target" {
+                if edit-mode {
+                    if root.update-snippet-target(edit-id, description, name, command-template) {
+                        if root.selected-snippet-id == edit-id {
+                            root.selected-snippet-name = name;
+                            root.selected-snippet-scope = description;
+                            root.selected-snippet-command-template = command-template;
+                        }
+                        return true;
+                    }
+                    return false;
+                }
+                return root.create-snippet-target(edit-id, description, name, command-template, share-target-id);
+            }
+            if edit-mode {
+                if root.update-snippet(edit-id, name, description, command-template) {
+                    if root.selected-snippet-id == edit-id {
+                        root.selected-snippet-name = name;
+                        root.selected-snippet-description = description;
+                        root.selected-snippet-command-template = command-template;
+                    }
+                    return true;
+                }
+                return false;
+            }
+            return root.create-snippet(parent-node-id, name, description, command-template);
+        }
+        group-name-edited(value) => { root.quick-snippet-group-name = value; }
+        create-group-close => { root.create-snippet-group-dialog-open = false; }
+        save-snippet-group(edit-mode, edit-id, parent-node-id, name) => {
+            edit-mode
+                ? root.rename-snippet-group(edit-id, name)
+                : root.create-snippet-group(parent-node-id, name)
+        }
     }
 }

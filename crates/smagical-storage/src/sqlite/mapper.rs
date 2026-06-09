@@ -5,24 +5,26 @@
 
 use std::collections::HashMap;
 
-use sea_orm::{
-    ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+use super::mapper_common::*;
+use super::mapper_credentials::{
+    load_credential_groups, load_credential_inspections, load_credentials, load_secrets,
+    save_credential_groups, save_credential_inspections, save_credentials, save_secrets,
 };
-use uuid::Uuid;
-
-use smagical_config::AppConfig;
-use smagical_core::{
-    AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, CredentialKind,
-    CredentialMetadata, GroupId, Host, HostGroup, HostId, JumpProfile, KeyAlgorithm,
-    KnownHostEntry, ProxyProfile, RecentConnection, SecretRef, SftpBookmark, Snippet,
-    SnippetArgument, SnippetId, SnippetScope, SnippetVariable, TunnelKind, TunnelRule,
-    WorkspaceState,
-};
-
+use super::mapper_hosts::{load_groups, load_hosts, save_groups, save_hosts};
 use super::{
     APP_CONFIG_SETTING_KEY, DEFAULT_WORKSPACE_KEY, clear_entities, current_unix_secs, entity,
 };
 use crate::{StorageManager, StoragePersistenceError, ThemeProfileRecord};
+use sea_orm::{
+    ActiveValue::Set, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder,
+};
+use smagical_config::AppConfig;
+use smagical_core::{
+    CommandHistoryId, CommandHistoryItem, HostId, KnownHostEntry, RecentConnection, SftpBookmark,
+    Snippet, SnippetArgument, SnippetGroup, SnippetGroupId, SnippetId, SnippetImplementation,
+    SnippetImplementationId, SnippetSupportTarget, SnippetSupportTargetId, SnippetVariable,
+    TunnelRule, WorkspaceState,
+};
 
 pub(super) async fn load_storage(
     db: &DatabaseConnection,
@@ -32,7 +34,10 @@ pub(super) async fn load_storage(
     storage.app_config = load_app_config(db).await?;
     storage.groups = load_groups(db).await?;
     storage.hosts = load_hosts(db).await?;
+    storage.credential_groups = load_credential_groups(db).await?;
     storage.credentials = load_credentials(db).await?;
+    storage.credential_inspections = load_credential_inspections(db).await?;
+    storage.secrets = load_secrets(db).await?;
     storage.known_hosts = load_known_hosts(db).await?;
 
     for connection in load_recent_connections(db).await? {
@@ -42,6 +47,7 @@ pub(super) async fn load_storage(
         storage.add_command_history(item);
     }
 
+    storage.snippet_groups = load_snippet_groups(db).await?;
     storage.snippets = load_snippets(db).await?;
     storage.sftp_bookmarks = load_sftp_bookmarks(db).await?;
     for rule in load_tunnel_rules(db).await? {
@@ -62,9 +68,13 @@ pub(super) async fn save_storage(
     save_settings(db, storage).await?;
     save_groups(db, &storage.groups).await?;
     save_hosts(db, &storage.hosts).await?;
+    save_credential_groups(db, &storage.credential_groups).await?;
     save_credentials(db, &storage.credentials).await?;
+    save_credential_inspections(db, &storage.credential_inspections).await?;
+    save_secrets(db, &storage.secrets).await?;
     save_known_hosts(db, &storage.known_hosts).await?;
     save_history(db, storage).await?;
+    save_snippet_groups(db, &storage.snippet_groups).await?;
     save_snippets(db, &storage.snippets).await?;
     save_sftp_bookmarks(db, &storage.sftp_bookmarks).await?;
     save_tunnel_rules(db, &storage.tunnel_rules).await?;
@@ -81,13 +91,18 @@ async fn clear_business_tables(db: &DatabaseConnection) -> Result<(), StoragePer
     clear_entities::<entity::tunnel_rule::Entity>(db).await?;
     clear_entities::<entity::sftp_bookmark::Entity>(db).await?;
     clear_entities::<entity::snippet_argument::Entity>(db).await?;
+    clear_entities::<entity::snippet_support_target::Entity>(db).await?;
+    clear_entities::<entity::snippet_implementation::Entity>(db).await?;
     clear_entities::<entity::snippet_variable::Entity>(db).await?;
     clear_entities::<entity::snippet::Entity>(db).await?;
+    clear_entities::<entity::snippet_group::Entity>(db).await?;
     clear_entities::<entity::recent_connection::Entity>(db).await?;
     clear_entities::<entity::command_history::Entity>(db).await?;
     clear_entities::<entity::known_host::Entity>(db).await?;
+    clear_entities::<entity::credential_inspection::Entity>(db).await?;
     clear_entities::<entity::secret::Entity>(db).await?;
     clear_entities::<entity::credential::Entity>(db).await?;
+    clear_entities::<entity::credential_group::Entity>(db).await?;
     clear_entities::<entity::host_jump::Entity>(db).await?;
     clear_entities::<entity::host_proxy::Entity>(db).await?;
     clear_entities::<entity::host_auth::Entity>(db).await?;
@@ -163,357 +178,6 @@ async fn save_themes(
         .await?;
     }
 
-    Ok(())
-}
-
-async fn load_groups(db: &DatabaseConnection) -> Result<Vec<HostGroup>, StoragePersistenceError> {
-    entity::host_group::Entity::find()
-        .order_by_asc(entity::host_group::Column::SortOrder)
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|model| {
-            Ok(HostGroup {
-                id: GroupId(parse_uuid(&model.id)?),
-                name: model.name,
-                parent_id: model
-                    .parent_id
-                    .as_deref()
-                    .map(parse_uuid)
-                    .transpose()?
-                    .map(GroupId),
-            })
-        })
-        .collect()
-}
-
-async fn save_groups(
-    db: &DatabaseConnection,
-    groups: &[HostGroup],
-) -> Result<(), StoragePersistenceError> {
-    let now = current_unix_secs();
-    for (index, group) in groups.iter().enumerate() {
-        // sort_order 保存当前内存顺序，树形层级由 parent_id 表达。
-        entity::host_group::Entity::insert(entity::host_group::ActiveModel {
-            id: Set(group.id.0.to_string()),
-            name: Set(group.name.clone()),
-            parent_id: Set(group.parent_id.map(|id| id.0.to_string())),
-            sort_order: Set(index as i32),
-            created_at_unix_secs: Set(now),
-            updated_at_unix_secs: Set(now),
-        })
-        .exec(db)
-        .await?;
-    }
-    Ok(())
-}
-
-async fn load_hosts(db: &DatabaseConnection) -> Result<Vec<Host>, StoragePersistenceError> {
-    // 主机本体、认证、代理、标签、跳板机分表存储，加载时先按 host_id 建索引。
-    let auth_by_host: HashMap<_, _> = entity::host_auth::Entity::find()
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|model| (model.host_id.clone(), model))
-        .collect();
-    let proxy_by_host: HashMap<_, _> = entity::host_proxy::Entity::find()
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|model| (model.host_id.clone(), model))
-        .collect();
-    let mut tags_by_host: HashMap<String, Vec<entity::host_tag::Model>> = HashMap::new();
-    for model in entity::host_tag::Entity::find()
-        .order_by_asc(entity::host_tag::Column::SortOrder)
-        .all(db)
-        .await?
-    {
-        tags_by_host
-            .entry(model.host_id.clone())
-            .or_default()
-            .push(model);
-    }
-    let mut jumps_by_host: HashMap<String, Vec<entity::host_jump::Model>> = HashMap::new();
-    for model in entity::host_jump::Entity::find()
-        .order_by_asc(entity::host_jump::Column::SortOrder)
-        .all(db)
-        .await?
-    {
-        jumps_by_host
-            .entry(model.host_id.clone())
-            .or_default()
-            .push(model);
-    }
-
-    let mut hosts = Vec::new();
-    for model in entity::host::Entity::find()
-        .order_by_asc(entity::host::Column::SortOrder)
-        .all(db)
-        .await?
-    {
-        let auth = auth_by_host
-            .get(&model.id)
-            .map(auth_from_model)
-            .transpose()?
-            .unwrap_or_else(default_auth);
-        let proxy = proxy_by_host
-            .get(&model.id)
-            .map(proxy_from_model)
-            .transpose()?;
-        let tags = tags_by_host
-            .remove(&model.id)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|tag| tag.tag)
-            .collect();
-        let jumps = jumps_by_host
-            .remove(&model.id)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|jump| {
-                Ok(JumpProfile {
-                    host_id: HostId(parse_uuid(&jump.jump_host_id)?),
-                })
-            })
-            .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
-
-        hosts.push(Host {
-            id: HostId(parse_uuid(&model.id)?),
-            name: model.name,
-            group_id: model
-                .group_id
-                .as_deref()
-                .map(parse_uuid)
-                .transpose()?
-                .map(GroupId),
-            icon_key: model.icon_key,
-            tags,
-            address: model.address,
-            port: to_u16(model.port)?,
-            auth,
-            proxy,
-            jumps,
-            theme_override: decode_optional_toml(model.theme_override_toml.as_deref())?,
-            background_override: decode_optional_toml(model.background_override_toml.as_deref())?,
-        });
-    }
-    Ok(hosts)
-}
-
-async fn save_hosts(
-    db: &DatabaseConnection,
-    hosts: &[Host],
-) -> Result<(), StoragePersistenceError> {
-    let now = current_unix_secs();
-    for (index, host) in hosts.iter().enumerate() {
-        let host_id = host.id.0.to_string();
-        // host 表保存主记录；认证、代理、标签和跳板机用子表表达一对多/可选关系。
-        entity::host::Entity::insert(entity::host::ActiveModel {
-            id: Set(host_id.clone()),
-            name: Set(host.name.clone()),
-            group_id: Set(host.group_id.map(|id| id.0.to_string())),
-            icon_key: Set(host.icon_key.clone()),
-            address: Set(host.address.clone()),
-            port: Set(host.port as i32),
-            theme_override_toml: Set(encode_optional_toml(host.theme_override.as_ref())?),
-            background_override_toml: Set(encode_optional_toml(host.background_override.as_ref())?),
-            sort_order: Set(index as i32),
-            created_at_unix_secs: Set(now),
-            updated_at_unix_secs: Set(now),
-        })
-        .exec(db)
-        .await?;
-
-        save_host_auth(db, &host_id, &host.auth, now).await?;
-        save_host_proxy(db, &host_id, host.proxy.as_ref()).await?;
-
-        for (tag_index, tag) in host.tags.iter().enumerate() {
-            // tag id 使用 host_id + 顺序，整体替换保存时足够稳定。
-            entity::host_tag::Entity::insert(entity::host_tag::ActiveModel {
-                id: Set(format!("{host_id}:tag:{tag_index}")),
-                host_id: Set(host_id.clone()),
-                tag: Set(tag.clone()),
-                sort_order: Set(tag_index as i32),
-            })
-            .exec(db)
-            .await?;
-        }
-
-        for (jump_index, jump) in host.jumps.iter().enumerate() {
-            // 跳板机只保存目标 host_id，不复制被引用主机的配置。
-            entity::host_jump::Entity::insert(entity::host_jump::ActiveModel {
-                id: Set(format!("{host_id}:jump:{jump_index}")),
-                host_id: Set(host_id.clone()),
-                jump_host_id: Set(jump.host_id.0.to_string()),
-                sort_order: Set(jump_index as i32),
-            })
-            .exec(db)
-            .await?;
-        }
-    }
-    Ok(())
-}
-
-async fn save_host_auth(
-    db: &DatabaseConnection,
-    host_id: &str,
-    auth: &AuthProfile,
-    now: i64,
-) -> Result<(), StoragePersistenceError> {
-    // 认证表只保存 SecretRef 字符串，不保存明文密码、私钥或证书。
-    let model = match auth {
-        AuthProfile::Password { username, secret } => entity::host_auth::ActiveModel {
-            host_id: Set(host_id.to_owned()),
-            auth_kind: Set("password".to_owned()),
-            username: Set(username.clone()),
-            password_secret_ref: Set(Some(secret.0.clone())),
-            key_secret_ref: Set(None),
-            passphrase_secret_ref: Set(None),
-            certificate_secret_ref: Set(None),
-            agent_source: Set(None),
-            agent_pipe: Set(None),
-            key_hint: Set(None),
-            updated_at_unix_secs: Set(now),
-        },
-        AuthProfile::Key {
-            username,
-            key,
-            passphrase,
-        } => entity::host_auth::ActiveModel {
-            host_id: Set(host_id.to_owned()),
-            auth_kind: Set("key".to_owned()),
-            username: Set(username.clone()),
-            password_secret_ref: Set(None),
-            key_secret_ref: Set(Some(key.0.clone())),
-            passphrase_secret_ref: Set(passphrase.as_ref().map(|reference| reference.0.clone())),
-            certificate_secret_ref: Set(None),
-            agent_source: Set(None),
-            agent_pipe: Set(None),
-            key_hint: Set(None),
-            updated_at_unix_secs: Set(now),
-        },
-        AuthProfile::Agent {
-            username,
-            source,
-            key_hint,
-        } => {
-            let (agent_source, agent_pipe) = agent_source_to_parts(source);
-            entity::host_auth::ActiveModel {
-                host_id: Set(host_id.to_owned()),
-                auth_kind: Set("agent".to_owned()),
-                username: Set(username.clone()),
-                password_secret_ref: Set(None),
-                key_secret_ref: Set(None),
-                passphrase_secret_ref: Set(None),
-                certificate_secret_ref: Set(None),
-                agent_source: Set(Some(agent_source)),
-                agent_pipe: Set(agent_pipe),
-                key_hint: Set(key_hint.clone()),
-                updated_at_unix_secs: Set(now),
-            }
-        }
-        AuthProfile::Certificate {
-            username,
-            key,
-            passphrase,
-            certificate,
-        } => entity::host_auth::ActiveModel {
-            host_id: Set(host_id.to_owned()),
-            auth_kind: Set("certificate".to_owned()),
-            username: Set(username.clone()),
-            password_secret_ref: Set(None),
-            key_secret_ref: Set(Some(key.0.clone())),
-            passphrase_secret_ref: Set(passphrase.as_ref().map(|reference| reference.0.clone())),
-            certificate_secret_ref: Set(Some(certificate.0.clone())),
-            agent_source: Set(None),
-            agent_pipe: Set(None),
-            key_hint: Set(None),
-            updated_at_unix_secs: Set(now),
-        },
-    };
-
-    entity::host_auth::Entity::insert(model).exec(db).await?;
-    Ok(())
-}
-
-async fn save_host_proxy(
-    db: &DatabaseConnection,
-    host_id: &str,
-    proxy: Option<&ProxyProfile>,
-) -> Result<(), StoragePersistenceError> {
-    let Some(proxy) = proxy else {
-        // 没有代理时不写 host_proxy 行，加载时自然得到 None。
-        return Ok(());
-    };
-    let (proxy_kind, proxy_host, proxy_port) = match proxy {
-        ProxyProfile::Socks5 { host, port } => ("socks5", host, *port),
-        ProxyProfile::Http { host, port } => ("http", host, *port),
-    };
-    entity::host_proxy::Entity::insert(entity::host_proxy::ActiveModel {
-        host_id: Set(host_id.to_owned()),
-        proxy_kind: Set(proxy_kind.to_owned()),
-        proxy_host: Set(proxy_host.clone()),
-        proxy_port: Set(proxy_port as i32),
-    })
-    .exec(db)
-    .await?;
-    Ok(())
-}
-
-async fn load_credentials(
-    db: &DatabaseConnection,
-) -> Result<Vec<CredentialMetadata>, StoragePersistenceError> {
-    // 凭据表保存元数据和 SecretRef，真实 secret 数据预留在 secrets 表。
-    entity::credential::Entity::find()
-        .order_by_asc(entity::credential::Column::Name)
-        .all(db)
-        .await?
-        .into_iter()
-        .map(|model| {
-            Ok(CredentialMetadata {
-                name: model.name,
-                kind: credential_kind_from_str(&model.kind),
-                username: model.username,
-                secret: model.secret_ref.map(SecretRef),
-                key_algorithm: model
-                    .key_algorithm
-                    .as_deref()
-                    .map(|kind| key_algorithm_from_parts(kind, model.key_algorithm_raw.as_deref())),
-                fingerprint: model.fingerprint,
-            })
-        })
-        .collect()
-}
-
-async fn save_credentials(
-    db: &DatabaseConnection,
-    credentials: &[CredentialMetadata],
-) -> Result<(), StoragePersistenceError> {
-    let now = current_unix_secs();
-    for credential in credentials {
-        // key_algorithm 分成标准 kind 和 raw，既能查询常见算法，也保留未知算法原文。
-        let (key_algorithm, key_algorithm_raw) = credential
-            .key_algorithm
-            .as_ref()
-            .map(key_algorithm_to_parts)
-            .unwrap_or((None, None));
-        entity::credential::Entity::insert(entity::credential::ActiveModel {
-            name: Set(credential.name.clone()),
-            kind: Set(credential_kind_to_str(&credential.kind).to_owned()),
-            username: Set(credential.username.clone()),
-            secret_ref: Set(credential
-                .secret
-                .as_ref()
-                .map(|reference| reference.0.clone())),
-            key_algorithm: Set(key_algorithm),
-            key_algorithm_raw: Set(key_algorithm_raw),
-            fingerprint: Set(credential.fingerprint.clone()),
-            created_at_unix_secs: Set(now),
-            updated_at_unix_secs: Set(now),
-        })
-        .exec(db)
-        .await?;
-    }
     Ok(())
 }
 
@@ -647,7 +311,7 @@ async fn save_history(
 }
 
 async fn load_snippets(db: &DatabaseConnection) -> Result<Vec<Snippet>, StoragePersistenceError> {
-    // 变量和上次参数是 snippet 的子表，先按 snippet_id 分组再合成 Snippet。
+    // 变量、实现、支持目标和上次参数都是 snippet 的子表，先分组再合成 Snippet。
     let mut variables_by_snippet: HashMap<String, Vec<entity::snippet_variable::Model>> =
         HashMap::new();
     for model in entity::snippet_variable::Entity::find()
@@ -660,14 +324,42 @@ async fn load_snippets(db: &DatabaseConnection) -> Result<Vec<Snippet>, StorageP
             .or_default()
             .push(model);
     }
-    let mut arguments_by_snippet: HashMap<String, Vec<entity::snippet_argument::Model>> =
+    let mut arguments_by_implementation: HashMap<String, Vec<entity::snippet_argument::Model>> =
         HashMap::new();
     for model in entity::snippet_argument::Entity::find()
         .order_by_asc(entity::snippet_argument::Column::SortOrder)
         .all(db)
         .await?
     {
-        arguments_by_snippet
+        arguments_by_implementation
+            .entry(model.implementation_id.clone())
+            .or_default()
+            .push(model);
+    }
+    let mut implementations_by_snippet: HashMap<
+        String,
+        Vec<entity::snippet_implementation::Model>,
+    > = HashMap::new();
+    for model in entity::snippet_implementation::Entity::find()
+        .order_by_asc(entity::snippet_implementation::Column::SortOrder)
+        .all(db)
+        .await?
+    {
+        implementations_by_snippet
+            .entry(model.snippet_id.clone())
+            .or_default()
+            .push(model);
+    }
+    let mut support_targets_by_snippet: HashMap<
+        String,
+        Vec<entity::snippet_support_target::Model>,
+    > = HashMap::new();
+    for model in entity::snippet_support_target::Entity::find()
+        .order_by_asc(entity::snippet_support_target::Column::SortOrder)
+        .all(db)
+        .await?
+    {
+        support_targets_by_snippet
             .entry(model.snippet_id.clone())
             .or_default()
             .push(model);
@@ -689,27 +381,136 @@ async fn load_snippets(db: &DatabaseConnection) -> Result<Vec<Snippet>, StorageP
                 required: variable.required,
             })
             .collect();
-        let last_arguments = arguments_by_snippet
+
+        let snippet_id = SnippetId(parse_uuid(&model.id)?);
+        let mut implementations = implementations_by_snippet
             .remove(&model.id)
             .unwrap_or_default()
             .into_iter()
-            .map(|argument| SnippetArgument {
-                name: argument.name,
-                value: argument.value,
+            .map(|implementation| {
+                let implementation_id = SnippetImplementationId(parse_uuid(&implementation.id)?);
+                let last_arguments = arguments_by_implementation
+                    .remove(&implementation.id)
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|argument| SnippetArgument {
+                        name: argument.name,
+                        value: argument.value,
+                    })
+                    .collect();
+                Ok(SnippetImplementation {
+                    id: implementation_id,
+                    snippet_id,
+                    name: implementation.name,
+                    shell: snippet_shell_from_parts(
+                        implementation.shell.as_str(),
+                        implementation.shell_custom,
+                    ),
+                    command_template: implementation.command_template,
+                    notes: implementation.notes,
+                    last_arguments,
+                    sort_order: implementation.sort_order,
+                })
             })
-            .collect();
+            .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
+        let mut support_targets = support_targets_by_snippet
+            .remove(&model.id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|target| {
+                Ok(SnippetSupportTarget {
+                    id: SnippetSupportTargetId(parse_uuid(&target.id)?),
+                    snippet_id,
+                    target_key: target.target_key,
+                    display_name: target.display_name,
+                    implementation_id: SnippetImplementationId(parse_uuid(
+                        &target.implementation_id,
+                    )?),
+                    sort_order: target.sort_order,
+                })
+            })
+            .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
 
+        // 开发期旧库可能还没有新子表；用旧 command_template 构造默认实现，保证可加载后再保存为新结构。
+        if implementations.is_empty() {
+            let fallback = Snippet::with_default_implementation(
+                snippet_id,
+                model.name.clone(),
+                model.description.clone(),
+                snippet_scope_from_parts(&model.scope_kind, model.scope_target_id.as_deref())?,
+                model
+                    .group_id
+                    .as_deref()
+                    .map(parse_uuid)
+                    .transpose()?
+                    .map(SnippetGroupId),
+                model.command_template.clone(),
+            );
+            implementations = fallback.implementations;
+            support_targets = fallback.support_targets;
+        }
         snippets.push(Snippet {
-            id: SnippetId(parse_uuid(&model.id)?),
+            id: snippet_id,
             name: model.name,
             description: model.description,
-            command_template: model.command_template,
             scope: snippet_scope_from_parts(&model.scope_kind, model.scope_target_id.as_deref())?,
+            group_id: model
+                .group_id
+                .as_deref()
+                .map(parse_uuid)
+                .transpose()?
+                .map(SnippetGroupId),
             variables,
-            last_arguments,
+            implementations,
+            support_targets,
         });
     }
     Ok(snippets)
+}
+
+async fn load_snippet_groups(
+    db: &DatabaseConnection,
+) -> Result<Vec<SnippetGroup>, StoragePersistenceError> {
+    entity::snippet_group::Entity::find()
+        .order_by_asc(entity::snippet_group::Column::SortOrder)
+        .order_by_asc(entity::snippet_group::Column::Name)
+        .all(db)
+        .await?
+        .into_iter()
+        .map(|model| {
+            Ok(SnippetGroup {
+                id: SnippetGroupId(parse_uuid(&model.id)?),
+                name: model.name,
+                parent_id: model
+                    .parent_id
+                    .as_deref()
+                    .map(parse_uuid)
+                    .transpose()?
+                    .map(SnippetGroupId),
+                sort_order: model.sort_order,
+            })
+        })
+        .collect()
+}
+
+async fn save_snippet_groups(
+    db: &DatabaseConnection,
+    groups: &[SnippetGroup],
+) -> Result<(), StoragePersistenceError> {
+    let now = current_unix_secs();
+    for (index, group) in groups.iter().enumerate() {
+        entity::snippet_group::Entity::insert(entity::snippet_group::ActiveModel {
+            id: Set(group.id.0.to_string()),
+            name: Set(group.name.clone()),
+            parent_id: Set(group.parent_id.map(|id| id.0.to_string())),
+            sort_order: Set(group.sort_order.max(index as i32)),
+            created_at_unix_secs: Set(now),
+            updated_at_unix_secs: Set(now),
+        })
+        .exec(db)
+        .await?;
+    }
+    Ok(())
 }
 
 async fn save_snippets(
@@ -720,14 +521,16 @@ async fn save_snippets(
     for (index, snippet) in snippets.iter().enumerate() {
         let snippet_id = snippet.id.0.to_string();
         let (scope_kind, scope_target_id) = snippet_scope_to_parts(&snippet.scope);
-        // scope 拆成 kind + target_id，便于后续按主机/分组查询。
+        // scope 拆成 kind + target_id，便于后续按主机查询。
         entity::snippet::Entity::insert(entity::snippet::ActiveModel {
             id: Set(snippet_id.clone()),
             name: Set(snippet.name.clone()),
             description: Set(snippet.description.clone()),
-            command_template: Set(snippet.command_template.clone()),
+            // 旧字段保留给历史迁移兜底；正式内容保存在 snippet_implementations。
+            command_template: Set(snippet.default_command_template().to_owned()),
             scope_kind: Set(scope_kind.to_owned()),
             scope_target_id: Set(scope_target_id),
+            group_id: Set(snippet.group_id.map(|id| id.0.to_string())),
             sort_order: Set(index as i32),
             created_at_unix_secs: Set(now),
             updated_at_unix_secs: Set(now),
@@ -749,15 +552,54 @@ async fn save_snippets(
             .await?;
         }
 
-        for (argument_index, argument) in snippet.last_arguments.iter().enumerate() {
-            // last_arguments 用于 UI 回填，不参与渲染规则判断。
-            entity::snippet_argument::Entity::insert(entity::snippet_argument::ActiveModel {
-                id: Set(format!("{snippet_id}:arg:{argument_index}")),
-                snippet_id: Set(snippet_id.clone()),
-                name: Set(argument.name.clone()),
-                value: Set(argument.value.clone()),
-                sort_order: Set(argument_index as i32),
-            })
+        for (implementation_index, implementation) in snippet.implementations.iter().enumerate() {
+            let implementation_id = implementation.id.0.to_string();
+            let (shell, shell_custom) = snippet_shell_to_parts(&implementation.shell);
+            entity::snippet_implementation::Entity::insert(
+                entity::snippet_implementation::ActiveModel {
+                    id: Set(implementation_id.clone()),
+                    snippet_id: Set(snippet_id.clone()),
+                    name: Set(implementation.name.clone()),
+                    shell: Set(shell.to_owned()),
+                    shell_custom: Set(shell_custom),
+                    command_template: Set(implementation.command_template.clone()),
+                    notes: Set(implementation.notes.clone()),
+                    sort_order: Set(implementation.sort_order.max(implementation_index as i32)),
+                    created_at_unix_secs: Set(now),
+                    updated_at_unix_secs: Set(now),
+                },
+            )
+            .exec(db)
+            .await?;
+
+            for (argument_index, argument) in implementation.last_arguments.iter().enumerate() {
+                // last_arguments 用于 UI 回填，不参与渲染规则判断。
+                entity::snippet_argument::Entity::insert(entity::snippet_argument::ActiveModel {
+                    id: Set(format!("{implementation_id}:arg:{argument_index}")),
+                    snippet_id: Set(Some(snippet_id.clone())),
+                    implementation_id: Set(implementation_id.clone()),
+                    name: Set(argument.name.clone()),
+                    value: Set(argument.value.clone()),
+                    sort_order: Set(argument_index as i32),
+                })
+                .exec(db)
+                .await?;
+            }
+        }
+
+        for (target_index, target) in snippet.support_targets.iter().enumerate() {
+            entity::snippet_support_target::Entity::insert(
+                entity::snippet_support_target::ActiveModel {
+                    id: Set(target.id.0.to_string()),
+                    snippet_id: Set(snippet_id.clone()),
+                    target_key: Set(target.target_key.clone()),
+                    display_name: Set(target.display_name.clone()),
+                    implementation_id: Set(target.implementation_id.0.to_string()),
+                    sort_order: Set(target.sort_order.max(target_index as i32)),
+                    created_at_unix_secs: Set(now),
+                    updated_at_unix_secs: Set(now),
+                },
+            )
             .exec(db)
             .await?;
         }
@@ -884,213 +726,4 @@ async fn save_workspace(
     .exec(db)
     .await?;
     Ok(())
-}
-
-fn auth_from_model(
-    model: &entity::host_auth::Model,
-) -> Result<AuthProfile, StoragePersistenceError> {
-    // 对关键 SecretRef 字段使用 required_field，坏数据应 fail-fast 暴露出来。
-    let profile = match model.auth_kind.as_str() {
-        "password" => AuthProfile::Password {
-            username: model.username.clone(),
-            secret: SecretRef(required_field(
-                model.password_secret_ref.clone(),
-                "host_auth.password_secret_ref",
-            )?),
-        },
-        "key" => AuthProfile::Key {
-            username: model.username.clone(),
-            key: SecretRef(required_field(
-                model.key_secret_ref.clone(),
-                "host_auth.key_secret_ref",
-            )?),
-            passphrase: model.passphrase_secret_ref.clone().map(SecretRef),
-        },
-        "agent" => AuthProfile::Agent {
-            username: model.username.clone(),
-            source: agent_source_from_parts(
-                model.agent_source.as_deref(),
-                model.agent_pipe.clone(),
-            ),
-            key_hint: model.key_hint.clone(),
-        },
-        "certificate" => AuthProfile::Certificate {
-            username: model.username.clone(),
-            key: SecretRef(required_field(
-                model.key_secret_ref.clone(),
-                "host_auth.key_secret_ref",
-            )?),
-            passphrase: model.passphrase_secret_ref.clone().map(SecretRef),
-            certificate: SecretRef(required_field(
-                model.certificate_secret_ref.clone(),
-                "host_auth.certificate_secret_ref",
-            )?),
-        },
-        _ => default_auth(),
-    };
-    Ok(profile)
-}
-
-fn proxy_from_model(
-    model: &entity::host_proxy::Model,
-) -> Result<ProxyProfile, StoragePersistenceError> {
-    let port = to_u16(model.proxy_port)?;
-    Ok(match model.proxy_kind.as_str() {
-        "http" => ProxyProfile::Http {
-            host: model.proxy_host.clone(),
-            port,
-        },
-        _ => ProxyProfile::Socks5 {
-            host: model.proxy_host.clone(),
-            port,
-        },
-    })
-}
-
-fn default_auth() -> AuthProfile {
-    // 缺失认证行时使用空用户名的 agent 认证，避免旧库加载崩溃；UI 保存后会写回完整配置。
-    AuthProfile::Agent {
-        username: String::new(),
-        source: AgentSource::Auto,
-        key_hint: None,
-    }
-}
-
-fn agent_source_to_parts(source: &AgentSource) -> (String, Option<String>) {
-    // 自定义 named pipe 需要额外保存 pipe，其余 agent source 只保存枚举 key。
-    match source {
-        AgentSource::Auto => ("auto".to_owned(), None),
-        AgentSource::OpenSsh => ("openssh".to_owned(), None),
-        AgentSource::Pageant => ("pageant".to_owned(), None),
-        AgentSource::CustomNamedPipe(pipe) => ("custom_named_pipe".to_owned(), Some(pipe.clone())),
-    }
-}
-
-fn agent_source_from_parts(source: Option<&str>, pipe: Option<String>) -> AgentSource {
-    match source {
-        Some("openssh") => AgentSource::OpenSsh,
-        Some("pageant") => AgentSource::Pageant,
-        Some("custom_named_pipe") => AgentSource::CustomNamedPipe(pipe.unwrap_or_default()),
-        _ => AgentSource::Auto,
-    }
-}
-
-fn credential_kind_to_str(kind: &CredentialKind) -> &'static str {
-    match kind {
-        CredentialKind::Password => "password",
-        CredentialKind::PrivateKey => "private_key",
-        CredentialKind::Agent => "agent",
-        CredentialKind::Certificate => "certificate",
-    }
-}
-
-fn credential_kind_from_str(kind: &str) -> CredentialKind {
-    match kind {
-        "private_key" => CredentialKind::PrivateKey,
-        "agent" => CredentialKind::Agent,
-        "certificate" => CredentialKind::Certificate,
-        _ => CredentialKind::Password,
-    }
-}
-
-fn key_algorithm_to_parts(algorithm: &KeyAlgorithm) -> (Option<String>, Option<String>) {
-    match algorithm {
-        KeyAlgorithm::Ed25519 => (Some("ed25519".to_owned()), None),
-        KeyAlgorithm::Rsa => (Some("rsa".to_owned()), None),
-        KeyAlgorithm::Ecdsa => (Some("ecdsa".to_owned()), None),
-        KeyAlgorithm::Unknown(value) => (Some("unknown".to_owned()), Some(value.clone())),
-    }
-}
-
-fn key_algorithm_from_parts(kind: &str, raw: Option<&str>) -> KeyAlgorithm {
-    match kind {
-        "ed25519" => KeyAlgorithm::Ed25519,
-        "rsa" => KeyAlgorithm::Rsa,
-        "ecdsa" => KeyAlgorithm::Ecdsa,
-        _ => KeyAlgorithm::Unknown(raw.unwrap_or(kind).to_owned()),
-    }
-}
-
-fn snippet_scope_to_parts(scope: &SnippetScope) -> (&'static str, Option<String>) {
-    match scope {
-        SnippetScope::Global => ("global", None),
-        SnippetScope::Host(id) => ("host", Some(id.0.to_string())),
-        SnippetScope::Group(id) => ("group", Some(id.0.to_string())),
-    }
-}
-
-fn snippet_scope_from_parts(
-    kind: &str,
-    target_id: Option<&str>,
-) -> Result<SnippetScope, StoragePersistenceError> {
-    // host/group scope 必须带 target_id，缺失说明数据库数据不完整。
-    Ok(match kind {
-        "host" => SnippetScope::Host(HostId(parse_uuid(required_str(
-            target_id,
-            "snippets.scope_target_id",
-        )?)?)),
-        "group" => SnippetScope::Group(GroupId(parse_uuid(required_str(
-            target_id,
-            "snippets.scope_target_id",
-        )?)?)),
-        _ => SnippetScope::Global,
-    })
-}
-
-fn tunnel_kind_to_str(kind: &TunnelKind) -> &'static str {
-    match kind {
-        TunnelKind::Local => "local",
-        TunnelKind::Remote => "remote",
-        TunnelKind::Dynamic => "dynamic",
-    }
-}
-
-fn tunnel_kind_from_str(kind: &str) -> TunnelKind {
-    match kind {
-        "local" => TunnelKind::Local,
-        "remote" => TunnelKind::Remote,
-        _ => TunnelKind::Dynamic,
-    }
-}
-
-fn encode_optional_toml<T: serde::Serialize>(
-    value: Option<&T>,
-) -> Result<Option<String>, StoragePersistenceError> {
-    // 复杂扩展字段直接以 TOML 存储，避免 schema 为少量 override 过度膨胀。
-    value.map(toml::to_string).transpose().map_err(Into::into)
-}
-
-fn decode_optional_toml<T: serde::de::DeserializeOwned>(
-    value: Option<&str>,
-) -> Result<Option<T>, StoragePersistenceError> {
-    value.map(toml::from_str).transpose().map_err(Into::into)
-}
-
-fn parse_uuid(value: &str) -> Result<Uuid, StoragePersistenceError> {
-    // 数据库中 UUID 全部以字符串保存，加载时统一校验格式。
-    Uuid::parse_str(value).map_err(|error| StoragePersistenceError::InvalidData(error.to_string()))
-}
-
-fn to_u16(value: i32) -> Result<u16, StoragePersistenceError> {
-    u16::try_from(value)
-        .map_err(|_| StoragePersistenceError::InvalidData(format!("数值超出 u16 范围：{value}")))
-}
-
-fn to_u64(value: i64) -> Result<u64, StoragePersistenceError> {
-    u64::try_from(value)
-        .map_err(|_| StoragePersistenceError::InvalidData(format!("数值超出 u64 范围：{value}")))
-}
-
-fn required_field(
-    value: Option<String>,
-    field: &'static str,
-) -> Result<String, StoragePersistenceError> {
-    value.ok_or_else(|| StoragePersistenceError::InvalidData(format!("缺少字段：{field}")))
-}
-
-fn required_str<'a>(
-    value: Option<&'a str>,
-    field: &'static str,
-) -> Result<&'a str, StoragePersistenceError> {
-    value.ok_or_else(|| StoragePersistenceError::InvalidData(format!("缺少字段：{field}")))
 }

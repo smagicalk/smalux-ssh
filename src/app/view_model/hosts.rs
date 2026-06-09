@@ -10,7 +10,7 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-use crate::model::{AppState, GroupId, Host, HostGroup};
+use crate::model::{AppState, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup};
 
 use super::common::{group_label, tags_label};
 use super::i18n::{locale_for_state, tr};
@@ -22,18 +22,28 @@ const TREE_GUIDE_LEVELS: usize = 8;
 type TreeGuides = [bool; TREE_GUIDE_LEVELS];
 
 pub(in crate::app) use types::{
-    CreateChoiceText, CreateGroupDialogViewModel, CreateHostDialogText, GroupOptionViewModel,
-    HostTreeViewModel, HostViewModel, QuickHostViewModel,
+    CreateChoiceText, CreateGroupDialogViewModel, CreateHostDialogText, CredentialOptionViewModel,
+    GroupOptionViewModel, HostTreeViewModel, HostViewModel, QuickHostViewModel,
 };
 
-fn accent_index_for_host_id(host_id: &str) -> i32 {
-    // 根据稳定 host_id 派生强调色索引，避免每次启动随机变化导致用户识别困难。
-    host_id
-        .bytes()
+fn accent_index_for_stable_key(key: &str) -> i32 {
+    key.bytes()
         .fold(0u32, |acc, byte| {
             acc.wrapping_mul(31).wrapping_add(byte as u32)
         })
         .rem_euclid(5) as i32
+}
+
+fn accent_index_for_host_id(host_id: &str) -> i32 {
+    // 树形主机节点使用稳定 host_id，避免同一主机在树里每次启动颜色变化。
+    accent_index_for_stable_key(host_id)
+}
+
+fn accent_index_for_group_id(group_id: Option<GroupId>) -> i32 {
+    // 卡片强调色跟随分组；移动主机到其他分组后，左侧标记会随分组更新。
+    group_id
+        .map(|id| accent_index_for_stable_key(&id.0.to_string()))
+        .unwrap_or_default()
 }
 
 pub(super) fn hosts(state: &AppState) -> Vec<HostViewModel> {
@@ -289,7 +299,7 @@ fn host_rows_for_query(
                 tags: tag_display(state, host),
                 status_key: host_status_key(state, host.id),
                 status: host_status_label(state, host.id, locale),
-                accent_index: accent_index_for_host_id(&host.id.0.to_string()),
+                accent_index: accent_index_for_group_id(host.group_id),
             }
         })
         .collect()
@@ -397,6 +407,16 @@ pub(super) fn quick_host(state: &AppState) -> QuickHostViewModel {
     QuickHostViewModel {
         group_path: group_path(state, draft.group_id, default_group),
         group_options: group_options(state, default_group, draft.group_id),
+        private_key_options: credential_options(
+            state,
+            CredentialKind::PrivateKey,
+            &draft.auth.private_key_ref,
+        ),
+        certificate_options: credential_options(
+            state,
+            CredentialKind::Certificate,
+            &draft.auth.certificate_ref,
+        ),
         name: draft.name.clone(),
         address: draft.address.clone(),
         port: draft.port.clone(),
@@ -411,6 +431,54 @@ pub(super) fn quick_host(state: &AppState) -> QuickHostViewModel {
         passphrase_ref: draft.auth.passphrase_ref.clone(),
         key_hint: draft.auth.key_hint.clone(),
         certificate_ref: draft.auth.certificate_ref.clone(),
+    }
+}
+
+fn credential_options(
+    state: &AppState,
+    kind: CredentialKind,
+    selected_value: &str,
+) -> Vec<CredentialOptionViewModel> {
+    let mut rows = state
+        .storage
+        .credentials
+        .iter()
+        .filter(|credential| credential.kind == kind)
+        .filter_map(|credential| {
+            credential
+                .secret
+                .as_ref()
+                .map(|secret| (credential, secret))
+        })
+        .map(|(credential, secret)| {
+            let value = secret.0.clone();
+            CredentialOptionViewModel {
+                value: value.clone(),
+                label: credential.name.clone(),
+                detail: credential_detail(credential),
+                selected: value == selected_value,
+            }
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.label.cmp(&right.label));
+    rows
+}
+
+fn credential_detail(credential: &CredentialMetadata) -> String {
+    credential
+        .username
+        .clone()
+        .or_else(|| credential.fingerprint.clone())
+        .or_else(|| credential.key_algorithm.as_ref().map(key_algorithm_label))
+        .unwrap_or_else(|| credential.name.clone())
+}
+
+fn key_algorithm_label(algorithm: &crate::model::KeyAlgorithm) -> String {
+    match algorithm {
+        crate::model::KeyAlgorithm::Ed25519 => "ed25519".to_owned(),
+        crate::model::KeyAlgorithm::Rsa => "rsa".to_owned(),
+        crate::model::KeyAlgorithm::Ecdsa => "ecdsa".to_owned(),
+        crate::model::KeyAlgorithm::Unknown(name) => name.clone(),
     }
 }
 
@@ -566,10 +634,20 @@ pub(super) fn create_host_dialog_text(state: &AppState) -> CreateHostDialogText 
         password_secret_placeholder: tr(locale, "host.password_secret_placeholder"),
         private_key_label: tr(locale, "host.private_key_label"),
         private_key_placeholder: tr(locale, "host.private_key_placeholder"),
+        add_private_key_label: tr(locale, "host.add_private_key"),
+        add_private_key_caption: tr(locale, "host.add_private_key_caption"),
         passphrase_label: tr(locale, "host.passphrase_label"),
         passphrase_placeholder: tr(locale, "host.passphrase_placeholder"),
         certificate_label: tr(locale, "host.certificate_label"),
         certificate_placeholder: tr(locale, "host.certificate_placeholder"),
+        add_certificate_label: tr(locale, "host.add_certificate"),
+        add_certificate_caption: tr(locale, "host.add_certificate_caption"),
+        credential_name_label: tr(locale, "host.credential_name_label"),
+        credential_name_placeholder: tr(locale, "host.credential_name_placeholder"),
+        credential_secret_label: tr(locale, "host.credential_secret_label"),
+        credential_secret_placeholder: tr(locale, "host.credential_secret_placeholder"),
+        credential_algorithm_label: tr(locale, "host.credential_algorithm_label"),
+        credential_save_label: tr(locale, "host.credential_save"),
         icon_title: tr(locale, "host.icon_title"),
         icon_server_label: tr(locale, "host.icon_server"),
         icon_database_label: tr(locale, "host.icon_database"),
@@ -577,5 +655,11 @@ pub(super) fn create_host_dialog_text(state: &AppState) -> CreateHostDialogText 
         icon_linux_label: tr(locale, "host.icon_linux"),
         icon_container_label: tr(locale, "host.icon_container"),
         icon_shield_label: tr(locale, "host.icon_shield"),
+        icon_router_label: tr(locale, "host.icon_router"),
+        icon_terminal_label: tr(locale, "host.icon_terminal"),
+        icon_globe_label: tr(locale, "host.icon_globe"),
+        icon_key_label: tr(locale, "host.icon_key"),
+        icon_chip_label: tr(locale, "host.icon_chip"),
+        icon_cluster_label: tr(locale, "host.icon_cluster"),
     }
 }

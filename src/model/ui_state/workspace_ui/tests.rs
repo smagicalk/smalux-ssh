@@ -8,6 +8,7 @@ fn workspace_ui_defaults_to_hosts_follow_system_language() {
     assert_eq!(state.language, LanguageMode::FollowSystem);
     assert_eq!(state.host_list_mode, HostListMode::Tree);
     assert!(state.host_search_query.is_empty());
+    assert!(state.collapsed_credential_tree_nodes.is_empty());
     assert!(!state.create_host_dialog_open);
     assert_eq!(state.hosts_panel_width, DEFAULT_HOSTS_PANEL_WIDTH);
     assert_eq!(state.activity_panel_width, DEFAULT_ACTIVITY_PANEL_WIDTH);
@@ -24,6 +25,20 @@ fn create_host_dialog_can_open_and_close() {
 
     state.create_host_dialog_open = false;
     assert!(!state.create_host_dialog_open);
+}
+
+#[test]
+fn credential_tree_node_toggle_tracks_collapsed_nodes() {
+    let mut state = WorkspaceUiState::default();
+
+    state.toggle_credential_tree_node("credential-group:one");
+    assert_eq!(
+        state.collapsed_credential_tree_nodes,
+        vec!["credential-group:one".to_owned()]
+    );
+
+    state.toggle_credential_tree_node("credential-group:one");
+    assert!(state.collapsed_credential_tree_nodes.is_empty());
 }
 
 #[test]

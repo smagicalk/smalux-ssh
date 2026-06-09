@@ -20,6 +20,12 @@ mod storage;
 mod target;
 #[path = "dispatch/ui.rs"]
 mod ui;
+#[path = "dispatch/ui_quick_host.rs"]
+mod ui_quick_host;
+#[path = "dispatch/ui_terminal.rs"]
+mod ui_terminal;
+#[path = "dispatch/ui_workspace.rs"]
+mod ui_workspace;
 #[path = "dispatch/visual.rs"]
 mod visual;
 #[path = "dispatch/workspace.rs"]

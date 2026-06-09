@@ -1,8 +1,11 @@
 use super::*;
 use crate::model::{
-    AgentSource, AppState, AuthProfile, CredentialKind, CredentialMetadata, Host, HostId,
-    KeyAlgorithm, KnownHostEntry, LanguageMode, Message, QuickHostAuthField, QuickHostAuthKind,
-    QuickHostDraftField, SecretRef, SessionId, TunnelRuntimeState, TunnelStatus,
+    AgentSource, AppState, AuthProfile, CredentialGroup, CredentialGroupId, CredentialInspection,
+    CredentialKind, CredentialMetadata, Host, HostId, KeyAlgorithm, KnownHostEntry, LanguageMode,
+    Message, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SecretMaterialKind,
+    SecretRecord, SecretRef, SessionId, Snippet, SnippetGroup, SnippetGroupId,
+    SnippetImplementation, SnippetImplementationId, SnippetScope, SnippetShell,
+    SnippetSupportTarget, SnippetSupportTargetId, TunnelRuntimeState, TunnelStatus,
 };
 use crate::storage::{SqliteStorage, ThemeProfileRecord};
 use uuid::Uuid;
@@ -15,11 +18,39 @@ fn app_view_model_uses_local_terminal_when_no_tab_is_open() {
     let vm = app_view_model(&state);
 
     assert_eq!(
-        vm.terminal.title,
+        vm.terminal_workspace.terminal.title,
         crate::model::DEFAULT_LOCAL_TERMINAL_TITLE
     );
-    assert_eq!(vm.terminal.status, "Ready");
-    assert!(vm.terminal.can_send_input);
+    assert_eq!(vm.terminal_workspace.terminal.status, "Ready");
+    assert!(vm.terminal_workspace.terminal.can_send_input);
+}
+
+#[test]
+fn app_view_model_projects_workspace_page_models() {
+    let mut state = AppState::default();
+    state.ui.workspace.language = LanguageMode::English;
+    state.ui.workspace.credential_search_query = "deploy".to_owned();
+    state.ui.workspace.snippet_search_query = "nginx".to_owned();
+
+    let vm = app_view_model(&state);
+
+    assert_eq!(
+        vm.terminal_workspace.terminal.title,
+        crate::model::DEFAULT_LOCAL_TERMINAL_TITLE
+    );
+    assert_eq!(vm.terminal_workspace.sftp.current_dir, "/");
+    assert!(vm.terminal_workspace.tabs.is_empty());
+    assert!(vm.terminal_workspace.history.is_empty());
+    assert_eq!(vm.terminal_workspace.tool_panel_width, 328);
+    assert_eq!(vm.terminal_workspace.tool_panel_mode_key, "Closed");
+    assert_eq!(vm.security_workspace.search_query, "deploy");
+    assert!(vm.security_workspace.credentials.is_empty());
+    assert!(!vm.security_workspace.credential_rows.is_empty());
+    assert_eq!(vm.snippet_workspace.search_query, "nginx");
+    assert!(vm.snippet_workspace.snippets.is_empty());
+    assert!(!vm.snippet_workspace.rows.is_empty());
+    assert!(vm.snippet_workspace.target_options.is_empty());
+    assert_eq!(vm.settings_workspace.settings.text.title, "Settings");
 }
 
 #[test]
@@ -128,6 +159,175 @@ fn app_view_model_keeps_local_terminal_visible_for_local_new_session_search() {
 }
 
 #[test]
+fn app_view_model_projects_snippet_tree_and_filters_by_search() {
+    let mut state = AppState::default();
+    state.ui.workspace.language = LanguageMode::English;
+    let host_id = HostId(Uuid::new_v4());
+    let snippet_group_id = SnippetGroupId(Uuid::new_v4());
+    state.storage.upsert_host(Host {
+        id: host_id,
+        name: "Production".to_owned(),
+        group_id: None,
+        icon_key: "server".to_owned(),
+        tags: Vec::new(),
+        address: "prod.example.com".to_owned(),
+        port: 22,
+        auth: AuthProfile::Agent {
+            username: "deploy".to_owned(),
+            source: AgentSource::Auto,
+            key_hint: None,
+        },
+        proxy: None,
+        jumps: Vec::new(),
+        theme_override: None,
+        background_override: None,
+    });
+    state.storage.upsert_snippet_group(SnippetGroup {
+        id: snippet_group_id,
+        name: "Operations".to_owned(),
+        parent_id: None,
+        sort_order: 0,
+    });
+    state
+        .storage
+        .upsert_snippet(Snippet::with_default_implementation(
+            crate::model::SnippetId(Uuid::new_v4()),
+            "Kubernetes pods".to_owned(),
+            Some("List pods".to_owned()),
+            SnippetScope::Global,
+            Some(snippet_group_id),
+            "kubectl get pods".to_owned(),
+        ));
+    let mut restart_snippet = Snippet::with_default_implementation(
+        crate::model::SnippetId(Uuid::new_v4()),
+        "restart service".to_owned(),
+        Some("Restart a service".to_owned()),
+        SnippetScope::Host(host_id),
+        None,
+        "systemctl restart {{service}}".to_owned(),
+    );
+    restart_snippet
+        .default_implementation_mut()
+        .expect("默认实现应存在")
+        .last_arguments = vec![crate::model::SnippetArgument {
+        name: "service".to_owned(),
+        value: "nginx".to_owned(),
+    }];
+    let shared_implementation_id = SnippetImplementationId(Uuid::new_v4());
+    restart_snippet.implementations.push(SnippetImplementation {
+        id: shared_implementation_id,
+        snippet_id: restart_snippet.id,
+        name: "Linux shared".to_owned(),
+        shell: SnippetShell::Bash,
+        command_template: "systemctl status {{service}}".to_owned(),
+        notes: None,
+        last_arguments: Vec::new(),
+        sort_order: 1,
+    });
+    restart_snippet.support_targets.push(SnippetSupportTarget {
+        id: SnippetSupportTargetId(Uuid::new_v4()),
+        snippet_id: restart_snippet.id,
+        target_key: "ubuntu".to_owned(),
+        display_name: "Ubuntu".to_owned(),
+        implementation_id: shared_implementation_id,
+        sort_order: 1,
+    });
+    restart_snippet.support_targets.push(SnippetSupportTarget {
+        id: SnippetSupportTargetId(Uuid::new_v4()),
+        snippet_id: restart_snippet.id,
+        target_key: "debian".to_owned(),
+        display_name: "Debian".to_owned(),
+        implementation_id: shared_implementation_id,
+        sort_order: 2,
+    });
+    state.storage.upsert_snippet(restart_snippet);
+
+    let vm = app_view_model(&state);
+
+    assert_eq!(vm.snippet_workspace.rows[0].id, "snippet-folder:all");
+    assert!(
+        vm.snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.icon_key == "folder")
+    );
+    assert!(
+        vm.snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.icon_key == "code")
+    );
+    assert!(
+        vm.snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.name == "Operations" && row.node_kind == "Group")
+    );
+    assert!(
+        vm.snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.node_kind == "SnippetTarget"
+                && row.scope_key == "SupportTargetShared"
+                && row.meta == "shared 2")
+    );
+    assert!(
+        vm.snippet_workspace
+            .target_options
+            .iter()
+            .any(|row| row.node_kind == "SnippetTarget" && row.name == "Debian")
+    );
+
+    state
+        .ui
+        .workspace
+        .collapsed_snippet_tree_nodes
+        .push("snippet-folder:all".to_owned());
+    let collapsed_vm = app_view_model(&state);
+    assert_eq!(collapsed_vm.snippet_workspace.rows.len(), 1);
+    assert!(
+        collapsed_vm
+            .snippet_workspace
+            .target_options
+            .iter()
+            .any(|row| row.node_kind == "SnippetTarget" && row.name == "Debian")
+    );
+    state.ui.workspace.collapsed_snippet_tree_nodes.clear();
+
+    state.ui.workspace.set_snippet_search_query("restart");
+    let filtered = app_view_model(&state);
+
+    assert!(
+        filtered
+            .snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.name == "restart service")
+    );
+    assert!(
+        filtered
+            .snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.node_kind == "SnippetTarget" && row.argument_values == "service=nginx")
+    );
+    assert!(
+        filtered
+            .snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.node_kind == "SnippetTarget" && row.variable_names == "service")
+    );
+    assert!(
+        !filtered
+            .snippet_workspace
+            .rows
+            .iter()
+            .any(|row| row.name == "Kubernetes pods")
+    );
+}
+
+#[test]
 fn app_view_model_projects_known_hosts_for_tool_panel() {
     let mut state = AppState::default();
     state.ui.workspace.language = LanguageMode::English;
@@ -140,20 +340,30 @@ fn app_view_model_projects_known_hosts_for_tool_panel() {
 
     let vm = app_view_model(&state);
 
-    assert_eq!(vm.known_hosts.len(), 1);
-    assert_eq!(vm.known_hosts[0].host, "example.com");
-    assert_eq!(vm.known_hosts[0].port, 22);
-    assert_eq!(vm.known_hosts[0].fingerprint, "SHA256:new");
-    assert_eq!(vm.known_hosts[0].status_key, "pending");
-    assert_eq!(vm.known_hosts[0].status, "pending");
+    assert_eq!(vm.terminal_workspace.known_hosts.len(), 1);
+    assert_eq!(vm.terminal_workspace.known_hosts[0].host, "example.com");
+    assert_eq!(vm.terminal_workspace.known_hosts[0].port, 22);
+    assert_eq!(
+        vm.terminal_workspace.known_hosts[0].fingerprint,
+        "SHA256:new"
+    );
+    assert_eq!(vm.terminal_workspace.known_hosts[0].status_key, "pending");
+    assert_eq!(vm.terminal_workspace.known_hosts[0].status, "pending");
 }
 
 #[test]
 fn app_view_model_projects_credentials_for_security_page() {
     let mut state = AppState::default();
+    state.storage.upsert_secret(SecretRecord::local_plaintext(
+        SecretRef("key:deploy".to_owned()),
+        SecretMaterialKind::PrivateKey,
+        b"private-key".to_vec(),
+    ));
     state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy".to_owned(),
         kind: CredentialKind::PrivateKey,
+        group_id: None,
         username: Some("ubuntu".to_owned()),
         secret: Some(SecretRef("key:deploy".to_owned())),
         key_algorithm: Some(KeyAlgorithm::Ed25519),
@@ -162,10 +372,434 @@ fn app_view_model_projects_credentials_for_security_page() {
 
     let vm = app_view_model(&state);
 
-    assert_eq!(vm.credentials.len(), 1);
-    assert_eq!(vm.credentials[0].title, "deploy");
-    assert_eq!(vm.credentials[0].subtitle, "ubuntu");
-    assert_eq!(vm.credentials[0].meta, "SHA256:key");
+    let security = &vm.security_workspace;
+    assert_eq!(security.credentials.len(), 1);
+    assert_eq!(security.credentials[0].title, "deploy");
+    assert_eq!(security.credentials[0].subtitle, "ubuntu");
+    assert_eq!(security.credentials[0].meta, "SHA256:key");
+    assert_eq!(security.credential_rows[0].id, "group:all");
+    assert_eq!(security.credential_rows[1].id, "group:PrivateKey");
+    assert_eq!(security.credential_rows[2].id, "credential:deploy");
+    assert!(security.credential_rows[0].expandable);
+    assert!(security.credential_rows[0].expanded);
+    assert!(security.credential_rows[1].expandable);
+    assert!(security.credential_rows[1].expanded);
+    assert!(!security.credential_rows[2].expandable);
+    assert_eq!(security.credential_rows[2].secret_ref, "已保存，可查看");
+    assert!(security.credential_rows[2].secret_available);
+    assert_eq!(security.credential_rows[2].algorithm, "ed25519");
+    assert_eq!(security.credential_rows[2].algorithm_key, "Ed25519");
+    assert_eq!(security.credential_rows[2].group_path, "私钥");
+}
+
+#[test]
+fn app_view_model_projects_credential_detail_fields_from_inspection() {
+    let mut state = AppState::default();
+    state.ui.workspace.language = LanguageMode::Chinese;
+    let credential_id = crate::model::CredentialId(uuid::Uuid::new_v4());
+    state.storage.upsert_secret(SecretRecord::local_plaintext(
+        SecretRef("secret://keys/deploy".to_owned()),
+        SecretMaterialKind::PrivateKey,
+        b"private-key".to_vec(),
+    ));
+    state.storage.upsert_credential(CredentialMetadata {
+        id: credential_id,
+        name: "deploy".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        group_id: None,
+        username: Some("ubuntu".to_owned()),
+        secret: Some(SecretRef("secret://keys/deploy".to_owned())),
+        key_algorithm: Some(KeyAlgorithm::Rsa),
+        fingerprint: Some("SHA256:old".to_owned()),
+    });
+    state
+        .storage
+        .upsert_credential_inspection(CredentialInspection {
+            credential_id,
+            kind: CredentialKind::PrivateKey,
+            payload_hash: "hash".to_owned(),
+            parser_version: 1,
+            parse_error: None,
+            algorithm: Some(KeyAlgorithm::Ed25519),
+            fingerprint: Some("SHA256:new".to_owned()),
+            public_key: Some("ssh-ed25519 AAAA deploy".to_owned()),
+            comment: Some("deploy".to_owned()),
+            encrypted: Some(false),
+            password_length: None,
+            certificate: None,
+        });
+
+    let vm = app_view_model(&state);
+    let fields = vm
+        .security_workspace
+        .detail_fields
+        .iter()
+        .filter(|field| field.credential_id == "credential:deploy")
+        .map(|field| (field.label.as_str(), field.value.as_str()))
+        .collect::<Vec<_>>();
+
+    assert!(fields.contains(&("类型", "私钥")));
+    assert!(fields.contains(&("用户名", "ubuntu")));
+    assert!(fields.contains(&("分组", "私钥")));
+    assert!(fields.contains(&("本地内容", "已保存，可查看")));
+    assert!(fields.contains(&("算法", "ed25519")));
+    assert!(fields.contains(&("指纹", "SHA256:new")));
+    assert!(fields.contains(&("解析状态", "正常")));
+    assert!(fields.contains(&("是否加密", "否")));
+    assert!(fields.contains(&("备注", "deploy")));
+    assert!(fields.contains(&("公钥", "ssh-ed25519 AAAA deploy")));
+}
+
+#[test]
+fn app_view_model_omits_agent_credentials_from_security_page() {
+    let mut state = AppState::default();
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "local-agent".to_owned(),
+        kind: CredentialKind::Agent,
+        group_id: None,
+        username: Some("deploy".to_owned()),
+        secret: Some(SecretRef("agent://auto".to_owned())),
+        key_algorithm: None,
+        fingerprint: None,
+    });
+
+    let vm = app_view_model(&state);
+
+    assert!(
+        !vm.security_workspace
+            .credential_rows
+            .iter()
+            .any(|row| row.kind_key == "Agent" || row.id == "credential:local-agent")
+    );
+    assert!(
+        !vm.security_workspace
+            .credentials
+            .iter()
+            .any(|item| item.title == "local-agent")
+    );
+}
+
+#[test]
+fn app_view_model_projects_custom_credential_groups() {
+    let mut state = AppState::default();
+    let group_id = CredentialGroupId(Uuid::new_v4());
+    let child_id = CredentialGroupId(Uuid::new_v4());
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: group_id,
+        name: "生产密钥".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: None,
+        sort_order: 0,
+    });
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: child_id,
+        name: "API".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: Some(group_id),
+        sort_order: 0,
+    });
+
+    let vm = app_view_model(&state);
+    let rows = &vm.security_workspace.credential_rows;
+    let group_index = rows
+        .iter()
+        .position(|row| row.id == format!("credential-group:{}", group_id.0))
+        .expect("parent credential group should be visible");
+    let child_index = rows
+        .iter()
+        .position(|row| row.id == format!("credential-group:{}", child_id.0))
+        .expect("child credential group should be visible");
+
+    assert_eq!(rows[group_index].name, "生产密钥");
+    assert_eq!(rows[group_index].depth, 2);
+    assert_eq!(rows[group_index].group_path, "生产密钥");
+    assert_eq!(rows[child_index].name, "API");
+    assert_eq!(rows[child_index].depth, 3);
+    assert_eq!(rows[child_index].group_path, "生产密钥 / API");
+    assert!(group_index < child_index);
+}
+
+#[test]
+fn app_view_model_projects_credential_group_contents_for_detail_panel() {
+    let mut state = AppState::default();
+    state.ui.workspace.language = LanguageMode::Chinese;
+    let group_id = CredentialGroupId(Uuid::new_v4());
+    let child_id = CredentialGroupId(Uuid::new_v4());
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: group_id,
+        name: "生产密钥".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: None,
+        sort_order: 0,
+    });
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: child_id,
+        name: "API".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: Some(group_id),
+        sort_order: 0,
+    });
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "root-key".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        group_id: None,
+        username: Some("root".to_owned()),
+        secret: None,
+        key_algorithm: Some(KeyAlgorithm::Ed25519),
+        fingerprint: None,
+    });
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "prod-key".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        group_id: Some(group_id),
+        username: Some("deploy".to_owned()),
+        secret: None,
+        key_algorithm: Some(KeyAlgorithm::Rsa),
+        fingerprint: Some("SHA256:prod".to_owned()),
+    });
+
+    let vm = app_view_model(&state);
+
+    let root_contents = vm
+        .security_workspace
+        .group_contents
+        .iter()
+        .filter(|row| row.parent_id == "group:all")
+        .collect::<Vec<_>>();
+    assert_eq!(root_contents.len(), 3);
+    assert_eq!(root_contents[0].id, "group:PrivateKey");
+    assert_eq!(root_contents[0].name, "私钥");
+    assert_eq!(root_contents[0].detail, "凭据分类");
+    assert_eq!(root_contents[0].meta, "2 项");
+
+    let private_key_contents = vm
+        .security_workspace
+        .group_contents
+        .iter()
+        .filter(|row| row.parent_id == "group:PrivateKey")
+        .collect::<Vec<_>>();
+    assert_eq!(private_key_contents.len(), 2);
+    assert_eq!(private_key_contents[0].node_kind, "CredentialGroup");
+    assert_eq!(
+        private_key_contents[0].id,
+        format!("credential-group:{}", group_id.0)
+    );
+    assert_eq!(private_key_contents[0].name, "生产密钥");
+    assert_eq!(private_key_contents[0].meta, "文件夹");
+    assert_eq!(private_key_contents[1].node_kind, "Credential");
+    assert_eq!(private_key_contents[1].name, "root-key");
+
+    let custom_group_contents = vm
+        .security_workspace
+        .group_contents
+        .iter()
+        .filter(|row| row.parent_id == format!("credential-group:{}", group_id.0))
+        .collect::<Vec<_>>();
+    assert_eq!(custom_group_contents.len(), 2);
+    assert_eq!(custom_group_contents[0].node_kind, "CredentialGroup");
+    assert_eq!(custom_group_contents[0].name, "API");
+    assert_eq!(custom_group_contents[1].node_kind, "Credential");
+    assert_eq!(custom_group_contents[1].name, "prod-key");
+    assert_eq!(custom_group_contents[1].meta, "SHA256:prod");
+
+    let empty_child_contents = vm
+        .security_workspace
+        .group_contents
+        .iter()
+        .filter(|row| row.parent_id == format!("credential-group:{}", child_id.0))
+        .collect::<Vec<_>>();
+    assert_eq!(empty_child_contents.len(), 1);
+    assert_eq!(empty_child_contents[0].node_kind, "Empty");
+    assert_eq!(empty_child_contents[0].name, "此分组为空");
+}
+
+#[test]
+fn app_view_model_marks_credential_tree_guides_for_later_siblings() {
+    let mut state = AppState::default();
+    let first_group_id = CredentialGroupId(Uuid::new_v4());
+    let child_group_id = CredentialGroupId(Uuid::new_v4());
+    let second_group_id = CredentialGroupId(Uuid::new_v4());
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: first_group_id,
+        name: "生产密钥".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: None,
+        sort_order: 0,
+    });
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: child_group_id,
+        name: "API".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: Some(first_group_id),
+        sort_order: 0,
+    });
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: second_group_id,
+        name: "测试密钥".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: None,
+        sort_order: 1,
+    });
+
+    let vm = app_view_model(&state);
+    let first_group = vm
+        .security_workspace
+        .credential_rows
+        .iter()
+        .find(|row| row.id == format!("credential-group:{}", first_group_id.0))
+        .expect("first credential group should be visible");
+    let child_group = vm
+        .security_workspace
+        .credential_rows
+        .iter()
+        .find(|row| row.id == format!("credential-group:{}", child_group_id.0))
+        .expect("child credential group should be visible");
+    let second_group = vm
+        .security_workspace
+        .credential_rows
+        .iter()
+        .find(|row| row.id == format!("credential-group:{}", second_group_id.0))
+        .expect("second credential group should be visible");
+
+    assert!(first_group.has_next_sibling);
+    assert!(child_group.guide_1);
+    assert!(!second_group.has_next_sibling);
+}
+
+#[test]
+fn app_view_model_collapses_credential_tree_nodes_without_affecting_search() {
+    let mut state = AppState::default();
+    let group_id = CredentialGroupId(Uuid::new_v4());
+    let child_id = CredentialGroupId(Uuid::new_v4());
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: group_id,
+        name: "生产密钥".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: None,
+        sort_order: 0,
+    });
+    state.storage.upsert_credential_group(CredentialGroup {
+        id: child_id,
+        name: "API".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        parent_id: Some(group_id),
+        sort_order: 0,
+    });
+    let parent_row_id = format!("credential-group:{}", group_id.0);
+    let child_row_id = format!("credential-group:{}", child_id.0);
+
+    state
+        .ui
+        .workspace
+        .collapsed_credential_tree_nodes
+        .push(parent_row_id.clone());
+    let collapsed = app_view_model(&state);
+
+    let parent = collapsed
+        .security_workspace
+        .credential_rows
+        .iter()
+        .find(|row| row.id == parent_row_id)
+        .expect("collapsed parent group should stay visible");
+    assert!(parent.expandable);
+    assert!(!parent.expanded);
+    assert!(
+        !collapsed
+            .security_workspace
+            .credential_rows
+            .iter()
+            .any(|row| row.id == child_row_id)
+    );
+
+    state.ui.workspace.credential_search_query = "api".to_owned();
+    let searched = app_view_model(&state);
+
+    assert!(
+        searched
+            .security_workspace
+            .credential_rows
+            .iter()
+            .any(|row| row.id == child_row_id)
+    );
+}
+
+#[test]
+fn app_view_model_filters_credential_rows_by_search_query() {
+    let mut state = AppState::default();
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "deploy".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        group_id: None,
+        username: Some("ubuntu".to_owned()),
+        secret: Some(SecretRef("key:deploy".to_owned())),
+        key_algorithm: Some(KeyAlgorithm::Ed25519),
+        fingerprint: Some("SHA256:key".to_owned()),
+    });
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "db-cert".to_owned(),
+        kind: CredentialKind::Certificate,
+        group_id: None,
+        username: None,
+        secret: Some(SecretRef("cert:db".to_owned())),
+        key_algorithm: Some(KeyAlgorithm::Rsa),
+        fingerprint: Some("SHA256:cert".to_owned()),
+    });
+    state.ui.workspace.set_credential_search_query("deploy");
+
+    let vm = app_view_model(&state);
+
+    assert_eq!(vm.security_workspace.credential_rows[0].id, "group:all");
+    assert_eq!(
+        vm.security_workspace.credential_rows[1].id,
+        "group:PrivateKey"
+    );
+    assert_eq!(
+        vm.security_workspace.credential_rows[2].id,
+        "credential:deploy"
+    );
+    assert_eq!(vm.security_workspace.credential_rows.len(), 3);
+}
+
+#[test]
+fn app_view_model_does_not_count_agent_credentials_in_security_search_root() {
+    let mut state = AppState::default();
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "deploy".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        group_id: None,
+        username: Some("ubuntu".to_owned()),
+        secret: Some(SecretRef("key:deploy".to_owned())),
+        key_algorithm: Some(KeyAlgorithm::Ed25519),
+        fingerprint: Some("SHA256:key".to_owned()),
+    });
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "deploy-agent".to_owned(),
+        kind: CredentialKind::Agent,
+        group_id: None,
+        username: Some("ubuntu".to_owned()),
+        secret: Some(SecretRef("agent://auto".to_owned())),
+        key_algorithm: None,
+        fingerprint: None,
+    });
+    state.ui.workspace.set_credential_search_query("deploy");
+
+    let vm = app_view_model(&state);
+
+    assert_eq!(vm.security_workspace.credential_rows[0].id, "group:all");
+    assert_eq!(vm.security_workspace.credential_rows[0].meta, "1 项");
+    assert!(
+        !vm.security_workspace
+            .credential_rows
+            .iter()
+            .any(|row| row.id == "credential:deploy-agent")
+    );
 }
 
 #[test]
@@ -173,8 +807,10 @@ fn app_view_model_localizes_tool_panel_fallback_labels() {
     let mut state = AppState::default();
     state.ui.workspace.language = LanguageMode::Chinese;
     state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy-key".to_owned(),
         kind: CredentialKind::PrivateKey,
+        group_id: None,
         username: None,
         secret: Some(SecretRef("key:deploy".to_owned())),
         key_algorithm: None,
@@ -191,10 +827,10 @@ fn app_view_model_localizes_tool_panel_fallback_labels() {
 
     let vm = app_view_model(&state);
 
-    assert_eq!(vm.credentials[0].subtitle, "私钥");
-    assert_eq!(vm.credentials[0].meta, "私钥");
-    assert_eq!(vm.tunnels[0].subtitle, "运行态");
-    assert_eq!(vm.tunnels[0].meta, "运行中");
+    assert_eq!(vm.security_workspace.credentials[0].subtitle, "私钥");
+    assert_eq!(vm.security_workspace.credentials[0].meta, "私钥");
+    assert_eq!(vm.terminal_workspace.tunnels[0].subtitle, "运行态");
+    assert_eq!(vm.terminal_workspace.tunnels[0].meta, "运行中");
 }
 
 #[test]
@@ -249,7 +885,7 @@ fn app_view_model_projects_create_host_dialog_text_by_language() {
     let zh = app_view_model(&state).create_host_dialog;
     assert_eq!(zh.dialog_title, "创建主机");
     assert_eq!(zh.address_label, "地址");
-    assert_eq!(zh.agent_source_title, "Agent 来源");
+    assert_eq!(zh.agent_source_title, "认证代理来源");
 
     state.ui.workspace.language = LanguageMode::English;
     let en = app_view_model(&state).create_host_dialog;
@@ -278,26 +914,80 @@ fn app_view_model_projects_workspace_text_by_language() {
     state.ui.workspace.language = LanguageMode::Chinese;
     let zh = app_view_model(&state).workspace_text;
     assert_eq!(zh.nav_hosts, "主机");
-    assert_eq!(zh.nav_security, "密钥");
+    assert_eq!(zh.nav_security, "凭据");
+    assert_eq!(zh.nav_proxy, "网络");
     assert_eq!(zh.host_open, "终端");
     assert_eq!(zh.host_edit, "编辑");
     assert_eq!(zh.host_delete_title, "删除主机");
-    assert_eq!(zh.tool_keys, "密钥");
+    assert_eq!(zh.tool_keys, "凭据");
+    assert_eq!(zh.tool_proxy, "网络");
+    assert_eq!(zh.proxy_empty, "还没有网络配置");
+    assert_eq!(zh.security_private_keys, "私钥");
+    assert_eq!(zh.security_certificates, "证书");
+    assert_eq!(zh.security_passwords, "密码");
+    assert_eq!(zh.security_agents, "认证代理");
+    assert_eq!(zh.security_credential_replace_secret, "替换内容");
+    assert_eq!(
+        zh.security_credential_generating_private_key,
+        "正在生成私钥..."
+    );
+    assert_eq!(
+        zh.security_credential_replace_secret_confirm_title,
+        "确认替换内容"
+    );
+    assert_eq!(zh.security_credential_replace_secret_confirm, "确认替换");
+    assert_eq!(zh.security_certificate_text_label, "证书文本");
+    assert_eq!(zh.security_secret_copy_success, "已复制");
+    assert_eq!(zh.security_field_secret_ref, "本地内容");
     assert_eq!(zh.new_session_local_kind, "本地");
     assert_eq!(zh.new_session_remote_kind, "远程");
     assert_eq!(zh.new_session_ungrouped_detail, "未分组主机");
+    assert_eq!(zh.snippets_new_target, "新建目标");
+    assert_eq!(zh.snippets_create_target_title, "创建支持目标");
+    assert_eq!(zh.snippets_edit_target_title, "编辑支持目标");
+    assert_eq!(zh.snippets_target_key_label, "目标标记");
+    assert_eq!(zh.snippets_target_mode_new, "新脚本");
+    assert_eq!(zh.snippets_target_mode_share, "共享脚本");
+    assert_eq!(zh.snippets_split_target, "独立编辑");
 
     state.ui.workspace.language = LanguageMode::English;
     let en = app_view_model(&state).workspace_text;
     assert_eq!(en.nav_hosts, "Hosts");
-    assert_eq!(en.nav_security, "Keys");
+    assert_eq!(en.nav_security, "Creds");
+    assert_eq!(en.nav_proxy, "Net");
     assert_eq!(en.host_open, "Shell");
     assert_eq!(en.host_edit, "Edit");
     assert_eq!(en.host_delete_title, "Delete Host");
-    assert_eq!(en.tool_keys, "Keys");
+    assert_eq!(en.tool_keys, "Credentials");
+    assert_eq!(en.tool_proxy, "Network");
+    assert_eq!(en.proxy_empty, "No network profiles");
+    assert_eq!(en.security_private_keys, "Private keys");
+    assert_eq!(en.security_certificates, "Certificates");
+    assert_eq!(en.security_passwords, "Passwords");
+    assert_eq!(en.security_agents, "Agents");
+    assert_eq!(en.security_credential_replace_secret, "Replace content");
+    assert_eq!(
+        en.security_credential_generating_private_key,
+        "Generating private key..."
+    );
+    assert_eq!(
+        en.security_credential_replace_secret_confirm_title,
+        "Confirm replacement"
+    );
+    assert_eq!(en.security_credential_replace_secret_confirm, "Replace");
+    assert_eq!(en.security_certificate_text_label, "Certificate text");
+    assert_eq!(en.security_secret_copy_success, "Copied");
+    assert_eq!(en.security_field_secret_ref, "Local content");
     assert_eq!(en.new_session_local_kind, "Local");
     assert_eq!(en.new_session_remote_kind, "Remote");
     assert_eq!(en.new_session_ungrouped_detail, "Ungrouped host");
+    assert_eq!(en.snippets_new_target, "New target");
+    assert_eq!(en.snippets_create_target_title, "Create target");
+    assert_eq!(en.snippets_edit_target_title, "Edit target");
+    assert_eq!(en.snippets_target_key_label, "Target key");
+    assert_eq!(en.snippets_target_mode_new, "New script");
+    assert_eq!(en.snippets_target_mode_share, "Shared script");
+    assert_eq!(en.snippets_split_target, "Make independent");
 }
 
 #[test]
@@ -331,7 +1021,7 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
         background_override: None,
     });
 
-    let settings = app_view_model(&state).settings;
+    let settings = app_view_model(&state).settings_workspace.settings;
 
     assert_eq!(settings.text.title, "设置");
     assert_eq!(settings.text.language_title, "语言");
@@ -540,7 +1230,10 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
     assert!(!settings.security.encryption_enabled);
     assert!(!settings.security.can_configure_encryption);
     assert_eq!(settings.security.status_label, "未加密");
-    assert_eq!(settings.security.detail_label, "可在后续设置密码后启用");
+    assert_eq!(
+        settings.security.detail_label,
+        "当前明文保存，已预留主密码加密配置"
+    );
     assert_eq!(settings.security.kdf_label, "未配置");
     assert_eq!(settings.security.encryption_version_label, "无");
 }
@@ -557,7 +1250,7 @@ fn app_view_model_marks_current_custom_theme_profile_selected() {
         builtin: false,
     });
 
-    let settings = app_view_model(&state).settings;
+    let settings = app_view_model(&state).settings_workspace.settings;
 
     assert_eq!(settings.theme.current_profile_name, "Imported");
     assert_eq!(
@@ -577,7 +1270,7 @@ fn app_view_model_projects_sqlite_storage_settings_status() {
     let mut state = AppState::default().with_storage_backend(SqliteStorage::new(&sqlite_path));
     state.ui.workspace.language = LanguageMode::English;
 
-    let settings = app_view_model(&state).settings;
+    let settings = app_view_model(&state).settings_workspace.settings;
 
     assert_eq!(settings.storage.backend_label, "SQLite local database");
     assert!(settings.storage.database_path.ends_with(".sqlite"));
@@ -640,8 +1333,8 @@ fn app_view_model_keeps_logic_keys_stable_when_text_is_chinese() {
 
     assert_eq!(vm.active_page_key, "Hosts");
     assert_eq!(vm.active_page, "主机");
-    assert_eq!(vm.tool_panel_mode_key, "Closed");
-    assert_eq!(vm.tool_panel_mode, "关闭");
+    assert_eq!(vm.terminal_workspace.tool_panel_mode_key, "Closed");
+    assert_eq!(vm.terminal_workspace.tool_panel_mode, "关闭");
 }
 
 #[test]
@@ -675,8 +1368,8 @@ fn app_view_model_localizes_connected_status_but_keeps_status_key_stable() {
 
     let vm = app_view_model(&state);
 
-    assert_eq!(vm.tabs[0].status_key, "Connected");
-    assert_eq!(vm.tabs[0].status, "已连接");
+    assert_eq!(vm.terminal_workspace.tabs[0].status_key, "Connected");
+    assert_eq!(vm.terminal_workspace.tabs[0].status, "已连接");
     assert_eq!(vm.hosts[0].status_key, "Connected");
     assert_eq!(vm.hosts[0].status, "已连接");
 }
@@ -737,8 +1430,11 @@ fn app_view_model_keeps_sftp_panel_on_active_host_without_browser() {
 
     let vm = app_view_model(&state);
 
-    assert_eq!(vm.sftp.host_id, shell_host_id.0.to_string());
-    assert_eq!(vm.sftp.title, "SFTP · shell");
-    assert_eq!(vm.sftp.current_dir, "/");
-    assert!(vm.sftp.entries.is_empty());
+    assert_eq!(
+        vm.terminal_workspace.sftp.host_id,
+        shell_host_id.0.to_string()
+    );
+    assert_eq!(vm.terminal_workspace.sftp.title, "SFTP · shell");
+    assert_eq!(vm.terminal_workspace.sftp.current_dir, "/");
+    assert!(vm.terminal_workspace.sftp.entries.is_empty());
 }

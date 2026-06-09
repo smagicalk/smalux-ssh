@@ -93,11 +93,8 @@ impl StorageManager {
             self.remove_host(host_id);
         }
 
-        // 最后删除分组和分组作用域片段。
+        // 最后删除分组；片段不再支持主机分组作用域。
         self.groups.retain(|group| !group_ids.contains(&group.id));
-        self.snippets.retain(|snippet| {
-            !matches!(snippet.scope, SnippetScope::Group(scoped_group_id) if group_ids.contains(&scoped_group_id))
-        });
 
         true
     }
@@ -201,15 +198,14 @@ mod tests {
             label: "home".to_owned(),
             remote_path: "/home/ops".to_owned(),
         });
-        storage.upsert_snippet(Snippet {
-            id: SnippetId(Uuid::new_v4()),
-            name: "uptime".to_owned(),
-            description: None,
-            command_template: "uptime".to_owned(),
-            scope: SnippetScope::Host(host_id),
-            variables: Vec::new(),
-            last_arguments: Vec::new(),
-        });
+        storage.upsert_snippet(Snippet::with_default_implementation(
+            SnippetId(Uuid::new_v4()),
+            "uptime".to_owned(),
+            None,
+            SnippetScope::Host(host_id),
+            None,
+            "uptime".to_owned(),
+        ));
 
         assert!(storage.remove_host(host_id));
         assert!(!storage.remove_host(host_id));

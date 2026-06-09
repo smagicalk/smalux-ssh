@@ -27,19 +27,9 @@ fn run_snippet_rejects_empty_rendered_command_without_side_effects() {
     let mut state = AppState::default();
     let host = sample_host();
     let host_id = host.id;
-    let snippet = Snippet {
-        id: SnippetId(Uuid::new_v4()),
-        name: "optional".to_owned(),
-        description: None,
-        command_template: "{{maybe}}".to_owned(),
-        scope: SnippetScope::Host(host_id),
-        variables: vec![SnippetVariable {
-            name: "maybe".to_owned(),
-            default_value: None,
-            required: false,
-        }],
-        last_arguments: Vec::new(),
-    };
+    let mut snippet = parameterized_host_snippet(host_id, "{{maybe}}");
+    snippet.name = "optional".to_owned();
+    snippet.variables[0].required = false;
     let snippet_id = snippet.id;
     state.storage.upsert_host(host);
     state.storage.upsert_snippet(snippet);
@@ -54,5 +44,19 @@ fn run_snippet_rejects_empty_rendered_command_without_side_effects() {
     assert_eq!(state.sessions.tab_count(), 0);
     assert_eq!(state.terminal.tab_count(), 0);
     assert_eq!(state.storage.command_history_count(), 0);
+    assert!(state.backend_commands.is_empty());
+}
+
+#[test]
+fn run_snippet_on_active_host_requires_remote_tab() {
+    let mut state = AppState::default();
+    let snippet = host_snippet(HostId(Uuid::new_v4()), "uptime");
+    let snippet_id = snippet.id;
+    state.storage.upsert_snippet(snippet);
+
+    let outcome = state.apply(Message::RunSnippetOnActiveHost { snippet_id });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_some());
     assert!(state.backend_commands.is_empty());
 }

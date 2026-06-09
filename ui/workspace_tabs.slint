@@ -1,0 +1,94 @@
+import { SessionTabRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { TabChip } from "./tabs.slint";
+
+export component WorkspaceTabStrip inherits Rectangle {
+    in property <[SessionTabRow]> tabs;
+    in property <string> ready-label;
+    callback activate-session(session-id: string);
+    callback close-session(session-id: string);
+    callback open-new-session();
+
+    property <length> strip-offset: 0px;
+    property <length> viewport-width: 0px;
+    property <length> preferred-tab-width: 168px;
+    property <length> min-tab-width: 84px;
+    property <length> tab-gap: 5px;
+    property <length> gap-width: max(0, root.tabs.length - 1) * root.tab-gap;
+    property <bool> fit-preferred-width: root.tabs.length == 0 || (root.tabs.length * root.preferred-tab-width) + root.gap-width <= root.viewport-width;
+    property <length> inactive-available-width: root.tabs.length <= 1 ? 0px : max(0px, root.viewport-width - root.preferred-tab-width - root.gap-width);
+    property <length> inactive-tab-width: root.fit-preferred-width ? root.preferred-tab-width : max(root.min-tab-width, min(root.preferred-tab-width, root.inactive-available-width / max(1, root.tabs.length - 1)));
+    property <length> scroll-step: root.inactive-tab-width + root.tab-gap;
+    property <length> content-width: root.tabs.length == 0 ? 0px : root.tabs.length == 1 ? root.preferred-tab-width : root.preferred-tab-width + ((root.tabs.length - 1) * root.inactive-tab-width) + root.gap-width;
+    property <length> max-offset: max(0px, root.content-width - root.viewport-width);
+    property <length> visible-offset: min(root.strip-offset, root.max-offset);
+
+    height: 30px;
+
+    changed tabs => {
+        root.strip-offset = min(root.strip-offset, root.max-offset);
+    }
+
+    HorizontalLayout {
+        spacing: 6px;
+
+        Rectangle {
+            horizontal-stretch: 1;
+            height: 30px;
+            clip: true;
+
+            changed width => {
+                root.viewport-width = self.width;
+            }
+
+            HorizontalLayout {
+                x: -root.visible-offset;
+                y: 0px;
+                height: 30px;
+                spacing: root.tab-gap;
+
+                for tab in root.tabs: TabChip {
+                    tab-width: tab.active ? root.preferred-tab-width : root.inactive-tab-width;
+                    session-id: tab.id;
+                    title: tab.title;
+                    kind: tab.kind;
+                    status-key: tab.status_key;
+                    status: tab.status;
+                    ready-label: root.ready-label;
+                    active-tab: tab.active;
+                    activate => { root.activate-session(tab.id); }
+                    close => { root.close-session(tab.id); }
+                    scroll(delta) => {
+                        if (delta < 0px) {
+                            root.strip-offset = min(root.max-offset, root.strip-offset + root.scroll-step);
+                        } else if (delta > 0px) {
+                            root.strip-offset = max(0px, root.strip-offset - root.scroll-step);
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            width: 34px;
+            height: 30px;
+            border-radius: 7px;
+            border-width: 1px;
+            border-color: add-touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+            background: add-touch.pressed ? AppTheme.button-secondary-pressed : add-touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.raised-bg;
+
+            add-touch := TouchArea {
+                clicked => { root.open-new-session(); }
+            }
+
+            Text {
+                text: "+";
+                color: AppTheme.text;
+                font-size: 16px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

@@ -1,0 +1,334 @@
+import { ScrollView } from "std-widgets.slint";
+import { GroupOptionRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { DialogButton, DialogCloseButton, DialogField } from "./common.slint";
+import { GroupPickerRow } from "./host_dialog_parts.slint";
+export component CreateGroupDialog inherits Rectangle {
+    in property <string> dialog-title: "";
+    in property <string> dialog-subtitle: "";
+    in property <string> parent-picker-title: "";
+    in property <string> parent-picker-subtitle: "";
+    in property <string> name-label: "";
+    in property <string> name-placeholder: "";
+    in property <string> parent-label: "";
+    in property <string> parent-path: "";
+    in property <[GroupOptionRow]> parent-options: [];
+    in property <string> cancel-label: "";
+    in property <string> save-label: "";
+    in property <string> group-name: "";
+    property <bool> parent-picker-open: false;
+    callback update-name(name: string);
+    callback select-parent(id: string);
+    callback save();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 420px);
+        height: 286px;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    spacing: 3px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.dialog-title;
+                        color: AppTheme.text-strong;
+                        font-size: 15px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: root.dialog-subtitle;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+                DialogCloseButton {
+                    clicked => { root.close(); }
+                }
+            }
+
+            Rectangle {
+                height: 56px;
+                background: AppTheme.transparent;
+
+                VerticalLayout {
+                    spacing: 5px;
+                    Text {
+                        text: root.parent-label;
+                        color: AppTheme.text-soft;
+                        font-size: 10px;
+                        font-weight: 700;
+                    }
+
+                    Rectangle {
+                        height: 34px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.input-bg;
+
+                        parent_touch := TouchArea {
+                            clicked => { root.parent-picker-open = true; }
+                        }
+
+                        Text {
+                            x: 10px;
+                            y: 0px;
+                            width: parent.width - 36px;
+                            height: parent.height;
+                            text: root.parent-path;
+                            color: AppTheme.text;
+                            font-size: 11px;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+
+                        Text {
+                            x: parent.width - 24px;
+                            y: 0px;
+                            width: 14px;
+                            height: parent.height;
+                            text: root.parent-picker-open ? "^" : "v";
+                            color: AppTheme.text-muted;
+                            font-size: 10px;
+                            font-weight: 700;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            DialogField {
+                label: root.name-label;
+                field-value: root.group-name;
+                placeholder: root.name-placeholder;
+                edited(value) => { root.update-name(value); }
+                accepted(value) => { root.update-name(value); root.save(); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+                DialogButton {
+                    label: root.save-label;
+                    primary: true;
+                    enabled: root.group-name != "";
+                    clicked => { root.save(); }
+                }
+            }
+        }
+    }
+
+    if root.parent-picker-open: Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 72px, 440px);
+        height: min(root.height - 72px, 350px);
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 2px;
+
+                    Text {
+                        text: root.parent-picker-title;
+                        color: AppTheme.text-strong;
+                        font-size: 14px;
+                        font-weight: 700;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        text: root.parent-picker-subtitle;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                        overflow: elide;
+                    }
+                }
+
+                DialogCloseButton {
+                    clicked => { root.parent-picker-open = false; }
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                ScrollView {
+                    x: 6px;
+                    y: 6px;
+                    width: parent.width - 12px;
+                    height: parent.height - 12px;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        for group in root.parent-options: GroupPickerRow {
+                            group: group;
+                            selected(id) => {
+                                root.select-parent(id);
+                                root.parent-picker-open = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component CreateGroupParentDialog inherits Rectangle {
+    in property <string> dialog-title: "";
+    in property <string> dialog-subtitle: "";
+    in property <string> parent-label: "";
+    in property <string> parent-path: "";
+    in property <[GroupOptionRow]> parent-options: [];
+    in property <string> cancel-label: "";
+    in property <string> next-label: "";
+    callback select-parent(id: string);
+    callback confirm();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 430px);
+        height: 390px;
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    spacing: 3px;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.dialog-title;
+                        color: AppTheme.text-strong;
+                        font-size: 15px;
+                        font-weight: 700;
+                    }
+                    Text {
+                        text: root.dialog-subtitle;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                        wrap: word-wrap;
+                    }
+                }
+                DialogCloseButton {
+                    clicked => { root.close(); }
+                }
+            }
+
+            Text {
+                text: root.parent-label;
+                color: AppTheme.text-soft;
+                font-size: 10px;
+                font-weight: 700;
+            }
+
+            Rectangle {
+                height: 34px;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.input-bg;
+
+                Text {
+                    x: 10px;
+                    y: 0px;
+                    width: parent.width - 20px;
+                    height: parent.height;
+                    text: root.parent-path;
+                    color: AppTheme.text;
+                    font-size: 11px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                ScrollView {
+                    x: 6px;
+                    y: 6px;
+                    width: parent.width - 12px;
+                    height: parent.height - 12px;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        for group in root.parent-options: GroupPickerRow {
+                            group: group;
+                            selected(id) => {
+                                root.select-parent(id);
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+                DialogButton {
+                    label: root.next-label;
+                    primary: true;
+                    clicked => { root.confirm(); }
+                }
+            }
+        }
+    }
+}

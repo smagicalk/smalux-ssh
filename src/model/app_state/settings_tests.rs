@@ -108,6 +108,109 @@ fn settings_storage_operations_report_missing_backend() {
 }
 
 #[test]
+fn settings_file_operations_reject_empty_paths() {
+    let sqlite_path = temp_path("settings-empty-path", "sqlite");
+    let backend = SqliteStorage::new(&sqlite_path);
+    let mut state = AppState::default().with_storage_backend(backend);
+
+    let backup = state.apply(Message::BackupStorage {
+        target_path: "   ".to_owned(),
+    });
+    assert!(backup.error.is_some_and(|error| error.contains("不能为空")));
+
+    let snapshot = state.apply(Message::ExportStorageSnapshot {
+        target_path: String::new(),
+    });
+    assert!(
+        snapshot
+            .error
+            .is_some_and(|error| error.contains("不能为空"))
+    );
+
+    let import_snapshot = state.apply(Message::ImportStorageSnapshot {
+        source_path: "\t".to_owned(),
+    });
+    assert!(
+        import_snapshot
+            .error
+            .is_some_and(|error| error.contains("不能为空"))
+    );
+
+    let sqlite_import = state.apply(Message::ImportSqliteBackup {
+        source_path: "\n".to_owned(),
+    });
+    assert!(
+        sqlite_import
+            .error
+            .is_some_and(|error| error.contains("不能为空"))
+    );
+
+    let theme_export = state.apply(Message::ExportCurrentTheme {
+        target_path: String::new(),
+        format: ThemeExchangeFormat::NativeToml,
+    });
+    assert!(
+        theme_export
+            .error
+            .is_some_and(|error| error.contains("不能为空"))
+    );
+
+    let theme_import = state.apply(Message::ImportTheme {
+        source_path: " ".to_owned(),
+    });
+    assert!(
+        theme_import
+            .error
+            .is_some_and(|error| error.contains("不能为空"))
+    );
+
+    let _ = fs::remove_file(sqlite_path);
+}
+
+#[test]
+fn settings_storage_file_operations_report_conflicting_paths() {
+    let sqlite_path = temp_path("settings-conflict-source", "sqlite");
+    let backup_path = temp_path("settings-conflict-backup", "sqlite");
+    let snapshot_path = temp_path("settings-conflict-snapshot", "toml");
+    let backend = SqliteStorage::new(&sqlite_path);
+    let mut state = AppState::default().with_storage_backend(backend);
+    state.storage.upsert_host(host("production"));
+    fs::write(&backup_path, "existing").expect("existing backup marker should write");
+    fs::write(&snapshot_path, "existing").expect("existing snapshot marker should write");
+
+    let backup = state.apply(Message::BackupStorage {
+        target_path: backup_path.to_string_lossy().into_owned(),
+    });
+    assert!(
+        backup
+            .error
+            .is_some_and(|error| error.contains("目标已存在"))
+    );
+
+    let snapshot = state.apply(Message::ExportStorageSnapshot {
+        target_path: snapshot_path.to_string_lossy().into_owned(),
+    });
+    assert!(
+        snapshot
+            .error
+            .is_some_and(|error| error.contains("目标已存在"))
+    );
+
+    let sqlite_import = state.apply(Message::ImportSqliteBackup {
+        source_path: sqlite_path.to_string_lossy().into_owned(),
+    });
+    assert!(
+        sqlite_import
+            .error
+            .is_some_and(|error| error.contains("当前 SQLite 数据库"))
+    );
+
+    let _ = fs::remove_file(sqlite_path);
+    let _ = fs::remove_file(backup_path);
+    let _ = fs::remove_file(snapshot_path);
+}
+
+#[test]
 fn settings_theme_export_writes_current_builtin_theme_document() {
     let export_path = temp_path("theme-export", "toml");
     let mut state = AppState::default();

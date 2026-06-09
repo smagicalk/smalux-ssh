@@ -25,6 +25,7 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_nav_snippets_label(text.nav_snippets.into());
     window.set_nav_history_label(text.nav_history.into());
     window.set_nav_security_label(text.nav_security.into());
+    window.set_nav_proxy_label(text.nav_proxy.into());
     window.set_nav_settings_label(text.nav_settings.into());
     window.set_host_new_label(text.host_new.into());
     window.set_host_open_label(text.host_open.into());
@@ -46,6 +47,200 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_tool_history_label(text.tool_history.into());
     window.set_tool_tunnels_label(text.tool_tunnels.into());
     window.set_tool_keys_label(text.tool_keys.into());
+    window.set_tool_proxy_label(text.tool_proxy.into());
+    window.set_proxy_empty_label(text.proxy_empty.into());
+    window.set_security_tree_title_label(text.security_tree_title.into());
+    window.set_security_search_placeholder_label(text.security_search_placeholder.into());
+    window.set_security_new_label(text.security_new.into());
+    window.set_security_create_action_title_label(text.security_create_action_title.into());
+    window.set_security_create_action_create_label(text.security_create_action_create.into());
+    window.set_security_create_action_create_caption_label(
+        text.security_create_action_create_caption.into(),
+    );
+    window.set_security_create_action_import_label(text.security_create_action_import.into());
+    window.set_security_create_action_import_caption_label(
+        text.security_create_action_import_caption.into(),
+    );
+    window.set_security_create_action_group_caption_label(
+        text.security_create_action_group_caption.into(),
+    );
+    window.set_security_create_type_title_label(text.security_create_type_title.into());
+    window.set_security_create_type_create_caption_label(
+        text.security_create_type_create_caption.into(),
+    );
+    window.set_security_create_type_import_caption_label(
+        text.security_create_type_import_caption.into(),
+    );
+    window.set_security_group_new_label(text.security_group_new.into());
+    window.set_security_group_edit_label(text.security_group_edit.into());
+    window.set_security_group_delete_label(text.security_group_delete.into());
+    window.set_security_private_keys_label(text.security_private_keys.into());
+    window.set_security_certificates_label(text.security_certificates.into());
+    window.set_security_passwords_label(text.security_passwords.into());
+    window.set_security_agents_label(text.security_agents.into());
+    window.set_security_private_key_create_label(text.security_private_key_create.into());
+    window.set_security_private_key_import_label(text.security_private_key_import.into());
+    window.set_security_certificate_create_label(text.security_certificate_create.into());
+    window.set_security_certificate_import_label(text.security_certificate_import.into());
+    window.set_security_password_create_label(text.security_password_create.into());
+    window.set_security_agent_create_label(text.security_agent_create.into());
+    window
+        .set_security_private_key_create_title_label(text.security_private_key_create_title.into());
+    window
+        .set_security_private_key_import_title_label(text.security_private_key_import_title.into());
+    window
+        .set_security_certificate_create_title_label(text.security_certificate_create_title.into());
+    window
+        .set_security_certificate_import_title_label(text.security_certificate_import_title.into());
+    window.set_security_password_create_title_label(text.security_password_create_title.into());
+    window.set_security_agent_create_title_label(text.security_agent_create_title.into());
+    window.set_security_credential_name_label(text.security_credential_name_label.into());
+    window
+        .set_security_credential_name_placeholder(text.security_credential_name_placeholder.into());
+    window.set_security_credential_secret_label(text.security_credential_secret_label.into());
+    window.set_security_private_key_secret_placeholder(
+        text.security_private_key_secret_placeholder.into(),
+    );
+    window.set_security_certificate_secret_placeholder(
+        text.security_certificate_secret_placeholder.into(),
+    );
+    window.set_security_password_secret_label(text.security_password_secret_label.into());
+    window
+        .set_security_password_secret_placeholder(text.security_password_secret_placeholder.into());
+    window.set_security_password_show_label(text.security_password_show.into());
+    window.set_security_password_hide_label(text.security_password_hide.into());
+    window.set_security_agent_secret_label(text.security_agent_secret_label.into());
+    window.set_security_agent_secret_placeholder(text.security_agent_secret_placeholder.into());
+    window.set_security_private_key_source_label(text.security_private_key_source_label.into());
+    window.set_security_private_key_source_placeholder(
+        text.security_private_key_source_placeholder.into(),
+    );
+    window.set_security_private_key_import_file_label(text.security_private_key_import_file.into());
+    window.set_security_private_key_import_text_label(text.security_private_key_import_text.into());
+    window.set_security_private_key_text_label(text.security_private_key_text_label.into());
+    window.set_security_private_key_text_placeholder(
+        text.security_private_key_text_placeholder.into(),
+    );
+    window.set_security_certificate_source_label(text.security_certificate_source_label.into());
+    window.set_security_certificate_source_placeholder(
+        text.security_certificate_source_placeholder.into(),
+    );
+    window.set_security_certificate_text_label(text.security_certificate_text_label.into());
+    window.set_security_certificate_text_placeholder(
+        text.security_certificate_text_placeholder.into(),
+    );
+    window.set_security_certificate_ca_key_label(text.security_certificate_ca_key_label.into());
+    window.set_security_certificate_ca_key_placeholder(
+        text.security_certificate_ca_key_placeholder.into(),
+    );
+    window.set_security_certificate_subject_key_label(
+        text.security_certificate_subject_key_label.into(),
+    );
+    window.set_security_certificate_subject_key_placeholder(
+        text.security_certificate_subject_key_placeholder.into(),
+    );
+    window.set_security_certificate_type_label(text.security_certificate_type_label.into());
+    window.set_security_certificate_type_user_label(text.security_certificate_type_user.into());
+    window.set_security_certificate_type_host_label(text.security_certificate_type_host.into());
+    window.set_security_certificate_principals_label(
+        text.security_certificate_principals_label.into(),
+    );
+    window.set_security_certificate_principals_placeholder(
+        text.security_certificate_principals_placeholder.into(),
+    );
+    window.set_security_certificate_valid_days_label(
+        text.security_certificate_valid_days_label.into(),
+    );
+    window.set_security_certificate_valid_days_placeholder(
+        text.security_certificate_valid_days_placeholder.into(),
+    );
+    window.set_security_certificate_key_id_label(text.security_certificate_key_id_label.into());
+    window.set_security_certificate_key_id_placeholder(
+        text.security_certificate_key_id_placeholder.into(),
+    );
+    window.set_security_certificate_serial_label(text.security_certificate_serial_label.into());
+    window.set_security_certificate_serial_placeholder(
+        text.security_certificate_serial_placeholder.into(),
+    );
+    window.set_security_certificate_key_picker_title_label(
+        text.security_certificate_key_picker_title.into(),
+    );
+    window.set_security_certificate_empty_private_keys_label(
+        text.security_certificate_empty_private_keys.into(),
+    );
+    window.set_security_credential_algorithm_label(text.security_credential_algorithm_label.into());
+    window.set_security_credential_save_label(text.security_credential_save.into());
+    window.set_security_credential_generating_private_key_label(
+        text.security_credential_generating_private_key.into(),
+    );
+    window.set_security_credential_edit_label(text.security_credential_edit.into());
+    window.set_security_credential_move_label(text.security_credential_move.into());
+    window.set_security_credential_duplicate_label(text.security_credential_duplicate.into());
+    window.set_security_credential_export_label(text.security_credential_export.into());
+    window.set_security_credential_replace_secret_label(
+        text.security_credential_replace_secret.into(),
+    );
+    window.set_security_credential_delete_label(text.security_credential_delete.into());
+    window.set_security_credential_delete_title_label(text.security_credential_delete_title.into());
+    window.set_security_credential_delete_caption_label(
+        text.security_credential_delete_caption.into(),
+    );
+    window.set_security_credential_delete_confirm_label(
+        text.security_credential_delete_confirm.into(),
+    );
+    window
+        .set_security_credential_delete_cancel_label(text.security_credential_delete_cancel.into());
+    window.set_security_credential_export_title_label(text.security_credential_export_title.into());
+    window.set_security_credential_export_path_label(
+        text.security_credential_export_path_label.into(),
+    );
+    window.set_security_credential_export_path_placeholder(
+        text.security_credential_export_path_placeholder.into(),
+    );
+    window.set_security_credential_replace_secret_title_label(
+        text.security_credential_replace_secret_title.into(),
+    );
+    window.set_security_credential_replace_secret_field_label(
+        text.security_credential_replace_secret_label.into(),
+    );
+    window.set_security_credential_replace_secret_placeholder(
+        text.security_credential_replace_secret_placeholder.into(),
+    );
+    window.set_security_credential_replace_secret_confirm_title_label(
+        text.security_credential_replace_secret_confirm_title.into(),
+    );
+    window.set_security_credential_replace_secret_confirm_caption_label(
+        text.security_credential_replace_secret_confirm_caption
+            .into(),
+    );
+    window.set_security_credential_replace_secret_confirm_label(
+        text.security_credential_replace_secret_confirm.into(),
+    );
+    window.set_security_credential_edit_private_key_label(
+        text.security_credential_edit_private_key.into(),
+    );
+    window.set_security_credential_edit_certificate_label(
+        text.security_credential_edit_certificate.into(),
+    );
+    window
+        .set_security_credential_edit_password_label(text.security_credential_edit_password.into());
+    window.set_security_view_content_label(text.security_view_content.into());
+    window.set_security_view_private_key_label(text.security_view_private_key.into());
+    window.set_security_view_certificate_label(text.security_view_certificate.into());
+    window.set_security_view_password_label(text.security_view_password.into());
+    window.set_security_secret_copy_label(text.security_secret_copy.into());
+    window.set_security_secret_copy_success_label(text.security_secret_copy_success.into());
+    window.set_security_secret_copy_failed_label(text.security_secret_copy_failed.into());
+    window.set_security_secret_content_missing_label(text.security_secret_content_missing.into());
+    window.set_security_detail_empty_title_label(text.security_detail_empty_title.into());
+    window.set_security_detail_empty_caption_label(text.security_detail_empty_caption.into());
+    window.set_security_field_type_label(text.security_field_type.into());
+    window.set_security_field_username_label(text.security_field_username.into());
+    window.set_security_field_algorithm_label(text.security_field_algorithm.into());
+    window.set_security_field_fingerprint_label(text.security_field_fingerprint.into());
+    window.set_security_field_secret_ref_label(text.security_field_secret_ref.into());
+    window.set_security_field_group_label(text.security_field_group.into());
+    window.set_security_group_caption_label(text.security_group_caption.into());
     window.set_host_search_placeholder(text.host_search_placeholder.into());
     window.set_hosts_section_title(text.hosts_section_title.into());
     window.set_hosts_empty_title(text.hosts_empty_title.into());
@@ -85,6 +280,83 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_sftp_empty_entries_label(text.sftp_empty_entries.into());
     window.set_tool_pinned_label(text.tool_pinned.into());
     window.set_tool_empty_value_label(text.tool_empty_value.into());
+    window.set_snippets_tree_title_label(text.snippets_tree_title.into());
+    window.set_snippets_search_placeholder_label(text.snippets_search_placeholder.into());
+    window.set_snippets_detail_empty_title_label(text.snippets_detail_empty_title.into());
+    window.set_snippets_detail_empty_caption_label(text.snippets_detail_empty_caption.into());
+    window.set_snippets_field_scope_label(text.snippets_field_scope.into());
+    window.set_snippets_field_variables_label(text.snippets_field_variables.into());
+    window.set_snippets_field_arguments_label(text.snippets_field_arguments.into());
+    window.set_snippets_command_template_label(text.snippets_command_template.into());
+    window.set_snippets_group_caption_label(text.snippets_group_caption.into());
+    window.set_snippets_description_empty_label(text.snippets_description_empty.into());
+    window.set_snippets_new_label(text.snippets_new.into());
+    window.set_snippets_new_snippet_label(text.snippets_new_snippet.into());
+    window.set_snippets_new_snippet_caption_label(text.snippets_new_snippet_caption.into());
+    window.set_snippets_new_target_label(text.snippets_new_target.into());
+    window.set_snippets_new_group_label(text.snippets_new_group.into());
+    window.set_snippets_new_group_caption_label(text.snippets_new_group_caption.into());
+    window.set_snippets_create_choice_title_label(text.snippets_create_choice_title.into());
+    window.set_snippets_group_contents_title_label(text.snippets_group_contents_title.into());
+    window.set_snippets_target_variant_title_label(text.snippets_target_variant_title.into());
+    window.set_snippets_script_relation_label(text.snippets_script_relation.into());
+    window.set_snippets_script_shared_label(text.snippets_script_shared.into());
+    window.set_snippets_script_independent_label(text.snippets_script_independent.into());
+    window.set_snippets_create_snippet_title_label(text.snippets_create_snippet_title.into());
+    window.set_snippets_create_target_title_label(text.snippets_create_target_title.into());
+    window.set_snippets_create_group_title_label(text.snippets_create_group_title.into());
+    window.set_snippets_edit_snippet_title_label(text.snippets_edit_snippet_title.into());
+    window.set_snippets_edit_target_title_label(text.snippets_edit_target_title.into());
+    window.set_snippets_edit_group_title_label(text.snippets_edit_group_title.into());
+    window.set_snippets_edit_label(text.snippets_edit.into());
+    window.set_snippets_delete_label(text.snippets_delete.into());
+    window.set_snippets_delete_title_label(text.snippets_delete_title.into());
+    window.set_snippets_delete_snippet_caption_label(text.snippets_delete_snippet_caption.into());
+    window.set_snippets_delete_group_caption_label(text.snippets_delete_group_caption.into());
+    window.set_snippets_delete_target_caption_label(text.snippets_delete_target_caption.into());
+    window.set_snippets_delete_confirm_label(text.snippets_delete_confirm.into());
+    window.set_snippets_copy_label(text.snippets_copy.into());
+    window.set_snippets_copy_success_label(text.snippets_copy_success.into());
+    window.set_snippets_copy_failed_label(text.snippets_copy_failed.into());
+    window.set_snippets_run_label(text.snippets_run.into());
+    window.set_snippets_run_title_label(text.snippets_run_title.into());
+    window.set_snippets_run_host_label(text.snippets_run_host_label.into());
+    window.set_snippets_run_arguments_label(text.snippets_run_arguments_label.into());
+    window.set_snippets_run_arguments_placeholder_label(
+        text.snippets_run_arguments_placeholder.into(),
+    );
+    window.set_snippets_run_no_hosts_label(text.snippets_run_no_hosts.into());
+    window.set_snippets_move_label(text.snippets_move.into());
+    window.set_snippets_move_title_label(text.snippets_move_title.into());
+    window.set_snippets_move_root_label(text.snippets_move_root.into());
+    window.set_snippets_name_label(text.snippets_name_label.into());
+    window.set_snippets_name_placeholder_label(text.snippets_name_placeholder.into());
+    window.set_snippets_group_name_placeholder_label(text.snippets_group_name_placeholder.into());
+    window.set_snippets_description_label(text.snippets_description_label.into());
+    window.set_snippets_description_placeholder_label(text.snippets_description_placeholder.into());
+    window.set_snippets_target_key_label(text.snippets_target_key_label.into());
+    window.set_snippets_target_key_placeholder_label(text.snippets_target_key_placeholder.into());
+    window.set_snippets_target_picker_placeholder_label(
+        text.snippets_target_picker_placeholder.into(),
+    );
+    window.set_snippets_target_linux_label(text.snippets_target_linux.into());
+    window.set_snippets_target_debian_label(text.snippets_target_debian.into());
+    window.set_snippets_target_rhel_label(text.snippets_target_rhel.into());
+    window.set_snippets_target_macos_label(text.snippets_target_macos.into());
+    window.set_snippets_target_powershell_label(text.snippets_target_powershell.into());
+    window.set_snippets_target_cmd_label(text.snippets_target_cmd.into());
+    window.set_snippets_command_placeholder_label(text.snippets_command_placeholder.into());
+    window.set_snippets_target_mode_new_label(text.snippets_target_mode_new.into());
+    window.set_snippets_target_mode_new_caption_label(text.snippets_target_mode_new_caption.into());
+    window.set_snippets_target_mode_share_label(text.snippets_target_mode_share.into());
+    window.set_snippets_target_mode_share_caption_label(
+        text.snippets_target_mode_share_caption.into(),
+    );
+    window.set_snippets_shared_target_label(text.snippets_shared_target.into());
+    window.set_snippets_split_target_label(text.snippets_split_target.into());
+    window.set_snippets_cancel_label(text.snippets_cancel.into());
+    window.set_snippets_create_label(text.snippets_create.into());
+    window.set_snippets_save_label(text.snippets_save.into());
     window.set_snippets_empty_label(text.snippets_empty.into());
     window.set_history_commands_label(text.history_commands.into());
     window.set_history_saved_suffix_label(text.history_saved_suffix.into());
@@ -94,7 +366,7 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_known_hosts_empty_label(text.known_hosts_empty.into());
     window.set_known_hosts_trust_label(text.known_hosts_trust.into());
     window.set_known_hosts_delete_label(text.known_hosts_delete.into());
-    let settings = &model.settings;
+    let settings = &model.settings_workspace.settings;
     window.set_settings_title_label(settings.text.title.into());
     window.set_settings_language_title_label(settings.text.language_title.into());
     window.set_settings_theme_title_label(settings.text.theme_title.into());
@@ -124,6 +396,8 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_host_list_mode_key(model.host_list_mode_key.into());
     window.set_host_list_mode(model.host_list_mode.into());
     window.set_host_search_query(model.host_search_query.as_str().into());
+    window.set_credential_search_query(model.security_workspace.search_query.as_str().into());
+    window.set_snippet_search_query(model.snippet_workspace.search_query.as_str().into());
     window.set_create_host_dialog_open(model.create_host_dialog_open);
     window.set_create_group_parent_dialog_open(model.create_group_parent_dialog_open);
     window.set_create_group_dialog_open(model.create_group_dialog_open);
@@ -192,10 +466,25 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     );
     window.set_create_host_private_key_label(create_host.private_key_label.into());
     window.set_create_host_private_key_placeholder(create_host.private_key_placeholder.into());
+    window.set_create_host_add_private_key_label(create_host.add_private_key_label.into());
+    window.set_create_host_add_private_key_caption(create_host.add_private_key_caption.into());
     window.set_create_host_passphrase_label(create_host.passphrase_label.into());
     window.set_create_host_passphrase_placeholder(create_host.passphrase_placeholder.into());
     window.set_create_host_certificate_label(create_host.certificate_label.into());
     window.set_create_host_certificate_placeholder(create_host.certificate_placeholder.into());
+    window.set_create_host_add_certificate_label(create_host.add_certificate_label.into());
+    window.set_create_host_add_certificate_caption(create_host.add_certificate_caption.into());
+    window.set_create_host_credential_name_label(create_host.credential_name_label.into());
+    window.set_create_host_credential_name_placeholder(
+        create_host.credential_name_placeholder.into(),
+    );
+    window.set_create_host_credential_secret_label(create_host.credential_secret_label.into());
+    window.set_create_host_credential_secret_placeholder(
+        create_host.credential_secret_placeholder.into(),
+    );
+    window
+        .set_create_host_credential_algorithm_label(create_host.credential_algorithm_label.into());
+    window.set_create_host_credential_save_label(create_host.credential_save_label.into());
     window.set_create_host_icon_title(create_host.icon_title.into());
     window.set_create_host_icon_server_label(create_host.icon_server_label.into());
     window.set_create_host_icon_database_label(create_host.icon_database_label.into());
@@ -203,6 +492,12 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_create_host_icon_linux_label(create_host.icon_linux_label.into());
     window.set_create_host_icon_container_label(create_host.icon_container_label.into());
     window.set_create_host_icon_shield_label(create_host.icon_shield_label.into());
+    window.set_create_host_icon_router_label(create_host.icon_router_label.into());
+    window.set_create_host_icon_terminal_label(create_host.icon_terminal_label.into());
+    window.set_create_host_icon_globe_label(create_host.icon_globe_label.into());
+    window.set_create_host_icon_key_label(create_host.icon_key_label.into());
+    window.set_create_host_icon_chip_label(create_host.icon_chip_label.into());
+    window.set_create_host_icon_cluster_label(create_host.icon_cluster_label.into());
     let create_group = &model.create_group_dialog;
     window.set_create_group_dialog_title(create_group.title.into());
     window.set_create_group_dialog_subtitle(create_group.subtitle.into());
@@ -234,9 +529,9 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_hosts_panel_collapsed(model.hosts_panel_collapsed);
     window.set_hosts_panel_width(model.hosts_panel_width);
     window.set_activity_panel_width(model.activity_panel_width);
-    window.set_tool_panel_width(model.tool_panel_width);
-    window.set_tool_panel_mode_key(model.tool_panel_mode_key.into());
-    window.set_tool_panel_mode(model.tool_panel_mode.into());
+    window.set_tool_panel_width(model.terminal_workspace.tool_panel_width);
+    window.set_tool_panel_mode_key(model.terminal_workspace.tool_panel_mode_key.into());
+    window.set_tool_panel_mode(model.terminal_workspace.tool_panel_mode.into());
     window.set_right_sidebar_collapsed(model.right_sidebar_collapsed);
     window.set_last_error(model.last_error.as_str().into());
     window.set_command_palette_open(model.command_palette_open);

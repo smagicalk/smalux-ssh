@@ -33,7 +33,7 @@ smagical-terminal = { path = "crates/smagical-terminal" }
 smagical-local-backend = { path = "crates/smagical-local-backend" }
 smagical-ssh-plan = { path = "crates/smagical-ssh-plan" }
 smagical-ssh-client-core = { path = "crates/smagical-ssh-client-core" }
-slint = { version = "1.15", features = ["unstable-winit-030"] }
+slint = { version = "1.16.1", features = ["unstable-winit-030"] }
 sys-locale = "0.3.2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "fs", "sync", "time"] }
 serde = { version = "1", features = ["derive"] }
@@ -47,6 +47,7 @@ anyhow = "1"
 aws-lc-rs = { version = "1.16", features = ["prebuilt-nasm"] }
 russh = { version = "0.55", default-features = false, features = ["aws-lc-rs", "flate2", "rsa"] }
 russh-sftp = "2"
+rfd = "0.17.2"
 
 [build-dependencies]
-slint-build = "1.15"
+slint-build = "1.16.1"

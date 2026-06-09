@@ -66,6 +66,16 @@ impl WorkspaceUiState {
         self.host_search_query = query.into();
     }
 
+    /// 更新密钥页分组树搜索条件。
+    pub fn set_credential_search_query(&mut self, query: impl Into<String>) {
+        self.credential_search_query = query.into();
+    }
+
+    /// 更新片段页分组树搜索条件。
+    pub fn set_snippet_search_query(&mut self, query: impl Into<String>) {
+        self.snippet_search_query = query.into();
+    }
+
     /// 折叠或展开主机树中的指定分组。
     pub fn toggle_host_tree_group(&mut self, group_id: Option<GroupId>) {
         let Some(group_id) = group_id else {
@@ -81,6 +91,42 @@ impl WorkspaceUiState {
             self.collapsed_host_tree_groups.remove(index);
         } else {
             self.collapsed_host_tree_groups.push(group_id);
+        }
+    }
+
+    /// 折叠或展开凭据树中的指定节点。
+    pub fn toggle_credential_tree_node(&mut self, node_id: impl Into<String>) {
+        let node_id = node_id.into();
+        if node_id.is_empty() {
+            return;
+        }
+
+        if let Some(index) = self
+            .collapsed_credential_tree_nodes
+            .iter()
+            .position(|id| *id == node_id)
+        {
+            self.collapsed_credential_tree_nodes.remove(index);
+        } else {
+            self.collapsed_credential_tree_nodes.push(node_id);
+        }
+    }
+
+    /// 折叠或展开片段树中的指定节点。
+    pub fn toggle_snippet_tree_node(&mut self, node_id: impl Into<String>) {
+        let node_id = node_id.into();
+        if node_id.is_empty() {
+            return;
+        }
+
+        if let Some(index) = self
+            .collapsed_snippet_tree_nodes
+            .iter()
+            .position(|id| *id == node_id)
+        {
+            self.collapsed_snippet_tree_nodes.remove(index);
+        } else {
+            self.collapsed_snippet_tree_nodes.push(node_id);
         }
     }
 

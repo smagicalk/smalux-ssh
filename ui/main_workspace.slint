@@ -1,750 +1,15 @@
-import { ScrollView } from "std-widgets.slint";
-import { HostRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, ToolItemRow } from "./models.slint";
+import { CredentialDetailFieldRow, CredentialGroupContentRow, CredentialRow, HostRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { CompactButton } from "./common.slint";
-import { VerticalSplitter } from "./splitter.slint";
-import { SftpPane, TerminalPane, ToolPanel } from "./workspace.slint";
-import { HostIcon } from "./hosts.slint";
-import { TabChip } from "./tabs.slint";
-
-component WorkspaceListItem inherits Rectangle {
-    in property <string> title;
-    in property <string> subtitle;
-    in property <string> meta;
-
-    height: 50px;
-    border-radius: 7px;
-    border-width: 1px;
-    border-color: AppTheme.border-soft;
-    background: AppTheme.card-bg;
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 8px;
-
-        VerticalLayout {
-            vertical-stretch: 1;
-            spacing: 3px;
-            Text {
-                text: root.title;
-                color: AppTheme.text;
-                font-size: 12px;
-                font-weight: 700;
-                overflow: elide;
-            }
-            Text {
-                text: root.subtitle;
-                color: AppTheme.text-muted;
-                font-size: 10px;
-                overflow: elide;
-            }
-        }
-        Text {
-            text: root.meta;
-            color: AppTheme.text-soft;
-            font-size: 10px;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-    }
-}
-
-component WorkspaceListPage inherits Rectangle {
-    in property <string> title;
-    in property <string> empty-label;
-    in property <[ToolItemRow]> items;
-
-    background: AppTheme.window-bg;
-    vertical-stretch: 1;
-    horizontal-stretch: 1;
-
-    VerticalLayout {
-        padding: 12px;
-        spacing: 10px;
-
-        Text {
-            text: root.title;
-            color: AppTheme.text-strong;
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        ScrollView {
-            vertical-stretch: 1;
-            VerticalLayout {
-                spacing: 7px;
-                if root.items.length == 0: WorkspaceListItem {
-                    title: root.empty-label;
-                    subtitle: "";
-                    meta: "";
-                }
-                for item in root.items: WorkspaceListItem {
-                    title: item.title;
-                    subtitle: item.subtitle;
-                    meta: item.meta;
-                }
-            }
-        }
-    }
-}
-
-component HistoryListPage inherits Rectangle {
-    in property <string> title;
-    in property <string> empty-label;
-    in property <[string]> history;
-
-    background: AppTheme.window-bg;
-    vertical-stretch: 1;
-    horizontal-stretch: 1;
-
-    VerticalLayout {
-        padding: 12px;
-        spacing: 10px;
-
-        Text {
-            text: root.title;
-            color: AppTheme.text-strong;
-            font-size: 15px;
-            font-weight: 700;
-        }
-
-        ScrollView {
-            vertical-stretch: 1;
-            VerticalLayout {
-                spacing: 7px;
-                if root.history.length == 0: WorkspaceListItem {
-                    title: root.empty-label;
-                    subtitle: "";
-                    meta: "";
-                }
-                for command in root.history: WorkspaceListItem {
-                    title: command;
-                    subtitle: "";
-                    meta: "";
-                }
-            }
-        }
-    }
-}
-
-component NewSessionRow inherits Rectangle {
-    in property <string> title;
-    in property <string> subtitle;
-    in property <string> meta;
-    in property <string> detail;
-    in property <string> tags;
-    in property <string> status;
-    in property <string> kind-label;
-    in property <string> icon-key: "server";
-    in property <bool> local;
-    in property <int> accent-index: 0;
-    callback clicked();
-
-    property <color> accent-color: root.local
-        ? AppTheme.accent-blue
-        : root.accent-index == 0 ? AppTheme.accent
-        : root.accent-index == 1 ? AppTheme.accent-violet
-        : root.accent-index == 2 ? AppTheme.warning
-        : root.accent-index == 3 ? AppTheme.info-text
-        : AppTheme.danger-text-soft;
-    property <color> accent-bg: root.local
-        ? AppTheme.badge-info-bg
-        : root.accent-index == 0 ? AppTheme.badge-success-bg
-        : root.accent-index == 1 ? AppTheme.badge-pending-bg
-        : root.accent-index == 2 ? AppTheme.badge-warning-bg
-        : root.accent-index == 3 ? AppTheme.badge-info-bg
-        : AppTheme.button-danger-bg;
-
-    height: 74px;
-    border-radius: 8px;
-    border-width: 1px;
-    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
-    background: touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
-
-    touch := TouchArea {
-        clicked => { root.clicked(); }
-    }
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        padding-top: 8px;
-        padding-bottom: 8px;
-        spacing: 10px;
-
-        Rectangle {
-            width: 36px;
-            height: 36px;
-            background: AppTheme.transparent;
-
-            if root.local: Rectangle {
-                width: 36px;
-                height: 36px;
-                border-radius: 8px;
-                border-width: 1px;
-                border-color: root.accent-color;
-                background: root.accent-bg;
-
-                Text {
-                    text: ">";
-                    color: root.accent-color;
-                    font-size: 14px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-            }
-
-            if !root.local: HostIcon {
-                x: 7px;
-                y: 7px;
-                icon-key: root.icon-key;
-                accent-index: root.accent-index;
-                status-key: "Created";
-            }
-        }
-
-        VerticalLayout {
-            vertical-stretch: 1;
-            spacing: 4px;
-
-            HorizontalLayout {
-                spacing: 8px;
-                Text {
-                    text: root.title;
-                    color: AppTheme.text-strong;
-                    font-size: 13px;
-                    font-weight: 700;
-                    horizontal-stretch: 1;
-                    overflow: elide;
-                }
-                Rectangle {
-                    width: 74px;
-                    height: 20px;
-                    border-radius: 6px;
-                    border-width: 1px;
-                    border-color: root.accent-color;
-                    background: root.accent-bg;
-
-                    Text {
-                        text: root.kind-label;
-                        color: root.accent-color;
-                        font-size: 10px;
-                        font-weight: 700;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-                }
-            }
-            Text {
-                text: root.subtitle;
-                color: AppTheme.text-muted;
-                font-size: 11px;
-                overflow: elide;
-            }
-
-            Text {
-                text: root.detail + (root.tags == "" ? "" : " · " + root.tags);
-                color: AppTheme.text-soft;
-                font-size: 10px;
-                overflow: elide;
-            }
-        }
-    }
-}
-
-component NewSessionDialog inherits Rectangle {
-    in property <[HostRow]> hosts;
-    in property <string> search-query: "";
-    in property <bool> local-visible: true;
-    in property <string> title-label: "";
-    in property <string> search-placeholder: "";
-    in property <string> local-title: "";
-    in property <string> local-subtitle: "";
-    in property <string> local-detail: "";
-    in property <string> local-tags: "";
-    in property <string> local-status: "";
-    in property <string> local-kind: "";
-    in property <string> remote-kind: "";
-    in property <string> ungrouped-detail: "";
-    in property <string> empty-title: "";
-    in property <string> empty-caption: "";
-    callback close();
-    callback search-changed(query: string);
-    callback open-local-terminal();
-    callback open-host(host-id: string);
-
-    background: AppTheme.overlay-bg;
-
-    Rectangle {
-        x: (root.width - self.width) / 2;
-        y: (root.height - self.height) / 2;
-        width: min(root.width - 48px, 640px);
-        height: min(root.height - 96px, 560px);
-        border-radius: 8px;
-        border-width: 1px;
-        border-color: AppTheme.border-strong;
-        background: AppTheme.dialog-bg;
-
-        VerticalLayout {
-            padding: 14px;
-            spacing: 10px;
-
-            HorizontalLayout {
-                Text {
-                    text: root.title-label;
-                    color: AppTheme.text-strong;
-                    font-size: 15px;
-                    font-weight: 700;
-                }
-                Rectangle { horizontal-stretch: 1; }
-                CompactButton {
-                    label: "x";
-                    tone: "subtle";
-                    compact: true;
-                    clicked => { root.close(); }
-                }
-            }
-
-            Rectangle {
-                height: 34px;
-                border-radius: 8px;
-                border-width: 1px;
-                border-color: AppTheme.border-soft;
-                background: AppTheme.inset-bg;
-
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        height: 30px;
-                        background: AppTheme.transparent;
-
-                        Text {
-                            x: 0px;
-                            y: 0px;
-                            width: parent.width;
-                            height: parent.height;
-                            text: root.search-placeholder;
-                            color: AppTheme.input-placeholder;
-                            font-size: 10px;
-                            vertical-alignment: center;
-                            visible: search-input.text == "";
-                            overflow: elide;
-                        }
-
-                        search-input := TextInput {
-                            x: 0px;
-                            y: 0px;
-                            width: parent.width;
-                            height: parent.height;
-                            text: root.search-query;
-                            single-line: true;
-                            color: AppTheme.text;
-                            font-size: 10px;
-                            text-cursor-width: 1px;
-                            selection-background-color: AppTheme.selection-bg;
-                            selection-foreground-color: AppTheme.text-strong;
-                            vertical-alignment: center;
-                            edited => { root.search-changed(self.text); }
-                            accepted => { root.search-changed(self.text); }
-                        }
-                    }
-                }
-            }
-
-            if root.local-visible: NewSessionRow {
-                title: root.local-title;
-                subtitle: root.local-subtitle;
-                detail: root.local-detail;
-                tags: root.local-tags;
-                meta: "local";
-                status: root.local-status;
-                kind-label: root.local-kind;
-                icon-key: "linux";
-                local: true;
-                accent-index: 1;
-                clicked => { root.open-local-terminal(); }
-            }
-
-            ScrollView {
-                vertical-stretch: 1;
-                VerticalLayout {
-                    spacing: 7px;
-                    if root.hosts.length == 0 && !root.local-visible: WorkspaceListItem {
-                        title: root.empty-title;
-                        subtitle: root.empty-caption;
-                        meta: "";
-                    }
-                    for host in root.hosts: NewSessionRow {
-                        title: host.name;
-                        subtitle: host.endpoint;
-                        meta: host.auth;
-                        detail: host.group == "" ? root.ungrouped-detail : host.group;
-                        tags: host.tags;
-                        status: host.status;
-                        kind-label: host.auth == "" ? root.remote-kind : host.auth;
-                        icon-key: host.icon_key;
-                        local: false;
-                        accent-index: host.accent_index;
-                        clicked => { root.open-host(host.id); }
-                    }
-                }
-            }
-        }
-    }
-}
-
-component SettingsSectionHeader inherits Text {
-    in property <string> label;
-
-    text: root.label;
-    color: AppTheme.section-text;
-    font-size: 10px;
-    font-weight: 700;
-}
-
-component SettingsOptionPill inherits Rectangle {
-    in property <SettingOptionRow> option;
-    in property <string> selected-label;
-    callback clicked(key: string);
-
-    height: 30px;
-    min-width: 120px;
-    border-radius: 7px;
-    border-width: 1px;
-    border-color: root.option.selected ? AppTheme.accent-blue : AppTheme.border-soft;
-    background: root.option.selected ? AppTheme.selection-bg : touch.has-hover ? AppTheme.surface-hover : AppTheme.raised-bg;
-
-    touch := TouchArea {
-        clicked => { root.clicked(root.option.key); }
-    }
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 6px;
-        Text {
-            text: root.option.label;
-            color: AppTheme.text;
-            font-size: 10px;
-            font-weight: 700;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-        if root.option.selected: Text {
-            text: root.selected-label;
-            color: AppTheme.accent-blue;
-            font-size: 9px;
-            vertical-alignment: center;
-        }
-    }
-}
-
-component SettingsSummaryItem inherits Rectangle {
-    in property <SettingsSummaryRow> item;
-
-    height: 44px;
-    border-radius: 7px;
-    border-width: 1px;
-    border-color: AppTheme.border-soft;
-    background: AppTheme.raised-bg;
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 8px;
-        Text {
-            text: root.item.label;
-            color: AppTheme.text-muted;
-            font-size: 10px;
-            vertical-alignment: center;
-            overflow: elide;
-        }
-        Rectangle { horizontal-stretch: 1; }
-        Text {
-            text: root.item.count + "";
-            color: AppTheme.text-strong;
-            font-size: 14px;
-            font-weight: 700;
-            vertical-alignment: center;
-        }
-    }
-}
-
-component SettingsProfileItem inherits Rectangle {
-    in property <SettingsProfileRow> profile;
-    in property <string> selected-label;
-    in property <string> apply-label;
-    in property <string> remove-label;
-    callback apply(name: string);
-    callback remove(name: string);
-
-    height: 46px;
-    border-radius: 7px;
-    border-width: 1px;
-    border-color: root.profile.selected ? AppTheme.accent-blue : AppTheme.border-soft;
-    background: root.profile.selected ? AppTheme.selection-bg : AppTheme.raised-bg;
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 8px;
-        spacing: 8px;
-        VerticalLayout {
-            vertical-stretch: 1;
-            spacing: 2px;
-            Text {
-                text: root.profile.name;
-                color: AppTheme.text;
-                font-size: 11px;
-                font-weight: 700;
-                overflow: elide;
-            }
-            Text {
-                text: root.profile.selected ? root.selected-label : root.profile.source_label;
-                color: root.profile.selected ? AppTheme.accent-blue : AppTheme.text-muted;
-                font-size: 9px;
-                overflow: elide;
-            }
-        }
-        CompactButton {
-            label: root.apply-label;
-            compact: true;
-            enabled: root.profile.can_apply;
-            clicked => { root.apply(root.profile.name); }
-        }
-        CompactButton {
-            label: root.remove-label;
-            tone: "danger";
-            compact: true;
-            enabled: root.profile.can_remove;
-            clicked => { root.remove(root.profile.name); }
-        }
-    }
-}
-
-component SettingsFileActionItem inherits Rectangle {
-    in property <SettingsFileActionRow> action;
-    in property <string> run-label;
-    in property <string> unavailable-label;
-    in property <string> choose-label;
-    in-out property <string> selected-path: root.action.default_file_name;
-    callback run(key: string, path: string, format: string);
-    callback choose(key: string, current-path: string, direction: string, extension: string);
-
-    height: 64px;
-    border-radius: 7px;
-    border-width: 1px;
-    border-color: AppTheme.border-soft;
-    background: AppTheme.raised-bg;
-
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 8px;
-        spacing: 8px;
-        VerticalLayout {
-            vertical-stretch: 1;
-            spacing: 3px;
-            HorizontalLayout {
-                spacing: 7px;
-                Text {
-                    text: root.action.label;
-                    color: AppTheme.text;
-                    font-size: 11px;
-                    font-weight: 700;
-                    horizontal-stretch: 1;
-                    overflow: elide;
-                }
-                Text {
-                    text: root.action.category_label + " · " + root.action.direction_label + " · " + root.action.format_label;
-                    color: AppTheme.text-muted;
-                    font-size: 9px;
-                    vertical-alignment: center;
-                    overflow: elide;
-                }
-            }
-            Rectangle {
-                height: 28px;
-                border-radius: 7px;
-                border-width: 1px;
-                border-color: AppTheme.border-soft;
-                background: AppTheme.input-bg;
-                Text {
-                    x: 8px;
-                    y: 0px;
-                    width: parent.width - 16px;
-                    height: parent.height;
-                    text: root.action.path_placeholder;
-                    color: AppTheme.input-placeholder;
-                    font-size: 10px;
-                    vertical-alignment: center;
-                    visible: root.selected-path == "";
-                    overflow: elide;
-                }
-                path-input := TextInput {
-                    x: 8px;
-                    y: 0px;
-                    width: parent.width - 16px;
-                    height: parent.height;
-                    font-size: 10px;
-                    color: AppTheme.text;
-                    text: root.selected-path;
-                    single-line: true;
-                    text-cursor-width: 1px;
-                    selection-background-color: AppTheme.input-selection;
-                    selection-foreground-color: AppTheme.text-strong;
-                    vertical-alignment: center;
-                    edited => { root.selected-path = self.text; }
-                }
-            }
-        }
-        CompactButton {
-            label: root.choose-label;
-            compact: true;
-            enabled: root.action.enabled;
-            clicked => {
-                root.choose(root.action.key, root.selected-path, root.action.direction, root.action.default_extension);
-            }
-        }
-        CompactButton {
-            label: root.action.enabled ? root.run-label : root.unavailable-label;
-            compact: true;
-            enabled: root.action.enabled && root.selected-path != "";
-            clicked => {
-                root.run(root.action.key, root.selected-path, root.action.format_key);
-            }
-        }
-    }
-}
-
-component SettingsPage inherits Rectangle {
-    in property <string> title;
-    in property <[SettingOptionRow]> language-options;
-    in property <[SettingOptionRow]> theme-options;
-    in property <[SettingsProfileRow]> theme-profiles;
-    in property <[SettingsSummaryRow]> storage-summary;
-    in property <[SettingsFileActionRow]> file-actions;
-    in property <string> language-title-label;
-    in property <string> theme-title-label;
-    in property <string> custom-theme-title-label;
-    in property <string> storage-title-label;
-    in property <string> file-actions-title-label;
-    in property <string> security-title-label;
-    in property <string> apply-label;
-    in property <string> copy-label;
-    in property <string> remove-label;
-    in property <string> run-label;
-    in property <string> choose-file-label;
-    in property <string> selected-label;
-    in property <string> unavailable-label;
-    in property <string> empty-custom-themes-label;
-    in property <string> current-profile-name;
-    in property <string> storage-summary-label;
-    in property <string> storage-backend-label;
-    in property <string> storage-database-path;
-    in property <string> security-summary-label;
-    in property <string> security-status-label;
-    in property <string> security-detail-label;
-    in property <string> security-kdf-label;
-    in property <string> security-version-label;
-    callback set-language(language: string);
-    callback set-built-in-theme(theme: string);
-    callback copy-current-built-in-theme();
-    callback apply-theme-profile(name: string);
-    callback remove-theme-profile(name: string);
-    callback run-file-action(key: string, path: string, format: string);
-    callback choose-file-action-path(key: string, current-path: string, direction: string, extension: string) -> string;
-
-    background: AppTheme.window-bg;
-
-    ScrollView {
-        width: parent.width;
-        height: parent.height;
-        VerticalLayout {
-            padding: 16px;
-            spacing: 12px;
-
-            Text {
-                text: root.title;
-                color: AppTheme.text-strong;
-                font-size: 16px;
-                font-weight: 700;
-            }
-
-            SettingsSectionHeader { label: root.language-title-label; }
-            HorizontalLayout {
-                spacing: 7px;
-                for option in root.language-options: SettingsOptionPill {
-                    option: option;
-                    selected-label: root.selected-label;
-                    clicked(key) => { root.set-language(key); }
-                }
-            }
-
-            SettingsSectionHeader { label: root.theme-title-label; }
-            HorizontalLayout {
-                spacing: 7px;
-                for option in root.theme-options: SettingsOptionPill {
-                    option: option;
-                    selected-label: root.selected-label;
-                    clicked(key) => { root.set-built-in-theme(key); }
-                }
-                CompactButton {
-                    label: root.copy-label;
-                    compact: true;
-                    clicked => { root.copy-current-built-in-theme(); }
-                }
-            }
-
-            SettingsSectionHeader { label: root.custom-theme-title-label; }
-            if root.theme-profiles.length == 0: WorkspaceListItem {
-                title: root.empty-custom-themes-label;
-                subtitle: root.current-profile-name;
-                meta: "";
-            }
-            for profile in root.theme-profiles: SettingsProfileItem {
-                profile: profile;
-                selected-label: root.selected-label;
-                apply-label: root.apply-label;
-                remove-label: root.remove-label;
-                apply(name) => { root.apply-theme-profile(name); }
-                remove(name) => { root.remove-theme-profile(name); }
-            }
-
-            SettingsSectionHeader { label: root.storage-title-label; }
-            WorkspaceListItem {
-                title: root.storage-backend-label;
-                subtitle: root.storage-database-path;
-                meta: root.storage-summary-label;
-            }
-            for item in root.storage-summary: SettingsSummaryItem { item: item; }
-
-            SettingsSectionHeader { label: root.file-actions-title-label; }
-            for action in root.file-actions: SettingsFileActionItem {
-                action: action;
-                run-label: root.run-label;
-                choose-label: root.choose-file-label;
-                unavailable-label: root.unavailable-label;
-                choose(key, current-path, direction, extension) => {
-                    self.selected-path = root.choose-file-action-path(key, current-path, direction, extension);
-                }
-                run(key, path, format) => { root.run-file-action(key, path, format); }
-            }
-
-            SettingsSectionHeader { label: root.security-title-label; }
-            WorkspaceListItem {
-                title: root.security-status-label;
-                subtitle: root.security-detail-label;
-                meta: root.security-summary-label + " · " + root.security-kdf-label + " · " + root.security-version-label;
-            }
-        }
-    }
-}
-
+import { SftpPane } from "./workspace.slint";
+import { WorkspaceTabStrip } from "./workspace_tabs.slint";
+import { HistoryListPage } from "./history_page.slint";
+import { NewSessionDialog } from "./new_session_dialog.slint";
+import { SecurityWorkspacePage } from "./workspace_security_page.slint";
+import { SettingsWorkspacePage } from "./workspace_settings_page.slint";
+import { SnippetWorkspacePage } from "./workspace_snippet_page.slint";
+import { TerminalWorkspacePage } from "./workspace_terminal_page.slint";
+import { ProxyPlaceholderPage, WorkspaceListPage } from "./workspace_common.slint";
 export component MainWorkspace inherits Rectangle {
     in property <string> active-page;
     in property <string> active-session-id;
@@ -775,6 +40,38 @@ export component MainWorkspace inherits Rectangle {
     in property <[ToolItemRow]> snippets;
     in property <[ToolItemRow]> tunnels;
     in property <[ToolItemRow]> credentials;
+    in property <string> selected-snippet-id: "";
+    in property <string> selected-snippet-name: "";
+    in property <string> selected-snippet-description: "";
+    in property <string> selected-snippet-command-template: "";
+    in property <string> selected-snippet-scope: "";
+    in property <string> selected-snippet-scope-key: "";
+    in property <string> selected-snippet-variables: "";
+    in property <string> selected-snippet-arguments: "";
+    in property <string> selected-snippet-meta: "";
+    in property <string> selected-snippet-icon-key: "code";
+    in property <string> selected-snippet-node-kind: "";
+    in property <int> selected-snippet-accent-index: 0;
+    in property <[SnippetRow]> snippet-rows: [];
+    in property <[CredentialRow]> credential-rows;
+    in property <[CredentialGroupContentRow]> credential-group-contents;
+    in property <[CredentialDetailFieldRow]> credential-detail-fields;
+    in property <string> selected-credential-id;
+    in property <string> selected-credential-name;
+    in property <string> selected-credential-group-id;
+    in property <string> selected-credential-group-path;
+    in property <string> selected-credential-kind;
+    in property <string> selected-credential-kind-key;
+    in property <string> selected-credential-username;
+    in property <string> selected-credential-secret-ref;
+    in property <bool> selected-credential-secret-available;
+    in property <string> selected-credential-algorithm;
+    in property <string> selected-credential-algorithm-key;
+    in property <string> selected-credential-fingerprint;
+    in property <string> selected-credential-meta;
+    in property <string> selected-credential-icon-key;
+    in property <string> selected-credential-node-kind;
+    in property <int> selected-credential-accent-index;
     in property <[KnownHostRow]> known-hosts;
     in property <[SettingOptionRow]> settings-language-options;
     in property <[SettingOptionRow]> settings-theme-options;
@@ -809,6 +106,30 @@ export component MainWorkspace inherits Rectangle {
     in property <string> tool-snippets-label: "";
     in property <string> tool-tunnels-label: "";
     in property <string> tool-keys-label: "";
+    in property <string> tool-proxy-label: "";
+    in property <string> proxy-empty-label: "";
+    in property <string> security-detail-empty-title-label: "";
+    in property <string> security-detail-empty-caption-label: "";
+    in property <string> security-field-type-label: "";
+    in property <string> security-field-username-label: "";
+    in property <string> security-field-algorithm-label: "";
+    in property <string> security-field-fingerprint-label: "";
+    in property <string> security-field-secret-ref-label: "";
+    in property <string> security-field-group-label: "";
+    in property <string> security-group-caption-label: "";
+    in property <string> security-view-content-label: "";
+    in property <string> security-view-private-key-label: "";
+    in property <string> security-view-certificate-label: "";
+    in property <string> security-view-password-label: "";
+    in property <string> security-secret-copy-label: "";
+    in property <string> security-secret-copy-success-label: "";
+    in property <string> security-secret-copy-failed-label: "";
+    in property <string> security-secret-content-missing-label: "";
+    in property <string> security-credential-edit-label: "";
+    in property <string> security-credential-edit-private-key-label: "";
+    in property <string> security-credential-edit-certificate-label: "";
+    in property <string> security-credential-edit-password-label: "";
+    in property <string> security-certificate-create-label: "";
     in property <string> terminal-reconnect-label: "";
     in property <string> tab-ready-label: "";
     in property <string> sftp-loading-label: "";
@@ -825,6 +146,28 @@ export component MainWorkspace inherits Rectangle {
     in property <string> sftp-empty-entries-label: "";
     in property <string> tool-pinned-label: "";
     in property <string> tool-empty-value-label: "";
+    in property <string> snippets-detail-empty-title-label: "";
+    in property <string> snippets-detail-empty-caption-label: "";
+    in property <string> snippets-field-scope-label: "";
+    in property <string> snippets-field-variables-label: "";
+    in property <string> snippets-field-arguments-label: "";
+    in property <string> snippets-command-template-label: "";
+    in property <string> snippets-group-caption-label: "";
+    in property <string> snippets-description-empty-label: "";
+    in property <string> snippets-new-target-label: "";
+    in property <string> snippets-split-target-label: "";
+    in property <string> snippets-group-contents-title-label: "";
+    in property <string> snippets-target-variant-title-label: "";
+    in property <string> snippets-script-relation-label: "";
+    in property <string> snippets-script-shared-label: "";
+    in property <string> snippets-script-independent-label: "";
+    in property <string> snippets-edit-label: "";
+    in property <string> snippets-delete-label: "";
+    in property <string> snippets-copy-label: "";
+    in property <string> snippets-copy-success-label: "";
+    in property <string> snippets-copy-failed-label: "";
+    in property <string> snippets-run-label: "";
+    in property <string> snippets-move-label: "";
     in property <string> snippets-empty-label: "";
     in property <string> history-commands-label: "";
     in property <string> history-saved-suffix-label: "";
@@ -879,23 +222,33 @@ export component MainWorkspace inherits Rectangle {
     callback open-local-terminal();
     callback open-command-palette();
     callback open-shell(host-id: string);
+    callback edit-credential(credential-id: string, name: string, group-id: string, group-path: string, kind-key: string, algorithm-key: string);
+    callback create-snippet-target();
+    callback split-snippet-target(snippet-row-id: string);
+    callback edit-selected-snippet();
+    callback delete-selected-snippet();
+    callback move-selected-snippet();
+    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback copy-snippet-command(content: string) -> bool;
+    callback run-selected-snippet();
+    callback create-certificate(group-id: string, group-path: string);
+    callback select-credential(id: string, name: string, group-id: string, group-path: string, kind: string, kind-key: string, username: string, secret-ref: string, secret-available: bool, algorithm: string, algorithm-key: string, fingerprint: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback read-credential-secret(credential-id: string) -> string;
+    callback copy-secret-content(content: string) -> bool;
     property <bool> new-session-dialog-open: false;
-    property <length> tabs-strip-offset: 0px;
-    property <length> tabs-strip-viewport-width: 0px;
-    property <length> preferred-tab-width: 168px;
-    property <length> min-tab-width: 84px;
-    property <length> tab-gap: 5px;
-    property <length> tabs-gap-width: max(0, root.tabs.length - 1) * root.tab-gap;
-    property <bool> tabs-fit-preferred-width: root.tabs.length == 0 || (root.tabs.length * root.preferred-tab-width) + root.tabs-gap-width <= root.tabs-strip-viewport-width;
-    property <length> inactive-tabs-available-width: root.tabs.length <= 1 ? 0px : max(0px, root.tabs-strip-viewport-width - root.preferred-tab-width - root.tabs-gap-width);
-    property <length> inactive-tab-width: root.tabs-fit-preferred-width ? root.preferred-tab-width : max(root.min-tab-width, min(root.preferred-tab-width, root.inactive-tabs-available-width / max(1, root.tabs.length - 1)));
-    property <length> tabs-scroll-step: root.inactive-tab-width + root.tab-gap;
-    property <length> tabs-content-width: root.tabs.length == 0 ? 0px : root.tabs.length == 1 ? root.preferred-tab-width : root.preferred-tab-width + ((root.tabs.length - 1) * root.inactive-tab-width) + root.tabs-gap-width;
-    property <length> tabs-strip-max-offset: max(0px, root.tabs-content-width - root.tabs-strip-viewport-width);
-    property <length> tabs-strip-visible-offset: min(root.tabs-strip-offset, root.tabs-strip-max-offset);
+    property <string> credential-secret-content: "";
+    property <bool> credential-secret-copyable: false;
 
-    changed tabs => {
-        root.tabs-strip-offset = min(root.tabs-strip-offset, root.tabs-strip-max-offset);
+    changed selected-credential-id => {
+        root.credential-secret-content = "";
+        root.credential-secret-copyable = false;
+        if root.selected-credential-id != "" && root.selected-credential-node-kind == "Credential" {
+            root.credential-secret-content = root.read-credential-secret(root.selected-credential-id);
+            root.credential-secret-copyable = root.credential-secret-content != "";
+            if root.credential-secret-content == "" {
+                root.credential-secret-content = root.security-secret-content-missing-label;
+            }
+        }
     }
 
     background: AppTheme.window-bg;
@@ -903,74 +256,21 @@ export component MainWorkspace inherits Rectangle {
     horizontal-stretch: 1;
 
     VerticalLayout {
-        padding: 8px;
+        padding-left: root.active-page == "Security" ? 0px : 8px;
+        padding-right: root.active-page == "Security" ? 4px : 8px;
+        padding-top: root.active-page == "Security" ? 0px : 8px;
+        padding-bottom: root.active-page == "Security" ? 4px : 8px;
         spacing: 7px;
 
-        HorizontalLayout {
-            spacing: 6px;
-
-            Rectangle {
-                horizontal-stretch: 1;
-                height: 30px;
-                clip: true;
-
-                changed width => {
-                    root.tabs-strip-viewport-width = self.width;
-                }
-
-                HorizontalLayout {
-                    x: -root.tabs-strip-visible-offset;
-                    y: 0px;
-                    height: 30px;
-                    spacing: root.tab-gap;
-
-                    for tab in root.tabs: TabChip {
-                        tab-width: tab.active ? root.preferred-tab-width : root.inactive-tab-width;
-                        session-id: tab.id;
-                        title: tab.title;
-                        kind: tab.kind;
-                        status-key: tab.status_key;
-                        status: tab.status;
-                        ready-label: root.tab-ready-label;
-                        active-tab: tab.active;
-                        activate => { root.activate-session(tab.id); }
-                        close => { root.close-session(tab.id); }
-                        scroll(delta) => {
-                            if (delta < 0px) {
-                                root.tabs-strip-offset = min(root.tabs-strip-max-offset, root.tabs-strip-offset + root.tabs-scroll-step);
-                            } else if (delta > 0px) {
-                                root.tabs-strip-offset = max(0px, root.tabs-strip-offset - root.tabs-scroll-step);
-                            }
-                        }
-                    }
-                }
+        if root.active-page != "Security" && root.active-page != "Snippets": WorkspaceTabStrip {
+            tabs: root.tabs;
+            ready-label: root.tab-ready-label;
+            activate-session(session-id) => { root.activate-session(session-id); }
+            close-session(session-id) => { root.close-session(session-id); }
+            open-new-session => {
+                root.update-new-session-search("");
+                root.new-session-dialog-open = true;
             }
-
-            Rectangle {
-                width: 34px;
-                height: 30px;
-                border-radius: 7px;
-                border-width: 1px;
-                border-color: add-touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
-                background: add-touch.pressed ? AppTheme.button-secondary-pressed : add-touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.raised-bg;
-
-                add-touch := TouchArea {
-                    clicked => {
-                        root.update-new-session-search("");
-                        root.new-session-dialog-open = true;
-                    }
-                }
-
-                Text {
-                    text: "+";
-                    color: AppTheme.text;
-                    font-size: 16px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-            }
-
         }
 
         if root.active-page == "SFTP": SftpPane {
@@ -1002,10 +302,50 @@ export component MainWorkspace inherits Rectangle {
             history: root.history;
         }
 
-        if root.active-page == "Snippets": WorkspaceListPage {
-            title: root.tool-snippets-label;
-            empty-label: root.snippets-empty-label;
-            items: root.snippets;
+        if root.active-page == "Snippets": SnippetWorkspacePage {
+            title-label: root.tool-snippets-label;
+            selected-id: root.selected-snippet-id;
+            selected-name: root.selected-snippet-name;
+            selected-description: root.selected-snippet-description;
+            selected-command-template: root.selected-snippet-command-template;
+            selected-scope: root.selected-snippet-scope;
+            selected-scope-key: root.selected-snippet-scope-key;
+            selected-variables: root.selected-snippet-variables;
+            selected-arguments: root.selected-snippet-arguments;
+            selected-meta: root.selected-snippet-meta;
+            selected-icon-key: root.selected-snippet-icon-key;
+            selected-node-kind: root.selected-snippet-node-kind;
+            selected-accent-index: root.selected-snippet-accent-index;
+            snippet-rows: root.snippet-rows;
+            empty-title-label: root.snippets-detail-empty-title-label;
+            empty-caption-label: root.snippets-detail-empty-caption-label;
+            field-scope-label: root.snippets-field-scope-label;
+            field-variables-label: root.snippets-field-variables-label;
+            field-arguments-label: root.snippets-field-arguments-label;
+            command-template-label: root.snippets-command-template-label;
+            group-caption-label: root.snippets-group-caption-label;
+            description-empty-label: root.snippets-description-empty-label;
+            new-target-label: root.snippets-new-target-label;
+            split-target-label: root.snippets-split-target-label;
+            group-contents-title-label: root.snippets-group-contents-title-label;
+            target-variant-title-label: root.snippets-target-variant-title-label;
+            script-relation-label: root.snippets-script-relation-label;
+            script-shared-label: root.snippets-script-shared-label;
+            script-independent-label: root.snippets-script-independent-label;
+            edit-label: root.snippets-edit-label;
+            delete-label: root.snippets-delete-label;
+            copy-label: root.snippets-copy-label;
+            copy-success-label: root.snippets-copy-success-label;
+            copy-failed-label: root.snippets-copy-failed-label;
+            run-label: root.snippets-run-label;
+            move-label: root.snippets-move-label;
+            create-target => { root.create-snippet-target(); }
+            split-target => { root.split-snippet-target(root.selected-snippet-id); }
+            edit-selected => { root.edit-selected-snippet(); }
+            delete-selected => { root.delete-selected-snippet(); }
+            move-selected => { root.move-selected-snippet(); }
+            copy-command(content) => { root.copy-snippet-command(content) }
+            run-selected => { root.run-selected-snippet(); }
         }
 
         if root.active-page == "Tunnels": WorkspaceListPage {
@@ -1014,13 +354,66 @@ export component MainWorkspace inherits Rectangle {
             items: root.tunnels;
         }
 
-        if root.active-page == "Security": WorkspaceListPage {
-            title: root.tool-keys-label;
-            empty-label: root.known-hosts-empty-label;
-            items: root.credentials;
+        if root.active-page == "Proxy": ProxyPlaceholderPage {
+            title: root.tool-proxy-label;
+            empty-label: root.proxy-empty-label;
         }
 
-        if root.active-page == "Settings": SettingsPage {
+        if root.active-page == "Security": SecurityWorkspacePage {
+            title-label: root.tool-keys-label;
+            selected-credential-id: root.selected-credential-id;
+            selected-credential-name: root.selected-credential-name;
+            selected-credential-group-id: root.selected-credential-group-id;
+            selected-credential-group-path: root.selected-credential-group-path;
+            selected-credential-kind: root.selected-credential-kind;
+            selected-credential-kind-key: root.selected-credential-kind-key;
+            selected-credential-username: root.selected-credential-username;
+            selected-credential-secret-ref: root.selected-credential-secret-ref;
+            selected-credential-secret-available: root.selected-credential-secret-available;
+            selected-credential-algorithm: root.selected-credential-algorithm;
+            selected-credential-algorithm-key: root.selected-credential-algorithm-key;
+            selected-credential-fingerprint: root.selected-credential-fingerprint;
+            selected-credential-meta: root.selected-credential-meta;
+            selected-credential-icon-key: root.selected-credential-icon-key;
+            selected-credential-node-kind: root.selected-credential-node-kind;
+            selected-credential-accent-index: root.selected-credential-accent-index;
+            credential-group-contents: root.credential-group-contents;
+            credential-detail-fields: root.credential-detail-fields;
+            empty-title-label: root.security-detail-empty-title-label;
+            empty-caption-label: root.security-detail-empty-caption-label;
+            field-type-label: root.security-field-type-label;
+            field-username-label: root.security-field-username-label;
+            field-algorithm-label: root.security-field-algorithm-label;
+            field-fingerprint-label: root.security-field-fingerprint-label;
+            field-secret-ref-label: root.security-field-secret-ref-label;
+            field-group-label: root.security-field-group-label;
+            group-caption-label: root.security-group-caption-label;
+            view-content-label: root.security-view-content-label;
+            view-private-key-label: root.security-view-private-key-label;
+            view-certificate-label: root.security-view-certificate-label;
+            view-password-label: root.security-view-password-label;
+            secret-content: root.credential-secret-content;
+            secret-content-missing-label: root.security-secret-content-missing-label;
+            secret-copy-enabled: root.credential-secret-copyable;
+            secret-copy-label: root.security-secret-copy-label;
+            secret-copy-success-label: root.security-secret-copy-success-label;
+            secret-copy-failed-label: root.security-secret-copy-failed-label;
+            edit-label: root.security-credential-edit-label;
+            edit-private-key-label: root.security-credential-edit-private-key-label;
+            edit-certificate-label: root.security-credential-edit-certificate-label;
+            edit-password-label: root.security-credential-edit-password-label;
+            compile-label: root.security-certificate-create-label;
+            select-credential(id, name, group-id, group-path, kind, kind-key, username, secret-ref, secret-available, algorithm, algorithm-key, fingerprint, meta, icon-key, node-kind, accent-index) => {
+                root.select-credential(id, name, group-id, group-path, kind, kind-key, username, secret-ref, secret-available, algorithm, algorithm-key, fingerprint, meta, icon-key, node-kind, accent-index);
+            }
+            copy-secret-content(content) => { root.copy-secret-content(content) }
+            edit-credential(credential-id, name, group-id, group-path, kind-key, algorithm-key) => {
+                root.edit-credential(credential-id, name, group-id, group-path, kind-key, algorithm-key);
+            }
+            compile-certificate(group-id, group-path) => { root.create-certificate(group-id, group-path); }
+        }
+
+        if root.active-page == "Settings": SettingsWorkspacePage {
             title: root.settings-title-label;
             language-options: root.settings-language-options;
             theme-options: root.settings-theme-options;
@@ -1058,96 +451,88 @@ export component MainWorkspace inherits Rectangle {
             choose-file-action-path(key, current-path, direction, extension) => {
                 root.choose-file-action-path(key, current-path, direction, extension)
             }
-            run-file-action(key, path, format) => {
-                if (key == "ExportCurrentTheme") {
-                    root.export-current-theme(path, format);
-                } else if (key == "ImportTheme") {
-                    root.import-theme(path);
-                } else if (key == "BackupSqlite") {
-                    root.backup-storage(path);
-                } else if (key == "ExportSnapshot") {
-                    root.export-storage-snapshot(path);
-                } else if (key == "ImportSnapshot") {
-                    root.import-storage-snapshot(path);
-                } else if (key == "ImportSqliteBackup") {
-                    root.import-sqlite-backup(path);
-                }
+            export-current-theme(target-path, format) => {
+                root.export-current-theme(target-path, format);
+            }
+            import-theme(source-path) => {
+                root.import-theme(source-path);
+            }
+            backup-storage(target-path) => {
+                root.backup-storage(target-path);
+            }
+            export-storage-snapshot(target-path) => {
+                root.export-storage-snapshot(target-path);
+            }
+            import-storage-snapshot(source-path) => {
+                root.import-storage-snapshot(source-path);
+            }
+            import-sqlite-backup(source-path) => {
+                root.import-sqlite-backup(source-path);
             }
         }
 
-        if root.active-page != "SFTP" && root.active-page != "History" && root.active-page != "Snippets" && root.active-page != "Tunnels" && root.active-page != "Security" && root.active-page != "Settings": HorizontalLayout {
-            spacing: 7px;
-            TerminalPane {
-                session-id: root.active-session-id;
-                title: root.active-tab-title;
-                kind: root.active-tab-kind;
-                status: root.active-tab-status;
-                input: root.terminal-input;
-                prompt: root.terminal-prompt;
-                output-lines: root.terminal-output;
-                can-send-input: root.terminal-can-send-input;
-                can-reconnect-shell: root.terminal-can-reconnect-shell;
-                reconnect-label: root.terminal-reconnect-label;
-                append-input(session-id, text) => { root.append-terminal-input(session-id, text); }
-                backspace-input(session-id) => { root.backspace-terminal-input(session-id); }
-                update-input(session-id, text) => { root.update-terminal-input(session-id, text); }
-                send-input(session-id, text) => { root.send-terminal-input(session-id, text); }
-                reconnect-shell(session-id) => { root.reconnect-shell(session-id); }
-            }
-
-            if root.tool-panel-mode-key != "Closed": VerticalSplitter {
-                base-width: root.tool-panel-width;
-                reverse: true;
-                resize(width) => { root.resize-tool-panel(width); }
-            }
-
-            if root.tool-panel-mode-key != "Closed": ToolPanel {
-                panel-width: root.tool-panel-width;
-                mode-key: root.tool-panel-mode-key;
-                mode: root.tool-panel-mode;
-                history-count: root.history-count;
-                sftp-host-id: root.sftp-host-id;
-                sftp-title: root.sftp-split-title;
-                sftp-current-dir: root.sftp-current-dir;
-                sftp-selected-path: root.sftp-selected-path;
-                sftp-loading: root.sftp-loading;
-                sftp-error: root.sftp-error;
-                sftp-entries: root.sftp-entries;
-                loading-label: root.sftp-loading-label;
-                refresh-label: root.sftp-refresh-label;
-                local-title: root.sftp-local-title;
-                remote-title: root.sftp-remote-title;
-                workspace-label: root.sftp-workspace-label;
-                queue-label: root.sftp-queue-label;
-                selected-label: root.sftp-selected-label;
-                path-label: root.sftp-path-label;
-                entries-label: root.sftp-entries-label;
-                loading-entries-label: root.sftp-loading-entries-label;
-                empty-entries-label: root.sftp-empty-entries-label;
-                pinned-label: root.tool-pinned-label;
-                empty-value-label: root.tool-empty-value-label;
-                snippets-empty-label: root.snippets-empty-label;
-                history-commands-label: root.history-commands-label;
-                history-saved-suffix-label: root.history-saved-suffix-label;
-                history-empty-label: root.history-empty-label;
-                history-run-label: root.history-run-label;
-                tunnels-empty-label: root.tunnels-empty-label;
-                known-hosts-empty-label: root.known-hosts-empty-label;
-                known-hosts-trust-label: root.known-hosts-trust-label;
-                known-hosts-delete-label: root.known-hosts-delete-label;
-                history: root.history;
-                snippets: root.snippets;
-                tunnels: root.tunnels;
-                known-hosts: root.known-hosts;
-                close => { root.close-tool-panel(); }
-                refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
-                select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
-                trust-known-host(host, port) => { root.trust-known-host(host, port); }
-                remove-known-host(host, port) => { root.remove-known-host(host, port); }
-            }
+        if root.active-page != "SFTP" && root.active-page != "History" && root.active-page != "Snippets" && root.active-page != "Tunnels" && root.active-page != "Security" && root.active-page != "Proxy" && root.active-page != "Settings": TerminalWorkspacePage {
+            active-session-id: root.active-session-id;
+            active-tab-title: root.active-tab-title;
+            active-tab-kind: root.active-tab-kind;
+            active-tab-status: root.active-tab-status;
+            terminal-input: root.terminal-input;
+            terminal-prompt: root.terminal-prompt;
+            terminal-output: root.terminal-output;
+            terminal-can-send-input: root.terminal-can-send-input;
+            terminal-can-reconnect-shell: root.terminal-can-reconnect-shell;
+            terminal-reconnect-label: root.terminal-reconnect-label;
+            tool-panel-width: root.tool-panel-width;
+            tool-panel-mode-key: root.tool-panel-mode-key;
+            tool-panel-mode: root.tool-panel-mode;
+            history-count: root.history-count;
+            sftp-host-id: root.sftp-host-id;
+            sftp-title: root.sftp-split-title;
+            sftp-current-dir: root.sftp-current-dir;
+            sftp-selected-path: root.sftp-selected-path;
+            sftp-loading: root.sftp-loading;
+            sftp-error: root.sftp-error;
+            sftp-entries: root.sftp-entries;
+            loading-label: root.sftp-loading-label;
+            refresh-label: root.sftp-refresh-label;
+            local-title: root.sftp-local-title;
+            remote-title: root.sftp-remote-title;
+            workspace-label: root.sftp-workspace-label;
+            queue-label: root.sftp-queue-label;
+            selected-label: root.sftp-selected-label;
+            path-label: root.sftp-path-label;
+            entries-label: root.sftp-entries-label;
+            loading-entries-label: root.sftp-loading-entries-label;
+            empty-entries-label: root.sftp-empty-entries-label;
+            pinned-label: root.tool-pinned-label;
+            empty-value-label: root.tool-empty-value-label;
+            snippets-empty-label: root.snippets-empty-label;
+            history-commands-label: root.history-commands-label;
+            history-saved-suffix-label: root.history-saved-suffix-label;
+            history-empty-label: root.history-empty-label;
+            history-run-label: root.history-run-label;
+            tunnels-empty-label: root.tunnels-empty-label;
+            known-hosts-empty-label: root.known-hosts-empty-label;
+            known-hosts-trust-label: root.known-hosts-trust-label;
+            known-hosts-delete-label: root.known-hosts-delete-label;
+            history: root.history;
+            snippets: root.snippets;
+            tunnels: root.tunnels;
+            known-hosts: root.known-hosts;
+            append-terminal-input(session-id, text) => { root.append-terminal-input(session-id, text); }
+            backspace-terminal-input(session-id) => { root.backspace-terminal-input(session-id); }
+            update-terminal-input(session-id, text) => { root.update-terminal-input(session-id, text); }
+            send-terminal-input(session-id, text) => { root.send-terminal-input(session-id, text); }
+            reconnect-shell(session-id) => { root.reconnect-shell(session-id); }
+            resize-tool-panel(width) => { root.resize-tool-panel(width); }
+            close-tool-panel => { root.close-tool-panel(); }
+            refresh-sftp(host-id) => { root.refresh-sftp(host-id); }
+            select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
+            trust-known-host(host, port) => { root.trust-known-host(host, port); }
+            remove-known-host(host, port) => { root.remove-known-host(host, port); }
         }
 
-        if root.last-error != "": Rectangle {
+        if root.last-error != "" && root.active-page != "Terminal": Rectangle {
             height: 34px;
             border-radius: 7px;
             border-width: 1px;
@@ -1205,4 +590,5 @@ export component MainWorkspace inherits Rectangle {
             root.open-shell(host-id);
         }
     }
+
 }

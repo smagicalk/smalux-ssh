@@ -1,0 +1,69 @@
+import { ScrollView } from "std-widgets.slint";
+import { GroupOptionRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { DialogCloseButton } from "./common.slint";
+import { GroupPickerRow } from "./host_dialog_parts.slint";
+export component HostGroupPickerOverlay inherits Rectangle {
+    in-out property <bool> open;
+    in property <string> title-label;
+    in property <[GroupOptionRow]> groups;
+    callback select-group(group-id: string);
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 72px, 440px);
+        height: min(root.height - 72px, 350px);
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                Text {
+                    text: root.title-label;
+                    color: AppTheme.text-strong;
+                    font-size: 14px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                DialogCloseButton {
+                    clicked => { root.open = false; }
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                border-radius: 8px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                ScrollView {
+                    x: 6px;
+                    y: 6px;
+                    width: parent.width - 12px;
+                    height: parent.height - 12px;
+
+                    VerticalLayout {
+                        spacing: 2px;
+                        for group in root.groups: GroupPickerRow {
+                            group: group;
+                            selected(id) => {
+                                root.select-group(id);
+                                root.open = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

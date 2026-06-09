@@ -1,0 +1,225 @@
+import { SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { CompactButton } from "./common.slint";
+
+export component SettingsSectionHeader inherits Text {
+    in property <string> label;
+
+    text: root.label;
+    color: AppTheme.section-text;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+export component SettingsOptionPill inherits Rectangle {
+    in property <SettingOptionRow> option;
+    in property <string> selected-label;
+    callback clicked(key: string);
+
+    height: 30px;
+    min-width: 120px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.option.selected ? AppTheme.accent-blue : AppTheme.border-soft;
+    background: root.option.selected ? AppTheme.selection-bg : touch.has-hover ? AppTheme.surface-hover : AppTheme.raised-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(root.option.key); }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        Text {
+            text: root.option.label;
+            color: AppTheme.text;
+            font-size: 10px;
+            font-weight: 700;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        if root.option.selected: Text {
+            text: root.selected-label;
+            color: AppTheme.accent-blue;
+            font-size: 9px;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component SettingsSummaryItem inherits Rectangle {
+    in property <SettingsSummaryRow> item;
+
+    height: 44px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.raised-bg;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        Text {
+            text: root.item.label;
+            color: AppTheme.text-muted;
+            font-size: 10px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+        Rectangle { horizontal-stretch: 1; }
+        Text {
+            text: root.item.count + "";
+            color: AppTheme.text-strong;
+            font-size: 14px;
+            font-weight: 700;
+            vertical-alignment: center;
+        }
+    }
+}
+
+export component SettingsProfileItem inherits Rectangle {
+    in property <SettingsProfileRow> profile;
+    in property <string> selected-label;
+    in property <string> apply-label;
+    in property <string> remove-label;
+    callback apply(name: string);
+    callback remove(name: string);
+
+    height: 46px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.profile.selected ? AppTheme.accent-blue : AppTheme.border-soft;
+    background: root.profile.selected ? AppTheme.selection-bg : AppTheme.raised-bg;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 8px;
+        spacing: 8px;
+        VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.profile.name;
+                color: AppTheme.text;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.profile.selected ? root.selected-label : root.profile.source_label;
+                color: root.profile.selected ? AppTheme.accent-blue : AppTheme.text-muted;
+                font-size: 9px;
+                overflow: elide;
+            }
+        }
+        CompactButton {
+            label: root.apply-label;
+            compact: true;
+            enabled: root.profile.can_apply;
+            clicked => { root.apply(root.profile.name); }
+        }
+        CompactButton {
+            label: root.remove-label;
+            tone: "danger";
+            compact: true;
+            enabled: root.profile.can_remove;
+            clicked => { root.remove(root.profile.name); }
+        }
+    }
+}
+
+export component SettingsFileActionItem inherits Rectangle {
+    in property <SettingsFileActionRow> action;
+    in property <string> run-label;
+    in property <string> unavailable-label;
+    in property <string> choose-label;
+    in-out property <string> selected-path: root.action.default_file_name;
+    callback run(key: string, path: string, format: string);
+    callback choose(key: string, current-path: string, direction: string, extension: string);
+
+    height: 64px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.raised-bg;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 8px;
+        spacing: 8px;
+        VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 3px;
+            HorizontalLayout {
+                spacing: 7px;
+                Text {
+                    text: root.action.label;
+                    color: AppTheme.text;
+                    font-size: 11px;
+                    font-weight: 700;
+                    horizontal-stretch: 1;
+                    overflow: elide;
+                }
+                Text {
+                    text: root.action.category_label + " · " + root.action.direction_label + " · " + root.action.format_label;
+                    color: AppTheme.text-muted;
+                    font-size: 9px;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+            Rectangle {
+                height: 28px;
+                border-radius: 7px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.input-bg;
+                Text {
+                    x: 8px;
+                    y: 0px;
+                    width: parent.width - 16px;
+                    height: parent.height;
+                    text: root.action.path_placeholder;
+                    color: AppTheme.input-placeholder;
+                    font-size: 10px;
+                    vertical-alignment: center;
+                    visible: root.selected-path == "";
+                    overflow: elide;
+                }
+                path-input := TextInput {
+                    x: 8px;
+                    y: 0px;
+                    width: parent.width - 16px;
+                    height: parent.height;
+                    font-size: 10px;
+                    color: AppTheme.text;
+                    text: root.selected-path;
+                    single-line: true;
+                    text-cursor-width: 1px;
+                    selection-background-color: AppTheme.input-selection;
+                    selection-foreground-color: AppTheme.text-strong;
+                    vertical-alignment: center;
+                    edited => { root.selected-path = self.text; }
+                }
+            }
+        }
+        CompactButton {
+            label: root.choose-label;
+            compact: true;
+            enabled: root.action.enabled;
+            clicked => {
+                root.choose(root.action.key, root.selected-path, root.action.direction, root.action.default_extension);
+            }
+        }
+        CompactButton {
+            label: root.action.enabled ? root.run-label : root.unavailable-label;
+            compact: true;
+            enabled: root.action.enabled && root.selected-path != "";
+            clicked => {
+                root.run(root.action.key, root.selected-path, root.action.format_key);
+            }
+        }
+    }
+}

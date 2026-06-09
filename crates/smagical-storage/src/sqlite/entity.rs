@@ -177,12 +177,79 @@ pub mod credential {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub name: String,
+        pub id: Option<String>,
         pub kind: String,
+        pub group_id: Option<String>,
         pub username: Option<String>,
         pub secret_ref: Option<String>,
         pub key_algorithm: Option<String>,
         pub key_algorithm_raw: Option<String>,
         pub fingerprint: Option<String>,
+        pub created_at_unix_secs: i64,
+        pub updated_at_unix_secs: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod credential_inspection {
+    //! 凭据内容解析缓存表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "credential_inspections")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub credential_id: String,
+        pub kind: String,
+        pub payload_hash: String,
+        pub parser_version: i32,
+        pub parse_error: Option<String>,
+        pub key_algorithm: Option<String>,
+        pub key_algorithm_raw: Option<String>,
+        pub fingerprint: Option<String>,
+        pub public_key: Option<String>,
+        pub comment: Option<String>,
+        pub encrypted: Option<bool>,
+        pub password_length: Option<i32>,
+        pub cert_type: Option<String>,
+        pub serial: Option<String>,
+        pub key_id: Option<String>,
+        pub principals_text: Option<String>,
+        pub valid_after_unix_secs: Option<i64>,
+        pub valid_before_unix_secs: Option<i64>,
+        pub ca_fingerprint: Option<String>,
+        pub subject_fingerprint: Option<String>,
+        pub critical_options_json: Option<String>,
+        pub extensions_json: Option<String>,
+        pub created_at_unix_secs: i64,
+        pub updated_at_unix_secs: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod credential_group {
+    //! 密钥分组表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "credential_groups")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub name: String,
+        pub kind: String,
+        pub parent_id: Option<String>,
+        pub sort_order: i32,
         pub created_at_unix_secs: i64,
         pub updated_at_unix_secs: i64,
     }
@@ -306,9 +373,86 @@ pub mod snippet {
         pub id: String,
         pub name: String,
         pub description: Option<String>,
+        /// 旧 schema 字段；新脚本内容保存在 snippet_implementations。
         pub command_template: String,
         pub scope_kind: String,
         pub scope_target_id: Option<String>,
+        pub group_id: Option<String>,
+        pub sort_order: i32,
+        pub created_at_unix_secs: i64,
+        pub updated_at_unix_secs: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod snippet_implementation {
+    //! 快捷命令脚本实现表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "snippet_implementations")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub snippet_id: String,
+        pub name: String,
+        pub shell: String,
+        pub shell_custom: Option<String>,
+        pub command_template: String,
+        pub notes: Option<String>,
+        pub sort_order: i32,
+        pub created_at_unix_secs: i64,
+        pub updated_at_unix_secs: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod snippet_support_target {
+    //! 快捷命令支持目标表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "snippet_support_targets")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub snippet_id: String,
+        pub target_key: String,
+        pub display_name: String,
+        pub implementation_id: String,
+        pub sort_order: i32,
+        pub created_at_unix_secs: i64,
+        pub updated_at_unix_secs: i64,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod snippet_group {
+    //! 快捷命令分组表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "snippet_groups")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub name: String,
+        pub parent_id: Option<String>,
         pub sort_order: i32,
         pub created_at_unix_secs: i64,
         pub updated_at_unix_secs: i64,
@@ -353,7 +497,9 @@ pub mod snippet_argument {
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
         pub id: String,
-        pub snippet_id: String,
+        /// 旧 schema 遗留列；新逻辑按 implementation_id 读取参数。
+        pub snippet_id: Option<String>,
+        pub implementation_id: String,
         pub name: String,
         pub value: String,
         pub sort_order: i32,

@@ -2,7 +2,7 @@
 
 use uuid::Uuid;
 
-use crate::model::{HostId, Snippet, SnippetId, SnippetScope, variables_from_template};
+use crate::model::{HostId, Snippet, SnippetId, SnippetScope};
 
 use super::super::{AppState, AppUpdateOutcome};
 use super::outcome::missing_host;
@@ -27,15 +27,15 @@ impl AppState {
             };
         }
 
-        self.storage.upsert_snippet(Snippet {
-            id: SnippetId(Uuid::new_v4()),
-            name: snippet_name(&command),
-            description: Some("从主机命令草稿保存".to_owned()),
-            command_template: command.clone(),
-            scope: SnippetScope::Host(host_id),
-            variables: variables_from_template(&command),
-            last_arguments: Vec::new(),
-        });
+        self.storage
+            .upsert_snippet(Snippet::with_default_implementation(
+                SnippetId(Uuid::new_v4()),
+                snippet_name(&command),
+                Some("从主机命令草稿保存".to_owned()),
+                SnippetScope::Host(host_id),
+                None,
+                command,
+            ));
 
         AppUpdateOutcome {
             state_changed: true,

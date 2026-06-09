@@ -9,7 +9,7 @@ component TerminalHeader inherits Rectangle {
     in property <bool> can-reconnect-shell;
     callback reconnect-shell();
 
-    height: 26px;
+    height: 20px;
 
     HorizontalLayout {
         spacing: 6px;
@@ -32,10 +32,10 @@ component TerminalHeader inherits Rectangle {
 }
 
 component TerminalOutputLine inherits Text {
-    height: 19px;
     color: AppTheme.terminal-text;
     font-size: 11px;
-    vertical-alignment: center;
+    wrap: char-wrap;
+    vertical-alignment: top;
 }
 
 component TerminalPromptLine inherits Rectangle {
@@ -88,7 +88,7 @@ component TerminalViewport inherits Rectangle {
     in property <bool> can-send-input;
     in property <length> content-padding;
     in property <length> terminal-line-height;
-    in property <length> content-height;
+    out property <length> content-height: max(1px, (root.content-padding * 2) + terminal-content.preferred-height);
     in-out property <length> viewport-height;
     in-out property <length> terminal-scroll-y;
     callback update-input(session-id: string, text: string);
@@ -105,32 +105,41 @@ component TerminalViewport inherits Rectangle {
         y: 0px;
         width: parent.width;
         height: parent.height;
-        changed height => {
-            root.viewport-height = self.height;
-            root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
-        }
         viewport-width: self.width;
-        viewport-height: root.content-height;
+        viewport-height: max(self.height, root.content-height);
         viewport-y <=> root.terminal-scroll-y;
 
-        for line[index] in root.output-lines: TerminalOutputLine {
+        terminal-content := VerticalLayout {
             x: root.content-padding;
-            y: root.content-padding + (index * root.terminal-line-height);
+            y: root.content-padding;
             width: parent.width - (root.content-padding * 2);
-            text: line;
+            spacing: 0px;
+
+            for line in root.output-lines: TerminalOutputLine {
+                width: parent.width;
+                text: line;
+            }
+
+            prompt-line := TerminalPromptLine {
+                width: parent.width;
+                height: root.terminal-line-height;
+                session-id: root.session-id;
+                prompt: root.prompt;
+                input <=> root.input;
+                can-send-input: root.can-send-input;
+                update-input(session-id, text) => { root.update-input(session-id, text); }
+                send-input(session-id, text) => { root.send-input(session-id, text); }
+            }
         }
-        prompt-line := TerminalPromptLine {
-            x: root.content-padding;
-            y: root.content-padding + (root.output-lines.length * root.terminal-line-height);
-            width: parent.width - (root.content-padding * 2);
-            height: root.terminal-line-height;
-            session-id: root.session-id;
-            prompt: root.prompt;
-            input <=> root.input;
-            can-send-input: root.can-send-input;
-            update-input(session-id, text) => { root.update-input(session-id, text); }
-            send-input(session-id, text) => { root.send-input(session-id, text); }
-        }
+    }
+    changed content-height => {
+        root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
+    }
+    changed output-lines => {
+        root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
+    }
+    changed width => {
+        root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
     }
     TouchArea {
         width: parent.width;
@@ -139,7 +148,7 @@ component TerminalViewport inherits Rectangle {
             min(
                 parent.height,
                 root.content-padding
-                    + (root.output-lines.length * root.terminal-line-height)
+                    + prompt-line.y
                     + terminal-scroll.viewport-y,
             ),
         );
@@ -153,8 +162,8 @@ component TerminalViewport inherits Rectangle {
             min(
                 parent.height,
                 root.content-padding
-                    + (root.output-lines.length * root.terminal-line-height)
-                    + root.terminal-line-height
+                    + prompt-line.y
+                    + prompt-line.height
                     + terminal-scroll.viewport-y,
             ),
         );
@@ -177,14 +186,11 @@ export component TerminalPane inherits Rectangle {
     in property <bool> can-send-input;
     in property <bool> can-reconnect-shell;
     in property <string> reconnect-label: "";
-    property <length> content-padding: 9px;
+    property <length> content-padding: 2px;
     property <length> terminal-line-height: 19px;
-    property <length> viewport-height: 0px;
-    property <length> content-height: max(
-        root.viewport-height,
-        (root.content-padding * 2) + ((root.output-lines.length + 1) * root.terminal-line-height),
-    );
-    in-out property <length> terminal-scroll-y: min(0px, root.viewport-height - root.content-height);
+    property <length> viewport-height: 4096px;
+    property <length> content-height: terminal-viewport.content-height;
+    in-out property <length> terminal-scroll-y: 0px;
     callback append-input(session-id: string, text: string);
     callback backspace-input(session-id: string);
     callback update-input(session-id: string, text: string);
@@ -199,34 +205,33 @@ export component TerminalPane inherits Rectangle {
     vertical-stretch: 1;
     forward-focus: terminal-viewport;
 
-    changed output-lines => {
-        root.terminal-scroll-y = min(0px, root.viewport-height - root.content-height);
+    terminal-viewport := TerminalViewport {
+        x: 4px;
+        y: 4px;
+        width: root.width - 8px;
+        height: root.height - 8px;
+        session-id: root.session-id;
+        input <=> root.input;
+        prompt: root.prompt;
+        output-lines: root.output-lines;
+        can-send-input: root.can-send-input;
+        content-padding: root.content-padding;
+        terminal-line-height: root.terminal-line-height;
+        viewport-height <=> root.viewport-height;
+        terminal-scroll-y <=> root.terminal-scroll-y;
+        update-input(session-id, text) => { root.update-input(session-id, text); }
+        send-input(session-id, text) => { root.send-input(session-id, text); }
     }
 
-    VerticalLayout {
-        padding: 9px;
-        spacing: 6px;
-        TerminalHeader {
-            title: root.title;
-            kind: root.kind;
-            status: root.status;
-            reconnect-label: root.reconnect-label;
-            can-reconnect-shell: root.can-reconnect-shell;
-            reconnect-shell => { root.reconnect-shell(root.session-id); }
-        }
-        terminal-viewport := TerminalViewport {
-            session-id: root.session-id;
-            input <=> root.input;
-            prompt: root.prompt;
-            output-lines: root.output-lines;
-            can-send-input: root.can-send-input;
-            content-padding: root.content-padding;
-            terminal-line-height: root.terminal-line-height;
-            content-height: root.content-height;
-            viewport-height <=> root.viewport-height;
-            terminal-scroll-y <=> root.terminal-scroll-y;
-            update-input(session-id, text) => { root.update-input(session-id, text); }
-            send-input(session-id, text) => { root.send-input(session-id, text); }
-        }
+    TerminalHeader {
+        x: 6px;
+        y: 4px;
+        width: root.width - 12px;
+        title: root.title;
+        kind: root.kind;
+        status: root.status;
+        reconnect-label: root.reconnect-label;
+        can-reconnect-shell: root.can-reconnect-shell;
+        reconnect-shell => { root.reconnect-shell(root.session-id); }
     }
 }

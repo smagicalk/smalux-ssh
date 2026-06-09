@@ -2,19 +2,72 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::ids::SecretRef;
+use crate::ids::{CredentialGroupId, CredentialId, SecretRef};
+
+/// 密钥分组。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CredentialGroup {
+    pub id: CredentialGroupId,
+    pub name: String,
+    #[serde(default = "default_credential_group_kind")]
+    pub kind: CredentialKind,
+    pub parent_id: Option<CredentialGroupId>,
+    pub sort_order: i32,
+}
 
 /// 凭据元数据。
 ///
 /// 只保存可展示和可索引的信息；明文密码、私钥口令等敏感内容必须通过 `SecretRef` 间接读取。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CredentialMetadata {
+    #[serde(default = "default_credential_id")]
+    pub id: CredentialId,
     pub name: String,
     pub kind: CredentialKind,
+    #[serde(default)]
+    pub group_id: Option<CredentialGroupId>,
     pub username: Option<String>,
     pub secret: Option<SecretRef>,
     pub key_algorithm: Option<KeyAlgorithm>,
     pub fingerprint: Option<String>,
+}
+
+fn default_credential_id() -> CredentialId {
+    CredentialId(uuid::Uuid::new_v4())
+}
+
+/// 凭据内容解析缓存。
+///
+/// `secrets` 中的原始 payload 仍是唯一事实来源；这个结构只保存可重建的展示、搜索和排序信息。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CredentialInspection {
+    pub credential_id: CredentialId,
+    pub kind: CredentialKind,
+    pub payload_hash: String,
+    pub parser_version: i32,
+    pub parse_error: Option<String>,
+    pub algorithm: Option<KeyAlgorithm>,
+    pub fingerprint: Option<String>,
+    pub public_key: Option<String>,
+    pub comment: Option<String>,
+    pub encrypted: Option<bool>,
+    pub password_length: Option<usize>,
+    pub certificate: Option<CertificateInspection>,
+}
+
+/// OpenSSH 证书解析缓存。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CertificateInspection {
+    pub cert_type: Option<String>,
+    pub serial: Option<u64>,
+    pub key_id: Option<String>,
+    pub principals: Vec<String>,
+    pub valid_after_unix_secs: Option<u64>,
+    pub valid_before_unix_secs: Option<u64>,
+    pub ca_fingerprint: Option<String>,
+    pub subject_fingerprint: Option<String>,
+    pub critical_options_json: Option<String>,
+    pub extensions_json: Option<String>,
 }
 
 /// 凭据类型。
@@ -24,6 +77,84 @@ pub enum CredentialKind {
     PrivateKey,
     Agent,
     Certificate,
+}
+
+fn default_credential_group_kind() -> CredentialKind {
+    CredentialKind::PrivateKey
+}
+
+/// 敏感材料类型。
+///
+/// 和 `CredentialKind` 分开建模，是因为 ssh-agent 只有元数据和引用，通常没有需要本地保存的
+/// secret payload；而私钥口令这类材料也不等同于一个可展示凭据。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SecretMaterialKind {
+    Password,
+    PrivateKey,
+    Passphrase,
+    Certificate,
+    Unknown(String),
+}
+
+/// 本地安全存储中的 secret 记录。
+///
+/// `encryption_version = 0` 表示当前未启用主密码加密，`encrypted_payload` 直接保存原始字节。
+/// 后续设置页接入主密码后，可以升级为非 0 版本并填充 kdf/salt/nonce，而不改变外层引用关系。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretRecord {
+    pub secret_ref: SecretRef,
+    pub kind: SecretMaterialKind,
+    pub encryption_version: i32,
+    pub kdf: Option<String>,
+    pub kdf_params_toml: Option<String>,
+    pub salt: Option<Vec<u8>>,
+    pub nonce: Option<Vec<u8>>,
+    pub encrypted_payload: Option<Vec<u8>>,
+    pub external_store: Option<String>,
+    pub external_key: Option<String>,
+}
+
+impl SecretRecord {
+    /// 用当前未加密存储格式创建本地 payload。
+    pub fn local_plaintext(
+        secret_ref: SecretRef,
+        kind: SecretMaterialKind,
+        payload: Vec<u8>,
+    ) -> Self {
+        Self {
+            secret_ref,
+            kind,
+            encryption_version: 0,
+            kdf: None,
+            kdf_params_toml: None,
+            salt: None,
+            nonce: None,
+            encrypted_payload: Some(payload),
+            external_store: None,
+            external_key: None,
+        }
+    }
+
+    /// 用外部凭据库引用创建占位记录。
+    pub fn external(
+        secret_ref: SecretRef,
+        kind: SecretMaterialKind,
+        store: impl Into<String>,
+        key: impl Into<String>,
+    ) -> Self {
+        Self {
+            secret_ref,
+            kind,
+            encryption_version: 0,
+            kdf: None,
+            kdf_params_toml: None,
+            salt: None,
+            nonce: None,
+            encrypted_payload: None,
+            external_store: Some(store.into()),
+            external_key: Some(key.into()),
+        }
+    }
 }
 
 /// SSH 密钥算法。

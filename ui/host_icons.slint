@@ -1,0 +1,506 @@
+import { AppTheme } from "./theme.slint";
+export component HostIcon inherits Rectangle {
+    in property <string> icon-key: "server";
+    in property <string> status-key: "";
+    in property <int> accent-index: 0;
+
+    property <bool> connected: root.status-key == "Connected";
+    property <color> accent-color: root.accent-index == 0 ? AppTheme.accent : root.accent-index == 1 ? AppTheme.accent-violet : root.accent-index == 2 ? AppTheme.warning : root.accent-index == 3 ? AppTheme.info-text : root.accent-index == 4 ? AppTheme.danger-text-soft : AppTheme.success-text;
+    property <color> accent-bg: root.accent-index == 0 ? AppTheme.badge-success-bg : root.accent-index == 1 ? AppTheme.badge-pending-bg : root.accent-index == 2 ? AppTheme.badge-warning-bg : root.accent-index == 3 ? AppTheme.badge-info-bg : root.accent-index == 4 ? AppTheme.button-danger-bg : AppTheme.dialog-success-icon-bg;
+    property <color> status-color: root.connected ? AppTheme.accent : root.status-key == "Connecting" ? AppTheme.warning : root.status-key == "Failed" ? AppTheme.danger : AppTheme.status-muted;
+
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: root.accent-color;
+    background: root.accent-bg;
+
+    if root.icon-key == "database": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 4px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "database": Rectangle {
+        x: 5px;
+        y: 9px;
+        width: 12px;
+        height: 7px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "cloud": Rectangle {
+        x: 5px;
+        y: 10px;
+        width: 12px;
+        height: 5px;
+        border-radius: 3px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cloud": Rectangle {
+        x: 8px;
+        y: 6px;
+        width: 7px;
+        height: 7px;
+        border-radius: 4px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "linux": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: ">";
+        color: root.accent-color;
+        font-size: 14px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "container": Rectangle {
+        x: 5px;
+        y: 6px;
+        width: 12px;
+        height: 11px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "container": Rectangle {
+        x: 9px;
+        y: 3px;
+        width: 8px;
+        height: 6px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "shield": Rectangle {
+        x: 7px;
+        y: 4px;
+        width: 8px;
+        height: 12px;
+        border-radius: 4px;
+        border-width: 2px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "router": Rectangle {
+        x: 4px;
+        y: 11px;
+        width: 14px;
+        height: 6px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "router": Rectangle {
+        x: 10px;
+        y: 5px;
+        width: 2px;
+        height: 6px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "router": Rectangle {
+        x: 6px;
+        y: 13px;
+        width: 2px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "router": Rectangle {
+        x: 11px;
+        y: 13px;
+        width: 2px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "terminal": Text {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        text: ">";
+        color: root.accent-color;
+        font-size: 13px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "terminal": Rectangle {
+        x: 12px;
+        y: 15px;
+        width: 5px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "globe": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "globe": Rectangle {
+        x: 10px;
+        y: 5px;
+        width: 1px;
+        height: 12px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "globe": Rectangle {
+        x: 5px;
+        y: 10px;
+        width: 12px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "key": Rectangle {
+        x: 5px;
+        y: 7px;
+        width: 7px;
+        height: 7px;
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "key": Rectangle {
+        x: 11px;
+        y: 10px;
+        width: 8px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "key": Rectangle {
+        x: 15px;
+        y: 12px;
+        width: 2px;
+        height: 3px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "chip": Rectangle {
+        x: 6px;
+        y: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "chip": Rectangle {
+        x: 9px;
+        y: 9px;
+        width: 4px;
+        height: 4px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "chip": Rectangle {
+        x: 3px;
+        y: 8px;
+        width: 4px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "chip": Rectangle {
+        x: 15px;
+        y: 8px;
+        width: 4px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "chip": Rectangle {
+        x: 3px;
+        y: 13px;
+        width: 4px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "chip": Rectangle {
+        x: 15px;
+        y: 13px;
+        width: 4px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cluster": Rectangle {
+        x: 7px;
+        y: 8px;
+        width: 8px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cluster": Rectangle {
+        x: 10px;
+        y: 9px;
+        width: 1px;
+        height: 6px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cluster": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 3px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cluster": Rectangle {
+        x: 13px;
+        y: 5px;
+        width: 5px;
+        height: 5px;
+        border-radius: 3px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cluster": Rectangle {
+        x: 9px;
+        y: 13px;
+        width: 5px;
+        height: 5px;
+        border-radius: 3px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "folder": Rectangle {
+        x: 4px;
+        y: 8px;
+        width: 14px;
+        height: 9px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "folder": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 7px;
+        height: 4px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "folder": Rectangle {
+        x: 6px;
+        y: 11px;
+        width: 10px;
+        height: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "code": Text {
+        x: 0px;
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        text: "{}";
+        color: root.accent-color;
+        font-size: 11px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key != "database" && root.icon-key != "cloud" && root.icon-key != "linux" && root.icon-key != "container" && root.icon-key != "shield" && root.icon-key != "router" && root.icon-key != "terminal" && root.icon-key != "globe" && root.icon-key != "key" && root.icon-key != "chip" && root.icon-key != "cluster" && root.icon-key != "folder" && root.icon-key != "code": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+
+        Rectangle {
+            x: 3px;
+            y: 3px;
+            width: 6px;
+            height: 2px;
+            border-radius: 2px;
+            background: root.accent-color;
+        }
+
+        Rectangle {
+            x: 3px;
+            y: 7px;
+            width: 4px;
+            height: 2px;
+            border-radius: 2px;
+            background: root.accent-color;
+        }
+    }
+
+    Rectangle {
+        x: 15px;
+        y: 15px;
+        width: 7px;
+        height: 7px;
+        border-radius: 4px;
+        border-width: 1px;
+        border-color: AppTheme.panel-bg;
+        background: root.status-color;
+    }
+}
+
+export component HostNodeIcon inherits Rectangle {
+    in property <string> kind: "Host";
+    in property <string> icon-key: "server";
+    in property <string> status-key: "";
+    in property <bool> expanded: true;
+    in property <int> accent-index: 0;
+
+    property <color> accent-color: root.accent-index == 0 ? AppTheme.accent : root.accent-index == 1 ? AppTheme.accent-violet : root.accent-index == 2 ? AppTheme.warning : root.accent-index == 3 ? AppTheme.info-text : root.accent-index == 4 ? AppTheme.danger-text-soft : AppTheme.success-text;
+    property <color> icon-bg: root.kind == "Group" ? AppTheme.badge-warning-bg : AppTheme.card-bg;
+
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: root.kind == "Group" ? AppTheme.warning : root.accent-color;
+    background: root.icon-bg;
+
+    if root.kind == "Group": Rectangle {
+        x: 4px;
+        y: 8px;
+        width: 14px;
+        height: 9px;
+        border-radius: 3px;
+        border-width: 1px;
+        border-color: AppTheme.warning;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Group": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 8px;
+        height: 5px;
+        border-radius: 2px;
+        background: AppTheme.warning;
+    }
+
+    if root.kind == "Group": Rectangle {
+        x: 7px;
+        y: 10px;
+        width: 8px;
+        height: 2px;
+        border-radius: 1px;
+        background: AppTheme.text-strong;
+    }
+
+    if root.kind == "Group" && !root.expanded: Rectangle {
+        x: 10px;
+        y: 7px;
+        width: 2px;
+        height: 8px;
+        border-radius: 1px;
+        background: AppTheme.text-strong;
+    }
+
+    if root.kind != "Group": HostIcon {
+        x: 0px;
+        y: 0px;
+        icon-key: root.icon-key;
+        status-key: root.status-key;
+        accent-index: root.accent-index;
+    }
+}
+
+export component HostIconOption inherits Rectangle {
+    in property <string> label;
+    in property <string> icon-key: "server";
+    in property <string> selected-icon-key: "server";
+    in property <int> accent-index: 0;
+    callback selected(key: string);
+
+    property <bool> active: root.icon-key == root.selected-icon-key;
+
+    height: 58px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.active ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.icon-key); }
+    }
+
+    VerticalLayout {
+        padding-top: 7px;
+        padding-bottom: 6px;
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 5px;
+
+        HostIcon {
+            icon-key: root.icon-key;
+            accent-index: root.accent-index;
+            status-key: "Created";
+        }
+
+        Text {
+            height: 14px;
+            text: root.label;
+            color: root.active ? AppTheme.text-strong : AppTheme.text-muted;
+            font-size: 9px;
+            font-weight: 700;
+            overflow: elide;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
+    }
+}

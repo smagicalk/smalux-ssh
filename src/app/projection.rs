@@ -41,7 +41,7 @@ pub(super) fn sync_terminal_pane(window: &AppWindow, state: &AppState) {
 
 fn sync_view_model(window: &AppWindow, model: &AppViewModel) {
     sync_workspace_state(window, model);
-    sync_terminal_model(window, &model.terminal);
+    sync_terminal_model(window, &model.terminal_workspace.terminal);
     sync_sftp_model(window, model);
     sync_collection_models(window, model);
 }

@@ -1,14 +1,13 @@
-//! 工作区布局尺寸与主机树 UI 状态回调。
+//! 工作区布局尺寸与树形 UI 状态回调。
 //!
-//! 这里处理的是纯 UI 状态：列表/树切换、搜索、侧栏宽度和树节点展开。所有值都进入
-//! `WorkspaceUiState`，下一次 projection 再把状态写回 Slint。
+//! 这里处理的是纯 UI 状态：列表/树切换、主机/凭据搜索、侧栏宽度和树节点展开。
+//! 片段页 CRUD 和运行回调放在 sibling 模块里，避免布局 Adapter 继续承担业务动作。
 
 use std::rc::Rc;
 
-use slint::ComponentHandle;
-
 use crate::app::callbacks::{AppWindow, SharedAppState, apply_and_sync};
 use crate::model::Message;
+use slint::ComponentHandle;
 
 use super::super::parse_optional_group_id;
 
@@ -42,6 +41,33 @@ pub(super) fn bind(window: &AppWindow, state: &SharedAppState) {
                 &state,
                 Message::UpdateHostSearchQuery {
                     query: query.to_string(),
+                },
+            );
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(state);
+        window.on_update_credential_search(move |query| {
+            // 密钥页搜索只影响密钥树投影，不改变持久化数据。
+            apply_and_sync(
+                &weak,
+                &state,
+                Message::UpdateCredentialSearchQuery {
+                    query: query.to_string(),
+                },
+            );
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(state);
+        window.on_toggle_credential_tree_node(move |node_id| {
+            apply_and_sync(
+                &weak,
+                &state,
+                Message::ToggleCredentialTreeNode {
+                    node_id: node_id.to_string(),
                 },
             );
         });

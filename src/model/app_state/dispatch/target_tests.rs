@@ -32,6 +32,22 @@ fn classifies_representative_messages_by_dispatch_target() {
         MessageDispatchTarget::Storage
     );
     assert_eq!(
+        MessageDispatchTarget::for_message(&Message::UpdateCredentialSecret {
+            name: "deploy".to_owned(),
+            secret_text: "new-key".to_owned(),
+        }),
+        MessageDispatchTarget::Storage
+    );
+    assert_eq!(
+        MessageDispatchTarget::for_message(&Message::ImportCertificateTextCredential {
+            name: "deploy-cert".to_owned(),
+            group_id: None,
+            certificate_text: "ssh-ed25519-cert-v01@openssh.com AAAATEST deploy-cert".to_owned(),
+            algorithm: None,
+        }),
+        MessageDispatchTarget::Storage
+    );
+    assert_eq!(
         MessageDispatchTarget::for_message(&Message::ActivateTerminalTab {
             session_id: SessionId(uuid::Uuid::nil()),
         }),
@@ -58,6 +74,13 @@ fn classifies_representative_messages_by_dispatch_target() {
     assert_eq!(
         MessageDispatchTarget::for_message(&Message::RunCommandHistory {
             history_id: crate::model::CommandHistoryId(uuid::Uuid::nil()),
+        }),
+        MessageDispatchTarget::Snippet
+    );
+    assert_eq!(
+        MessageDispatchTarget::for_message(&Message::CreateSnippetGroup {
+            name: "ops".to_owned(),
+            parent_id: None,
         }),
         MessageDispatchTarget::Snippet
     );

@@ -1,0 +1,323 @@
+import { AppTheme } from "./theme.slint";
+import { DialogButton, DialogCloseButton, DialogField } from "./common.slint";
+import { HostNodeIcon } from "./hosts.slint";
+import { AgentSourceOption } from "./host_dialog_parts.slint";
+
+export component HostFormHeader inherits Rectangle {
+    in property <string> title;
+    in property <string> subtitle;
+    callback close();
+
+    height: 36px;
+
+    HorizontalLayout {
+        spacing: 12px;
+
+        Rectangle {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: AppTheme.dialog-success-icon-bg;
+            border-width: 1px;
+            border-color: AppTheme.dialog-success-icon-border;
+
+            Text {
+                text: "+";
+                color: AppTheme.accent;
+                font-size: 20px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            height: 36px;
+            horizontal-stretch: 1;
+
+            Text {
+                y: 0px;
+                width: parent.width;
+                height: 20px;
+                text: root.title;
+                color: AppTheme.text-strong;
+                font-size: 17px;
+                font-weight: 700;
+            }
+
+            Text {
+                y: 21px;
+                width: parent.width;
+                height: 15px;
+                text: root.subtitle;
+                color: AppTheme.text-muted;
+                font-size: 11px;
+                wrap: word-wrap;
+            }
+        }
+
+        DialogCloseButton { clicked => { root.close(); } }
+    }
+}
+
+export component HostGroupSelectField inherits Rectangle {
+    in property <string> label;
+    in property <string> group-path;
+    callback open();
+
+    height: 46px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.input-bg;
+
+    touch := TouchArea {
+        clicked => { root.open(); }
+    }
+
+    Text {
+        x: 10px;
+        y: 7px;
+        width: parent.width - 36px;
+        height: 13px;
+        text: root.label;
+        color: AppTheme.text-muted;
+        font-size: 9px;
+        font-weight: 700;
+        overflow: elide;
+    }
+
+    Text {
+        x: 10px;
+        y: 21px;
+        width: parent.width - 36px;
+        height: 17px;
+        text: root.group-path;
+        color: AppTheme.text-strong;
+        font-size: 11px;
+        font-weight: 700;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+
+    Text {
+        x: parent.width - 24px;
+        y: 0px;
+        width: 14px;
+        height: parent.height;
+        text: "v";
+        color: AppTheme.text-muted;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component HostIconSelectField inherits Rectangle {
+    in property <string> title;
+    in property <string> selected-label;
+    in property <string> icon-key;
+    in property <bool> open-state;
+    in property <int> accent-index;
+    callback open();
+
+    height: 46px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.input-bg;
+
+    touch := TouchArea {
+        clicked => { root.open(); }
+    }
+
+    HostNodeIcon {
+        x: 10px;
+        y: (parent.height - self.height) / 2;
+        kind: "Host";
+        icon-key: root.icon-key;
+        status-key: "Created";
+        accent-index: root.accent-index;
+    }
+
+    Text {
+        x: 42px;
+        y: 7px;
+        width: parent.width - 68px;
+        height: 13px;
+        text: root.title;
+        color: AppTheme.text-muted;
+        font-size: 9px;
+        font-weight: 700;
+        overflow: elide;
+    }
+
+    Text {
+        x: 42px;
+        y: 21px;
+        width: parent.width - 68px;
+        height: 17px;
+        text: root.selected-label;
+        color: AppTheme.text-strong;
+        font-size: 12px;
+        font-weight: 700;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+
+    Text {
+        x: parent.width - 24px;
+        y: 0px;
+        width: 14px;
+        height: parent.height;
+        text: root.open-state ? "^" : "v";
+        color: AppTheme.text-muted;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component HostAgentSourceSection inherits Rectangle {
+    in property <string> selected-source;
+    in property <string> title;
+    in property <string> auto-label;
+    in property <string> auto-caption;
+    in property <string> openssh-label;
+    in property <string> openssh-caption;
+    in property <string> pageant-label;
+    in property <string> pageant-caption;
+    in property <string> custom-label;
+    in property <string> custom-caption;
+    in property <string> custom-pipe-label;
+    in property <string> custom-pipe-placeholder;
+    in property <string> custom-pipe-value;
+    callback select-source(source: string);
+    callback update-custom-pipe(value: string);
+
+    height: root.selected-source == "Custom" ? 138px : 88px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.dialog-section-bg;
+
+    property <string> caption: root.selected-source == "Auto"
+        ? root.auto-caption
+        : root.selected-source == "OpenSSH"
+            ? root.openssh-caption
+            : root.selected-source == "Pageant"
+                ? root.pageant-caption
+                : root.custom-caption;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+
+        VerticalLayout {
+            spacing: 3px;
+
+            Text {
+                text: root.title;
+                color: AppTheme.text-strong;
+                font-size: 11px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: root.caption;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                wrap: word-wrap;
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 6px;
+
+            AgentSourceOption {
+                label: root.auto-label;
+                token: "Auto";
+                selected-token: root.selected-source;
+                horizontal-stretch: 1;
+                selected(token) => { root.select-source(token); }
+            }
+
+            AgentSourceOption {
+                label: root.openssh-label;
+                token: "OpenSSH";
+                selected-token: root.selected-source;
+                horizontal-stretch: 1;
+                selected(token) => { root.select-source(token); }
+            }
+
+            AgentSourceOption {
+                label: root.pageant-label;
+                token: "Pageant";
+                selected-token: root.selected-source;
+                horizontal-stretch: 1;
+                selected(token) => { root.select-source(token); }
+            }
+
+            AgentSourceOption {
+                label: root.custom-label;
+                token: "Custom";
+                selected-token: root.selected-source;
+                horizontal-stretch: 1;
+                selected(token) => { root.select-source(token); }
+            }
+        }
+
+        if root.selected-source == "Custom": DialogField {
+            label: root.custom-pipe-label;
+            field-value: root.custom-pipe-value;
+            placeholder: root.custom-pipe-placeholder;
+            edited(value) => { root.update-custom-pipe(value); }
+            accepted(value) => { root.update-custom-pipe(value); }
+        }
+    }
+}
+
+export component HostFormFooter inherits Rectangle {
+    in property <string> note;
+    in property <string> cancel-label;
+    in property <string> save-label;
+    in property <bool> save-enabled;
+    callback close();
+    callback save();
+
+    height: 30px;
+
+    HorizontalLayout {
+        spacing: 8px;
+
+        Rectangle {
+            height: 30px;
+            horizontal-stretch: 1;
+
+            Text {
+                width: parent.width;
+                height: parent.height;
+                text: root.note;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                wrap: word-wrap;
+                vertical-alignment: center;
+            }
+        }
+
+        DialogButton {
+            label: root.cancel-label;
+            primary: false;
+            clicked => { root.close(); }
+        }
+
+        DialogButton {
+            label: root.save-label;
+            primary: true;
+            enabled: root.save-enabled;
+            clicked => { root.save(); }
+        }
+    }
+}

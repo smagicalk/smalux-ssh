@@ -5,8 +5,10 @@
 
 use slint::{ModelRc, VecModel};
 
-use crate::app::view_model::{GroupOptionViewModel, HostTreeViewModel, HostViewModel};
-use crate::app::{GroupOptionRow, HostRow, HostTreeRow};
+use crate::app::view_model::{
+    CredentialOptionViewModel, GroupOptionViewModel, HostTreeViewModel, HostViewModel,
+};
+use crate::app::{CredentialOptionRow, GroupOptionRow, HostRow, HostTreeRow};
 
 pub(in crate::app::projection) fn host_model(items: &[HostViewModel]) -> ModelRc<HostRow> {
     // HostRow 对应卡片/列表视图，包含完整 endpoint、auth、tags 和状态展示字段。
@@ -76,6 +78,21 @@ pub(in crate::app::projection) fn group_option_model(
             path: group.path.as_str().into(),
             depth: group.depth,
             selected: group.selected,
+        })
+        .collect::<Vec<_>>();
+    ModelRc::new(VecModel::from(rows))
+}
+
+pub(in crate::app::projection) fn credential_option_model(
+    items: &[CredentialOptionViewModel],
+) -> ModelRc<CredentialOptionRow> {
+    let rows = items
+        .iter()
+        .map(|item| CredentialOptionRow {
+            value: item.value.as_str().into(),
+            label: item.label.as_str().into(),
+            detail: item.detail.as_str().into(),
+            selected: item.selected,
         })
         .collect::<Vec<_>>();
     ModelRc::new(VecModel::from(rows))

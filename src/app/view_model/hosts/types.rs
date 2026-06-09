@@ -84,6 +84,15 @@ pub(in crate::app) struct GroupOptionViewModel {
     pub selected: bool,
 }
 
+/// 创建主机弹窗中的凭据选项。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::app) struct CredentialOptionViewModel {
+    pub value: String,
+    pub label: String,
+    pub detail: String,
+    pub selected: bool,
+}
+
 /// 创建主机弹窗文案。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::app) struct CreateHostDialogText {
@@ -134,10 +143,20 @@ pub(in crate::app) struct CreateHostDialogText {
     pub password_secret_placeholder: &'static str,
     pub private_key_label: &'static str,
     pub private_key_placeholder: &'static str,
+    pub add_private_key_label: &'static str,
+    pub add_private_key_caption: &'static str,
     pub passphrase_label: &'static str,
     pub passphrase_placeholder: &'static str,
     pub certificate_label: &'static str,
     pub certificate_placeholder: &'static str,
+    pub add_certificate_label: &'static str,
+    pub add_certificate_caption: &'static str,
+    pub credential_name_label: &'static str,
+    pub credential_name_placeholder: &'static str,
+    pub credential_secret_label: &'static str,
+    pub credential_secret_placeholder: &'static str,
+    pub credential_algorithm_label: &'static str,
+    pub credential_save_label: &'static str,
     pub icon_title: &'static str,
     pub icon_server_label: &'static str,
     pub icon_database_label: &'static str,
@@ -145,6 +164,12 @@ pub(in crate::app) struct CreateHostDialogText {
     pub icon_linux_label: &'static str,
     pub icon_container_label: &'static str,
     pub icon_shield_label: &'static str,
+    pub icon_router_label: &'static str,
+    pub icon_terminal_label: &'static str,
+    pub icon_globe_label: &'static str,
+    pub icon_key_label: &'static str,
+    pub icon_chip_label: &'static str,
+    pub icon_cluster_label: &'static str,
 }
 
 /// 首页快速新增主机表单展示模型。
@@ -152,6 +177,8 @@ pub(in crate::app) struct CreateHostDialogText {
 pub(in crate::app) struct QuickHostViewModel {
     pub group_path: String,
     pub group_options: Vec<GroupOptionViewModel>,
+    pub private_key_options: Vec<CredentialOptionViewModel>,
+    pub certificate_options: Vec<CredentialOptionViewModel>,
     pub name: String,
     pub address: String,
     pub port: String,

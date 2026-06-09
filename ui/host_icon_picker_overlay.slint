@@ -1,0 +1,89 @@
+import { AppTheme } from "./theme.slint";
+import { DialogCloseButton } from "./common.slint";
+import { HostIconChoice } from "./host_dialog_parts.slint";
+export component HostIconPickerOverlay inherits Rectangle {
+    in-out property <bool> open;
+    in property <string> selected-icon-key;
+    in property <string> title-label;
+    in property <string> server-label;
+    in property <string> database-label;
+    in property <string> cloud-label;
+    in property <string> linux-label;
+    in property <string> container-label;
+    in property <string> shield-label;
+    in property <string> router-label;
+    in property <string> terminal-label;
+    in property <string> globe-label;
+    in property <string> key-label;
+    in property <string> chip-label;
+    in property <string> cluster-label;
+    callback selected(key: string);
+
+    property <length> picker-width: min(root.width - 72px, 560px);
+    property <length> choice-width: (root.picker-width - 44px) / 3;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: root.picker-width;
+        height: min(root.height - 72px, 292px);
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                Text {
+                    text: root.title-label;
+                    color: AppTheme.text-strong;
+                    font-size: 14px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                DialogCloseButton {
+                    clicked => { root.open = false; }
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    HostIconChoice { label: root.server-label; icon-key: "server"; selected-icon-key: root.selected-icon-key; accent-index: 0; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.database-label; icon-key: "database"; selected-icon-key: root.selected-icon-key; accent-index: 1; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.cloud-label; icon-key: "cloud"; selected-icon-key: root.selected-icon-key; accent-index: 2; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    HostIconChoice { label: root.linux-label; icon-key: "linux"; selected-icon-key: root.selected-icon-key; accent-index: 3; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.container-label; icon-key: "container"; selected-icon-key: root.selected-icon-key; accent-index: 4; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.shield-label; icon-key: "shield"; selected-icon-key: root.selected-icon-key; accent-index: 5; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    HostIconChoice { label: root.router-label; icon-key: "router"; selected-icon-key: root.selected-icon-key; accent-index: 0; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.terminal-label; icon-key: "terminal"; selected-icon-key: root.selected-icon-key; accent-index: 1; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.globe-label; icon-key: "globe"; selected-icon-key: root.selected-icon-key; accent-index: 2; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    HostIconChoice { label: root.key-label; icon-key: "key"; selected-icon-key: root.selected-icon-key; accent-index: 3; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.chip-label; icon-key: "chip"; selected-icon-key: root.selected-icon-key; accent-index: 4; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                    HostIconChoice { label: root.cluster-label; icon-key: "cluster"; selected-icon-key: root.selected-icon-key; accent-index: 5; width: root.choice-width; selected(key) => { root.selected(key); root.open = false; } }
+                }
+            }
+        }
+    }
+}

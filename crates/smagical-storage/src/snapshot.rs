@@ -7,8 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use smagical_config::AppConfig;
 use smagical_core::{
-    CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
-    SftpBookmark, Snippet, TunnelRule, WorkspaceState,
+    CommandHistoryItem, CredentialGroup, CredentialInspection, CredentialMetadata, Host, HostGroup,
+    KnownHostEntry, RecentConnection, SecretRecord, SftpBookmark, Snippet, SnippetGroup,
+    TunnelRule, WorkspaceState,
 };
 
 use super::{StorageManager, ThemeProfileRecord};
@@ -24,6 +25,14 @@ pub(crate) struct StorageSnapshot {
     pub(crate) groups: Vec<HostGroup>,
     /// 凭据元数据集合。
     pub(crate) credentials: Vec<CredentialMetadata>,
+    /// 凭据内容解析缓存集合。
+    #[serde(default)]
+    pub(crate) credential_inspections: Vec<CredentialInspection>,
+    /// 密钥分组集合。
+    pub(crate) credential_groups: Vec<CredentialGroup>,
+    /// 本地安全存储集合。
+    #[serde(default)]
+    pub(crate) secrets: Vec<SecretRecord>,
     /// Known Hosts 集合。
     pub(crate) known_hosts: Vec<KnownHostEntry>,
     /// 最近连接集合。
@@ -32,6 +41,9 @@ pub(crate) struct StorageSnapshot {
     pub(crate) command_history: Vec<CommandHistoryItem>,
     /// 快捷命令集合。
     pub(crate) snippets: Vec<Snippet>,
+    /// 快捷命令分组集合。
+    #[serde(default)]
+    pub(crate) snippet_groups: Vec<SnippetGroup>,
     /// SFTP 书签集合。
     pub(crate) sftp_bookmarks: Vec<SftpBookmark>,
     /// 隧道规则集合。
@@ -49,10 +61,14 @@ impl From<&StorageManager> for StorageSnapshot {
             hosts: storage.hosts.clone(),
             groups: storage.groups.clone(),
             credentials: storage.credentials.clone(),
+            credential_inspections: storage.credential_inspections.clone(),
+            credential_groups: storage.credential_groups.clone(),
+            secrets: storage.secrets.clone(),
             known_hosts: storage.known_hosts.clone(),
             recent_connections: storage.recent_connections.clone(),
             command_history: storage.command_history.clone(),
             snippets: storage.snippets.clone(),
+            snippet_groups: storage.snippet_groups.clone(),
             sftp_bookmarks: storage.sftp_bookmarks.clone(),
             tunnel_rules: storage.tunnel_rules.clone(),
             themes: storage.themes.clone(),
@@ -70,10 +86,14 @@ impl StorageSnapshot {
             hosts: self.hosts,
             groups: self.groups,
             credentials: self.credentials,
+            credential_inspections: self.credential_inspections,
+            credential_groups: self.credential_groups,
+            secrets: self.secrets,
             known_hosts: self.known_hosts,
             recent_connections: self.recent_connections,
             command_history: Vec::new(),
             snippets: self.snippets,
+            snippet_groups: self.snippet_groups,
             sftp_bookmarks: self.sftp_bookmarks,
             tunnel_rules: Vec::new(),
             themes: self.themes,

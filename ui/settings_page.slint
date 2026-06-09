@@ -1,0 +1,129 @@
+import { ScrollView } from "std-widgets.slint";
+import { SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { CompactButton } from "./common.slint";
+import { WorkspaceListItem } from "./workspace_common.slint";
+import { SettingsFileActionItem, SettingsOptionPill, SettingsProfileItem, SettingsSectionHeader, SettingsSummaryItem } from "./settings_page_parts.slint";
+export component SettingsPage inherits Rectangle {
+    in property <string> title;
+    in property <[SettingOptionRow]> language-options;
+    in property <[SettingOptionRow]> theme-options;
+    in property <[SettingsProfileRow]> theme-profiles;
+    in property <[SettingsSummaryRow]> storage-summary;
+    in property <[SettingsFileActionRow]> file-actions;
+    in property <string> language-title-label;
+    in property <string> theme-title-label;
+    in property <string> custom-theme-title-label;
+    in property <string> storage-title-label;
+    in property <string> file-actions-title-label;
+    in property <string> security-title-label;
+    in property <string> apply-label;
+    in property <string> copy-label;
+    in property <string> remove-label;
+    in property <string> run-label;
+    in property <string> choose-file-label;
+    in property <string> selected-label;
+    in property <string> unavailable-label;
+    in property <string> empty-custom-themes-label;
+    in property <string> current-profile-name;
+    in property <string> storage-summary-label;
+    in property <string> storage-backend-label;
+    in property <string> storage-database-path;
+    in property <string> security-summary-label;
+    in property <string> security-status-label;
+    in property <string> security-detail-label;
+    in property <string> security-kdf-label;
+    in property <string> security-version-label;
+    callback set-language(language: string);
+    callback set-built-in-theme(theme: string);
+    callback copy-current-built-in-theme();
+    callback apply-theme-profile(name: string);
+    callback remove-theme-profile(name: string);
+    callback run-file-action(key: string, path: string, format: string);
+    callback choose-file-action-path(key: string, current-path: string, direction: string, extension: string) -> string;
+
+    background: AppTheme.window-bg;
+
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+
+            Text {
+                text: root.title;
+                color: AppTheme.text-strong;
+                font-size: 16px;
+                font-weight: 700;
+            }
+
+            SettingsSectionHeader { label: root.language-title-label; }
+            HorizontalLayout {
+                spacing: 7px;
+                for option in root.language-options: SettingsOptionPill {
+                    option: option;
+                    selected-label: root.selected-label;
+                    clicked(key) => { root.set-language(key); }
+                }
+            }
+
+            SettingsSectionHeader { label: root.theme-title-label; }
+            HorizontalLayout {
+                spacing: 7px;
+                for option in root.theme-options: SettingsOptionPill {
+                    option: option;
+                    selected-label: root.selected-label;
+                    clicked(key) => { root.set-built-in-theme(key); }
+                }
+                CompactButton {
+                    label: root.copy-label;
+                    compact: true;
+                    clicked => { root.copy-current-built-in-theme(); }
+                }
+            }
+
+            SettingsSectionHeader { label: root.custom-theme-title-label; }
+            if root.theme-profiles.length == 0: WorkspaceListItem {
+                title: root.empty-custom-themes-label;
+                subtitle: root.current-profile-name;
+                meta: "";
+            }
+            for profile in root.theme-profiles: SettingsProfileItem {
+                profile: profile;
+                selected-label: root.selected-label;
+                apply-label: root.apply-label;
+                remove-label: root.remove-label;
+                apply(name) => { root.apply-theme-profile(name); }
+                remove(name) => { root.remove-theme-profile(name); }
+            }
+
+            SettingsSectionHeader { label: root.storage-title-label; }
+            WorkspaceListItem {
+                title: root.storage-backend-label;
+                subtitle: root.storage-database-path;
+                meta: root.storage-summary-label;
+            }
+            for item in root.storage-summary: SettingsSummaryItem { item: item; }
+
+            SettingsSectionHeader { label: root.file-actions-title-label; }
+            for action in root.file-actions: SettingsFileActionItem {
+                action: action;
+                run-label: root.run-label;
+                choose-label: root.choose-file-label;
+                unavailable-label: root.unavailable-label;
+                choose(key, current-path, direction, extension) => {
+                    self.selected-path = root.choose-file-action-path(key, current-path, direction, extension);
+                }
+                run(key, path, format) => { root.run-file-action(key, path, format); }
+            }
+
+            SettingsSectionHeader { label: root.security-title-label; }
+            WorkspaceListItem {
+                title: root.security-status-label;
+                subtitle: root.security-detail-label;
+                meta: root.security-summary-label + " · " + root.security-kdf-label + " · " + root.security-version-label;
+            }
+        }
+    }
+}

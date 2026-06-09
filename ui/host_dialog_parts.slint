@@ -1,0 +1,317 @@
+import { CredentialOptionRow, GroupOptionRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { HostNodeIcon } from "./hosts.slint";
+export component AgentSourceOption inherits Rectangle {
+    in property <string> label;
+    in property <string> token;
+    in property <string> selected-token;
+    callback selected(token: string);
+
+    property <bool> active: root.token == root.selected-token;
+
+    height: 26px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.active ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: root.active ? AppTheme.button-secondary-bg : touch.pressed ? AppTheme.button-secondary-pressed : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.surface-bg;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.token); }
+    }
+
+    Text {
+        text: root.label;
+        color: root.active ? AppTheme.text-strong : AppTheme.text-muted;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+export component GroupPickerRow inherits Rectangle {
+    in property <GroupOptionRow> group;
+    callback selected(id: string);
+
+    height: 34px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.group.selected ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-soft : AppTheme.transparent;
+    background: root.group.selected ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.group.id); }
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 7px;
+
+        Rectangle {
+            width: root.group.depth * 14px;
+            height: parent.height;
+            background: AppTheme.transparent;
+        }
+
+        Rectangle {
+            width: 18px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 2px;
+                y: 11px;
+                width: 14px;
+                height: 11px;
+                border-radius: 3px;
+                border-width: 1px;
+                border-color: root.group.selected ? AppTheme.accent : AppTheme.border-soft;
+                background: root.group.selected ? AppTheme.badge-success-bg : AppTheme.card-bg;
+            }
+
+            Rectangle {
+                x: 4px;
+                y: 8px;
+                width: 8px;
+                height: 4px;
+                border-radius: 2px;
+                background: root.group.selected ? AppTheme.accent : AppTheme.border-soft;
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 1px;
+
+            Text {
+                text: root.group.name;
+                color: root.group.selected ? AppTheme.text-strong : AppTheme.text;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.group.path;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                overflow: elide;
+            }
+        }
+    }
+}
+
+export component CredentialPickerButton inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+    in property <string> placeholder;
+    callback open();
+
+    height: 46px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.input-bg;
+
+    touch := TouchArea {
+        clicked => { root.open(); }
+    }
+
+    Text {
+        x: 10px;
+        y: 7px;
+        width: parent.width - 36px;
+        height: 13px;
+        text: root.label;
+        color: AppTheme.text-muted;
+        font-size: 9px;
+        font-weight: 700;
+        overflow: elide;
+    }
+
+    Text {
+        x: 10px;
+        y: 21px;
+        width: parent.width - 36px;
+        height: 17px;
+        text: root.value == "" ? root.placeholder : root.value;
+        color: root.value == "" ? AppTheme.input-placeholder : AppTheme.text-strong;
+        font-size: 11px;
+        font-weight: 700;
+        overflow: elide;
+        vertical-alignment: center;
+    }
+
+    Text {
+        x: parent.width - 24px;
+        y: 0px;
+        width: 14px;
+        height: parent.height;
+        text: "v";
+        color: AppTheme.text-muted;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+}
+
+export component CredentialOptionItem inherits Rectangle {
+    in property <CredentialOptionRow> option;
+    callback selected(value: string);
+
+    height: 44px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.option.selected ? AppTheme.border-strong : AppTheme.transparent;
+    background: root.option.selected ? AppTheme.selection-bg : AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.option.value); }
+    }
+
+    VerticalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        padding-top: 6px;
+        padding-bottom: 6px;
+        spacing: 2px;
+
+        Text {
+            text: root.option.label;
+            color: root.option.selected ? AppTheme.text-strong : AppTheme.text;
+            font-size: 11px;
+            font-weight: 700;
+            overflow: elide;
+        }
+
+        Text {
+            text: root.option.detail;
+            color: AppTheme.text-muted;
+            font-size: 9px;
+            overflow: elide;
+        }
+    }
+}
+
+export component CredentialAddItem inherits Rectangle {
+    in property <string> label;
+    in property <string> caption;
+    callback clicked();
+
+    height: 50px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.card-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 9px;
+
+        Rectangle {
+            width: 26px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 1px;
+                y: (parent.height - self.height) / 2;
+                width: 24px;
+                height: 24px;
+                border-radius: 7px;
+                border-width: 1px;
+                border-color: AppTheme.dialog-success-icon-border;
+                background: AppTheme.dialog-success-icon-bg;
+
+                Text {
+                    text: "+";
+                    color: AppTheme.accent;
+                    font-size: 16px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+
+            Rectangle { vertical-stretch: 1; }
+            Text {
+                text: root.label;
+                color: AppTheme.text-strong;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.caption;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                overflow: elide;
+            }
+            Rectangle { vertical-stretch: 1; }
+        }
+    }
+}
+
+export component HostIconChoice inherits Rectangle {
+    in property <string> label;
+    in property <string> icon-key: "server";
+    in property <string> selected-icon-key: "server";
+    in property <int> accent-index: 0;
+    callback selected(key: string);
+
+    property <bool> active: root.icon-key == root.selected-icon-key;
+
+    height: 46px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: root.active ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
+
+    touch := TouchArea {
+        clicked => { root.selected(root.icon-key); }
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+
+        Rectangle {
+            width: 30px;
+            height: root.height;
+            background: AppTheme.transparent;
+
+            HostNodeIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                kind: "Host";
+                icon-key: root.icon-key;
+                status-key: "Created";
+                accent-index: root.accent-index;
+            }
+        }
+
+        Text {
+            text: root.label;
+            color: root.active ? AppTheme.text-strong : AppTheme.text;
+            font-size: 11px;
+            font-weight: 700;
+            horizontal-stretch: 1;
+            overflow: elide;
+            vertical-alignment: center;
+        }
+    }
+}

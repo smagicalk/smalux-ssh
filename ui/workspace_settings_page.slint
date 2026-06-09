@@ -1,0 +1,108 @@
+import { SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow } from "./models.slint";
+import { SettingsPage } from "./settings_page.slint";
+
+// 设置工作区页面包装层：统一处理设置页的文件动作分发，MainWorkspace 只保留顶层回调。
+export component SettingsWorkspacePage inherits Rectangle {
+    in property <string> title: "";
+    in property <[SettingOptionRow]> language-options: [];
+    in property <[SettingOptionRow]> theme-options: [];
+    in property <[SettingsProfileRow]> theme-profiles: [];
+    in property <[SettingsSummaryRow]> storage-summary: [];
+    in property <[SettingsFileActionRow]> file-actions: [];
+    in property <string> language-title-label: "";
+    in property <string> theme-title-label: "";
+    in property <string> custom-theme-title-label: "";
+    in property <string> storage-title-label: "";
+    in property <string> file-actions-title-label: "";
+    in property <string> security-title-label: "";
+    in property <string> apply-label: "";
+    in property <string> copy-label: "";
+    in property <string> remove-label: "";
+    in property <string> run-label: "";
+    in property <string> choose-file-label: "";
+    in property <string> selected-label: "";
+    in property <string> unavailable-label: "";
+    in property <string> empty-custom-themes-label: "";
+    in property <string> current-profile-name: "";
+    in property <string> storage-summary-label: "";
+    in property <string> storage-backend-label: "";
+    in property <string> storage-database-path: "";
+    in property <string> security-summary-label: "";
+    in property <string> security-status-label: "";
+    in property <string> security-detail-label: "";
+    in property <string> security-kdf-label: "";
+    in property <string> security-version-label: "";
+
+    callback set-language(language: string);
+    callback set-built-in-theme(theme: string);
+    callback copy-current-built-in-theme();
+    callback apply-theme-profile(name: string);
+    callback remove-theme-profile(name: string);
+    callback choose-file-action-path(key: string, current-path: string, direction: string, extension: string) -> string;
+    callback export-current-theme(target-path: string, format: string);
+    callback import-theme(source-path: string);
+    callback backup-storage(target-path: string);
+    callback export-storage-snapshot(target-path: string);
+    callback import-storage-snapshot(source-path: string);
+    callback import-sqlite-backup(source-path: string);
+
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    SettingsPage {
+        width: root.width;
+        height: root.height;
+        title: root.title;
+        language-options: root.language-options;
+        theme-options: root.theme-options;
+        theme-profiles: root.theme-profiles;
+        storage-summary: root.storage-summary;
+        file-actions: root.file-actions;
+        language-title-label: root.language-title-label;
+        theme-title-label: root.theme-title-label;
+        custom-theme-title-label: root.custom-theme-title-label;
+        storage-title-label: root.storage-title-label;
+        file-actions-title-label: root.file-actions-title-label;
+        security-title-label: root.security-title-label;
+        apply-label: root.apply-label;
+        copy-label: root.copy-label;
+        remove-label: root.remove-label;
+        run-label: root.run-label;
+        choose-file-label: root.choose-file-label;
+        selected-label: root.selected-label;
+        unavailable-label: root.unavailable-label;
+        empty-custom-themes-label: root.empty-custom-themes-label;
+        current-profile-name: root.current-profile-name;
+        storage-summary-label: root.storage-summary-label;
+        storage-backend-label: root.storage-backend-label;
+        storage-database-path: root.storage-database-path;
+        security-summary-label: root.security-summary-label;
+        security-status-label: root.security-status-label;
+        security-detail-label: root.security-detail-label;
+        security-kdf-label: root.security-kdf-label;
+        security-version-label: root.security-version-label;
+        set-language(language) => { root.set-language(language); }
+        set-built-in-theme(theme) => { root.set-built-in-theme(theme); }
+        copy-current-built-in-theme => { root.copy-current-built-in-theme(); }
+        apply-theme-profile(name) => { root.apply-theme-profile(name); }
+        remove-theme-profile(name) => { root.remove-theme-profile(name); }
+        choose-file-action-path(key, current-path, direction, extension) => {
+            root.choose-file-action-path(key, current-path, direction, extension)
+        }
+        run-file-action(key, path, format) => {
+            if (key == "ExportCurrentTheme") {
+                root.export-current-theme(path, format);
+            } else if (key == "ImportTheme") {
+                root.import-theme(path);
+            } else if (key == "BackupSqlite") {
+                root.backup-storage(path);
+            } else if (key == "ExportSnapshot") {
+                root.export-storage-snapshot(path);
+            } else if (key == "ImportSnapshot") {
+                root.import-storage-snapshot(path);
+            } else if (key == "ImportSqliteBackup") {
+                root.import-sqlite-backup(path);
+            }
+        }
+    }
+}

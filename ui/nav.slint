@@ -161,6 +161,57 @@ export component RailIcon inherits Rectangle {
         background: AppTheme.transparent;
     }
 
+    if root.kind == "Proxy": Rectangle {
+        x: 4px;
+        y: 3px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Proxy": Rectangle {
+        x: 14px;
+        y: 3px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Proxy": Rectangle {
+        x: 9px;
+        y: 11px;
+        width: 6px;
+        height: 6px;
+        border-radius: 3px;
+        border-width: 2px;
+        border-color: root.icon-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.kind == "Proxy": Rectangle {
+        x: 7px;
+        y: 8px;
+        width: 11px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.icon-color;
+    }
+
+    if root.kind == "Proxy": Rectangle {
+        x: 11px;
+        y: 8px;
+        width: 2px;
+        height: 6px;
+        border-radius: 1px;
+        background: root.icon-color;
+    }
+
     if root.kind == "Settings": Rectangle {
         x: 4px;
         y: 2px;
@@ -197,7 +248,7 @@ export component RailButton inherits Rectangle {
     height: 42px;
     border-radius: 2px;
     border-width: 1px;
-    border-color: active ? AppTheme.accent : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.transparent;
     background: active ? AppTheme.raised-bg : touch.pressed ? AppTheme.panel-bg : touch.has-hover ? AppTheme.surface-bg : AppTheme.rail-bg;
 
     touch := TouchArea {

@@ -16,6 +16,7 @@ pub(super) fn page_label(page: WorkspacePage, locale: Locale) -> &'static str {
         WorkspacePage::Snippets => tr(locale, "page.snippets"),
         WorkspacePage::History => tr(locale, "page.history"),
         WorkspacePage::Security => tr(locale, "page.security"),
+        WorkspacePage::Proxy => tr(locale, "page.proxy"),
         WorkspacePage::Settings => tr(locale, "page.settings"),
     }
 }
@@ -29,6 +30,7 @@ pub(super) fn page_key(page: WorkspacePage) -> &'static str {
         WorkspacePage::Snippets => "Snippets",
         WorkspacePage::History => "History",
         WorkspacePage::Security => "Security",
+        WorkspacePage::Proxy => "Proxy",
         WorkspacePage::Settings => "Settings",
     }
 }

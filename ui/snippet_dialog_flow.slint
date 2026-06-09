@@ -1,0 +1,276 @@
+import { HostRow, SnippetRow } from "./models.slint";
+import { ConfirmDialog } from "./common.slint";
+import { CreateSnippetDialog, CreateSnippetChoiceDialog, CreateSnippetGroupDialog } from "./snippet_create_dialogs.slint";
+import { MoveSnippetDialog } from "./snippet_move_dialog.slint";
+import { RunSnippetDialog } from "./snippet_run_dialog.slint";
+export component SnippetDialogFlow inherits Rectangle {
+    in property <bool> remove-dialog-open;
+    in property <string> remove-dialog-id;
+    in property <string> remove-dialog-name;
+    in property <string> remove-dialog-kind;
+    in property <bool> run-dialog-open;
+    in property <string> run-host-id;
+    in property <string> run-arguments;
+    in property <bool> move-dialog-open;
+    in property <string> move-target-group-id;
+    in property <bool> create-choice-dialog-open;
+    in property <bool> create-dialog-open;
+    in property <bool> create-group-dialog-open;
+    in property <string> choice-parent-node-id;
+    in property <string> selected-snippet-id;
+    in property <string> selected-node-kind;
+    in property <string> selected-command-template;
+    in property <string> selected-variable-names;
+    in property <[HostRow]> hosts;
+    in property <[SnippetRow]> snippet-rows;
+    in property <[SnippetRow]> snippet-target-options;
+    in property <bool> quick-edit-mode;
+    in property <string> quick-dialog-kind;
+    in property <string> quick-edit-id;
+    in property <string> quick-parent-node-id;
+    in property <string> quick-name;
+    in property <string> quick-description;
+    in property <string> quick-command;
+    in property <string> quick-target-mode;
+    in property <string> quick-share-target-id;
+    in property <string> quick-group-name;
+    in-out property <bool> quick-target-linux-selected;
+    in-out property <bool> quick-target-debian-selected;
+    in-out property <bool> quick-target-rhel-selected;
+    in-out property <bool> quick-target-macos-selected;
+    in-out property <bool> quick-target-powershell-selected;
+    in-out property <bool> quick-target-cmd-selected;
+    in property <string> delete-title-label;
+    in property <string> delete-snippet-caption-label;
+    in property <string> delete-group-caption-label;
+    in property <string> delete-target-caption-label;
+    in property <string> delete-confirm-label;
+    in property <string> cancel-label;
+    in property <string> run-title-label;
+    in property <string> command-template-label;
+    in property <string> run-host-label;
+    in property <string> run-arguments-label;
+    in property <string> run-arguments-placeholder-label;
+    in property <string> run-no-hosts-label;
+    in property <string> run-label;
+    in property <string> move-title-label;
+    in property <string> move-root-label;
+    in property <string> move-label;
+    in property <string> create-choice-title-label;
+    in property <string> create-snippet-title-label;
+    in property <string> create-target-title-label;
+    in property <string> create-group-title-label;
+    in property <string> edit-snippet-title-label;
+    in property <string> edit-target-title-label;
+    in property <string> edit-group-title-label;
+    in property <string> name-label;
+    in property <string> name-placeholder-label;
+    in property <string> group-name-placeholder-label;
+    in property <string> description-label;
+    in property <string> description-placeholder-label;
+    in property <string> target-key-label;
+    in property <string> target-key-placeholder-label;
+    in property <string> target-picker-placeholder-label;
+    in property <string> target-linux-label;
+    in property <string> target-debian-label;
+    in property <string> target-rhel-label;
+    in property <string> target-macos-label;
+    in property <string> target-powershell-label;
+    in property <string> target-cmd-label;
+    in property <string> command-placeholder-label;
+    in property <string> target-mode-new-label;
+    in property <string> target-mode-new-caption-label;
+    in property <string> target-mode-share-label;
+    in property <string> target-mode-share-caption-label;
+    in property <string> new-snippet-caption-label;
+    in property <string> new-group-label;
+    in property <string> new-group-caption-label;
+    in property <string> shared-target-label;
+    in property <string> create-label;
+    in property <string> save-label;
+
+    callback remove-cancel();
+    callback remove-confirm(id: string, kind: string);
+    callback select-run-host(host-id: string);
+    callback run-arguments-edited(value: string);
+    callback run-close();
+    callback run-snippet(snippet-row-id: string, host-id: string, arguments-text: string) -> bool;
+    callback select-move-group(group-id: string);
+    callback move-close();
+    callback move-snippet(node-id: string, node-kind: string, target-group-id: string) -> bool;
+    callback create-choice-close();
+    callback open-create-snippet(parent-node-id: string);
+    callback open-create-target(parent-node-id: string);
+    callback open-create-group(parent-node-id: string);
+    callback name-edited(value: string);
+    callback description-edited(value: string);
+    callback command-edited(value: string);
+    callback target-mode-selected(value: string);
+    callback share-target-selected(value: string);
+    callback create-close();
+    callback save-snippet(dialog-kind: string, edit-mode: bool, edit-id: string, parent-node-id: string, name: string, description: string, command-template: string, share-target-id: string) -> bool;
+    callback group-name-edited(value: string);
+    callback create-group-close();
+    callback save-snippet-group(edit-mode: bool, edit-id: string, parent-node-id: string, name: string) -> bool;
+
+    property <string> delete-message-label: root.remove-dialog-kind == "Group"
+        ? root.delete-group-caption-label
+        : root.remove-dialog-kind == "SnippetTarget"
+            ? root.delete-target-caption-label
+            : root.delete-snippet-caption-label;
+    property <string> create-title-label: root.quick-dialog-kind == "Target"
+        ? (root.quick-edit-mode ? root.edit-target-title-label : root.create-target-title-label)
+        : (root.quick-edit-mode ? root.edit-snippet-title-label : root.create-snippet-title-label);
+    property <string> create-description-label: root.quick-dialog-kind == "Target" ? root.target-key-label : root.description-label;
+    property <string> create-description-placeholder-label: root.quick-dialog-kind == "Target" ? root.target-key-placeholder-label : root.description-placeholder-label;
+    property <string> create-action-label: root.quick-edit-mode ? root.save-label : root.create-label;
+
+    if root.remove-dialog-open: ConfirmDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title: root.delete-title-label;
+        message: root.delete-message-label;
+        subject: root.remove-dialog-name;
+        cancel-label: root.cancel-label;
+        confirm-label: root.delete-confirm-label;
+        cancel => { root.remove-cancel(); }
+        confirm => { root.remove-confirm(root.remove-dialog-id, root.remove-dialog-kind); }
+    }
+
+    if root.run-dialog-open: RunSnippetDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title-label: root.run-title-label;
+        command-label: root.command-template-label;
+        command-template: root.selected-command-template;
+        host-label: root.run-host-label;
+        arguments-label: root.run-arguments-label;
+        arguments-placeholder: root.run-arguments-placeholder-label;
+        variable-names: root.selected-variable-names;
+        no-hosts-label: root.run-no-hosts-label;
+        cancel-label: root.cancel-label;
+        run-label: root.run-label;
+        hosts: root.hosts;
+        selected-host-id: root.run-host-id;
+        arguments-text: root.run-arguments;
+        select-host(host-id) => { root.select-run-host(host-id); }
+        arguments-edited(value) => { root.run-arguments-edited(value); }
+        close => { root.run-close(); }
+        run => {
+            if root.run-host-id == "" {
+                return false;
+            }
+            root.run-snippet(root.selected-snippet-id, root.run-host-id, root.run-arguments)
+        }
+    }
+
+    if root.move-dialog-open: MoveSnippetDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title-label: root.move-title-label;
+        root-label: root.move-root-label;
+        cancel-label: root.cancel-label;
+        move-label: root.move-label;
+        groups: root.snippet-rows;
+        selected-group-id: root.move-target-group-id;
+        select-group(group-id) => { root.select-move-group(group-id); }
+        close => { root.move-close(); }
+        move => { root.move-snippet(root.selected-snippet-id, root.selected-node-kind, root.move-target-group-id) }
+    }
+
+    if root.create-choice-dialog-open: CreateSnippetChoiceDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title-label: root.create-choice-title-label;
+        snippet-label: root.create-snippet-title-label;
+        snippet-caption-label: root.new-snippet-caption-label;
+        group-label: root.new-group-label;
+        group-caption-label: root.new-group-caption-label;
+        close => { root.create-choice-close(); }
+        create-snippet => {
+            root.create-choice-close();
+            root.open-create-snippet(root.choice-parent-node-id);
+        }
+        create-group => {
+            root.create-choice-close();
+            root.open-create-group(root.choice-parent-node-id);
+        }
+    }
+
+    if root.create-dialog-open: CreateSnippetDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        dialog-kind: root.quick-dialog-kind;
+        edit-mode: root.quick-edit-mode;
+        title-label: root.create-title-label;
+        name-label: root.name-label;
+        name-placeholder: root.name-placeholder-label;
+        description-label: root.create-description-label;
+        description-placeholder: root.create-description-placeholder-label;
+        target-picker-placeholder-label: root.target-picker-placeholder-label;
+        target-linux-label: root.target-linux-label;
+        target-debian-label: root.target-debian-label;
+        target-rhel-label: root.target-rhel-label;
+        target-macos-label: root.target-macos-label;
+        target-powershell-label: root.target-powershell-label;
+        target-cmd-label: root.target-cmd-label;
+        command-label: root.command-template-label;
+        command-placeholder: root.command-placeholder-label;
+        target-mode-new-label: root.target-mode-new-label;
+        target-mode-new-caption-label: root.target-mode-new-caption-label;
+        target-mode-share-label: root.target-mode-share-label;
+        target-mode-share-caption-label: root.target-mode-share-caption-label;
+        shared-target-label: root.shared-target-label;
+        cancel-label: root.cancel-label;
+        create-label: root.create-action-label;
+        target-picker-save-label: root.save-label;
+        draft-name: root.quick-name;
+        draft-description: root.quick-description;
+        draft-command: root.quick-command;
+        target-mode: root.quick-target-mode;
+        share-target-id: root.quick-share-target-id;
+        snippet-row-id: root.quick-edit-id;
+        snippet-rows: root.snippet-target-options;
+        target-linux-selected <=> root.quick-target-linux-selected;
+        target-debian-selected <=> root.quick-target-debian-selected;
+        target-rhel-selected <=> root.quick-target-rhel-selected;
+        target-macos-selected <=> root.quick-target-macos-selected;
+        target-powershell-selected <=> root.quick-target-powershell-selected;
+        target-cmd-selected <=> root.quick-target-cmd-selected;
+        name-edited(value) => { root.name-edited(value); }
+        description-edited(value) => { root.description-edited(value); }
+        command-edited(value) => { root.command-edited(value); }
+        target-mode-selected(value) => { root.target-mode-selected(value); }
+        share-target-selected(value) => { root.share-target-selected(value); }
+        close => { root.create-close(); }
+        create(name, description, command-template, share-target-id) => {
+            root.save-snippet(root.quick-dialog-kind, root.quick-edit-mode, root.quick-edit-id, root.quick-parent-node-id, name, description, command-template, share-target-id)
+        }
+    }
+
+    if root.create-group-dialog-open: CreateSnippetGroupDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title-label: root.quick-edit-mode ? root.edit-group-title-label : root.create-group-title-label;
+        name-label: root.name-label;
+        name-placeholder: root.group-name-placeholder-label;
+        cancel-label: root.cancel-label;
+        create-label: root.create-action-label;
+        draft-name: root.quick-group-name;
+        name-edited(value) => { root.group-name-edited(value); }
+        close => { root.create-group-close(); }
+        create(name) => { root.save-snippet-group(root.quick-edit-mode, root.quick-edit-id, root.quick-parent-node-id, name) }
+    }
+}

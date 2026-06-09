@@ -1,0 +1,463 @@
+import { ScrollView } from "std-widgets.slint";
+import { CredentialOptionRow, GroupOptionRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { DialogAuthOption, DialogField, DialogSectionHeader } from "./common.slint";
+import { CredentialPickerButton } from "./host_dialog_parts.slint";
+import { HostAgentSourceSection, HostFormFooter, HostFormHeader, HostGroupSelectField, HostIconSelectField } from "./host_form_parts.slint";
+import { HostCredentialPickerOverlay, HostGroupPickerOverlay, HostIconPickerOverlay, HostInlineCredentialOverlay } from "./host_form_overlays.slint";
+export component CreateHostDialog inherits Rectangle {
+    in property <string> dialog-title: "";
+    in property <string> dialog-subtitle: "";
+    in property <string> connection-title: "";
+    in property <string> connection-caption: "";
+    in property <string> authentication-title: "";
+    in property <string> authentication-caption: "";
+    in property <string> credential-note: "";
+    in property <string> cancel-label: "";
+    in property <string> create-label: "";
+    in property <string> address-label: "";
+    in property <string> address-placeholder: "";
+    in property <string> port-label: "";
+    in property <string> port-placeholder: "22";
+    in property <string> username-label: "";
+    in property <string> username-placeholder: "";
+    in property <string> host-alias-label: "";
+    in property <string> host-alias-placeholder: "";
+    in property <string> tags-label: "";
+    in property <string> tags-placeholder: "";
+    in property <string> group-label: "";
+    in property <string> group-picker-title: "";
+    in property <string> auth-agent-label: "";
+    in property <string> auth-agent-caption: "";
+    in property <string> auth-password-label: "";
+    in property <string> auth-password-caption: "";
+    in property <string> auth-key-label: "";
+    in property <string> auth-key-caption: "";
+    in property <string> auth-certificate-label: "";
+    in property <string> auth-certificate-caption: "";
+    in property <string> agent-source-title: "";
+    in property <string> agent-auto-label: "";
+    in property <string> agent-auto-caption: "";
+    in property <string> agent-openssh-label: "";
+    in property <string> agent-openssh-caption: "";
+    in property <string> agent-pageant-label: "";
+    in property <string> agent-pageant-caption: "";
+    in property <string> agent-custom-label: "";
+    in property <string> agent-custom-caption: "";
+    in property <string> custom-agent-pipe-label: "";
+    in property <string> custom-agent-pipe-placeholder: "\\\\.\\pipe\\openssh-ssh-agent";
+    in property <string> agent-key-hint-label: "";
+    in property <string> agent-key-hint-placeholder: "";
+    in property <string> password-secret-label: "";
+    in property <string> password-secret-placeholder: "secret://hosts/prod/password";
+    in property <string> private-key-label: "";
+    in property <string> private-key-placeholder: "secret://keys/prod-api";
+    in property <string> add-private-key-label: "";
+    in property <string> add-private-key-caption: "";
+    in property <string> passphrase-label: "";
+    in property <string> passphrase-placeholder: "";
+    in property <string> certificate-label: "";
+    in property <string> certificate-placeholder: "secret://certs/prod-api";
+    in property <string> add-certificate-label: "";
+    in property <string> add-certificate-caption: "";
+    in property <string> credential-name-label: "";
+    in property <string> credential-name-placeholder: "";
+    in property <string> credential-secret-label: "";
+    in property <string> credential-secret-placeholder: "";
+    in property <string> credential-algorithm-label: "";
+    in property <string> credential-save-label: "";
+    in property <string> icon-title: "";
+    in property <string> icon-server-label: "";
+    in property <string> icon-database-label: "";
+    in property <string> icon-cloud-label: "";
+    in property <string> icon-linux-label: "";
+    in property <string> icon-container-label: "";
+    in property <string> icon-shield-label: "";
+    in property <string> icon-router-label: "";
+    in property <string> icon-terminal-label: "";
+    in property <string> icon-globe-label: "";
+    in property <string> icon-key-label: "";
+    in property <string> icon-chip-label: "";
+    in property <string> icon-cluster-label: "";
+    in property <string> quick-host-name;
+    in property <string> quick-host-address;
+    in property <string> quick-host-port;
+    in property <string> quick-host-username;
+    in property <string> quick-host-group-path;
+    in property <string> quick-host-icon-key;
+    in property <string> quick-host-tags;
+    in property <string> quick-host-auth-kind;
+    in property <string> quick-host-agent-source;
+    in property <string> quick-host-agent-custom-pipe;
+    in property <string> quick-host-password-secret-ref;
+    in property <string> quick-host-private-key-ref;
+    in property <string> quick-host-passphrase-ref;
+    in property <string> quick-host-key-hint;
+    in property <string> quick-host-certificate-ref;
+    in property <[GroupOptionRow]> quick-host-groups;
+    in property <[CredentialOptionRow]> private-key-options;
+    in property <[CredentialOptionRow]> certificate-options;
+    in property <string> last-error;
+    property <bool> group-picker-open: false;
+    property <bool> icon-picker-open: false;
+    property <bool> private-key-picker-open: false;
+    property <bool> certificate-picker-open: false;
+    property <bool> credential-create-open: false;
+    property <string> credential-create-kind: "PrivateKey";
+    property <string> credential-create-name: "";
+    property <string> credential-create-secret-ref: "";
+    property <string> credential-create-algorithm: "Ed25519";
+    property <length> icon-picker-width: min(root.width - 72px, 560px);
+    property <length> icon-choice-width: (root.icon-picker-width - 44px) / 3;
+    property <int> selected-icon-accent-index: root.quick-host-icon-key == "database" ? 1 : root.quick-host-icon-key == "cloud" ? 2 : root.quick-host-icon-key == "linux" ? 3 : root.quick-host-icon-key == "container" ? 4 : root.quick-host-icon-key == "shield" ? 5 : root.quick-host-icon-key == "router" ? 0 : root.quick-host-icon-key == "terminal" ? 1 : root.quick-host-icon-key == "globe" ? 2 : root.quick-host-icon-key == "key" ? 3 : root.quick-host-icon-key == "chip" ? 4 : root.quick-host-icon-key == "cluster" ? 5 : 0;
+    property <string> selected-icon-label: root.quick-host-icon-key == "database" ? root.icon-database-label : root.quick-host-icon-key == "cloud" ? root.icon-cloud-label : root.quick-host-icon-key == "linux" ? root.icon-linux-label : root.quick-host-icon-key == "container" ? root.icon-container-label : root.quick-host-icon-key == "shield" ? root.icon-shield-label : root.quick-host-icon-key == "router" ? root.icon-router-label : root.quick-host-icon-key == "terminal" ? root.icon-terminal-label : root.quick-host-icon-key == "globe" ? root.icon-globe-label : root.quick-host-icon-key == "key" ? root.icon-key-label : root.quick-host-icon-key == "chip" ? root.icon-chip-label : root.quick-host-icon-key == "cluster" ? root.icon-cluster-label : root.icon-server-label;
+    callback update-field(field: string, value: string);
+    callback select-group(group-id: string);
+    callback update-auth-kind(kind: string);
+    callback update-auth-field(field: string, value: string);
+    callback create-credential(kind: string, name: string, secret-ref: string, algorithm: string);
+    callback save();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(18px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 660px);
+        height: min(root.height - 36px, 660px);
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 14px;
+            spacing: 10px;
+
+            HostFormHeader {
+                title: root.dialog-title;
+                subtitle: root.dialog-subtitle;
+                close => { root.close(); }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border-soft;
+            }
+
+            ScrollView {
+                vertical-stretch: 1;
+                VerticalLayout {
+                    padding-right: 10px;
+                    spacing: 9px;
+                    DialogSectionHeader {
+                        title: root.connection-title;
+                        caption: root.connection-caption;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        DialogField {
+                            label: root.address-label;
+                            field-value: root.quick-host-address;
+                            placeholder: root.address-placeholder;
+                            horizontal-stretch: 1;
+                            edited(value) => { root.update-field("Address", value); }
+                            accepted(value) => { root.update-field("Address", value); }
+                        }
+                        DialogField {
+                            label: root.port-label;
+                            field-value: root.quick-host-port;
+                            placeholder: root.port-placeholder;
+                            width: 118px;
+                            edited(value) => { root.update-field("Port", value); }
+                            accepted(value) => { root.update-field("Port", value); }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        DialogField {
+                            label: root.username-label;
+                            field-value: root.quick-host-username;
+                            placeholder: root.username-placeholder;
+                            horizontal-stretch: 1;
+                            edited(value) => { root.update-field("Username", value); }
+                            accepted(value) => { root.update-field("Username", value); }
+                        }
+                        DialogField {
+                            label: root.host-alias-label;
+                            field-value: root.quick-host-name;
+                            placeholder: root.host-alias-placeholder;
+                            horizontal-stretch: 1;
+                            edited(value) => { root.update-field("Name", value); }
+                            accepted(value) => { root.update-field("Name", value); }
+                        }
+                    }
+
+                    HostGroupSelectField {
+                        label: root.group-label;
+                        group-path: root.quick-host-group-path;
+                        open => {
+                            root.group-picker-open = true;
+                            root.icon-picker-open = false;
+                            root.private-key-picker-open = false;
+                            root.certificate-picker-open = false;
+                        }
+                    }
+
+                    HostIconSelectField {
+                        title: root.icon-title;
+                        selected-label: root.selected-icon-label;
+                        icon-key: root.quick-host-icon-key;
+                        open-state: root.icon-picker-open;
+                        accent-index: root.selected-icon-accent-index;
+                        open => {
+                            root.icon-picker-open = true;
+                            root.group-picker-open = false;
+                            root.private-key-picker-open = false;
+                            root.certificate-picker-open = false;
+                        }
+                    }
+
+                    DialogSectionHeader {
+                        title: root.authentication-title;
+                        caption: root.authentication-caption;
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        DialogAuthOption {
+                            label: root.auth-agent-label;
+                            caption: root.auth-agent-caption;
+                            active: root.quick-host-auth-kind == "ssh-agent";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("ssh-agent"); }
+                        }
+                        DialogAuthOption {
+                            label: root.auth-password-label;
+                            caption: root.auth-password-caption;
+                            active: root.quick-host-auth-kind == "Password";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("Password"); }
+                        }
+                        DialogAuthOption {
+                            label: root.auth-key-label;
+                            caption: root.auth-key-caption;
+                            active: root.quick-host-auth-kind == "Key";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("Key"); }
+                        }
+                        DialogAuthOption {
+                            label: root.auth-certificate-label;
+                            caption: root.auth-certificate-caption;
+                            active: root.quick-host-auth-kind == "Certificate";
+                            horizontal-stretch: 1;
+                            clicked => { root.update-auth-kind("Certificate"); }
+                        }
+                    }
+
+                    if root.quick-host-auth-kind == "ssh-agent": HostAgentSourceSection {
+                        selected-source: root.quick-host-agent-source;
+                        title: root.agent-source-title;
+                        auto-label: root.agent-auto-label;
+                        auto-caption: root.agent-auto-caption;
+                        openssh-label: root.agent-openssh-label;
+                        openssh-caption: root.agent-openssh-caption;
+                        pageant-label: root.agent-pageant-label;
+                        pageant-caption: root.agent-pageant-caption;
+                        custom-label: root.agent-custom-label;
+                        custom-caption: root.agent-custom-caption;
+                        custom-pipe-label: root.custom-agent-pipe-label;
+                        custom-pipe-placeholder: root.custom-agent-pipe-placeholder;
+                        custom-pipe-value: root.quick-host-agent-custom-pipe;
+                        select-source(token) => { root.update-auth-field("AgentSource", token); }
+                        update-custom-pipe(value) => { root.update-auth-field("AgentCustomPipe", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "ssh-agent": DialogField {
+                        label: root.agent-key-hint-label;
+                        field-value: root.quick-host-key-hint;
+                        placeholder: root.agent-key-hint-placeholder;
+                        edited(value) => { root.update-auth-field("KeyHint", value); }
+                        accepted(value) => { root.update-auth-field("KeyHint", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Password": DialogField {
+                        label: root.password-secret-label;
+                        field-value: root.quick-host-password-secret-ref;
+                        placeholder: root.password-secret-placeholder;
+                        edited(value) => { root.update-auth-field("PasswordSecretRef", value); }
+                        accepted(value) => { root.update-auth-field("PasswordSecretRef", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Key" || root.quick-host-auth-kind == "Certificate": CredentialPickerButton {
+                        label: root.private-key-label;
+                        value: root.quick-host-private-key-ref;
+                        placeholder: root.private-key-placeholder;
+                        open => {
+                            root.private-key-picker-open = true;
+                            root.certificate-picker-open = false;
+                            root.group-picker-open = false;
+                            root.icon-picker-open = false;
+                        }
+                    }
+
+                    if root.quick-host-auth-kind == "Key" || root.quick-host-auth-kind == "Certificate": DialogField {
+                        label: root.passphrase-label;
+                        field-value: root.quick-host-passphrase-ref;
+                        placeholder: root.passphrase-placeholder;
+                        edited(value) => { root.update-auth-field("PassphraseRef", value); }
+                        accepted(value) => { root.update-auth-field("PassphraseRef", value); }
+                    }
+
+                    if root.quick-host-auth-kind == "Certificate": CredentialPickerButton {
+                        label: root.certificate-label;
+                        value: root.quick-host-certificate-ref;
+                        placeholder: root.certificate-placeholder;
+                        open => {
+                            root.certificate-picker-open = true;
+                            root.private-key-picker-open = false;
+                            root.group-picker-open = false;
+                            root.icon-picker-open = false;
+                        }
+                    }
+
+                    if root.last-error != "": Rectangle {
+                        height: 36px;
+                        border-radius: 8px;
+                        border-width: 1px;
+                        border-color: AppTheme.dialog-error-border;
+                        background: AppTheme.dialog-error-bg;
+                        Text {
+                            x: 11px;
+                            y: 0px;
+                            width: parent.width - 22px;
+                            height: parent.height;
+                            text: root.last-error;
+                            color: AppTheme.danger-text-soft;
+                            font-size: 10px;
+                            wrap: word-wrap;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border-soft;
+            }
+
+            HostFormFooter {
+                note: root.credential-note;
+                cancel-label: root.cancel-label;
+                save-label: root.create-label;
+                save-enabled: root.quick-host-address != "" && root.quick-host-username != "";
+                close => { root.close(); }
+                save => { root.save(); }
+            }
+        }
+    }
+
+    if root.group-picker-open: HostGroupPickerOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        open <=> root.group-picker-open;
+        title-label: root.group-picker-title;
+        groups: root.quick-host-groups;
+        select-group(group-id) => { root.select-group(group-id); }
+    }
+
+    if root.private-key-picker-open: HostCredentialPickerOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        open <=> root.private-key-picker-open;
+        credential-create-open <=> root.credential-create-open;
+        credential-create-kind <=> root.credential-create-kind;
+        credential-create-name <=> root.credential-create-name;
+        credential-create-secret-ref <=> root.credential-create-secret-ref;
+        credential-create-algorithm <=> root.credential-create-algorithm;
+        credential-kind: "PrivateKey";
+        title-label: root.private-key-label;
+        add-label: root.add-private-key-label;
+        add-caption: root.add-private-key-caption;
+        empty-label: root.private-key-placeholder;
+        options: root.private-key-options;
+        select-credential(value) => { root.update-auth-field("PrivateKeyRef", value); }
+    }
+
+    if root.certificate-picker-open: HostCredentialPickerOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        open <=> root.certificate-picker-open;
+        credential-create-open <=> root.credential-create-open;
+        credential-create-kind <=> root.credential-create-kind;
+        credential-create-name <=> root.credential-create-name;
+        credential-create-secret-ref <=> root.credential-create-secret-ref;
+        credential-create-algorithm <=> root.credential-create-algorithm;
+        credential-kind: "Certificate";
+        title-label: root.certificate-label;
+        add-label: root.add-certificate-label;
+        add-caption: root.add-certificate-caption;
+        empty-label: root.certificate-placeholder;
+        options: root.certificate-options;
+        select-credential(value) => { root.update-auth-field("CertificateRef", value); }
+    }
+
+    if root.credential-create-open: HostInlineCredentialOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        open <=> root.credential-create-open;
+        private-key-picker-open <=> root.private-key-picker-open;
+        certificate-picker-open <=> root.certificate-picker-open;
+        credential-create-kind: root.credential-create-kind;
+        credential-create-name <=> root.credential-create-name;
+        credential-create-secret-ref <=> root.credential-create-secret-ref;
+        credential-create-algorithm <=> root.credential-create-algorithm;
+        add-private-key-label: root.add-private-key-label;
+        add-private-key-caption: root.add-private-key-caption;
+        add-certificate-label: root.add-certificate-label;
+        add-certificate-caption: root.add-certificate-caption;
+        credential-name-label: root.credential-name-label;
+        credential-name-placeholder: root.credential-name-placeholder;
+        credential-secret-label: root.credential-secret-label;
+        credential-secret-placeholder: root.credential-secret-placeholder;
+        credential-algorithm-label: root.credential-algorithm-label;
+        cancel-label: root.cancel-label;
+        save-label: root.credential-save-label;
+        create-credential(kind, name, secret-ref, algorithm) => { root.create-credential(kind, name, secret-ref, algorithm); }
+    }
+
+    if root.icon-picker-open: HostIconPickerOverlay {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        open <=> root.icon-picker-open;
+        selected-icon-key: root.quick-host-icon-key;
+        title-label: root.icon-title;
+        server-label: root.icon-server-label;
+        database-label: root.icon-database-label;
+        cloud-label: root.icon-cloud-label;
+        linux-label: root.icon-linux-label;
+        container-label: root.icon-container-label;
+        shield-label: root.icon-shield-label;
+        router-label: root.icon-router-label;
+        terminal-label: root.icon-terminal-label;
+        globe-label: root.icon-globe-label;
+        key-label: root.icon-key-label;
+        chip-label: root.icon-chip-label;
+        cluster-label: root.icon-cluster-label;
+        selected(key) => { root.update-field("IconKey", key); }
+    }
+}

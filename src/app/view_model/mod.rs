@@ -25,9 +25,20 @@ mod tabs;
 #[cfg(test)]
 mod tests;
 mod tools;
+mod tools_credentials;
+mod tools_credentials_common;
+mod tools_credentials_detail;
+mod tools_credentials_group_content;
+mod tools_credentials_tree;
+mod tools_known_hosts;
+mod tools_snippets;
+mod tools_tunnels;
+mod tools_types;
 
 pub(super) use activity::ActivityViewModel;
-pub(super) use hosts::{GroupOptionViewModel, HostTreeViewModel, HostViewModel};
+pub(super) use hosts::{
+    CredentialOptionViewModel, GroupOptionViewModel, HostTreeViewModel, HostViewModel,
+};
 pub(super) use palette::CommandPaletteItemViewModel;
 pub(super) use root::{AppViewModel, app_view_model};
 pub(super) use settings::{
@@ -37,4 +48,7 @@ pub(super) use settings::{
 pub(super) use sftp::SftpEntryViewModel;
 pub(super) use tabs::active_terminal;
 pub(super) use tabs::{SessionTabViewModel, TerminalViewModel};
-pub(super) use tools::{KnownHostViewModel, ToolItemViewModel};
+pub(super) use tools_types::{
+    CredentialDetailFieldViewModel, CredentialGroupContentViewModel, CredentialRowViewModel,
+    KnownHostViewModel, SnippetRowViewModel, ToolItemViewModel,
+};

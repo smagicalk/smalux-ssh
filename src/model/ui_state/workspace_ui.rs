@@ -35,8 +35,15 @@ pub struct WorkspaceUiState {
     pub active_page: WorkspacePage,
     pub host_list_mode: HostListMode,
     pub host_search_query: String,
+    pub credential_search_query: String,
+    #[serde(default)]
+    pub snippet_search_query: String,
     pub host_tree_root_collapsed: bool,
     pub collapsed_host_tree_groups: Vec<crate::model::GroupId>,
+    #[serde(default)]
+    pub collapsed_credential_tree_nodes: Vec<String>,
+    #[serde(default)]
+    pub collapsed_snippet_tree_nodes: Vec<String>,
     pub new_session_search_query: String,
     pub create_host_dialog_open: bool,
     pub create_group_parent_dialog_open: bool,
@@ -62,8 +69,12 @@ impl Default for WorkspaceUiState {
             active_page: WorkspacePage::Hosts,
             host_list_mode: HostListMode::Tree,
             host_search_query: String::new(),
+            credential_search_query: String::new(),
+            snippet_search_query: String::new(),
             host_tree_root_collapsed: false,
             collapsed_host_tree_groups: Vec::new(),
+            collapsed_credential_tree_nodes: Vec::new(),
+            collapsed_snippet_tree_nodes: Vec::new(),
             new_session_search_query: String::new(),
             create_host_dialog_open: false,
             create_group_parent_dialog_open: false,

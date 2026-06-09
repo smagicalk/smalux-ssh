@@ -8,7 +8,8 @@ use std::path::{Path, PathBuf};
 
 use directories::ProjectDirs;
 use sea_orm::{
-    ActiveValue::Set, ConnectionTrait, Database, DatabaseConnection, EntityTrait, PaginatorTrait,
+    ActiveValue::Set, ConnectionTrait, Database, DatabaseBackend, DatabaseConnection, EntityTrait,
+    PaginatorTrait, Statement,
 };
 use sea_orm_migration::MigratorTrait;
 use tokio::runtime::{Builder, Runtime};
@@ -17,13 +18,24 @@ use super::{RedbStorage, StorageManager, StoragePersistenceError};
 
 mod entity;
 mod mapper;
+mod mapper_common;
+mod mapper_credentials;
+mod mapper_hosts;
 mod migration;
+mod migration_common;
+mod migration_credentials;
+mod migration_extensions;
+mod migration_history;
+mod migration_hosts;
+mod migration_settings;
+mod migration_snippets;
 
 const SQLITE_STORAGE_FILE_NAME: &str = "smagicalssh.sqlite";
 const APP_CONFIG_SETTING_KEY: &str = "app_config";
 const DEFAULT_WORKSPACE_KEY: &str = "default";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const CORE_SCHEMA_VERSION: &str = "1";
+const LEGACY_DERIVED_MIGRATION_NAME: &str = "migration";
 
 /// 本地 SQLite 存储入口。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -210,9 +222,10 @@ pub enum LegacyImportOutcome {
 
 async fn connect_and_migrate(path: &Path) -> Result<DatabaseConnection, StoragePersistenceError> {
     // mode=rwc 表示文件不存在则创建，存在则读写打开。
-    let url = format!("sqlite://{}?mode=rwc", path.display());
+    let url = sqlite_connection_url(path, "rwc")?;
     let db = Database::connect(url).await?;
     configure_sqlite(&db).await?;
+    repair_legacy_migration_name(&db).await?;
     migration::Migrator::up(&db, None).await?;
     seed_schema_meta(&db).await?;
     Ok(db)
@@ -245,6 +258,38 @@ async fn seed_schema_meta(db: &DatabaseConnection) -> Result<(), StoragePersiste
     .await?;
 
     Ok(())
+}
+
+async fn repair_legacy_migration_name(
+    db: &DatabaseConnection,
+) -> Result<(), StoragePersistenceError> {
+    // 旧版本把多个 migration struct 放在同一个模块并使用 DeriveMigrationName，
+    // SeaORM 会记录通用版本名 `migration`。显式 migration 名上线后，旧记录会被
+    // SeaORM 判定为“当前 Migrator 缺失的迁移”，因此需要先清理这个兼容性脏记录。
+    if !sqlite_table_exists(db, "seaql_migrations").await? {
+        return Ok(());
+    }
+
+    db.execute_unprepared(&format!(
+        "DELETE FROM seaql_migrations WHERE version = {}",
+        sqlite_string_literal(LEGACY_DERIVED_MIGRATION_NAME)
+    ))
+    .await?;
+    Ok(())
+}
+
+async fn sqlite_table_exists(
+    db: &DatabaseConnection,
+    table_name: &str,
+) -> Result<bool, StoragePersistenceError> {
+    let statement = Statement::from_string(
+        DatabaseBackend::Sqlite,
+        format!(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = {} LIMIT 1",
+            sqlite_string_literal(table_name)
+        ),
+    );
+    Ok(db.query_one_raw(statement).await?.is_some())
 }
 
 async fn has_business_data(db: &DatabaseConnection) -> Result<bool, StoragePersistenceError> {
@@ -319,6 +364,17 @@ fn sqlite_string_literal(value: &str) -> String {
     format!("'{}'", value.replace('\'', "''"))
 }
 
+fn sqlite_connection_url(path: &Path, mode: &str) -> Result<String, StoragePersistenceError> {
+    // sqlx 的 SQLite URL 使用 `/` 分隔符；Windows `Path::display()` 的反斜杠会被误解析。
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    let normalized = absolute.to_string_lossy().replace('\\', "/");
+    Ok(format!("sqlite://{normalized}?mode={mode}"))
+}
+
 async fn clear_entities<E>(db: &DatabaseConnection) -> Result<(), StoragePersistenceError>
 where
     E: EntityTrait,
@@ -336,11 +392,12 @@ mod tests {
     use smagical_config::HostListModePreference;
     use smagical_core::{
         AgentSource, AuthProfile, BackgroundProfile, CommandHistoryId, CommandHistoryItem,
-        CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, HostId, ImageSource,
-        KeyAlgorithm, KnownHostEntry, ProxyProfile, RecentConnection, SecretRef, SessionId,
-        SessionKind, SftpBookmark, Snippet, SnippetArgument, SnippetId, SnippetScope,
-        SnippetVariable, SplitAxis, TunnelKind, TunnelRule, WindowState, WorkspaceState,
-        WorkspaceTabSnapshot,
+        CredentialId, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, HostId,
+        ImageSource, KeyAlgorithm, KnownHostEntry, ProxyProfile, RecentConnection,
+        SecretMaterialKind, SecretRecord, SecretRef, SessionId, SessionKind, SftpBookmark, Snippet,
+        SnippetArgument, SnippetGroup, SnippetGroupId, SnippetId, SnippetScope,
+        SnippetSupportTarget, SnippetSupportTargetId, SplitAxis, TunnelKind, TunnelRule,
+        WindowState, WorkspaceState, WorkspaceTabSnapshot,
     };
     use uuid::Uuid;
 
@@ -424,6 +481,8 @@ mod tests {
         let group_id = GroupId(Uuid::new_v4());
         let host_id = HostId(Uuid::new_v4());
         let snippet_id = SnippetId(Uuid::new_v4());
+        let snippet_group_id = SnippetGroupId(Uuid::new_v4());
+        let credential_id = CredentialId(Uuid::new_v4());
         let mut storage = StorageManager::default();
 
         storage.app_config.theme.name = "Solarized Dark".to_owned();
@@ -435,13 +494,21 @@ mod tests {
         storage.upsert_group(sample_group(group_id));
         storage.upsert_host(sample_host(host_id, group_id));
         storage.upsert_credential(CredentialMetadata {
+            id: credential_id,
             name: "deploy-key".to_owned(),
             kind: CredentialKind::PrivateKey,
+            group_id: None,
             username: Some("deploy".to_owned()),
             secret: Some(SecretRef("key:deploy".to_owned())),
             key_algorithm: Some(KeyAlgorithm::Ed25519),
             fingerprint: Some("SHA256:key".to_owned()),
         });
+        storage.upsert_secret(SecretRecord::local_plaintext(
+            SecretRef("key:deploy".to_owned()),
+            SecretMaterialKind::PrivateKey,
+            b"-----BEGIN OPENSSH PRIVATE KEY-----\nmock\n-----END OPENSSH PRIVATE KEY-----\n"
+                .to_vec(),
+        ));
         storage.upsert_known_host(KnownHostEntry {
             host: "prod.example.com".to_owned(),
             port: 2222,
@@ -463,22 +530,29 @@ mod tests {
             started_at_unix_secs: 1_700_000_001,
             duration_ms: Some(30),
         });
-        storage.upsert_snippet(Snippet {
-            id: snippet_id,
-            name: "restart service".to_owned(),
-            description: Some("Restart a systemd service".to_owned()),
-            command_template: "systemctl restart {{service}}".to_owned(),
-            scope: SnippetScope::Host(host_id),
-            variables: vec![SnippetVariable {
-                name: "service".to_owned(),
-                default_value: Some("sshd".to_owned()),
-                required: true,
-            }],
-            last_arguments: vec![SnippetArgument {
-                name: "service".to_owned(),
-                value: "nginx".to_owned(),
-            }],
+        storage.upsert_snippet_group(SnippetGroup {
+            id: snippet_group_id,
+            name: "服务".to_owned(),
+            parent_id: None,
+            sort_order: 0,
         });
+        let mut snippet = Snippet::with_default_implementation(
+            snippet_id,
+            "restart service".to_owned(),
+            Some("Restart a systemd service".to_owned()),
+            SnippetScope::Host(host_id),
+            Some(snippet_group_id),
+            "systemctl restart {{service}}".to_owned(),
+        );
+        snippet.variables[0].default_value = Some("sshd".to_owned());
+        snippet
+            .default_implementation_mut()
+            .expect("默认实现应存在")
+            .last_arguments = vec![SnippetArgument {
+            name: "service".to_owned(),
+            value: "nginx".to_owned(),
+        }];
+        storage.upsert_snippet(snippet);
         storage.upsert_sftp_bookmark(SftpBookmark {
             host_id,
             label: "home".to_owned(),
@@ -523,6 +597,50 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_migrations_create_split_domain_tables() {
+        let path = temp_db_path("migration-domain-tables");
+        let store = SqliteStorage::new(&path);
+
+        store
+            .save(&StorageManager::default())
+            .expect("empty storage should migrate schema");
+
+        let url = sqlite_connection_url(&path, "rw").expect("SQLite URL should be valid");
+        block_on_storage(async {
+            let db = Database::connect(url).await?;
+            for table in [
+                "schema_meta",
+                "host_groups",
+                "hosts",
+                "credentials",
+                "credential_groups",
+                "credential_inspections",
+                "secrets",
+                "snippets",
+                "snippet_groups",
+                "snippet_implementations",
+                "snippet_support_targets",
+                "command_history",
+                "recent_connections",
+                "settings",
+                "theme_profiles",
+                "workspace_state",
+                "sftp_bookmarks",
+                "tunnel_rules",
+            ] {
+                assert!(
+                    sqlite_table_exists(&db, table).await?,
+                    "{table} should exist"
+                );
+            }
+            Ok::<(), StoragePersistenceError>(())
+        })
+        .expect("migrated domain tables should be queryable");
+
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn core_storage_round_trips_through_business_tables() {
         let path = temp_db_path("roundtrip");
         let store = SqliteStorage::new(&path);
@@ -532,6 +650,70 @@ mod tests {
         let loaded = store.load().expect("storage should load from SQLite");
 
         assert_eq!(loaded, storage);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn snippet_groups_and_arguments_round_trip_through_sqlite() {
+        let path = temp_db_path("snippet-roundtrip");
+        let store = SqliteStorage::new(&path);
+        let parent_id = SnippetGroupId(Uuid::new_v4());
+        let child_id = SnippetGroupId(Uuid::new_v4());
+        let snippet_id = SnippetId(Uuid::new_v4());
+        let host_id = HostId(Uuid::new_v4());
+        let mut storage = StorageManager::default();
+
+        storage.upsert_snippet_group(SnippetGroup {
+            id: parent_id,
+            name: "运维".to_owned(),
+            parent_id: None,
+            sort_order: 0,
+        });
+        storage.upsert_snippet_group(SnippetGroup {
+            id: child_id,
+            name: "服务".to_owned(),
+            parent_id: Some(parent_id),
+            sort_order: 1,
+        });
+        let mut snippet = Snippet::with_default_implementation(
+            snippet_id,
+            "重启服务".to_owned(),
+            Some("通过 systemd 重启服务".to_owned()),
+            SnippetScope::Host(host_id),
+            Some(child_id),
+            "systemctl restart {{service}} --env {{env}}".to_owned(),
+        );
+        snippet.variables[0].default_value = Some("sshd".to_owned());
+        snippet.variables[1].required = false;
+        snippet
+            .default_implementation_mut()
+            .expect("默认实现应存在")
+            .last_arguments = vec![
+            SnippetArgument {
+                name: "service".to_owned(),
+                value: "nginx".to_owned(),
+            },
+            SnippetArgument {
+                name: "env".to_owned(),
+                value: "prod".to_owned(),
+            },
+        ];
+        let shared_implementation_id = snippet.implementations[0].id;
+        snippet.support_targets.push(SnippetSupportTarget {
+            id: SnippetSupportTargetId(Uuid::new_v4()),
+            snippet_id,
+            target_key: "debian".to_owned(),
+            display_name: "Debian".to_owned(),
+            implementation_id: shared_implementation_id,
+            sort_order: 1,
+        });
+        storage.upsert_snippet(snippet);
+
+        store.save(&storage).expect("snippets should save");
+        let loaded = store.load().expect("snippets should load");
+
+        assert_eq!(loaded.snippet_groups, storage.snippet_groups);
+        assert_eq!(loaded.snippets, storage.snippets);
         let _ = fs::remove_file(path);
     }
 
@@ -549,6 +731,7 @@ mod tests {
 
         assert_eq!(loaded.host_count(), 0);
         assert_eq!(loaded.credential_count(), 0);
+        assert_eq!(loaded.secret_count(), 0);
         assert_eq!(loaded.known_host_count(), 0);
         assert_eq!(loaded.snippet_count(), 0);
         assert_eq!(loaded.tunnel_rule_count(), 0);
@@ -593,6 +776,34 @@ mod tests {
     }
 
     #[test]
+    fn sqlite_save_repairs_legacy_derived_migration_name() {
+        let path = temp_db_path("legacy-migration-name");
+        let url = sqlite_connection_url(&path, "rwc").expect("SQLite URL should be valid");
+        block_on_storage(async {
+            let db = Database::connect(url).await?;
+            db.execute_unprepared(
+                "CREATE TABLE seaql_migrations (version varchar NOT NULL PRIMARY KEY, applied_at integer NOT NULL)",
+            )
+            .await?;
+            db.execute_unprepared(
+                "INSERT INTO seaql_migrations (version, applied_at) VALUES ('migration', 0)",
+            )
+            .await?;
+            Ok::<(), StoragePersistenceError>(())
+        })
+        .expect("legacy migration table should be created");
+
+        let store = SqliteStorage::new(&path);
+        store
+            .save(&StorageManager::default())
+            .expect("save should repair legacy migration name");
+
+        let loaded = store.load().expect("repaired database should load");
+        assert!(loaded.is_empty());
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
     fn default_path_uses_sqlite_file() {
         let path = SqliteStorage::default_path().expect("platform should provide app data path");
 
@@ -624,6 +835,7 @@ mod tests {
         assert_eq!(loaded.host_count(), 1);
         assert_eq!(loaded.group_count(), 1);
         assert_eq!(loaded.credential_count(), 1);
+        assert_eq!(loaded.secret_count(), 1);
         assert_eq!(loaded.command_history_count(), 1);
         assert_eq!(loaded.snippet_count(), 1);
         assert_eq!(loaded.theme_count(), 1);

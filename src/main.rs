@@ -1,3 +1,3 @@
-fn main() -> Result<(), slint::PlatformError> {
+fn main() -> anyhow::Result<()> {
     smagicalssh::app::run()
 }

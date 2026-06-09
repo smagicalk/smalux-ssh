@@ -15,12 +15,17 @@ use super::{AppWindow, SharedAppState, apply_and_sync};
 mod known_hosts;
 #[path = "workspace/layout.rs"]
 mod layout;
+#[path = "workspace/snippet_actions.rs"]
+mod snippet_actions;
+#[path = "workspace/snippet_helpers.rs"]
+mod snippet_helpers;
 #[path = "workspace/tool_panel.rs"]
 mod tool_panel;
 
 pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     // 布局相关回调单独拆分，避免主工作区绑定文件继续膨胀。
     layout::bind(window, &state);
+    snippet_actions::bind(window, &state);
 
     {
         let weak = window.as_weak();

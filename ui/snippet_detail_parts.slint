@@ -1,0 +1,153 @@
+import { SnippetRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { HostIcon } from "./hosts.slint";
+
+export component SnippetStatCard inherits Rectangle {
+    in property <string> label;
+    in property <string> value;
+
+    height: 58px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.surface-bg;
+
+    VerticalLayout {
+        padding-left: 12px;
+        padding-right: 12px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+        spacing: 3px;
+
+        Text {
+            text: root.label;
+            color: AppTheme.text-soft;
+            font-size: 10px;
+            font-weight: 700;
+            overflow: elide;
+        }
+
+        Text {
+            text: root.value;
+            color: AppTheme.text-strong;
+            font-size: 13px;
+            font-weight: 700;
+            overflow: elide;
+        }
+    }
+}
+
+export component SnippetGroupContentItem inherits Rectangle {
+    in property <SnippetRow> item;
+    in property <string> active-parent-id;
+    in property <string> selected-id;
+    callback selected(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+
+    property <bool> item-visible: root.item.parent_id == root.active-parent-id && root.item.id != root.active-parent-id;
+    property <color> marker-color: root.item.node_kind == "Group"
+        ? AppTheme.accent-blue
+        : root.item.node_kind == "SnippetTarget"
+            ? AppTheme.accent-violet
+            : AppTheme.accent;
+
+    height: root.item-visible ? 52px : 0px;
+    background: AppTheme.transparent;
+    border-width: 0px;
+
+    Rectangle {
+        visible: root.item-visible;
+        width: parent.width;
+        height: 46px;
+        border-radius: 7px;
+        border-width: 1px;
+        border-color: root.item.id == root.selected-id ? AppTheme.border-strong : AppTheme.border-soft;
+        background: root.item.id == root.selected-id ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.surface-bg;
+
+        touch := TouchArea {
+            clicked => {
+                root.selected(
+                    root.item.id,
+                    root.item.parent_id,
+                    root.item.name,
+                    root.item.description,
+                    root.item.command_template,
+                    root.item.scope,
+                    root.item.scope_key,
+                    root.item.variables,
+                    root.item.variable_names,
+                    root.item.arguments,
+                    root.item.argument_values,
+                    root.item.meta,
+                    root.item.icon_key,
+                    root.item.node_kind,
+                    root.item.accent_index,
+                );
+            }
+        }
+
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 9px;
+
+            Rectangle {
+                width: 3px;
+                height: parent.height;
+
+                Rectangle {
+                    y: (parent.height - self.height) / 2;
+                    width: 3px;
+                    height: 24px;
+                    border-radius: 2px;
+                    background: root.marker-color;
+                }
+            }
+
+            Rectangle {
+                width: 22px;
+                height: parent.height;
+
+                HostIcon {
+                    y: (parent.height - self.height) / 2;
+                    icon-key: root.item.icon_key;
+                    accent-index: root.item.accent_index;
+                    status-key: "Created";
+                }
+            }
+
+            VerticalLayout {
+                horizontal-stretch: 1;
+                spacing: 2px;
+
+                Text {
+                    text: root.item.name;
+                    color: AppTheme.text-strong;
+                    font-size: 12px;
+                    font-weight: 700;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.item.node_kind == "Group" ? root.item.meta : root.item.description;
+                    color: AppTheme.text-muted;
+                    font-size: 10px;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+
+            Text {
+                width: 72px;
+                height: parent.height;
+                text: root.item.node_kind == "Group" ? root.item.scope : root.item.meta;
+                color: AppTheme.text-soft;
+                font-size: 10px;
+                font-weight: 700;
+                horizontal-alignment: right;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+    }
+}

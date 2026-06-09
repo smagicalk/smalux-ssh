@@ -11,6 +11,14 @@ pub struct HostId(pub Uuid);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GroupId(pub Uuid);
 
+/// 密钥分组唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CredentialGroupId(pub Uuid);
+
+/// 凭据唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CredentialId(pub Uuid);
+
 /// 连接会话唯一标识。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SessionId(pub Uuid);
@@ -42,6 +50,18 @@ pub struct WorkspaceId(pub Uuid);
 /// 快捷命令唯一标识。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SnippetId(pub Uuid);
+
+/// 快捷命令脚本实现唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SnippetImplementationId(pub Uuid);
+
+/// 快捷命令支持目标唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SnippetSupportTargetId(pub Uuid);
+
+/// 快捷命令分组唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SnippetGroupId(pub Uuid);
 
 /// 敏感凭据的间接引用。
 ///

@@ -10,6 +10,7 @@ export component NavRail inherits Rectangle {
     in property <string> snippets-label: "";
     in property <string> history-label: "";
     in property <string> security-label: "";
+    in property <string> proxy-label: "";
     in property <string> settings-label: "";
     in property <string> find-label: "";
     callback open-hosts();
@@ -19,6 +20,7 @@ export component NavRail inherits Rectangle {
     callback open-snippets();
     callback open-history();
     callback open-security();
+    callback open-proxy();
     callback open-settings();
     callback open-command-palette();
 
@@ -38,6 +40,7 @@ export component NavRail inherits Rectangle {
         RailButton { label: root.sftp-label; icon-key: "Sftp"; active: root.active-page == "SFTP"; clicked => { root.open-sftp(); } }
         RailButton { label: root.snippets-label; icon-key: "Snippets"; active: root.active-page == "Snippets"; clicked => { root.open-snippets(); } }
         RailButton { label: root.security-label; icon-key: "Security"; active: root.active-page == "Security"; clicked => { root.open-security(); } }
+        RailButton { label: root.proxy-label; icon-key: "Proxy"; active: root.active-page == "Proxy"; clicked => { root.open-proxy(); } }
         RailButton { label: root.history-label; icon-key: "History"; active: root.active-page == "History"; clicked => { root.open-history(); } }
         Rectangle { height: 4px; }
         RailButton { label: root.find-label; icon-key: "Search"; active: false; clicked => { root.open-command-palette(); } }

@@ -15,9 +15,11 @@
 
 use crate::backend::BackendEvent;
 use crate::model::{
-    BuiltInTheme, CommandHistoryId, GroupId, HostId, LanguageMode, QuickHostAuthField,
-    QuickHostAuthKind, QuickHostDraftField, SessionId, SftpActionDraftField, SnippetId,
-    ToolPanelMode, TransferId, TunnelRule, VisualSettingsDraftField, WorkspacePage,
+    BuiltInTheme, CommandHistoryId, CredentialGroupId, CredentialKind, GroupId, HostId,
+    KeyAlgorithm, LanguageMode, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
+    SessionId, SftpActionDraftField, SnippetArgument, SnippetGroupId, SnippetId, SnippetScope,
+    SnippetSupportTargetId, ToolPanelMode, TransferId, TunnelRule, VisualSettingsDraftField,
+    WorkspacePage,
 };
 use crate::theme::ThemeExchangeFormat;
 
@@ -87,8 +89,103 @@ pub enum Message {
     },
     CloseCreateGroupDialog,
     SaveQuickGroup,
+    CreateCredentialGroup {
+        name: String,
+        kind: CredentialKind,
+        parent_id: Option<CredentialGroupId>,
+    },
+    RenameCredentialGroup {
+        group_id: CredentialGroupId,
+        name: String,
+    },
+    RemoveCredentialGroup {
+        group_id: CredentialGroupId,
+    },
+    CreateCredentialMetadata {
+        kind: CredentialKind,
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        secret_ref: String,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    UpdateCredentialMetadata {
+        original_name: String,
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    UpdateCredentialSecret {
+        name: String,
+        secret_text: String,
+    },
+    GeneratePrivateKeyCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    SavePasswordCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        password: String,
+    },
+    ImportPrivateKeyCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        source_path: String,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    ImportPrivateKeyTextCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        private_key_text: String,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    ImportCertificateCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        source_path: String,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    ImportCertificateTextCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        certificate_text: String,
+        algorithm: Option<KeyAlgorithm>,
+    },
+    GenerateCertificateCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        ca_private_key_ref: String,
+        subject_private_key_ref: String,
+        cert_type: String,
+        principals: String,
+        valid_days: String,
+        key_id: String,
+        serial: String,
+    },
+    ExportCredentialSecret {
+        name: String,
+        target_path: String,
+    },
+    DuplicateCredential {
+        name: String,
+    },
     RemoveCredential {
         name: String,
+    },
+    MoveCredential {
+        name: String,
+        group_id: Option<CredentialGroupId>,
+    },
+    MoveCredentialGroup {
+        group_id: CredentialGroupId,
+        parent_id: Option<CredentialGroupId>,
+    },
+    UpdateSnippetSearchQuery {
+        query: String,
+    },
+    ToggleSnippetTreeNode {
+        node_id: String,
     },
     TrustKnownHost {
         host: String,
@@ -127,7 +224,13 @@ pub enum Message {
     ToggleHostTreeGroup {
         group_id: Option<GroupId>,
     },
+    ToggleCredentialTreeNode {
+        node_id: String,
+    },
     UpdateHostSearchQuery {
+        query: String,
+    },
+    UpdateCredentialSearchQuery {
         query: String,
     },
     UpdateNewSessionSearchQuery {
@@ -286,10 +389,87 @@ pub enum Message {
         host_id: HostId,
         snippet_id: SnippetId,
     },
+    RunSnippetWithArguments {
+        host_id: HostId,
+        snippet_id: SnippetId,
+        arguments: Vec<SnippetArgument>,
+    },
+    RunSnippetTargetWithArguments {
+        host_id: HostId,
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+        arguments: Vec<SnippetArgument>,
+    },
+    RunSnippetOnActiveHost {
+        snippet_id: SnippetId,
+    },
+    RunSnippetTargetOnActiveHost {
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+    },
     UpdateSnippetArgument {
         snippet_id: SnippetId,
         name: String,
         value: String,
+    },
+    CreateSnippet {
+        name: String,
+        description: String,
+        command_template: String,
+        scope: SnippetScope,
+        group_id: Option<SnippetGroupId>,
+    },
+    UpdateSnippet {
+        snippet_id: SnippetId,
+        name: String,
+        description: String,
+        command_template: String,
+        scope: SnippetScope,
+        group_id: Option<SnippetGroupId>,
+    },
+    CreateSnippetTarget {
+        snippet_id: SnippetId,
+        target_keys: Vec<String>,
+        display_name: String,
+        command_template: String,
+        share_target_id: Option<SnippetSupportTargetId>,
+    },
+    UpdateSnippetTarget {
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+        target_key: String,
+        display_name: String,
+        command_template: String,
+    },
+    RemoveSnippetTarget {
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+    },
+    SplitSnippetTargetImplementation {
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+    },
+    CreateSnippetGroup {
+        name: String,
+        parent_id: Option<SnippetGroupId>,
+    },
+    RenameSnippetGroup {
+        group_id: SnippetGroupId,
+        name: String,
+    },
+    RemoveSnippetGroup {
+        group_id: SnippetGroupId,
+    },
+    RemoveSnippetGroupRecursive {
+        group_id: SnippetGroupId,
+    },
+    MoveSnippetGroup {
+        group_id: SnippetGroupId,
+        parent_id: Option<SnippetGroupId>,
+    },
+    MoveSnippet {
+        snippet_id: SnippetId,
+        group_id: Option<SnippetGroupId>,
     },
     RemoveSnippet {
         snippet_id: SnippetId,

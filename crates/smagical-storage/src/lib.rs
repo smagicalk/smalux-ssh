@@ -19,8 +19,9 @@ mod workspace;
 use serde::{Deserialize, Serialize};
 use smagical_config::AppConfig;
 use smagical_core::{
-    CommandHistoryItem, CredentialMetadata, Host, HostGroup, KnownHostEntry, RecentConnection,
-    SftpBookmark, Snippet, TunnelRule, WorkspaceState,
+    CommandHistoryItem, CredentialGroup, CredentialInspection, CredentialMetadata, Host, HostGroup,
+    KnownHostEntry, RecentConnection, SecretRecord, SftpBookmark, Snippet, SnippetGroup,
+    TunnelRule, WorkspaceState,
 };
 
 pub use persistence::{RedbStorage, StoragePersistenceError};
@@ -40,6 +41,12 @@ pub struct StorageManager {
     pub groups: Vec<HostGroup>,
     /// 凭据元数据，不包含明文秘密。
     pub credentials: Vec<CredentialMetadata>,
+    /// 凭据内容解析缓存，不包含密码明文。
+    pub credential_inspections: Vec<CredentialInspection>,
+    /// 密钥页树形分组。
+    pub credential_groups: Vec<CredentialGroup>,
+    /// 本地安全存储记录，可能是未加密开发期 payload，也可能是外部凭据库引用。
+    pub secrets: Vec<SecretRecord>,
     /// Known Hosts 安全记录。
     pub known_hosts: Vec<KnownHostEntry>,
     /// 最近连接列表。
@@ -48,6 +55,8 @@ pub struct StorageManager {
     pub command_history: Vec<CommandHistoryItem>,
     /// 快捷命令片段。
     pub snippets: Vec<Snippet>,
+    /// 快捷命令片段分组。
+    pub snippet_groups: Vec<SnippetGroup>,
     /// SFTP 书签。
     pub sftp_bookmarks: Vec<SftpBookmark>,
     /// SSH 隧道规则。
@@ -85,6 +94,16 @@ impl StorageManager {
         self.credentials.len()
     }
 
+    /// 密钥分组数量。
+    pub fn credential_group_count(&self) -> usize {
+        self.credential_groups.len()
+    }
+
+    /// 安全存储记录数量。
+    pub fn secret_count(&self) -> usize {
+        self.secrets.len()
+    }
+
     /// Known Hosts 记录数量。
     pub fn known_host_count(&self) -> usize {
         self.known_hosts.len()
@@ -103,6 +122,11 @@ impl StorageManager {
     /// 快捷命令数量。
     pub fn snippet_count(&self) -> usize {
         self.snippets.len()
+    }
+
+    /// 快捷命令分组数量。
+    pub fn snippet_group_count(&self) -> usize {
+        self.snippet_groups.len()
     }
 
     /// SFTP 书签数量。
@@ -134,10 +158,13 @@ impl StorageManager {
         self.hosts.is_empty()
             && self.groups.is_empty()
             && self.credentials.is_empty()
+            && self.credential_groups.is_empty()
+            && self.secrets.is_empty()
             && self.known_hosts.is_empty()
             && self.recent_connections.is_empty()
             && self.command_history.is_empty()
             && self.snippets.is_empty()
+            && self.snippet_groups.is_empty()
             && self.sftp_bookmarks.is_empty()
             && self.tunnel_rules.is_empty()
             && self.themes.is_empty()
@@ -229,6 +256,7 @@ mod tests {
         assert_eq!(storage.host_count(), 1);
         assert_eq!(storage.group_count(), 1);
         assert_eq!(storage.credential_count(), 0);
+        assert_eq!(storage.secret_count(), 0);
         assert_eq!(storage.known_host_count(), 0);
         assert_eq!(storage.recent_count(), 1);
         assert_eq!(storage.command_history_count(), 1);

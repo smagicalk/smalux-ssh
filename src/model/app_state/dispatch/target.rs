@@ -36,20 +36,57 @@ impl MessageDispatchTarget {
     /// 新增消息时必须在这里归类；分类错误会让消息进入错误路由并触发对应
     /// `unreachable!`，因此相关测试会很快暴露问题。
     pub(super) fn for_message(message: &Message) -> Self {
-        match message {
-            Message::UpdateVisualSettingsDraft { .. }
+        if is_visual_message(message) {
+            Self::Visual
+        } else if is_workspace_message(message) {
+            Self::Workspace
+        } else if is_ui_message(message) {
+            Self::Ui
+        } else if is_storage_message(message) {
+            Self::Storage
+        } else if is_session_message(message) {
+            Self::Session
+        } else if is_sftp_message(message) {
+            Self::Sftp
+        } else if is_launch_message(message) {
+            Self::Launch
+        } else if is_snippet_message(message) {
+            Self::Snippet
+        } else {
+            match message {
+                Message::BackendEventReceived(_) => Self::Backend,
+                _ => unreachable!("所有 Message 变体必须归类到一个 dispatch target"),
+            }
+        }
+    }
+}
+
+fn is_visual_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::UpdateVisualSettingsDraft { .. }
             | Message::SetVisualBackgroundEnabled { .. }
             | Message::ApplyVisualSettings
             | Message::UpdateHostVisualSettingsDraft { .. }
             | Message::SetHostVisualBackgroundEnabled { .. }
             | Message::ApplyHostVisualSettings { .. }
-            | Message::ClearHostVisualSettings { .. } => Self::Visual,
+            | Message::ClearHostVisualSettings { .. }
+    )
+}
 
-            Message::SaveWorkspaceSnapshot
+fn is_workspace_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::SaveWorkspaceSnapshot
             | Message::RestoreWorkspaceSnapshot
-            | Message::ClearWorkspaceSnapshot => Self::Workspace,
+            | Message::ClearWorkspaceSnapshot
+    )
+}
 
-            Message::UpdateQuickHostDraft { .. }
+fn is_ui_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::UpdateQuickHostDraft { .. }
             | Message::SelectQuickHostGroup { .. }
             | Message::UpdateQuickHostAuthKind { .. }
             | Message::UpdateQuickHostAuthField { .. }
@@ -77,7 +114,11 @@ impl MessageDispatchTarget {
             | Message::NavigateWorkspacePage { .. }
             | Message::ToggleHostListMode
             | Message::ToggleHostTreeGroup { .. }
+            | Message::ToggleCredentialTreeNode { .. }
             | Message::UpdateHostSearchQuery { .. }
+            | Message::UpdateCredentialSearchQuery { .. }
+            | Message::UpdateSnippetSearchQuery { .. }
+            | Message::ToggleSnippetTreeNode { .. }
             | Message::UpdateNewSessionSearchQuery { .. }
             | Message::ResizeHostsPanel { .. }
             | Message::ResizeActivityPanel { .. }
@@ -108,17 +149,49 @@ impl MessageDispatchTarget {
             | Message::SendTerminalInput { .. }
             | Message::UpdateHostCommandDraft { .. }
             | Message::UpdateHostSftpInitialDirDraft { .. }
-            | Message::UpdateSftpActionDraft { .. } => Self::Ui,
+            | Message::UpdateSftpActionDraft { .. }
+    )
+}
 
-            Message::ConfirmRemoveHost
+fn is_storage_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::ConfirmRemoveHost
             | Message::ConfirmRemoveGroup
+            | Message::CreateCredentialGroup { .. }
+            | Message::RenameCredentialGroup { .. }
+            | Message::RemoveCredentialGroup { .. }
+            | Message::CreateCredentialMetadata { .. }
+            | Message::UpdateCredentialMetadata { .. }
+            | Message::UpdateCredentialSecret { .. }
+            | Message::GeneratePrivateKeyCredential { .. }
+            | Message::SavePasswordCredential { .. }
+            | Message::ImportPrivateKeyCredential { .. }
+            | Message::ImportPrivateKeyTextCredential { .. }
+            | Message::ImportCertificateCredential { .. }
+            | Message::ImportCertificateTextCredential { .. }
+            | Message::GenerateCertificateCredential { .. }
+            | Message::ExportCredentialSecret { .. }
+            | Message::DuplicateCredential { .. }
             | Message::RemoveCredential { .. }
+            | Message::MoveCredential { .. }
+            | Message::MoveCredentialGroup { .. }
             | Message::TrustKnownHost { .. }
-            | Message::RemoveKnownHost { .. } => Self::Storage,
+            | Message::RemoveKnownHost { .. }
+    )
+}
 
-            Message::CloseSessionTab { .. } | Message::ActivateTerminalTab { .. } => Self::Session,
+fn is_session_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::CloseSessionTab { .. } | Message::ActivateTerminalTab { .. }
+    )
+}
 
-            Message::RefreshSftp { .. }
+fn is_sftp_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::RefreshSftp { .. }
             | Message::SaveSftpBookmark { .. }
             | Message::OpenSftpBookmark { .. }
             | Message::RemoveSftpBookmark { .. }
@@ -128,23 +201,46 @@ impl MessageDispatchTarget {
             | Message::DownloadSftp { .. }
             | Message::CancelSftpTransfer { .. }
             | Message::RemoveSftpFile { .. }
-            | Message::CreateSftpDir { .. } => Self::Sftp,
+            | Message::CreateSftpDir { .. }
+    )
+}
 
-            Message::OpenShell { .. }
+fn is_launch_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::OpenShell { .. }
             | Message::OpenRecentConnection { .. }
             | Message::ReconnectShell { .. }
             | Message::OpenSftp { .. }
             | Message::RunRemoteCommand { .. }
             | Message::StartTunnel { .. }
-            | Message::StopTunnel { .. } => Self::Launch,
+            | Message::StopTunnel { .. }
+    )
+}
 
-            Message::SaveHostCommandSnippet { .. }
+fn is_snippet_message(message: &Message) -> bool {
+    matches!(
+        message,
+        Message::SaveHostCommandSnippet { .. }
             | Message::RunSnippet { .. }
+            | Message::RunSnippetWithArguments { .. }
+            | Message::RunSnippetTargetWithArguments { .. }
+            | Message::RunSnippetOnActiveHost { .. }
+            | Message::RunSnippetTargetOnActiveHost { .. }
             | Message::UpdateSnippetArgument { .. }
+            | Message::CreateSnippet { .. }
+            | Message::UpdateSnippet { .. }
+            | Message::CreateSnippetTarget { .. }
+            | Message::UpdateSnippetTarget { .. }
+            | Message::RemoveSnippetTarget { .. }
+            | Message::SplitSnippetTargetImplementation { .. }
+            | Message::CreateSnippetGroup { .. }
+            | Message::RenameSnippetGroup { .. }
+            | Message::RemoveSnippetGroup { .. }
+            | Message::RemoveSnippetGroupRecursive { .. }
+            | Message::MoveSnippetGroup { .. }
+            | Message::MoveSnippet { .. }
             | Message::RemoveSnippet { .. }
-            | Message::RunCommandHistory { .. } => Self::Snippet,
-
-            Message::BackendEventReceived(_) => Self::Backend,
-        }
-    }
+            | Message::RunCommandHistory { .. }
+    )
 }

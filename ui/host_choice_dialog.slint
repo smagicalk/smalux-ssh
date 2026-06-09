@@ -1,0 +1,129 @@
+import { AppTheme } from "./theme.slint";
+import { DialogButton, DialogCloseButton } from "./common.slint";
+import { HostNodeIcon } from "./hosts.slint";
+component CreateChoiceCard inherits Rectangle {
+    in property <string> label;
+    in property <string> caption;
+    in property <string> kind;
+    in property <int> accent-index: 0;
+    callback clicked();
+
+    height: 76px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.dialog-section-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HostNodeIcon {
+        x: 20px;
+        y: (root.height - self.height) / 2;
+        kind: root.kind;
+        accent-index: root.accent-index;
+        status-key: "";
+    }
+
+    VerticalLayout {
+        x: 64px;
+        y: 0px;
+        width: root.width - 78px;
+        height: root.height;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 4px;
+
+        Rectangle { vertical-stretch: 1; }
+
+        Text {
+            text: root.label;
+            color: AppTheme.text-strong;
+            font-size: 13px;
+            font-weight: 700;
+            overflow: elide;
+        }
+
+        Text {
+            text: root.caption;
+            color: AppTheme.text-muted;
+            font-size: 10px;
+            overflow: elide;
+        }
+
+        Rectangle { vertical-stretch: 1; }
+    }
+}
+
+export component CreateChoiceDialog inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <string> host-label: "";
+    in property <string> host-caption: "";
+    in property <string> group-label: "";
+    in property <string> group-caption: "";
+    in property <string> cancel-label: "";
+    callback create-host();
+    callback create-group();
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: (root.height - self.height) / 2;
+        width: min(root.width - 48px, 430px);
+        height: 306px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding-left: 18px;
+            padding-right: 18px;
+            padding-top: 18px;
+            padding-bottom: 24px;
+            spacing: 12px;
+
+            HorizontalLayout {
+                spacing: 10px;
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text { text: root.title; color: AppTheme.text-strong; font-size: 17px; font-weight: 700; }
+                    Text { text: root.subtitle; color: AppTheme.text-muted; font-size: 10px; overflow: elide; }
+                }
+                DialogCloseButton { clicked => { root.close(); } }
+            }
+
+            CreateChoiceCard {
+                label: root.host-label;
+                caption: root.host-caption;
+                kind: "Host";
+                accent-index: 0;
+                clicked => { root.create-host(); }
+            }
+
+            CreateChoiceCard {
+                label: root.group-label;
+                caption: root.group-caption;
+                kind: "Group";
+                accent-index: 2;
+                clicked => { root.create-group(); }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton {
+                    label: root.cancel-label;
+                    primary: false;
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}

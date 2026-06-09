@@ -8,6 +8,22 @@
 
 #[path = "storage_admin/credential.rs"]
 mod credential;
+#[path = "storage_admin/credential_certificate_params.rs"]
+mod credential_certificate_params;
+#[path = "storage_admin/credential_groups.rs"]
+mod credential_groups;
+#[path = "storage_admin/credential_ids.rs"]
+mod credential_ids;
+#[path = "storage_admin/credential_material.rs"]
+mod credential_material;
+#[path = "storage_admin/credential_material_certificate.rs"]
+mod credential_material_certificate;
+#[path = "storage_admin/credential_material_generate.rs"]
+mod credential_material_generate;
+#[path = "storage_admin/credential_payload.rs"]
+mod credential_payload;
+#[path = "storage_admin/credential_refs.rs"]
+mod credential_refs;
 #[path = "storage_admin/known_hosts.rs"]
 mod known_hosts;
 #[cfg(test)]

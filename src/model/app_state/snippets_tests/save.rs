@@ -16,7 +16,7 @@ fn save_host_command_snippet_uses_current_command_draft() {
     assert_eq!(state.storage.snippet_count(), 1);
     assert_eq!(state.storage.snippets[0].name, "systemctl status sshd");
     assert_eq!(
-        state.storage.snippets[0].command_template,
+        state.storage.snippets[0].default_command_template(),
         "systemctl status sshd"
     );
     assert_eq!(state.storage.snippets[0].scope, SnippetScope::Host(host_id));

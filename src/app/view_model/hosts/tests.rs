@@ -1,5 +1,8 @@
 use super::*;
-use crate::model::{AgentSource, AuthProfile, GroupId, Host, HostGroup, HostId, LanguageMode};
+use crate::model::{
+    AgentSource, AuthProfile, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, HostId,
+    KeyAlgorithm, LanguageMode, SecretRef,
+};
 use uuid::Uuid;
 
 fn agent_host(name: &str, address: &str, tags: &[&str]) -> Host {
@@ -254,16 +257,45 @@ fn create_group_dialog_projects_parent_options() {
 }
 
 #[test]
-fn host_rows_use_stable_accent_mapping() {
+fn host_rows_use_group_accent_mapping() {
     let mut state = AppState::default();
-    let host = agent_host("Production", "prod.example.com", &["prod"]);
+    let first_group_id = GroupId(Uuid::new_v4());
+    let mut second_group_id = GroupId(Uuid::new_v4());
+    while accent_index_for_group_id(Some(first_group_id))
+        == accent_index_for_group_id(Some(second_group_id))
+    {
+        second_group_id = GroupId(Uuid::new_v4());
+    }
+    state.storage.upsert_group(HostGroup {
+        id: first_group_id,
+        name: "生产".to_owned(),
+        parent_id: None,
+    });
+    state.storage.upsert_group(HostGroup {
+        id: second_group_id,
+        name: "测试".to_owned(),
+        parent_id: None,
+    });
+    let mut host = agent_host("Production", "prod.example.com", &["prod"]);
+    host.group_id = Some(first_group_id);
     state.storage.upsert_host(host.clone());
 
     let rows = hosts(&state);
     let accent = rows[0].accent_index;
 
     assert!((0..=4).contains(&accent));
-    assert_eq!(accent, hosts(&state)[0].accent_index);
+    assert_eq!(accent, accent_index_for_group_id(Some(first_group_id)));
+
+    host.group_id = Some(second_group_id);
+    state.storage.upsert_host(host);
+
+    let changed_rows = hosts(&state);
+
+    assert_eq!(
+        changed_rows[0].accent_index,
+        accent_index_for_group_id(Some(second_group_id))
+    );
+    assert_ne!(accent, changed_rows[0].accent_index);
 }
 
 #[test]
@@ -309,6 +341,54 @@ fn quick_host_projects_group_path_options_and_selection() {
 }
 
 #[test]
+fn quick_host_projects_key_and_certificate_options() {
+    let mut state = AppState::default();
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "prod-key".to_owned(),
+        kind: CredentialKind::PrivateKey,
+        group_id: None,
+        username: Some("deploy".to_owned()),
+        secret: Some(SecretRef("secret://keys/prod".to_owned())),
+        key_algorithm: Some(KeyAlgorithm::Ed25519),
+        fingerprint: None,
+    });
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "prod-cert".to_owned(),
+        kind: CredentialKind::Certificate,
+        group_id: None,
+        username: None,
+        secret: Some(SecretRef("secret://certs/prod".to_owned())),
+        key_algorithm: None,
+        fingerprint: Some("SHA256:cert".to_owned()),
+    });
+    state.storage.upsert_credential(CredentialMetadata {
+        id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+        name: "password".to_owned(),
+        kind: CredentialKind::Password,
+        group_id: None,
+        username: None,
+        secret: Some(SecretRef("secret://passwords/prod".to_owned())),
+        key_algorithm: None,
+        fingerprint: None,
+    });
+    state.ui.quick_host.auth.private_key_ref = "secret://keys/prod".to_owned();
+    state.ui.quick_host.auth.certificate_ref = "secret://certs/prod".to_owned();
+
+    let vm = quick_host(&state);
+
+    assert_eq!(vm.private_key_options.len(), 1);
+    assert_eq!(vm.private_key_options[0].label, "prod-key");
+    assert_eq!(vm.private_key_options[0].detail, "deploy");
+    assert!(vm.private_key_options[0].selected);
+    assert_eq!(vm.certificate_options.len(), 1);
+    assert_eq!(vm.certificate_options[0].label, "prod-cert");
+    assert_eq!(vm.certificate_options[0].detail, "SHA256:cert");
+    assert!(vm.certificate_options[0].selected);
+}
+
+#[test]
 fn new_session_hosts_hide_empty_tags_after_localization() {
     let mut state = AppState::default();
     state.ui.workspace.language = LanguageMode::Chinese;
@@ -318,7 +398,7 @@ fn new_session_hosts_hide_empty_tags_after_localization() {
 
     let host = new_session_hosts(&state).remove(0);
 
-    assert_eq!(hosts(&state)[0].tags, "未标记");
+    assert_eq!(hosts(&state)[0].tags, "默认");
     assert_eq!(host.tags, "");
 }
 

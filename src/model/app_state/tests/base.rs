@@ -39,8 +39,10 @@ fn remove_credential_message_updates_storage() {
     state
         .storage
         .upsert_credential(crate::model::CredentialMetadata {
+            id: crate::model::CredentialId(uuid::Uuid::new_v4()),
             name: "deploy".to_owned(),
             kind: crate::model::CredentialKind::Password,
+            group_id: None,
             username: Some("deploy".to_owned()),
             secret: Some(crate::model::SecretRef("password:deploy".to_owned())),
             key_algorithm: None,
@@ -53,6 +55,73 @@ fn remove_credential_message_updates_storage() {
 
     assert!(outcome.changed());
     assert_eq!(state.storage.credential_count(), 0);
+}
+
+#[test]
+fn update_credential_metadata_message_updates_storage() {
+    let mut state = AppState::default();
+    state
+        .storage
+        .upsert_credential(crate::model::CredentialMetadata {
+            id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+            name: "deploy".to_owned(),
+            kind: crate::model::CredentialKind::PrivateKey,
+            group_id: None,
+            username: Some("deploy".to_owned()),
+            secret: Some(crate::model::SecretRef("secret://keys/deploy".to_owned())),
+            key_algorithm: Some(crate::model::KeyAlgorithm::Ed25519),
+            fingerprint: None,
+        });
+
+    let outcome = state.apply(Message::UpdateCredentialMetadata {
+        original_name: "deploy".to_owned(),
+        name: "deploy-prod".to_owned(),
+        group_id: None,
+        algorithm: Some(crate::model::KeyAlgorithm::Rsa),
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(state.storage.credentials[0].name, "deploy-prod");
+    assert_eq!(
+        state.storage.credentials[0].key_algorithm,
+        Some(crate::model::KeyAlgorithm::Rsa)
+    );
+}
+
+#[test]
+fn update_credential_secret_message_updates_storage() {
+    let mut state = AppState::default();
+    let secret_ref = crate::model::SecretRef("secret://passwords/deploy".to_owned());
+    state
+        .storage
+        .upsert_secret(crate::model::SecretRecord::local_plaintext(
+            secret_ref.clone(),
+            crate::model::SecretMaterialKind::Password,
+            b"old-password".to_vec(),
+        ));
+    state
+        .storage
+        .upsert_credential(crate::model::CredentialMetadata {
+            id: crate::model::CredentialId(uuid::Uuid::new_v4()),
+            name: "deploy".to_owned(),
+            kind: crate::model::CredentialKind::Password,
+            group_id: None,
+            username: Some("deploy".to_owned()),
+            secret: Some(secret_ref),
+            key_algorithm: None,
+            fingerprint: None,
+        });
+
+    let outcome = state.apply(Message::UpdateCredentialSecret {
+        name: "deploy".to_owned(),
+        secret_text: "new-password".to_owned(),
+    });
+
+    assert!(outcome.changed());
+    assert_eq!(
+        state.storage.secrets[0].encrypted_payload.as_deref(),
+        Some(b"new-password".as_slice())
+    );
 }
 
 #[test]
