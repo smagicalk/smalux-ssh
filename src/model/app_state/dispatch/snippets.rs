@@ -85,6 +85,19 @@ impl AppState {
                 display_name,
                 command_template,
             ),
+            Message::SyncSnippetTargetImplementationTargets {
+                snippet_id,
+                target_id,
+                target_keys,
+                display_name,
+                command_template,
+            } => self.sync_snippet_target_implementation_targets(
+                snippet_id,
+                target_id,
+                target_keys,
+                display_name,
+                command_template,
+            ),
             Message::RemoveSnippetTarget {
                 snippet_id,
                 target_id,

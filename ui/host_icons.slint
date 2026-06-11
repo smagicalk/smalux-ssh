@@ -60,12 +60,246 @@ export component HostIcon inherits Rectangle {
         y: 1px;
         width: parent.width;
         height: parent.height;
-        text: ">";
+        text: "LX";
         color: root.accent-color;
-        font-size: 14px;
+        font-size: 9px;
         font-weight: 700;
         horizontal-alignment: center;
         vertical-alignment: center;
+    }
+
+    if root.icon-key == "debian": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "DE";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "debian": Rectangle {
+        x: 6px;
+        y: 6px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "rhel": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "RH";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "rhel": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 5px;
+        border-radius: 3px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "alpine": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "AL";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "alpine": Rectangle {
+        x: 5px;
+        y: 13px;
+        width: 12px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "fedora": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "FD";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "fedora": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "arch": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "AR";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "arch": Rectangle {
+        x: 10px;
+        y: 4px;
+        width: 2px;
+        height: 13px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "suse": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "SU";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "suse": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "freebsd": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "FB";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "freebsd": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "macos": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "OS";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "macos": Rectangle {
+        x: 6px;
+        y: 5px;
+        width: 10px;
+        height: 12px;
+        border-radius: 3px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
+    }
+
+    if root.icon-key == "powershell": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "PS";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "powershell": Rectangle {
+        x: 5px;
+        y: 15px;
+        width: 12px;
+        height: 2px;
+        border-radius: 1px;
+        background: root.accent-color;
+    }
+
+    if root.icon-key == "cmd": Text {
+        x: 0px;
+        y: 1px;
+        width: parent.width;
+        height: parent.height;
+        text: "C:";
+        color: root.accent-color;
+        font-size: 9px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+    }
+
+    if root.icon-key == "cmd": Rectangle {
+        x: 5px;
+        y: 5px;
+        width: 12px;
+        height: 12px;
+        border-radius: 2px;
+        border-width: 1px;
+        border-color: root.accent-color;
+        background: AppTheme.transparent;
     }
 
     if root.icon-key == "container": Rectangle {
@@ -355,7 +589,7 @@ export component HostIcon inherits Rectangle {
         vertical-alignment: center;
     }
 
-    if root.icon-key != "database" && root.icon-key != "cloud" && root.icon-key != "linux" && root.icon-key != "container" && root.icon-key != "shield" && root.icon-key != "router" && root.icon-key != "terminal" && root.icon-key != "globe" && root.icon-key != "key" && root.icon-key != "chip" && root.icon-key != "cluster" && root.icon-key != "folder" && root.icon-key != "code": Rectangle {
+    if root.icon-key != "database" && root.icon-key != "cloud" && root.icon-key != "linux" && root.icon-key != "debian" && root.icon-key != "rhel" && root.icon-key != "alpine" && root.icon-key != "fedora" && root.icon-key != "arch" && root.icon-key != "suse" && root.icon-key != "freebsd" && root.icon-key != "macos" && root.icon-key != "powershell" && root.icon-key != "cmd" && root.icon-key != "container" && root.icon-key != "shield" && root.icon-key != "router" && root.icon-key != "terminal" && root.icon-key != "globe" && root.icon-key != "key" && root.icon-key != "chip" && root.icon-key != "cluster" && root.icon-key != "folder" && root.icon-key != "code": Rectangle {
         x: 5px;
         y: 5px;
         width: 12px;

@@ -399,3 +399,93 @@ fn snippet_target_messages_create_share_update_split_and_remove_targets() {
             .any(|implementation| implementation.id == debian_implementation_id)
     );
 }
+
+#[test]
+fn snippet_target_batch_create_rejects_duplicate_target_without_partial_write() {
+    let mut state = AppState::default();
+    let host_id = HostId(Uuid::new_v4());
+    let snippet = parameterized_host_snippet(host_id, "ls {{path}}");
+    let snippet_id = snippet.id;
+    let linux_target_id = snippet.support_targets[0].id;
+    state.storage.upsert_snippet(snippet);
+
+    let rejected = state.apply(Message::CreateSnippetTarget {
+        snippet_id,
+        target_keys: vec!["debian-ubuntu".to_owned(), "linux".to_owned()],
+        display_name: String::new(),
+        command_template: String::new(),
+        share_target_id: Some(linux_target_id),
+    });
+
+    assert!(rejected.changed());
+    assert!(rejected.error.is_some());
+    assert_eq!(state.storage.snippets[0].support_targets.len(), 1);
+    assert!(
+        !state.storage.snippets[0]
+            .support_targets
+            .iter()
+            .any(|target| target.target_key == "debian-ubuntu")
+    );
+}
+
+#[test]
+fn snippet_target_sync_updates_shared_implementation_target_set() {
+    let mut state = AppState::default();
+    let host_id = HostId(Uuid::new_v4());
+    let snippet = parameterized_host_snippet(host_id, "systemctl status {{service}}");
+    let snippet_id = snippet.id;
+    let linux_target_id = snippet.support_targets[0].id;
+    let linux_implementation_id = snippet.support_targets[0].implementation_id;
+    state.storage.upsert_snippet(snippet);
+
+    let created_shared_target = state.apply(Message::CreateSnippetTarget {
+        snippet_id,
+        target_keys: vec!["debian-ubuntu".to_owned()],
+        display_name: String::new(),
+        command_template: String::new(),
+        share_target_id: Some(linux_target_id),
+    });
+    assert!(created_shared_target.changed());
+
+    let synced = state.apply(Message::SyncSnippetTargetImplementationTargets {
+        snippet_id,
+        target_id: linux_target_id,
+        target_keys: vec!["debian-ubuntu".to_owned(), "macos".to_owned()],
+        display_name: String::new(),
+        command_template: "echo {{service}}".to_owned(),
+    });
+    assert!(synced.changed());
+
+    let snippet = &state.storage.snippets[0];
+    let reused_target = snippet
+        .support_targets
+        .iter()
+        .find(|target| target.id == linux_target_id)
+        .expect("当前编辑的目标行应复用到新的第一个标签");
+    let implementation_targets = snippet
+        .support_targets
+        .iter()
+        .filter(|target| target.implementation_id == linux_implementation_id)
+        .map(|target| target.target_key.as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(snippet.implementations.len(), 1);
+    assert_eq!(reused_target.target_key, "debian-ubuntu");
+    assert_eq!(implementation_targets, vec!["debian-ubuntu", "macos"]);
+    assert!(
+        !snippet
+            .support_targets
+            .iter()
+            .any(|target| target.target_key == "linux")
+    );
+    assert!(
+        snippet
+            .variables
+            .iter()
+            .any(|variable| variable.name == "service")
+    );
+    assert_eq!(
+        snippet.implementations[0].command_template,
+        "echo {{service}}"
+    );
+}

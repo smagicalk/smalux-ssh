@@ -17,6 +17,7 @@ export component SnippetWorkspacePage inherits Rectangle {
     in property <string> selected-node-kind: "";
     in property <int> selected-accent-index: 0;
     in property <[SnippetRow]> snippet-rows: [];
+    in property <[SnippetRow]> snippet-target-options: [];
     in property <string> empty-title-label: "";
     in property <string> empty-caption-label: "";
     in property <string> field-scope-label: "";
@@ -47,6 +48,7 @@ export component SnippetWorkspacePage inherits Rectangle {
     callback move-selected();
     callback copy-command(content: string) -> bool;
     callback run-selected();
+    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
 
     vertical-stretch: 1;
     horizontal-stretch: 1;
@@ -68,6 +70,7 @@ export component SnippetWorkspacePage inherits Rectangle {
         selected-node-kind: root.selected-node-kind;
         selected-accent-index: root.selected-accent-index;
         snippet-rows: root.snippet-rows;
+        snippet-target-options: root.snippet-target-options;
         empty-title-label: root.empty-title-label;
         empty-caption-label: root.empty-caption-label;
         field-scope-label: root.field-scope-label;
@@ -97,5 +100,8 @@ export component SnippetWorkspacePage inherits Rectangle {
         move-selected => { root.move-selected(); }
         copy-command(content) => { root.copy-command(content) }
         run-selected => { root.run-selected(); }
+        select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
+            root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index);
+        }
     }
 }

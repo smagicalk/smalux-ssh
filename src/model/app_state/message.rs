@@ -15,11 +15,11 @@
 
 use crate::backend::BackendEvent;
 use crate::model::{
-    BuiltInTheme, CommandHistoryId, CredentialGroupId, CredentialKind, GroupId, HostId,
-    KeyAlgorithm, LanguageMode, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
-    SessionId, SftpActionDraftField, SnippetArgument, SnippetGroupId, SnippetId, SnippetScope,
-    SnippetSupportTargetId, ToolPanelMode, TransferId, TunnelRule, VisualSettingsDraftField,
-    WorkspacePage,
+    BuiltInTheme, CommandHistoryId, CredentialGroupId, CredentialKind, ForwardId, GroupId, HostId,
+    JumpChainId, KeyAlgorithm, LanguageMode, ProxyId, QuickHostAuthField, QuickHostAuthKind,
+    QuickHostDraftField, SessionId, SftpActionDraftField, SnippetArgument, SnippetGroupId,
+    SnippetId, SnippetScope, SnippetSupportTargetId, ToolPanelMode, TransferId, TunnelRule,
+    VisualSettingsDraftField, WorkspacePage,
 };
 use crate::theme::ThemeExchangeFormat;
 
@@ -65,6 +65,15 @@ pub enum Message {
     UpdateQuickHostAuthField {
         field: QuickHostAuthField,
         value: String,
+    },
+    ToggleQuickHostNetworkProxy {
+        proxy_id: ProxyId,
+    },
+    ToggleQuickHostNetworkJumpChain {
+        chain_id: JumpChainId,
+    },
+    ToggleQuickHostNetworkForward {
+        forward_id: ForwardId,
     },
     SaveQuickHost,
     OpenCreateHostDialogInGroup {
@@ -180,6 +189,39 @@ pub enum Message {
     MoveCredentialGroup {
         group_id: CredentialGroupId,
         parent_id: Option<CredentialGroupId>,
+    },
+    SaveProxyAsset {
+        proxy_id: Option<ProxyId>,
+        name: String,
+        proxy_kind: String,
+        host: String,
+        port: String,
+        tags: String,
+    },
+    SaveJumpChainAsset {
+        chain_id: Option<JumpChainId>,
+        name: String,
+        host_ids: Vec<HostId>,
+    },
+    SaveForwardAsset {
+        forward_id: Option<ForwardId>,
+        name: String,
+        kind: String,
+        bind_host: String,
+        bind_port: String,
+        target_host: String,
+        target_port: String,
+        tags: String,
+        auto_start: bool,
+    },
+    RemoveProxyAsset {
+        proxy_id: ProxyId,
+    },
+    RemoveJumpChainAsset {
+        chain_id: JumpChainId,
+    },
+    RemoveForwardAsset {
+        forward_id: ForwardId,
     },
     UpdateSnippetSearchQuery {
         query: String,
@@ -438,6 +480,13 @@ pub enum Message {
         snippet_id: SnippetId,
         target_id: SnippetSupportTargetId,
         target_key: String,
+        display_name: String,
+        command_template: String,
+    },
+    SyncSnippetTargetImplementationTargets {
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+        target_keys: Vec<String>,
         display_name: String,
         command_template: String,
     },

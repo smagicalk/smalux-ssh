@@ -1,7 +1,8 @@
 use super::*;
 use crate::model::{
-    AgentSource, AuthProfile, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, HostId,
-    KeyAlgorithm, LanguageMode, SecretRef,
+    AgentSource, AuthProfile, CredentialKind, CredentialMetadata, ForwardAsset, ForwardId, GroupId,
+    Host, HostGroup, HostId, JumpChainAsset, JumpChainId, KeyAlgorithm, LanguageMode, ProxyAsset,
+    ProxyId, ProxyProfile, SecretRef, TunnelKind, TunnelRule,
 };
 use uuid::Uuid;
 
@@ -19,7 +20,8 @@ fn agent_host(name: &str, address: &str, tags: &[&str]) -> Host {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -42,7 +44,8 @@ fn host_rows_do_not_expose_auth_secrets() {
             username: "root".to_owned(),
             secret: crate::model::SecretRef("password:root".to_owned()),
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -386,6 +389,82 @@ fn quick_host_projects_key_and_certificate_options() {
     assert_eq!(vm.certificate_options[0].label, "prod-cert");
     assert_eq!(vm.certificate_options[0].detail, "SHA256:cert");
     assert!(vm.certificate_options[0].selected);
+}
+
+#[test]
+fn quick_host_projects_network_resource_options() {
+    let mut state = AppState::default();
+    state.ui.workspace.language = LanguageMode::Chinese;
+    let proxy_id = ProxyId(Uuid::new_v4());
+    let chain_id = JumpChainId(Uuid::new_v4());
+    let forward_id = ForwardId(Uuid::new_v4());
+    let jump_host_id = HostId(Uuid::new_v4());
+    state.storage.upsert_host(Host {
+        id: jump_host_id,
+        name: "跳板机".to_owned(),
+        group_id: None,
+        icon_key: "server".to_owned(),
+        tags: Vec::new(),
+        address: "jump.example.com".to_owned(),
+        port: 22,
+        auth: AuthProfile::Agent {
+            username: "ops".to_owned(),
+            source: AgentSource::Auto,
+            key_hint: None,
+        },
+        network: Default::default(),
+        proxies: Vec::new(),
+        jumps: Vec::new(),
+        theme_override: None,
+        background_override: None,
+    });
+    state.storage.upsert_proxy_asset(ProxyAsset {
+        id: proxy_id,
+        name: "corp-proxy".to_owned(),
+        tags: Vec::new(),
+        profile: ProxyProfile::Http {
+            host: "proxy.example.com".to_owned(),
+            port: 8080,
+        },
+    });
+    state.storage.upsert_jump_chain_asset(JumpChainAsset {
+        id: chain_id,
+        name: "prod-jump".to_owned(),
+        steps: vec![crate::model::JumpProfile {
+            host_id: jump_host_id,
+        }],
+    });
+    state.storage.upsert_forward_asset(ForwardAsset {
+        id: forward_id,
+        name: "db-forward".to_owned(),
+        tags: Vec::new(),
+        rule: TunnelRule {
+            name: "db-forward".to_owned(),
+            kind: TunnelKind::Local,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 15432,
+            target_host: "10.0.0.5".to_owned(),
+            target_port: 5432,
+            auto_start: false,
+        },
+    });
+    state.ui.quick_host.network.proxy_ids.push(proxy_id);
+    state.ui.quick_host.network.forward_ids.push(forward_id);
+
+    let vm = quick_host(&state);
+
+    assert_eq!(vm.network_proxy_options.len(), 1);
+    assert_eq!(vm.network_proxy_options[0].label, "corp-proxy");
+    assert_eq!(
+        vm.network_proxy_options[0].detail,
+        "HTTP proxy.example.com:8080"
+    );
+    assert!(vm.network_proxy_options[0].selected);
+    assert_eq!(vm.network_jump_chain_options[0].detail, "跳板机");
+    assert!(!vm.network_jump_chain_options[0].selected);
+    assert_eq!(vm.network_forward_options[0].kind_label, "转发");
+    assert!(vm.network_forward_options[0].detail.contains("本地"));
+    assert!(vm.network_forward_options[0].selected);
 }
 
 #[test]

@@ -1,7 +1,7 @@
 use super::super::*;
 use crate::model::{
-    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, KnownHostEntry,
-    SecretMaterialKind, SecretRecord, SecretRef,
+    AuthProfile, CredentialGroupId, CredentialKind, CredentialMetadata, Host, HostNetworkSelection,
+    KeyAlgorithm, KnownHostEntry, Message, SecretMaterialKind, SecretRecord, SecretRef,
 };
 use russh::keys::{
     Algorithm, PrivateKey,
@@ -1335,4 +1335,158 @@ fn known_host_can_be_trusted_and_removed() {
     assert!(state.storage.known_hosts[0].trusted);
     assert!(state.remove_known_host("example.com", 22).changed());
     assert!(state.remove_known_host("example.com", 22).error.is_some());
+}
+
+fn sample_network_host(network: HostNetworkSelection) -> Host {
+    Host {
+        id: crate::model::HostId(uuid::Uuid::new_v4()),
+        name: "生产主机".to_owned(),
+        group_id: None,
+        icon_key: "server".to_owned(),
+        tags: Vec::new(),
+        address: "prod.example.com".to_owned(),
+        port: 22,
+        auth: AuthProfile::Password {
+            username: "ops".to_owned(),
+            secret: SecretRef("password:ops".to_owned()),
+        },
+        network,
+        proxies: Vec::new(),
+        jumps: Vec::new(),
+        theme_override: None,
+        background_override: None,
+    }
+}
+
+#[test]
+fn network_proxy_asset_can_be_created_updated_and_removed() {
+    let mut state = AppState::default();
+
+    let created = state.apply(Message::SaveProxyAsset {
+        proxy_id: None,
+        name: " 办公网关 ".to_owned(),
+        proxy_kind: "Socks5".to_owned(),
+        host: " 127.0.0.1 ".to_owned(),
+        port: "1080".to_owned(),
+        tags: "office, shared".to_owned(),
+    });
+
+    assert!(created.changed());
+    assert_eq!(state.storage.proxy_asset_count(), 1);
+    let proxy_id = state.storage.proxy_assets[0].id;
+    assert_eq!(state.storage.proxy_assets[0].name, "办公网关");
+
+    let updated = state.apply(Message::SaveProxyAsset {
+        proxy_id: Some(proxy_id),
+        name: "办公 HTTP".to_owned(),
+        proxy_kind: "Http".to_owned(),
+        host: "proxy.internal".to_owned(),
+        port: "8080".to_owned(),
+        tags: "office".to_owned(),
+    });
+
+    assert!(updated.changed());
+    assert_eq!(state.storage.proxy_asset_count(), 1);
+    assert_eq!(state.storage.proxy_assets[0].name, "办公 HTTP");
+
+    let removed = state.apply(Message::RemoveProxyAsset { proxy_id });
+    assert!(removed.changed());
+    assert_eq!(state.storage.proxy_asset_count(), 0);
+}
+
+#[test]
+fn referenced_network_proxy_asset_reports_used_hosts_on_delete() {
+    let mut state = AppState::default();
+    state.apply(Message::SaveProxyAsset {
+        proxy_id: None,
+        name: "办公网关".to_owned(),
+        proxy_kind: "Socks5".to_owned(),
+        host: "127.0.0.1".to_owned(),
+        port: "1080".to_owned(),
+        tags: String::new(),
+    });
+    let proxy_id = state.storage.proxy_assets[0].id;
+    state
+        .storage
+        .upsert_host(sample_network_host(HostNetworkSelection {
+            proxy_ids: vec![proxy_id],
+            jump_chain_ids: Vec::new(),
+            forward_ids: Vec::new(),
+        }));
+
+    let outcome = state.apply(Message::RemoveProxyAsset { proxy_id });
+
+    assert!(outcome.error.is_some());
+    assert!(
+        outcome
+            .error
+            .as_deref()
+            .is_some_and(|error| error.contains("生产主机"))
+    );
+    assert_eq!(state.storage.proxy_asset_count(), 1);
+}
+
+#[test]
+fn network_jump_chain_asset_validates_hosts_and_blocks_referenced_delete() {
+    let mut state = AppState::default();
+    let host = sample_network_host(HostNetworkSelection::default());
+    let host_id = host.id;
+    state.storage.upsert_host(host);
+
+    let created = state.apply(Message::SaveJumpChainAsset {
+        chain_id: None,
+        name: "生产跳板".to_owned(),
+        host_ids: vec![host_id],
+    });
+
+    assert!(created.changed());
+    assert_eq!(state.storage.jump_chain_asset_count(), 1);
+    let chain_id = state.storage.jump_chain_assets[0].id;
+    state.storage.hosts[0].network.jump_chain_ids.push(chain_id);
+
+    let outcome = state.apply(Message::RemoveJumpChainAsset { chain_id });
+
+    assert!(outcome.error.is_some());
+    assert_eq!(state.storage.jump_chain_asset_count(), 1);
+}
+
+#[test]
+fn network_forward_asset_can_be_created_updated_and_removed() {
+    let mut state = AppState::default();
+
+    let created = state.apply(Message::SaveForwardAsset {
+        forward_id: None,
+        name: "本地数据库".to_owned(),
+        kind: "Local".to_owned(),
+        bind_host: "127.0.0.1".to_owned(),
+        bind_port: "15432".to_owned(),
+        target_host: "db.internal".to_owned(),
+        target_port: "5432".to_owned(),
+        tags: "db".to_owned(),
+        auto_start: false,
+    });
+
+    assert!(created.changed());
+    assert_eq!(state.storage.forward_asset_count(), 1);
+    let forward_id = state.storage.forward_assets[0].id;
+
+    let updated = state.apply(Message::SaveForwardAsset {
+        forward_id: Some(forward_id),
+        name: "动态代理".to_owned(),
+        kind: "Dynamic".to_owned(),
+        bind_host: "127.0.0.1".to_owned(),
+        bind_port: "1080".to_owned(),
+        target_host: String::new(),
+        target_port: String::new(),
+        tags: "proxy".to_owned(),
+        auto_start: false,
+    });
+
+    assert!(updated.changed());
+    assert_eq!(state.storage.forward_asset_count(), 1);
+    assert_eq!(state.storage.forward_assets[0].name, "动态代理");
+
+    let removed = state.apply(Message::RemoveForwardAsset { forward_id });
+    assert!(removed.changed());
+    assert_eq!(state.storage.forward_asset_count(), 0);
 }

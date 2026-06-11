@@ -256,6 +256,28 @@ fn snippet_folder_row(
         arguments: String::new(),
         argument_values: String::new(),
         meta: snippet_count_label(child_count, locale),
+        target_linux_selected: false,
+        target_debian_selected: false,
+        target_rhel_selected: false,
+        target_alpine_selected: false,
+        target_fedora_selected: false,
+        target_arch_selected: false,
+        target_suse_selected: false,
+        target_freebsd_selected: false,
+        target_macos_selected: false,
+        target_powershell_selected: false,
+        target_cmd_selected: false,
+        target_linux_disabled: false,
+        target_debian_disabled: false,
+        target_rhel_disabled: false,
+        target_alpine_disabled: false,
+        target_fedora_disabled: false,
+        target_arch_disabled: false,
+        target_suse_disabled: false,
+        target_freebsd_disabled: false,
+        target_macos_disabled: false,
+        target_powershell_disabled: false,
+        target_cmd_disabled: false,
         icon_key: "folder",
         depth,
         node_kind: "Group",
@@ -285,6 +307,7 @@ fn snippet_row(
     locale: super::i18n::Locale,
 ) -> SnippetRowViewModel {
     let target_count = snippet.support_targets.len();
+    let disabled_target_keys = snippet_all_target_keys(snippet);
     SnippetRowViewModel {
         id: snippet_row_id(snippet),
         parent_id,
@@ -298,6 +321,32 @@ fn snippet_row(
         arguments: snippet_default_arguments(snippet).len().to_string(),
         argument_values: snippet_argument_values(snippet),
         meta: snippet_target_count_label(target_count, locale),
+        target_linux_selected: false,
+        target_debian_selected: false,
+        target_rhel_selected: false,
+        target_alpine_selected: false,
+        target_fedora_selected: false,
+        target_arch_selected: false,
+        target_suse_selected: false,
+        target_freebsd_selected: false,
+        target_macos_selected: false,
+        target_powershell_selected: false,
+        target_cmd_selected: false,
+        target_linux_disabled: disabled_target_keys.iter().any(|key| key == "linux"),
+        target_debian_disabled: disabled_target_keys
+            .iter()
+            .any(|key| key == "debian-ubuntu"),
+        target_rhel_disabled: disabled_target_keys.iter().any(|key| key == "rhel-centos"),
+        target_alpine_disabled: disabled_target_keys.iter().any(|key| key == "alpine"),
+        target_fedora_disabled: disabled_target_keys.iter().any(|key| key == "fedora"),
+        target_arch_disabled: disabled_target_keys.iter().any(|key| key == "arch"),
+        target_suse_disabled: disabled_target_keys.iter().any(|key| key == "suse"),
+        target_freebsd_disabled: disabled_target_keys.iter().any(|key| key == "freebsd"),
+        target_macos_disabled: disabled_target_keys.iter().any(|key| key == "macos"),
+        target_powershell_disabled: disabled_target_keys
+            .iter()
+            .any(|key| key == "windows-powershell"),
+        target_cmd_disabled: disabled_target_keys.iter().any(|key| key == "windows-cmd"),
         icon_key: "code",
         depth,
         node_kind: "Snippet",
@@ -372,11 +421,25 @@ fn snippet_target_row(
         .iter()
         .filter(|other| other.implementation_id == target.implementation_id)
         .count();
+    let target_keys = snippet_implementation_target_keys(snippet, target.implementation_id);
+    let target_linux_selected = target_keys.iter().any(|key| key == "linux");
+    let target_debian_selected = target_keys.iter().any(|key| key == "debian-ubuntu");
+    let target_rhel_selected = target_keys.iter().any(|key| key == "rhel-centos");
+    let target_alpine_selected = target_keys.iter().any(|key| key == "alpine");
+    let target_fedora_selected = target_keys.iter().any(|key| key == "fedora");
+    let target_arch_selected = target_keys.iter().any(|key| key == "arch");
+    let target_suse_selected = target_keys.iter().any(|key| key == "suse");
+    let target_freebsd_selected = target_keys.iter().any(|key| key == "freebsd");
+    let target_macos_selected = target_keys.iter().any(|key| key == "macos");
+    let target_powershell_selected = target_keys.iter().any(|key| key == "windows-powershell");
+    let target_cmd_selected = target_keys.iter().any(|key| key == "windows-cmd");
+    let disabled_target_keys =
+        snippet_other_implementation_target_keys(snippet, target.implementation_id);
     SnippetRowViewModel {
         id: snippet_target_row_id(snippet, target),
         parent_id: snippet_row_id(snippet),
-        name: snippet.name.clone(),
-        description: implementation.name.clone(),
+        name: target.target_key.clone(),
+        description: target_keys.join(";"),
         command_template: implementation.command_template.clone(),
         scope: target.target_key.clone(),
         scope_key: if shared_count > 1 {
@@ -396,10 +459,36 @@ fn snippet_target_row(
         } else {
             implementation.shell.key().to_owned()
         },
-        icon_key: "terminal",
+        target_linux_selected,
+        target_debian_selected,
+        target_rhel_selected,
+        target_alpine_selected,
+        target_fedora_selected,
+        target_arch_selected,
+        target_suse_selected,
+        target_freebsd_selected,
+        target_macos_selected,
+        target_powershell_selected,
+        target_cmd_selected,
+        target_linux_disabled: disabled_target_keys.iter().any(|key| key == "linux"),
+        target_debian_disabled: disabled_target_keys
+            .iter()
+            .any(|key| key == "debian-ubuntu"),
+        target_rhel_disabled: disabled_target_keys.iter().any(|key| key == "rhel-centos"),
+        target_alpine_disabled: disabled_target_keys.iter().any(|key| key == "alpine"),
+        target_fedora_disabled: disabled_target_keys.iter().any(|key| key == "fedora"),
+        target_arch_disabled: disabled_target_keys.iter().any(|key| key == "arch"),
+        target_suse_disabled: disabled_target_keys.iter().any(|key| key == "suse"),
+        target_freebsd_disabled: disabled_target_keys.iter().any(|key| key == "freebsd"),
+        target_macos_disabled: disabled_target_keys.iter().any(|key| key == "macos"),
+        target_powershell_disabled: disabled_target_keys
+            .iter()
+            .any(|key| key == "windows-powershell"),
+        target_cmd_disabled: disabled_target_keys.iter().any(|key| key == "windows-cmd"),
+        icon_key: snippet_target_icon_key(target.target_key.as_str()),
         depth,
         node_kind: "SnippetTarget",
-        accent_index: (accent_index + target.sort_order + 1) % 6,
+        accent_index: snippet_target_accent_index(target.target_key.as_str(), accent_index),
         expandable: false,
         expanded: false,
         has_next_sibling: false,
@@ -420,6 +509,93 @@ fn snippet_row_id(snippet: &Snippet) -> String {
 
 fn snippet_target_row_id(snippet: &Snippet, target: &crate::model::SnippetSupportTarget) -> String {
     format!("snippet-target:{}:{}", snippet.id.0, target.id.0)
+}
+
+fn snippet_target_icon_key(target_key: &str) -> &'static str {
+    match target_key {
+        "linux" => "linux",
+        "debian-ubuntu" => "debian",
+        "rhel-centos" => "rhel",
+        "alpine" => "alpine",
+        "fedora" => "fedora",
+        "arch" => "arch",
+        "suse" => "suse",
+        "freebsd" => "freebsd",
+        "macos" => "macos",
+        "windows-powershell" => "powershell",
+        "windows-cmd" => "cmd",
+        _ => "terminal",
+    }
+}
+
+fn snippet_target_accent_index(target_key: &str, fallback: i32) -> i32 {
+    match target_key {
+        "linux" => 0,
+        "debian-ubuntu" => 1,
+        "rhel-centos" => 2,
+        "alpine" => 5,
+        "fedora" => 4,
+        "arch" => 3,
+        "suse" => 2,
+        "freebsd" => 5,
+        "macos" => 3,
+        "windows-powershell" => 4,
+        "windows-cmd" => 5,
+        _ => (fallback + 1) % 6,
+    }
+}
+
+fn snippet_implementation_target_keys(
+    snippet: &Snippet,
+    implementation_id: crate::model::SnippetImplementationId,
+) -> Vec<String> {
+    let mut targets = snippet
+        .support_targets
+        .iter()
+        .filter(|target| target.implementation_id == implementation_id)
+        .collect::<Vec<_>>();
+    targets.sort_by(|left, right| {
+        left.sort_order
+            .cmp(&right.sort_order)
+            .then_with(|| left.target_key.cmp(&right.target_key))
+    });
+    targets
+        .into_iter()
+        .map(|target| target.target_key.clone())
+        .collect::<Vec<_>>()
+}
+
+fn snippet_other_implementation_target_keys(
+    snippet: &Snippet,
+    implementation_id: crate::model::SnippetImplementationId,
+) -> Vec<String> {
+    let mut targets = snippet
+        .support_targets
+        .iter()
+        .filter(|target| target.implementation_id != implementation_id)
+        .collect::<Vec<_>>();
+    targets.sort_by(|left, right| {
+        left.sort_order
+            .cmp(&right.sort_order)
+            .then_with(|| left.target_key.cmp(&right.target_key))
+    });
+    targets
+        .into_iter()
+        .map(|target| target.target_key.clone())
+        .collect::<Vec<_>>()
+}
+
+fn snippet_all_target_keys(snippet: &Snippet) -> Vec<String> {
+    let mut targets = snippet.support_targets.iter().collect::<Vec<_>>();
+    targets.sort_by(|left, right| {
+        left.sort_order
+            .cmp(&right.sort_order)
+            .then_with(|| left.target_key.cmp(&right.target_key))
+    });
+    targets
+        .into_iter()
+        .map(|target| target.target_key.clone())
+        .collect::<Vec<_>>()
 }
 
 fn snippet_group_folder_id(group_id: SnippetGroupId) -> String {

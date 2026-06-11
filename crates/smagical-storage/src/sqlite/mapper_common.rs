@@ -7,6 +7,11 @@ use smagical_core::{
 
 use crate::StoragePersistenceError;
 
+#[derive(serde::Serialize, serde::Deserialize)]
+struct StringListToml {
+    items: Vec<String>,
+}
+
 pub(super) fn default_auth() -> AuthProfile {
     // 缺失认证行时使用空用户名的 agent 认证，避免旧库加载崩溃；UI 保存后会写回完整配置。
     AuthProfile::Agent {
@@ -161,6 +166,17 @@ pub(super) fn decode_optional_toml<T: serde::de::DeserializeOwned>(
     value: Option<&str>,
 ) -> Result<Option<T>, StoragePersistenceError> {
     value.map(toml::from_str).transpose().map_err(Into::into)
+}
+
+pub(super) fn encode_string_list_toml(items: &[String]) -> Result<String, StoragePersistenceError> {
+    toml::to_string(&StringListToml {
+        items: items.to_vec(),
+    })
+    .map_err(Into::into)
+}
+
+pub(super) fn decode_string_list_toml(value: &str) -> Result<Vec<String>, StoragePersistenceError> {
+    Ok(toml::from_str::<StringListToml>(value)?.items)
 }
 
 pub(super) fn parse_uuid(value: &str) -> Result<Uuid, StoragePersistenceError> {

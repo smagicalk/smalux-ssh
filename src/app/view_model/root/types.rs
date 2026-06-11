@@ -13,7 +13,7 @@ use super::super::sftp::SftpViewModel;
 use super::super::tabs::{SessionTabViewModel, TerminalViewModel};
 use super::super::tools::{
     CredentialDetailFieldViewModel, CredentialGroupContentViewModel, CredentialRowViewModel,
-    KnownHostViewModel, SnippetRowViewModel, ToolItemViewModel,
+    KnownHostViewModel, NetworkNavItemViewModel, SnippetRowViewModel, ToolItemViewModel,
 };
 
 /// Slint 窗口所需的完整展示模型。
@@ -50,6 +50,7 @@ pub(in crate::app) struct AppViewModel {
     pub terminal_workspace: TerminalWorkspaceViewModel,
     pub security_workspace: SecurityWorkspaceViewModel,
     pub snippet_workspace: SnippetWorkspaceViewModel,
+    pub network_workspace: NetworkWorkspaceViewModel,
     pub settings_workspace: SettingsWorkspaceViewModel,
     pub last_error: String,
     pub command_palette_open: bool,
@@ -97,6 +98,13 @@ pub(in crate::app) struct SnippetWorkspaceViewModel {
     pub target_options: Vec<SnippetRowViewModel>,
 }
 
+/// Network 页需要的 Rust 侧页面模型。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::app) struct NetworkWorkspaceViewModel {
+    pub runtime_tunnels: Vec<NetworkNavItemViewModel>,
+    pub resources: Vec<NetworkNavItemViewModel>,
+}
+
 /// 设置页需要的 Rust 侧页面模型。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::app) struct SettingsWorkspaceViewModel {
@@ -142,6 +150,44 @@ pub(in crate::app) struct WorkspaceText {
     pub tool_keys: &'static str,
     pub tool_proxy: &'static str,
     pub proxy_empty: &'static str,
+    pub proxy_section_route: &'static str,
+    pub proxy_section_forward: &'static str,
+    pub proxy_section_host: &'static str,
+    pub proxy_jump_caption: &'static str,
+    pub proxy_command_caption: &'static str,
+    pub proxy_forward_caption: &'static str,
+    pub proxy_host_hint_caption: &'static str,
+    pub proxy_runtime_section: &'static str,
+    pub proxy_resources_section: &'static str,
+    pub proxy_runtime_empty: &'static str,
+    pub proxy_resources_empty: &'static str,
+    pub proxy_new_proxy: &'static str,
+    pub proxy_new_jump: &'static str,
+    pub proxy_new_forward: &'static str,
+    pub proxy_edit: &'static str,
+    pub proxy_delete: &'static str,
+    pub proxy_save: &'static str,
+    pub proxy_cancel: &'static str,
+    pub proxy_delete_title: &'static str,
+    pub proxy_delete_caption: &'static str,
+    pub proxy_name_label: &'static str,
+    pub proxy_name_placeholder: &'static str,
+    pub proxy_address_label: &'static str,
+    pub proxy_port_label: &'static str,
+    pub proxy_tags_label: &'static str,
+    pub proxy_bind_label: &'static str,
+    pub proxy_target_label: &'static str,
+    pub proxy_host_ids_label: &'static str,
+    pub proxy_host_ids_placeholder: &'static str,
+    pub proxy_bind_host_placeholder: &'static str,
+    pub proxy_target_host_placeholder: &'static str,
+    pub proxy_tags_placeholder: &'static str,
+    pub proxy_auto_start: &'static str,
+    pub proxy_kind_socks5: &'static str,
+    pub proxy_kind_http: &'static str,
+    pub proxy_kind_local: &'static str,
+    pub proxy_kind_remote: &'static str,
+    pub proxy_kind_dynamic: &'static str,
     pub security_tree_title: &'static str,
     pub security_search_placeholder: &'static str,
     pub security_new: &'static str,
@@ -339,6 +385,8 @@ pub(in crate::app) struct WorkspaceText {
     pub snippets_move: &'static str,
     pub snippets_move_title: &'static str,
     pub snippets_move_root: &'static str,
+    pub snippets_choose_group: &'static str,
+    pub snippets_confirm_group: &'static str,
     pub snippets_name_label: &'static str,
     pub snippets_name_placeholder: &'static str,
     pub snippets_group_name_placeholder: &'static str,
@@ -350,6 +398,11 @@ pub(in crate::app) struct WorkspaceText {
     pub snippets_target_linux: &'static str,
     pub snippets_target_debian: &'static str,
     pub snippets_target_rhel: &'static str,
+    pub snippets_target_alpine: &'static str,
+    pub snippets_target_fedora: &'static str,
+    pub snippets_target_arch: &'static str,
+    pub snippets_target_suse: &'static str,
+    pub snippets_target_freebsd: &'static str,
     pub snippets_target_macos: &'static str,
     pub snippets_target_powershell: &'static str,
     pub snippets_target_cmd: &'static str,

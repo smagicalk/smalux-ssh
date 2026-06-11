@@ -7,9 +7,10 @@ use crate::app::AppWindow;
 use crate::app::projection::models::{
     activity_model, command_palette_model, credential_detail_field_model,
     credential_group_content_model, credential_option_model, credential_row_model,
-    group_option_model, host_model, host_tree_model, known_host_model, setting_option_model,
-    settings_file_action_model, settings_profile_model, settings_summary_model, sftp_entry_model,
-    snippet_row_model, string_model, tab_model, tool_item_model,
+    group_option_model, host_model, host_tree_model, known_host_model, network_item_model,
+    network_resource_option_model, setting_option_model, settings_file_action_model,
+    settings_profile_model, settings_summary_model, sftp_entry_model, snippet_row_model,
+    string_model, tab_model, tool_item_model,
 };
 use crate::app::view_model::AppViewModel;
 
@@ -31,6 +32,15 @@ pub(super) fn sync_collection_models(window: &AppWindow, model: &AppViewModel) {
     window.set_quick_host_certificate_options(credential_option_model(
         &model.quick_host.certificate_options,
     ));
+    window.set_quick_host_network_proxy_options(network_resource_option_model(
+        &model.quick_host.network_proxy_options,
+    ));
+    window.set_quick_host_network_jump_options(network_resource_option_model(
+        &model.quick_host.network_jump_chain_options,
+    ));
+    window.set_quick_host_network_forward_options(network_resource_option_model(
+        &model.quick_host.network_forward_options,
+    ));
     window.set_quick_group_parent_options(group_option_model(
         &model.create_group_dialog.parent_options,
     ));
@@ -45,6 +55,11 @@ pub(super) fn sync_collection_models(window: &AppWindow, model: &AppViewModel) {
     window.set_snippet_rows(snippet_row_model(&snippet_page.rows));
     window.set_snippet_target_options(snippet_row_model(&snippet_page.target_options));
     window.set_tunnels(tool_item_model(&terminal_page.tunnels));
+    window
+        .set_network_runtime_tunnels(network_item_model(&model.network_workspace.runtime_tunnels));
+    window.set_network_saved_tunnels(network_item_model(&model.network_workspace.resources));
+    window.set_network_proxy_assets(network_item_model(&[]));
+    window.set_network_route_definitions(network_item_model(&[]));
     window.set_credentials(tool_item_model(&security_page.credentials));
     window.set_credential_rows(credential_row_model(&security_page.credential_rows));
     window.set_credential_group_contents(credential_group_content_model(

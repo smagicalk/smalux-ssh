@@ -18,6 +18,15 @@ impl AppState {
             Message::UpdateQuickHostAuthField { field, value } => {
                 self.update_quick_host_auth_field(field.clone(), value.clone())
             }
+            Message::ToggleQuickHostNetworkProxy { proxy_id } => {
+                self.toggle_quick_host_network_proxy(*proxy_id)
+            }
+            Message::ToggleQuickHostNetworkJumpChain { chain_id } => {
+                self.toggle_quick_host_network_jump_chain(*chain_id)
+            }
+            Message::ToggleQuickHostNetworkForward { forward_id } => {
+                self.toggle_quick_host_network_forward(*forward_id)
+            }
             Message::SaveQuickHost => self.save_quick_host(),
             Message::OpenCreateHostDialogInGroup { group_id } => {
                 self.open_create_host_dialog_in_group(*group_id)

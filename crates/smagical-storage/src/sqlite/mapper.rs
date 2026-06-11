@@ -10,7 +10,13 @@ use super::mapper_credentials::{
     load_credential_groups, load_credential_inspections, load_credentials, load_secrets,
     save_credential_groups, save_credential_inspections, save_credentials, save_secrets,
 };
-use super::mapper_hosts::{load_groups, load_hosts, save_groups, save_hosts};
+use super::mapper_hosts::{
+    load_groups, load_hosts, save_groups, save_host_network_selections, save_hosts,
+};
+use super::mapper_network::{
+    load_forward_assets, load_jump_chain_assets, load_proxy_assets, save_forward_assets,
+    save_jump_chain_assets, save_proxy_assets,
+};
 use super::{
     APP_CONFIG_SETTING_KEY, DEFAULT_WORKSPACE_KEY, clear_entities, current_unix_secs, entity,
 };
@@ -33,6 +39,9 @@ pub(super) async fn load_storage(
     let mut storage = StorageManager::default();
     storage.app_config = load_app_config(db).await?;
     storage.groups = load_groups(db).await?;
+    storage.proxy_assets = load_proxy_assets(db).await?;
+    storage.jump_chain_assets = load_jump_chain_assets(db).await?;
+    storage.forward_assets = load_forward_assets(db).await?;
     storage.hosts = load_hosts(db).await?;
     storage.credential_groups = load_credential_groups(db).await?;
     storage.credentials = load_credentials(db).await?;
@@ -68,6 +77,10 @@ pub(super) async fn save_storage(
     save_settings(db, storage).await?;
     save_groups(db, &storage.groups).await?;
     save_hosts(db, &storage.hosts).await?;
+    save_proxy_assets(db, &storage.proxy_assets).await?;
+    save_jump_chain_assets(db, &storage.jump_chain_assets).await?;
+    save_forward_assets(db, &storage.forward_assets).await?;
+    save_host_network_selections(db, &storage.hosts).await?;
     save_credential_groups(db, &storage.credential_groups).await?;
     save_credentials(db, &storage.credentials).await?;
     save_credential_inspections(db, &storage.credential_inspections).await?;
@@ -103,8 +116,15 @@ async fn clear_business_tables(db: &DatabaseConnection) -> Result<(), StoragePer
     clear_entities::<entity::secret::Entity>(db).await?;
     clear_entities::<entity::credential::Entity>(db).await?;
     clear_entities::<entity::credential_group::Entity>(db).await?;
+    clear_entities::<entity::host_network_forward::Entity>(db).await?;
+    clear_entities::<entity::host_network_jump_chain::Entity>(db).await?;
+    clear_entities::<entity::host_network_proxy::Entity>(db).await?;
     clear_entities::<entity::host_jump::Entity>(db).await?;
     clear_entities::<entity::host_proxy::Entity>(db).await?;
+    clear_entities::<entity::jump_chain_step::Entity>(db).await?;
+    clear_entities::<entity::jump_chain_asset::Entity>(db).await?;
+    clear_entities::<entity::proxy_asset::Entity>(db).await?;
+    clear_entities::<entity::forward_asset::Entity>(db).await?;
     clear_entities::<entity::host_auth::Entity>(db).await?;
     clear_entities::<entity::host_tag::Entity>(db).await?;
     clear_entities::<entity::host::Entity>(db).await?;

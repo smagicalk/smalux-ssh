@@ -1,4 +1,4 @@
-import { CredentialOptionRow, GroupOptionRow } from "./models.slint";
+import { CredentialOptionRow, GroupOptionRow, NetworkResourceOptionRow } from "./models.slint";
 import { CreateChoiceDialog, CreateGroupDialog, CreateGroupParentDialog, CreateHostDialog } from "./host_create_dialogs.slint";
 import { ConfirmDialog } from "./common.slint";
 
@@ -89,6 +89,12 @@ export component HostDialogFlow inherits Rectangle {
     in property <string> create-host-credential-secret-placeholder;
     in property <string> create-host-credential-algorithm-label;
     in property <string> create-host-credential-save-label;
+    in property <string> create-host-network-title;
+    in property <string> create-host-network-caption;
+    in property <string> create-host-network-proxy-label;
+    in property <string> create-host-network-jump-label;
+    in property <string> create-host-network-forward-label;
+    in property <string> create-host-network-empty-label;
     in property <string> create-host-icon-title;
     in property <string> create-host-icon-server-label;
     in property <string> create-host-icon-database-label;
@@ -120,6 +126,9 @@ export component HostDialogFlow inherits Rectangle {
     in property <[GroupOptionRow]> quick-host-groups;
     in property <[CredentialOptionRow]> quick-host-private-key-options;
     in property <[CredentialOptionRow]> quick-host-certificate-options;
+    in property <[NetworkResourceOptionRow]> quick-host-network-proxy-options;
+    in property <[NetworkResourceOptionRow]> quick-host-network-jump-options;
+    in property <[NetworkResourceOptionRow]> quick-host-network-forward-options;
     in property <string> last-error;
     in property <string> host-delete-title-label;
     in property <string> host-delete-caption-label;
@@ -145,6 +154,7 @@ export component HostDialogFlow inherits Rectangle {
     callback select-quick-host-group(group-id: string);
     callback update-quick-host-auth-kind(kind: string);
     callback update-quick-host-auth-field(field: string, value: string);
+    callback toggle-quick-host-network-resource(kind: string, resource-id: string);
     callback create-credential(kind: string, name: string, secret-ref: string, algorithm: string);
     callback save-quick-host();
     callback cancel-remove-host();
@@ -280,6 +290,12 @@ export component HostDialogFlow inherits Rectangle {
         credential-secret-placeholder: root.create-host-credential-secret-placeholder;
         credential-algorithm-label: root.create-host-credential-algorithm-label;
         credential-save-label: root.create-host-credential-save-label;
+        network-title: root.create-host-network-title;
+        network-caption: root.create-host-network-caption;
+        network-proxy-label: root.create-host-network-proxy-label;
+        network-jump-label: root.create-host-network-jump-label;
+        network-forward-label: root.create-host-network-forward-label;
+        network-empty-label: root.create-host-network-empty-label;
         icon-title: root.create-host-icon-title;
         icon-server-label: root.create-host-icon-server-label;
         icon-database-label: root.create-host-icon-database-label;
@@ -311,11 +327,15 @@ export component HostDialogFlow inherits Rectangle {
         quick-host-groups: root.quick-host-groups;
         private-key-options: root.quick-host-private-key-options;
         certificate-options: root.quick-host-certificate-options;
+        network-proxy-options: root.quick-host-network-proxy-options;
+        network-jump-options: root.quick-host-network-jump-options;
+        network-forward-options: root.quick-host-network-forward-options;
         last-error: root.last-error;
         update-field(field, value) => { root.update-quick-host-field(field, value); }
         select-group(group-id) => { root.select-quick-host-group(group-id); }
         update-auth-kind(kind) => { root.update-quick-host-auth-kind(kind); }
         update-auth-field(field, value) => { root.update-quick-host-auth-field(field, value); }
+        toggle-network-resource(kind, resource-id) => { root.toggle-quick-host-network-resource(kind, resource-id); }
         create-credential(kind, name, secret-ref, algorithm) => { root.create-credential(kind, name, secret-ref, algorithm); }
         save => { root.save-quick-host(); }
         close => { root.close-create-host-dialog(); }

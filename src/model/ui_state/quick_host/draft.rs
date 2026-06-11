@@ -1,6 +1,6 @@
 //! 快速新增主机表单草稿构建。
 
-use crate::model::{AgentSource, AuthProfile, GroupId, Host, HostId};
+use crate::model::{AgentSource, AuthProfile, GroupId, Host, HostId, HostNetworkSelection};
 
 use super::{QuickHostAgentSource, QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraftError};
 
@@ -12,6 +12,7 @@ pub const MAX_QUICK_HOST_NAME_CHARS: usize = 48;
 pub struct QuickHostDraft {
     pub editing_host_id: Option<HostId>,
     pub group_id: Option<GroupId>,
+    pub network: HostNetworkSelection,
     pub name: String,
     pub address: String,
     pub port: String,
@@ -26,6 +27,7 @@ impl Default for QuickHostDraft {
         Self {
             editing_host_id: None,
             group_id: None,
+            network: HostNetworkSelection::default(),
             name: String::new(),
             address: String::new(),
             port: "22".to_owned(),
@@ -45,6 +47,7 @@ impl QuickHostDraft {
         Self {
             editing_host_id: Some(host.id),
             group_id: host.group_id,
+            network: host.network.clone(),
             name: host.name.clone(),
             address: host.address.clone(),
             port: host.port.to_string(),
@@ -101,14 +104,15 @@ impl QuickHostDraft {
             address: address.to_owned(),
             port,
             auth,
-            proxy: None,
+            network: self.network.clone(),
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override: None,
             background_override: None,
         };
 
         if let Some(existing) = existing {
-            host.proxy = existing.proxy.clone();
+            host.proxies = existing.proxies.clone();
             host.jumps = existing.jumps.clone();
             host.theme_override = existing.theme_override.clone();
             host.background_override = existing.background_override.clone();

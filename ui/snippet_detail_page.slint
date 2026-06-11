@@ -19,6 +19,7 @@ export component SnippetDetailPage inherits Rectangle {
     in property <string> selected-node-kind;
     in property <int> selected-accent-index;
     in property <[SnippetRow]> snippet-rows;
+    in property <[SnippetRow]> snippet-target-options;
     in property <string> empty-title-label;
     in property <string> empty-caption-label;
     in property <string> field-scope-label;
@@ -48,7 +49,7 @@ export component SnippetDetailPage inherits Rectangle {
     callback move-selected();
     callback copy-command(content: string) -> bool;
     callback run-selected();
-    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
 
     property <bool> selected: root.selected-id != "";
     property <bool> group-selected: root.selected-node-kind == "Group";
@@ -180,16 +181,9 @@ export component SnippetDetailPage inherits Rectangle {
                     }
 
                     if root.selected && !root.root-folder-selected: HorizontalLayout {
-                        width: root.target-selected ? (root.shared-target-selected ? 238px : 174px) : root.snippet-only-selected ? 298px : 174px;
+                        width: root.target-selected ? (root.shared-target-selected ? 174px : 112px) : root.snippet-only-selected ? 298px : 174px;
                         height: 24px;
                         spacing: 6px;
-
-                        if root.target-selected: CompactButton {
-                            label: root.run-label;
-                            tone: "primary";
-                            compact: true;
-                            clicked => { root.run-selected(); }
-                        }
 
                         if root.snippet-only-selected: CompactButton {
                             label: root.new-target-label;
@@ -264,7 +258,7 @@ export component SnippetDetailPage inherits Rectangle {
                 }
 
                 if root.snippet-only-selected: Rectangle {
-                    height: 138px;
+                    vertical-stretch: 1;
                     border-radius: 8px;
                     border-width: 1px;
                     border-color: AppTheme.border-soft;
@@ -293,12 +287,12 @@ export component SnippetDetailPage inherits Rectangle {
                                 padding-right: 4px;
                                 spacing: 2px;
 
-                                for item in root.snippet-rows: SnippetGroupContentItem {
+                                for item in root.snippet-target-options: SnippetGroupContentItem {
                                     item: item;
                                     active-parent-id: root.selected-id;
                                     selected-id: root.selected-id;
-                                    selected(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
-                                        root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index);
+                                    selected(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
+                                        root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index);
                                     }
                                 }
                             }
@@ -306,7 +300,7 @@ export component SnippetDetailPage inherits Rectangle {
                     }
                 }
 
-                if root.snippet-selected: Rectangle {
+                if root.target-selected: Rectangle {
                     vertical-stretch: 1;
                     border-radius: 8px;
                     border-width: 1px;
@@ -328,7 +322,7 @@ export component SnippetDetailPage inherits Rectangle {
                             spacing: 6px;
 
                             Text {
-                                text: root.target-selected ? root.command-template-label : root.command-template-label;
+                                text: root.command-template-label;
                                 color: AppTheme.text-soft;
                                 font-size: 10px;
                                 font-weight: 700;
@@ -415,8 +409,8 @@ export component SnippetDetailPage inherits Rectangle {
                                     item: item;
                                     active-parent-id: root.selected-id;
                                     selected-id: root.selected-id;
-                                    selected(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
-                                        root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index);
+                                    selected(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
+                                        root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index);
                                     }
                                 }
                             }

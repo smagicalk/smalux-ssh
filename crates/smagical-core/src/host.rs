@@ -1,11 +1,14 @@
-//! 主机、分组、认证、代理和跳板机配置。
+//! 主机、分组和认证配置。
 //!
-//! 这个 crate 只定义可序列化的领域数据，不依赖 UI、存储后端或 SSH 执行器。认证字段中
-//! 保存的是 `SecretRef` 引用，不是明文密码或私钥内容；真正的秘密读取由 security 层完成。
+//! 网络相关纯模型已经下沉到 `network.rs`，这里保留 Host 本体和认证结构。
 
 use serde::{Deserialize, Serialize};
 
-use crate::{BackgroundProfile, GroupId, HostId, SecretRef, ThemeProfile};
+use crate::network::deserialize_host_proxies;
+use crate::{
+    BackgroundProfile, GroupId, HostId, HostNetworkSelection, JumpProfile, ProxyProfile, SecretRef,
+    ThemeProfile,
+};
 
 /// 可保存的 SSH 主机配置。
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -28,9 +31,18 @@ pub struct Host {
     pub port: u16,
     /// 登录认证方式，内部只保存 SecretRef。
     pub auth: AuthProfile,
-    /// 连接代理，后续执行器可以按需实现。
-    pub proxy: Option<ProxyProfile>,
+    /// 主机选择使用的网络资源，页面主路径只编辑这里。
+    #[serde(default)]
+    pub network: HostNetworkSelection,
+    /// 连接代理列表；为空表示直连。
+    #[serde(
+        default,
+        alias = "proxy",
+        deserialize_with = "deserialize_host_proxies"
+    )]
+    pub proxies: Vec<ProxyProfile>,
     /// 跳板机链路，当前以已保存主机 ID 引用。
+    #[serde(default)]
     pub jumps: Vec<JumpProfile>,
     /// 主机级主题覆盖，不影响全局主题配置。
     pub theme_override: Option<ThemeProfile>,
@@ -95,22 +107,6 @@ pub enum AgentSource {
     CustomNamedPipe(String),
 }
 
-/// 连接代理配置。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum ProxyProfile {
-    /// SOCKS5 代理。
-    Socks5 { host: String, port: u16 },
-    /// HTTP CONNECT 代理。
-    Http { host: String, port: u16 },
-}
-
-/// 跳板机链路中的一个节点。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct JumpProfile {
-    /// 跳板机引用已保存主机，避免在链路里复制整份主机配置。
-    pub host_id: HostId,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,10 +131,11 @@ mod tests {
                 key: secret("key:deploy"),
                 passphrase: Some(secret("passphrase:deploy")),
             },
-            proxy: Some(ProxyProfile::Socks5 {
+            network: HostNetworkSelection::default(),
+            proxies: vec![ProxyProfile::Socks5 {
                 host: "127.0.0.1".to_owned(),
                 port: 1080,
-            }),
+            }],
             jumps: vec![JumpProfile {
                 host_id: HostId(Uuid::new_v4()),
             }],
@@ -214,9 +211,40 @@ mod tests {
         assert_eq!(decoded.address, host.address);
         assert_eq!(decoded.tags, host.tags);
         assert_eq!(decoded.port, 22);
-        assert!(decoded.proxy.is_some());
+        assert_eq!(decoded.network, host.network);
+        assert_eq!(decoded.proxies.len(), 1);
         assert_eq!(decoded.jumps.len(), 1);
         assert!(decoded.theme_override.is_some());
         assert!(decoded.background_override.is_some());
+    }
+
+    #[test]
+    fn host_deserializes_legacy_single_proxy_field() {
+        let host = toml::from_str::<Host>(
+            r#"
+id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+name = "legacy"
+icon_key = "server"
+tags = []
+address = "example.com"
+port = 22
+
+[auth.Password]
+username = "root"
+secret = "password:root"
+
+[proxy.Socks5]
+host = "127.0.0.1"
+port = 1080
+"#,
+        )
+        .expect("legacy single proxy field should still deserialize");
+
+        assert_eq!(host.proxies.len(), 1);
+        assert_eq!(host.network, HostNetworkSelection::default());
+        assert!(matches!(
+            host.proxies.first(),
+            Some(ProxyProfile::Socks5 { host, port }) if host == "127.0.0.1" && *port == 1080
+        ));
     }
 }

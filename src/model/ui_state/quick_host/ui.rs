@@ -1,6 +1,6 @@
 //! 快速新增主机 UI 草稿字段更新。
 
-use crate::model::{GroupId, UiState};
+use crate::model::{ForwardId, GroupId, JumpChainId, ProxyId, UiState};
 
 use super::{
     QuickHostAgentSource, QuickHostAuthField, QuickHostAuthKind, QuickHostDraft,
@@ -55,6 +55,21 @@ impl UiState {
         }
     }
 
+    /// 切换快速新增主机使用的代理资产。
+    pub fn toggle_quick_host_proxy(&mut self, proxy_id: ProxyId) {
+        toggle_id(&mut self.quick_host.network.proxy_ids, proxy_id);
+    }
+
+    /// 切换快速新增主机使用的跳板链资产。
+    pub fn toggle_quick_host_jump_chain(&mut self, chain_id: JumpChainId) {
+        toggle_id(&mut self.quick_host.network.jump_chain_ids, chain_id);
+    }
+
+    /// 切换快速新增主机绑定的端口转发资产。
+    pub fn toggle_quick_host_forward(&mut self, forward_id: ForwardId) {
+        toggle_id(&mut self.quick_host.network.forward_ids, forward_id);
+    }
+
     /// 清空快速新增主机表单，保留默认 SSH 端口。
     pub fn reset_quick_host(&mut self) {
         self.quick_host = QuickHostDraft::default();
@@ -72,5 +87,13 @@ fn parse_agent_source(value: &str) -> QuickHostAgentSource {
         "Pageant" => QuickHostAgentSource::Pageant,
         "Custom" => QuickHostAgentSource::CustomNamedPipe,
         _ => QuickHostAgentSource::Auto,
+    }
+}
+
+fn toggle_id<T: PartialEq>(items: &mut Vec<T>, id: T) {
+    if let Some(index) = items.iter().position(|item| item == &id) {
+        items.remove(index);
+    } else {
+        items.push(id);
     }
 }

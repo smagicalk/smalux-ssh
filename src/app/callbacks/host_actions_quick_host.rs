@@ -6,8 +6,9 @@
 use std::rc::Rc;
 
 use slint::ComponentHandle;
+use uuid::Uuid;
 
-use crate::model::Message;
+use crate::model::{ForwardId, JumpChainId, Message, ProxyId};
 
 use super::host_actions_helpers::{
     parse_quick_host_auth_field, parse_quick_host_auth_kind, parse_quick_host_field,
@@ -257,8 +258,34 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
+        window.on_toggle_quick_host_network_resource(move |kind, resource_id| {
+            let Some(message) = parse_quick_host_network_toggle(&kind, &resource_id) else {
+                return;
+            };
+            apply_and_sync(&weak, &state, message);
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
         window.on_save_quick_host(move || {
             apply_and_sync(&weak, &state, Message::SaveQuickHost);
         });
+    }
+}
+
+fn parse_quick_host_network_toggle(kind: &str, resource_id: &str) -> Option<Message> {
+    let id = Uuid::parse_str(resource_id).ok()?;
+    match kind {
+        "ProxyAsset" => Some(Message::ToggleQuickHostNetworkProxy {
+            proxy_id: ProxyId(id),
+        }),
+        "JumpChainAsset" => Some(Message::ToggleQuickHostNetworkJumpChain {
+            chain_id: JumpChainId(id),
+        }),
+        "ForwardAsset" => Some(Message::ToggleQuickHostNetworkForward {
+            forward_id: ForwardId(id),
+        }),
+        _ => None,
     }
 }

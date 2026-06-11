@@ -5,6 +5,7 @@
 pub mod history;
 pub mod host;
 pub mod ids;
+pub mod network;
 pub mod security;
 pub mod session;
 pub mod sftp;
@@ -16,6 +17,7 @@ pub mod workspace;
 pub use history::*;
 pub use host::*;
 pub use ids::*;
+pub use network::*;
 pub use security::*;
 pub use session::*;
 pub use sftp::*;

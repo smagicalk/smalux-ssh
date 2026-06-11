@@ -1,5 +1,8 @@
 use super::*;
-use crate::model::{GroupId, HostGroup};
+use crate::model::{
+    ForwardAsset, ForwardId, GroupId, HostGroup, JumpChainAsset, ProxyAsset, ProxyId, ProxyProfile,
+    TunnelKind, TunnelRule,
+};
 
 #[test]
 fn quick_host_draft_message_updates_form_only() {
@@ -554,6 +557,72 @@ fn confirm_remove_group_deletes_group_children_and_hosts() {
     assert_eq!(state.ui.workspace.pending_delete_group_id, None);
 }
 
+#[test]
+fn quick_host_network_messages_update_draft_and_save_host_selection() {
+    let mut state = AppState::default();
+    let proxy_id = ProxyId(Uuid::new_v4());
+    let forward_id = ForwardId(Uuid::new_v4());
+    state.storage.upsert_proxy_asset(ProxyAsset {
+        id: proxy_id,
+        name: "corp-proxy".to_owned(),
+        tags: Vec::new(),
+        profile: ProxyProfile::Socks5 {
+            host: "127.0.0.1".to_owned(),
+            port: 1080,
+        },
+    });
+    state.storage.upsert_jump_chain_asset(JumpChainAsset {
+        id: crate::model::JumpChainId(Uuid::new_v4()),
+        name: "prod-jump".to_owned(),
+        steps: Vec::new(),
+    });
+    state.storage.upsert_forward_asset(ForwardAsset {
+        id: forward_id,
+        name: "db-forward".to_owned(),
+        tags: Vec::new(),
+        rule: TunnelRule {
+            name: "db-forward".to_owned(),
+            kind: TunnelKind::Local,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 15432,
+            target_host: "10.0.0.5".to_owned(),
+            target_port: 5432,
+            auto_start: false,
+        },
+    });
+
+    let proxy = state.apply(Message::ToggleQuickHostNetworkProxy { proxy_id });
+    let forward = state.apply(Message::ToggleQuickHostNetworkForward { forward_id });
+    state.apply(Message::UpdateQuickHostDraft {
+        field: QuickHostDraftField::Address,
+        value: "prod.example.com".to_owned(),
+    });
+    state.apply(Message::UpdateQuickHostDraft {
+        field: QuickHostDraftField::Username,
+        value: "deploy".to_owned(),
+    });
+    let save = state.apply(Message::SaveQuickHost);
+
+    assert!(proxy.changed());
+    assert!(forward.changed());
+    assert!(save.changed());
+    assert_eq!(state.storage.hosts[0].network.proxy_ids, vec![proxy_id]);
+    assert_eq!(state.storage.hosts[0].network.forward_ids, vec![forward_id]);
+}
+
+#[test]
+fn quick_host_network_toggle_rejects_missing_resource() {
+    let mut state = AppState::default();
+
+    let outcome = state.apply(Message::ToggleQuickHostNetworkProxy {
+        proxy_id: ProxyId(Uuid::new_v4()),
+    });
+
+    assert!(outcome.changed());
+    assert!(outcome.error.is_some());
+    assert!(state.ui.quick_host.network.proxy_ids.is_empty());
+}
+
 fn editable_host() -> Host {
     Host {
         id: HostId(Uuid::new_v4()),
@@ -568,7 +637,8 @@ fn editable_host() -> Host {
             key: SecretRef("key:prod".to_owned()),
             passphrase: Some(SecretRef("passphrase:prod".to_owned())),
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: Some(ThemeProfile {
             name: "Host Dark".to_owned(),

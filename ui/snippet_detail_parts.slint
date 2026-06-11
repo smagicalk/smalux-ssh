@@ -41,7 +41,7 @@ export component SnippetGroupContentItem inherits Rectangle {
     in property <SnippetRow> item;
     in property <string> active-parent-id;
     in property <string> selected-id;
-    callback selected(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback selected(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
 
     property <bool> item-visible: root.item.parent_id == root.active-parent-id && root.item.id != root.active-parent-id;
     property <color> marker-color: root.item.node_kind == "Group"
@@ -78,6 +78,28 @@ export component SnippetGroupContentItem inherits Rectangle {
                     root.item.arguments,
                     root.item.argument_values,
                     root.item.meta,
+                    root.item.target_linux_selected,
+                    root.item.target_debian_selected,
+                    root.item.target_rhel_selected,
+                    root.item.target_alpine_selected,
+                    root.item.target_fedora_selected,
+                    root.item.target_arch_selected,
+                    root.item.target_suse_selected,
+                    root.item.target_freebsd_selected,
+                    root.item.target_macos_selected,
+                    root.item.target_powershell_selected,
+                    root.item.target_cmd_selected,
+                    root.item.target_linux_disabled,
+                    root.item.target_debian_disabled,
+                    root.item.target_rhel_disabled,
+                    root.item.target_alpine_disabled,
+                    root.item.target_fedora_disabled,
+                    root.item.target_arch_disabled,
+                    root.item.target_suse_disabled,
+                    root.item.target_freebsd_disabled,
+                    root.item.target_macos_disabled,
+                    root.item.target_powershell_disabled,
+                    root.item.target_cmd_disabled,
                     root.item.icon_key,
                     root.item.node_kind,
                     root.item.accent_index,

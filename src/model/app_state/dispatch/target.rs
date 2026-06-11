@@ -90,6 +90,9 @@ fn is_ui_message(message: &Message) -> bool {
             | Message::SelectQuickHostGroup { .. }
             | Message::UpdateQuickHostAuthKind { .. }
             | Message::UpdateQuickHostAuthField { .. }
+            | Message::ToggleQuickHostNetworkProxy { .. }
+            | Message::ToggleQuickHostNetworkJumpChain { .. }
+            | Message::ToggleQuickHostNetworkForward { .. }
             | Message::SaveQuickHost
             | Message::OpenCreateHostDialogInGroup { .. }
             | Message::OpenCreateGroupParentDialog { .. }
@@ -176,6 +179,12 @@ fn is_storage_message(message: &Message) -> bool {
             | Message::RemoveCredential { .. }
             | Message::MoveCredential { .. }
             | Message::MoveCredentialGroup { .. }
+            | Message::SaveProxyAsset { .. }
+            | Message::SaveJumpChainAsset { .. }
+            | Message::SaveForwardAsset { .. }
+            | Message::RemoveProxyAsset { .. }
+            | Message::RemoveJumpChainAsset { .. }
+            | Message::RemoveForwardAsset { .. }
             | Message::TrustKnownHost { .. }
             | Message::RemoveKnownHost { .. }
     )
@@ -232,6 +241,7 @@ fn is_snippet_message(message: &Message) -> bool {
             | Message::UpdateSnippet { .. }
             | Message::CreateSnippetTarget { .. }
             | Message::UpdateSnippetTarget { .. }
+            | Message::SyncSnippetTargetImplementationTargets { .. }
             | Message::RemoveSnippetTarget { .. }
             | Message::SplitSnippetTargetImplementation { .. }
             | Message::CreateSnippetGroup { .. }

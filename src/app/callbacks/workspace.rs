@@ -6,10 +6,11 @@
 use std::rc::Rc;
 
 use slint::ComponentHandle;
+use uuid::Uuid;
 
-use crate::model::Message;
+use crate::model::{ForwardId, HostId, JumpChainId, Message, ProxyId};
 
-use super::{AppWindow, SharedAppState, apply_and_sync};
+use super::{AppWindow, SharedAppState, apply_and_sync, apply_and_sync_success, parse_session_id};
 
 #[path = "workspace/known_hosts.rs"]
 mod known_hosts;
@@ -81,8 +82,179 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
+        window.on_stop_network_tunnel(move |session_id, rule_name| {
+            let Some(session_id) = parse_session_id(&session_id) else {
+                return;
+            };
+            apply_and_sync(
+                &weak,
+                &state,
+                Message::StopTunnel {
+                    session_id,
+                    rule_name: rule_name.to_string(),
+                },
+            );
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_save_network_proxy(move |asset_id, name, proxy_kind, host, port, tags| {
+            let Some(proxy_id) = parse_optional_proxy_id(asset_id.as_str()) else {
+                return report_network_parse_error(&weak, &state);
+            };
+            apply_and_sync_success(
+                &weak,
+                &state,
+                Message::SaveProxyAsset {
+                    proxy_id,
+                    name: name.to_string(),
+                    proxy_kind: proxy_kind.to_string(),
+                    host: host.to_string(),
+                    port: port.to_string(),
+                    tags: tags.to_string(),
+                },
+            )
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_save_network_jump_chain(move |asset_id, name, host_ids| {
+            let Some(chain_id) = parse_optional_jump_chain_id(asset_id.as_str()) else {
+                return report_network_parse_error(&weak, &state);
+            };
+            let Some(host_ids) = parse_host_ids_text(host_ids.as_str()) else {
+                return report_network_parse_error(&weak, &state);
+            };
+            apply_and_sync_success(
+                &weak,
+                &state,
+                Message::SaveJumpChainAsset {
+                    chain_id,
+                    name: name.to_string(),
+                    host_ids,
+                },
+            )
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_save_network_forward(
+            move |asset_id,
+                  name,
+                  kind,
+                  bind_host,
+                  bind_port,
+                  target_host,
+                  target_port,
+                  tags,
+                  auto_start| {
+                let Some(forward_id) = parse_optional_forward_id(asset_id.as_str()) else {
+                    return report_network_parse_error(&weak, &state);
+                };
+                apply_and_sync_success(
+                    &weak,
+                    &state,
+                    Message::SaveForwardAsset {
+                        forward_id,
+                        name: name.to_string(),
+                        kind: kind.to_string(),
+                        bind_host: bind_host.to_string(),
+                        bind_port: bind_port.to_string(),
+                        target_host: target_host.to_string(),
+                        target_port: target_port.to_string(),
+                        tags: tags.to_string(),
+                        auto_start,
+                    },
+                )
+            },
+        );
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
+        window.on_remove_network_asset(move |kind_key, asset_id| {
+            let Some(message) =
+                parse_remove_network_asset_message(kind_key.as_str(), asset_id.as_str())
+            else {
+                report_network_parse_error(&weak, &state);
+                return;
+            };
+            apply_and_sync(&weak, &state, message);
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(&state);
         window.on_dismiss_ui_error(move || {
             apply_and_sync(&weak, &state, Message::DismissUiError);
         });
     }
+}
+
+fn parse_optional_proxy_id(id: &str) -> Option<Option<ProxyId>> {
+    parse_optional_uuid(id).map(|id| id.map(ProxyId))
+}
+
+fn parse_optional_jump_chain_id(id: &str) -> Option<Option<JumpChainId>> {
+    parse_optional_uuid(id).map(|id| id.map(JumpChainId))
+}
+
+fn parse_optional_forward_id(id: &str) -> Option<Option<ForwardId>> {
+    parse_optional_uuid(id).map(|id| id.map(ForwardId))
+}
+
+fn parse_optional_uuid(id: &str) -> Option<Option<Uuid>> {
+    let id = id.trim();
+    if id.is_empty() {
+        Some(None)
+    } else {
+        Uuid::parse_str(id).ok().map(Some)
+    }
+}
+
+fn parse_host_ids_text(text: &str) -> Option<Vec<HostId>> {
+    let mut host_ids = Vec::new();
+    for token in text.split(is_host_id_separator).map(str::trim) {
+        if token.is_empty() {
+            continue;
+        }
+        host_ids.push(HostId(Uuid::parse_str(token).ok()?));
+    }
+    Some(host_ids)
+}
+
+fn is_host_id_separator(ch: char) -> bool {
+    ch == ',' || ch == ';' || ch == '，' || ch == '；' || ch.is_whitespace()
+}
+
+fn parse_remove_network_asset_message(kind_key: &str, asset_id: &str) -> Option<Message> {
+    let id = Uuid::parse_str(asset_id.trim()).ok()?;
+    match kind_key {
+        "ProxyAsset" => Some(Message::RemoveProxyAsset {
+            proxy_id: ProxyId(id),
+        }),
+        "JumpChainAsset" => Some(Message::RemoveJumpChainAsset {
+            chain_id: JumpChainId(id),
+        }),
+        "ForwardAsset" => Some(Message::RemoveForwardAsset {
+            forward_id: ForwardId(id),
+        }),
+        _ => None,
+    }
+}
+
+fn report_network_parse_error(weak: &slint::Weak<AppWindow>, state: &SharedAppState) -> bool {
+    let Some(window) = weak.upgrade() else {
+        return false;
+    };
+    let message = {
+        let state_ref = state.borrow();
+        crate::app::view_model::tr_for_state(&state_ref, "proxy.invalid_resource_id").to_owned()
+    };
+    state.borrow_mut().ui.set_last_error(message);
+    super::sync_window(&window, &state.borrow());
+    false
 }

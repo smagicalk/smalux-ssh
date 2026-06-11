@@ -1,5 +1,6 @@
 import { ScrollView } from "std-widgets.slint";
-import { ToolItemRow } from "./models.slint";
+import { CompactButton } from "./common.slint";
+import { NetworkItemRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 
 export component WorkspaceListItem inherits Rectangle {
@@ -8,6 +9,7 @@ export component WorkspaceListItem inherits Rectangle {
     in property <string> meta;
 
     height: 50px;
+    horizontal-stretch: 1;
     border-radius: 7px;
     border-width: 1px;
     border-color: AppTheme.border-soft;
@@ -84,91 +86,166 @@ export component WorkspaceListPage inherits Rectangle {
     }
 }
 
-export component ProxyPlaceholderPage inherits Rectangle {
+component ProxySectionHeader inherits Text {
+    in property <string> label;
+
+    text: root.label;
+    color: AppTheme.section-text;
+    font-size: 10px;
+    font-weight: 700;
+}
+
+component NetworkListItem inherits Rectangle {
+    in property <NetworkItemRow> item;
+    callback stop-tunnel(session-id: string, rule-name: string);
+
+    height: 56px;
+    horizontal-stretch: 1;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.card-bg;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+
+        VerticalLayout {
+            vertical-stretch: 1;
+            spacing: 3px;
+            Text {
+                text: root.item.title;
+                color: AppTheme.text;
+                font-size: 12px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.item.subtitle;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+
+        VerticalLayout {
+            width: 116px;
+            spacing: 4px;
+            Text {
+                text: root.item.meta;
+                color: AppTheme.text-soft;
+                font-size: 10px;
+                horizontal-alignment: right;
+                overflow: elide;
+            }
+            if root.item.primary_action_key == "stop": CompactButton {
+                label: root.item.primary_action_label;
+                enabled: root.item.primary_action_enabled;
+                tone: "danger";
+                compact: true;
+                clicked => { root.stop-tunnel(root.item.session_id, root.item.title); }
+            }
+        }
+    }
+}
+
+component NetworkSection inherits Rectangle {
+    in property <string> label;
+    in property <string> caption;
+    in property <[NetworkItemRow]> items;
+    callback stop-tunnel(session-id: string, rule-name: string);
+
+    background: AppTheme.transparent;
+    horizontal-stretch: 1;
+
+    VerticalLayout {
+        spacing: 8px;
+        ProxySectionHeader { label: root.label; }
+        Text {
+            text: root.caption;
+            color: AppTheme.text-muted;
+            font-size: 10px;
+        }
+        if root.items.length == 0: WorkspaceListItem {
+            title: root.caption;
+            subtitle: "";
+            meta: "";
+        }
+        for item in root.items: NetworkListItem {
+            item: item;
+            stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+        }
+    }
+}
+
+export component NetworkWorkspacePage inherits Rectangle {
     in property <string> title;
     in property <string> empty-label;
+    in property <string> section-route-label;
+    in property <string> section-forward-label;
+    in property <string> section-host-label;
+    in property <string> jump-caption;
+    in property <string> command-caption;
+    in property <string> forward-caption;
+    in property <string> host-hint-caption;
+    in property <[NetworkItemRow]> proxies;
+    in property <[NetworkItemRow]> jump-chains;
+    in property <[NetworkItemRow]> host-routes;
+    in property <[NetworkItemRow]> tunnels;
+    callback stop-tunnel(session-id: string, rule-name: string);
 
     background: AppTheme.window-bg;
     vertical-stretch: 1;
     horizontal-stretch: 1;
 
-    VerticalLayout {
-        padding: 12px;
-        spacing: 10px;
+    ScrollView {
+        width: parent.width;
+        height: parent.height;
 
-        Text {
-            text: root.title;
-            color: AppTheme.text-strong;
-            font-size: 15px;
-            font-weight: 700;
-        }
+        VerticalLayout {
+            padding: 12px;
+            spacing: 12px;
 
-        Rectangle {
-            height: 78px;
-            border-radius: 8px;
-            border-width: 1px;
-            border-color: AppTheme.border-soft;
-            background: AppTheme.card-bg;
-
-            HorizontalLayout {
-                padding-left: 14px;
-                padding-right: 14px;
-                spacing: 10px;
-
-                Rectangle {
-                    width: 34px;
-                    height: 34px;
-                    border-radius: 8px;
-                    border-width: 1px;
-                    border-color: AppTheme.border-strong;
-                    background: AppTheme.surface-bg;
-
-                    Rectangle {
-                        x: 8px;
-                        y: 8px;
-                        width: 7px;
-                        height: 7px;
-                        border-radius: 4px;
-                        background: AppTheme.accent;
-                    }
-
-                    Rectangle {
-                        x: 20px;
-                        y: 8px;
-                        width: 7px;
-                        height: 7px;
-                        border-radius: 4px;
-                        background: AppTheme.accent-blue;
-                    }
-
-                    Rectangle {
-                        x: 14px;
-                        y: 21px;
-                        width: 7px;
-                        height: 7px;
-                        border-radius: 4px;
-                        background: AppTheme.warning;
-                    }
-
-                    Rectangle { x: 12px; y: 16px; width: 12px; height: 2px; border-radius: 1px; background: AppTheme.text-soft; }
-                    Rectangle { x: 17px; y: 16px; width: 2px; height: 8px; border-radius: 1px; background: AppTheme.text-soft; }
-                }
-
-                VerticalLayout {
-                    vertical-stretch: 1;
-
-                    Text {
-                        text: root.empty-label;
-                        color: AppTheme.text;
-                        font-size: 12px;
-                        font-weight: 700;
-                        vertical-alignment: center;
-                        overflow: elide;
-                    }
-                }
+            Text {
+                text: root.title;
+                color: AppTheme.text-strong;
+                font-size: 15px;
+                font-weight: 700;
             }
-        }
 
-        Rectangle { vertical-stretch: 1; }
+            WorkspaceListItem {
+                title: root.empty-label;
+                subtitle: root.host-hint-caption;
+                meta: "live";
+            }
+
+            NetworkSection {
+                label: root.section-route-label;
+                caption: root.command-caption;
+                items: root.proxies;
+            }
+
+            NetworkSection {
+                label: root.section-host-label;
+                caption: root.jump-caption;
+                items: root.jump-chains;
+            }
+
+            NetworkSection {
+                label: "Host Routes";
+                caption: root.host-hint-caption;
+                items: root.host-routes;
+            }
+
+            NetworkSection {
+                label: root.section-forward-label;
+                caption: root.forward-caption;
+                items: root.tunnels;
+                stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+            }
+
+            Rectangle { height: 8px; }
+        }
     }
 }

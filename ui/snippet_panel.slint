@@ -33,10 +33,11 @@ component SnippetContextMenuItem inherits Rectangle {
 component SnippetTreeItem inherits Rectangle {
     in property <SnippetRow> snippet;
     in property <string> selected-id;
-    callback selected(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    in property <length> visible-row-width;
+    callback selected(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
     callback toggle-node(id: string);
-    callback move-node(source-id: string, target-id: string) -> bool;
-    callback open-context-menu(abs-x: length, abs-y: length, id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback move-node(source-id: string, source-kind: string, target-id: string) -> bool;
+    callback open-context-menu(abs-x: length, abs-y: length, id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
 
     property <bool> active: root.snippet.id == root.selected-id;
     property <color> marker-color: root.snippet.node_kind == "Group"
@@ -51,9 +52,9 @@ component SnippetTreeItem inherits Rectangle {
     property <bool> target-node: root.snippet.node_kind == "SnippetTarget";
     property <string> badge-text: root.target-node ? root.snippet.scope : root.snippet.meta;
     property <bool> root-group: root.snippet.id == "snippet-folder:all";
-    property <bool> drag-enabled: root.snippet-node;
+    property <bool> drag-enabled: root.snippet-node || (root.group-node && !root.root-group);
     property <bool> drop-enabled: root.group-node;
-    property <string> drag-mime-type: "application/x-smagical-snippet-row";
+    property <string> drag-mime-type: root.group-node ? "application/x-smagical-snippet-group-row" : "application/x-smagical-snippet-row";
 
     height: root.target-node ? 30px : 34px;
     border-radius: 7px;
@@ -74,6 +75,28 @@ component SnippetTreeItem inherits Rectangle {
                 root.snippet.arguments,
                 root.snippet.argument_values,
                 root.snippet.meta,
+                root.snippet.target_linux_selected,
+                root.snippet.target_debian_selected,
+                root.snippet.target_rhel_selected,
+                root.snippet.target_alpine_selected,
+                root.snippet.target_fedora_selected,
+                root.snippet.target_arch_selected,
+                root.snippet.target_suse_selected,
+                root.snippet.target_freebsd_selected,
+                root.snippet.target_macos_selected,
+                root.snippet.target_powershell_selected,
+                root.snippet.target_cmd_selected,
+                root.snippet.target_linux_disabled,
+                root.snippet.target_debian_disabled,
+                root.snippet.target_rhel_disabled,
+                root.snippet.target_alpine_disabled,
+                root.snippet.target_fedora_disabled,
+                root.snippet.target_arch_disabled,
+                root.snippet.target_suse_disabled,
+                root.snippet.target_freebsd_disabled,
+                root.snippet.target_macos_disabled,
+                root.snippet.target_powershell_disabled,
+                root.snippet.target_cmd_disabled,
                 root.snippet.icon_key,
                 root.snippet.node_kind,
                 root.snippet.accent_index,
@@ -94,6 +117,28 @@ component SnippetTreeItem inherits Rectangle {
                     root.snippet.arguments,
                     root.snippet.argument_values,
                     root.snippet.meta,
+                    root.snippet.target_linux_selected,
+                    root.snippet.target_debian_selected,
+                    root.snippet.target_rhel_selected,
+                    root.snippet.target_alpine_selected,
+                    root.snippet.target_fedora_selected,
+                    root.snippet.target_arch_selected,
+                    root.snippet.target_suse_selected,
+                    root.snippet.target_freebsd_selected,
+                    root.snippet.target_macos_selected,
+                    root.snippet.target_powershell_selected,
+                    root.snippet.target_cmd_selected,
+                    root.snippet.target_linux_disabled,
+                    root.snippet.target_debian_disabled,
+                    root.snippet.target_rhel_disabled,
+                    root.snippet.target_alpine_disabled,
+                    root.snippet.target_fedora_disabled,
+                    root.snippet.target_arch_disabled,
+                    root.snippet.target_suse_disabled,
+                    root.snippet.target_freebsd_disabled,
+                    root.snippet.target_macos_disabled,
+                    root.snippet.target_powershell_disabled,
+                    root.snippet.target_cmd_disabled,
                     root.snippet.icon_key,
                     root.snippet.node_kind,
                     root.snippet.accent_index,
@@ -113,6 +158,28 @@ component SnippetTreeItem inherits Rectangle {
                     root.snippet.arguments,
                     root.snippet.argument_values,
                     root.snippet.meta,
+                    root.snippet.target_linux_selected,
+                    root.snippet.target_debian_selected,
+                    root.snippet.target_rhel_selected,
+                    root.snippet.target_alpine_selected,
+                    root.snippet.target_fedora_selected,
+                    root.snippet.target_arch_selected,
+                    root.snippet.target_suse_selected,
+                    root.snippet.target_freebsd_selected,
+                    root.snippet.target_macos_selected,
+                    root.snippet.target_powershell_selected,
+                    root.snippet.target_cmd_selected,
+                    root.snippet.target_linux_disabled,
+                    root.snippet.target_debian_disabled,
+                    root.snippet.target_rhel_disabled,
+                    root.snippet.target_alpine_disabled,
+                    root.snippet.target_fedora_disabled,
+                    root.snippet.target_arch_disabled,
+                    root.snippet.target_suse_disabled,
+                    root.snippet.target_freebsd_disabled,
+                    root.snippet.target_macos_disabled,
+                    root.snippet.target_powershell_disabled,
+                    root.snippet.target_cmd_disabled,
                     root.snippet.icon_key,
                     root.snippet.node_kind,
                     root.snippet.accent_index,
@@ -174,7 +241,7 @@ component SnippetTreeItem inherits Rectangle {
     Text {
         x: (root.target-node ? 50px : 48px) + root.snippet.depth * 18px;
         y: 0px;
-        width: parent.width - (root.target-node ? 150px : 138px + root.snippet.depth * 18px);
+        width: max(0px, min(parent.width, root.visible-row-width) - ((root.target-node ? 50px : 48px) + root.snippet.depth * 18px) - (root.drag-enabled ? 32px : 12px));
         height: parent.height;
         text: root.snippet.name;
         color: root.active ? AppTheme.text-strong : AppTheme.text;
@@ -191,6 +258,7 @@ component SnippetTreeItem inherits Rectangle {
         height: 18px;
         border-radius: 6px;
         border-width: 1px;
+        visible: false;
         border-color: root.target-node ? root.marker-color : AppTheme.border-soft;
         background: root.target-node ? AppTheme.dialog-section-bg : AppTheme.transparent;
 
@@ -232,21 +300,29 @@ component SnippetTreeItem inherits Rectangle {
         height: parent.height;
         enabled: root.drop-enabled;
         can-drop(event) => {
-            event.mime_type == root.drag-mime-type && event.data != root.snippet.id
+            root.drop-enabled
+                && (event.mime_type == "application/x-smagical-snippet-row" || event.mime_type == "application/x-smagical-snippet-group-row")
+                && event.data != root.snippet.id
         }
         dropped(event) => {
-            if event.mime_type == root.drag-mime-type && event.data != root.snippet.id {
-                root.move-node(event.data, root.snippet.id);
+            if root.drop-enabled && event.data != root.snippet.id {
+                if event.mime_type == "application/x-smagical-snippet-row" {
+                    root.move-node(event.data, "Snippet", root.snippet.id);
+                }
+                if event.mime_type == "application/x-smagical-snippet-group-row" {
+                    root.move-node(event.data, "Group", root.snippet.id);
+                }
             }
         }
     }
 
     DragArea {
-        x: parent.width - 24px;
+        x: max(0px, min(parent.width - 24px, root.visible-row-width - 24px));
         y: 0px;
         width: 22px;
         height: parent.height;
         enabled: root.drag-enabled;
+        visible: root.drag-enabled;
         mime-type: root.drag-mime-type;
         data: root.snippet.id;
 
@@ -297,12 +373,13 @@ export component SnippetsPanel inherits Rectangle {
     callback move-snippet();
     callback run-snippet();
     callback split-target();
-    callback move-node(source-id: string, target-id: string) -> bool;
-    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback move-node(source-id: string, source-kind: string, target-id: string) -> bool;
+    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
 
     property <string> create-parent-id: root.selected-id == "" ? "snippet-folder:all" : root.selected-node-kind == "Group" ? root.selected-id : root.selected-parent-id;
 
-    property <length> tree-content-width: max(root.panel-width * 1px - 36px, 344px);
+    property <length> tree-visible-width: max(root.panel-width * 1px - 36px, 0px);
+    property <length> tree-content-width: max(root.tree-visible-width, 344px);
     property <bool> context-menu-open: false;
     property <length> context-menu-x: 12px;
     property <length> context-menu-y: 64px;
@@ -313,9 +390,9 @@ export component SnippetsPanel inherits Rectangle {
     property <int> context-menu-item-count: root.context-node-kind == "Group"
         ? (root.context-root-group ? 2 : 5)
         : root.context-node-kind == "Snippet"
-            ? 5
+            ? 4
             : root.context-node-kind == "SnippetTarget"
-                ? (root.context-node-id == "" ? 0 : 4)
+                ? (root.context-node-id == "" ? 0 : 3)
                 : 0;
     property <length> context-menu-height: (10 + root.context-menu-item-count * 32 + (root.context-menu-item-count > 0 ? (root.context-menu-item-count - 1) * 3 : 0)) * 1px;
 
@@ -383,16 +460,17 @@ export component SnippetsPanel inherits Rectangle {
 
                     for snippet in root.snippets: SnippetTreeItem {
                         width: root.tree-content-width;
+                        visible-row-width: root.tree-visible-width;
                         snippet: snippet;
                         selected-id: root.selected-id;
                         toggle-node(node-id) => { root.toggle-tree-node(node-id); }
-                        move-node(source-id, target-id) => { root.move-node(source-id, target-id) }
-                        selected(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
+                        move-node(source-id, source-kind, target-id) => { root.move-node(source-id, source-kind, target-id) }
+                        selected(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
                             root.context-menu-open = false;
-                            root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index);
+                            root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index);
                         }
-                        open-context-menu(abs-x, abs-y, id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
-                            root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index);
+                        open-context-menu(abs-x, abs-y, id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
+                            root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index);
                             root.context-node-kind = node-kind;
                             root.context-node-id = id;
                             root.context-parent-id = parent-id;
@@ -486,27 +564,11 @@ export component SnippetsPanel inherits Rectangle {
             }
 
             if root.context-node-kind == "Snippet": SnippetContextMenuItem {
-                label: root.run-label;
-                clicked => {
-                    root.context-menu-open = false;
-                    root.run-snippet();
-                }
-            }
-
-            if root.context-node-kind == "Snippet": SnippetContextMenuItem {
                 label: root.delete-label;
                 danger: true;
                 clicked => {
                     root.context-menu-open = false;
                     root.delete-snippet();
-                }
-            }
-
-            if root.context-node-kind == "SnippetTarget": SnippetContextMenuItem {
-                label: root.run-label;
-                clicked => {
-                    root.context-menu-open = false;
-                    root.run-snippet();
                 }
             }
 

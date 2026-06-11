@@ -1,4 +1,4 @@
-import { ActivityRow, CommandPaletteRow, CredentialDetailFieldRow, CredentialGroupContentRow, CredentialOptionRow, CredentialRow, GroupOptionRow, HostRow, HostTreeRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
+import { ActivityRow, CommandPaletteRow, CredentialDetailFieldRow, CredentialGroupContentRow, CredentialOptionRow, CredentialRow, GroupOptionRow, HostRow, HostTreeRow, KnownHostRow, NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkResourceOptionRow, NetworkStatRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 export { AppTheme } from "./theme.slint";
 import { ActivityPanel } from "./activity_panel.slint";
@@ -67,6 +67,44 @@ export component AppWindow inherits Window {
     in property <string> tool-keys-label: "";
     in property <string> tool-proxy-label: "";
     in property <string> proxy-empty-label: "";
+    in property <string> proxy-section-route-label: "";
+    in property <string> proxy-section-forward-label: "";
+    in property <string> proxy-section-host-label: "";
+    in property <string> proxy-jump-caption-label: "";
+    in property <string> proxy-command-caption-label: "";
+    in property <string> proxy-forward-caption-label: "";
+    in property <string> proxy-host-hint-caption-label: "";
+    in property <string> proxy-runtime-section-label: "";
+    in property <string> proxy-resources-section-label: "";
+    in property <string> proxy-runtime-empty-label: "";
+    in property <string> proxy-resources-empty-label: "";
+    in property <string> proxy-new-proxy-label: "";
+    in property <string> proxy-new-jump-label: "";
+    in property <string> proxy-new-forward-label: "";
+    in property <string> proxy-edit-label: "";
+    in property <string> proxy-delete-label: "";
+    in property <string> proxy-save-label: "";
+    in property <string> proxy-cancel-label: "";
+    in property <string> proxy-delete-title-label: "";
+    in property <string> proxy-delete-caption-label: "";
+    in property <string> proxy-name-label: "";
+    in property <string> proxy-name-placeholder: "";
+    in property <string> proxy-address-label: "";
+    in property <string> proxy-port-label: "";
+    in property <string> proxy-tags-label: "";
+    in property <string> proxy-bind-label: "";
+    in property <string> proxy-target-label: "";
+    in property <string> proxy-host-ids-label: "";
+    in property <string> proxy-host-ids-placeholder: "";
+    in property <string> proxy-bind-host-placeholder: "";
+    in property <string> proxy-target-host-placeholder: "";
+    in property <string> proxy-tags-placeholder: "";
+    in property <string> proxy-auto-start-label: "";
+    in property <string> proxy-kind-socks5-label: "";
+    in property <string> proxy-kind-http-label: "";
+    in property <string> proxy-kind-local-label: "";
+    in property <string> proxy-kind-remote-label: "";
+    in property <string> proxy-kind-dynamic-label: "";
     in property <string> security-tree-title-label: "";
     in property <string> security-search-placeholder-label: "";
     in property <string> security-new-label: "";
@@ -255,6 +293,8 @@ export component AppWindow inherits Window {
     in property <string> snippets-move-label: "";
     in property <string> snippets-move-title-label: "";
     in property <string> snippets-move-root-label: "";
+    in property <string> snippets-choose-group-label: "";
+    in property <string> snippets-confirm-group-label: "";
     in property <string> snippets-name-label: "";
     in property <string> snippets-name-placeholder-label: "";
     in property <string> snippets-group-name-placeholder-label: "";
@@ -266,6 +306,11 @@ export component AppWindow inherits Window {
     in property <string> snippets-target-linux-label: "";
     in property <string> snippets-target-debian-label: "";
     in property <string> snippets-target-rhel-label: "";
+    in property <string> snippets-target-alpine-label: "";
+    in property <string> snippets-target-fedora-label: "";
+    in property <string> snippets-target-arch-label: "";
+    in property <string> snippets-target-suse-label: "";
+    in property <string> snippets-target-freebsd-label: "";
     in property <string> snippets-target-macos-label: "";
     in property <string> snippets-target-powershell-label: "";
     in property <string> snippets-target-cmd-label: "";
@@ -474,6 +519,12 @@ export component AppWindow inherits Window {
     in property <string> quick-host-passphrase-ref: "";
     in property <string> quick-host-key-hint: "";
     in property <string> quick-host-certificate-ref: "";
+    in property <string> create-host-network-title: "";
+    in property <string> create-host-network-caption: "";
+    in property <string> create-host-network-proxy-label: "";
+    in property <string> create-host-network-jump-label: "";
+    in property <string> create-host-network-forward-label: "";
+    in property <string> create-host-network-empty-label: "";
     in property <bool> hosts-panel-collapsed: false;
     in property <int> hosts-panel-width: 276;
     in property <int> activity-panel-width: 244;
@@ -486,6 +537,34 @@ export component AppWindow inherits Window {
     property <string> selected-credential-id: "";
     property <string> selected-credential-name: "";
     property <string> selected-credential-group-id: "";
+    property <string> network-selected-id: "";
+    property <string> network-selected-title: "";
+    property <string> network-selected-caption: "";
+    property <string> network-selected-kind: "";
+    property <string> network-selected-kind-key: "";
+    property <string> network-selected-meta: "";
+    property <string> network-selected-note: "";
+    property <string> network-selected-icon-key: "router";
+    property <int> network-selected-accent-index: 0;
+    property <string> network-primary-action-key: "";
+    property <string> network-primary-action-label: "";
+    property <bool> network-primary-action-enabled: false;
+    property <string> network-action-session-id: "";
+    property <string> network-action-rule-name: "";
+    property <[NetworkStatRow]> network-stats: [];
+    property <[NetworkDetailFieldRow]> network-detail-fields: [];
+    property <[NetworkRelatedItemRow]> network-related-items: [];
+    property <string> network-selected-asset-id: "";
+    property <string> network-selected-edit-kind-key: "";
+    property <string> network-selected-edit-host: "";
+    property <string> network-selected-edit-port: "";
+    property <string> network-selected-edit-tags: "";
+    property <string> network-selected-edit-bind-host: "";
+    property <string> network-selected-edit-bind-port: "";
+    property <string> network-selected-edit-target-host: "";
+    property <string> network-selected-edit-target-port: "";
+    property <bool> network-selected-edit-auto-start: false;
+    property <string> network-selected-edit-host-ids: "";
     property <string> selected-credential-group-path: "";
     property <string> selected-credential-kind: "";
     property <string> selected-credential-kind-key: "";
@@ -516,6 +595,28 @@ export component AppWindow inherits Window {
     property <string> selected-snippet-arguments: "";
     property <string> selected-snippet-argument-values: "";
     property <string> selected-snippet-meta: "";
+    property <bool> selected-snippet-target-linux-selected: false;
+    property <bool> selected-snippet-target-debian-selected: false;
+    property <bool> selected-snippet-target-rhel-selected: false;
+    property <bool> selected-snippet-target-alpine-selected: false;
+    property <bool> selected-snippet-target-fedora-selected: false;
+    property <bool> selected-snippet-target-arch-selected: false;
+    property <bool> selected-snippet-target-suse-selected: false;
+    property <bool> selected-snippet-target-freebsd-selected: false;
+    property <bool> selected-snippet-target-macos-selected: false;
+    property <bool> selected-snippet-target-powershell-selected: false;
+    property <bool> selected-snippet-target-cmd-selected: false;
+    property <bool> selected-snippet-target-linux-disabled: false;
+    property <bool> selected-snippet-target-debian-disabled: false;
+    property <bool> selected-snippet-target-rhel-disabled: false;
+    property <bool> selected-snippet-target-alpine-disabled: false;
+    property <bool> selected-snippet-target-fedora-disabled: false;
+    property <bool> selected-snippet-target-arch-disabled: false;
+    property <bool> selected-snippet-target-suse-disabled: false;
+    property <bool> selected-snippet-target-freebsd-disabled: false;
+    property <bool> selected-snippet-target-macos-disabled: false;
+    property <bool> selected-snippet-target-powershell-disabled: false;
+    property <bool> selected-snippet-target-cmd-disabled: false;
     property <string> selected-snippet-icon-key: "code";
     property <string> selected-snippet-node-kind: "";
     property <int> selected-snippet-accent-index: 0;
@@ -524,6 +625,7 @@ export component AppWindow inherits Window {
     property <bool> create-snippet-group-dialog-open: false;
     property <string> quick-snippet-choice-parent-node-id: "snippet-folder:all";
     property <string> quick-snippet-parent-node-id: "";
+    property <string> quick-snippet-parent-group-name: "";
     property <bool> quick-snippet-edit-mode: false;
     property <string> quick-snippet-dialog-kind: "Snippet";
     property <string> quick-snippet-edit-id: "";
@@ -532,10 +634,16 @@ export component AppWindow inherits Window {
     property <string> quick-snippet-command: "";
     property <string> quick-snippet-target-mode: "New";
     property <string> quick-snippet-share-target-id: "";
+    property <string> quick-snippet-group-id: "";
     property <string> quick-snippet-group-name: "";
     property <bool> quick-snippet-target-linux-selected: true;
     property <bool> quick-snippet-target-debian-selected: false;
     property <bool> quick-snippet-target-rhel-selected: false;
+    property <bool> quick-snippet-target-alpine-selected: false;
+    property <bool> quick-snippet-target-fedora-selected: false;
+    property <bool> quick-snippet-target-arch-selected: false;
+    property <bool> quick-snippet-target-suse-selected: false;
+    property <bool> quick-snippet-target-freebsd-selected: false;
     property <bool> quick-snippet-target-macos-selected: false;
     property <bool> quick-snippet-target-powershell-selected: false;
     property <bool> quick-snippet-target-cmd-selected: false;
@@ -587,6 +695,9 @@ export component AppWindow inherits Window {
     in property <[GroupOptionRow]> quick-host-groups: [];
     in property <[CredentialOptionRow]> quick-host-private-key-options: [];
     in property <[CredentialOptionRow]> quick-host-certificate-options: [];
+    in property <[NetworkResourceOptionRow]> quick-host-network-proxy-options: [];
+    in property <[NetworkResourceOptionRow]> quick-host-network-jump-options: [];
+    in property <[NetworkResourceOptionRow]> quick-host-network-forward-options: [];
     in property <[CredentialRow]> credential-rows: [];
     in property <[CredentialGroupContentRow]> credential-group-contents: [];
     in property <[CredentialDetailFieldRow]> credential-detail-fields: [];
@@ -604,6 +715,10 @@ export component AppWindow inherits Window {
     in property <[ToolItemRow]> snippets: [];
     in property <[ToolItemRow]> tunnels: [];
     in property <[ToolItemRow]> credentials: [];
+    in property <[NetworkItemRow]> network-runtime-tunnels: [];
+    in property <[NetworkItemRow]> network-saved-tunnels: [];
+    in property <[NetworkItemRow]> network-proxy-assets: [];
+    in property <[NetworkItemRow]> network-route-definitions: [];
     in property <[KnownHostRow]> known-hosts: [];
     in property <[SettingOptionRow]> settings-language-options: [];
     in property <[SettingOptionRow]> settings-theme-options: [];
@@ -654,8 +769,9 @@ export component AppWindow inherits Window {
     callback update-snippet-search(query: string);
 
     // 片段核心操作回调。
-    callback create-snippet(parent-node-id: string, name: string, description: string, command-template: string) -> bool;
-    callback update-snippet(snippet-row-id: string, name: string, description: string, command-template: string) -> bool;
+    callback create-snippet(parent-node-id: string, group-id: string, name: string, description: string, command-template: string) -> bool;
+    callback update-snippet(snippet-row-id: string, group-id: string, name: string, description: string, command-template: string) -> bool;
+    callback snippet-group-name(group-id: string) -> string;
     callback create-snippet-target(snippet-row-id: string, target-key: string, display-name: string, command-template: string, share-target-row-id: string) -> bool;
     callback update-snippet-target(snippet-row-id: string, target-key: string, display-name: string, command-template: string) -> bool;
     callback split-snippet-target(snippet-row-id: string) -> bool;
@@ -696,6 +812,7 @@ export component AppWindow inherits Window {
     callback select-quick-host-group(group-id: string);
     callback update-quick-host-auth-kind(kind: string);
     callback update-quick-host-auth-field(field: string, value: string);
+    callback toggle-quick-host-network-resource(kind: string, resource-id: string);
 
     // 凭据、密钥、证书和文件选择操作回调。
     callback create-credential-metadata(kind: string, name: string, group-id: string, secret-ref: string, algorithm: string) -> bool;
@@ -758,6 +875,11 @@ export component AppWindow inherits Window {
     callback select-sftp-entry(host-id: string, path: string);
     callback trust-known-host(host: string, port: int);
     callback remove-known-host(host: string, port: int);
+    callback stop-network-tunnel(session-id: string, rule-name: string);
+    callback save-network-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save-network-jump-chain(asset-id: string, name: string, host-ids: string) -> bool;
+    callback save-network-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
+    callback remove-network-asset(kind-key: string, asset-id: string);
     callback dismiss-ui-error();
 
     title: root.brand-name-label + " - " + root.active-page;
@@ -1045,16 +1167,24 @@ export component AppWindow inherits Window {
                     root.quick-snippet-command = "";
                     root.quick-snippet-target-mode = "New";
                     root.quick-snippet-share-target-id = "";
-                    root.quick-snippet-target-linux-selected = true;
-                    root.quick-snippet-target-debian-selected = false;
-                    root.quick-snippet-target-rhel-selected = false;
-                    root.quick-snippet-target-macos-selected = false;
-                    root.quick-snippet-target-powershell-selected = false;
-                    root.quick-snippet-target-cmd-selected = false;
+                    root.quick-snippet-group-id = "";
+                    root.quick-snippet-group-name = root.snippets-move-root-label;
+                    root.quick-snippet-target-linux-selected = !root.selected-snippet-target-linux-disabled;
+                    root.quick-snippet-target-debian-selected = root.selected-snippet-target-linux-disabled && !root.selected-snippet-target-debian-disabled;
+                    root.quick-snippet-target-rhel-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && !root.selected-snippet-target-rhel-disabled;
+                    root.quick-snippet-target-alpine-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && !root.selected-snippet-target-alpine-disabled;
+                    root.quick-snippet-target-fedora-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && !root.selected-snippet-target-fedora-disabled;
+                    root.quick-snippet-target-arch-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && !root.selected-snippet-target-arch-disabled;
+                    root.quick-snippet-target-suse-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && !root.selected-snippet-target-suse-disabled;
+                    root.quick-snippet-target-freebsd-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && !root.selected-snippet-target-freebsd-disabled;
+                    root.quick-snippet-target-macos-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && root.selected-snippet-target-freebsd-disabled && !root.selected-snippet-target-macos-disabled;
+                    root.quick-snippet-target-powershell-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && root.selected-snippet-target-freebsd-disabled && root.selected-snippet-target-macos-disabled && !root.selected-snippet-target-powershell-disabled;
+                    root.quick-snippet-target-cmd-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && root.selected-snippet-target-freebsd-disabled && root.selected-snippet-target-macos-disabled && root.selected-snippet-target-powershell-disabled && !root.selected-snippet-target-cmd-disabled;
                     root.create-snippet-dialog-open = true;
                 }
                 open-create-group(parent-node-id) => {
                     root.quick-snippet-parent-node-id = parent-node-id;
+                    root.quick-snippet-parent-group-name = parent-node-id == "snippet-folder:all" ? root.snippets-move-root-label : root.snippet-group-name(parent-node-id);
                     root.quick-snippet-edit-mode = false;
                     root.quick-snippet-edit-id = "";
                     root.quick-snippet-group-name = "";
@@ -1072,9 +1202,16 @@ export component AppWindow inherits Window {
                             root.quick-snippet-command = root.selected-snippet-command-template;
                             root.quick-snippet-target-mode = "New";
                             root.quick-snippet-share-target-id = "";
+                            root.quick-snippet-group-id = root.selected-snippet-parent-id == "snippet-folder:all" ? "" : root.selected-snippet-parent-id;
+                            root.quick-snippet-group-name = root.snippet-group-name(root.quick-snippet-group-id);
                             root.quick-snippet-target-linux-selected = true;
                             root.quick-snippet-target-debian-selected = false;
                             root.quick-snippet-target-rhel-selected = false;
+                            root.quick-snippet-target-alpine-selected = false;
+                            root.quick-snippet-target-fedora-selected = false;
+                            root.quick-snippet-target-arch-selected = false;
+                            root.quick-snippet-target-suse-selected = false;
+                            root.quick-snippet-target-freebsd-selected = false;
                             root.quick-snippet-target-macos-selected = false;
                             root.quick-snippet-target-powershell-selected = false;
                             root.quick-snippet-target-cmd-selected = false;
@@ -1084,20 +1221,29 @@ export component AppWindow inherits Window {
                             root.quick-snippet-edit-mode = true;
                             root.quick-snippet-edit-id = root.selected-snippet-id;
                             root.quick-snippet-name = root.selected-snippet-name;
-                            root.quick-snippet-description = root.selected-snippet-scope;
+                            root.quick-snippet-description = root.selected-snippet-description;
                             root.quick-snippet-command = root.selected-snippet-command-template;
                             root.quick-snippet-target-mode = "New";
                             root.quick-snippet-share-target-id = "";
-                            root.quick-snippet-target-linux-selected = root.selected-snippet-scope == "linux";
-                            root.quick-snippet-target-debian-selected = root.selected-snippet-scope == "debian-ubuntu";
-                            root.quick-snippet-target-rhel-selected = root.selected-snippet-scope == "rhel-centos";
-                            root.quick-snippet-target-macos-selected = root.selected-snippet-scope == "macos";
-                            root.quick-snippet-target-powershell-selected = root.selected-snippet-scope == "windows-powershell" || root.selected-snippet-scope == "windows" || root.selected-snippet-scope == "powershell" || root.selected-snippet-scope == "pwsh";
-                            root.quick-snippet-target-cmd-selected = root.selected-snippet-scope == "windows-cmd" || root.selected-snippet-scope == "cmd";
+                            root.quick-snippet-group-id = "";
+                            root.quick-snippet-group-name = root.snippets-move-root-label;
+                            root.quick-snippet-target-linux-selected = root.selected-snippet-target-linux-selected;
+                            root.quick-snippet-target-debian-selected = root.selected-snippet-target-debian-selected;
+                            root.quick-snippet-target-rhel-selected = root.selected-snippet-target-rhel-selected;
+                            root.quick-snippet-target-alpine-selected = root.selected-snippet-target-alpine-selected;
+                            root.quick-snippet-target-fedora-selected = root.selected-snippet-target-fedora-selected;
+                            root.quick-snippet-target-arch-selected = root.selected-snippet-target-arch-selected;
+                            root.quick-snippet-target-suse-selected = root.selected-snippet-target-suse-selected;
+                            root.quick-snippet-target-freebsd-selected = root.selected-snippet-target-freebsd-selected;
+                            root.quick-snippet-target-macos-selected = root.selected-snippet-target-macos-selected;
+                            root.quick-snippet-target-powershell-selected = root.selected-snippet-target-powershell-selected;
+                            root.quick-snippet-target-cmd-selected = root.selected-snippet-target-cmd-selected;
                             root.create-snippet-dialog-open = true;
                         } else if root.selected-snippet-node-kind == "Group" {
                             root.quick-snippet-edit-mode = true;
                             root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-parent-node-id = root.selected-snippet-parent-id;
+                            root.quick-snippet-parent-group-name = root.selected-snippet-parent-id == "snippet-folder:all" ? root.snippets-move-root-label : root.snippet-group-name(root.selected-snippet-parent-id);
                             root.quick-snippet-group-name = root.selected-snippet-name;
                             root.create-snippet-group-dialog-open = true;
                         }
@@ -1125,8 +1271,8 @@ export component AppWindow inherits Window {
                     }
                 }
                 split-target => { root.split-snippet-target(root.selected-snippet-id); }
-                move-node(source-id, target-id) => { root.move-snippet-node(source-id, "Snippet", target-id) }
-                select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
+                move-node(source-id, source-kind, target-id) => { root.move-snippet-node(source-id, source-kind, target-id) }
+                select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
                     root.selected-snippet-parent-id = parent-id;
                     root.selected-snippet-name = name;
                     root.selected-snippet-description = description;
@@ -1138,6 +1284,28 @@ export component AppWindow inherits Window {
                     root.selected-snippet-arguments = arguments;
                     root.selected-snippet-argument-values = argument-values;
                     root.selected-snippet-meta = meta;
+                    root.selected-snippet-target-linux-selected = target-linux-selected;
+                    root.selected-snippet-target-debian-selected = target-debian-selected;
+                    root.selected-snippet-target-rhel-selected = target-rhel-selected;
+                    root.selected-snippet-target-alpine-selected = target-alpine-selected;
+                    root.selected-snippet-target-fedora-selected = target-fedora-selected;
+                    root.selected-snippet-target-arch-selected = target-arch-selected;
+                    root.selected-snippet-target-suse-selected = target-suse-selected;
+                    root.selected-snippet-target-freebsd-selected = target-freebsd-selected;
+                    root.selected-snippet-target-macos-selected = target-macos-selected;
+                    root.selected-snippet-target-powershell-selected = target-powershell-selected;
+                    root.selected-snippet-target-cmd-selected = target-cmd-selected;
+                    root.selected-snippet-target-linux-disabled = target-linux-disabled;
+                    root.selected-snippet-target-debian-disabled = target-debian-disabled;
+                    root.selected-snippet-target-rhel-disabled = target-rhel-disabled;
+                    root.selected-snippet-target-alpine-disabled = target-alpine-disabled;
+                    root.selected-snippet-target-fedora-disabled = target-fedora-disabled;
+                    root.selected-snippet-target-arch-disabled = target-arch-disabled;
+                    root.selected-snippet-target-suse-disabled = target-suse-disabled;
+                    root.selected-snippet-target-freebsd-disabled = target-freebsd-disabled;
+                    root.selected-snippet-target-macos-disabled = target-macos-disabled;
+                    root.selected-snippet-target-powershell-disabled = target-powershell-disabled;
+                    root.selected-snippet-target-cmd-disabled = target-cmd-disabled;
                     root.selected-snippet-icon-key = icon-key;
                     root.selected-snippet-node-kind = node-kind;
                     root.selected-snippet-accent-index = accent-index;
@@ -1190,6 +1358,38 @@ export component AppWindow inherits Window {
                 snippets: root.snippets;
                 tunnels: root.tunnels;
                 credentials: root.credentials;
+                network-runtime-tunnels: root.network-runtime-tunnels;
+                network-saved-tunnels: root.network-saved-tunnels;
+                network-proxy-assets: root.network-proxy-assets;
+                network-route-definitions: root.network-route-definitions;
+                network-selected-id: root.network-selected-id;
+                network-selected-title: root.network-selected-title;
+                network-selected-caption: root.network-selected-caption;
+                network-selected-kind: root.network-selected-kind;
+                network-selected-kind-key: root.network-selected-kind-key;
+                network-selected-meta: root.network-selected-meta;
+                network-selected-note: root.network-selected-note;
+                network-selected-icon-key: root.network-selected-icon-key;
+                network-selected-accent-index: root.network-selected-accent-index;
+                network-primary-action-key: root.network-primary-action-key;
+                network-primary-action-label: root.network-primary-action-label;
+                network-primary-action-enabled: root.network-primary-action-enabled;
+                network-action-session-id: root.network-action-session-id;
+                network-action-rule-name: root.network-action-rule-name;
+                network-stats: root.network-stats;
+                network-detail-fields: root.network-detail-fields;
+                network-related-items: root.network-related-items;
+                network-selected-asset-id: root.network-selected-asset-id;
+                network-selected-edit-kind-key: root.network-selected-edit-kind-key;
+                network-selected-edit-host: root.network-selected-edit-host;
+                network-selected-edit-port: root.network-selected-edit-port;
+                network-selected-edit-tags: root.network-selected-edit-tags;
+                network-selected-edit-bind-host: root.network-selected-edit-bind-host;
+                network-selected-edit-bind-port: root.network-selected-edit-bind-port;
+                network-selected-edit-target-host: root.network-selected-edit-target-host;
+                network-selected-edit-target-port: root.network-selected-edit-target-port;
+                network-selected-edit-auto-start: root.network-selected-edit-auto-start;
+                network-selected-edit-host-ids: root.network-selected-edit-host-ids;
                 selected-snippet-id: root.selected-snippet-id;
                 selected-snippet-name: root.selected-snippet-name;
                 selected-snippet-description: root.selected-snippet-description;
@@ -1203,6 +1403,7 @@ export component AppWindow inherits Window {
                 selected-snippet-node-kind: root.selected-snippet-node-kind;
                 selected-snippet-accent-index: root.selected-snippet-accent-index;
                 snippet-rows: root.snippet-rows;
+                snippet-target-options: root.snippet-target-options;
                 credential-rows: root.credential-rows;
                 credential-group-contents: root.credential-group-contents;
                 credential-detail-fields: root.credential-detail-fields;
@@ -1258,6 +1459,44 @@ export component AppWindow inherits Window {
                 tool-keys-label: root.tool-keys-label;
                 tool-proxy-label: root.tool-proxy-label;
                 proxy-empty-label: root.proxy-empty-label;
+                proxy-section-route-label: root.proxy-section-route-label;
+                proxy-section-forward-label: root.proxy-section-forward-label;
+                proxy-section-host-label: root.proxy-section-host-label;
+                proxy-jump-caption-label: root.proxy-jump-caption-label;
+                proxy-command-caption-label: root.proxy-command-caption-label;
+                proxy-forward-caption-label: root.proxy-forward-caption-label;
+                proxy-host-hint-caption-label: root.proxy-host-hint-caption-label;
+                proxy-runtime-section-label: root.proxy-runtime-section-label;
+                proxy-resources-section-label: root.proxy-resources-section-label;
+                proxy-runtime-empty-label: root.proxy-runtime-empty-label;
+                proxy-resources-empty-label: root.proxy-resources-empty-label;
+                proxy-new-proxy-label: root.proxy-new-proxy-label;
+                proxy-new-jump-label: root.proxy-new-jump-label;
+                proxy-new-forward-label: root.proxy-new-forward-label;
+                proxy-edit-label: root.proxy-edit-label;
+                proxy-delete-label: root.proxy-delete-label;
+                proxy-save-label: root.proxy-save-label;
+                proxy-cancel-label: root.proxy-cancel-label;
+                proxy-delete-title-label: root.proxy-delete-title-label;
+                proxy-delete-caption-label: root.proxy-delete-caption-label;
+                proxy-name-label: root.proxy-name-label;
+                proxy-name-placeholder: root.proxy-name-placeholder;
+                proxy-address-label: root.proxy-address-label;
+                proxy-port-label: root.proxy-port-label;
+                proxy-tags-label: root.proxy-tags-label;
+                proxy-bind-label: root.proxy-bind-label;
+                proxy-target-label: root.proxy-target-label;
+                proxy-host-ids-label: root.proxy-host-ids-label;
+                proxy-host-ids-placeholder: root.proxy-host-ids-placeholder;
+                proxy-bind-host-placeholder: root.proxy-bind-host-placeholder;
+                proxy-target-host-placeholder: root.proxy-target-host-placeholder;
+                proxy-tags-placeholder: root.proxy-tags-placeholder;
+                proxy-auto-start-label: root.proxy-auto-start-label;
+                proxy-kind-socks5-label: root.proxy-kind-socks5-label;
+                proxy-kind-http-label: root.proxy-kind-http-label;
+                proxy-kind-local-label: root.proxy-kind-local-label;
+                proxy-kind-remote-label: root.proxy-kind-remote-label;
+                proxy-kind-dynamic-label: root.proxy-kind-dynamic-label;
                 security-view-content-label: root.security-view-content-label;
                 security-view-private-key-label: root.security-view-private-key-label;
                 security-view-certificate-label: root.security-view-certificate-label;
@@ -1350,6 +1589,17 @@ export component AppWindow inherits Window {
                 select-sftp-entry(host-id, path) => { root.select-sftp-entry(host-id, path); }
                 trust-known-host(host, port) => { root.trust-known-host(host, port); }
                 remove-known-host(host, port) => { root.remove-known-host(host, port); }
+                stop-network-tunnel(session-id, rule-name) => { root.stop-network-tunnel(session-id, rule-name); }
+                save-network-proxy(asset-id, name, proxy-kind, host, port, tags) => {
+                    root.save-network-proxy(asset-id, name, proxy-kind, host, port, tags)
+                }
+                save-network-jump-chain(asset-id, name, host-ids) => {
+                    root.save-network-jump-chain(asset-id, name, host-ids)
+                }
+                save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) => {
+                    root.save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start)
+                }
+                remove-network-asset(kind-key, asset-id) => { root.remove-network-asset(kind-key, asset-id); }
                 dismiss-ui-error => { root.dismiss-ui-error(); }
                 set-language(language) => { root.set-language(language); }
                 set-built-in-theme(theme) => { root.set-built-in-theme(theme); }
@@ -1382,9 +1632,16 @@ export component AppWindow inherits Window {
                         root.quick-snippet-command = "";
                         root.quick-snippet-target-mode = "New";
                         root.quick-snippet-share-target-id = "";
+                        root.quick-snippet-group-id = root.selected-snippet-parent-id == "snippet-folder:all" ? "" : root.selected-snippet-parent-id;
+                        root.quick-snippet-group-name = root.snippet-group-name(root.quick-snippet-group-id);
                         root.quick-snippet-target-linux-selected = true;
                         root.quick-snippet-target-debian-selected = false;
                         root.quick-snippet-target-rhel-selected = false;
+                        root.quick-snippet-target-alpine-selected = false;
+                        root.quick-snippet-target-fedora-selected = false;
+                        root.quick-snippet-target-arch-selected = false;
+                        root.quick-snippet-target-suse-selected = false;
+                        root.quick-snippet-target-freebsd-selected = false;
                         root.quick-snippet-target-macos-selected = false;
                         root.quick-snippet-target-powershell-selected = false;
                         root.quick-snippet-target-cmd-selected = false;
@@ -1406,9 +1663,16 @@ export component AppWindow inherits Window {
                             root.quick-snippet-command = root.selected-snippet-command-template;
                             root.quick-snippet-target-mode = "New";
                             root.quick-snippet-share-target-id = "";
+                            root.quick-snippet-group-id = root.selected-snippet-parent-id == "snippet-folder:all" ? "" : root.selected-snippet-parent-id;
+                            root.quick-snippet-group-name = root.snippet-group-name(root.quick-snippet-group-id);
                             root.quick-snippet-target-linux-selected = true;
                             root.quick-snippet-target-debian-selected = false;
                             root.quick-snippet-target-rhel-selected = false;
+                            root.quick-snippet-target-alpine-selected = false;
+                            root.quick-snippet-target-fedora-selected = false;
+                            root.quick-snippet-target-arch-selected = false;
+                            root.quick-snippet-target-suse-selected = false;
+                            root.quick-snippet-target-freebsd-selected = false;
                             root.quick-snippet-target-macos-selected = false;
                             root.quick-snippet-target-powershell-selected = false;
                             root.quick-snippet-target-cmd-selected = false;
@@ -1418,20 +1682,29 @@ export component AppWindow inherits Window {
                             root.quick-snippet-edit-mode = true;
                             root.quick-snippet-edit-id = root.selected-snippet-id;
                             root.quick-snippet-name = root.selected-snippet-name;
-                            root.quick-snippet-description = root.selected-snippet-scope;
+                            root.quick-snippet-description = root.selected-snippet-description;
                             root.quick-snippet-command = root.selected-snippet-command-template;
                             root.quick-snippet-target-mode = "New";
                             root.quick-snippet-share-target-id = "";
-                            root.quick-snippet-target-linux-selected = root.selected-snippet-scope == "linux";
-                            root.quick-snippet-target-debian-selected = root.selected-snippet-scope == "debian-ubuntu";
-                            root.quick-snippet-target-rhel-selected = root.selected-snippet-scope == "rhel-centos";
-                            root.quick-snippet-target-macos-selected = root.selected-snippet-scope == "macos";
-                            root.quick-snippet-target-powershell-selected = root.selected-snippet-scope == "windows-powershell" || root.selected-snippet-scope == "windows" || root.selected-snippet-scope == "powershell" || root.selected-snippet-scope == "pwsh";
-                            root.quick-snippet-target-cmd-selected = root.selected-snippet-scope == "windows-cmd" || root.selected-snippet-scope == "cmd";
+                            root.quick-snippet-group-id = "";
+                            root.quick-snippet-group-name = root.snippets-move-root-label;
+                            root.quick-snippet-target-linux-selected = root.selected-snippet-target-linux-selected;
+                            root.quick-snippet-target-debian-selected = root.selected-snippet-target-debian-selected;
+                            root.quick-snippet-target-rhel-selected = root.selected-snippet-target-rhel-selected;
+                            root.quick-snippet-target-alpine-selected = root.selected-snippet-target-alpine-selected;
+                            root.quick-snippet-target-fedora-selected = root.selected-snippet-target-fedora-selected;
+                            root.quick-snippet-target-arch-selected = root.selected-snippet-target-arch-selected;
+                            root.quick-snippet-target-suse-selected = root.selected-snippet-target-suse-selected;
+                            root.quick-snippet-target-freebsd-selected = root.selected-snippet-target-freebsd-selected;
+                            root.quick-snippet-target-macos-selected = root.selected-snippet-target-macos-selected;
+                            root.quick-snippet-target-powershell-selected = root.selected-snippet-target-powershell-selected;
+                            root.quick-snippet-target-cmd-selected = root.selected-snippet-target-cmd-selected;
                             root.create-snippet-dialog-open = true;
                         } else if root.selected-snippet-node-kind == "Group" {
                             root.quick-snippet-edit-mode = true;
                             root.quick-snippet-edit-id = root.selected-snippet-id;
+                            root.quick-snippet-parent-node-id = root.selected-snippet-parent-id;
+                            root.quick-snippet-parent-group-name = root.selected-snippet-parent-id == "snippet-folder:all" ? root.snippets-move-root-label : root.snippet-group-name(root.selected-snippet-parent-id);
                             root.quick-snippet-group-name = root.selected-snippet-name;
                             root.create-snippet-group-dialog-open = true;
                         }
@@ -1451,7 +1724,7 @@ export component AppWindow inherits Window {
                         root.move-snippet-dialog-open = true;
                     }
                 }
-                select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, icon-key, node-kind, accent-index) => {
+                select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
                     root.selected-snippet-parent-id = parent-id;
                     root.selected-snippet-name = name;
                     root.selected-snippet-description = description;
@@ -1463,6 +1736,28 @@ export component AppWindow inherits Window {
                     root.selected-snippet-arguments = arguments;
                     root.selected-snippet-argument-values = argument-values;
                     root.selected-snippet-meta = meta;
+                    root.selected-snippet-target-linux-selected = target-linux-selected;
+                    root.selected-snippet-target-debian-selected = target-debian-selected;
+                    root.selected-snippet-target-rhel-selected = target-rhel-selected;
+                    root.selected-snippet-target-alpine-selected = target-alpine-selected;
+                    root.selected-snippet-target-fedora-selected = target-fedora-selected;
+                    root.selected-snippet-target-arch-selected = target-arch-selected;
+                    root.selected-snippet-target-suse-selected = target-suse-selected;
+                    root.selected-snippet-target-freebsd-selected = target-freebsd-selected;
+                    root.selected-snippet-target-macos-selected = target-macos-selected;
+                    root.selected-snippet-target-powershell-selected = target-powershell-selected;
+                    root.selected-snippet-target-cmd-selected = target-cmd-selected;
+                    root.selected-snippet-target-linux-disabled = target-linux-disabled;
+                    root.selected-snippet-target-debian-disabled = target-debian-disabled;
+                    root.selected-snippet-target-rhel-disabled = target-rhel-disabled;
+                    root.selected-snippet-target-alpine-disabled = target-alpine-disabled;
+                    root.selected-snippet-target-fedora-disabled = target-fedora-disabled;
+                    root.selected-snippet-target-arch-disabled = target-arch-disabled;
+                    root.selected-snippet-target-suse-disabled = target-suse-disabled;
+                    root.selected-snippet-target-freebsd-disabled = target-freebsd-disabled;
+                    root.selected-snippet-target-macos-disabled = target-macos-disabled;
+                    root.selected-snippet-target-powershell-disabled = target-powershell-disabled;
+                    root.selected-snippet-target-cmd-disabled = target-cmd-disabled;
                     root.selected-snippet-icon-key = icon-key;
                     root.selected-snippet-node-kind = node-kind;
                     root.selected-snippet-accent-index = accent-index;
@@ -1649,6 +1944,12 @@ export component AppWindow inherits Window {
         create-host-credential-secret-placeholder: root.create-host-credential-secret-placeholder;
         create-host-credential-algorithm-label: root.create-host-credential-algorithm-label;
         create-host-credential-save-label: root.create-host-credential-save-label;
+        create-host-network-title: root.create-host-network-title;
+        create-host-network-caption: root.create-host-network-caption;
+        create-host-network-proxy-label: root.create-host-network-proxy-label;
+        create-host-network-jump-label: root.create-host-network-jump-label;
+        create-host-network-forward-label: root.create-host-network-forward-label;
+        create-host-network-empty-label: root.create-host-network-empty-label;
         create-host-icon-title: root.create-host-icon-title;
         create-host-icon-server-label: root.create-host-icon-server-label;
         create-host-icon-database-label: root.create-host-icon-database-label;
@@ -1680,6 +1981,9 @@ export component AppWindow inherits Window {
         quick-host-groups: root.quick-host-groups;
         quick-host-private-key-options: root.quick-host-private-key-options;
         quick-host-certificate-options: root.quick-host-certificate-options;
+        quick-host-network-proxy-options: root.quick-host-network-proxy-options;
+        quick-host-network-jump-options: root.quick-host-network-jump-options;
+        quick-host-network-forward-options: root.quick-host-network-forward-options;
         last-error: root.last-error;
         host-delete-title-label: root.host-delete-title-label;
         host-delete-caption-label: root.host-delete-caption-label;
@@ -1705,6 +2009,7 @@ export component AppWindow inherits Window {
         select-quick-host-group(group-id) => { root.select-quick-host-group(group-id); }
         update-quick-host-auth-kind(kind) => { root.update-quick-host-auth-kind(kind); }
         update-quick-host-auth-field(field, value) => { root.update-quick-host-auth-field(field, value); }
+        toggle-quick-host-network-resource(kind, resource-id) => { root.toggle-quick-host-network-resource(kind, resource-id); }
         create-credential(kind, name, secret-ref, algorithm) => { root.create-credential-metadata(kind, name, "", secret-ref, algorithm); }
         save-quick-host => { root.save-quick-host(); }
         cancel-remove-host => { root.cancel-remove-host(); }
@@ -1918,18 +2223,36 @@ export component AppWindow inherits Window {
         quick-dialog-kind: root.quick-snippet-dialog-kind;
         quick-edit-id: root.quick-snippet-edit-id;
         quick-parent-node-id: root.quick-snippet-parent-node-id;
+        quick-parent-group-name: root.quick-snippet-parent-group-name;
         quick-name: root.quick-snippet-name;
         quick-description: root.quick-snippet-description;
         quick-command: root.quick-snippet-command;
         quick-target-mode: root.quick-snippet-target-mode;
         quick-share-target-id: root.quick-snippet-share-target-id;
+        quick-group-id: root.quick-snippet-group-id;
         quick-group-name: root.quick-snippet-group-name;
         quick-target-linux-selected <=> root.quick-snippet-target-linux-selected;
         quick-target-debian-selected <=> root.quick-snippet-target-debian-selected;
         quick-target-rhel-selected <=> root.quick-snippet-target-rhel-selected;
+        quick-target-alpine-selected <=> root.quick-snippet-target-alpine-selected;
+        quick-target-fedora-selected <=> root.quick-snippet-target-fedora-selected;
+        quick-target-arch-selected <=> root.quick-snippet-target-arch-selected;
+        quick-target-suse-selected <=> root.quick-snippet-target-suse-selected;
+        quick-target-freebsd-selected <=> root.quick-snippet-target-freebsd-selected;
         quick-target-macos-selected <=> root.quick-snippet-target-macos-selected;
         quick-target-powershell-selected <=> root.quick-snippet-target-powershell-selected;
         quick-target-cmd-selected <=> root.quick-snippet-target-cmd-selected;
+        target-linux-disabled: root.selected-snippet-target-linux-disabled;
+        target-debian-disabled: root.selected-snippet-target-debian-disabled;
+        target-rhel-disabled: root.selected-snippet-target-rhel-disabled;
+        target-alpine-disabled: root.selected-snippet-target-alpine-disabled;
+        target-fedora-disabled: root.selected-snippet-target-fedora-disabled;
+        target-arch-disabled: root.selected-snippet-target-arch-disabled;
+        target-suse-disabled: root.selected-snippet-target-suse-disabled;
+        target-freebsd-disabled: root.selected-snippet-target-freebsd-disabled;
+        target-macos-disabled: root.selected-snippet-target-macos-disabled;
+        target-powershell-disabled: root.selected-snippet-target-powershell-disabled;
+        target-cmd-disabled: root.selected-snippet-target-cmd-disabled;
         delete-title-label: root.snippets-delete-title-label;
         delete-snippet-caption-label: root.snippets-delete-snippet-caption-label;
         delete-group-caption-label: root.snippets-delete-group-caption-label;
@@ -1964,6 +2287,11 @@ export component AppWindow inherits Window {
         target-linux-label: root.snippets-target-linux-label;
         target-debian-label: root.snippets-target-debian-label;
         target-rhel-label: root.snippets-target-rhel-label;
+        target-alpine-label: root.snippets-target-alpine-label;
+        target-fedora-label: root.snippets-target-fedora-label;
+        target-arch-label: root.snippets-target-arch-label;
+        target-suse-label: root.snippets-target-suse-label;
+        target-freebsd-label: root.snippets-target-freebsd-label;
         target-macos-label: root.snippets-target-macos-label;
         target-powershell-label: root.snippets-target-powershell-label;
         target-cmd-label: root.snippets-target-cmd-label;
@@ -1976,6 +2304,10 @@ export component AppWindow inherits Window {
         new-group-label: root.snippets-new-group-label;
         new-group-caption-label: root.snippets-new-group-caption-label;
         shared-target-label: root.snippets-shared-target-label;
+        group-label: root.snippets-group-caption-label;
+        root-group-label: root.snippets-move-root-label;
+        choose-group-label: root.snippets-choose-group-label;
+        confirm-group-label: root.snippets-confirm-group-label;
         create-label: root.snippets-create-label;
         save-label: root.snippets-save-label;
         remove-cancel => {
@@ -1999,6 +2331,28 @@ export component AppWindow inherits Window {
                 root.selected-snippet-arguments = "";
                 root.selected-snippet-argument-values = "";
                 root.selected-snippet-meta = "";
+                root.selected-snippet-target-linux-selected = false;
+                root.selected-snippet-target-debian-selected = false;
+                root.selected-snippet-target-rhel-selected = false;
+                root.selected-snippet-target-alpine-selected = false;
+                root.selected-snippet-target-fedora-selected = false;
+                root.selected-snippet-target-arch-selected = false;
+                root.selected-snippet-target-suse-selected = false;
+                root.selected-snippet-target-freebsd-selected = false;
+                root.selected-snippet-target-macos-selected = false;
+                root.selected-snippet-target-powershell-selected = false;
+                root.selected-snippet-target-cmd-selected = false;
+                root.selected-snippet-target-linux-disabled = false;
+                root.selected-snippet-target-debian-disabled = false;
+                root.selected-snippet-target-rhel-disabled = false;
+                root.selected-snippet-target-alpine-disabled = false;
+                root.selected-snippet-target-fedora-disabled = false;
+                root.selected-snippet-target-arch-disabled = false;
+                root.selected-snippet-target-suse-disabled = false;
+                root.selected-snippet-target-freebsd-disabled = false;
+                root.selected-snippet-target-macos-disabled = false;
+                root.selected-snippet-target-powershell-disabled = false;
+                root.selected-snippet-target-cmd-disabled = false;
                 root.selected-snippet-icon-key = "code";
                 root.selected-snippet-node-kind = "";
                 root.selected-snippet-accent-index = 0;
@@ -2037,12 +2391,19 @@ export component AppWindow inherits Window {
             root.quick-snippet-command = "";
             root.quick-snippet-target-mode = "New";
             root.quick-snippet-share-target-id = "";
-            root.quick-snippet-target-linux-selected = true;
-            root.quick-snippet-target-debian-selected = false;
-            root.quick-snippet-target-rhel-selected = false;
-            root.quick-snippet-target-macos-selected = false;
-            root.quick-snippet-target-powershell-selected = false;
-            root.quick-snippet-target-cmd-selected = false;
+            root.quick-snippet-group-id = parent-node-id == "snippet-folder:all" ? "" : parent-node-id;
+            root.quick-snippet-group-name = root.snippet-group-name(root.quick-snippet-group-id);
+            root.quick-snippet-target-linux-selected = !root.selected-snippet-target-linux-disabled;
+            root.quick-snippet-target-debian-selected = root.selected-snippet-target-linux-disabled && !root.selected-snippet-target-debian-disabled;
+            root.quick-snippet-target-rhel-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && !root.selected-snippet-target-rhel-disabled;
+            root.quick-snippet-target-alpine-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && !root.selected-snippet-target-alpine-disabled;
+            root.quick-snippet-target-fedora-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && !root.selected-snippet-target-fedora-disabled;
+            root.quick-snippet-target-arch-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && !root.selected-snippet-target-arch-disabled;
+            root.quick-snippet-target-suse-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && !root.selected-snippet-target-suse-disabled;
+            root.quick-snippet-target-freebsd-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && !root.selected-snippet-target-freebsd-disabled;
+            root.quick-snippet-target-macos-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && root.selected-snippet-target-freebsd-disabled && !root.selected-snippet-target-macos-disabled;
+            root.quick-snippet-target-powershell-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && root.selected-snippet-target-freebsd-disabled && root.selected-snippet-target-macos-disabled && !root.selected-snippet-target-powershell-disabled;
+            root.quick-snippet-target-cmd-selected = root.selected-snippet-target-linux-disabled && root.selected-snippet-target-debian-disabled && root.selected-snippet-target-rhel-disabled && root.selected-snippet-target-alpine-disabled && root.selected-snippet-target-fedora-disabled && root.selected-snippet-target-arch-disabled && root.selected-snippet-target-suse-disabled && root.selected-snippet-target-freebsd-disabled && root.selected-snippet-target-macos-disabled && root.selected-snippet-target-powershell-disabled && !root.selected-snippet-target-cmd-disabled;
             root.create-snippet-dialog-open = true;
         }
         open-create-target(parent-node-id) => {
@@ -2056,9 +2417,16 @@ export component AppWindow inherits Window {
             root.quick-snippet-command = "";
             root.quick-snippet-target-mode = "New";
             root.quick-snippet-share-target-id = "";
+            root.quick-snippet-group-id = "";
+            root.quick-snippet-group-name = root.snippets-move-root-label;
             root.quick-snippet-target-linux-selected = true;
             root.quick-snippet-target-debian-selected = false;
             root.quick-snippet-target-rhel-selected = false;
+            root.quick-snippet-target-alpine-selected = false;
+            root.quick-snippet-target-fedora-selected = false;
+            root.quick-snippet-target-arch-selected = false;
+            root.quick-snippet-target-suse-selected = false;
+            root.quick-snippet-target-freebsd-selected = false;
             root.quick-snippet-target-macos-selected = false;
             root.quick-snippet-target-powershell-selected = false;
             root.quick-snippet-target-cmd-selected = false;
@@ -2066,6 +2434,7 @@ export component AppWindow inherits Window {
         }
         open-create-group(parent-node-id) => {
             root.quick-snippet-parent-node-id = parent-node-id;
+            root.quick-snippet-parent-group-name = parent-node-id == "snippet-folder:all" ? root.snippets-move-root-label : root.snippet-group-name(parent-node-id);
             root.quick-snippet-edit-mode = false;
             root.quick-snippet-edit-id = "";
             root.quick-snippet-group-name = "";
@@ -2081,6 +2450,10 @@ export component AppWindow inherits Window {
             }
         }
         share-target-selected(value) => { root.quick-snippet-share-target-id = value; }
+        snippet-group-selected(value, name) => {
+            root.quick-snippet-group-id = value;
+            root.quick-snippet-group-name = name;
+        }
         create-close => {
             root.create-snippet-dialog-open = false;
             root.quick-snippet-edit-mode = false;
@@ -2090,21 +2463,39 @@ export component AppWindow inherits Window {
             root.quick-snippet-command = "";
             root.quick-snippet-target-mode = "New";
             root.quick-snippet-share-target-id = "";
+            root.quick-snippet-group-id = "";
+            root.quick-snippet-group-name = root.snippets-move-root-label;
             root.quick-snippet-target-linux-selected = true;
             root.quick-snippet-target-debian-selected = false;
             root.quick-snippet-target-rhel-selected = false;
+            root.quick-snippet-target-alpine-selected = false;
+            root.quick-snippet-target-fedora-selected = false;
+            root.quick-snippet-target-arch-selected = false;
+            root.quick-snippet-target-suse-selected = false;
+            root.quick-snippet-target-freebsd-selected = false;
             root.quick-snippet-target-macos-selected = false;
             root.quick-snippet-target-powershell-selected = false;
             root.quick-snippet-target-cmd-selected = false;
         }
-        save-snippet(dialog-kind, edit-mode, edit-id, parent-node-id, name, description, command-template, share-target-id) => {
+        save-snippet(dialog-kind, edit-mode, edit-id, parent-node-id, name, description, command-template, share-target-id, group-id) => {
             if dialog-kind == "Target" {
                 if edit-mode {
                     if root.update-snippet-target(edit-id, description, name, command-template) {
                         if root.selected-snippet-id == edit-id {
                             root.selected-snippet-name = name;
-                            root.selected-snippet-scope = description;
+                            root.selected-snippet-description = description;
                             root.selected-snippet-command-template = command-template;
+                            root.selected-snippet-target-linux-selected = root.quick-snippet-target-linux-selected;
+                            root.selected-snippet-target-debian-selected = root.quick-snippet-target-debian-selected;
+                            root.selected-snippet-target-rhel-selected = root.quick-snippet-target-rhel-selected;
+                            root.selected-snippet-target-alpine-selected = root.quick-snippet-target-alpine-selected;
+                            root.selected-snippet-target-fedora-selected = root.quick-snippet-target-fedora-selected;
+                            root.selected-snippet-target-arch-selected = root.quick-snippet-target-arch-selected;
+                            root.selected-snippet-target-suse-selected = root.quick-snippet-target-suse-selected;
+                            root.selected-snippet-target-freebsd-selected = root.quick-snippet-target-freebsd-selected;
+                            root.selected-snippet-target-macos-selected = root.quick-snippet-target-macos-selected;
+                            root.selected-snippet-target-powershell-selected = root.quick-snippet-target-powershell-selected;
+                            root.selected-snippet-target-cmd-selected = root.quick-snippet-target-cmd-selected;
                         }
                         return true;
                     }
@@ -2113,23 +2504,28 @@ export component AppWindow inherits Window {
                 return root.create-snippet-target(edit-id, description, name, command-template, share-target-id);
             }
             if edit-mode {
-                if root.update-snippet(edit-id, name, description, command-template) {
+                if root.update-snippet(edit-id, group-id, name, description, command-template) {
                     if root.selected-snippet-id == edit-id {
                         root.selected-snippet-name = name;
                         root.selected-snippet-description = description;
                         root.selected-snippet-command-template = command-template;
+                        root.selected-snippet-parent-id = group-id == "" ? "snippet-folder:all" : group-id;
                     }
                     return true;
                 }
                 return false;
             }
-            return root.create-snippet(parent-node-id, name, description, command-template);
+            return root.create-snippet(parent-node-id, group-id, name, description, command-template);
         }
         group-name-edited(value) => { root.quick-snippet-group-name = value; }
+        group-parent-selected(value, name) => {
+            root.quick-snippet-parent-node-id = value == "" ? "snippet-folder:all" : value;
+            root.quick-snippet-parent-group-name = name;
+        }
         create-group-close => { root.create-snippet-group-dialog-open = false; }
         save-snippet-group(edit-mode, edit-id, parent-node-id, name) => {
             edit-mode
-                ? root.rename-snippet-group(edit-id, name)
+                ? (root.move-snippet-node(edit-id, "Group", parent-node-id) && root.rename-snippet-group(edit-id, name))
                 : root.create-snippet-group(parent-node-id, name)
         }
     }

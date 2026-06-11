@@ -13,6 +13,7 @@ use super::super::labels::{
     host_list_mode_key, host_list_mode_label, page_key, page_label, theme_label,
     tool_panel_mode_key, tool_panel_mode_label,
 };
+use super::super::network::{network_resource_items, runtime_tunnel_items};
 use super::super::palette::command_palette_results;
 use super::super::settings::settings;
 use super::super::sftp::active_sftp;
@@ -22,8 +23,8 @@ use super::super::tools::{
     known_host_items, snippet_items, snippet_rows, snippet_target_options, tunnel_items,
 };
 use super::types::{
-    AppViewModel, SecurityWorkspaceViewModel, SettingsWorkspaceViewModel,
-    SnippetWorkspaceViewModel, TerminalWorkspaceViewModel,
+    AppViewModel, NetworkWorkspaceViewModel, SecurityWorkspaceViewModel,
+    SettingsWorkspaceViewModel, SnippetWorkspaceViewModel, TerminalWorkspaceViewModel,
 };
 use super::workspace_text::workspace_text;
 
@@ -50,6 +51,8 @@ pub(in crate::app) fn app_view_model(state: &AppState) -> AppViewModel {
     let credential_group_contents = credential_group_contents(state);
     let credential_detail_fields = credential_detail_fields(state);
     let known_hosts = known_host_items(state);
+    let runtime_tunnels = runtime_tunnel_items(state);
+    let network_resources = network_resource_items(state);
 
     AppViewModel {
         host_count: state.storage.host_count().to_string(),
@@ -103,6 +106,10 @@ pub(in crate::app) fn app_view_model(state: &AppState) -> AppViewModel {
             snippets: snippets.clone(),
             rows: snippet_rows.clone(),
             target_options: snippet_target_options.clone(),
+        },
+        network_workspace: NetworkWorkspaceViewModel {
+            runtime_tunnels,
+            resources: network_resources,
         },
         settings_workspace: SettingsWorkspaceViewModel {
             settings: settings.clone(),

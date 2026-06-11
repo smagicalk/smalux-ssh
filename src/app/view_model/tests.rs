@@ -1,11 +1,13 @@
 use super::*;
 use crate::model::{
     AgentSource, AppState, AuthProfile, CredentialGroup, CredentialGroupId, CredentialInspection,
-    CredentialKind, CredentialMetadata, Host, HostId, KeyAlgorithm, KnownHostEntry, LanguageMode,
-    Message, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SecretMaterialKind,
-    SecretRecord, SecretRef, SessionId, Snippet, SnippetGroup, SnippetGroupId,
-    SnippetImplementation, SnippetImplementationId, SnippetScope, SnippetShell,
-    SnippetSupportTarget, SnippetSupportTargetId, TunnelRuntimeState, TunnelStatus,
+    CredentialKind, CredentialMetadata, ForwardAsset, ForwardId, Host, HostId,
+    HostNetworkSelection, JumpChainAsset, JumpChainId, JumpProfile, KeyAlgorithm, KnownHostEntry,
+    LanguageMode, Message, ProxyAsset, ProxyId, ProxyProfile, QuickHostAuthField,
+    QuickHostAuthKind, QuickHostDraftField, SecretMaterialKind, SecretRecord, SecretRef, SessionId,
+    Snippet, SnippetGroup, SnippetGroupId, SnippetImplementation, SnippetImplementationId,
+    SnippetScope, SnippetShell, SnippetSupportTarget, SnippetSupportTargetId, TunnelKind,
+    TunnelRule, TunnelRuntimeState, TunnelStatus,
 };
 use crate::storage::{SqliteStorage, ThemeProfileRecord};
 use uuid::Uuid;
@@ -69,7 +71,8 @@ fn auth_label_covers_password_without_secret_leakage() {
             username: "root".to_owned(),
             secret: SecretRef("password:root".to_owned()),
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -97,7 +100,8 @@ fn app_view_model_filters_new_session_hosts_without_changing_host_list() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -115,7 +119,8 @@ fn app_view_model_filters_new_session_hosts_without_changing_host_list() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -145,7 +150,8 @@ fn app_view_model_keeps_local_terminal_visible_for_local_new_session_search() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -177,7 +183,8 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -227,16 +234,16 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
     restart_snippet.support_targets.push(SnippetSupportTarget {
         id: SnippetSupportTargetId(Uuid::new_v4()),
         snippet_id: restart_snippet.id,
-        target_key: "ubuntu".to_owned(),
-        display_name: "Ubuntu".to_owned(),
+        target_key: "debian-ubuntu".to_owned(),
+        display_name: "Ubuntu legacy label".to_owned(),
         implementation_id: shared_implementation_id,
         sort_order: 1,
     });
     restart_snippet.support_targets.push(SnippetSupportTarget {
         id: SnippetSupportTargetId(Uuid::new_v4()),
         snippet_id: restart_snippet.id,
-        target_key: "debian".to_owned(),
-        display_name: "Debian".to_owned(),
+        target_key: "rhel-centos".to_owned(),
+        display_name: "RHEL legacy label".to_owned(),
         implementation_id: shared_implementation_id,
         sort_order: 2,
     });
@@ -271,11 +278,36 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
                 && row.scope_key == "SupportTargetShared"
                 && row.meta == "shared 2")
     );
+    let shared_target = vm
+        .snippet_workspace
+        .rows
+        .iter()
+        .find(|row| row.node_kind == "SnippetTarget" && row.name == "debian-ubuntu")
+        .expect("片段目标节点应展示标签名");
+    assert_eq!(shared_target.description, "debian-ubuntu;rhel-centos");
+    assert!(shared_target.target_debian_selected);
+    assert!(shared_target.target_rhel_selected);
+    assert!(!shared_target.target_linux_selected);
+    assert!(!shared_target.target_debian_disabled);
+    assert!(!shared_target.target_rhel_disabled);
+    assert!(shared_target.target_linux_disabled);
+    assert_eq!(shared_target.icon_key, "debian");
+    assert_eq!(shared_target.accent_index, 1);
+    let restart_row = vm
+        .snippet_workspace
+        .rows
+        .iter()
+        .find(|row| row.node_kind == "Snippet" && row.name == "restart service")
+        .expect("片段节点应存在");
+    assert!(restart_row.target_linux_disabled);
+    assert!(restart_row.target_debian_disabled);
+    assert!(restart_row.target_rhel_disabled);
+    assert!(!restart_row.target_macos_disabled);
     assert!(
         vm.snippet_workspace
             .target_options
             .iter()
-            .any(|row| row.node_kind == "SnippetTarget" && row.name == "Debian")
+            .any(|row| row.node_kind == "SnippetTarget" && row.name == "rhel-centos")
     );
 
     state
@@ -290,7 +322,7 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
             .snippet_workspace
             .target_options
             .iter()
-            .any(|row| row.node_kind == "SnippetTarget" && row.name == "Debian")
+            .any(|row| row.node_kind == "SnippetTarget" && row.name == "rhel-centos")
     );
     state.ui.workspace.collapsed_snippet_tree_nodes.clear();
 
@@ -921,7 +953,23 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(zh.host_delete_title, "删除主机");
     assert_eq!(zh.tool_keys, "凭据");
     assert_eq!(zh.tool_proxy, "网络");
-    assert_eq!(zh.proxy_empty, "还没有网络配置");
+    assert_eq!(zh.proxy_empty, "代理池、跳板链和端口转发");
+    assert_eq!(zh.proxy_section_route, "代理池");
+    assert_eq!(zh.proxy_section_forward, "端口转发");
+    assert_eq!(zh.proxy_section_host, "跳板链");
+    assert_eq!(
+        zh.proxy_jump_caption,
+        "按顺序进入堡垒机、网关或隔离网段主机。"
+    );
+    assert_eq!(
+        zh.proxy_command_caption,
+        "为不同出口维护多个代理配置，再由主机按需选择。"
+    );
+    assert_eq!(zh.proxy_forward_caption, "本地、远端和动态转发独立管理。");
+    assert_eq!(
+        zh.proxy_host_hint_caption,
+        "跳板只负责 SSH 进入链，代理只负责网络出口。"
+    );
     assert_eq!(zh.security_private_keys, "私钥");
     assert_eq!(zh.security_certificates, "证书");
     assert_eq!(zh.security_passwords, "密码");
@@ -948,7 +996,7 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(zh.snippets_target_key_label, "目标标记");
     assert_eq!(zh.snippets_target_mode_new, "新脚本");
     assert_eq!(zh.snippets_target_mode_share, "共享脚本");
-    assert_eq!(zh.snippets_split_target, "独立编辑");
+    assert_eq!(zh.snippets_split_target, "拆分为独立");
 
     state.ui.workspace.language = LanguageMode::English;
     let en = app_view_model(&state).workspace_text;
@@ -960,7 +1008,29 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(en.host_delete_title, "Delete Host");
     assert_eq!(en.tool_keys, "Credentials");
     assert_eq!(en.tool_proxy, "Network");
-    assert_eq!(en.proxy_empty, "No network profiles");
+    assert_eq!(
+        en.proxy_empty,
+        "Proxy pools, jump chains, and port forwarding"
+    );
+    assert_eq!(en.proxy_section_route, "Proxy Pool");
+    assert_eq!(en.proxy_section_forward, "Port Forwarding");
+    assert_eq!(en.proxy_section_host, "Jump Chain");
+    assert_eq!(
+        en.proxy_jump_caption,
+        "Enter bastions, gateways, or isolated hosts in order."
+    );
+    assert_eq!(
+        en.proxy_command_caption,
+        "Maintain multiple proxy profiles and let hosts pick one when needed."
+    );
+    assert_eq!(
+        en.proxy_forward_caption,
+        "Manage local, remote, and dynamic forwarding separately."
+    );
+    assert_eq!(
+        en.proxy_host_hint_caption,
+        "Jumps are SSH entry hops; proxies are network exits."
+    );
     assert_eq!(en.security_private_keys, "Private keys");
     assert_eq!(en.security_certificates, "Certificates");
     assert_eq!(en.security_passwords, "Passwords");
@@ -987,7 +1057,141 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(en.snippets_target_key_label, "Target key");
     assert_eq!(en.snippets_target_mode_new, "New script");
     assert_eq!(en.snippets_target_mode_share, "Shared script");
-    assert_eq!(en.snippets_split_target, "Make independent");
+    assert_eq!(en.snippets_split_target, "Split independent");
+}
+
+#[test]
+fn app_view_model_projects_network_workspace_items() {
+    let mut state = AppState::default();
+    state.ui.workspace.language = LanguageMode::English;
+    let jump_host_id = HostId(Uuid::new_v4());
+    let route_host_id = HostId(Uuid::new_v4());
+    let session_id = SessionId(Uuid::new_v4());
+    let proxy_id = ProxyId(Uuid::new_v4());
+    let chain_id = JumpChainId(Uuid::new_v4());
+    let forward_id = ForwardId(Uuid::new_v4());
+
+    state.storage.upsert_host(Host {
+        id: jump_host_id,
+        name: "Jump Box".to_owned(),
+        group_id: None,
+        icon_key: "server".to_owned(),
+        tags: vec!["bastion".to_owned()],
+        address: "jump.example.com".to_owned(),
+        port: 22,
+        auth: AuthProfile::Agent {
+            username: "ops".to_owned(),
+            source: AgentSource::Auto,
+            key_hint: None,
+        },
+        network: HostNetworkSelection::default(),
+        proxies: Vec::new(),
+        jumps: Vec::new(),
+        theme_override: None,
+        background_override: None,
+    });
+    state.storage.upsert_host(Host {
+        id: route_host_id,
+        name: "Prod API".to_owned(),
+        group_id: None,
+        icon_key: "cloud".to_owned(),
+        tags: vec!["prod".to_owned(), "api".to_owned()],
+        address: "prod.example.com".to_owned(),
+        port: 22,
+        auth: AuthProfile::Agent {
+            username: "deploy".to_owned(),
+            source: AgentSource::Auto,
+            key_hint: None,
+        },
+        network: HostNetworkSelection {
+            proxy_ids: vec![proxy_id],
+            jump_chain_ids: vec![chain_id],
+            forward_ids: vec![forward_id],
+        },
+        proxies: vec![ProxyProfile::Socks5 {
+            host: "127.0.0.1".to_owned(),
+            port: 1080,
+        }],
+        jumps: vec![JumpProfile {
+            host_id: jump_host_id,
+        }],
+        theme_override: None,
+        background_override: None,
+    });
+    state.storage.upsert_proxy_asset(ProxyAsset {
+        id: proxy_id,
+        name: "Office Proxy".to_owned(),
+        tags: vec!["shared".to_owned()],
+        profile: ProxyProfile::Http {
+            host: "proxy.example.com".to_owned(),
+            port: 8080,
+        },
+    });
+    state.storage.upsert_jump_chain_asset(JumpChainAsset {
+        id: chain_id,
+        name: "Prod Chain".to_owned(),
+        steps: vec![JumpProfile {
+            host_id: jump_host_id,
+        }],
+    });
+    state.storage.upsert_forward_asset(ForwardAsset {
+        id: forward_id,
+        name: "DB Forward".to_owned(),
+        tags: vec!["db".to_owned()],
+        rule: TunnelRule {
+            name: "db".to_owned(),
+            kind: TunnelKind::Local,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 15432,
+            target_host: "10.0.0.10".to_owned(),
+            target_port: 5432,
+            auto_start: false,
+        },
+    });
+    state.sessions.start_tunnel(
+        session_id,
+        &crate::model::TunnelRule {
+            name: "runtime".to_owned(),
+            kind: crate::model::TunnelKind::Dynamic,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 1080,
+            target_host: String::new(),
+            target_port: 0,
+            auto_start: false,
+        },
+        Some(route_host_id),
+        1,
+    );
+    state.sessions.mark_tunnel_running(session_id, "runtime");
+
+    let vm = app_view_model(&state);
+
+    assert_eq!(vm.network_workspace.runtime_tunnels.len(), 1);
+    assert_eq!(vm.network_workspace.runtime_tunnels[0].title, "runtime");
+    assert_eq!(vm.network_workspace.resources.len(), 3);
+    assert!(
+        vm.network_workspace
+            .resources
+            .iter()
+            .any(|item| { item.kind_key == "ProxyAsset" && item.title == "Office Proxy" })
+    );
+    assert!(
+        vm.network_workspace
+            .resources
+            .iter()
+            .any(|item| { item.kind_key == "JumpChainAsset" && item.title == "Prod Chain" })
+    );
+    assert!(
+        vm.network_workspace
+            .resources
+            .iter()
+            .any(|item| { item.kind_key == "ForwardAsset" && item.title == "DB Forward" })
+    );
+    assert!(vm.network_workspace.runtime_tunnels.iter().any(|item| {
+        item.kind_key == "TunnelRuntime"
+            && item.primary_action_key == "stop"
+            && item.primary_action_enabled
+    }));
 }
 
 #[test]
@@ -1015,7 +1219,8 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -1309,7 +1514,8 @@ fn app_view_model_projects_pending_remove_host_dialog() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -1356,7 +1562,8 @@ fn app_view_model_localizes_connected_status_but_keeps_status_key_stable() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -1390,7 +1597,8 @@ fn app_view_model_keeps_sftp_panel_on_active_host_without_browser() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -1408,7 +1616,8 @@ fn app_view_model_keeps_sftp_panel_on_active_host_without_browser() {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        network: Default::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,

@@ -11,6 +11,18 @@ pub struct HostId(pub Uuid);
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct GroupId(pub Uuid);
 
+/// 代理资产唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ProxyId(pub Uuid);
+
+/// 跳板链唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct JumpChainId(pub Uuid);
+
+/// 端口转发资产唯一标识。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct ForwardId(pub Uuid);
+
 /// 密钥分组唯一标识。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CredentialGroupId(pub Uuid);

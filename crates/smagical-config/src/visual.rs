@@ -43,7 +43,7 @@ mod tests {
                 username: "ops".to_owned(),
                 secret: SecretRef("password:ops".to_owned()),
             },
-            proxy: None,
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override,
             background_override,

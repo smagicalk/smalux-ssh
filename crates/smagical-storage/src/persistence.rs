@@ -144,8 +144,8 @@ pub enum StoragePersistenceError {
 mod tests {
     use super::*;
     use smagical_core::{
-        AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId, ImageSource,
-        RecentConnection, TunnelKind, TunnelRule,
+        AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId,
+        HostNetworkSelection, ImageSource, RecentConnection, TunnelKind, TunnelRule,
     };
     use uuid::Uuid;
 
@@ -167,7 +167,8 @@ mod tests {
                 source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             },
-            proxy: None,
+            network: HostNetworkSelection::default(),
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override: None,
             background_override: None,

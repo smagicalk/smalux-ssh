@@ -10,10 +10,13 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-use crate::model::{AppState, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup};
+use crate::model::{
+    AppState, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, ProxyProfile,
+    TunnelKind, TunnelRule,
+};
 
-use super::common::{group_label, tags_label};
-use super::i18n::{locale_for_state, tr};
+use super::common::{group_label, host_name, tags_label};
+use super::i18n::{Locale, locale_for_state, tr};
 use super::labels::auth_label;
 use filter::host_matches_query;
 use status::{host_status_key, host_status_label};
@@ -23,7 +26,8 @@ type TreeGuides = [bool; TREE_GUIDE_LEVELS];
 
 pub(in crate::app) use types::{
     CreateChoiceText, CreateGroupDialogViewModel, CreateHostDialogText, CredentialOptionViewModel,
-    GroupOptionViewModel, HostTreeViewModel, HostViewModel, QuickHostViewModel,
+    GroupOptionViewModel, HostTreeViewModel, HostViewModel, NetworkResourceOptionViewModel,
+    QuickHostViewModel,
 };
 
 fn accent_index_for_stable_key(key: &str) -> i32 {
@@ -417,6 +421,9 @@ pub(super) fn quick_host(state: &AppState) -> QuickHostViewModel {
             CredentialKind::Certificate,
             &draft.auth.certificate_ref,
         ),
+        network_proxy_options: network_proxy_options(state),
+        network_jump_chain_options: network_jump_chain_options(state),
+        network_forward_options: network_forward_options(state),
         name: draft.name.clone(),
         address: draft.address.clone(),
         port: draft.port.clone(),
@@ -479,6 +486,117 @@ fn key_algorithm_label(algorithm: &crate::model::KeyAlgorithm) -> String {
         crate::model::KeyAlgorithm::Rsa => "rsa".to_owned(),
         crate::model::KeyAlgorithm::Ecdsa => "ecdsa".to_owned(),
         crate::model::KeyAlgorithm::Unknown(name) => name.clone(),
+    }
+}
+
+fn network_proxy_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel> {
+    let locale = locale_for_state(state);
+    let selected_ids = &state.ui.quick_host.network.proxy_ids;
+    let mut rows = state
+        .storage
+        .proxy_assets
+        .iter()
+        .map(|asset| NetworkResourceOptionViewModel {
+            value: asset.id.0.to_string(),
+            label: asset.name.clone(),
+            detail: proxy_profile_label(&asset.profile),
+            kind_key: "ProxyAsset",
+            kind_label: tr(locale, "host.network_proxy_label").to_owned(),
+            icon_key: "globe",
+            accent_index: 1,
+            selected: selected_ids.contains(&asset.id),
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.label.cmp(&right.label));
+    rows
+}
+
+fn network_jump_chain_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel> {
+    let locale = locale_for_state(state);
+    let selected_ids = &state.ui.quick_host.network.jump_chain_ids;
+    let mut rows = state
+        .storage
+        .jump_chain_assets
+        .iter()
+        .map(|asset| {
+            let path = asset
+                .steps
+                .iter()
+                .map(|step| host_name(state, step.host_id))
+                .collect::<Vec<_>>();
+            NetworkResourceOptionViewModel {
+                value: asset.id.0.to_string(),
+                label: asset.name.clone(),
+                detail: if path.is_empty() {
+                    tr(locale, "tool.empty_value").to_owned()
+                } else {
+                    path.join(" -> ")
+                },
+                kind_key: "JumpChainAsset",
+                kind_label: tr(locale, "host.network_jump_label").to_owned(),
+                icon_key: "router",
+                accent_index: 2,
+                selected: selected_ids.contains(&asset.id),
+            }
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.label.cmp(&right.label));
+    rows
+}
+
+fn network_forward_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel> {
+    let locale = locale_for_state(state);
+    let selected_ids = &state.ui.quick_host.network.forward_ids;
+    let mut rows = state
+        .storage
+        .forward_assets
+        .iter()
+        .map(|asset| NetworkResourceOptionViewModel {
+            value: asset.id.0.to_string(),
+            label: asset.name.clone(),
+            detail: forward_rule_label(&asset.rule, locale),
+            kind_key: "ForwardAsset",
+            kind_label: tr(locale, "host.network_forward_label").to_owned(),
+            icon_key: "router",
+            accent_index: 3,
+            selected: selected_ids.contains(&asset.id),
+        })
+        .collect::<Vec<_>>();
+    rows.sort_by(|left, right| left.label.cmp(&right.label));
+    rows
+}
+
+fn proxy_profile_label(profile: &ProxyProfile) -> String {
+    match profile {
+        ProxyProfile::Socks5 { host, port } => format!("SOCKS5 {host}:{port}"),
+        ProxyProfile::Http { host, port } => format!("HTTP {host}:{port}"),
+    }
+}
+
+fn forward_rule_label(rule: &TunnelRule, locale: Locale) -> String {
+    match rule.kind {
+        TunnelKind::Local => format!(
+            "{} {}:{} -> {}:{}",
+            tr(locale, "host.network_forward_local"),
+            rule.bind_host,
+            rule.bind_port,
+            rule.target_host,
+            rule.target_port
+        ),
+        TunnelKind::Remote => format!(
+            "{} {}:{} -> {}:{}",
+            tr(locale, "host.network_forward_remote"),
+            rule.bind_host,
+            rule.bind_port,
+            rule.target_host,
+            rule.target_port
+        ),
+        TunnelKind::Dynamic => format!(
+            "{} {}:{}",
+            tr(locale, "host.network_forward_dynamic"),
+            rule.bind_host,
+            rule.bind_port
+        ),
     }
 }
 
@@ -648,6 +766,12 @@ pub(super) fn create_host_dialog_text(state: &AppState) -> CreateHostDialogText 
         credential_secret_placeholder: tr(locale, "host.credential_secret_placeholder"),
         credential_algorithm_label: tr(locale, "host.credential_algorithm_label"),
         credential_save_label: tr(locale, "host.credential_save"),
+        network_title: tr(locale, "host.network_title"),
+        network_caption: tr(locale, "host.network_caption"),
+        network_proxy_label: tr(locale, "host.network_proxy_label"),
+        network_jump_label: tr(locale, "host.network_jump_label"),
+        network_forward_label: tr(locale, "host.network_forward_label"),
+        network_empty_label: tr(locale, "host.network_empty_label"),
         icon_title: tr(locale, "host.icon_title"),
         icon_server_label: tr(locale, "host.icon_server"),
         icon_database_label: tr(locale, "host.icon_database"),

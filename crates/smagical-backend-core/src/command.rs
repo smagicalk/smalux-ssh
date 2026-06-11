@@ -178,7 +178,7 @@ mod tests {
                 source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             },
-            proxy: None,
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override: None,
             background_override: None,

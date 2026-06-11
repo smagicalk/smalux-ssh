@@ -28,18 +28,36 @@ export component SnippetDialogFlow inherits Rectangle {
     in property <string> quick-dialog-kind;
     in property <string> quick-edit-id;
     in property <string> quick-parent-node-id;
+    in property <string> quick-parent-group-name;
     in property <string> quick-name;
     in property <string> quick-description;
     in property <string> quick-command;
     in property <string> quick-target-mode;
     in property <string> quick-share-target-id;
+    in property <string> quick-group-id;
     in property <string> quick-group-name;
     in-out property <bool> quick-target-linux-selected;
     in-out property <bool> quick-target-debian-selected;
     in-out property <bool> quick-target-rhel-selected;
+    in-out property <bool> quick-target-alpine-selected;
+    in-out property <bool> quick-target-fedora-selected;
+    in-out property <bool> quick-target-arch-selected;
+    in-out property <bool> quick-target-suse-selected;
+    in-out property <bool> quick-target-freebsd-selected;
     in-out property <bool> quick-target-macos-selected;
     in-out property <bool> quick-target-powershell-selected;
     in-out property <bool> quick-target-cmd-selected;
+    in property <bool> target-linux-disabled;
+    in property <bool> target-debian-disabled;
+    in property <bool> target-rhel-disabled;
+    in property <bool> target-alpine-disabled;
+    in property <bool> target-fedora-disabled;
+    in property <bool> target-arch-disabled;
+    in property <bool> target-suse-disabled;
+    in property <bool> target-freebsd-disabled;
+    in property <bool> target-macos-disabled;
+    in property <bool> target-powershell-disabled;
+    in property <bool> target-cmd-disabled;
     in property <string> delete-title-label;
     in property <string> delete-snippet-caption-label;
     in property <string> delete-group-caption-label;
@@ -74,6 +92,11 @@ export component SnippetDialogFlow inherits Rectangle {
     in property <string> target-linux-label;
     in property <string> target-debian-label;
     in property <string> target-rhel-label;
+    in property <string> target-alpine-label;
+    in property <string> target-fedora-label;
+    in property <string> target-arch-label;
+    in property <string> target-suse-label;
+    in property <string> target-freebsd-label;
     in property <string> target-macos-label;
     in property <string> target-powershell-label;
     in property <string> target-cmd-label;
@@ -86,6 +109,10 @@ export component SnippetDialogFlow inherits Rectangle {
     in property <string> new-group-label;
     in property <string> new-group-caption-label;
     in property <string> shared-target-label;
+    in property <string> group-label;
+    in property <string> root-group-label;
+    in property <string> choose-group-label;
+    in property <string> confirm-group-label;
     in property <string> create-label;
     in property <string> save-label;
 
@@ -107,9 +134,11 @@ export component SnippetDialogFlow inherits Rectangle {
     callback command-edited(value: string);
     callback target-mode-selected(value: string);
     callback share-target-selected(value: string);
+    callback snippet-group-selected(value: string, name: string);
     callback create-close();
-    callback save-snippet(dialog-kind: string, edit-mode: bool, edit-id: string, parent-node-id: string, name: string, description: string, command-template: string, share-target-id: string) -> bool;
+    callback save-snippet(dialog-kind: string, edit-mode: bool, edit-id: string, parent-node-id: string, name: string, description: string, command-template: string, share-target-id: string, group-id: string) -> bool;
     callback group-name-edited(value: string);
+    callback group-parent-selected(value: string, name: string);
     callback create-group-close();
     callback save-snippet-group(edit-mode: bool, edit-id: string, parent-node-id: string, name: string) -> bool;
 
@@ -179,7 +208,7 @@ export component SnippetDialogFlow inherits Rectangle {
         move-label: root.move-label;
         groups: root.snippet-rows;
         selected-group-id: root.move-target-group-id;
-        select-group(group-id) => { root.select-move-group(group-id); }
+        select-group(group-id, name) => { root.select-move-group(group-id); }
         close => { root.move-close(); }
         move => { root.move-snippet(root.selected-snippet-id, root.selected-node-kind, root.move-target-group-id) }
     }
@@ -221,6 +250,11 @@ export component SnippetDialogFlow inherits Rectangle {
         target-linux-label: root.target-linux-label;
         target-debian-label: root.target-debian-label;
         target-rhel-label: root.target-rhel-label;
+        target-alpine-label: root.target-alpine-label;
+        target-fedora-label: root.target-fedora-label;
+        target-arch-label: root.target-arch-label;
+        target-suse-label: root.target-suse-label;
+        target-freebsd-label: root.target-freebsd-label;
         target-macos-label: root.target-macos-label;
         target-powershell-label: root.target-powershell-label;
         target-cmd-label: root.target-cmd-label;
@@ -231,6 +265,10 @@ export component SnippetDialogFlow inherits Rectangle {
         target-mode-share-label: root.target-mode-share-label;
         target-mode-share-caption-label: root.target-mode-share-caption-label;
         shared-target-label: root.shared-target-label;
+        group-label: root.group-label;
+        root-group-label: root.root-group-label;
+        choose-group-label: root.choose-group-label;
+        confirm-group-label: root.confirm-group-label;
         cancel-label: root.cancel-label;
         create-label: root.create-action-label;
         target-picker-save-label: root.save-label;
@@ -240,21 +278,41 @@ export component SnippetDialogFlow inherits Rectangle {
         target-mode: root.quick-target-mode;
         share-target-id: root.quick-share-target-id;
         snippet-row-id: root.quick-edit-id;
+        group-id: root.quick-group-id;
+        group-name: root.quick-group-name;
         snippet-rows: root.snippet-target-options;
+        group-rows: root.snippet-rows;
         target-linux-selected <=> root.quick-target-linux-selected;
         target-debian-selected <=> root.quick-target-debian-selected;
         target-rhel-selected <=> root.quick-target-rhel-selected;
+        target-alpine-selected <=> root.quick-target-alpine-selected;
+        target-fedora-selected <=> root.quick-target-fedora-selected;
+        target-arch-selected <=> root.quick-target-arch-selected;
+        target-suse-selected <=> root.quick-target-suse-selected;
+        target-freebsd-selected <=> root.quick-target-freebsd-selected;
         target-macos-selected <=> root.quick-target-macos-selected;
         target-powershell-selected <=> root.quick-target-powershell-selected;
         target-cmd-selected <=> root.quick-target-cmd-selected;
+        target-linux-disabled: root.target-linux-disabled;
+        target-debian-disabled: root.target-debian-disabled;
+        target-rhel-disabled: root.target-rhel-disabled;
+        target-alpine-disabled: root.target-alpine-disabled;
+        target-fedora-disabled: root.target-fedora-disabled;
+        target-arch-disabled: root.target-arch-disabled;
+        target-suse-disabled: root.target-suse-disabled;
+        target-freebsd-disabled: root.target-freebsd-disabled;
+        target-macos-disabled: root.target-macos-disabled;
+        target-powershell-disabled: root.target-powershell-disabled;
+        target-cmd-disabled: root.target-cmd-disabled;
         name-edited(value) => { root.name-edited(value); }
         description-edited(value) => { root.description-edited(value); }
         command-edited(value) => { root.command-edited(value); }
         target-mode-selected(value) => { root.target-mode-selected(value); }
         share-target-selected(value) => { root.share-target-selected(value); }
+        group-selected(value, name) => { root.snippet-group-selected(value, name); }
         close => { root.create-close(); }
-        create(name, description, command-template, share-target-id) => {
-            root.save-snippet(root.quick-dialog-kind, root.quick-edit-mode, root.quick-edit-id, root.quick-parent-node-id, name, description, command-template, share-target-id)
+        create(name, description, command-template, share-target-id, group-id) => {
+            root.save-snippet(root.quick-dialog-kind, root.quick-edit-mode, root.quick-edit-id, root.quick-parent-node-id, name, description, command-template, share-target-id, group-id)
         }
     }
 
@@ -266,11 +324,21 @@ export component SnippetDialogFlow inherits Rectangle {
         title-label: root.quick-edit-mode ? root.edit-group-title-label : root.create-group-title-label;
         name-label: root.name-label;
         name-placeholder: root.group-name-placeholder-label;
+        group-label: root.group-label;
+        root-group-label: root.root-group-label;
+        choose-group-label: root.choose-group-label;
+        confirm-group-label: root.confirm-group-label;
+        group-rows: root.snippet-rows;
+        group-id: root.quick-parent-node-id;
+        group-name: root.quick-parent-group-name;
         cancel-label: root.cancel-label;
         create-label: root.create-action-label;
         draft-name: root.quick-group-name;
         name-edited(value) => { root.group-name-edited(value); }
+        group-selected(value, name) => {
+            root.group-parent-selected(value, name);
+        }
         close => { root.create-group-close(); }
-        create(name) => { root.save-snippet-group(root.quick-edit-mode, root.quick-edit-id, root.quick-parent-node-id, name) }
+        create(parent-node-id, name) => { root.save-snippet-group(root.quick-edit-mode, root.quick-edit-id, parent-node-id, name) }
     }
 }

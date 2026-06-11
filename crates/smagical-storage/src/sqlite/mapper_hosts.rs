@@ -3,10 +3,12 @@ use std::collections::HashMap;
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, QueryOrder};
 
 use smagical_core::{
-    AuthProfile, GroupId, Host, HostGroup, HostId, JumpProfile, ProxyProfile, SecretRef,
+    AuthProfile, ForwardId, GroupId, Host, HostGroup, HostId, HostNetworkSelection, JumpChainId,
+    JumpProfile, ProxyId, ProxyProfile, SecretRef,
 };
 
 use super::mapper_common::*;
+use super::mapper_network::{proxy_parts_to_profile, proxy_profile_to_parts};
 use super::{current_unix_secs, entity};
 use crate::StoragePersistenceError;
 
@@ -64,12 +66,17 @@ pub(super) async fn load_hosts(
         .into_iter()
         .map(|model| (model.host_id.clone(), model))
         .collect();
-    let proxy_by_host: HashMap<_, _> = entity::host_proxy::Entity::find()
+    let mut proxies_by_host: HashMap<String, Vec<entity::host_proxy::Model>> = HashMap::new();
+    for model in entity::host_proxy::Entity::find()
+        .order_by_asc(entity::host_proxy::Column::SortOrder)
         .all(db)
         .await?
-        .into_iter()
-        .map(|model| (model.host_id.clone(), model))
-        .collect();
+    {
+        proxies_by_host
+            .entry(model.host_id.clone())
+            .or_default()
+            .push(model);
+    }
     let mut tags_by_host: HashMap<String, Vec<entity::host_tag::Model>> = HashMap::new();
     for model in entity::host_tag::Entity::find()
         .order_by_asc(entity::host_tag::Column::SortOrder)
@@ -92,6 +99,44 @@ pub(super) async fn load_hosts(
             .or_default()
             .push(model);
     }
+    let mut network_proxies_by_host: HashMap<String, Vec<entity::host_network_proxy::Model>> =
+        HashMap::new();
+    for model in entity::host_network_proxy::Entity::find()
+        .order_by_asc(entity::host_network_proxy::Column::SortOrder)
+        .all(db)
+        .await?
+    {
+        network_proxies_by_host
+            .entry(model.host_id.clone())
+            .or_default()
+            .push(model);
+    }
+    let mut network_jump_chains_by_host: HashMap<
+        String,
+        Vec<entity::host_network_jump_chain::Model>,
+    > = HashMap::new();
+    for model in entity::host_network_jump_chain::Entity::find()
+        .order_by_asc(entity::host_network_jump_chain::Column::SortOrder)
+        .all(db)
+        .await?
+    {
+        network_jump_chains_by_host
+            .entry(model.host_id.clone())
+            .or_default()
+            .push(model);
+    }
+    let mut network_forwards_by_host: HashMap<String, Vec<entity::host_network_forward::Model>> =
+        HashMap::new();
+    for model in entity::host_network_forward::Entity::find()
+        .order_by_asc(entity::host_network_forward::Column::SortOrder)
+        .all(db)
+        .await?
+    {
+        network_forwards_by_host
+            .entry(model.host_id.clone())
+            .or_default()
+            .push(model);
+    }
 
     let mut hosts = Vec::new();
     for model in entity::host::Entity::find()
@@ -104,10 +149,12 @@ pub(super) async fn load_hosts(
             .map(auth_from_model)
             .transpose()?
             .unwrap_or_else(default_auth);
-        let proxy = proxy_by_host
-            .get(&model.id)
-            .map(proxy_from_model)
-            .transpose()?;
+        let proxies = proxies_by_host
+            .remove(&model.id)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|proxy| proxy_from_model(&proxy))
+            .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
         let tags = tags_by_host
             .remove(&model.id)
             .unwrap_or_default()
@@ -124,6 +171,26 @@ pub(super) async fn load_hosts(
                 })
             })
             .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
+        let network = HostNetworkSelection {
+            proxy_ids: network_proxies_by_host
+                .remove(&model.id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|row| Ok(ProxyId(parse_uuid(&row.proxy_id)?)))
+                .collect::<Result<Vec<_>, StoragePersistenceError>>()?,
+            jump_chain_ids: network_jump_chains_by_host
+                .remove(&model.id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|row| Ok(JumpChainId(parse_uuid(&row.chain_id)?)))
+                .collect::<Result<Vec<_>, StoragePersistenceError>>()?,
+            forward_ids: network_forwards_by_host
+                .remove(&model.id)
+                .unwrap_or_default()
+                .into_iter()
+                .map(|row| Ok(ForwardId(parse_uuid(&row.forward_id)?)))
+                .collect::<Result<Vec<_>, StoragePersistenceError>>()?,
+        };
 
         hosts.push(Host {
             id: HostId(parse_uuid(&model.id)?),
@@ -139,7 +206,8 @@ pub(super) async fn load_hosts(
             address: model.address,
             port: to_u16(model.port)?,
             auth,
-            proxy,
+            network,
+            proxies,
             jumps,
             theme_override: decode_optional_toml(model.theme_override_toml.as_deref())?,
             background_override: decode_optional_toml(model.background_override_toml.as_deref())?,
@@ -173,7 +241,7 @@ pub(super) async fn save_hosts(
         .await?;
 
         save_host_auth(db, &host_id, &host.auth, now).await?;
-        save_host_proxy(db, &host_id, host.proxy.as_ref()).await?;
+        save_host_proxies(db, &host_id, &host.proxies).await?;
 
         for (tag_index, tag) in host.tags.iter().enumerate() {
             // tag id 使用 host_id + 顺序，整体替换保存时足够稳定。
@@ -199,6 +267,59 @@ pub(super) async fn save_hosts(
             .await?;
         }
     }
+    Ok(())
+}
+
+pub(super) async fn save_host_network_selections(
+    db: &DatabaseConnection,
+    hosts: &[Host],
+) -> Result<(), StoragePersistenceError> {
+    for host in hosts {
+        save_host_network_selection(db, &host.id.0.to_string(), &host.network).await?;
+    }
+    Ok(())
+}
+
+async fn save_host_network_selection(
+    db: &DatabaseConnection,
+    host_id: &str,
+    network: &HostNetworkSelection,
+) -> Result<(), StoragePersistenceError> {
+    for (index, proxy_id) in network.proxy_ids.iter().enumerate() {
+        entity::host_network_proxy::Entity::insert(entity::host_network_proxy::ActiveModel {
+            id: Set(format!("{host_id}:network-proxy:{index}")),
+            host_id: Set(host_id.to_owned()),
+            proxy_id: Set(proxy_id.0.to_string()),
+            sort_order: Set(index as i32),
+        })
+        .exec(db)
+        .await?;
+    }
+
+    for (index, chain_id) in network.jump_chain_ids.iter().enumerate() {
+        entity::host_network_jump_chain::Entity::insert(
+            entity::host_network_jump_chain::ActiveModel {
+                id: Set(format!("{host_id}:network-jump-chain:{index}")),
+                host_id: Set(host_id.to_owned()),
+                chain_id: Set(chain_id.0.to_string()),
+                sort_order: Set(index as i32),
+            },
+        )
+        .exec(db)
+        .await?;
+    }
+
+    for (index, forward_id) in network.forward_ids.iter().enumerate() {
+        entity::host_network_forward::Entity::insert(entity::host_network_forward::ActiveModel {
+            id: Set(format!("{host_id}:network-forward:{index}")),
+            host_id: Set(host_id.to_owned()),
+            forward_id: Set(forward_id.0.to_string()),
+            sort_order: Set(index as i32),
+        })
+        .exec(db)
+        .await?;
+    }
+
     Ok(())
 }
 
@@ -284,27 +405,24 @@ async fn save_host_auth(
     Ok(())
 }
 
-async fn save_host_proxy(
+async fn save_host_proxies(
     db: &DatabaseConnection,
     host_id: &str,
-    proxy: Option<&ProxyProfile>,
+    proxies: &[ProxyProfile],
 ) -> Result<(), StoragePersistenceError> {
-    let Some(proxy) = proxy else {
-        // 没有代理时不写 host_proxy 行，加载时自然得到 None。
-        return Ok(());
-    };
-    let (proxy_kind, proxy_host, proxy_port) = match proxy {
-        ProxyProfile::Socks5 { host, port } => ("socks5", host, *port),
-        ProxyProfile::Http { host, port } => ("http", host, *port),
-    };
-    entity::host_proxy::Entity::insert(entity::host_proxy::ActiveModel {
-        host_id: Set(host_id.to_owned()),
-        proxy_kind: Set(proxy_kind.to_owned()),
-        proxy_host: Set(proxy_host.clone()),
-        proxy_port: Set(proxy_port as i32),
-    })
-    .exec(db)
-    .await?;
+    for (proxy_index, proxy) in proxies.iter().enumerate() {
+        let (proxy_kind, proxy_host, proxy_port) = proxy_profile_to_parts(proxy);
+        entity::host_proxy::Entity::insert(entity::host_proxy::ActiveModel {
+            id: Set(format!("{host_id}:proxy:{proxy_index}")),
+            host_id: Set(host_id.to_owned()),
+            sort_order: Set(proxy_index as i32),
+            proxy_kind: Set(proxy_kind.to_owned()),
+            proxy_host: Set(proxy_host),
+            proxy_port: Set(proxy_port as i32),
+        })
+        .exec(db)
+        .await?;
+    }
     Ok(())
 }
 
@@ -356,15 +474,5 @@ fn auth_from_model(
 fn proxy_from_model(
     model: &entity::host_proxy::Model,
 ) -> Result<ProxyProfile, StoragePersistenceError> {
-    let port = to_u16(model.proxy_port)?;
-    Ok(match model.proxy_kind.as_str() {
-        "http" => ProxyProfile::Http {
-            host: model.proxy_host.clone(),
-            port,
-        },
-        _ => ProxyProfile::Socks5 {
-            host: model.proxy_host.clone(),
-            port,
-        },
-    })
+    proxy_parts_to_profile(&model.proxy_kind, &model.proxy_host, model.proxy_port)
 }

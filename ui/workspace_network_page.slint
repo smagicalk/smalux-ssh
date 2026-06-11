@@ -1,0 +1,974 @@
+import { ScrollView } from "std-widgets.slint";
+import { NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkStatRow } from "./models.slint";
+import { AppTheme } from "./theme.slint";
+import { CompactButton, ConfirmDialog, DialogAuthOption, DialogButton, DialogCloseButton, DialogField } from "./common.slint";
+import { HostIcon } from "./hosts.slint";
+import { CredentialDetailField } from "./security_credential_detail_parts.slint";
+import { SnippetStatCard } from "./snippet_detail_parts.slint";
+
+component NetworkNavSectionHeader inherits Rectangle {
+    in property <string> label;
+
+    height: 24px;
+    background: AppTheme.transparent;
+
+    Text {
+        y: 0px;
+        width: parent.width;
+        height: parent.height;
+        text: root.label;
+        color: AppTheme.section-text;
+        font-size: 10px;
+        font-weight: 700;
+        vertical-alignment: center;
+    }
+}
+
+component NetworkNavItem inherits Rectangle {
+    in property <NetworkItemRow> item;
+    in property <string> selected-id;
+    callback selected(item: NetworkItemRow);
+    callback stop-tunnel(session-id: string, rule-name: string);
+
+    property <bool> active: root.item.id == root.selected-id;
+
+    height: 50px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.active ? AppTheme.border-strong : AppTheme.border-soft;
+    background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
+
+    touch := TouchArea {
+        clicked => {
+            root.selected(root.item);
+        }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+
+        Rectangle {
+            width: 3px;
+            height: parent.height;
+
+            Rectangle {
+                y: (parent.height - self.height) / 2;
+                width: 3px;
+                height: 22px;
+                border-radius: 2px;
+                background: root.active ? AppTheme.accent : AppTheme.border-strong;
+            }
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.item.title;
+                color: AppTheme.text-strong;
+                font-size: 12px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.item.subtitle;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+
+        if root.item.primary_action_key == "stop": CompactButton {
+            width: 44px;
+            label: root.item.primary_action_label;
+            enabled: root.item.primary_action_enabled;
+            tone: "danger";
+            compact: true;
+            clicked => {
+                root.stop-tunnel(root.item.session_id, root.item.title);
+            }
+        }
+    }
+}
+
+component NetworkRelatedItem inherits Rectangle {
+    in property <NetworkRelatedItemRow> item;
+
+    height: 46px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.surface-bg;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 8px;
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+            Text {
+                text: root.item.title;
+                color: AppTheme.text-strong;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.item.subtitle;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+        Text {
+            text: root.item.meta;
+            color: AppTheme.text-soft;
+            font-size: 10px;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+component NetworkProxyDialog inherits Rectangle {
+    in-out property <string> asset-id;
+    in-out property <string> name;
+    in-out property <string> proxy-kind;
+    in-out property <string> host;
+    in-out property <string> port;
+    in-out property <string> tags;
+    in property <string> title-label;
+    in property <string> socks5-label;
+    in property <string> http-label;
+    in property <string> name-label;
+    in property <string> name-placeholder;
+    in property <string> address-label;
+    in property <string> port-label;
+    in property <string> tags-label;
+    in property <string> tags-placeholder;
+    in property <string> save-label;
+    in property <string> cancel-label;
+    callback save(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 520px);
+        height: 454px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding-left: 18px;
+            padding-right: 18px;
+            padding-top: 16px;
+            padding-bottom: 18px;
+            spacing: 10px;
+
+            HorizontalLayout {
+                height: 28px;
+                spacing: 10px;
+                Text {
+                    text: root.title-label;
+                    color: AppTheme.text-strong;
+                    font-size: 16px;
+                    font-weight: 700;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+                DialogCloseButton { clicked => { root.close(); } }
+            }
+
+            HorizontalLayout {
+                height: 44px;
+                spacing: 8px;
+                DialogAuthOption {
+                    horizontal-stretch: 1;
+                    label: root.socks5-label;
+                    caption: "";
+                    active: root.proxy-kind != "Http";
+                    clicked => { root.proxy-kind = "Socks5"; }
+                }
+                DialogAuthOption {
+                    horizontal-stretch: 1;
+                    label: root.http-label;
+                    caption: "";
+                    active: root.proxy-kind == "Http";
+                    clicked => { root.proxy-kind = "Http"; }
+                }
+            }
+
+            DialogField {
+                label: root.name-label;
+                placeholder: root.name-placeholder;
+                field-value: root.name;
+                edited(value) => { root.name = value; }
+                accepted(value) => { root.name = value; }
+            }
+            DialogField {
+                label: root.address-label;
+                placeholder: root.address-label;
+                field-value: root.host;
+                edited(value) => { root.host = value; }
+                accepted(value) => { root.host = value; }
+            }
+            DialogField {
+                label: root.port-label;
+                placeholder: root.port-label;
+                field-value: root.port;
+                edited(value) => { root.port = value; }
+                accepted(value) => { root.port = value; }
+            }
+            DialogField {
+                label: root.tags-label;
+                placeholder: root.tags-placeholder;
+                field-value: root.tags;
+                edited(value) => { root.tags = value; }
+                accepted(value) => { root.tags = value; }
+            }
+
+            Rectangle { vertical-stretch: 1; }
+
+            HorizontalLayout {
+                height: 34px;
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton { label: root.cancel-label; primary: false; clicked => { root.close(); } }
+                DialogButton {
+                    label: root.save-label;
+                    primary: true;
+                    clicked => {
+                        if root.save(root.asset-id, root.name, root.proxy-kind, root.host, root.port, root.tags) {
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component NetworkJumpDialog inherits Rectangle {
+    in-out property <string> asset-id;
+    in-out property <string> name;
+    in-out property <string> host-ids;
+    in property <string> title-label;
+    in property <string> name-label;
+    in property <string> name-placeholder;
+    in property <string> host-ids-label;
+    in property <string> host-ids-placeholder;
+    in property <string> save-label;
+    in property <string> cancel-label;
+    callback save(asset-id: string, name: string, host-ids: string) -> bool;
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(24px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 520px);
+        height: 278px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 18px;
+            spacing: 10px;
+            HorizontalLayout {
+                height: 28px;
+                Text {
+                    text: root.title-label;
+                    color: AppTheme.text-strong;
+                    font-size: 16px;
+                    font-weight: 700;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+                DialogCloseButton { clicked => { root.close(); } }
+            }
+            DialogField {
+                label: root.name-label;
+                placeholder: root.name-placeholder;
+                field-value: root.name;
+                edited(value) => { root.name = value; }
+                accepted(value) => { root.name = value; }
+            }
+            DialogField {
+                label: root.host-ids-label;
+                placeholder: root.host-ids-placeholder;
+                field-value: root.host-ids;
+                edited(value) => { root.host-ids = value; }
+                accepted(value) => { root.host-ids = value; }
+            }
+            Rectangle { vertical-stretch: 1; }
+            HorizontalLayout {
+                height: 34px;
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton { label: root.cancel-label; primary: false; clicked => { root.close(); } }
+                DialogButton {
+                    label: root.save-label;
+                    primary: true;
+                    clicked => {
+                        if root.save(root.asset-id, root.name, root.host-ids) {
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+component NetworkForwardDialog inherits Rectangle {
+    in-out property <string> asset-id;
+    in-out property <string> name;
+    in-out property <string> forward-kind;
+    in-out property <string> bind-host;
+    in-out property <string> bind-port;
+    in-out property <string> target-host;
+    in-out property <string> target-port;
+    in-out property <string> tags;
+    in-out property <bool> auto-start;
+    in property <string> title-label;
+    in property <string> name-label;
+    in property <string> name-placeholder;
+    in property <string> bind-label;
+    in property <string> target-label;
+    in property <string> port-label;
+    in property <string> tags-label;
+    in property <string> tags-placeholder;
+    in property <string> bind-host-placeholder;
+    in property <string> target-host-placeholder;
+    in property <string> local-kind-label;
+    in property <string> remote-kind-label;
+    in property <string> dynamic-kind-label;
+    in property <string> auto-start-label;
+    in property <string> save-label;
+    in property <string> cancel-label;
+    callback save(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
+    callback close();
+
+    background: AppTheme.overlay-bg;
+
+    Rectangle {
+        x: (root.width - self.width) / 2;
+        y: max(18px, (root.height - self.height) / 2);
+        width: min(root.width - 64px, 560px);
+        height: 568px;
+        border-radius: 10px;
+        border-width: 1px;
+        border-color: AppTheme.border-strong;
+        background: AppTheme.dialog-bg;
+
+        VerticalLayout {
+            padding: 18px;
+            spacing: 10px;
+            HorizontalLayout {
+                height: 28px;
+                Text {
+                    text: root.title-label;
+                    color: AppTheme.text-strong;
+                    font-size: 16px;
+                    font-weight: 700;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+                DialogCloseButton { clicked => { root.close(); } }
+            }
+            HorizontalLayout {
+                height: 44px;
+                spacing: 8px;
+                DialogAuthOption { horizontal-stretch: 1; label: root.local-kind-label; caption: ""; active: root.forward-kind == "Local"; clicked => { root.forward-kind = "Local"; } }
+                DialogAuthOption { horizontal-stretch: 1; label: root.remote-kind-label; caption: ""; active: root.forward-kind == "Remote"; clicked => { root.forward-kind = "Remote"; } }
+                DialogAuthOption { horizontal-stretch: 1; label: root.dynamic-kind-label; caption: ""; active: root.forward-kind == "Dynamic"; clicked => { root.forward-kind = "Dynamic"; } }
+            }
+            DialogField {
+                label: root.name-label;
+                placeholder: root.name-placeholder;
+                field-value: root.name;
+                edited(value) => { root.name = value; }
+                accepted(value) => { root.name = value; }
+            }
+            HorizontalLayout {
+                height: 50px;
+                spacing: 8px;
+                DialogField {
+                    horizontal-stretch: 1;
+                    label: root.bind-label;
+                    placeholder: root.bind-host-placeholder;
+                    field-value: root.bind-host;
+                    edited(value) => { root.bind-host = value; }
+                    accepted(value) => { root.bind-host = value; }
+                }
+                DialogField {
+                    width: 128px;
+                    label: root.port-label;
+                    placeholder: root.port-label;
+                    field-value: root.bind-port;
+                    edited(value) => { root.bind-port = value; }
+                    accepted(value) => { root.bind-port = value; }
+                }
+            }
+            HorizontalLayout {
+                height: 50px;
+                spacing: 8px;
+                DialogField {
+                    horizontal-stretch: 1;
+                    label: root.target-label;
+                    placeholder: root.target-host-placeholder;
+                    field-value: root.target-host;
+                    edited(value) => { root.target-host = value; }
+                    accepted(value) => { root.target-host = value; }
+                }
+                DialogField {
+                    width: 128px;
+                    label: root.port-label;
+                    placeholder: root.port-label;
+                    field-value: root.target-port;
+                    edited(value) => { root.target-port = value; }
+                    accepted(value) => { root.target-port = value; }
+                }
+            }
+            DialogField {
+                label: root.tags-label;
+                placeholder: root.tags-placeholder;
+                field-value: root.tags;
+                edited(value) => { root.tags = value; }
+                accepted(value) => { root.tags = value; }
+            }
+            DialogAuthOption {
+                label: root.auto-start-label;
+                caption: root.auto-start ? root.auto-start-label : "";
+                active: root.auto-start;
+                clicked => { root.auto-start = !root.auto-start; }
+            }
+            Rectangle { vertical-stretch: 1; }
+            HorizontalLayout {
+                height: 34px;
+                spacing: 8px;
+                Rectangle { horizontal-stretch: 1; }
+                DialogButton { label: root.cancel-label; primary: false; clicked => { root.close(); } }
+                DialogButton {
+                    label: root.save-label;
+                    primary: true;
+                    clicked => {
+                        if root.save(root.asset-id, root.name, root.forward-kind, root.bind-host, root.bind-port, root.target-host, root.target-port, root.tags, root.auto-start) {
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export component NetworkWorkspacePage inherits Rectangle {
+    in property <string> title: "";
+    in property <string> runtime-section-label: "";
+    in property <string> saved-section-label: "";
+    in property <string> runtime-empty-label: "";
+    in property <string> resources-empty-label: "";
+    in property <string> proxy-section-label: "";
+    in property <string> routes-section-label: "";
+    in property <string> empty-title-label: "";
+    in property <string> empty-caption-label: "";
+    in property <string> new-proxy-label: "";
+    in property <string> new-jump-label: "";
+    in property <string> new-forward-label: "";
+    in property <string> edit-label: "";
+    in property <string> delete-label: "";
+    in property <string> save-label: "";
+    in property <string> cancel-label: "";
+    in property <string> delete-title-label: "";
+    in property <string> delete-caption-label: "";
+    in property <string> name-label: "";
+    in property <string> name-placeholder: "";
+    in property <string> address-label: "";
+    in property <string> port-label: "";
+    in property <string> tags-label: "";
+    in property <string> bind-label: "";
+    in property <string> target-label: "";
+    in property <string> host-ids-label: "";
+    in property <string> host-ids-placeholder: "";
+    in property <string> bind-host-placeholder: "";
+    in property <string> target-host-placeholder: "";
+    in property <string> tags-placeholder: "";
+    in property <string> auto-start-label: "";
+    in property <string> socks5-kind-label: "";
+    in property <string> http-kind-label: "";
+    in property <string> local-kind-label: "";
+    in property <string> remote-kind-label: "";
+    in property <string> dynamic-kind-label: "";
+    in property <[NetworkItemRow]> runtime-tunnels: [];
+    in property <[NetworkItemRow]> saved-tunnels: [];
+    in property <[NetworkItemRow]> proxy-assets: [];
+    in property <[NetworkItemRow]> route-definitions: [];
+    in property <string> selected-id: "";
+    in property <string> selected-title: "";
+    in property <string> selected-caption: "";
+    in property <string> selected-kind: "";
+    in property <string> selected-kind-key: "";
+    in property <string> selected-meta: "";
+    in property <string> selected-note: "";
+    in property <string> selected-icon-key: "router";
+    in property <int> selected-accent-index: 0;
+    in property <string> primary-action-key: "";
+    in property <string> primary-action-label: "";
+    in property <bool> primary-action-enabled: false;
+    in property <string> action-session-id: "";
+    in property <string> action-rule-name: "";
+    in property <[NetworkStatRow]> stats: [];
+    in property <[NetworkDetailFieldRow]> detail-fields: [];
+    in property <[NetworkRelatedItemRow]> related-items: [];
+    in property <string> selected-asset-id: "";
+    in property <string> selected-edit-kind-key: "";
+    in property <string> selected-edit-host: "";
+    in property <string> selected-edit-port: "";
+    in property <string> selected-edit-tags: "";
+    in property <string> selected-edit-bind-host: "";
+    in property <string> selected-edit-bind-port: "";
+    in property <string> selected-edit-target-host: "";
+    in property <string> selected-edit-target-port: "";
+    in property <bool> selected-edit-auto-start: false;
+    in property <string> selected-edit-host-ids: "";
+
+    callback select-network-item(item: NetworkItemRow);
+    callback stop-tunnel(session-id: string, rule-name: string);
+    callback save-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save-jump-chain(asset-id: string, name: string, host-ids: string) -> bool;
+    callback save-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
+    callback remove-asset(kind-key: string, asset-id: string);
+
+    property <bool> has-selection: root.selected-id != "";
+    property <bool> selected-asset: root.selected-asset-id != "";
+    property <bool> proxy-dialog-open: false;
+    property <bool> jump-dialog-open: false;
+    property <bool> forward-dialog-open: false;
+    property <bool> remove-dialog-open: false;
+    property <string> draft-asset-id: "";
+    property <string> draft-name: "";
+    property <string> draft-kind: "Socks5";
+    property <string> draft-host: "";
+    property <string> draft-port: "";
+    property <string> draft-tags: "";
+    property <string> draft-bind-host: "127.0.0.1";
+    property <string> draft-bind-port: "";
+    property <string> draft-target-host: "";
+    property <string> draft-target-port: "";
+    property <string> draft-host-ids: "";
+    property <bool> draft-auto-start: false;
+
+    background: AppTheme.window-bg;
+    vertical-stretch: 1;
+    horizontal-stretch: 1;
+
+    HorizontalLayout {
+        spacing: 8px;
+
+        Rectangle {
+            width: 296px;
+            vertical-stretch: 1;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: AppTheme.border-soft;
+            background: AppTheme.card-bg;
+            clip: true;
+
+            ScrollView {
+                width: parent.width;
+                height: parent.height;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+
+                    Text {
+                        text: root.title;
+                        color: AppTheme.text-strong;
+                        font-size: 15px;
+                        font-weight: 700;
+                    }
+
+                    HorizontalLayout {
+                        height: 28px;
+                        spacing: 6px;
+                        CompactButton {
+                            horizontal-stretch: 1;
+                            label: root.new-proxy-label;
+                            tone: "neutral";
+                            clicked => {
+                                root.draft-asset-id = "";
+                                root.draft-name = "";
+                                root.draft-kind = "Socks5";
+                                root.draft-host = "";
+                                root.draft-port = "1080";
+                                root.draft-tags = "";
+                                root.proxy-dialog-open = true;
+                            }
+                        }
+                        CompactButton {
+                            horizontal-stretch: 1;
+                            label: root.new-jump-label;
+                            tone: "neutral";
+                            clicked => {
+                                root.draft-asset-id = "";
+                                root.draft-name = "";
+                                root.draft-host-ids = "";
+                                root.jump-dialog-open = true;
+                            }
+                        }
+                        CompactButton {
+                            horizontal-stretch: 1;
+                            label: root.new-forward-label;
+                            tone: "neutral";
+                            clicked => {
+                                root.draft-asset-id = "";
+                                root.draft-name = "";
+                                root.draft-kind = "Local";
+                                root.draft-bind-host = "127.0.0.1";
+                                root.draft-bind-port = "";
+                                root.draft-target-host = "";
+                                root.draft-target-port = "";
+                                root.draft-tags = "";
+                                root.draft-auto-start = false;
+                                root.forward-dialog-open = true;
+                            }
+                        }
+                    }
+
+                    NetworkNavSectionHeader { label: root.runtime-section-label; }
+                    if root.runtime-tunnels.length == 0: Text {
+                        text: root.runtime-empty-label;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                    }
+                    for item in root.runtime-tunnels: NetworkNavItem {
+                        item: item;
+                        selected-id: root.selected-id;
+                        selected(item) => { root.select-network-item(item); }
+                        stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                    }
+
+                    NetworkNavSectionHeader { label: root.saved-section-label; }
+                    if root.saved-tunnels.length == 0: Text {
+                        text: root.resources-empty-label;
+                        color: AppTheme.text-muted;
+                        font-size: 10px;
+                    }
+                    for item in root.saved-tunnels: NetworkNavItem {
+                        item: item;
+                        selected-id: root.selected-id;
+                        selected(item) => { root.select-network-item(item); }
+                        stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                    }
+
+                    if root.proxy-section-label != "": NetworkNavSectionHeader { label: root.proxy-section-label; }
+                    if root.proxy-section-label != "": VerticalLayout {
+                        spacing: 10px;
+                        for item in root.proxy-assets: NetworkNavItem {
+                            item: item;
+                            selected-id: root.selected-id;
+                            selected(item) => { root.select-network-item(item); }
+                            stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                        }
+                    }
+
+                    if root.routes-section-label != "": NetworkNavSectionHeader { label: root.routes-section-label; }
+                    if root.routes-section-label != "": VerticalLayout {
+                        spacing: 10px;
+                        for item in root.route-definitions: NetworkNavItem {
+                            item: item;
+                            selected-id: root.selected-id;
+                            selected(item) => { root.select-network-item(item); }
+                            stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                        }
+                    }
+                }
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
+            border-radius: 8px;
+            border-width: 1px;
+            border-color: AppTheme.border-soft;
+            background: AppTheme.card-bg;
+            clip: true;
+
+            if !root.has-selection: VerticalLayout {
+                padding: 18px;
+                spacing: 6px;
+                Rectangle { vertical-stretch: 1; }
+                Text {
+                    text: root.empty-title-label;
+                    color: AppTheme.text-strong;
+                    font-size: 15px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: root.empty-caption-label;
+                    color: AppTheme.text-muted;
+                    font-size: 11px;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+                Rectangle { vertical-stretch: 1; }
+            }
+
+            if root.has-selection: ScrollView {
+                width: parent.width;
+                height: parent.height;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        height: 42px;
+                        spacing: 10px;
+
+                        HostIcon {
+                            icon-key: root.selected-icon-key;
+                            accent-index: root.selected-accent-index;
+                            status-key: "Created";
+                        }
+
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            spacing: 3px;
+
+                            Text {
+                                text: root.selected-title;
+                                color: AppTheme.text-strong;
+                                font-size: 16px;
+                                font-weight: 700;
+                                overflow: elide;
+                            }
+
+                            Text {
+                                text: root.selected-caption;
+                                color: AppTheme.text-muted;
+                                font-size: 10px;
+                                overflow: elide;
+                            }
+                        }
+
+                        Rectangle {
+                            width: 110px;
+                            height: 24px;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: AppTheme.border-soft;
+                            background: AppTheme.surface-bg;
+
+                            Text {
+                                x: 8px;
+                                y: 0px;
+                                width: parent.width - 16px;
+                                height: parent.height;
+                                text: root.selected-kind;
+                                color: AppTheme.text-muted;
+                                font-size: 10px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                        }
+
+                        if root.primary-action-key == "stop": CompactButton {
+                            width: 52px;
+                            label: root.primary-action-label;
+                            enabled: root.primary-action-enabled;
+                            tone: "danger";
+                            compact: true;
+                            clicked => { root.stop-tunnel(root.action-session-id, root.action-rule-name); }
+                        }
+
+                        if root.selected-asset: CompactButton {
+                            width: 52px;
+                            label: root.edit-label;
+                            compact: true;
+                            clicked => {
+                                root.draft-asset-id = root.selected-asset-id;
+                                root.draft-name = root.selected-title;
+                                root.draft-kind = root.selected-edit-kind-key;
+                                root.draft-host = root.selected-edit-host;
+                                root.draft-port = root.selected-edit-port;
+                                root.draft-tags = root.selected-edit-tags;
+                                root.draft-bind-host = root.selected-edit-bind-host;
+                                root.draft-bind-port = root.selected-edit-bind-port;
+                                root.draft-target-host = root.selected-edit-target-host;
+                                root.draft-target-port = root.selected-edit-target-port;
+                                root.draft-auto-start = root.selected-edit-auto-start;
+                                root.draft-host-ids = root.selected-edit-host-ids;
+                                if root.selected-kind-key == "ProxyAsset" {
+                                    root.proxy-dialog-open = true;
+                                } else if root.selected-kind-key == "JumpChainAsset" {
+                                    root.jump-dialog-open = true;
+                                } else if root.selected-kind-key == "ForwardAsset" {
+                                    root.forward-dialog-open = true;
+                                }
+                            }
+                        }
+
+                        if root.selected-asset: CompactButton {
+                            width: 52px;
+                            label: root.delete-label;
+                            tone: "danger";
+                            compact: true;
+                            clicked => { root.remove-dialog-open = true; }
+                        }
+                    }
+
+                    if root.stats.length > 0: HorizontalLayout {
+                        height: 58px;
+                        spacing: 8px;
+                        for stat in root.stats: SnippetStatCard {
+                            horizontal-stretch: 1;
+                            label: stat.label;
+                            value: stat.value;
+                        }
+                    }
+
+                    if root.selected-note != "": Rectangle {
+                        border-radius: 7px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.surface-bg;
+                        min-height: 54px;
+
+                        Text {
+                            x: 12px;
+                            y: 10px;
+                            width: parent.width - 24px;
+                            text: root.selected-note;
+                            color: AppTheme.text-muted;
+                            font-size: 11px;
+                            wrap: word-wrap;
+                        }
+                    }
+
+                    if root.detail-fields.length > 0: VerticalLayout {
+                        spacing: 0px;
+                        for field in root.detail-fields: CredentialDetailField {
+                            label: field.label;
+                            value: field.value;
+                            active: true;
+                            copy-value(value) => { false }
+                        }
+                    }
+
+                    if root.related-items.length > 0: VerticalLayout {
+                        spacing: 8px;
+                        for item in root.related-items: NetworkRelatedItem {
+                            item: item;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if root.proxy-dialog-open: NetworkProxyDialog {
+        width: root.width;
+        height: root.height;
+        asset-id: root.draft-asset-id;
+        name: root.draft-name;
+        proxy-kind: root.draft-kind;
+        host: root.draft-host;
+        port: root.draft-port;
+        tags: root.draft-tags;
+        title-label: root.new-proxy-label;
+        socks5-label: root.socks5-kind-label;
+        http-label: root.http-kind-label;
+        name-label: root.name-label;
+        name-placeholder: root.name-placeholder;
+        address-label: root.address-label;
+        port-label: root.port-label;
+        tags-label: root.tags-label;
+        tags-placeholder: root.tags-placeholder;
+        save-label: root.save-label;
+        cancel-label: root.cancel-label;
+        save(asset-id, name, proxy-kind, host, port, tags) => { root.save-proxy(asset-id, name, proxy-kind, host, port, tags) }
+        close => { root.proxy-dialog-open = false; }
+    }
+
+    if root.jump-dialog-open: NetworkJumpDialog {
+        width: root.width;
+        height: root.height;
+        asset-id: root.draft-asset-id;
+        name: root.draft-name;
+        host-ids: root.draft-host-ids;
+        title-label: root.new-jump-label;
+        name-label: root.name-label;
+        name-placeholder: root.name-placeholder;
+        host-ids-label: root.host-ids-label;
+        host-ids-placeholder: root.host-ids-placeholder;
+        save-label: root.save-label;
+        cancel-label: root.cancel-label;
+        save(asset-id, name, host-ids) => { root.save-jump-chain(asset-id, name, host-ids) }
+        close => { root.jump-dialog-open = false; }
+    }
+
+    if root.forward-dialog-open: NetworkForwardDialog {
+        width: root.width;
+        height: root.height;
+        asset-id: root.draft-asset-id;
+        name: root.draft-name;
+        forward-kind: root.draft-kind;
+        bind-host: root.draft-bind-host;
+        bind-port: root.draft-bind-port;
+        target-host: root.draft-target-host;
+        target-port: root.draft-target-port;
+        tags: root.draft-tags;
+        auto-start: root.draft-auto-start;
+        title-label: root.new-forward-label;
+        name-label: root.name-label;
+        name-placeholder: root.name-placeholder;
+        bind-label: root.bind-label;
+        target-label: root.target-label;
+        port-label: root.port-label;
+        tags-label: root.tags-label;
+        tags-placeholder: root.tags-placeholder;
+        bind-host-placeholder: root.bind-host-placeholder;
+        target-host-placeholder: root.target-host-placeholder;
+        local-kind-label: root.local-kind-label;
+        remote-kind-label: root.remote-kind-label;
+        dynamic-kind-label: root.dynamic-kind-label;
+        auto-start-label: root.auto-start-label;
+        save-label: root.save-label;
+        cancel-label: root.cancel-label;
+        save(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) => { root.save-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) }
+        close => { root.forward-dialog-open = false; }
+    }
+
+    if root.remove-dialog-open: ConfirmDialog {
+        width: root.width;
+        height: root.height;
+        title: root.delete-title-label;
+        message: root.delete-caption-label;
+        subject: root.selected-title;
+        cancel-label: root.cancel-label;
+        confirm-label: root.delete-label;
+        cancel => { root.remove-dialog-open = false; }
+        confirm => {
+            root.remove-dialog-open = false;
+            root.remove-asset(root.selected-kind-key, root.selected-asset-id);
+        }
+    }
+}

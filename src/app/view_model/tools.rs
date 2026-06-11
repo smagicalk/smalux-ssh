@@ -11,5 +11,5 @@ pub(super) use super::tools_snippets::{snippet_items, snippet_rows, snippet_targ
 pub(super) use super::tools_tunnels::tunnel_items;
 pub(in crate::app) use super::tools_types::{
     CredentialDetailFieldViewModel, CredentialGroupContentViewModel, CredentialRowViewModel,
-    KnownHostViewModel, SnippetRowViewModel, ToolItemViewModel,
+    KnownHostViewModel, NetworkNavItemViewModel, SnippetRowViewModel, ToolItemViewModel,
 };

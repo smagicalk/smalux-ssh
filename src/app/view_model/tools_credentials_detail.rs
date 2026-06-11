@@ -251,9 +251,15 @@ fn push_credential_detail_field(
     label: &str,
     value: String,
 ) {
+    let field_index = rows
+        .iter()
+        .filter(|field| field.credential_id == credential_id)
+        .count() as i32;
     rows.push(CredentialDetailFieldViewModel {
         credential_id: credential_id.to_owned(),
         label: label.to_owned(),
         value,
+        row: field_index / 2,
+        col: field_index % 2,
     });
 }

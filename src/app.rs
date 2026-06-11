@@ -30,11 +30,11 @@ use crate::config::{AppConfig, HostListModePreference};
 use crate::model::{
     AgentSource, AppState, AuthProfile, CommandHistoryId, CommandHistoryItem, CredentialGroup,
     CredentialGroupId, CredentialId, CredentialInspection, CredentialKind, CredentialMetadata,
-    GroupId, Host, HostGroup, HostId, KeyAlgorithm, KnownHostEntry, ProxyProfile, RecentConnection,
-    SecretMaterialKind, SecretRecord, SecretRef, SftpBookmark, Snippet, SnippetArgument,
-    SnippetGroup, SnippetGroupId, SnippetId, SnippetImplementation, SnippetImplementationId,
-    SnippetScope, SnippetShell, SnippetSupportTarget, SnippetSupportTargetId, SnippetVariable,
-    TunnelKind, TunnelRule,
+    GroupId, Host, HostGroup, HostId, HostNetworkSelection, KeyAlgorithm, KnownHostEntry,
+    ProxyProfile, RecentConnection, SecretMaterialKind, SecretRecord, SecretRef, SftpBookmark,
+    Snippet, SnippetArgument, SnippetGroup, SnippetGroupId, SnippetId, SnippetImplementation,
+    SnippetImplementationId, SnippetScope, SnippetShell, SnippetSupportTarget,
+    SnippetSupportTargetId, SnippetVariable, TunnelKind, TunnelRule,
 };
 use crate::storage::{SqliteStorage, StorageManager, ThemeProfileRecord};
 
@@ -181,10 +181,10 @@ fn preview_storage() -> StorageManager {
         storage.upsert_host(host);
     }
     if let Some(host) = storage.hosts.iter_mut().find(|host| host.id == api_host) {
-        host.proxy = Some(ProxyProfile::Socks5 {
+        host.proxies = vec![ProxyProfile::Socks5 {
             host: "127.0.0.1".to_owned(),
             port: 1080,
-        });
+        }];
         host.jumps = vec![crate::model::JumpProfile { host_id: jump_host }];
     }
 
@@ -502,7 +502,8 @@ fn preview_host(
         address: address.to_owned(),
         port,
         auth,
-        proxy: None,
+        network: HostNetworkSelection::default(),
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
@@ -534,7 +535,7 @@ fn multi_target_snippet(
                 name: "Linux 通用".to_owned(),
                 shell: SnippetShell::Bash,
                 command_template: linux_command.to_owned(),
-                notes: Some("Debian 和 RHEL 共享这份脚本".to_owned()),
+                notes: Some("Linux 发行版目标共享这份脚本".to_owned()),
                 last_arguments: Vec::new(),
                 sort_order: 0,
             },
@@ -553,13 +554,18 @@ fn multi_target_snippet(
             snippet_target(id, 1, "linux", "Linux", linux_impl, 0),
             snippet_target(id, 2, "debian-ubuntu", "Debian / Ubuntu", linux_impl, 1),
             snippet_target(id, 3, "rhel-centos", "RHEL / CentOS", linux_impl, 2),
+            snippet_target(id, 5, "alpine", "Alpine", linux_impl, 3),
+            snippet_target(id, 6, "fedora", "Fedora", linux_impl, 4),
+            snippet_target(id, 7, "arch", "Arch", linux_impl, 5),
+            snippet_target(id, 8, "suse", "SUSE / openSUSE", linux_impl, 6),
+            snippet_target(id, 9, "freebsd", "FreeBSD", linux_impl, 7),
             snippet_target(
                 id,
                 4,
                 "windows-powershell",
                 "Windows PowerShell",
                 windows_impl,
-                3,
+                8,
             ),
         ],
     }

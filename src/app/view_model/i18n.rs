@@ -44,7 +44,7 @@ pub(super) fn tr(locale: Locale, key: &'static str) -> &'static str {
     tr_from_files(&catalog_root().files, locale, key)
 }
 
-pub(super) fn tr_for_state(state: &AppState, key: &'static str) -> &'static str {
+pub(in crate::app) fn tr_for_state(state: &AppState, key: &'static str) -> &'static str {
     tr(locale_for_state(state), key)
 }
 

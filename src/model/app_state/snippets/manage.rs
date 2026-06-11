@@ -277,6 +277,29 @@ impl AppState {
                 ..AppUpdateOutcome::default()
             };
         }
+        let Some(snippet) = self
+            .storage
+            .snippets
+            .iter()
+            .find(|snippet| snippet.id == snippet_id)
+        else {
+            return missing_snippet(snippet_id);
+        };
+        if let Some(existing) = target_keys
+            .iter()
+            .find(|target_key| {
+                snippet
+                    .support_targets
+                    .iter()
+                    .any(|target| target.target_key == **target_key)
+            })
+            .cloned()
+        {
+            return AppUpdateOutcome {
+                error: Some(format!("支持目标已存在：{existing}")),
+                ..AppUpdateOutcome::default()
+            };
+        }
 
         for target_key in target_keys {
             let outcome = self.create_snippet_target(
@@ -460,6 +483,138 @@ impl AppState {
         implementation.name = format!("{display_name} 脚本");
         implementation.shell = default_shell_for_target(target_key.as_str());
         implementation.command_template = command_template;
+
+        refresh_snippet_variables(&mut snippet);
+        self.storage.upsert_snippet(snippet);
+
+        AppUpdateOutcome {
+            state_changed: true,
+            ..AppUpdateOutcome::default()
+        }
+    }
+
+    /// 同步某个脚本实现对应的支持目标集合。
+    ///
+    /// 编辑共享实现时，UI 会一次性提交所有选中的目标标签。这里负责让同一
+    /// implementation 下的目标集合与提交值保持一致：保留仍选中的目标，新增
+    /// 新选中的目标，移除取消选中的目标。
+    pub(in crate::model::app_state) fn sync_snippet_target_implementation_targets(
+        &mut self,
+        snippet_id: SnippetId,
+        target_id: SnippetSupportTargetId,
+        target_keys: Vec<String>,
+        display_name: String,
+        command_template: String,
+    ) -> AppUpdateOutcome {
+        let target_keys = normalized_target_keys(target_keys);
+        if target_keys.is_empty() {
+            return AppUpdateOutcome {
+                error: Some("至少需要选择一个支持目标".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let Some(mut snippet) = self
+            .storage
+            .snippets
+            .iter()
+            .find(|snippet| snippet.id == snippet_id)
+            .cloned()
+        else {
+            return missing_snippet(snippet_id);
+        };
+
+        let Some(target_index) = snippet
+            .support_targets
+            .iter()
+            .position(|target| target.id == target_id)
+        else {
+            return AppUpdateOutcome {
+                error: Some("找不到支持目标".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        let implementation_id = snippet.support_targets[target_index].implementation_id;
+
+        if snippet.support_targets.iter().any(|target| {
+            target.implementation_id != implementation_id
+                && target_keys.contains(&target.target_key)
+        }) {
+            return AppUpdateOutcome {
+                error: Some("支持目标已存在".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let command_template = command_template.trim().to_owned();
+        if command_template.is_empty() {
+            return AppUpdateOutcome {
+                error: Some("脚本内容不能为空".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        let Some(implementation) = snippet
+            .implementations
+            .iter_mut()
+            .find(|implementation| implementation.id == implementation_id)
+        else {
+            return AppUpdateOutcome {
+                error: Some("支持目标没有可编辑脚本".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        };
+
+        let primary_target_key = target_keys[0].clone();
+        let display_name = normalized_target_name(&display_name, &primary_target_key);
+        implementation.name = format!("{display_name} 脚本");
+        implementation.shell = default_shell_for_target(primary_target_key.as_str());
+        implementation.command_template = command_template;
+
+        let current_target_removed = snippet
+            .support_targets
+            .get(target_index)
+            .is_some_and(|target| !target_keys.contains(&target.target_key));
+        if current_target_removed {
+            snippet.support_targets.retain(|target| {
+                target.id == target_id
+                    || target.implementation_id != implementation_id
+                    || target.target_key != primary_target_key
+            });
+            if let Some(target) = snippet
+                .support_targets
+                .iter_mut()
+                .find(|target| target.id == target_id)
+            {
+                target.target_key = primary_target_key.clone();
+                target.display_name = normalized_target_name("", &primary_target_key);
+            }
+        }
+
+        snippet.support_targets.retain(|target| {
+            target.implementation_id != implementation_id
+                || target_keys.contains(&target.target_key)
+        });
+
+        let mut next_sort_order = next_target_sort_order(&snippet);
+        for target_key in target_keys {
+            if let Some(target) = snippet.support_targets.iter_mut().find(|target| {
+                target.implementation_id == implementation_id && target.target_key == target_key
+            }) {
+                target.display_name = normalized_target_name("", &target_key);
+            } else {
+                snippet.support_targets.push(SnippetSupportTarget {
+                    id: SnippetSupportTargetId(Uuid::new_v4()),
+                    snippet_id,
+                    target_key: target_key.clone(),
+                    display_name: normalized_target_name("", &target_key),
+                    implementation_id,
+                    sort_order: next_sort_order,
+                });
+                next_sort_order += 1;
+            }
+        }
 
         refresh_snippet_variables(&mut snippet);
         self.storage.upsert_snippet(snippet);
@@ -721,6 +876,8 @@ fn default_shell_for_target(target_key: &str) -> SnippetShell {
             SnippetShell::PowerShell
         }
         "cmd" | "windows-cmd" => SnippetShell::Cmd,
+        "apk" | "alpine" | "fedora" | "dnf" | "arch" | "pacman" | "suse" | "opensuse" | "sles"
+        | "freebsd" | "bsd" => SnippetShell::Bash,
         _ => SnippetShell::Bash,
     }
 }

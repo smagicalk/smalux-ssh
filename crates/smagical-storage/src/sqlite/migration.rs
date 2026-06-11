@@ -13,7 +13,9 @@ use super::migration_credentials::{
 use super::migration_extensions::{SftpBookmarks, TunnelRules, create_extension_tables};
 use super::migration_history::{CommandHistory, RecentConnections, create_history};
 use super::migration_hosts::{
-    HostAuth, HostGroups, HostJumps, HostProxy, HostTags, Hosts, create_hosts,
+    ForwardAssets, HostAuth, HostGroups, HostJumps, HostNetworkForwards, HostNetworkJumpChains,
+    HostNetworkProxies, HostProxy, HostTags, Hosts, JumpChainAssets, JumpChainSteps, ProxyAssets,
+    create_hosts,
 };
 use super::migration_settings::{Settings, ThemeProfiles, WorkspaceState, create_settings};
 use super::migration_snippets::{
@@ -79,8 +81,15 @@ impl MigrationTrait for M20260528000000CreateCoreStorageSchema {
         drop_table(manager, Secrets::Table).await?;
         drop_table(manager, Credentials::Table).await?;
         drop_table(manager, CredentialGroups::Table).await?;
+        drop_table(manager, HostNetworkForwards::Table).await?;
+        drop_table(manager, HostNetworkJumpChains::Table).await?;
+        drop_table(manager, HostNetworkProxies::Table).await?;
         drop_table(manager, HostJumps::Table).await?;
         drop_table(manager, HostProxy::Table).await?;
+        drop_table(manager, JumpChainSteps::Table).await?;
+        drop_table(manager, JumpChainAssets::Table).await?;
+        drop_table(manager, ProxyAssets::Table).await?;
+        drop_table(manager, ForwardAssets::Table).await?;
         drop_table(manager, HostAuth::Table).await?;
         drop_table(manager, HostTags::Table).await?;
         drop_table(manager, Hosts::Table).await?;

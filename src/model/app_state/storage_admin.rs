@@ -26,6 +26,8 @@ mod credential_payload;
 mod credential_refs;
 #[path = "storage_admin/known_hosts.rs"]
 mod known_hosts;
+#[path = "storage_admin/network_assets.rs"]
+mod network_assets;
 #[cfg(test)]
 #[path = "storage_admin/tests.rs"]
 mod tests;

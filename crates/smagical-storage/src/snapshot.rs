@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use smagical_config::AppConfig;
 use smagical_core::{
-    CommandHistoryItem, CredentialGroup, CredentialInspection, CredentialMetadata, Host, HostGroup,
-    KnownHostEntry, RecentConnection, SecretRecord, SftpBookmark, Snippet, SnippetGroup,
-    TunnelRule, WorkspaceState,
+    CommandHistoryItem, CredentialGroup, CredentialInspection, CredentialMetadata, ForwardAsset,
+    Host, HostGroup, JumpChainAsset, KnownHostEntry, ProxyAsset, RecentConnection, SecretRecord,
+    SftpBookmark, Snippet, SnippetGroup, TunnelRule, WorkspaceState,
 };
 
 use super::{StorageManager, ThemeProfileRecord};
@@ -23,6 +23,15 @@ pub(crate) struct StorageSnapshot {
     pub(crate) hosts: Vec<Host>,
     /// 分组集合。
     pub(crate) groups: Vec<HostGroup>,
+    /// 代理资产集合。
+    #[serde(default)]
+    pub(crate) proxy_assets: Vec<ProxyAsset>,
+    /// 跳板链资产集合。
+    #[serde(default)]
+    pub(crate) jump_chain_assets: Vec<JumpChainAsset>,
+    /// 端口转发资产集合。
+    #[serde(default)]
+    pub(crate) forward_assets: Vec<ForwardAsset>,
     /// 凭据元数据集合。
     pub(crate) credentials: Vec<CredentialMetadata>,
     /// 凭据内容解析缓存集合。
@@ -60,6 +69,9 @@ impl From<&StorageManager> for StorageSnapshot {
             app_config: storage.app_config.clone(),
             hosts: storage.hosts.clone(),
             groups: storage.groups.clone(),
+            proxy_assets: storage.proxy_assets.clone(),
+            jump_chain_assets: storage.jump_chain_assets.clone(),
+            forward_assets: storage.forward_assets.clone(),
             credentials: storage.credentials.clone(),
             credential_inspections: storage.credential_inspections.clone(),
             credential_groups: storage.credential_groups.clone(),
@@ -85,6 +97,9 @@ impl StorageSnapshot {
             app_config: self.app_config,
             hosts: self.hosts,
             groups: self.groups,
+            proxy_assets: self.proxy_assets,
+            jump_chain_assets: self.jump_chain_assets,
+            forward_assets: self.forward_assets,
             credentials: self.credentials,
             credential_inspections: self.credential_inspections,
             credential_groups: self.credential_groups,

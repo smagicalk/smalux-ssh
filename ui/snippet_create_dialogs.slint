@@ -3,6 +3,7 @@ import { SnippetRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { DialogAuthOption, DialogButton, DialogCloseButton, DialogField } from "./common.slint";
 import { HostIcon } from "./hosts.slint";
+import { MoveSnippetDialog } from "./snippet_move_dialog.slint";
 
 component SnippetCreateChoiceItem inherits Rectangle {
     in property <string> label;
@@ -181,13 +182,14 @@ component SnippetTargetPickerOption inherits Rectangle {
     in property <string> icon-key: "terminal";
     in property <int> accent-index: 0;
     in property <bool> active;
+    in property <bool> enabled: true;
     callback toggled(value: string);
 
     height: 44px;
     border-radius: 8px;
     border-width: 1px;
-    border-color: root.active ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-soft : AppTheme.transparent;
-    background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
+    border-color: root.active ? AppTheme.border-strong : root.enabled && touch.has-hover ? AppTheme.border-soft : AppTheme.transparent;
+    background: root.active ? AppTheme.selection-bg : root.enabled && touch.pressed ? AppTheme.surface-pressed : root.enabled && touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
 
     HostIcon {
         x: 10px;
@@ -223,7 +225,7 @@ component SnippetTargetPickerOption inherits Rectangle {
         width: parent.width - 76px;
         height: parent.height;
         text: root.label;
-        color: root.active ? AppTheme.text-strong : AppTheme.text-muted;
+        color: !root.enabled ? AppTheme.text-soft : root.active ? AppTheme.text-strong : AppTheme.text-muted;
         font-size: 11px;
         font-weight: 700;
         vertical-alignment: center;
@@ -233,7 +235,11 @@ component SnippetTargetPickerOption inherits Rectangle {
     touch := TouchArea {
         width: parent.width;
         height: parent.height;
-        clicked => { root.toggled(root.value); }
+        clicked => {
+            if root.enabled {
+                root.toggled(root.value);
+            }
+        }
     }
 }
 
@@ -243,15 +249,36 @@ component SnippetTargetPresetField inherits Rectangle {
     in property <string> linux-label;
     in property <string> debian-label;
     in property <string> rhel-label;
+    in property <string> alpine-label;
+    in property <string> fedora-label;
+    in property <string> arch-label;
+    in property <string> suse-label;
+    in property <string> freebsd-label;
     in property <string> macos-label;
     in property <string> powershell-label;
     in property <string> cmd-label;
     in-out property <bool> linux-selected;
     in-out property <bool> debian-selected;
     in-out property <bool> rhel-selected;
+    in-out property <bool> alpine-selected;
+    in-out property <bool> fedora-selected;
+    in-out property <bool> arch-selected;
+    in-out property <bool> suse-selected;
+    in-out property <bool> freebsd-selected;
     in-out property <bool> macos-selected;
     in-out property <bool> powershell-selected;
     in-out property <bool> cmd-selected;
+    in property <bool> linux-disabled;
+    in property <bool> debian-disabled;
+    in property <bool> rhel-disabled;
+    in property <bool> alpine-disabled;
+    in property <bool> fedora-disabled;
+    in property <bool> arch-disabled;
+    in property <bool> suse-disabled;
+    in property <bool> freebsd-disabled;
+    in property <bool> macos-disabled;
+    in property <bool> powershell-disabled;
+    in property <bool> cmd-disabled;
     in property <bool> multi-select: true;
     callback open-picker();
 
@@ -264,6 +291,11 @@ component SnippetTargetPresetField inherits Rectangle {
         return (root.linux-selected ? "linux;" : "")
             + (root.debian-selected ? "debian-ubuntu;" : "")
             + (root.rhel-selected ? "rhel-centos;" : "")
+            + (root.alpine-selected ? "alpine;" : "")
+            + (root.fedora-selected ? "fedora;" : "")
+            + (root.arch-selected ? "arch;" : "")
+            + (root.suse-selected ? "suse;" : "")
+            + (root.freebsd-selected ? "freebsd;" : "")
             + (root.macos-selected ? "macos;" : "")
             + (root.powershell-selected ? "windows-powershell;" : "")
             + (root.cmd-selected ? "windows-cmd;" : "");
@@ -273,9 +305,14 @@ component SnippetTargetPresetField inherits Rectangle {
         return (root.linux-selected ? root.linux-label : "")
             + (root.debian-selected ? (root.linux-selected ? " / " : "") + root.debian-label : "")
             + (root.rhel-selected ? (root.linux-selected || root.debian-selected ? " / " : "") + root.rhel-label : "")
-            + (root.macos-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected ? " / " : "") + root.macos-label : "")
-            + (root.powershell-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.macos-selected ? " / " : "") + root.powershell-label : "")
-            + (root.cmd-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.macos-selected || root.powershell-selected ? " / " : "") + root.cmd-label : "");
+            + (root.alpine-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected ? " / " : "") + root.alpine-label : "")
+            + (root.fedora-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected ? " / " : "") + root.fedora-label : "")
+            + (root.arch-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected || root.fedora-selected ? " / " : "") + root.arch-label : "")
+            + (root.suse-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected || root.fedora-selected || root.arch-selected ? " / " : "") + root.suse-label : "")
+            + (root.freebsd-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected || root.fedora-selected || root.arch-selected || root.suse-selected ? " / " : "") + root.freebsd-label : "")
+            + (root.macos-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected || root.fedora-selected || root.arch-selected || root.suse-selected || root.freebsd-selected ? " / " : "") + root.macos-label : "")
+            + (root.powershell-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected || root.fedora-selected || root.arch-selected || root.suse-selected || root.freebsd-selected || root.macos-selected ? " / " : "") + root.powershell-label : "")
+            + (root.cmd-selected ? (root.linux-selected || root.debian-selected || root.rhel-selected || root.alpine-selected || root.fedora-selected || root.arch-selected || root.suse-selected || root.freebsd-selected || root.macos-selected || root.powershell-selected ? " / " : "") + root.cmd-label : "");
     }
 
     height: 72px;
@@ -344,7 +381,8 @@ component SnippetCommandTextArea inherits Rectangle {
     in property <string> placeholder;
     callback edited(value: string);
 
-    height: 164px;
+    min-height: 164px;
+    vertical-stretch: 1;
     background: AppTheme.transparent;
 
     VerticalLayout {
@@ -358,7 +396,7 @@ component SnippetCommandTextArea inherits Rectangle {
         }
 
         Rectangle {
-            height: 140px;
+            vertical-stretch: 1;
             border-radius: 7px;
             border-width: 1px;
             border-color: AppTheme.border-soft;
@@ -418,6 +456,11 @@ component SnippetTargetPickerDialog inherits Rectangle {
     in property <string> linux-label;
     in property <string> debian-label;
     in property <string> rhel-label;
+    in property <string> alpine-label;
+    in property <string> fedora-label;
+    in property <string> arch-label;
+    in property <string> suse-label;
+    in property <string> freebsd-label;
     in property <string> macos-label;
     in property <string> powershell-label;
     in property <string> cmd-label;
@@ -427,9 +470,25 @@ component SnippetTargetPickerDialog inherits Rectangle {
     in-out property <bool> linux-selected;
     in-out property <bool> debian-selected;
     in-out property <bool> rhel-selected;
+    in-out property <bool> alpine-selected;
+    in-out property <bool> fedora-selected;
+    in-out property <bool> arch-selected;
+    in-out property <bool> suse-selected;
+    in-out property <bool> freebsd-selected;
     in-out property <bool> macos-selected;
     in-out property <bool> powershell-selected;
     in-out property <bool> cmd-selected;
+    in property <bool> linux-disabled;
+    in property <bool> debian-disabled;
+    in property <bool> rhel-disabled;
+    in property <bool> alpine-disabled;
+    in property <bool> fedora-disabled;
+    in property <bool> arch-disabled;
+    in property <bool> suse-disabled;
+    in property <bool> freebsd-disabled;
+    in property <bool> macos-disabled;
+    in property <bool> powershell-disabled;
+    in property <bool> cmd-disabled;
     callback close();
     callback save();
 
@@ -438,6 +497,11 @@ component SnippetTargetPickerDialog inherits Rectangle {
             root.linux-selected = value == "linux";
             root.debian-selected = value == "debian-ubuntu";
             root.rhel-selected = value == "rhel-centos";
+            root.alpine-selected = value == "alpine";
+            root.fedora-selected = value == "fedora";
+            root.arch-selected = value == "arch";
+            root.suse-selected = value == "suse";
+            root.freebsd-selected = value == "freebsd";
             root.macos-selected = value == "macos";
             root.powershell-selected = value == "windows-powershell";
             root.cmd-selected = value == "windows-cmd";
@@ -449,6 +513,16 @@ component SnippetTargetPickerDialog inherits Rectangle {
             root.debian-selected = !root.debian-selected;
         } else if value == "rhel-centos" {
             root.rhel-selected = !root.rhel-selected;
+        } else if value == "alpine" {
+            root.alpine-selected = !root.alpine-selected;
+        } else if value == "fedora" {
+            root.fedora-selected = !root.fedora-selected;
+        } else if value == "arch" {
+            root.arch-selected = !root.arch-selected;
+        } else if value == "suse" {
+            root.suse-selected = !root.suse-selected;
+        } else if value == "freebsd" {
+            root.freebsd-selected = !root.freebsd-selected;
         } else if value == "macos" {
             root.macos-selected = !root.macos-selected;
         } else if value == "windows-powershell" {
@@ -464,7 +538,7 @@ component SnippetTargetPickerDialog inherits Rectangle {
         x: (root.width - self.width) / 2;
         y: max(24px, (root.height - self.height) / 2);
         width: min(root.width - 64px, 460px);
-        height: 414px;
+        height: min(root.height - 48px, 560px);
         border-radius: 10px;
         border-width: 1px;
         border-color: AppTheme.border-strong;
@@ -501,7 +575,7 @@ component SnippetTargetPickerDialog inherits Rectangle {
                     width: parent.width - 12px;
                     height: parent.height - 12px;
                     viewport-width: self.visible-width;
-                    viewport-height: max(self.visible-height, 274px);
+                    viewport-height: max(self.visible-height, 560px);
                     vertical-scrollbar-policy: ScrollBarPolicy.as-needed;
 
                     VerticalLayout {
@@ -514,46 +588,97 @@ component SnippetTargetPickerDialog inherits Rectangle {
                             icon-key: "linux";
                             accent-index: 0;
                             active: root.linux-selected;
+                            enabled: !root.linux-disabled || root.linux-selected;
                             toggled(value) => { root.select-value(value); }
                         }
                         SnippetTargetPickerOption {
                             label: root.debian-label;
                             value: "debian-ubuntu";
-                            icon-key: "server";
+                            icon-key: "debian";
                             accent-index: 1;
                             active: root.debian-selected;
+                            enabled: !root.debian-disabled || root.debian-selected;
                             toggled(value) => { root.select-value(value); }
                         }
                         SnippetTargetPickerOption {
                             label: root.rhel-label;
                             value: "rhel-centos";
-                            icon-key: "shield";
+                            icon-key: "rhel";
                             accent-index: 2;
                             active: root.rhel-selected;
+                            enabled: !root.rhel-disabled || root.rhel-selected;
+                            toggled(value) => { root.select-value(value); }
+                        }
+                        SnippetTargetPickerOption {
+                            label: root.alpine-label;
+                            value: "alpine";
+                            icon-key: "alpine";
+                            accent-index: 5;
+                            active: root.alpine-selected;
+                            enabled: !root.alpine-disabled || root.alpine-selected;
+                            toggled(value) => { root.select-value(value); }
+                        }
+                        SnippetTargetPickerOption {
+                            label: root.fedora-label;
+                            value: "fedora";
+                            icon-key: "fedora";
+                            accent-index: 4;
+                            active: root.fedora-selected;
+                            enabled: !root.fedora-disabled || root.fedora-selected;
+                            toggled(value) => { root.select-value(value); }
+                        }
+                        SnippetTargetPickerOption {
+                            label: root.arch-label;
+                            value: "arch";
+                            icon-key: "arch";
+                            accent-index: 3;
+                            active: root.arch-selected;
+                            enabled: !root.arch-disabled || root.arch-selected;
+                            toggled(value) => { root.select-value(value); }
+                        }
+                        SnippetTargetPickerOption {
+                            label: root.suse-label;
+                            value: "suse";
+                            icon-key: "suse";
+                            accent-index: 2;
+                            active: root.suse-selected;
+                            enabled: !root.suse-disabled || root.suse-selected;
+                            toggled(value) => { root.select-value(value); }
+                        }
+                        SnippetTargetPickerOption {
+                            label: root.freebsd-label;
+                            value: "freebsd";
+                            icon-key: "freebsd";
+                            accent-index: 5;
+                            active: root.freebsd-selected;
+                            enabled: !root.freebsd-disabled || root.freebsd-selected;
                             toggled(value) => { root.select-value(value); }
                         }
                         SnippetTargetPickerOption {
                             label: root.macos-label;
                             value: "macos";
-                            icon-key: "chip";
+                            icon-key: "macos";
                             accent-index: 3;
                             active: root.macos-selected;
+                            enabled: !root.macos-disabled || root.macos-selected;
                             toggled(value) => { root.select-value(value); }
                         }
                         SnippetTargetPickerOption {
                             label: root.powershell-label;
                             value: "windows-powershell";
-                            icon-key: "terminal";
+                            icon-key: "powershell";
                             accent-index: 4;
                             active: root.powershell-selected;
+                            enabled: !root.powershell-disabled || root.powershell-selected;
                             toggled(value) => { root.select-value(value); }
                         }
                         SnippetTargetPickerOption {
                             label: root.cmd-label;
                             value: "windows-cmd";
-                            icon-key: "code";
+                            icon-key: "cmd";
                             accent-index: 5;
                             active: root.cmd-selected;
+                            enabled: !root.cmd-disabled || root.cmd-selected;
                             toggled(value) => { root.select-value(value); }
                         }
                     }
@@ -591,6 +716,11 @@ export component CreateSnippetDialog inherits Rectangle {
     in property <string> target-linux-label;
     in property <string> target-debian-label;
     in property <string> target-rhel-label;
+    in property <string> target-alpine-label;
+    in property <string> target-fedora-label;
+    in property <string> target-arch-label;
+    in property <string> target-suse-label;
+    in property <string> target-freebsd-label;
     in property <string> target-macos-label;
     in property <string> target-powershell-label;
     in property <string> target-cmd-label;
@@ -601,6 +731,10 @@ export component CreateSnippetDialog inherits Rectangle {
     in property <string> target-mode-share-label;
     in property <string> target-mode-share-caption-label;
     in property <string> shared-target-label;
+    in property <string> group-label;
+    in property <string> root-group-label;
+    in property <string> choose-group-label;
+    in property <string> confirm-group-label;
     in property <string> cancel-label;
     in property <string> create-label;
     in property <string> target-picker-save-label;
@@ -610,42 +744,79 @@ export component CreateSnippetDialog inherits Rectangle {
     in property <string> target-mode: "New";
     in property <string> share-target-id: "";
     in property <string> snippet-row-id: "";
+    in property <string> group-id: "";
+    in property <string> group-name: "";
     in property <[SnippetRow]> snippet-rows: [];
+    in property <[SnippetRow]> group-rows: [];
     in-out property <bool> target-linux-selected;
     in-out property <bool> target-debian-selected;
     in-out property <bool> target-rhel-selected;
+    in-out property <bool> target-alpine-selected;
+    in-out property <bool> target-fedora-selected;
+    in-out property <bool> target-arch-selected;
+    in-out property <bool> target-suse-selected;
+    in-out property <bool> target-freebsd-selected;
     in-out property <bool> target-macos-selected;
     in-out property <bool> target-powershell-selected;
     in-out property <bool> target-cmd-selected;
+    in property <bool> target-linux-disabled;
+    in property <bool> target-debian-disabled;
+    in property <bool> target-rhel-disabled;
+    in property <bool> target-alpine-disabled;
+    in property <bool> target-fedora-disabled;
+    in property <bool> target-arch-disabled;
+    in property <bool> target-suse-disabled;
+    in property <bool> target-freebsd-disabled;
+    in property <bool> target-macos-disabled;
+    in property <bool> target-powershell-disabled;
+    in property <bool> target-cmd-disabled;
     callback name-edited(value: string);
     callback description-edited(value: string);
     callback command-edited(value: string);
     callback target-mode-selected(value: string);
     callback share-target-selected(value: string);
+    callback group-selected(value: string, name: string);
     callback close();
-    callback create(name: string, description: string, command-template: string, share-target-id: string) -> bool;
+    callback create(name: string, description: string, command-template: string, share-target-id: string, group-id: string) -> bool;
 
     property <bool> target-dialog: root.dialog-kind == "Target";
     property <bool> share-mode: root.target-dialog && !root.edit-mode && root.target-mode == "Share";
     property <bool> target-preset-mode: root.target-dialog;
     property <bool> target-picker-dialog-open: false;
+    property <bool> group-picker-dialog-open: false;
     property <bool> draft-target-linux-selected: false;
     property <bool> draft-target-debian-selected: false;
     property <bool> draft-target-rhel-selected: false;
+    property <bool> draft-target-alpine-selected: false;
+    property <bool> draft-target-fedora-selected: false;
+    property <bool> draft-target-arch-selected: false;
+    property <bool> draft-target-suse-selected: false;
+    property <bool> draft-target-freebsd-selected: false;
     property <bool> draft-target-macos-selected: false;
     property <bool> draft-target-powershell-selected: false;
     property <bool> draft-target-cmd-selected: false;
     property <string> selected-target-values: (root.target-linux-selected ? "linux;" : "")
         + (root.target-debian-selected ? "debian-ubuntu;" : "")
         + (root.target-rhel-selected ? "rhel-centos;" : "")
+        + (root.target-alpine-selected ? "alpine;" : "")
+        + (root.target-fedora-selected ? "fedora;" : "")
+        + (root.target-arch-selected ? "arch;" : "")
+        + (root.target-suse-selected ? "suse;" : "")
+        + (root.target-freebsd-selected ? "freebsd;" : "")
         + (root.target-macos-selected ? "macos;" : "")
         + (root.target-powershell-selected ? "windows-powershell;" : "")
         + (root.target-cmd-selected ? "windows-cmd;" : "");
+    property <string> group-display-name: root.group-name == "" ? root.root-group-label : root.group-name;
 
     function open-target-picker() {
         root.draft-target-linux-selected = root.target-linux-selected;
         root.draft-target-debian-selected = root.target-debian-selected;
         root.draft-target-rhel-selected = root.target-rhel-selected;
+        root.draft-target-alpine-selected = root.target-alpine-selected;
+        root.draft-target-fedora-selected = root.target-fedora-selected;
+        root.draft-target-arch-selected = root.target-arch-selected;
+        root.draft-target-suse-selected = root.target-suse-selected;
+        root.draft-target-freebsd-selected = root.target-freebsd-selected;
         root.draft-target-macos-selected = root.target-macos-selected;
         root.draft-target-powershell-selected = root.target-powershell-selected;
         root.draft-target-cmd-selected = root.target-cmd-selected;
@@ -656,6 +827,11 @@ export component CreateSnippetDialog inherits Rectangle {
         root.target-linux-selected = root.draft-target-linux-selected;
         root.target-debian-selected = root.draft-target-debian-selected;
         root.target-rhel-selected = root.draft-target-rhel-selected;
+        root.target-alpine-selected = root.draft-target-alpine-selected;
+        root.target-fedora-selected = root.draft-target-fedora-selected;
+        root.target-arch-selected = root.draft-target-arch-selected;
+        root.target-suse-selected = root.draft-target-suse-selected;
+        root.target-freebsd-selected = root.draft-target-freebsd-selected;
         root.target-macos-selected = root.draft-target-macos-selected;
         root.target-powershell-selected = root.draft-target-powershell-selected;
         root.target-cmd-selected = root.draft-target-cmd-selected;
@@ -728,18 +904,97 @@ export component CreateSnippetDialog inherits Rectangle {
                 accepted(value) => { root.description-edited(value); }
             }
 
+            if !root.target-dialog: Rectangle {
+                height: 62px;
+                background: AppTheme.transparent;
+
+                Text {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: 15px;
+                    text: root.group-label;
+                    color: AppTheme.text-soft;
+                    font-size: 10px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    x: 0px;
+                    y: 18px;
+                    width: parent.width;
+                    height: 38px;
+                    border-radius: 7px;
+                    border-width: 1px;
+                    border-color: AppTheme.border-soft;
+                    background: touch.has-hover ? AppTheme.surface-hover : AppTheme.input-bg;
+
+                    HostIcon {
+                        x: 10px;
+                        y: (parent.height - self.height) / 2;
+                        icon-key: "folder";
+                        accent-index: 0;
+                        status-key: "Created";
+                    }
+
+                    Text {
+                        x: 40px;
+                        y: 0px;
+                        width: parent.width - 92px;
+                        height: parent.height;
+                        text: root.group-display-name;
+                        color: AppTheme.text;
+                        font-size: 11px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        x: parent.width - 48px;
+                        y: 0px;
+                        width: 38px;
+                        height: parent.height;
+                        text: root.choose-group-label;
+                        color: AppTheme.text-soft;
+                        font-size: 10px;
+                        font-weight: 700;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    touch := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        clicked => { root.group-picker-dialog-open = true; }
+                    }
+                }
+            }
+
             if root.target-preset-mode: SnippetTargetPresetField {
                 label: root.description-label;
                 placeholder-label: root.target-picker-placeholder-label;
                 linux-label: root.target-linux-label;
                 debian-label: root.target-debian-label;
                 rhel-label: root.target-rhel-label;
+                alpine-label: root.target-alpine-label;
+                fedora-label: root.target-fedora-label;
+                arch-label: root.target-arch-label;
+                suse-label: root.target-suse-label;
+                freebsd-label: root.target-freebsd-label;
                 macos-label: root.target-macos-label;
                 powershell-label: root.target-powershell-label;
                 cmd-label: root.target-cmd-label;
                 linux-selected <=> root.target-linux-selected;
                 debian-selected <=> root.target-debian-selected;
                 rhel-selected <=> root.target-rhel-selected;
+                alpine-selected <=> root.target-alpine-selected;
+                fedora-selected <=> root.target-fedora-selected;
+                arch-selected <=> root.target-arch-selected;
+                suse-selected <=> root.target-suse-selected;
+                freebsd-selected <=> root.target-freebsd-selected;
                 macos-selected <=> root.target-macos-selected;
                 powershell-selected <=> root.target-powershell-selected;
                 cmd-selected <=> root.target-cmd-selected;
@@ -797,7 +1052,7 @@ export component CreateSnippetDialog inherits Rectangle {
                 }
             }
 
-            Rectangle { vertical-stretch: 1; }
+            if root.share-mode: Rectangle { vertical-stretch: 1; }
 
             HorizontalLayout {
                 height: 34px;
@@ -813,7 +1068,7 @@ export component CreateSnippetDialog inherits Rectangle {
                     primary: true;
                     enabled: !root.share-mode || root.share-target-id != "";
                     clicked => {
-                        if root.create(root.draft-name, root.target-preset-mode ? root.selected-target-values : root.draft-description, root.share-mode ? "" : root.draft-command, root.share-mode ? root.share-target-id : "") {
+                        if root.create(root.draft-name, root.target-preset-mode ? root.selected-target-values : root.draft-description, root.share-mode ? "" : root.draft-command, root.share-mode ? root.share-target-id : "", root.group-id) {
                             root.close();
                         }
                     }
@@ -831,6 +1086,11 @@ export component CreateSnippetDialog inherits Rectangle {
         linux-label: root.target-linux-label;
         debian-label: root.target-debian-label;
         rhel-label: root.target-rhel-label;
+        alpine-label: root.target-alpine-label;
+        fedora-label: root.target-fedora-label;
+        arch-label: root.target-arch-label;
+        suse-label: root.target-suse-label;
+        freebsd-label: root.target-freebsd-label;
         macos-label: root.target-macos-label;
         powershell-label: root.target-powershell-label;
         cmd-label: root.target-cmd-label;
@@ -840,11 +1100,46 @@ export component CreateSnippetDialog inherits Rectangle {
         linux-selected <=> root.draft-target-linux-selected;
         debian-selected <=> root.draft-target-debian-selected;
         rhel-selected <=> root.draft-target-rhel-selected;
+        alpine-selected <=> root.draft-target-alpine-selected;
+        fedora-selected <=> root.draft-target-fedora-selected;
+        arch-selected <=> root.draft-target-arch-selected;
+        suse-selected <=> root.draft-target-suse-selected;
+        freebsd-selected <=> root.draft-target-freebsd-selected;
         macos-selected <=> root.draft-target-macos-selected;
         powershell-selected <=> root.draft-target-powershell-selected;
         cmd-selected <=> root.draft-target-cmd-selected;
+        linux-disabled: root.target-linux-disabled;
+        debian-disabled: root.target-debian-disabled;
+        rhel-disabled: root.target-rhel-disabled;
+        alpine-disabled: root.target-alpine-disabled;
+        fedora-disabled: root.target-fedora-disabled;
+        arch-disabled: root.target-arch-disabled;
+        suse-disabled: root.target-suse-disabled;
+        freebsd-disabled: root.target-freebsd-disabled;
+        macos-disabled: root.target-macos-disabled;
+        powershell-disabled: root.target-powershell-disabled;
+        cmd-disabled: root.target-cmd-disabled;
         close => { root.target-picker-dialog-open = false; }
         save => { root.save-target-picker(); }
+    }
+
+    if root.group-picker-dialog-open: MoveSnippetDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title-label: root.group-label;
+        root-label: root.root-group-label;
+        cancel-label: root.cancel-label;
+        move-label: root.confirm-group-label;
+        groups: root.group-rows;
+        selected-group-id: root.group-id;
+        select-group(group-id, name) => { root.group-selected(group-id, name); }
+        close => { root.group-picker-dialog-open = false; }
+        move => {
+            root.group-picker-dialog-open = false;
+            true
+        }
     }
 }
 
@@ -852,12 +1147,24 @@ export component CreateSnippetGroupDialog inherits Rectangle {
     in property <string> title-label;
     in property <string> name-label;
     in property <string> name-placeholder;
+    in property <string> group-label;
+    in property <string> root-group-label;
+    in property <string> choose-group-label;
+    in property <string> confirm-group-label;
+    in property <string> group-id: "snippet-folder:all";
+    in property <string> group-name: "";
+    in property <[SnippetRow]> group-rows: [];
     in property <string> cancel-label;
     in property <string> create-label;
     in property <string> draft-name;
+    callback group-selected(value: string, name: string);
     callback name-edited(value: string);
     callback close();
-    callback create(name: string) -> bool;
+    callback create(parent-node-id: string, name: string) -> bool;
+
+    property <bool> group-picker-dialog-open: false;
+    property <string> selected-parent-id: root.group-id;
+    property <string> selected-parent-name: root.group-name == "" ? root.root-group-label : root.group-name;
 
     background: AppTheme.overlay-bg;
 
@@ -865,7 +1172,7 @@ export component CreateSnippetGroupDialog inherits Rectangle {
         x: (root.width - self.width) / 2;
         y: max(24px, (root.height - self.height) / 2);
         width: min(root.width - 64px, 420px);
-        height: 210px;
+        height: 282px;
         border-radius: 8px;
         border-width: 1px;
         border-color: AppTheme.border-strong;
@@ -886,6 +1193,75 @@ export component CreateSnippetGroupDialog inherits Rectangle {
                     horizontal-stretch: 1;
                 }
                 DialogCloseButton { clicked => { root.close(); } }
+            }
+
+            Rectangle {
+                height: 62px;
+                background: AppTheme.transparent;
+
+                Text {
+                    x: 0px;
+                    y: 0px;
+                    width: parent.width;
+                    height: 15px;
+                    text: root.group-label;
+                    color: AppTheme.text-soft;
+                    font-size: 10px;
+                    font-weight: 700;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    x: 0px;
+                    y: 18px;
+                    width: parent.width;
+                    height: 38px;
+                    border-radius: 7px;
+                    border-width: 1px;
+                    border-color: AppTheme.border-soft;
+                    background: touch.has-hover ? AppTheme.surface-hover : AppTheme.input-bg;
+
+                    HostIcon {
+                        x: 10px;
+                        y: (parent.height - self.height) / 2;
+                        icon-key: "folder";
+                        accent-index: 0;
+                        status-key: "Created";
+                    }
+
+                    Text {
+                        x: 40px;
+                        y: 0px;
+                        width: parent.width - 92px;
+                        height: parent.height;
+                        text: root.selected-parent-name;
+                        color: AppTheme.text;
+                        font-size: 11px;
+                        font-weight: 700;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    Text {
+                        x: parent.width - 48px;
+                        y: 0px;
+                        width: 38px;
+                        height: parent.height;
+                        text: root.choose-group-label;
+                        color: AppTheme.text-soft;
+                        font-size: 10px;
+                        font-weight: 700;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+
+                    touch := TouchArea {
+                        width: parent.width;
+                        height: parent.height;
+                        clicked => { root.group-picker-dialog-open = true; }
+                    }
+                }
             }
 
             DialogField {
@@ -911,12 +1287,35 @@ export component CreateSnippetGroupDialog inherits Rectangle {
                     label: root.create-label;
                     primary: true;
                     clicked => {
-                        if root.create(root.draft-name) {
+                        if root.create(root.selected-parent-id, root.draft-name) {
                             root.close();
                         }
                     }
                 }
             }
+        }
+    }
+
+    if root.group-picker-dialog-open: MoveSnippetDialog {
+        x: 0px;
+        y: 0px;
+        width: root.width;
+        height: root.height;
+        title-label: root.group-label;
+        root-label: root.root-group-label;
+        cancel-label: root.cancel-label;
+        move-label: root.confirm-group-label;
+        groups: root.group-rows;
+        selected-group-id: root.selected-parent-id == "snippet-folder:all" ? "" : root.selected-parent-id;
+        select-group(group-id, name) => {
+            root.selected-parent-id = group-id == "" ? "snippet-folder:all" : group-id;
+            root.selected-parent-name = name;
+            root.group-selected(root.selected-parent-id, name);
+        }
+        close => { root.group-picker-dialog-open = false; }
+        move => {
+            root.group-picker-dialog-open = false;
+            true
         }
     }
 }

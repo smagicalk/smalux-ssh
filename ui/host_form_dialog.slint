@@ -1,9 +1,9 @@
 import { ScrollView } from "std-widgets.slint";
-import { CredentialOptionRow, GroupOptionRow } from "./models.slint";
+import { CredentialOptionRow, GroupOptionRow, NetworkResourceOptionRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { DialogAuthOption, DialogField, DialogSectionHeader } from "./common.slint";
 import { CredentialPickerButton } from "./host_dialog_parts.slint";
-import { HostAgentSourceSection, HostFormFooter, HostFormHeader, HostGroupSelectField, HostIconSelectField } from "./host_form_parts.slint";
+import { HostAgentSourceSection, HostFormFooter, HostFormHeader, HostGroupSelectField, HostIconSelectField, HostNetworkResourceSection } from "./host_form_parts.slint";
 import { HostCredentialPickerOverlay, HostGroupPickerOverlay, HostIconPickerOverlay, HostInlineCredentialOverlay } from "./host_form_overlays.slint";
 export component CreateHostDialog inherits Rectangle {
     in property <string> dialog-title: "";
@@ -66,6 +66,12 @@ export component CreateHostDialog inherits Rectangle {
     in property <string> credential-secret-placeholder: "";
     in property <string> credential-algorithm-label: "";
     in property <string> credential-save-label: "";
+    in property <string> network-title: "";
+    in property <string> network-caption: "";
+    in property <string> network-proxy-label: "";
+    in property <string> network-jump-label: "";
+    in property <string> network-forward-label: "";
+    in property <string> network-empty-label: "";
     in property <string> icon-title: "";
     in property <string> icon-server-label: "";
     in property <string> icon-database-label: "";
@@ -97,6 +103,9 @@ export component CreateHostDialog inherits Rectangle {
     in property <[GroupOptionRow]> quick-host-groups;
     in property <[CredentialOptionRow]> private-key-options;
     in property <[CredentialOptionRow]> certificate-options;
+    in property <[NetworkResourceOptionRow]> network-proxy-options;
+    in property <[NetworkResourceOptionRow]> network-jump-options;
+    in property <[NetworkResourceOptionRow]> network-forward-options;
     in property <string> last-error;
     property <bool> group-picker-open: false;
     property <bool> icon-picker-open: false;
@@ -115,6 +124,7 @@ export component CreateHostDialog inherits Rectangle {
     callback select-group(group-id: string);
     callback update-auth-kind(kind: string);
     callback update-auth-field(field: string, value: string);
+    callback toggle-network-resource(kind: string, resource-id: string);
     callback create-credential(kind: string, name: string, secret-ref: string, algorithm: string);
     callback save();
     callback close();
@@ -221,6 +231,14 @@ export component CreateHostDialog inherits Rectangle {
                         }
                     }
 
+                    DialogField {
+                        label: root.tags-label;
+                        field-value: root.quick-host-tags;
+                        placeholder: root.tags-placeholder;
+                        edited(value) => { root.update-field("Tags", value); }
+                        accepted(value) => { root.update-field("Tags", value); }
+                    }
+
                     DialogSectionHeader {
                         title: root.authentication-title;
                         caption: root.authentication-caption;
@@ -321,6 +339,21 @@ export component CreateHostDialog inherits Rectangle {
                             root.private-key-picker-open = false;
                             root.group-picker-open = false;
                             root.icon-picker-open = false;
+                        }
+                    }
+
+                    HostNetworkResourceSection {
+                        title: root.network-title;
+                        caption: root.network-caption;
+                        proxy-label: root.network-proxy-label;
+                        jump-label: root.network-jump-label;
+                        forward-label: root.network-forward-label;
+                        empty-label: root.network-empty-label;
+                        proxy-options: root.network-proxy-options;
+                        jump-options: root.network-jump-options;
+                        forward-options: root.network-forward-options;
+                        toggle-resource(kind, resource-id) => {
+                            root.toggle-network-resource(kind, resource-id);
                         }
                     }
 

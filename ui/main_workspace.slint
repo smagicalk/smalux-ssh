@@ -1,4 +1,4 @@
-import { CredentialDetailFieldRow, CredentialGroupContentRow, CredentialRow, HostRow, KnownHostRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
+import { CredentialDetailFieldRow, CredentialGroupContentRow, CredentialRow, HostRow, KnownHostRow, NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkStatRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { CompactButton } from "./common.slint";
 import { SftpPane } from "./workspace.slint";
@@ -9,7 +9,8 @@ import { SecurityWorkspacePage } from "./workspace_security_page.slint";
 import { SettingsWorkspacePage } from "./workspace_settings_page.slint";
 import { SnippetWorkspacePage } from "./workspace_snippet_page.slint";
 import { TerminalWorkspacePage } from "./workspace_terminal_page.slint";
-import { ProxyPlaceholderPage, WorkspaceListPage } from "./workspace_common.slint";
+import { NetworkWorkspacePage } from "./workspace_network_page.slint";
+import { WorkspaceListPage } from "./workspace_common.slint";
 export component MainWorkspace inherits Rectangle {
     in property <string> active-page;
     in property <string> active-session-id;
@@ -40,6 +41,38 @@ export component MainWorkspace inherits Rectangle {
     in property <[ToolItemRow]> snippets;
     in property <[ToolItemRow]> tunnels;
     in property <[ToolItemRow]> credentials;
+    in property <[NetworkItemRow]> network-runtime-tunnels: [];
+    in property <[NetworkItemRow]> network-saved-tunnels: [];
+    in property <[NetworkItemRow]> network-proxy-assets: [];
+    in property <[NetworkItemRow]> network-route-definitions: [];
+    in-out property <string> network-selected-id: "";
+    in-out property <string> network-selected-title: "";
+    in-out property <string> network-selected-caption: "";
+    in-out property <string> network-selected-kind: "";
+    in-out property <string> network-selected-kind-key: "";
+    in-out property <string> network-selected-meta: "";
+    in-out property <string> network-selected-note: "";
+    in-out property <string> network-selected-icon-key: "router";
+    in-out property <int> network-selected-accent-index: 0;
+    in-out property <string> network-primary-action-key: "";
+    in-out property <string> network-primary-action-label: "";
+    in-out property <bool> network-primary-action-enabled: false;
+    in-out property <string> network-action-session-id: "";
+    in-out property <string> network-action-rule-name: "";
+    in-out property <[NetworkStatRow]> network-stats: [];
+    in-out property <[NetworkDetailFieldRow]> network-detail-fields: [];
+    in-out property <[NetworkRelatedItemRow]> network-related-items: [];
+    in-out property <string> network-selected-asset-id: "";
+    in-out property <string> network-selected-edit-kind-key: "";
+    in-out property <string> network-selected-edit-host: "";
+    in-out property <string> network-selected-edit-port: "";
+    in-out property <string> network-selected-edit-tags: "";
+    in-out property <string> network-selected-edit-bind-host: "";
+    in-out property <string> network-selected-edit-bind-port: "";
+    in-out property <string> network-selected-edit-target-host: "";
+    in-out property <string> network-selected-edit-target-port: "";
+    in-out property <bool> network-selected-edit-auto-start: false;
+    in-out property <string> network-selected-edit-host-ids: "";
     in property <string> selected-snippet-id: "";
     in property <string> selected-snippet-name: "";
     in property <string> selected-snippet-description: "";
@@ -53,6 +86,7 @@ export component MainWorkspace inherits Rectangle {
     in property <string> selected-snippet-node-kind: "";
     in property <int> selected-snippet-accent-index: 0;
     in property <[SnippetRow]> snippet-rows: [];
+    in property <[SnippetRow]> snippet-target-options: [];
     in property <[CredentialRow]> credential-rows;
     in property <[CredentialGroupContentRow]> credential-group-contents;
     in property <[CredentialDetailFieldRow]> credential-detail-fields;
@@ -108,6 +142,44 @@ export component MainWorkspace inherits Rectangle {
     in property <string> tool-keys-label: "";
     in property <string> tool-proxy-label: "";
     in property <string> proxy-empty-label: "";
+    in property <string> proxy-section-route-label: "";
+    in property <string> proxy-section-forward-label: "";
+    in property <string> proxy-section-host-label: "";
+    in property <string> proxy-jump-caption-label: "";
+    in property <string> proxy-command-caption-label: "";
+    in property <string> proxy-forward-caption-label: "";
+    in property <string> proxy-host-hint-caption-label: "";
+    in property <string> proxy-runtime-section-label: "";
+    in property <string> proxy-resources-section-label: "";
+    in property <string> proxy-runtime-empty-label: "";
+    in property <string> proxy-resources-empty-label: "";
+    in property <string> proxy-new-proxy-label: "";
+    in property <string> proxy-new-jump-label: "";
+    in property <string> proxy-new-forward-label: "";
+    in property <string> proxy-edit-label: "";
+    in property <string> proxy-delete-label: "";
+    in property <string> proxy-save-label: "";
+    in property <string> proxy-cancel-label: "";
+    in property <string> proxy-delete-title-label: "";
+    in property <string> proxy-delete-caption-label: "";
+    in property <string> proxy-name-label: "";
+    in property <string> proxy-name-placeholder: "";
+    in property <string> proxy-address-label: "";
+    in property <string> proxy-port-label: "";
+    in property <string> proxy-tags-label: "";
+    in property <string> proxy-bind-label: "";
+    in property <string> proxy-target-label: "";
+    in property <string> proxy-host-ids-label: "";
+    in property <string> proxy-host-ids-placeholder: "";
+    in property <string> proxy-bind-host-placeholder: "";
+    in property <string> proxy-target-host-placeholder: "";
+    in property <string> proxy-tags-placeholder: "";
+    in property <string> proxy-auto-start-label: "";
+    in property <string> proxy-kind-socks5-label: "";
+    in property <string> proxy-kind-http-label: "";
+    in property <string> proxy-kind-local-label: "";
+    in property <string> proxy-kind-remote-label: "";
+    in property <string> proxy-kind-dynamic-label: "";
     in property <string> security-detail-empty-title-label: "";
     in property <string> security-detail-empty-caption-label: "";
     in property <string> security-field-type-label: "";
@@ -202,6 +274,11 @@ export component MainWorkspace inherits Rectangle {
     callback select-sftp-entry(host-id: string, path: string);
     callback trust-known-host(host: string, port: int);
     callback remove-known-host(host: string, port: int);
+    callback stop-network-tunnel(session-id: string, rule-name: string);
+    callback save-network-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save-network-jump-chain(asset-id: string, name: string, host-ids: string) -> bool;
+    callback save-network-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
+    callback remove-network-asset(kind-key: string, asset-id: string);
     callback dismiss-ui-error();
     callback set-language(language: string);
     callback set-built-in-theme(theme: string);
@@ -228,7 +305,7 @@ export component MainWorkspace inherits Rectangle {
     callback edit-selected-snippet();
     callback delete-selected-snippet();
     callback move-selected-snippet();
-    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, icon-key: string, node-kind: string, accent-index: int);
+    callback select-snippet(id: string, parent-id: string, name: string, description: string, command-template: string, scope: string, scope-key: string, variables: string, variable-names: string, arguments: string, argument-values: string, meta: string, target-linux-selected: bool, target-debian-selected: bool, target-rhel-selected: bool, target-alpine-selected: bool, target-fedora-selected: bool, target-arch-selected: bool, target-suse-selected: bool, target-freebsd-selected: bool, target-macos-selected: bool, target-powershell-selected: bool, target-cmd-selected: bool, target-linux-disabled: bool, target-debian-disabled: bool, target-rhel-disabled: bool, target-alpine-disabled: bool, target-fedora-disabled: bool, target-arch-disabled: bool, target-suse-disabled: bool, target-freebsd-disabled: bool, target-macos-disabled: bool, target-powershell-disabled: bool, target-cmd-disabled: bool, icon-key: string, node-kind: string, accent-index: int);
     callback copy-snippet-command(content: string) -> bool;
     callback run-selected-snippet();
     callback create-certificate(group-id: string, group-path: string);
@@ -317,6 +394,7 @@ export component MainWorkspace inherits Rectangle {
             selected-node-kind: root.selected-snippet-node-kind;
             selected-accent-index: root.selected-snippet-accent-index;
             snippet-rows: root.snippet-rows;
+            snippet-target-options: root.snippet-target-options;
             empty-title-label: root.snippets-detail-empty-title-label;
             empty-caption-label: root.snippets-detail-empty-caption-label;
             field-scope-label: root.snippets-field-scope-label;
@@ -346,6 +424,9 @@ export component MainWorkspace inherits Rectangle {
             move-selected => { root.move-selected-snippet(); }
             copy-command(content) => { root.copy-snippet-command(content) }
             run-selected => { root.run-selected-snippet(); }
+            select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index) => {
+                root.select-snippet(id, parent-id, name, description, command-template, scope, scope-key, variables, variable-names, arguments, argument-values, meta, target-linux-selected, target-debian-selected, target-rhel-selected, target-alpine-selected, target-fedora-selected, target-arch-selected, target-suse-selected, target-freebsd-selected, target-macos-selected, target-powershell-selected, target-cmd-selected, target-linux-disabled, target-debian-disabled, target-rhel-disabled, target-alpine-disabled, target-fedora-disabled, target-arch-disabled, target-suse-disabled, target-freebsd-disabled, target-macos-disabled, target-powershell-disabled, target-cmd-disabled, icon-key, node-kind, accent-index);
+            }
         }
 
         if root.active-page == "Tunnels": WorkspaceListPage {
@@ -354,9 +435,124 @@ export component MainWorkspace inherits Rectangle {
             items: root.tunnels;
         }
 
-        if root.active-page == "Proxy": ProxyPlaceholderPage {
+        if root.active-page == "Proxy": NetworkWorkspacePage {
             title: root.tool-proxy-label;
-            empty-label: root.proxy-empty-label;
+            runtime-section-label: root.proxy-runtime-section-label;
+            saved-section-label: root.proxy-resources-section-label;
+            runtime-empty-label: root.proxy-runtime-empty-label;
+            resources-empty-label: root.proxy-resources-empty-label;
+            proxy-section-label: "";
+            routes-section-label: "";
+            empty-title-label: root.proxy-empty-label;
+            empty-caption-label: root.proxy-host-hint-caption-label;
+            new-proxy-label: root.proxy-new-proxy-label;
+            new-jump-label: root.proxy-new-jump-label;
+            new-forward-label: root.proxy-new-forward-label;
+            edit-label: root.proxy-edit-label;
+            delete-label: root.proxy-delete-label;
+            save-label: root.proxy-save-label;
+            cancel-label: root.proxy-cancel-label;
+            delete-title-label: root.proxy-delete-title-label;
+            delete-caption-label: root.proxy-delete-caption-label;
+            name-label: root.proxy-name-label;
+            name-placeholder: root.proxy-name-placeholder;
+            address-label: root.proxy-address-label;
+            port-label: root.proxy-port-label;
+            tags-label: root.proxy-tags-label;
+            bind-label: root.proxy-bind-label;
+            target-label: root.proxy-target-label;
+            host-ids-label: root.proxy-host-ids-label;
+            host-ids-placeholder: root.proxy-host-ids-placeholder;
+            bind-host-placeholder: root.proxy-bind-host-placeholder;
+            target-host-placeholder: root.proxy-target-host-placeholder;
+            tags-placeholder: root.proxy-tags-placeholder;
+            auto-start-label: root.proxy-auto-start-label;
+            socks5-kind-label: root.proxy-kind-socks5-label;
+            http-kind-label: root.proxy-kind-http-label;
+            local-kind-label: root.proxy-kind-local-label;
+            remote-kind-label: root.proxy-kind-remote-label;
+            dynamic-kind-label: root.proxy-kind-dynamic-label;
+            runtime-tunnels: root.network-runtime-tunnels;
+            saved-tunnels: root.network-saved-tunnels;
+            proxy-assets: root.network-proxy-assets;
+            route-definitions: root.network-route-definitions;
+            selected-id: root.network-selected-id;
+            selected-title: root.network-selected-title;
+            selected-caption: root.network-selected-caption;
+            selected-kind: root.network-selected-kind;
+            selected-kind-key: root.network-selected-kind-key;
+            selected-meta: root.network-selected-meta;
+            selected-note: root.network-selected-note;
+            selected-icon-key: root.network-selected-icon-key;
+            selected-accent-index: root.network-selected-accent-index;
+            primary-action-key: root.network-primary-action-key;
+            primary-action-label: root.network-primary-action-label;
+            primary-action-enabled: root.network-primary-action-enabled;
+            action-session-id: root.network-action-session-id;
+            action-rule-name: root.network-action-rule-name;
+            stats: root.network-stats;
+            detail-fields: root.network-detail-fields;
+            related-items: root.network-related-items;
+            selected-asset-id: root.network-selected-asset-id;
+            selected-edit-kind-key: root.network-selected-edit-kind-key;
+            selected-edit-host: root.network-selected-edit-host;
+            selected-edit-port: root.network-selected-edit-port;
+            selected-edit-tags: root.network-selected-edit-tags;
+            selected-edit-bind-host: root.network-selected-edit-bind-host;
+            selected-edit-bind-port: root.network-selected-edit-bind-port;
+            selected-edit-target-host: root.network-selected-edit-target-host;
+            selected-edit-target-port: root.network-selected-edit-target-port;
+            selected-edit-auto-start: root.network-selected-edit-auto-start;
+            selected-edit-host-ids: root.network-selected-edit-host-ids;
+            select-network-item(item) => {
+                root.network-selected-id = item.id;
+                root.network-selected-title = item.title;
+                root.network-selected-caption = item.subtitle;
+                root.network-selected-kind = item.kind_label;
+                root.network-selected-kind-key = item.kind_key;
+                root.network-selected-meta = item.meta;
+                root.network-selected-note = item.note;
+                root.network-selected-icon-key = item.icon_key;
+                root.network-selected-accent-index = item.accent_index;
+                root.network-primary-action-key = item.primary_action_key;
+                root.network-primary-action-label = item.primary_action_label;
+                root.network-primary-action-enabled = item.primary_action_enabled;
+                root.network-action-session-id = item.session_id;
+                root.network-action-rule-name = item.title;
+                root.network-stats = [
+                    { label: item.stat_primary_label, value: item.stat_primary_value },
+                    { label: item.stat_secondary_label, value: item.stat_secondary_value },
+                ];
+                root.network-detail-fields = [
+                    { label: item.detail_primary_label, value: item.detail_primary_value },
+                    { label: item.detail_secondary_label, value: item.detail_secondary_value },
+                ];
+                root.network-related-items = [
+                    { title: item.body_label, subtitle: item.body_value, meta: item.meta },
+                ];
+                root.network-selected-asset-id = item.asset_id;
+                root.network-selected-edit-kind-key = item.edit_kind_key;
+                root.network-selected-edit-host = item.edit_host;
+                root.network-selected-edit-port = item.edit_port;
+                root.network-selected-edit-tags = item.edit_tags;
+                root.network-selected-edit-bind-host = item.edit_bind_host;
+                root.network-selected-edit-bind-port = item.edit_bind_port;
+                root.network-selected-edit-target-host = item.edit_target_host;
+                root.network-selected-edit-target-port = item.edit_target_port;
+                root.network-selected-edit-auto-start = item.edit_auto_start;
+                root.network-selected-edit-host-ids = item.edit_host_ids;
+            }
+            stop-tunnel(session-id, rule-name) => { root.stop-network-tunnel(session-id, rule-name); }
+            save-proxy(asset-id, name, proxy-kind, host, port, tags) => {
+                root.save-network-proxy(asset-id, name, proxy-kind, host, port, tags)
+            }
+            save-jump-chain(asset-id, name, host-ids) => {
+                root.save-network-jump-chain(asset-id, name, host-ids)
+            }
+            save-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) => {
+                root.save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start)
+            }
+            remove-asset(kind-key, asset-id) => { root.remove-network-asset(kind-key, asset-id); }
         }
 
         if root.active-page == "Security": SecurityWorkspacePage {

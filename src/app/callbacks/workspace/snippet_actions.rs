@@ -8,7 +8,6 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::app::callbacks::{AppWindow, SharedAppState, apply_and_sync, apply_and_sync_success};
-use crate::app::projection::sync_window;
 use crate::model::{Message, SnippetScope};
 
 use super::super::parse_host_id;
@@ -46,54 +45,80 @@ pub(super) fn bind(window: &AppWindow, state: &SharedAppState) {
         });
     }
     {
-        let weak = window.as_weak();
         let state = Rc::clone(state);
-        window.on_create_snippet(move |parent_node_id, name, description, command_template| {
-            apply_and_sync_success(
-                &weak,
-                &state,
-                Message::CreateSnippet {
-                    name: name.to_string(),
-                    description: description.to_string(),
-                    command_template: command_template.to_string(),
-                    scope: SnippetScope::Global,
-                    group_id: parse_optional_snippet_group_node_id(parent_node_id.as_str()),
-                },
-            )
+        window.on_snippet_group_name(move |group_id| {
+            let state = state.borrow();
+            let Some(group_id) = parse_snippet_group_node_id(group_id.as_str()) else {
+                return "根分组".into();
+            };
+            state
+                .storage
+                .snippet_groups
+                .iter()
+                .find(|group| group.id == group_id)
+                .map(|group| group.name.as_str())
+                .unwrap_or("根分组")
+                .into()
         });
     }
     {
         let weak = window.as_weak();
         let state = Rc::clone(state);
-        window.on_update_snippet(move |snippet_row_id, name, description, command_template| {
-            let Some(snippet_id) = parse_snippet_row_id(snippet_row_id.as_str()) else {
-                return false;
-            };
-            let (scope, group_id) = {
-                let state = state.borrow();
-                let Some(snippet) = state
-                    .storage
-                    .snippets
-                    .iter()
-                    .find(|snippet| snippet.id == snippet_id)
-                else {
+        window.on_create_snippet(
+            move |parent_node_id, group_id, name, description, command_template| {
+                let target_group_id = if group_id.trim().is_empty() {
+                    parse_optional_snippet_group_node_id(parent_node_id.as_str())
+                } else {
+                    parse_optional_snippet_group_node_id(group_id.as_str())
+                };
+                apply_and_sync_success(
+                    &weak,
+                    &state,
+                    Message::CreateSnippet {
+                        name: name.to_string(),
+                        description: description.to_string(),
+                        command_template: command_template.to_string(),
+                        scope: SnippetScope::Global,
+                        group_id: target_group_id,
+                    },
+                )
+            },
+        );
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(state);
+        window.on_update_snippet(
+            move |snippet_row_id, group_id, name, description, command_template| {
+                let Some(snippet_id) = parse_snippet_row_id(snippet_row_id.as_str()) else {
                     return false;
                 };
-                (snippet.scope.clone(), snippet.group_id)
-            };
-            apply_and_sync_success(
-                &weak,
-                &state,
-                Message::UpdateSnippet {
-                    snippet_id,
-                    name: name.to_string(),
-                    description: description.to_string(),
-                    command_template: command_template.to_string(),
-                    scope,
-                    group_id,
-                },
-            )
-        });
+                let scope = {
+                    let state = state.borrow();
+                    let Some(snippet) = state
+                        .storage
+                        .snippets
+                        .iter()
+                        .find(|snippet| snippet.id == snippet_id)
+                    else {
+                        return false;
+                    };
+                    snippet.scope.clone()
+                };
+                apply_and_sync_success(
+                    &weak,
+                    &state,
+                    Message::UpdateSnippet {
+                        snippet_id,
+                        name: name.to_string(),
+                        description: description.to_string(),
+                        command_template: command_template.to_string(),
+                        scope,
+                        group_id: parse_optional_snippet_group_node_id(group_id.as_str()),
+                    },
+                )
+            },
+        );
     }
     {
         let weak = window.as_weak();
@@ -134,30 +159,16 @@ pub(super) fn bind(window: &AppWindow, state: &SharedAppState) {
                     return false;
                 };
                 let target_keys = parse_target_keys(target_key.as_str());
-                if target_keys.len() <= 1 {
-                    return apply_and_sync_success(
-                        &weak,
-                        &state,
-                        Message::UpdateSnippetTarget {
-                            snippet_id,
-                            target_id,
-                            target_key: target_keys
-                                .first()
-                                .cloned()
-                                .unwrap_or_else(|| target_key.to_string()),
-                            display_name: display_name.to_string(),
-                            command_template: command_template.to_string(),
-                        },
-                    );
-                }
-                update_snippet_target_with_extra_targets(
+                apply_and_sync_success(
                     &weak,
                     &state,
-                    snippet_id,
-                    target_id,
-                    target_keys,
-                    display_name.to_string(),
-                    command_template.to_string(),
+                    Message::SyncSnippetTargetImplementationTargets {
+                        snippet_id,
+                        target_id,
+                        target_keys,
+                        display_name: display_name.to_string(),
+                        command_template: command_template.to_string(),
+                    },
                 )
             },
         );
@@ -319,67 +330,6 @@ fn parse_target_keys(value: &str) -> Vec<String> {
         .filter(|target| !target.is_empty())
         .map(str::to_owned)
         .collect()
-}
-
-fn update_snippet_target_with_extra_targets(
-    weak: &slint::Weak<AppWindow>,
-    state: &SharedAppState,
-    snippet_id: crate::model::SnippetId,
-    target_id: crate::model::SnippetSupportTargetId,
-    target_keys: Vec<String>,
-    display_name: String,
-    command_template: String,
-) -> bool {
-    let Some(window) = weak.upgrade() else {
-        return false;
-    };
-    let mut target_keys = target_keys.into_iter();
-    let Some(primary_target_key) = target_keys.next() else {
-        return false;
-    };
-
-    let success = {
-        let mut state = state.borrow_mut();
-        let storage_before = state.storage.clone();
-        let primary_outcome = state.apply(Message::UpdateSnippetTarget {
-            snippet_id,
-            target_id,
-            target_key: primary_target_key,
-            display_name: display_name.clone(),
-            command_template: command_template.clone(),
-        });
-        let mut success = primary_outcome.error.is_none();
-        if success {
-            for target_key in target_keys {
-                let outcome = state.apply(Message::CreateSnippetTarget {
-                    snippet_id,
-                    target_keys: vec![target_key],
-                    display_name: display_name.clone(),
-                    command_template: command_template.clone(),
-                    share_target_id: Some(target_id),
-                });
-                if outcome.error.is_some() {
-                    success = false;
-                    break;
-                }
-            }
-        }
-
-        if state.storage != storage_before {
-            if let Err(error) = state.persist_storage() {
-                tracing::error!(error = %error, "保存本地存储失败");
-                state
-                    .ui
-                    .set_last_error(format!("保存本地存储失败：{error}"));
-                success = false;
-            }
-        }
-
-        success
-    };
-
-    sync_window(&window, &state.borrow());
-    success
 }
 
 #[cfg(test)]

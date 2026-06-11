@@ -40,6 +40,11 @@ impl StorageManager {
             self.snippets.retain(|snippet| {
                 !matches!(snippet.scope, SnippetScope::Host(scoped_host_id) if scoped_host_id == host_id)
             });
+            for asset in &mut self.jump_chain_assets {
+                asset.steps.retain(|step| step.host_id != host_id);
+            }
+            self.jump_chain_assets
+                .retain(|asset| !asset.steps.is_empty());
         }
 
         removed
@@ -125,7 +130,10 @@ impl StorageManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use smagical_core::{AuthProfile, HostId, SecretRef};
+    use smagical_core::{
+        AuthProfile, HostId, HostNetworkSelection, JumpChainAsset, JumpChainId, JumpProfile,
+        SecretRef,
+    };
     use uuid::Uuid;
 
     fn sample_host_with(id: HostId, name: &str, address: &str, tags: &[&str]) -> Host {
@@ -141,7 +149,8 @@ mod tests {
                 username: "ops".to_owned(),
                 secret: SecretRef("password:ops".to_owned()),
             },
-            proxy: None,
+            network: HostNetworkSelection::default(),
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override: None,
             background_override: None,
@@ -179,6 +188,11 @@ mod tests {
         let mut storage = StorageManager::default();
         let host_id = HostId(Uuid::new_v4());
         storage.upsert_host(sample_host_with(host_id, "prod", "prod.example.com", &[]));
+        storage.upsert_jump_chain_asset(JumpChainAsset {
+            id: JumpChainId(Uuid::new_v4()),
+            name: "prod-chain".to_owned(),
+            steps: vec![JumpProfile { host_id }],
+        });
         storage.record_recent_connection(RecentConnection {
             host_id,
             label: "prod".to_owned(),
@@ -214,6 +228,7 @@ mod tests {
         assert_eq!(storage.command_history_count(), 0);
         assert_eq!(storage.sftp_bookmark_count(), 0);
         assert_eq!(storage.snippet_count(), 0);
+        assert_eq!(storage.jump_chain_asset_count(), 0);
     }
 
     #[test]

@@ -93,6 +93,19 @@ pub(in crate::app) struct CredentialOptionViewModel {
     pub selected: bool,
 }
 
+/// 创建主机弹窗中的网络资源选项。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(in crate::app) struct NetworkResourceOptionViewModel {
+    pub value: String,
+    pub label: String,
+    pub detail: String,
+    pub kind_key: &'static str,
+    pub kind_label: String,
+    pub icon_key: &'static str,
+    pub accent_index: i32,
+    pub selected: bool,
+}
+
 /// 创建主机弹窗文案。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(in crate::app) struct CreateHostDialogText {
@@ -157,6 +170,12 @@ pub(in crate::app) struct CreateHostDialogText {
     pub credential_secret_placeholder: &'static str,
     pub credential_algorithm_label: &'static str,
     pub credential_save_label: &'static str,
+    pub network_title: &'static str,
+    pub network_caption: &'static str,
+    pub network_proxy_label: &'static str,
+    pub network_jump_label: &'static str,
+    pub network_forward_label: &'static str,
+    pub network_empty_label: &'static str,
     pub icon_title: &'static str,
     pub icon_server_label: &'static str,
     pub icon_database_label: &'static str,
@@ -179,6 +198,9 @@ pub(in crate::app) struct QuickHostViewModel {
     pub group_options: Vec<GroupOptionViewModel>,
     pub private_key_options: Vec<CredentialOptionViewModel>,
     pub certificate_options: Vec<CredentialOptionViewModel>,
+    pub network_proxy_options: Vec<NetworkResourceOptionViewModel>,
+    pub network_jump_chain_options: Vec<NetworkResourceOptionViewModel>,
+    pub network_forward_options: Vec<NetworkResourceOptionViewModel>,
     pub name: String,
     pub address: String,
     pub port: String,

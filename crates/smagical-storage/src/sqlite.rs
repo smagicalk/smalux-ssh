@@ -21,6 +21,7 @@ mod mapper;
 mod mapper_common;
 mod mapper_credentials;
 mod mapper_hosts;
+mod mapper_network;
 mod migration;
 mod migration_common;
 mod migration_credentials;
@@ -226,6 +227,8 @@ async fn connect_and_migrate(path: &Path) -> Result<DatabaseConnection, StorageP
     let db = Database::connect(url).await?;
     configure_sqlite(&db).await?;
     repair_legacy_migration_name(&db).await?;
+    repair_legacy_host_proxy_schema(&db).await?;
+    repair_network_asset_tables(&db).await?;
     migration::Migrator::up(&db, None).await?;
     seed_schema_meta(&db).await?;
     Ok(db)
@@ -278,6 +281,169 @@ async fn repair_legacy_migration_name(
     Ok(())
 }
 
+async fn repair_legacy_host_proxy_schema(
+    db: &DatabaseConnection,
+) -> Result<(), StoragePersistenceError> {
+    if !sqlite_table_exists(db, "host_proxy").await? {
+        return Ok(());
+    }
+    if sqlite_table_has_column(db, "host_proxy", "id").await? {
+        return Ok(());
+    }
+
+    db.execute_unprepared("ALTER TABLE host_proxy RENAME TO host_proxy_legacy")
+        .await?;
+    db.execute_unprepared(
+        "CREATE TABLE host_proxy (
+            id varchar(80) NOT NULL PRIMARY KEY,
+            host_id varchar(36) NOT NULL,
+            sort_order integer NOT NULL,
+            proxy_kind text NOT NULL,
+            proxy_host text NOT NULL,
+            proxy_port integer NOT NULL,
+            CONSTRAINT fk_host_proxy_host FOREIGN KEY (host_id) REFERENCES hosts (id) ON DELETE CASCADE
+        )",
+    )
+    .await?;
+    db.execute_unprepared("CREATE INDEX idx_host_proxy_host ON host_proxy (host_id)")
+        .await?;
+    db.execute_unprepared(
+        "INSERT INTO host_proxy (id, host_id, sort_order, proxy_kind, proxy_host, proxy_port)
+         SELECT host_id || ':proxy:0', host_id, 0, proxy_kind, proxy_host, proxy_port
+         FROM host_proxy_legacy",
+    )
+    .await?;
+    db.execute_unprepared("DROP TABLE host_proxy_legacy")
+        .await?;
+    Ok(())
+}
+
+async fn repair_network_asset_tables(
+    db: &DatabaseConnection,
+) -> Result<(), StoragePersistenceError> {
+    if !sqlite_table_exists(db, "hosts").await? {
+        return Ok(());
+    }
+
+    if !sqlite_table_exists(db, "proxy_assets").await? {
+        db.execute_unprepared(
+            "CREATE TABLE proxy_assets (
+                id varchar(36) NOT NULL PRIMARY KEY,
+                name text NOT NULL,
+                tags_toml text NOT NULL DEFAULT 'items = []',
+                proxy_kind text NOT NULL,
+                proxy_host text NOT NULL,
+                proxy_port integer NOT NULL,
+                sort_order integer NOT NULL
+            )",
+        )
+        .await?;
+    }
+
+    if !sqlite_table_exists(db, "jump_chain_assets").await? {
+        db.execute_unprepared(
+            "CREATE TABLE jump_chain_assets (
+                id varchar(36) NOT NULL PRIMARY KEY,
+                name text NOT NULL,
+                sort_order integer NOT NULL
+            )",
+        )
+        .await?;
+    }
+
+    if !sqlite_table_exists(db, "jump_chain_steps").await? {
+        db.execute_unprepared(
+            "CREATE TABLE jump_chain_steps (
+                id varchar(80) NOT NULL PRIMARY KEY,
+                chain_id varchar(36) NOT NULL,
+                jump_host_id varchar(36) NOT NULL,
+                sort_order integer NOT NULL,
+                CONSTRAINT fk_jump_chain_steps_chain FOREIGN KEY (chain_id) REFERENCES jump_chain_assets (id) ON DELETE CASCADE,
+                CONSTRAINT fk_jump_chain_steps_host FOREIGN KEY (jump_host_id) REFERENCES hosts (id) ON DELETE CASCADE
+            )",
+        )
+        .await?;
+        db.execute_unprepared(
+            "CREATE INDEX IF NOT EXISTS idx_jump_chain_steps_chain ON jump_chain_steps (chain_id)",
+        )
+        .await?;
+    }
+
+    if !sqlite_table_exists(db, "forward_assets").await? {
+        db.execute_unprepared(
+            "CREATE TABLE forward_assets (
+                id varchar(36) NOT NULL PRIMARY KEY,
+                name text NOT NULL,
+                tags_toml text NOT NULL DEFAULT 'items = []',
+                kind text NOT NULL,
+                bind_host text NOT NULL,
+                bind_port integer NOT NULL,
+                target_host text NOT NULL,
+                target_port integer NOT NULL,
+                auto_start boolean NOT NULL,
+                sort_order integer NOT NULL
+            )",
+        )
+        .await?;
+    }
+
+    if !sqlite_table_exists(db, "host_network_proxies").await? {
+        db.execute_unprepared(
+            "CREATE TABLE host_network_proxies (
+                id varchar(80) NOT NULL PRIMARY KEY,
+                host_id varchar(36) NOT NULL,
+                proxy_id varchar(36) NOT NULL,
+                sort_order integer NOT NULL,
+                CONSTRAINT fk_host_network_proxies_host FOREIGN KEY (host_id) REFERENCES hosts (id) ON DELETE CASCADE,
+                CONSTRAINT fk_host_network_proxies_proxy FOREIGN KEY (proxy_id) REFERENCES proxy_assets (id) ON DELETE RESTRICT
+            )",
+        )
+        .await?;
+        db.execute_unprepared(
+            "CREATE INDEX IF NOT EXISTS idx_host_network_proxies_host ON host_network_proxies (host_id)",
+        )
+        .await?;
+    }
+
+    if !sqlite_table_exists(db, "host_network_jump_chains").await? {
+        db.execute_unprepared(
+            "CREATE TABLE host_network_jump_chains (
+                id varchar(80) NOT NULL PRIMARY KEY,
+                host_id varchar(36) NOT NULL,
+                chain_id varchar(36) NOT NULL,
+                sort_order integer NOT NULL,
+                CONSTRAINT fk_host_network_jump_chains_host FOREIGN KEY (host_id) REFERENCES hosts (id) ON DELETE CASCADE,
+                CONSTRAINT fk_host_network_jump_chains_chain FOREIGN KEY (chain_id) REFERENCES jump_chain_assets (id) ON DELETE RESTRICT
+            )",
+        )
+        .await?;
+        db.execute_unprepared(
+            "CREATE INDEX IF NOT EXISTS idx_host_network_jump_chains_host ON host_network_jump_chains (host_id)",
+        )
+        .await?;
+    }
+
+    if !sqlite_table_exists(db, "host_network_forwards").await? {
+        db.execute_unprepared(
+            "CREATE TABLE host_network_forwards (
+                id varchar(80) NOT NULL PRIMARY KEY,
+                host_id varchar(36) NOT NULL,
+                forward_id varchar(36) NOT NULL,
+                sort_order integer NOT NULL,
+                CONSTRAINT fk_host_network_forwards_host FOREIGN KEY (host_id) REFERENCES hosts (id) ON DELETE CASCADE,
+                CONSTRAINT fk_host_network_forwards_forward FOREIGN KEY (forward_id) REFERENCES forward_assets (id) ON DELETE RESTRICT
+            )",
+        )
+        .await?;
+        db.execute_unprepared(
+            "CREATE INDEX IF NOT EXISTS idx_host_network_forwards_host ON host_network_forwards (host_id)",
+        )
+        .await?;
+    }
+
+    Ok(())
+}
+
 async fn sqlite_table_exists(
     db: &DatabaseConnection,
     table_name: &str,
@@ -292,10 +458,30 @@ async fn sqlite_table_exists(
     Ok(db.query_one_raw(statement).await?.is_some())
 }
 
+async fn sqlite_table_has_column(
+    db: &DatabaseConnection,
+    table_name: &str,
+    column_name: &str,
+) -> Result<bool, StoragePersistenceError> {
+    let statement = Statement::from_string(
+        DatabaseBackend::Sqlite,
+        format!("PRAGMA table_info({})", sqlite_string_literal(table_name)),
+    );
+    let rows = db.query_all_raw(statement).await?;
+    Ok(rows.into_iter().any(|row| {
+        row.try_get::<String>("", "name")
+            .map(|name| name == column_name)
+            .unwrap_or(false)
+    }))
+}
+
 async fn has_business_data(db: &DatabaseConnection) -> Result<bool, StoragePersistenceError> {
     // 只看业务表；schema_meta/app_config 不算用户业务数据，否则空库无法导入旧数据。
     Ok(entity::host::Entity::find().count(db).await? > 0
         || entity::host_group::Entity::find().count(db).await? > 0
+        || entity::proxy_asset::Entity::find().count(db).await? > 0
+        || entity::jump_chain_asset::Entity::find().count(db).await? > 0
+        || entity::forward_asset::Entity::find().count(db).await? > 0
         || entity::credential::Entity::find().count(db).await? > 0
         || entity::known_host::Entity::find().count(db).await? > 0
         || entity::recent_connection::Entity::find().count(db).await? > 0
@@ -393,11 +579,12 @@ mod tests {
     use smagical_core::{
         AgentSource, AuthProfile, BackgroundProfile, CommandHistoryId, CommandHistoryItem,
         CredentialId, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, HostId,
-        ImageSource, KeyAlgorithm, KnownHostEntry, ProxyProfile, RecentConnection,
-        SecretMaterialKind, SecretRecord, SecretRef, SessionId, SessionKind, SftpBookmark, Snippet,
-        SnippetArgument, SnippetGroup, SnippetGroupId, SnippetId, SnippetScope,
-        SnippetSupportTarget, SnippetSupportTargetId, SplitAxis, TunnelKind, TunnelRule,
-        WindowState, WorkspaceState, WorkspaceTabSnapshot,
+        HostNetworkSelection, ImageSource, JumpChainAsset, JumpChainId, KeyAlgorithm,
+        KnownHostEntry, ProxyAsset, ProxyId, ProxyProfile, RecentConnection, SecretMaterialKind,
+        SecretRecord, SecretRef, SessionId, SessionKind, SftpBookmark, Snippet, SnippetArgument,
+        SnippetGroup, SnippetGroupId, SnippetId, SnippetScope, SnippetSupportTarget,
+        SnippetSupportTargetId, SplitAxis, TunnelKind, TunnelRule, WindowState, WorkspaceState,
+        WorkspaceTabSnapshot,
     };
     use uuid::Uuid;
 
@@ -421,6 +608,26 @@ mod tests {
         }
     }
 
+    fn sample_proxy_asset() -> ProxyAsset {
+        ProxyAsset {
+            id: ProxyId(Uuid::new_v4()),
+            name: "office-socks".to_owned(),
+            tags: vec!["office".to_owned(), "shared".to_owned()],
+            profile: ProxyProfile::Socks5 {
+                host: "127.0.0.1".to_owned(),
+                port: 1080,
+            },
+        }
+    }
+
+    fn sample_jump_chain_asset(host_id: HostId) -> JumpChainAsset {
+        JumpChainAsset {
+            id: JumpChainId(Uuid::new_v4()),
+            name: "prod-chain".to_owned(),
+            steps: vec![smagical_core::JumpProfile { host_id }],
+        }
+    }
+
     fn sample_host(id: HostId, group_id: GroupId) -> Host {
         Host {
             id,
@@ -435,10 +642,17 @@ mod tests {
                 key: SecretRef("key:deploy".to_owned()),
                 passphrase: Some(SecretRef("passphrase:deploy".to_owned())),
             },
-            proxy: Some(ProxyProfile::Socks5 {
-                host: "127.0.0.1".to_owned(),
-                port: 1080,
-            }),
+            network: HostNetworkSelection::default(),
+            proxies: vec![
+                ProxyProfile::Socks5 {
+                    host: "127.0.0.1".to_owned(),
+                    port: 1080,
+                },
+                ProxyProfile::Http {
+                    host: "proxy.example.com".to_owned(),
+                    port: 8080,
+                },
+            ],
             jumps: vec![smagical_core::JumpProfile { host_id: id }],
             theme_override: Some(smagical_core::ThemeProfile {
                 name: "Host Dark".to_owned(),
@@ -493,6 +707,8 @@ mod tests {
 
         storage.upsert_group(sample_group(group_id));
         storage.upsert_host(sample_host(host_id, group_id));
+        storage.upsert_proxy_asset(sample_proxy_asset());
+        storage.upsert_jump_chain_asset(sample_jump_chain_asset(host_id));
         storage.upsert_credential(CredentialMetadata {
             id: credential_id,
             name: "deploy-key".to_owned(),
@@ -612,6 +828,9 @@ mod tests {
                 "schema_meta",
                 "host_groups",
                 "hosts",
+                "proxy_assets",
+                "jump_chain_assets",
+                "jump_chain_steps",
                 "credentials",
                 "credential_groups",
                 "credential_inspections",
@@ -650,6 +869,57 @@ mod tests {
         let loaded = store.load().expect("storage should load from SQLite");
 
         assert_eq!(loaded, storage);
+        let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn sqlite_load_repairs_legacy_single_proxy_table() {
+        let path = temp_db_path("legacy-host-proxy");
+        let store = SqliteStorage::new(&path);
+        let storage = sample_storage();
+        let host_id = storage.hosts[0].id.0.to_string();
+
+        store.save(&storage).expect("storage should save to SQLite");
+
+        let url = sqlite_connection_url(&path, "rw").expect("SQLite URL should be valid");
+        block_on_storage(async {
+            let db = Database::connect(url).await?;
+            configure_sqlite(&db).await?;
+            db.execute_unprepared("DROP TABLE host_proxy").await?;
+            db.execute_unprepared(
+                "CREATE TABLE host_proxy (
+                    host_id varchar(36) NOT NULL PRIMARY KEY,
+                    proxy_kind text NOT NULL,
+                    proxy_host text NOT NULL,
+                    proxy_port integer NOT NULL,
+                    CONSTRAINT fk_host_proxy_host FOREIGN KEY (host_id) REFERENCES hosts (id) ON DELETE CASCADE
+                )",
+            )
+            .await?;
+            db.execute_unprepared(&format!(
+                "INSERT INTO host_proxy (host_id, proxy_kind, proxy_host, proxy_port) VALUES ({}, 'socks5', '127.0.0.1', 1080)",
+                sqlite_string_literal(&host_id)
+            ))
+            .await?;
+            Ok::<(), StoragePersistenceError>(())
+        })
+        .expect("legacy host_proxy table should be prepared");
+
+        let loaded = store
+            .load()
+            .expect("load should repair legacy single proxy table");
+
+        assert_eq!(loaded.hosts[0].proxies.len(), 1);
+
+        let url = sqlite_connection_url(&path, "rw").expect("SQLite URL should be valid");
+        block_on_storage(async {
+            let db = Database::connect(url).await?;
+            configure_sqlite(&db).await?;
+            assert!(sqlite_table_has_column(&db, "host_proxy", "id").await?);
+            Ok::<(), StoragePersistenceError>(())
+        })
+        .expect("host_proxy table should be upgraded to multi-row schema");
+
         let _ = fs::remove_file(path);
     }
 
@@ -758,7 +1028,8 @@ mod tests {
                 source: AgentSource::Auto,
                 key_hint: Some("id_ed25519".to_owned()),
             },
-            proxy: None,
+            network: HostNetworkSelection::default(),
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override: None,
             background_override: None,

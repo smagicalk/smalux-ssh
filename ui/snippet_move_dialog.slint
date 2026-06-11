@@ -7,7 +7,7 @@ component SnippetGroupPickerItem inherits Rectangle {
     in property <SnippetRow> item;
     in property <string> selected-group-id;
     in property <string> root-label;
-    callback selected(group-id: string);
+    callback selected(group-id: string, name: string);
 
     property <bool> visible-row: root.item.node_kind == "Group";
     property <string> emitted-id: root.item.id == "snippet-folder:all" ? "" : root.item.id;
@@ -21,7 +21,7 @@ component SnippetGroupPickerItem inherits Rectangle {
     background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
 
     touch := TouchArea {
-        clicked => { root.selected(root.emitted-id); }
+        clicked => { root.selected(root.emitted-id, root.item.id == "snippet-folder:all" ? root.root-label : root.item.name); }
     }
 
     HostIcon {
@@ -53,7 +53,7 @@ export component MoveSnippetDialog inherits Rectangle {
     in property <string> move-label;
     in property <[SnippetRow]> groups;
     in property <string> selected-group-id;
-    callback select-group(group-id: string);
+    callback select-group(group-id: string, name: string);
     callback close();
     callback move() -> bool;
 
@@ -104,7 +104,7 @@ export component MoveSnippetDialog inherits Rectangle {
                             item: snippet;
                             selected-group-id: root.selected-group-id;
                             root-label: root.root-label;
-                            selected(group-id) => { root.select-group(group-id); }
+                            selected(group-id, name) => { root.select-group(group-id, name); }
                         }
                     }
                 }

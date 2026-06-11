@@ -134,7 +134,9 @@ pub mod host_proxy {
     #[sea_orm(table_name = "host_proxy")]
     pub struct Model {
         #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
         pub host_id: String,
+        pub sort_order: i32,
         pub proxy_kind: String,
         pub proxy_host: String,
         pub proxy_port: i32,
@@ -158,6 +160,161 @@ pub mod host_jump {
         pub id: String,
         pub host_id: String,
         pub jump_host_id: String,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod proxy_asset {
+    //! 可复用代理资产表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "proxy_assets")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub name: String,
+        pub tags_toml: String,
+        pub proxy_kind: String,
+        pub proxy_host: String,
+        pub proxy_port: i32,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod jump_chain_asset {
+    //! 可复用跳板链资产表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "jump_chain_assets")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub name: String,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod jump_chain_step {
+    //! 可复用跳板链步骤表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "jump_chain_steps")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub chain_id: String,
+        pub jump_host_id: String,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod forward_asset {
+    //! 可复用端口转发资产表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "forward_assets")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub name: String,
+        pub tags_toml: String,
+        pub kind: String,
+        pub bind_host: String,
+        pub bind_port: i32,
+        pub target_host: String,
+        pub target_port: i32,
+        pub auto_start: bool,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod host_network_proxy {
+    //! 主机引用代理资产表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "host_network_proxies")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub host_id: String,
+        pub proxy_id: String,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod host_network_jump_chain {
+    //! 主机引用跳板链资产表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "host_network_jump_chains")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub host_id: String,
+        pub chain_id: String,
+        pub sort_order: i32,
+    }
+
+    #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
+    pub enum Relation {}
+
+    impl ActiveModelBehavior for ActiveModel {}
+}
+
+pub mod host_network_forward {
+    //! 主机引用端口转发资产表。
+
+    use super::*;
+
+    #[derive(Clone, Debug, PartialEq, DeriveEntityModel)]
+    #[sea_orm(table_name = "host_network_forwards")]
+    pub struct Model {
+        #[sea_orm(primary_key, auto_increment = false)]
+        pub id: String,
+        pub host_id: String,
+        pub forward_id: String,
         pub sort_order: i32,
     }
 

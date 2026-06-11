@@ -2,6 +2,7 @@ import { AppTheme } from "./theme.slint";
 import { DialogButton, DialogCloseButton, DialogField } from "./common.slint";
 import { HostNodeIcon } from "./hosts.slint";
 import { AgentSourceOption } from "./host_dialog_parts.slint";
+import { NetworkResourceOptionRow } from "./models.slint";
 
 export component HostFormHeader inherits Rectangle {
     in property <string> title;
@@ -275,6 +276,195 @@ export component HostAgentSourceSection inherits Rectangle {
             placeholder: root.custom-pipe-placeholder;
             edited(value) => { root.update-custom-pipe(value); }
             accepted(value) => { root.update-custom-pipe(value); }
+        }
+    }
+}
+
+export component HostNetworkResourceRow inherits Rectangle {
+    in property <NetworkResourceOptionRow> option;
+    callback toggled(kind-key: string, resource-id: string);
+
+    height: 38px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.option.selected ? AppTheme.border-strong : touch.has-hover ? AppTheme.border-soft : AppTheme.transparent;
+    background: root.option.selected ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
+
+    touch := TouchArea {
+        clicked => { root.toggled(root.option.kind_key, root.option.value); }
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+
+        HostNodeIcon {
+            kind: "Host";
+            icon-key: root.option.icon_key;
+            status-key: "Created";
+            accent-index: root.option.accent_index;
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 1px;
+
+            Rectangle { vertical-stretch: 1; }
+            Text {
+                text: root.option.label;
+                color: root.option.selected ? AppTheme.text-strong : AppTheme.text;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+            Text {
+                text: root.option.detail;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                overflow: elide;
+            }
+            Rectangle { vertical-stretch: 1; }
+        }
+
+        Rectangle {
+            width: 18px;
+            height: parent.height;
+            background: AppTheme.transparent;
+
+            Rectangle {
+                x: 1px;
+                y: (parent.height - self.height) / 2;
+                width: 16px;
+                height: 16px;
+                border-radius: 5px;
+                border-width: 1px;
+                border-color: root.option.selected ? AppTheme.accent : AppTheme.border-soft;
+                background: root.option.selected ? AppTheme.badge-success-bg : AppTheme.input-bg;
+
+                Text {
+                    text: root.option.selected ? "✓" : "";
+                    color: AppTheme.accent;
+                    font-size: 11px;
+                    font-weight: 700;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+export component HostNetworkResourceGroup inherits Rectangle {
+    in property <string> label;
+    in property <string> empty-label;
+    in property <[NetworkResourceOptionRow]> options;
+    callback toggled(kind-key: string, resource-id: string);
+
+    height: root.options.length == 0 ? 48px : 24px + root.options.length * 40px;
+    background: AppTheme.transparent;
+
+    VerticalLayout {
+        spacing: 4px;
+
+        Text {
+            text: root.label;
+            color: AppTheme.text-soft;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        if root.options.length == 0: Rectangle {
+            height: 24px;
+            border-radius: 7px;
+            border-width: 1px;
+            border-color: AppTheme.border-soft;
+            background: AppTheme.input-bg;
+
+            Text {
+                x: 8px;
+                width: parent.width - 16px;
+                height: parent.height;
+                text: root.empty-label;
+                color: AppTheme.input-placeholder;
+                font-size: 10px;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+
+        if root.options.length > 0: VerticalLayout {
+            spacing: 2px;
+            for option in root.options: HostNetworkResourceRow {
+                option: option;
+                toggled(kind-key, resource-id) => { root.toggled(kind-key, resource-id); }
+            }
+        }
+    }
+}
+
+export component HostNetworkResourceSection inherits Rectangle {
+    in property <string> title;
+    in property <string> caption;
+    in property <string> proxy-label;
+    in property <string> jump-label;
+    in property <string> forward-label;
+    in property <string> empty-label;
+    in property <[NetworkResourceOptionRow]> proxy-options;
+    in property <[NetworkResourceOptionRow]> jump-options;
+    in property <[NetworkResourceOptionRow]> forward-options;
+    callback toggle-resource(kind-key: string, resource-id: string);
+
+    height: 58px
+        + (root.proxy-options.length == 0 ? 48px : 24px + root.proxy-options.length * 40px)
+        + (root.jump-options.length == 0 ? 48px : 24px + root.jump-options.length * 40px)
+        + (root.forward-options.length == 0 ? 48px : 24px + root.forward-options.length * 40px);
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.dialog-section-bg;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 7px;
+
+        VerticalLayout {
+            spacing: 2px;
+
+            Text {
+                text: root.title;
+                color: AppTheme.text-strong;
+                font-size: 11px;
+                font-weight: 700;
+            }
+
+            Text {
+                text: root.caption;
+                color: AppTheme.text-muted;
+                font-size: 9px;
+                wrap: word-wrap;
+            }
+        }
+
+        HostNetworkResourceGroup {
+            label: root.proxy-label;
+            empty-label: root.empty-label;
+            options: root.proxy-options;
+            toggled(kind-key, resource-id) => { root.toggle-resource(kind-key, resource-id); }
+        }
+
+        HostNetworkResourceGroup {
+            label: root.jump-label;
+            empty-label: root.empty-label;
+            options: root.jump-options;
+            toggled(kind-key, resource-id) => { root.toggle-resource(kind-key, resource-id); }
+        }
+
+        HostNetworkResourceGroup {
+            label: root.forward-label;
+            empty-label: root.empty-label;
+            options: root.forward-options;
+            toggled(kind-key, resource-id) => { root.toggle-resource(kind-key, resource-id); }
         }
     }
 }

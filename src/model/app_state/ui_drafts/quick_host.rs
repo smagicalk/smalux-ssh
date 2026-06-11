@@ -6,8 +6,8 @@
 use uuid::Uuid;
 
 use crate::model::{
-    GroupId, HostGroup, HostId, QuickGroupDraft, QuickHostAuthField, QuickHostAuthKind,
-    QuickHostDraftField,
+    ForwardId, GroupId, HostGroup, HostId, JumpChainId, ProxyId, QuickGroupDraft,
+    QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
 };
 
 use super::super::{AppState, AppUpdateOutcome};
@@ -53,6 +53,69 @@ impl AppState {
     ) -> AppUpdateOutcome {
         // 认证字段可能是密码、私钥路径、agent 名称等，统一走草稿字段枚举。
         self.ui.set_quick_host_auth_field(field, value);
+        draft_changed()
+    }
+
+    /// 切换当前主机草稿要使用的代理资源。
+    pub(in crate::model::app_state) fn toggle_quick_host_network_proxy(
+        &mut self,
+        proxy_id: ProxyId,
+    ) -> AppUpdateOutcome {
+        if !self
+            .storage
+            .proxy_assets
+            .iter()
+            .any(|asset| asset.id == proxy_id)
+        {
+            return AppUpdateOutcome {
+                error: Some("代理资源不存在，无法选择".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        self.ui.toggle_quick_host_proxy(proxy_id);
+        draft_changed()
+    }
+
+    /// 切换当前主机草稿要使用的跳板链资源。
+    pub(in crate::model::app_state) fn toggle_quick_host_network_jump_chain(
+        &mut self,
+        chain_id: JumpChainId,
+    ) -> AppUpdateOutcome {
+        if !self
+            .storage
+            .jump_chain_assets
+            .iter()
+            .any(|asset| asset.id == chain_id)
+        {
+            return AppUpdateOutcome {
+                error: Some("跳板资源不存在，无法选择".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        self.ui.toggle_quick_host_jump_chain(chain_id);
+        draft_changed()
+    }
+
+    /// 切换当前主机草稿要绑定的端口转发资源。
+    pub(in crate::model::app_state) fn toggle_quick_host_network_forward(
+        &mut self,
+        forward_id: ForwardId,
+    ) -> AppUpdateOutcome {
+        if !self
+            .storage
+            .forward_assets
+            .iter()
+            .any(|asset| asset.id == forward_id)
+        {
+            return AppUpdateOutcome {
+                error: Some("转发资源不存在，无法选择".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
+
+        self.ui.toggle_quick_host_forward(forward_id);
         draft_changed()
     }
 

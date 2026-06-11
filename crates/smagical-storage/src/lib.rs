@@ -7,6 +7,7 @@ mod credentials;
 mod history;
 mod hosts;
 mod known_hosts;
+mod network_assets;
 mod persistence;
 mod sftp;
 mod snapshot;
@@ -19,9 +20,9 @@ mod workspace;
 use serde::{Deserialize, Serialize};
 use smagical_config::AppConfig;
 use smagical_core::{
-    CommandHistoryItem, CredentialGroup, CredentialInspection, CredentialMetadata, Host, HostGroup,
-    KnownHostEntry, RecentConnection, SecretRecord, SftpBookmark, Snippet, SnippetGroup,
-    TunnelRule, WorkspaceState,
+    CommandHistoryItem, CredentialGroup, CredentialInspection, CredentialMetadata, ForwardAsset,
+    Host, HostGroup, JumpChainAsset, KnownHostEntry, ProxyAsset, RecentConnection, SecretRecord,
+    SftpBookmark, Snippet, SnippetGroup, TunnelRule, WorkspaceState,
 };
 
 pub use persistence::{RedbStorage, StoragePersistenceError};
@@ -39,6 +40,12 @@ pub struct StorageManager {
     pub hosts: Vec<Host>,
     /// 树形主机分组。
     pub groups: Vec<HostGroup>,
+    /// 可复用代理资产。
+    pub proxy_assets: Vec<ProxyAsset>,
+    /// 可复用跳板链资产。
+    pub jump_chain_assets: Vec<JumpChainAsset>,
+    /// 可复用端口转发资产。
+    pub forward_assets: Vec<ForwardAsset>,
     /// 凭据元数据，不包含明文秘密。
     pub credentials: Vec<CredentialMetadata>,
     /// 凭据内容解析缓存，不包含密码明文。
@@ -92,6 +99,21 @@ impl StorageManager {
     /// 凭据元数据数量。
     pub fn credential_count(&self) -> usize {
         self.credentials.len()
+    }
+
+    /// 代理资产数量。
+    pub fn proxy_asset_count(&self) -> usize {
+        self.proxy_assets.len()
+    }
+
+    /// 跳板链资产数量。
+    pub fn jump_chain_asset_count(&self) -> usize {
+        self.jump_chain_assets.len()
+    }
+
+    /// 端口转发资产数量。
+    pub fn forward_asset_count(&self) -> usize {
+        self.forward_assets.len()
     }
 
     /// 密钥分组数量。
@@ -157,6 +179,9 @@ impl StorageManager {
         // app_config 也纳入判断，避免旧数据迁移时误删只改过设置的存储。
         self.hosts.is_empty()
             && self.groups.is_empty()
+            && self.proxy_assets.is_empty()
+            && self.jump_chain_assets.is_empty()
+            && self.forward_assets.is_empty()
             && self.credentials.is_empty()
             && self.credential_groups.is_empty()
             && self.secrets.is_empty()
@@ -177,8 +202,9 @@ impl StorageManager {
 mod tests {
     use super::*;
     use smagical_core::{
-        AuthProfile, CommandHistoryId, GroupId, HostId, RecentConnection, SecretRef, TunnelKind,
-        TunnelRule,
+        AuthProfile, CommandHistoryId, ForwardAsset, ForwardId, GroupId, HostId,
+        HostNetworkSelection, JumpChainAsset, JumpChainId, ProxyAsset, ProxyId, RecentConnection,
+        SecretRef, TunnelKind, TunnelRule,
     };
     use uuid::Uuid;
 
@@ -195,7 +221,8 @@ mod tests {
                 username: "ops".to_owned(),
                 secret: SecretRef("password:ops".to_owned()),
             },
-            proxy: None,
+            network: HostNetworkSelection::default(),
+            proxies: Vec::new(),
             jumps: Vec::new(),
             theme_override: None,
             background_override: None,
@@ -210,6 +237,28 @@ mod tests {
         }
     }
 
+    fn sample_proxy_asset() -> ProxyAsset {
+        ProxyAsset {
+            id: ProxyId(Uuid::new_v4()),
+            name: "办公出口".to_owned(),
+            tags: vec!["office".to_owned(), "socks".to_owned()],
+            profile: smagical_core::ProxyProfile::Socks5 {
+                host: "127.0.0.1".to_owned(),
+                port: 1080,
+            },
+        }
+    }
+
+    fn sample_jump_chain_asset() -> JumpChainAsset {
+        JumpChainAsset {
+            id: JumpChainId(Uuid::new_v4()),
+            name: "生产堡垒链".to_owned(),
+            steps: vec![smagical_core::JumpProfile {
+                host_id: HostId(Uuid::new_v4()),
+            }],
+        }
+    }
+
     fn sample_tunnel_rule() -> TunnelRule {
         TunnelRule {
             name: "dynamic-proxy".to_owned(),
@@ -219,6 +268,15 @@ mod tests {
             target_host: "ignored-for-dynamic".to_owned(),
             target_port: 0,
             auto_start: false,
+        }
+    }
+
+    fn sample_forward_asset() -> ForwardAsset {
+        ForwardAsset {
+            id: ForwardId(Uuid::new_v4()),
+            name: "本地数据库".to_owned(),
+            tags: vec!["db".to_owned()],
+            rule: sample_tunnel_rule(),
         }
     }
 
@@ -237,6 +295,9 @@ mod tests {
 
         storage.upsert_host(sample_host());
         storage.upsert_group(sample_group());
+        storage.upsert_proxy_asset(sample_proxy_asset());
+        storage.upsert_jump_chain_asset(sample_jump_chain_asset());
+        storage.upsert_forward_asset(sample_forward_asset());
         storage.upsert_tunnel_rule(sample_tunnel_rule());
         storage.record_recent_connection(RecentConnection {
             host_id: HostId(Uuid::new_v4()),
@@ -255,6 +316,9 @@ mod tests {
 
         assert_eq!(storage.host_count(), 1);
         assert_eq!(storage.group_count(), 1);
+        assert_eq!(storage.proxy_asset_count(), 1);
+        assert_eq!(storage.jump_chain_asset_count(), 1);
+        assert_eq!(storage.forward_asset_count(), 1);
         assert_eq!(storage.credential_count(), 0);
         assert_eq!(storage.secret_count(), 0);
         assert_eq!(storage.known_host_count(), 0);

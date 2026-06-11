@@ -84,6 +84,8 @@ pub(in crate::app::projection) fn credential_detail_field_model(
             credential_id: item.credential_id.as_str().into(),
             label: item.label.as_str().into(),
             value: item.value.as_str().into(),
+            row: item.row,
+            col: item.col,
         })
         .collect::<Vec<_>>();
     ModelRc::new(VecModel::from(rows))

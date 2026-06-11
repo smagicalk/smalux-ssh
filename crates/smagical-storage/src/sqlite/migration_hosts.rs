@@ -121,7 +121,9 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
             Table::create()
                 .table(HostProxy::Table)
                 .if_not_exists()
-                .col(string_pk(HostProxy::HostId, 36))
+                .col(string_pk(HostProxy::Id, 80))
+                .col(string(HostProxy::HostId, 36))
+                .col(integer(HostProxy::SortOrder))
                 .col(text(HostProxy::ProxyKind))
                 .col(text(HostProxy::ProxyHost))
                 .col(integer(HostProxy::ProxyPort))
@@ -135,6 +137,13 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .to_owned(),
         )
         .await?;
+    create_index(
+        manager,
+        HostProxy::Table,
+        "idx_host_proxy_host",
+        [HostProxy::HostId],
+    )
+    .await?;
 
     manager
         .create_table(
@@ -160,6 +169,189 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
         HostJumps::Table,
         "idx_host_jumps_host",
         [HostJumps::HostId],
+    )
+    .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ProxyAssets::Table)
+                .if_not_exists()
+                .col(string_pk(ProxyAssets::Id, 36))
+                .col(text(ProxyAssets::Name))
+                .col(text_with_default(ProxyAssets::TagsToml, "items = []\n"))
+                .col(text(ProxyAssets::ProxyKind))
+                .col(text(ProxyAssets::ProxyHost))
+                .col(integer(ProxyAssets::ProxyPort))
+                .col(integer(ProxyAssets::SortOrder))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(JumpChainAssets::Table)
+                .if_not_exists()
+                .col(string_pk(JumpChainAssets::Id, 36))
+                .col(text(JumpChainAssets::Name))
+                .col(integer(JumpChainAssets::SortOrder))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(JumpChainSteps::Table)
+                .if_not_exists()
+                .col(string_pk(JumpChainSteps::Id, 80))
+                .col(string(JumpChainSteps::ChainId, 36))
+                .col(string(JumpChainSteps::JumpHostId, 36))
+                .col(integer(JumpChainSteps::SortOrder))
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_jump_chain_steps_chain")
+                        .from(JumpChainSteps::Table, JumpChainSteps::ChainId)
+                        .to(JumpChainAssets::Table, JumpChainAssets::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_jump_chain_steps_host")
+                        .from(JumpChainSteps::Table, JumpChainSteps::JumpHostId)
+                        .to(Hosts::Table, Hosts::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .to_owned(),
+        )
+        .await?;
+    create_index(
+        manager,
+        JumpChainSteps::Table,
+        "idx_jump_chain_steps_chain",
+        [JumpChainSteps::ChainId],
+    )
+    .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(ForwardAssets::Table)
+                .if_not_exists()
+                .col(string_pk(ForwardAssets::Id, 36))
+                .col(text(ForwardAssets::Name))
+                .col(text_with_default(ForwardAssets::TagsToml, "items = []\n"))
+                .col(text(ForwardAssets::Kind))
+                .col(text(ForwardAssets::BindHost))
+                .col(integer(ForwardAssets::BindPort))
+                .col(text(ForwardAssets::TargetHost))
+                .col(integer(ForwardAssets::TargetPort))
+                .col(boolean(ForwardAssets::AutoStart))
+                .col(integer(ForwardAssets::SortOrder))
+                .to_owned(),
+        )
+        .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(HostNetworkProxies::Table)
+                .if_not_exists()
+                .col(string_pk(HostNetworkProxies::Id, 80))
+                .col(string(HostNetworkProxies::HostId, 36))
+                .col(string(HostNetworkProxies::ProxyId, 36))
+                .col(integer(HostNetworkProxies::SortOrder))
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_host_network_proxies_host")
+                        .from(HostNetworkProxies::Table, HostNetworkProxies::HostId)
+                        .to(Hosts::Table, Hosts::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_host_network_proxies_proxy")
+                        .from(HostNetworkProxies::Table, HostNetworkProxies::ProxyId)
+                        .to(ProxyAssets::Table, ProxyAssets::Id)
+                        .on_delete(ForeignKeyAction::Restrict),
+                )
+                .to_owned(),
+        )
+        .await?;
+    create_index(
+        manager,
+        HostNetworkProxies::Table,
+        "idx_host_network_proxies_host",
+        [HostNetworkProxies::HostId],
+    )
+    .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(HostNetworkJumpChains::Table)
+                .if_not_exists()
+                .col(string_pk(HostNetworkJumpChains::Id, 80))
+                .col(string(HostNetworkJumpChains::HostId, 36))
+                .col(string(HostNetworkJumpChains::ChainId, 36))
+                .col(integer(HostNetworkJumpChains::SortOrder))
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_host_network_jump_chains_host")
+                        .from(HostNetworkJumpChains::Table, HostNetworkJumpChains::HostId)
+                        .to(Hosts::Table, Hosts::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_host_network_jump_chains_chain")
+                        .from(HostNetworkJumpChains::Table, HostNetworkJumpChains::ChainId)
+                        .to(JumpChainAssets::Table, JumpChainAssets::Id)
+                        .on_delete(ForeignKeyAction::Restrict),
+                )
+                .to_owned(),
+        )
+        .await?;
+    create_index(
+        manager,
+        HostNetworkJumpChains::Table,
+        "idx_host_network_jump_chains_host",
+        [HostNetworkJumpChains::HostId],
+    )
+    .await?;
+
+    manager
+        .create_table(
+            Table::create()
+                .table(HostNetworkForwards::Table)
+                .if_not_exists()
+                .col(string_pk(HostNetworkForwards::Id, 80))
+                .col(string(HostNetworkForwards::HostId, 36))
+                .col(string(HostNetworkForwards::ForwardId, 36))
+                .col(integer(HostNetworkForwards::SortOrder))
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_host_network_forwards_host")
+                        .from(HostNetworkForwards::Table, HostNetworkForwards::HostId)
+                        .to(Hosts::Table, Hosts::Id)
+                        .on_delete(ForeignKeyAction::Cascade),
+                )
+                .foreign_key(
+                    ForeignKey::create()
+                        .name("fk_host_network_forwards_forward")
+                        .from(HostNetworkForwards::Table, HostNetworkForwards::ForwardId)
+                        .to(ForwardAssets::Table, ForwardAssets::Id)
+                        .on_delete(ForeignKeyAction::Restrict),
+                )
+                .to_owned(),
+        )
+        .await?;
+    create_index(
+        manager,
+        HostNetworkForwards::Table,
+        "idx_host_network_forwards_host",
+        [HostNetworkForwards::HostId],
     )
     .await
 }
@@ -219,7 +411,9 @@ pub(super) enum HostAuth {
 #[derive(DeriveIden)]
 pub(super) enum HostProxy {
     Table,
+    Id,
     HostId,
+    SortOrder,
     ProxyKind,
     ProxyHost,
     ProxyPort,
@@ -231,5 +425,76 @@ pub(super) enum HostJumps {
     Id,
     HostId,
     JumpHostId,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum ProxyAssets {
+    Table,
+    Id,
+    Name,
+    TagsToml,
+    ProxyKind,
+    ProxyHost,
+    ProxyPort,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum JumpChainAssets {
+    Table,
+    Id,
+    Name,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum JumpChainSteps {
+    Table,
+    Id,
+    ChainId,
+    JumpHostId,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum ForwardAssets {
+    Table,
+    Id,
+    Name,
+    TagsToml,
+    Kind,
+    BindHost,
+    BindPort,
+    TargetHost,
+    TargetPort,
+    AutoStart,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum HostNetworkProxies {
+    Table,
+    Id,
+    HostId,
+    ProxyId,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum HostNetworkJumpChains {
+    Table,
+    Id,
+    HostId,
+    ChainId,
+    SortOrder,
+}
+
+#[derive(DeriveIden)]
+pub(super) enum HostNetworkForwards {
+    Table,
+    Id,
+    HostId,
+    ForwardId,
     SortOrder,
 }

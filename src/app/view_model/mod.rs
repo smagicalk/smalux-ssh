@@ -17,6 +17,7 @@ mod common;
 mod hosts;
 mod i18n;
 mod labels;
+mod network;
 mod palette;
 mod root;
 mod settings;
@@ -38,7 +39,9 @@ mod tools_types;
 pub(super) use activity::ActivityViewModel;
 pub(super) use hosts::{
     CredentialOptionViewModel, GroupOptionViewModel, HostTreeViewModel, HostViewModel,
+    NetworkResourceOptionViewModel,
 };
+pub(in crate::app) use i18n::tr_for_state;
 pub(super) use palette::CommandPaletteItemViewModel;
 pub(super) use root::{AppViewModel, app_view_model};
 pub(super) use settings::{
@@ -50,5 +53,5 @@ pub(super) use tabs::active_terminal;
 pub(super) use tabs::{SessionTabViewModel, TerminalViewModel};
 pub(super) use tools_types::{
     CredentialDetailFieldViewModel, CredentialGroupContentViewModel, CredentialRowViewModel,
-    KnownHostViewModel, SnippetRowViewModel, ToolItemViewModel,
+    KnownHostViewModel, NetworkNavItemViewModel, SnippetRowViewModel, ToolItemViewModel,
 };

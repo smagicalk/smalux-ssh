@@ -22,7 +22,7 @@ fn host() -> Host {
             source: AgentSource::Auto,
             key_hint: None,
         },
-        proxy: None,
+        proxies: Vec::new(),
         jumps: Vec::new(),
         theme_override: None,
         background_override: None,
