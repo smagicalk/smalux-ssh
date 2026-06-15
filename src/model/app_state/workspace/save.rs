@@ -2,10 +2,18 @@
 
 use crate::model::{SessionKind, SessionTab, SplitAxis, WorkspaceState, WorkspaceTabSnapshot};
 
-use super::super::{AppState, AppUpdateOutcome};
+use crate::core::CoreState;
+
+use super::super::AppUpdateOutcome;
 use super::DEFAULT_WORKSPACE_NAME;
 
-impl AppState {
+impl CoreState {
+    /// 保存工作区快照的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn save_workspace_snapshot_action(&mut self) -> AppUpdateOutcome {
+        self.save_workspace_snapshot()
+    }
+
     /// 保存当前会话标签页和基础分屏布局。
     pub(in crate::model::app_state) fn save_workspace_snapshot(&mut self) -> AppUpdateOutcome {
         if self.sessions.tabs.is_empty() {

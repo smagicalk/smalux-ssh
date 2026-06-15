@@ -191,7 +191,13 @@ mod tests {
         storage.upsert_jump_chain_asset(JumpChainAsset {
             id: JumpChainId(Uuid::new_v4()),
             name: "prod-chain".to_owned(),
-            steps: vec![JumpProfile { host_id }],
+            steps: vec![JumpProfile {
+                host_id,
+                username_override: None,
+                port_override: None,
+                alias: None,
+            }],
+            stop_on_failure: true,
         });
         storage.record_recent_connection(RecentConnection {
             host_id,

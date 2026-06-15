@@ -1,3 +1,4 @@
+use crate::core::CoreState;
 use std::path::Path;
 
 use crate::model::{
@@ -5,15 +6,15 @@ use crate::model::{
     SecretMaterialKind, SecretRecord,
 };
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::credential_groups::validate_credential_group;
 use super::credential_ids::new_credential_id;
 use super::credential_payload::{credential_payload_validation_error, inspect_credential_payload};
 use super::credential_refs::next_secret_ref;
 
-impl AppState {
+impl CoreState {
     /// 从本地文件导入私钥内容，并创建对应的凭据元数据。
-    pub(in crate::model::app_state) fn import_private_key_credential(
+    pub(crate) fn import_private_key_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -35,7 +36,7 @@ impl AppState {
     }
 
     /// 从用户粘贴的 OpenSSH 私钥文本导入内容，并创建对应的凭据元数据。
-    pub(in crate::model::app_state) fn import_private_key_text_credential(
+    pub(crate) fn import_private_key_text_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -57,7 +58,7 @@ impl AppState {
     }
 
     /// 从用户粘贴的 OpenSSH 证书文本导入内容，并创建对应的凭据元数据。
-    pub(in crate::model::app_state) fn import_certificate_text_credential(
+    pub(crate) fn import_certificate_text_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -79,7 +80,7 @@ impl AppState {
     }
 
     /// 从本地文件导入 OpenSSH 证书内容，并创建对应的凭据元数据。
-    pub(in crate::model::app_state) fn import_certificate_credential(
+    pub(crate) fn import_certificate_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -231,7 +232,7 @@ impl AppState {
         &mut self,
         kind: CredentialKind,
         secret_kind: SecretMaterialKind,
-        auth_field: QuickHostAuthField,
+        _auth_field: QuickHostAuthField,
         secret_namespace: &str,
         secret_fallback: &str,
         name: &str,
@@ -265,8 +266,6 @@ impl AppState {
             fingerprint: None,
         });
         self.storage.upsert_credential_inspection(inspection);
-        self.ui.set_quick_host_auth_field(auth_field, &secret_ref.0);
-
         AppUpdateOutcome {
             state_changed: true,
             ..AppUpdateOutcome::default()

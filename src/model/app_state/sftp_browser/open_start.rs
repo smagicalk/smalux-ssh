@@ -3,14 +3,25 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, SftpRequest};
-use crate::model::{HostId, SessionId, SessionStatus, WorkspacePage};
+use crate::core::CoreState;
+use crate::model::{HostId, SessionId, SessionStatus};
 
+use super::super::super::AppUpdateOutcome;
 use super::super::super::launch::{
     connect_command_with_known_hosts, missing_host, normalize_remote_dir, queued_outcome,
 };
-use super::super::super::{AppState, AppUpdateOutcome};
 
-impl AppState {
+impl CoreState {
+    /// 打开 SFTP 浏览器的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn open_sftp_action(
+        &mut self,
+        host_id: HostId,
+        initial_dir: String,
+    ) -> AppUpdateOutcome {
+        self.open_sftp(host_id, initial_dir)
+    }
+
     /// 打开 SFTP 浏览器，并排队读取初始远端目录。
     pub(in crate::model::app_state) fn open_sftp(
         &mut self,
@@ -28,7 +39,6 @@ impl AppState {
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
         self.sessions.set_sftp_loading(host.id, true);
-        self.ui.workspace.active_page = WorkspacePage::Sftp;
         self.record_recent_connection(&host);
         let known_hosts = self.storage.known_hosts.clone();
         self.backend_commands.extend([

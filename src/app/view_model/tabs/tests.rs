@@ -1,6 +1,7 @@
 use super::*;
 use crate::model::{
-    DEFAULT_LOCAL_TERMINAL_TITLE, HostId, LOCAL_TERMINAL_SESSION_ID, SessionId, SessionStatus,
+    AppState, DEFAULT_LOCAL_TERMINAL_TITLE, HostId, LOCAL_TERMINAL_SESSION_ID, SessionId,
+    SessionStatus,
 };
 use crate::terminal::TerminalTabState;
 use uuid::Uuid;

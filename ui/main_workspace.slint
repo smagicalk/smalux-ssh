@@ -1,4 +1,4 @@
-import { CredentialDetailFieldRow, CredentialGroupContentRow, CredentialRow, HostRow, KnownHostRow, NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkStatRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
+import { CredentialDetailFieldRow, CredentialGroupContentRow, CredentialOptionRow, CredentialRow, HostRow, KnownHostRow, NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkStatRow, SessionTabRow, SettingOptionRow, SettingsFileActionRow, SettingsProfileRow, SettingsSummaryRow, SftpEntryRow, SnippetRow, ToolItemRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { CompactButton } from "./common.slint";
 import { SftpPane } from "./workspace.slint";
@@ -11,6 +11,56 @@ import { SnippetWorkspacePage } from "./workspace_snippet_page.slint";
 import { TerminalWorkspacePage } from "./workspace_terminal_page.slint";
 import { NetworkWorkspacePage } from "./workspace_network_page.slint";
 import { WorkspaceListPage } from "./workspace_common.slint";
+
+component ErrorToast inherits Rectangle {
+    in property <string> message: "";
+    in property <length> available-width: 420px;
+    in property <bool> fading: false;
+    callback dismiss();
+
+    width: min(420px, max(260px, root.available-width - 32px));
+    height: 54px;
+    opacity: root.fading ? 0 : 1;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: AppTheme.dialog-error-border;
+    background: AppTheme.dialog-error-bg;
+
+    animate opacity { duration: 280ms; easing: ease; }
+
+    HorizontalLayout {
+        padding-left: 12px;
+        padding-right: 8px;
+        spacing: 9px;
+
+        Rectangle {
+            width: 6px;
+            height: 30px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 3px;
+            background: AppTheme.danger;
+        }
+
+        Text {
+            text: root.message;
+            color: AppTheme.danger-text;
+            font-size: 12px;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+            wrap: word-wrap;
+            overflow: elide;
+        }
+
+        CompactButton {
+            width: 24px;
+            label: "x";
+            tone: "danger";
+            compact: true;
+            clicked => { root.dismiss(); }
+        }
+    }
+}
+
 export component MainWorkspace inherits Rectangle {
     in property <string> active-page;
     in property <string> active-session-id;
@@ -32,6 +82,7 @@ export component MainWorkspace inherits Rectangle {
     in property <string> tool-panel-mode-key: "Closed";
     in property <string> tool-panel-mode;
     in property <string> last-error;
+    in property <bool> toast-fading: false;
     in property <int> history-count;
     in property <[SessionTabRow]> tabs;
     in property <[HostRow]> hosts;
@@ -42,9 +93,9 @@ export component MainWorkspace inherits Rectangle {
     in property <[ToolItemRow]> tunnels;
     in property <[ToolItemRow]> credentials;
     in property <[NetworkItemRow]> network-runtime-tunnels: [];
-    in property <[NetworkItemRow]> network-saved-tunnels: [];
+    in property <[NetworkItemRow]> network-jump-chain-assets: [];
     in property <[NetworkItemRow]> network-proxy-assets: [];
-    in property <[NetworkItemRow]> network-route-definitions: [];
+    in property <[NetworkItemRow]> network-forward-assets: [];
     in-out property <string> network-selected-id: "";
     in-out property <string> network-selected-title: "";
     in-out property <string> network-selected-caption: "";
@@ -67,12 +118,18 @@ export component MainWorkspace inherits Rectangle {
     in-out property <string> network-selected-edit-host: "";
     in-out property <string> network-selected-edit-port: "";
     in-out property <string> network-selected-edit-tags: "";
+    in-out property <string> network-selected-edit-auth-kind: "";
+    in-out property <string> network-selected-edit-auth-username: "";
+    in-out property <string> network-selected-edit-auth-password-ref: "";
+    in-out property <bool> network-selected-edit-remote-dns: false;
     in-out property <string> network-selected-edit-bind-host: "";
     in-out property <string> network-selected-edit-bind-port: "";
     in-out property <string> network-selected-edit-target-host: "";
     in-out property <string> network-selected-edit-target-port: "";
     in-out property <bool> network-selected-edit-auto-start: false;
+    in-out property <bool> network-selected-edit-exit-on-failure: false;
     in-out property <string> network-selected-edit-host-ids: "";
+    in property <string> network-search-query: "";
     in property <string> selected-snippet-id: "";
     in property <string> selected-snippet-name: "";
     in property <string> selected-snippet-description: "";
@@ -153,6 +210,9 @@ export component MainWorkspace inherits Rectangle {
     in property <string> proxy-resources-section-label: "";
     in property <string> proxy-runtime-empty-label: "";
     in property <string> proxy-resources-empty-label: "";
+    in property <string> proxy-search-placeholder-label: "";
+    in property <string> proxy-search-empty-label: "";
+    in property <string> proxy-clear-selection-label: "";
     in property <string> proxy-new-proxy-label: "";
     in property <string> proxy-new-jump-label: "";
     in property <string> proxy-new-forward-label: "";
@@ -170,11 +230,19 @@ export component MainWorkspace inherits Rectangle {
     in property <string> proxy-bind-label: "";
     in property <string> proxy-target-label: "";
     in property <string> proxy-host-ids-label: "";
+    in property <string> proxy-note-label: "";
+    in property <string> proxy-used-by-label: "";
     in property <string> proxy-host-ids-placeholder: "";
     in property <string> proxy-bind-host-placeholder: "";
     in property <string> proxy-target-host-placeholder: "";
     in property <string> proxy-tags-placeholder: "";
     in property <string> proxy-auto-start-label: "";
+    in property <string> proxy-exit-on-failure-label: "";
+    in property <string> proxy-auth-none-label: "";
+    in property <string> proxy-auth-user-password-label: "";
+    in property <string> proxy-auth-username-label: "";
+    in property <string> proxy-auth-password-ref-label: "";
+    in property <string> proxy-remote-dns-label: "";
     in property <string> proxy-kind-socks5-label: "";
     in property <string> proxy-kind-http-label: "";
     in property <string> proxy-kind-local-label: "";
@@ -275,10 +343,65 @@ export component MainWorkspace inherits Rectangle {
     callback trust-known-host(host: string, port: int);
     callback remove-known-host(host: string, port: int);
     callback stop-network-tunnel(session-id: string, rule-name: string);
-    callback save-network-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save-network-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string, auth-kind: string, auth-username: string, auth-password-ref: string, remote-dns: bool) -> bool;
     callback save-network-jump-chain(asset-id: string, name: string, host-ids: string) -> bool;
-    callback save-network-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
-    callback remove-network-asset(kind-key: string, asset-id: string);
+    callback save-network-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool, exit-on-failure: bool) -> bool;
+    callback remove-network-asset(kind-key: string, asset-id: string) -> bool;
+    pure callback network-jump-host-selected(host-ids: string, host-id: string) -> bool;
+    pure callback network-jump-host-order(host-ids: string, host-id: string) -> int;
+    pure callback network-jump-host-matches(query: string, host: HostRow) -> bool;
+    pure callback has-network-jump-host-match(query: string) -> bool;
+    pure callback selected-network-jump-host-count(host-ids: string) -> int;
+    callback clear-network-jump-hosts() -> string;
+    callback toggle-network-jump-host(host-ids: string, host-id: string) -> string;
+    callback update-network-jump-step-host(step-text: string, step-index: int, host-id: string) -> string;
+    callback update-network-jump-step-username(step-text: string, step-index: int, username: string) -> string;
+    callback update-network-jump-step-port(step-text: string, step-index: int, port: string) -> string;
+    callback update-network-jump-step-alias(step-text: string, step-index: int, alias: string) -> string;
+    callback move-jump-step-up(step-text: string, step-index: int) -> string;
+    callback move-jump-step-down(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-host-id(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-username(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-port(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-alias(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-label(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-endpoint(step-text: string, step-index: int) -> string;
+    function clear-network-selection() {
+        root.network-selected-id = "";
+        root.network-selected-title = "";
+        root.network-selected-caption = "";
+        root.network-selected-kind = "";
+        root.network-selected-kind-key = "";
+        root.network-selected-meta = "";
+        root.network-selected-note = "";
+        root.network-selected-icon-key = "router";
+        root.network-selected-accent-index = 0;
+        root.network-primary-action-key = "";
+        root.network-primary-action-label = "";
+        root.network-primary-action-enabled = false;
+        root.network-action-session-id = "";
+        root.network-action-rule-name = "";
+        root.network-stats = [];
+        root.network-detail-fields = [];
+        root.network-related-items = [];
+        root.network-selected-asset-id = "";
+        root.network-selected-edit-kind-key = "";
+        root.network-selected-edit-host = "";
+        root.network-selected-edit-port = "";
+        root.network-selected-edit-tags = "";
+        root.network-selected-edit-auth-kind = "";
+        root.network-selected-edit-auth-username = "";
+        root.network-selected-edit-auth-password-ref = "";
+        root.network-selected-edit-remote-dns = false;
+        root.network-selected-edit-bind-host = "";
+        root.network-selected-edit-bind-port = "";
+        root.network-selected-edit-target-host = "";
+        root.network-selected-edit-target-port = "";
+        root.network-selected-edit-auto-start = false;
+        root.network-selected-edit-exit-on-failure = false;
+        root.network-selected-edit-host-ids = "";
+    }
+    callback update-network-search(query: string);
     callback dismiss-ui-error();
     callback set-language(language: string);
     callback set-built-in-theme(theme: string);
@@ -339,7 +462,7 @@ export component MainWorkspace inherits Rectangle {
         padding-bottom: root.active-page == "Security" ? 4px : 8px;
         spacing: 7px;
 
-        if root.active-page != "Security" && root.active-page != "Snippets": WorkspaceTabStrip {
+        if root.active-page != "Security" && root.active-page != "Snippets" && root.active-page != "Proxy": WorkspaceTabStrip {
             tabs: root.tabs;
             ready-label: root.tab-ready-label;
             activate-session(session-id) => { root.activate-session(session-id); }
@@ -438,13 +561,17 @@ export component MainWorkspace inherits Rectangle {
         if root.active-page == "Proxy": NetworkWorkspacePage {
             title: root.tool-proxy-label;
             runtime-section-label: root.proxy-runtime-section-label;
-            saved-section-label: root.proxy-resources-section-label;
+            saved-section-label: root.proxy-section-host-label;
             runtime-empty-label: root.proxy-runtime-empty-label;
             resources-empty-label: root.proxy-resources-empty-label;
-            proxy-section-label: "";
-            routes-section-label: "";
+            detail-label: root.proxy-resources-section-label;
+            proxy-section-label: root.proxy-section-route-label;
+            routes-section-label: root.proxy-section-forward-label;
             empty-title-label: root.proxy-empty-label;
             empty-caption-label: root.proxy-host-hint-caption-label;
+            search-placeholder: root.proxy-search-placeholder-label;
+            search-empty-label: root.proxy-search-empty-label;
+            clear-selection-label: root.proxy-clear-selection-label;
             new-proxy-label: root.proxy-new-proxy-label;
             new-jump-label: root.proxy-new-jump-label;
             new-forward-label: root.proxy-new-forward-label;
@@ -462,20 +589,30 @@ export component MainWorkspace inherits Rectangle {
             bind-label: root.proxy-bind-label;
             target-label: root.proxy-target-label;
             host-ids-label: root.proxy-host-ids-label;
+            note-label: root.proxy-note-label;
+            used-by-label: root.proxy-used-by-label;
             host-ids-placeholder: root.proxy-host-ids-placeholder;
             bind-host-placeholder: root.proxy-bind-host-placeholder;
             target-host-placeholder: root.proxy-target-host-placeholder;
             tags-placeholder: root.proxy-tags-placeholder;
             auto-start-label: root.proxy-auto-start-label;
+            exit-on-failure-label: root.proxy-exit-on-failure-label;
+            auth-none-label: root.proxy-auth-none-label;
+            auth-user-password-label: root.proxy-auth-user-password-label;
+            auth-username-label: root.proxy-auth-username-label;
+            auth-password-ref-label: root.proxy-auth-password-ref-label;
+            remote-dns-label: root.proxy-remote-dns-label;
             socks5-kind-label: root.proxy-kind-socks5-label;
             http-kind-label: root.proxy-kind-http-label;
             local-kind-label: root.proxy-kind-local-label;
             remote-kind-label: root.proxy-kind-remote-label;
             dynamic-kind-label: root.proxy-kind-dynamic-label;
+            hosts: root.hosts;
+            search-query: root.network-search-query;
             runtime-tunnels: root.network-runtime-tunnels;
-            saved-tunnels: root.network-saved-tunnels;
+            jump-chain-assets: root.network-jump-chain-assets;
             proxy-assets: root.network-proxy-assets;
-            route-definitions: root.network-route-definitions;
+            forward-assets: root.network-forward-assets;
             selected-id: root.network-selected-id;
             selected-title: root.network-selected-title;
             selected-caption: root.network-selected-caption;
@@ -498,11 +635,16 @@ export component MainWorkspace inherits Rectangle {
             selected-edit-host: root.network-selected-edit-host;
             selected-edit-port: root.network-selected-edit-port;
             selected-edit-tags: root.network-selected-edit-tags;
+            selected-edit-auth-kind: root.network-selected-edit-auth-kind;
+            selected-edit-auth-username: root.network-selected-edit-auth-username;
+            selected-edit-auth-password-ref: root.network-selected-edit-auth-password-ref;
+            selected-edit-remote-dns: root.network-selected-edit-remote-dns;
             selected-edit-bind-host: root.network-selected-edit-bind-host;
             selected-edit-bind-port: root.network-selected-edit-bind-port;
             selected-edit-target-host: root.network-selected-edit-target-host;
             selected-edit-target-port: root.network-selected-edit-target-port;
             selected-edit-auto-start: root.network-selected-edit-auto-start;
+            selected-edit-exit-on-failure: root.network-selected-edit-exit-on-failure;
             selected-edit-host-ids: root.network-selected-edit-host-ids;
             select-network-item(item) => {
                 root.network-selected-id = item.id;
@@ -535,24 +677,50 @@ export component MainWorkspace inherits Rectangle {
                 root.network-selected-edit-host = item.edit_host;
                 root.network-selected-edit-port = item.edit_port;
                 root.network-selected-edit-tags = item.edit_tags;
+                root.network-selected-edit-auth-kind = item.edit_auth_kind;
+                root.network-selected-edit-auth-username = item.edit_auth_username;
+                root.network-selected-edit-auth-password-ref = item.edit_auth_password_ref;
+                root.network-selected-edit-remote-dns = item.edit_remote_dns;
                 root.network-selected-edit-bind-host = item.edit_bind_host;
                 root.network-selected-edit-bind-port = item.edit_bind_port;
                 root.network-selected-edit-target-host = item.edit_target_host;
                 root.network-selected-edit-target-port = item.edit_target_port;
                 root.network-selected-edit-auto-start = item.edit_auto_start;
+                root.network-selected-edit-exit-on-failure = item.edit_exit_on_failure;
                 root.network-selected-edit-host-ids = item.edit_host_ids;
             }
+            update-search(query) => { root.update-network-search(query); }
             stop-tunnel(session-id, rule-name) => { root.stop-network-tunnel(session-id, rule-name); }
-            save-proxy(asset-id, name, proxy-kind, host, port, tags) => {
-                root.save-network-proxy(asset-id, name, proxy-kind, host, port, tags)
+            save-proxy(asset-id, name, proxy-kind, host, port, tags, auth-kind, auth-username, auth-password-ref, remote-dns) => {
+                root.save-network-proxy(asset-id, name, proxy-kind, host, port, tags, auth-kind, auth-username, auth-password-ref, remote-dns)
             }
             save-jump-chain(asset-id, name, host-ids) => {
                 root.save-network-jump-chain(asset-id, name, host-ids)
             }
-            save-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) => {
-                root.save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start)
+            save-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start, exit-on-failure) => {
+                root.save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start, exit-on-failure)
             }
-            remove-asset(kind-key, asset-id) => { root.remove-network-asset(kind-key, asset-id); }
+            remove-asset(kind-key, asset-id) => { root.remove-network-asset(kind-key, asset-id) }
+            clear-selection() => { root.clear-network-selection(); }
+            jump-host-selected(host-ids, host-id) => { root.network-jump-host-selected(host-ids, host-id) }
+            jump-host-order(host-ids, host-id) => { root.network-jump-host-order(host-ids, host-id) }
+            jump-host-matches(query, host) => { root.network-jump-host-matches(query, host) }
+            has-jump-host-match(query) => { root.has-network-jump-host-match(query) }
+            selected-jump-host-count(host-ids) => { root.selected-network-jump-host-count(host-ids) }
+            clear-jump-hosts() => { root.clear-network-jump-hosts() }
+            toggle-jump-host(host-ids, host-id) => { root.toggle-network-jump-host(host-ids, host-id) }
+            update-jump-step-host(step-text, step-index, host-id) => { root.update-network-jump-step-host(step-text, step-index, host-id) }
+            update-jump-step-username(step-text, step-index, username) => { root.update-network-jump-step-username(step-text, step-index, username) }
+            update-jump-step-port(step-text, step-index, port) => { root.update-network-jump-step-port(step-text, step-index, port) }
+            update-jump-step-alias(step-text, step-index, alias) => { root.update-network-jump-step-alias(step-text, step-index, alias) }
+            move-jump-step-up(step-text, step-index) => { root.move-jump-step-up(step-text, step-index) }
+            move-jump-step-down(step-text, step-index) => { root.move-jump-step-down(step-text, step-index) }
+            jump-step-host-id(step-text, step-index) => { root.network-jump-step-host-id(step-text, step-index) }
+            jump-step-username(step-text, step-index) => { root.network-jump-step-username(step-text, step-index) }
+            jump-step-port(step-text, step-index) => { root.network-jump-step-port(step-text, step-index) }
+            jump-step-alias(step-text, step-index) => { root.network-jump-step-alias(step-text, step-index) }
+            jump-step-label(step-text, step-index) => { root.network-jump-step-label(step-text, step-index) }
+            jump-step-endpoint(step-text, step-index) => { root.network-jump-step-endpoint(step-text, step-index) }
         }
 
         if root.active-page == "Security": SecurityWorkspacePage {
@@ -728,31 +896,15 @@ export component MainWorkspace inherits Rectangle {
             remove-known-host(host, port) => { root.remove-known-host(host, port); }
         }
 
-        if root.last-error != "" && root.active-page != "Terminal": Rectangle {
-            height: 34px;
-            border-radius: 7px;
-            border-width: 1px;
-            border-color: AppTheme.danger;
-            background: AppTheme.dialog-error-bg;
-            HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 8px;
-                spacing: 8px;
-                Text {
-                    text: root.last-error;
-                    color: AppTheme.danger-text;
-                    font-size: 12px;
-                    vertical-alignment: center;
-                    horizontal-stretch: 1;
-                    overflow: elide;
-                }
-                CompactButton {
-                    label: "x";
-                    tone: "danger";
-                    clicked => { root.dismiss-ui-error(); }
-                }
-            }
-        }
+    }
+
+    if root.last-error != "": ErrorToast {
+        x: root.width - self.width - 16px;
+        y: 16px;
+        available-width: root.width;
+        fading: root.toast-fading;
+        message: root.last-error;
+        dismiss => { root.dismiss-ui-error(); }
     }
 
     if root.new-session-dialog-open: NewSessionDialog {

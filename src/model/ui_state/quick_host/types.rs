@@ -1,6 +1,6 @@
 //! 快速新增主机草稿类型。
 
-use super::{QuickHostDraftError, auth};
+use super::auth;
 
 /// 快速新增主机可选的 ssh-agent 来源。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,16 +59,6 @@ impl Default for QuickHostAuthDraft {
             key_hint: String::new(),
             certificate_ref: String::new(),
         }
-    }
-}
-
-impl QuickHostAuthDraft {
-    /// 将认证草稿转换为主机认证配置。
-    pub(super) fn build_auth(
-        &self,
-        username: &str,
-    ) -> Result<crate::model::AuthProfile, QuickHostDraftError> {
-        auth::build_quick_host_auth(self, username)
     }
 }
 

@@ -3,14 +3,17 @@
 //! 这里管理的是“凭据索引/元数据”，不是私钥或密码本体。后续接入加密存储时，真正敏感
 //! 数据应在 storage/security 层处理，状态层只通过名称或 ID 发起管理动作。
 
+use crate::core::CoreState;
 use crate::model::{
-    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, QuickHostAuthField,
-    SecretMaterialKind, SecretRecord, SecretRef,
+    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, SecretMaterialKind,
+    SecretRecord, SecretRef,
 };
 use russh::keys::PrivateKey;
 use std::path::Path;
 
-use super::super::{AppState, AppUpdateOutcome};
+#[cfg(test)]
+use super::super::AppState;
+use super::super::AppUpdateOutcome;
 use super::credential_groups::validate_credential_group;
 use super::credential_ids::new_credential_id;
 use super::credential_payload::{
@@ -22,9 +25,9 @@ use super::credential_refs::{
     next_secret_ref,
 };
 
-impl AppState {
-    /// 创建或更新凭据元数据，并把新引用回填到当前创建主机草稿。
-    pub(in crate::model::app_state) fn create_credential_metadata(
+impl CoreState {
+    /// 创建或更新凭据元数据。
+    pub(crate) fn create_credential_metadata(
         &mut self,
         kind: CredentialKind,
         name: String,
@@ -69,11 +72,6 @@ impl AppState {
             }
         }
 
-        let auth_field = match kind {
-            CredentialKind::PrivateKey => Some(QuickHostAuthField::PrivateKeyRef),
-            CredentialKind::Certificate => Some(QuickHostAuthField::CertificateRef),
-            CredentialKind::Password | CredentialKind::Agent => None,
-        };
         let key_algorithm = match kind {
             CredentialKind::PrivateKey | CredentialKind::Certificate => algorithm,
             CredentialKind::Password | CredentialKind::Agent => None,
@@ -89,10 +87,6 @@ impl AppState {
             key_algorithm,
             fingerprint: None,
         });
-
-        if let Some(field) = auth_field {
-            self.ui.set_quick_host_auth_field(field, secret_ref);
-        }
 
         AppUpdateOutcome {
             state_changed: true,
@@ -528,5 +522,21 @@ impl AppState {
             return Err(format!("{display_name}内容为空"));
         };
         decode_plaintext_private_key(payload, display_name)
+    }
+}
+
+#[cfg(test)]
+impl AppState {
+    /// 创建或更新凭据元数据，并把新引用回填到当前创建主机草稿。
+    pub(crate) fn create_credential_metadata(
+        &mut self,
+        kind: CredentialKind,
+        name: String,
+        group_id: Option<CredentialGroupId>,
+        secret_ref: String,
+        algorithm: Option<KeyAlgorithm>,
+    ) -> AppUpdateOutcome {
+        self.core
+            .create_credential_metadata(kind, name, group_id, secret_ref, algorithm)
     }
 }

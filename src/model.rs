@@ -1,12 +1,14 @@
 //! 领域模型聚合和应用根状态。
 //!
 //! 具体领域类型按单一职责拆分到 `src/model/` 子模块中，本文件只负责对外导出稳定 API，
-//! 并保留 Iced 应用根状态，避免单文件继续膨胀。
+//! 并保留过渡期状态类型，避免单文件继续膨胀。
 
 mod app_state;
+mod host_draft;
 mod ui_state;
 
 pub use app_state::*;
+pub use host_draft::*;
 pub use ui_state::*;
 
 pub use smagical_core::*;

@@ -3,9 +3,17 @@
 use crate::model::{SessionKind, SftpBrowserState, WorkspaceState};
 use crate::terminal::TerminalTabState;
 
-use super::super::{AppState, AppUpdateOutcome};
+use crate::core::CoreState;
 
-impl AppState {
+use super::super::AppUpdateOutcome;
+
+impl CoreState {
+    /// 恢复工作区快照的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn restore_workspace_snapshot_action(&mut self) -> AppUpdateOutcome {
+        self.restore_workspace_snapshot()
+    }
+
     /// 从已保存工作区恢复可见标签页，不自动发起 SSH 连接。
     pub(in crate::model::app_state) fn restore_workspace_snapshot(&mut self) -> AppUpdateOutcome {
         let Some(workspace) = self.storage.workspace.clone() else {

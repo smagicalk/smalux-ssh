@@ -27,6 +27,8 @@ export component AppWindow inherits Window {
     in property <string> host-search-query: "";
     in property <string> credential-search-query: "";
     in property <string> snippet-search-query: "";
+    in property <string> network-search-query: "";
+    property <bool> toast-fading: false;
     in property <string> brand-short-label: "";
     in property <string> brand-name-label: "";
     in property <string> topbar-find-label: "";
@@ -78,6 +80,9 @@ export component AppWindow inherits Window {
     in property <string> proxy-resources-section-label: "";
     in property <string> proxy-runtime-empty-label: "";
     in property <string> proxy-resources-empty-label: "";
+    in property <string> proxy-search-placeholder-label: "";
+    in property <string> proxy-search-empty-label: "";
+    in property <string> proxy-clear-selection-label: "";
     in property <string> proxy-new-proxy-label: "";
     in property <string> proxy-new-jump-label: "";
     in property <string> proxy-new-forward-label: "";
@@ -95,11 +100,19 @@ export component AppWindow inherits Window {
     in property <string> proxy-bind-label: "";
     in property <string> proxy-target-label: "";
     in property <string> proxy-host-ids-label: "";
+    in property <string> proxy-note-label: "";
+    in property <string> proxy-used-by-label: "";
     in property <string> proxy-host-ids-placeholder: "";
     in property <string> proxy-bind-host-placeholder: "";
     in property <string> proxy-target-host-placeholder: "";
     in property <string> proxy-tags-placeholder: "";
     in property <string> proxy-auto-start-label: "";
+    in property <string> proxy-exit-on-failure-label: "";
+    in property <string> proxy-auth-none-label: "";
+    in property <string> proxy-auth-user-password-label: "";
+    in property <string> proxy-auth-username-label: "";
+    in property <string> proxy-auth-password-ref-label: "";
+    in property <string> proxy-remote-dns-label: "";
     in property <string> proxy-kind-socks5-label: "";
     in property <string> proxy-kind-http-label: "";
     in property <string> proxy-kind-local-label: "";
@@ -559,11 +572,16 @@ export component AppWindow inherits Window {
     property <string> network-selected-edit-host: "";
     property <string> network-selected-edit-port: "";
     property <string> network-selected-edit-tags: "";
+    property <string> network-selected-edit-auth-kind: "";
+    property <string> network-selected-edit-auth-username: "";
+    property <string> network-selected-edit-auth-password-ref: "";
+    property <bool> network-selected-edit-remote-dns: false;
     property <string> network-selected-edit-bind-host: "";
     property <string> network-selected-edit-bind-port: "";
     property <string> network-selected-edit-target-host: "";
     property <string> network-selected-edit-target-port: "";
     property <bool> network-selected-edit-auto-start: false;
+    property <bool> network-selected-edit-exit-on-failure: false;
     property <string> network-selected-edit-host-ids: "";
     property <string> selected-credential-group-path: "";
     property <string> selected-credential-kind: "";
@@ -716,9 +734,9 @@ export component AppWindow inherits Window {
     in property <[ToolItemRow]> tunnels: [];
     in property <[ToolItemRow]> credentials: [];
     in property <[NetworkItemRow]> network-runtime-tunnels: [];
-    in property <[NetworkItemRow]> network-saved-tunnels: [];
+    in property <[NetworkItemRow]> network-jump-chain-assets: [];
     in property <[NetworkItemRow]> network-proxy-assets: [];
-    in property <[NetworkItemRow]> network-route-definitions: [];
+    in property <[NetworkItemRow]> network-forward-assets: [];
     in property <[KnownHostRow]> known-hosts: [];
     in property <[SettingOptionRow]> settings-language-options: [];
     in property <[SettingOptionRow]> settings-theme-options: [];
@@ -876,11 +894,36 @@ export component AppWindow inherits Window {
     callback trust-known-host(host: string, port: int);
     callback remove-known-host(host: string, port: int);
     callback stop-network-tunnel(session-id: string, rule-name: string);
-    callback save-network-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save-network-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string, auth-kind: string, auth-username: string, auth-password-ref: string, remote-dns: bool) -> bool;
     callback save-network-jump-chain(asset-id: string, name: string, host-ids: string) -> bool;
-    callback save-network-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
-    callback remove-network-asset(kind-key: string, asset-id: string);
+    callback save-network-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool, exit-on-failure: bool) -> bool;
+    callback remove-network-asset(kind-key: string, asset-id: string) -> bool;
+    pure callback network-jump-host-selected(host-ids: string, host-id: string) -> bool;
+    pure callback network-jump-host-order(host-ids: string, host-id: string) -> int;
+    pure callback network-jump-host-matches(query: string, host: HostRow) -> bool;
+    pure callback has-network-jump-host-match(query: string) -> bool;
+    pure callback selected-network-jump-host-count(host-ids: string) -> int;
+    callback clear-network-jump-hosts() -> string;
+    callback toggle-network-jump-host(host-ids: string, host-id: string) -> string;
+    callback update-network-jump-step-host(step-text: string, step-index: int, host-id: string) -> string;
+    callback update-network-jump-step-username(step-text: string, step-index: int, username: string) -> string;
+    callback update-network-jump-step-port(step-text: string, step-index: int, port: string) -> string;
+    callback update-network-jump-step-alias(step-text: string, step-index: int, alias: string) -> string;
+    callback move-jump-step-up(step-text: string, step-index: int) -> string;
+    callback move-jump-step-down(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-host-id(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-username(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-port(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-alias(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-label(step-text: string, step-index: int) -> string;
+    pure callback network-jump-step-endpoint(step-text: string, step-index: int) -> string;
+    callback update-network-search(query: string);
     callback dismiss-ui-error();
+
+    function clear-toast-error() {
+        root.toast-fading = false;
+        root.dismiss-ui-error();
+    }
 
     title: root.brand-name-label + " - " + root.active-page;
     preferred-width: 1280px;
@@ -894,6 +937,22 @@ export component AppWindow inherits Window {
         running: root.quick-security-credential-busy;
         triggered => {
             root.quick-security-credential-busy-frame = root.quick-security-credential-busy-frame >= 2 ? 0 : root.quick-security-credential-busy-frame + 1;
+        }
+    }
+
+    Timer {
+        interval: 3200ms;
+        running: root.last-error != "" && !root.toast-fading;
+        triggered => {
+            root.toast-fading = true;
+        }
+    }
+
+    Timer {
+        interval: 280ms;
+        running: root.last-error != "" && root.toast-fading;
+        triggered => {
+            root.clear-toast-error();
         }
     }
 
@@ -1348,6 +1407,7 @@ export component AppWindow inherits Window {
                 tool-panel-mode: root.tool-panel-mode;
                 tool-panel-mode-key: root.tool-panel-mode-key;
                 last-error: root.last-error;
+                toast-fading: root.toast-fading;
                 history-count: root.history.length;
                 tabs: root.tabs;
                 hosts: root.hosts;
@@ -1359,9 +1419,9 @@ export component AppWindow inherits Window {
                 tunnels: root.tunnels;
                 credentials: root.credentials;
                 network-runtime-tunnels: root.network-runtime-tunnels;
-                network-saved-tunnels: root.network-saved-tunnels;
+                network-jump-chain-assets: root.network-jump-chain-assets;
                 network-proxy-assets: root.network-proxy-assets;
-                network-route-definitions: root.network-route-definitions;
+                network-forward-assets: root.network-forward-assets;
                 network-selected-id: root.network-selected-id;
                 network-selected-title: root.network-selected-title;
                 network-selected-caption: root.network-selected-caption;
@@ -1384,12 +1444,18 @@ export component AppWindow inherits Window {
                 network-selected-edit-host: root.network-selected-edit-host;
                 network-selected-edit-port: root.network-selected-edit-port;
                 network-selected-edit-tags: root.network-selected-edit-tags;
+                network-selected-edit-auth-kind: root.network-selected-edit-auth-kind;
+                network-selected-edit-auth-username: root.network-selected-edit-auth-username;
+                network-selected-edit-auth-password-ref: root.network-selected-edit-auth-password-ref;
+                network-selected-edit-remote-dns: root.network-selected-edit-remote-dns;
                 network-selected-edit-bind-host: root.network-selected-edit-bind-host;
                 network-selected-edit-bind-port: root.network-selected-edit-bind-port;
                 network-selected-edit-target-host: root.network-selected-edit-target-host;
                 network-selected-edit-target-port: root.network-selected-edit-target-port;
                 network-selected-edit-auto-start: root.network-selected-edit-auto-start;
+                network-selected-edit-exit-on-failure: root.network-selected-edit-exit-on-failure;
                 network-selected-edit-host-ids: root.network-selected-edit-host-ids;
+                network-search-query: root.network-search-query;
                 selected-snippet-id: root.selected-snippet-id;
                 selected-snippet-name: root.selected-snippet-name;
                 selected-snippet-description: root.selected-snippet-description;
@@ -1470,6 +1536,9 @@ export component AppWindow inherits Window {
                 proxy-resources-section-label: root.proxy-resources-section-label;
                 proxy-runtime-empty-label: root.proxy-runtime-empty-label;
                 proxy-resources-empty-label: root.proxy-resources-empty-label;
+                proxy-search-placeholder-label: root.proxy-search-placeholder-label;
+                proxy-search-empty-label: root.proxy-search-empty-label;
+                proxy-clear-selection-label: root.proxy-clear-selection-label;
                 proxy-new-proxy-label: root.proxy-new-proxy-label;
                 proxy-new-jump-label: root.proxy-new-jump-label;
                 proxy-new-forward-label: root.proxy-new-forward-label;
@@ -1487,11 +1556,19 @@ export component AppWindow inherits Window {
                 proxy-bind-label: root.proxy-bind-label;
                 proxy-target-label: root.proxy-target-label;
                 proxy-host-ids-label: root.proxy-host-ids-label;
+                proxy-note-label: root.proxy-note-label;
+                proxy-used-by-label: root.proxy-used-by-label;
                 proxy-host-ids-placeholder: root.proxy-host-ids-placeholder;
                 proxy-bind-host-placeholder: root.proxy-bind-host-placeholder;
                 proxy-target-host-placeholder: root.proxy-target-host-placeholder;
                 proxy-tags-placeholder: root.proxy-tags-placeholder;
                 proxy-auto-start-label: root.proxy-auto-start-label;
+                proxy-exit-on-failure-label: root.proxy-exit-on-failure-label;
+                proxy-auth-none-label: root.proxy-auth-none-label;
+                proxy-auth-user-password-label: root.proxy-auth-user-password-label;
+                proxy-auth-username-label: root.proxy-auth-username-label;
+                proxy-auth-password-ref-label: root.proxy-auth-password-ref-label;
+                proxy-remote-dns-label: root.proxy-remote-dns-label;
                 proxy-kind-socks5-label: root.proxy-kind-socks5-label;
                 proxy-kind-http-label: root.proxy-kind-http-label;
                 proxy-kind-local-label: root.proxy-kind-local-label;
@@ -1590,17 +1667,37 @@ export component AppWindow inherits Window {
                 trust-known-host(host, port) => { root.trust-known-host(host, port); }
                 remove-known-host(host, port) => { root.remove-known-host(host, port); }
                 stop-network-tunnel(session-id, rule-name) => { root.stop-network-tunnel(session-id, rule-name); }
-                save-network-proxy(asset-id, name, proxy-kind, host, port, tags) => {
-                    root.save-network-proxy(asset-id, name, proxy-kind, host, port, tags)
+                save-network-proxy(asset-id, name, proxy-kind, host, port, tags, auth-kind, auth-username, auth-password-ref, remote-dns) => {
+                    root.save-network-proxy(asset-id, name, proxy-kind, host, port, tags, auth-kind, auth-username, auth-password-ref, remote-dns)
                 }
                 save-network-jump-chain(asset-id, name, host-ids) => {
                     root.save-network-jump-chain(asset-id, name, host-ids)
                 }
-                save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) => {
-                    root.save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start)
+                save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start, exit-on-failure) => {
+                    root.save-network-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start, exit-on-failure)
                 }
-                remove-network-asset(kind-key, asset-id) => { root.remove-network-asset(kind-key, asset-id); }
-                dismiss-ui-error => { root.dismiss-ui-error(); }
+                remove-network-asset(kind-key, asset-id) => { root.remove-network-asset(kind-key, asset-id) }
+                network-jump-host-selected(host-ids, host-id) => { root.network-jump-host-selected(host-ids, host-id) }
+                network-jump-host-order(host-ids, host-id) => { root.network-jump-host-order(host-ids, host-id) }
+                network-jump-host-matches(query, host) => { root.network-jump-host-matches(query, host) }
+                has-network-jump-host-match(query) => { root.has-network-jump-host-match(query) }
+                selected-network-jump-host-count(host-ids) => { root.selected-network-jump-host-count(host-ids) }
+                clear-network-jump-hosts() => { root.clear-network-jump-hosts() }
+                toggle-network-jump-host(host-ids, host-id) => { root.toggle-network-jump-host(host-ids, host-id) }
+                update-network-jump-step-host(step-text, step-index, host-id) => { root.update-network-jump-step-host(step-text, step-index, host-id) }
+                update-network-jump-step-username(step-text, step-index, username) => { root.update-network-jump-step-username(step-text, step-index, username) }
+                update-network-jump-step-port(step-text, step-index, port) => { root.update-network-jump-step-port(step-text, step-index, port) }
+                update-network-jump-step-alias(step-text, step-index, alias) => { root.update-network-jump-step-alias(step-text, step-index, alias) }
+                move-jump-step-up(step-text, step-index) => { root.move-jump-step-up(step-text, step-index) }
+                move-jump-step-down(step-text, step-index) => { root.move-jump-step-down(step-text, step-index) }
+                network-jump-step-host-id(step-text, step-index) => { root.network-jump-step-host-id(step-text, step-index) }
+                network-jump-step-username(step-text, step-index) => { root.network-jump-step-username(step-text, step-index) }
+                network-jump-step-port(step-text, step-index) => { root.network-jump-step-port(step-text, step-index) }
+                network-jump-step-alias(step-text, step-index) => { root.network-jump-step-alias(step-text, step-index) }
+                network-jump-step-label(step-text, step-index) => { root.network-jump-step-label(step-text, step-index) }
+                network-jump-step-endpoint(step-text, step-index) => { root.network-jump-step-endpoint(step-text, step-index) }
+                update-network-search(query) => { root.update-network-search(query); }
+                dismiss-ui-error => { root.clear-toast-error(); }
                 set-language(language) => { root.set-language(language); }
                 set-built-in-theme(theme) => { root.set-built-in-theme(theme); }
                 copy-current-built-in-theme => { root.copy-current-built-in-theme(); }

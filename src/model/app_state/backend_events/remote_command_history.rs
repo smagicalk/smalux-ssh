@@ -2,7 +2,7 @@
 
 use crate::model::{SessionId, SessionTab};
 
-use super::super::AppState;
+use crate::core::CoreState;
 use remote_command_history_finish::RemoteCommandHistoryFinish;
 use remote_command_history_match::{RemoteCommandHistoryMatch, remote_command_history_match};
 
@@ -11,7 +11,7 @@ mod remote_command_history_finish;
 #[path = "remote_command_history_match.rs"]
 mod remote_command_history_match;
 
-impl AppState {
+impl CoreState {
     pub(in crate::model::app_state) fn finish_remote_command_history(
         &mut self,
         session_id: SessionId,

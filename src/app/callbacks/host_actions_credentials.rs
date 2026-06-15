@@ -112,11 +112,11 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
             let source_id = source_id.to_string();
             let target_id = target_id.to_string();
             let borrowed = state.borrow();
-            let Some(target) = parse_credential_drop_target(&borrowed, &target_id) else {
+            let Some(target) = parse_credential_drop_target(&borrowed.core, &target_id) else {
                 return false;
             };
             let message = if let Some(name) = parse_credential_row_id(&source_id) {
-                let Some(kind) = credential_kind_by_name(&borrowed, name) else {
+                let Some(kind) = credential_kind_by_name(&borrowed.core, name) else {
                     return false;
                 };
                 if target
@@ -131,7 +131,7 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
                     group_id: target.group_id,
                 }
             } else if let Some(group_id) = parse_credential_group_row_id(&source_id) {
-                let Some(kind) = credential_group_kind_by_id(&borrowed, group_id) else {
+                let Some(kind) = credential_group_kind_by_id(&borrowed.core, group_id) else {
                     return false;
                 };
                 if target
@@ -357,7 +357,7 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     {
         let state = Rc::clone(&state);
         window.on_read_credential_secret(move |credential_id| {
-            credential_secret_text(&state.borrow(), credential_id.as_str())
+            credential_secret_text(&state.borrow().core, credential_id.as_str())
                 .unwrap_or_default()
                 .into()
         });

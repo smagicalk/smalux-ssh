@@ -16,6 +16,7 @@ mod visual_settings_tests;
 mod workspace_ui;
 
 use super::{BackgroundProfile, GroupId, HostId, ThemeProfile};
+use crate::config::AppConfig;
 
 pub use host_action::*;
 pub use quick_host::*;
@@ -70,6 +71,16 @@ impl UiState {
         let had_error = self.last_error.is_some();
         self.last_error = None;
         had_error
+    }
+
+    /// 根据持久化配置同步工作区 UI 偏好。
+    pub fn apply_workspace_preferences_from_config(&mut self, config: &AppConfig) {
+        self.workspace.host_list_mode = match config.workspace.host_list_mode {
+            crate::config::HostListModePreference::Tree => HostListMode::Tree,
+            crate::config::HostListModePreference::Card => HostListMode::Card,
+        };
+        self.workspace.language = LanguageMode::from_preference(config.workspace.language);
+        self.workspace.theme = BuiltInTheme::from_preference(config.workspace.built_in_theme);
     }
 }
 

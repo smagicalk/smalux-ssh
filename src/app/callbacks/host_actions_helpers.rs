@@ -2,6 +2,7 @@
 
 use uuid::Uuid;
 
+use crate::core::CoreState;
 use crate::model::{
     CredentialGroupId, CredentialKind, KeyAlgorithm, QuickHostAuthField, QuickHostAuthKind,
     QuickHostDraftField,
@@ -50,10 +51,7 @@ pub(super) fn copy_text_to_clipboard(text: &str) -> bool {
     }
 }
 
-pub(super) fn credential_secret_text(
-    state: &crate::model::AppState,
-    row_id: &str,
-) -> Option<String> {
+pub(super) fn credential_secret_text(state: &CoreState, row_id: &str) -> Option<String> {
     let name = parse_credential_row_id(row_id)?;
     let credential = state
         .storage
@@ -144,7 +142,7 @@ pub(super) fn parse_optional_credential_group_row_id(row_id: &str) -> Option<Cre
 }
 
 pub(super) fn parse_credential_drop_target(
-    state: &crate::model::AppState,
+    state: &CoreState,
     row_id: &str,
 ) -> Option<CredentialDropTarget> {
     if let Some(kind) = row_id
@@ -165,10 +163,7 @@ pub(super) fn parse_credential_drop_target(
     })
 }
 
-pub(super) fn credential_kind_by_name(
-    state: &crate::model::AppState,
-    name: &str,
-) -> Option<CredentialKind> {
+pub(super) fn credential_kind_by_name(state: &CoreState, name: &str) -> Option<CredentialKind> {
     state
         .storage
         .credentials
@@ -178,7 +173,7 @@ pub(super) fn credential_kind_by_name(
 }
 
 pub(super) fn credential_group_kind_by_id(
-    state: &crate::model::AppState,
+    state: &CoreState,
     group_id: CredentialGroupId,
 ) -> Option<CredentialKind> {
     state

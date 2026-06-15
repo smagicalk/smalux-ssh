@@ -16,5 +16,6 @@ fn tunnel_rule() -> TunnelRule {
         target_host: "10.0.0.5".to_owned(),
         target_port: 5432,
         auto_start: false,
+        exit_on_failure: false,
     }
 }

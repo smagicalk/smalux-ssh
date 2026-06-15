@@ -3,7 +3,8 @@
 //! 设置页把语言、主题、存储和安全状态合成纯 Rust view model。这里不执行导入、导出、
 //! 备份等副作用，只计算按钮是否可用、默认文件名、显示文案和计数摘要。
 
-use crate::model::{AppState, BuiltInTheme, LanguageMode};
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
+use crate::model::{BuiltInTheme, LanguageMode};
 
 use super::i18n::{Locale, locale_for_state, tr};
 use super::labels::theme_label;
@@ -138,7 +139,8 @@ pub(in crate::app) struct SettingsSecurityViewModel {
     pub encryption_version_label: &'static str,
 }
 
-pub(super) fn settings(state: &AppState) -> SettingsViewModel {
+pub(super) fn settings(state: impl AsDesktopStateView) -> SettingsViewModel {
+    let state = state.as_desktop_state_view();
     // 先分别计算存储和安全状态，文件操作按钮会依赖存储后端是否持久化。
     let locale = locale_for_state(state);
     let storage = storage_status(state, locale);
@@ -217,7 +219,7 @@ fn theme_options(selected: BuiltInTheme, locale: Locale) -> Vec<SettingOptionVie
         .collect()
 }
 
-fn theme_status(state: &AppState, locale: Locale) -> SettingsThemeViewModel {
+fn theme_status(state: DesktopStateView<'_>, locale: Locale) -> SettingsThemeViewModel {
     // 主题导入导出先暴露能力和格式，实际解析/写文件由 theme 模块处理。
     SettingsThemeViewModel {
         current_theme_name: theme_label(state.ui.workspace.theme, locale).to_owned(),
@@ -240,7 +242,7 @@ fn theme_status(state: &AppState, locale: Locale) -> SettingsThemeViewModel {
     }
 }
 
-fn current_theme_export_file_name(state: &AppState) -> String {
+fn current_theme_export_file_name(state: DesktopStateView<'_>) -> String {
     let stem = state
         .storage
         .theme_by_name(&state.config.theme.name)
@@ -278,7 +280,10 @@ fn file_stem_from_theme_name(name: &str) -> String {
     }
 }
 
-fn custom_theme_profiles(state: &AppState, locale: Locale) -> Vec<CustomThemeProfileViewModel> {
+fn custom_theme_profiles(
+    state: DesktopStateView<'_>,
+    locale: Locale,
+) -> Vec<CustomThemeProfileViewModel> {
     // 已选中的 profile 不能再次应用；内置 profile 不允许从用户存储中删除。
     state
         .storage
@@ -402,7 +407,7 @@ fn format_view_model(
 }
 
 fn file_actions(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     storage: &SettingsStorageViewModel,
     locale: Locale,
 ) -> Vec<SettingsFileActionViewModel> {
@@ -539,7 +544,7 @@ fn file_path_placeholder(direction: &'static str, locale: Locale) -> &'static st
     }
 }
 
-fn storage_summary(state: &AppState, locale: Locale) -> String {
+fn storage_summary(state: DesktopStateView<'_>, locale: Locale) -> String {
     // 顶部摘要只取前几项，详细列表由 settings_storage_summary 单独展示。
     storage_summary_items(state, locale)
         .into_iter()
@@ -549,7 +554,7 @@ fn storage_summary(state: &AppState, locale: Locale) -> String {
         .join(" · ")
 }
 
-fn storage_status(state: &AppState, locale: Locale) -> SettingsStorageViewModel {
+fn storage_status(state: DesktopStateView<'_>, locale: Locale) -> SettingsStorageViewModel {
     // 没有 SQLite 后端时仍能运行，但备份/导入导出按钮应禁用。
     let database_path = state
         .storage_backend
@@ -577,7 +582,7 @@ fn storage_status(state: &AppState, locale: Locale) -> SettingsStorageViewModel 
 }
 
 fn storage_summary_items(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     locale: Locale,
 ) -> Vec<SettingsStorageSummaryItemViewModel> {
     // 这些计数来自 StorageManager，后续新增模块时只需追加一个 summary item。
@@ -684,7 +689,7 @@ fn storage_action(
     }
 }
 
-fn security_status(state: &AppState, locale: Locale) -> SettingsSecurityViewModel {
+fn security_status(state: DesktopStateView<'_>, locale: Locale) -> SettingsSecurityViewModel {
     // 当前只实现未加密状态；后续设置密码后在这里扩展启用、KDF 和版本展示。
     match state.config.security.encryption {
         crate::config::StorageEncryptionPreference::Disabled => SettingsSecurityViewModel {

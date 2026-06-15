@@ -1,6 +1,5 @@
+use crate::core::CoreState;
 use crate::model::{AuthProfile, CredentialKind, CredentialMetadata, SecretRef};
-
-use super::super::AppState;
 
 pub(super) fn next_credential_copy_name(
     credentials: &[CredentialMetadata],
@@ -19,7 +18,7 @@ pub(super) fn next_credential_copy_name(
 }
 
 pub(super) fn next_secret_ref(
-    state: &AppState,
+    state: &CoreState,
     namespace: &str,
     fallback: &str,
     name: &str,
@@ -86,7 +85,7 @@ fn secret_ref_slug(name: &str) -> String {
     slug
 }
 
-fn secret_ref_exists(state: &AppState, candidate: &str) -> bool {
+fn secret_ref_exists(state: &CoreState, candidate: &str) -> bool {
     state
         .storage
         .secrets

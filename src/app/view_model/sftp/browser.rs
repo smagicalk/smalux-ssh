@@ -1,13 +1,15 @@
 //! SFTP 浏览器展示模型构建。
 
-use crate::model::{AppState, HostId, SftpBrowserState};
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
+use crate::model::{HostId, SftpBrowserState};
 
 use super::super::common::{bytes_label, host_name};
 use super::super::i18n::{locale_for_state, tr};
 use super::labels::sftp_kind_label;
 use super::types::{SftpEntryViewModel, SftpViewModel};
 
-pub(in crate::app::view_model) fn active_sftp(state: &AppState) -> SftpViewModel {
+pub(in crate::app::view_model) fn active_sftp(state: impl AsDesktopStateView) -> SftpViewModel {
+    let state = state.as_desktop_state_view();
     if let Some(host_id) = active_host_id(state) {
         return state
             .sessions
@@ -25,7 +27,7 @@ pub(in crate::app::view_model) fn active_sftp(state: &AppState) -> SftpViewModel
     browser_view_model(state, browser)
 }
 
-fn active_host_id(state: &AppState) -> Option<HostId> {
+fn active_host_id(state: DesktopStateView<'_>) -> Option<HostId> {
     state.sessions.active_tab.and_then(|session_id| {
         state
             .sessions
@@ -36,7 +38,7 @@ fn active_host_id(state: &AppState) -> Option<HostId> {
     })
 }
 
-fn browser_view_model(state: &AppState, browser: &SftpBrowserState) -> SftpViewModel {
+fn browser_view_model(state: DesktopStateView<'_>, browser: &SftpBrowserState) -> SftpViewModel {
     let selected_path = browser.selected_path.clone().unwrap_or_default();
     let locale = locale_for_state(state);
     SftpViewModel {
@@ -60,7 +62,7 @@ fn browser_view_model(state: &AppState, browser: &SftpBrowserState) -> SftpViewM
     }
 }
 
-fn empty_sftp(state: &AppState) -> SftpViewModel {
+fn empty_sftp(state: DesktopStateView<'_>) -> SftpViewModel {
     let locale = locale_for_state(state);
     SftpViewModel {
         host_id: String::new(),
@@ -73,7 +75,7 @@ fn empty_sftp(state: &AppState) -> SftpViewModel {
     }
 }
 
-fn empty_sftp_for_host(state: &AppState, host_id: HostId) -> SftpViewModel {
+fn empty_sftp_for_host(state: DesktopStateView<'_>, host_id: HostId) -> SftpViewModel {
     SftpViewModel {
         host_id: host_id.0.to_string(),
         title: format!("SFTP · {}", host_name(state, host_id)),

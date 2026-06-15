@@ -10,9 +10,10 @@ mod types;
 #[cfg(test)]
 mod tests;
 
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
 use crate::model::{
-    AppState, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, ProxyProfile,
-    TunnelKind, TunnelRule,
+    CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, ProxyProfile, TunnelKind,
+    TunnelRule,
 };
 
 use super::common::{group_label, host_name, tags_label};
@@ -50,13 +51,15 @@ fn accent_index_for_group_id(group_id: Option<GroupId>) -> i32 {
         .unwrap_or_default()
 }
 
-pub(super) fn hosts(state: &AppState) -> Vec<HostViewModel> {
+pub(super) fn hosts(state: impl AsDesktopStateView) -> Vec<HostViewModel> {
+    let state = state.as_desktop_state_view();
     // 首页卡片/列表视图使用完整标签展示和分组标题。
     let query = state.ui.workspace.host_search_query.trim().to_lowercase();
-    host_rows_for_query(state, &query, true, tag_display::full)
+    host_rows_for_query(state, &query, true, true)
 }
 
-pub(super) fn host_tree(state: &AppState) -> Vec<HostTreeViewModel> {
+pub(super) fn host_tree(state: impl AsDesktopStateView) -> Vec<HostTreeViewModel> {
+    let state = state.as_desktop_state_view();
     // 树视图从一个虚拟 root 开始，空 group_id 表示“所有主机”。
     let query = state.ui.workspace.host_search_query.trim().to_lowercase();
     let locale = locale_for_state(state);
@@ -94,7 +97,7 @@ pub(super) fn host_tree(state: &AppState) -> Vec<HostTreeViewModel> {
 }
 
 fn append_tree_child_rows(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     parent_id: Option<GroupId>,
     depth: i32,
     query: &str,
@@ -175,10 +178,10 @@ fn append_tree_child_rows(
 }
 
 fn visible_child_groups<'a>(
-    state: &'a AppState,
+    state: DesktopStateView<'_>,
     parent_id: Option<GroupId>,
     query: &str,
-) -> Vec<&'a HostGroup> {
+) -> Vec<HostGroup> {
     // 分组自己命中或子孙命中时都要保留，这样搜索结果能显示完整路径。
     let mut groups = state
         .storage
@@ -189,22 +192,24 @@ fn visible_child_groups<'a>(
             let group_matches = query.is_empty() || group.name.to_lowercase().contains(query);
             group_matches || group_has_matching_descendant(state, group.id, query)
         })
+        .cloned()
         .collect::<Vec<_>>();
     groups.sort_by(|left, right| left.name.cmp(&right.name));
     groups
 }
 
 fn visible_child_hosts<'a>(
-    state: &'a AppState,
+    state: DesktopStateView<'_>,
     group_id: Option<GroupId>,
     query: &str,
-) -> Vec<&'a Host> {
+) -> Vec<Host> {
     // 只返回当前父分组下的主机；递归结构由 append_tree_child_rows 控制。
     let mut hosts = state
         .storage
         .hosts
         .iter()
         .filter(|host| host.group_id == group_id && host_matches_query(host, query))
+        .cloned()
         .collect::<Vec<_>>();
     hosts.sort_by(|left, right| left.name.cmp(&right.name));
     hosts
@@ -225,7 +230,11 @@ fn tree_guides_with_depth(mut guides: TreeGuides, depth: i32, active: bool) -> T
     guides
 }
 
-fn group_has_matching_descendant(state: &AppState, group_id: GroupId, query: &str) -> bool {
+fn group_has_matching_descendant(
+    state: DesktopStateView<'_>,
+    group_id: GroupId,
+    query: &str,
+) -> bool {
     // 空查询时所有分组都可见；非空查询递归检查子主机和子分组。
     query.is_empty()
         || state
@@ -244,7 +253,8 @@ fn group_has_matching_descendant(state: &AppState, group_id: GroupId, query: &st
             })
 }
 
-pub(super) fn new_session_hosts(state: &AppState) -> Vec<HostViewModel> {
+pub(super) fn new_session_hosts(state: impl AsDesktopStateView) -> Vec<HostViewModel> {
+    let state = state.as_desktop_state_view();
     // 新建会话弹窗使用紧凑标签，避免卡片高度被长 tag 撑大。
     let query = state
         .ui
@@ -252,17 +262,17 @@ pub(super) fn new_session_hosts(state: &AppState) -> Vec<HostViewModel> {
         .new_session_search_query
         .trim()
         .to_lowercase();
-    host_rows_for_query(state, "", false, tag_display::compact)
+    host_rows_for_query(state, "", false, false)
         .into_iter()
         .filter(|host| host_view_matches_query(host, &query))
         .collect()
 }
 
 fn host_rows_for_query(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     query: &str,
     include_group_headers: bool,
-    tag_display: fn(&AppState, &Host) -> String,
+    show_full_tags: bool,
 ) -> Vec<HostViewModel> {
     let locale = locale_for_state(state);
     let mut last_group = String::new();
@@ -300,7 +310,11 @@ fn host_rows_for_query(
                 group_id,
                 group_header,
                 group_header_id,
-                tags: tag_display(state, host),
+                tags: if show_full_tags {
+                    tag_display::full(state, host)
+                } else {
+                    tag_display::compact(state, host)
+                },
                 status_key: host_status_key(state, host.id),
                 status: host_status_label(state, host.id, locale),
                 accent_index: accent_index_for_group_id(host.group_id),
@@ -309,7 +323,8 @@ fn host_rows_for_query(
         .collect()
 }
 
-pub(super) fn create_group_dialog(state: &AppState) -> CreateGroupDialogViewModel {
+pub(super) fn create_group_dialog(state: impl AsDesktopStateView) -> CreateGroupDialogViewModel {
+    let state = state.as_desktop_state_view();
     // 创建分组和选择父级共用一份文案模型，实际显示哪个弹窗由 workspace 状态决定。
     let locale = locale_for_state(state);
     let default_group = tr(locale, "common.ungrouped");
@@ -339,7 +354,7 @@ pub(super) fn create_group_dialog(state: &AppState) -> CreateGroupDialogViewMode
     }
 }
 
-fn effective_create_group_parent_id(state: &AppState) -> Option<crate::model::GroupId> {
+fn effective_create_group_parent_id(state: DesktopStateView<'_>) -> Option<crate::model::GroupId> {
     // 父级选择弹窗打开时，pending 选择优先于真正的 quick_group 草稿。
     if state.ui.workspace.create_group_parent_dialog_open {
         state.ui.workspace.pending_create_group_parent_id
@@ -348,7 +363,8 @@ fn effective_create_group_parent_id(state: &AppState) -> Option<crate::model::Gr
     }
 }
 
-pub(super) fn create_choice_text(state: &AppState) -> CreateChoiceText {
+pub(super) fn create_choice_text(state: impl AsDesktopStateView) -> CreateChoiceText {
+    let state = state.as_desktop_state_view();
     // 创建入口弹窗只有文案，不持有业务状态。
     let locale = locale_for_state(state);
 
@@ -375,15 +391,16 @@ fn host_view_matches_query(host: &HostViewModel, query: &str) -> bool {
 }
 
 mod tag_display {
-    use crate::model::{AppState, Host};
+    use crate::app::state::AsDesktopStateView;
+    use crate::model::Host;
 
     use super::tags_label;
 
-    pub(super) fn full(state: &AppState, host: &Host) -> String {
+    pub(super) fn full(state: impl AsDesktopStateView, host: &Host) -> String {
         tags_label(state, host)
     }
 
-    pub(super) fn compact(_state: &AppState, host: &Host) -> String {
+    pub(super) fn compact(_state: impl AsDesktopStateView, host: &Host) -> String {
         // 弹窗卡片只显示第一个 tag 和剩余数量，减少横向挤压。
         compact_host_tags(&host.tags)
     }
@@ -402,7 +419,8 @@ mod tag_display {
     }
 }
 
-pub(super) fn quick_host(state: &AppState) -> QuickHostViewModel {
+pub(super) fn quick_host(state: impl AsDesktopStateView) -> QuickHostViewModel {
+    let state = state.as_desktop_state_view();
     // 草稿字段原样回填，认证方式和 agent source 使用稳定 key 供 Slint 单选控件匹配。
     let draft = &state.ui.quick_host;
     let locale = locale_for_state(state);
@@ -442,7 +460,7 @@ pub(super) fn quick_host(state: &AppState) -> QuickHostViewModel {
 }
 
 fn credential_options(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     kind: CredentialKind,
     selected_value: &str,
 ) -> Vec<CredentialOptionViewModel> {
@@ -489,7 +507,7 @@ fn key_algorithm_label(algorithm: &crate::model::KeyAlgorithm) -> String {
     }
 }
 
-fn network_proxy_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel> {
+fn network_proxy_options(state: DesktopStateView<'_>) -> Vec<NetworkResourceOptionViewModel> {
     let locale = locale_for_state(state);
     let selected_ids = &state.ui.quick_host.network.proxy_ids;
     let mut rows = state
@@ -511,7 +529,7 @@ fn network_proxy_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel
     rows
 }
 
-fn network_jump_chain_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel> {
+fn network_jump_chain_options(state: DesktopStateView<'_>) -> Vec<NetworkResourceOptionViewModel> {
     let locale = locale_for_state(state);
     let selected_ids = &state.ui.quick_host.network.jump_chain_ids;
     let mut rows = state
@@ -544,7 +562,7 @@ fn network_jump_chain_options(state: &AppState) -> Vec<NetworkResourceOptionView
     rows
 }
 
-fn network_forward_options(state: &AppState) -> Vec<NetworkResourceOptionViewModel> {
+fn network_forward_options(state: DesktopStateView<'_>) -> Vec<NetworkResourceOptionViewModel> {
     let locale = locale_for_state(state);
     let selected_ids = &state.ui.quick_host.network.forward_ids;
     let mut rows = state
@@ -568,8 +586,8 @@ fn network_forward_options(state: &AppState) -> Vec<NetworkResourceOptionViewMod
 
 fn proxy_profile_label(profile: &ProxyProfile) -> String {
     match profile {
-        ProxyProfile::Socks5 { host, port } => format!("SOCKS5 {host}:{port}"),
-        ProxyProfile::Http { host, port } => format!("HTTP {host}:{port}"),
+        ProxyProfile::Socks5 { host, port, .. } => format!("SOCKS5 {host}:{port}"),
+        ProxyProfile::Http { host, port, .. } => format!("HTTP {host}:{port}"),
     }
 }
 
@@ -601,7 +619,7 @@ fn forward_rule_label(rule: &TunnelRule, locale: Locale) -> String {
 }
 
 fn group_options(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     default_group: &'static str,
     selected_group_id: Option<GroupId>,
 ) -> Vec<GroupOptionViewModel> {
@@ -618,7 +636,7 @@ fn group_options(
 }
 
 fn append_group_options(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     parent_id: Option<GroupId>,
     depth: i32,
     parent_path: Vec<String>,
@@ -656,7 +674,11 @@ fn append_group_options(
     }
 }
 
-fn group_path(state: &AppState, group_id: Option<GroupId>, default_group: &'static str) -> String {
+fn group_path(
+    state: DesktopStateView<'_>,
+    group_id: Option<GroupId>,
+    default_group: &'static str,
+) -> String {
     // None 或已删除分组都回退到根分组文案，避免 UI 显示裸 UUID。
     let Some(group_id) = group_id else {
         return default_group.to_owned();
@@ -679,15 +701,17 @@ fn group_path(state: &AppState, group_id: Option<GroupId>, default_group: &'stat
     names.join(" / ")
 }
 
-fn find_group(state: &AppState, group_id: GroupId) -> Option<&HostGroup> {
+fn find_group(state: DesktopStateView<'_>, group_id: GroupId) -> Option<HostGroup> {
     state
         .storage
         .groups
         .iter()
         .find(|group| group.id == group_id)
+        .cloned()
 }
 
-pub(super) fn create_host_dialog_text(state: &AppState) -> CreateHostDialogText {
+pub(super) fn create_host_dialog_text(state: impl AsDesktopStateView) -> CreateHostDialogText {
+    let state = state.as_desktop_state_view();
     // 创建和编辑共用一个弹窗，只根据 editing 状态切换标题和确认按钮文案。
     let editing = state.ui.quick_host.editing_host_id.is_some();
     let locale = locale_for_state(state);

@@ -168,6 +168,9 @@ pub(super) async fn load_hosts(
             .map(|jump| {
                 Ok(JumpProfile {
                     host_id: HostId(parse_uuid(&jump.jump_host_id)?),
+                    username_override: None,
+                    port_override: None,
+                    alias: None,
                 })
             })
             .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
@@ -411,14 +414,18 @@ async fn save_host_proxies(
     proxies: &[ProxyProfile],
 ) -> Result<(), StoragePersistenceError> {
     for (proxy_index, proxy) in proxies.iter().enumerate() {
-        let (proxy_kind, proxy_host, proxy_port) = proxy_profile_to_parts(proxy);
+        let parts = proxy_profile_to_parts(proxy);
         entity::host_proxy::Entity::insert(entity::host_proxy::ActiveModel {
             id: Set(format!("{host_id}:proxy:{proxy_index}")),
             host_id: Set(host_id.to_owned()),
             sort_order: Set(proxy_index as i32),
-            proxy_kind: Set(proxy_kind.to_owned()),
-            proxy_host: Set(proxy_host),
-            proxy_port: Set(proxy_port as i32),
+            proxy_kind: Set(parts.kind.to_owned()),
+            proxy_host: Set(parts.host),
+            proxy_port: Set(parts.port as i32),
+            auth_kind: Set(parts.auth_kind.to_owned()),
+            auth_username: Set(parts.auth_username),
+            auth_password_secret_ref: Set(parts.auth_password_secret_ref),
+            remote_dns: Set(parts.remote_dns),
         })
         .exec(db)
         .await?;
@@ -474,5 +481,13 @@ fn auth_from_model(
 fn proxy_from_model(
     model: &entity::host_proxy::Model,
 ) -> Result<ProxyProfile, StoragePersistenceError> {
-    proxy_parts_to_profile(&model.proxy_kind, &model.proxy_host, model.proxy_port)
+    proxy_parts_to_profile(
+        &model.proxy_kind,
+        &model.proxy_host,
+        model.proxy_port,
+        &model.auth_kind,
+        model.auth_username.clone(),
+        model.auth_password_secret_ref.clone(),
+        model.remote_dns,
+    )
 }

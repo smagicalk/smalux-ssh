@@ -2,24 +2,26 @@
 
 use uuid::Uuid;
 
+use crate::core::CoreState;
 use crate::model::{HostId, Snippet, SnippetId, SnippetScope};
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::outcome::missing_host;
 
 const HOST_SNIPPET_NAME_LIMIT: usize = 48;
 
-impl AppState {
-    /// 将当前主机命令草稿保存为主机级快捷命令。
-    pub(in crate::model::app_state) fn save_host_command_snippet(
+impl CoreState {
+    /// 将一条命令保存为主机级快捷命令。
+    pub(crate) fn save_host_command_snippet_action(
         &mut self,
         host_id: HostId,
+        command: String,
     ) -> AppUpdateOutcome {
         if !self.storage.hosts.iter().any(|host| host.id == host_id) {
             return missing_host(host_id);
         }
 
-        let command = self.ui.remote_command_for(host_id).trim().to_owned();
+        let command = command.trim().to_owned();
         if command.is_empty() {
             return AppUpdateOutcome {
                 error: Some("快捷命令内容不能为空".to_owned()),

@@ -18,9 +18,11 @@ use std::thread;
 use slint::{ComponentHandle, Timer, TimerMode};
 
 use crate::backend::{BackendCommand, SharedBackendExecutor};
-use crate::model::BackendCommandResult;
+use crate::core::CoreState;
+use crate::model::{BackendCommandResult, UiState};
 
 use super::projection::sync_terminal_pane;
+use super::state::AsDesktopStateView;
 use super::{AppWindow, SharedAppState};
 use drain::enqueue_drain_commands;
 
@@ -30,7 +32,7 @@ const BACKEND_PUMP_INTERVAL: std::time::Duration = std::time::Duration::from_mil
 pub(super) fn start_backend_pump(window: &AppWindow, state: SharedAppState) {
     let timer = Timer::default();
     let weak = window.as_weak();
-    let worker = BackendWorker::start(state.borrow().backend_executor.clone());
+    let worker = BackendWorker::start(state.borrow().core.backend_executor.clone());
 
     timer.start(TimerMode::Repeated, BACKEND_PUMP_INTERVAL, move || {
         let Some(window) = weak.upgrade() else {
@@ -39,19 +41,24 @@ pub(super) fn start_backend_pump(window: &AppWindow, state: SharedAppState) {
 
         let session_ids = {
             let state = state.borrow();
-            state.sessions.interactive_shell_tab_ids()
+            state.core.sessions.interactive_shell_tab_ids()
         };
 
         let changed = {
             let mut state = state.borrow_mut();
+            let state = &mut *state;
             // 先应用后台线程已经完成的命令结果，再补充交互式 shell 的 drain 命令。
             // 这样 UI 看到的是“旧结果已归约，新读取请求已排队”的一致状态。
-            let mut changed = apply_ready_backend_results(&mut state, &worker.result_receiver);
-            enqueue_drain_commands(&mut state, session_ids);
+            let mut changed = apply_ready_backend_results(
+                &mut state.core,
+                &mut state.ui,
+                &worker.result_receiver,
+            );
+            enqueue_drain_commands(&mut state.core, session_ids);
 
             // 每个 tick 只向后台 worker 提交一条可执行命令，避免 UI 线程里阻塞网络
             // 或 PTY 操作，同时保留命令队列的顺序语义。
-            let next = state.next_backend_command_for_worker();
+            let next = state.core.next_backend_command_for_worker();
             changed |= next.changed();
             if let Some(command) = next.worker_command {
                 worker.dispatch(command);
@@ -61,18 +68,18 @@ pub(super) fn start_backend_pump(window: &AppWindow, state: SharedAppState) {
         };
 
         if changed {
-            sync_terminal_pane(&window, &state.borrow());
+            sync_terminal_pane(&window, state.borrow().as_desktop_state_view());
         }
     });
 
-    // Slint 的 Timer 停止于 Drop。泄漏一个应用生命周期定时器比把它塞进
-    // 可克隆 AppState 更清晰，窗口退出后进程生命周期会回收它。
+    // Slint 的 Timer 停止于 Drop。这里把它作为桌面 Adapter 生命周期资源保留；
+    // 窗口退出后进程生命周期会回收它。
     std::mem::forget(timer);
 }
 
 /// 后台执行线程的句柄。
 ///
-/// `AppState` 里保存的是可替换的后端执行器；这里负责把 UI 线程里的命令队列
+/// `CoreState` 里保存的是可替换的后端执行器；这里负责把 UI 线程里的命令队列
 /// 送到后台线程执行，并把结果送回下一轮 pump。
 struct BackendWorker {
     command_sender: Sender<BackendCommand>,
@@ -124,7 +131,8 @@ impl BackendWorker {
 /// 这里使用非阻塞 `try_recv`，保证 UI tick 不会等待网络或文件操作完成。
 /// 返回值只表示核心状态是否变化，用于决定是否需要局部刷新终端面板。
 fn apply_ready_backend_results(
-    state: &mut crate::model::AppState,
+    state: &mut CoreState,
+    ui: &mut UiState,
     receiver: &Receiver<BackendCommandResult>,
 ) -> bool {
     let mut changed = false;
@@ -133,6 +141,9 @@ fn apply_ready_backend_results(
         match receiver.try_recv() {
             Ok(result) => {
                 let outcome = state.apply_backend_command_result(result.command, result.result);
+                if let Some(error) = &outcome.error {
+                    ui.set_last_error(error.clone());
+                }
                 changed |= outcome.changed();
             }
             Err(TryRecvError::Empty) => return changed,

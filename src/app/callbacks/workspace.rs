@@ -5,10 +5,14 @@
 
 use std::rc::Rc;
 
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model};
 use uuid::Uuid;
 
 use crate::model::{ForwardId, HostId, JumpChainId, Message, ProxyId};
+
+use crate::app::HostRow;
+use crate::app::state::AsDesktopStateView;
+use crate::model::JumpProfile;
 
 use super::{AppWindow, SharedAppState, apply_and_sync, apply_and_sync_success, parse_session_id};
 
@@ -99,23 +103,38 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
     {
         let weak = window.as_weak();
         let state = Rc::clone(&state);
-        window.on_save_network_proxy(move |asset_id, name, proxy_kind, host, port, tags| {
-            let Some(proxy_id) = parse_optional_proxy_id(asset_id.as_str()) else {
-                return report_network_parse_error(&weak, &state);
-            };
-            apply_and_sync_success(
-                &weak,
-                &state,
-                Message::SaveProxyAsset {
-                    proxy_id,
-                    name: name.to_string(),
-                    proxy_kind: proxy_kind.to_string(),
-                    host: host.to_string(),
-                    port: port.to_string(),
-                    tags: tags.to_string(),
-                },
-            )
-        });
+        window.on_save_network_proxy(
+            move |asset_id,
+                  name,
+                  proxy_kind,
+                  host,
+                  port,
+                  tags,
+                  auth_kind,
+                  auth_username,
+                  auth_password_ref,
+                  remote_dns| {
+                let Some(proxy_id) = parse_optional_proxy_id(asset_id.as_str()) else {
+                    return report_network_parse_error(&weak, &state);
+                };
+                apply_and_sync_success(
+                    &weak,
+                    &state,
+                    Message::SaveProxyAsset {
+                        proxy_id,
+                        name: name.to_string(),
+                        proxy_kind: proxy_kind.to_string(),
+                        host: host.to_string(),
+                        port: port.to_string(),
+                        tags: tags.to_string(),
+                        auth_kind: auth_kind.to_string(),
+                        auth_username: auth_username.to_string(),
+                        auth_password_ref: auth_password_ref.to_string(),
+                        remote_dns,
+                    },
+                )
+            },
+        );
     }
     {
         let weak = window.as_weak();
@@ -124,7 +143,7 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
             let Some(chain_id) = parse_optional_jump_chain_id(asset_id.as_str()) else {
                 return report_network_parse_error(&weak, &state);
             };
-            let Some(host_ids) = parse_host_ids_text(host_ids.as_str()) else {
+            let Some(steps) = parse_jump_steps_text(host_ids.as_str()) else {
                 return report_network_parse_error(&weak, &state);
             };
             apply_and_sync_success(
@@ -133,9 +152,95 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
                 Message::SaveJumpChainAsset {
                     chain_id,
                     name: name.to_string(),
-                    host_ids,
+                    steps,
                 },
             )
+        });
+    }
+    window.on_network_jump_host_selected(|host_ids, host_id| {
+        let Some(host_id) = parse_host_id_text(host_id.as_str()) else {
+            return false;
+        };
+        parse_jump_steps_text(host_ids.as_str())
+            .is_some_and(|steps| steps.iter().any(|step| step.host_id == host_id))
+    });
+    window.on_network_jump_host_order(|host_ids, host_id| {
+        let Some(host_id) = parse_host_id_text(host_id.as_str()) else {
+            return 0;
+        };
+        jump_host_order(host_ids.as_str(), host_id)
+    });
+    window.on_network_jump_host_matches(|query, host| host_row_matches_query(&query, &host));
+    {
+        let weak = window.as_weak();
+        window.on_has_network_jump_host_match(move |query| {
+            let Some(window) = weak.upgrade() else {
+                return false;
+            };
+            let hosts = window.get_hosts();
+            (0..hosts.row_count()).any(|index| {
+                hosts
+                    .row_data(index)
+                    .is_some_and(|host| host_row_matches_query(&query, &host))
+            })
+        });
+    }
+    window.on_selected_network_jump_host_count(|host_ids| jump_step_count(host_ids.as_str()));
+    window.on_clear_network_jump_hosts(|| "[]".into());
+    window.on_toggle_network_jump_host(|host_ids, host_id| {
+        let Some(host_id) = parse_host_id_text(host_id.as_str()) else {
+            return host_ids;
+        };
+        toggle_jump_step_text(host_ids.as_str(), host_id).into()
+    });
+    window.on_update_network_jump_step_host(|step_text, step_index, host_id| {
+        let Some(host_id) = parse_host_id_text(host_id.as_str()) else {
+            return step_text;
+        };
+        update_jump_step_host_text(step_text.as_str(), step_index as usize, host_id).into()
+    });
+    window.on_update_network_jump_step_username(|step_text, step_index, username| {
+        update_jump_step_username_text(step_text.as_str(), step_index as usize, username.as_str())
+            .into()
+    });
+    window.on_update_network_jump_step_port(|step_text, step_index, port| {
+        update_jump_step_port_text(step_text.as_str(), step_index as usize, port.as_str()).into()
+    });
+    window.on_update_network_jump_step_alias(|step_text, step_index, alias| {
+        update_jump_step_alias_text(step_text.as_str(), step_index as usize, alias.as_str()).into()
+    });
+    window.on_move_jump_step_up(|step_text, step_index| {
+        move_jump_step_text(step_text.as_str(), step_index as usize, true).into()
+    });
+    window.on_move_jump_step_down(|step_text, step_index| {
+        move_jump_step_text(step_text.as_str(), step_index as usize, false).into()
+    });
+    window.on_network_jump_step_host_id(|step_text, step_index| {
+        jump_step_host_id_text(step_text.as_str(), step_index as usize).into()
+    });
+    window.on_network_jump_step_username(|step_text, step_index| {
+        jump_step_username_text(step_text.as_str(), step_index as usize).into()
+    });
+    window.on_network_jump_step_port(|step_text, step_index| {
+        jump_step_port_text(step_text.as_str(), step_index as usize).into()
+    });
+    window.on_network_jump_step_alias(|step_text, step_index| {
+        jump_step_alias_text(step_text.as_str(), step_index as usize).into()
+    });
+    {
+        let weak = window.as_weak();
+        window.on_network_jump_step_label(move |step_text, step_index| {
+            let Some(window) = weak.upgrade() else {
+                return "".into();
+            };
+            jump_step_label_text(step_text.as_str(), step_index as usize, &window).into()
+        });
+        let weak = window.as_weak();
+        window.on_network_jump_step_endpoint(move |step_text, step_index| {
+            let Some(window) = weak.upgrade() else {
+                return "".into();
+            };
+            jump_step_endpoint_text(step_text.as_str(), step_index as usize, &window).into()
         });
     }
     {
@@ -150,7 +255,8 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
                   target_host,
                   target_port,
                   tags,
-                  auto_start| {
+                  auto_start,
+                  exit_on_failure| {
                 let Some(forward_id) = parse_optional_forward_id(asset_id.as_str()) else {
                     return report_network_parse_error(&weak, &state);
                 };
@@ -167,6 +273,7 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
                         target_port: target_port.to_string(),
                         tags: tags.to_string(),
                         auto_start,
+                        exit_on_failure,
                     },
                 )
             },
@@ -179,10 +286,9 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
             let Some(message) =
                 parse_remove_network_asset_message(kind_key.as_str(), asset_id.as_str())
             else {
-                report_network_parse_error(&weak, &state);
-                return;
+                return report_network_parse_error(&weak, &state);
             };
-            apply_and_sync(&weak, &state, message);
+            apply_and_sync_success(&weak, &state, message)
         });
     }
     {
@@ -221,9 +327,245 @@ fn parse_host_ids_text(text: &str) -> Option<Vec<HostId>> {
         if token.is_empty() {
             continue;
         }
-        host_ids.push(HostId(Uuid::parse_str(token).ok()?));
+        host_ids.push(parse_host_id_text(token)?);
     }
     Some(host_ids)
+}
+
+fn parse_jump_steps_text(text: &str) -> Option<Vec<crate::model::JumpProfile>> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return Some(Vec::new());
+    }
+    if trimmed.starts_with('[') {
+        serde_json::from_str::<Vec<JumpStepDraft>>(trimmed)
+            .ok()
+            .map(|steps| {
+                steps
+                    .into_iter()
+                    .map(Into::into)
+                    .filter(|step: &JumpProfile| step.host_id.0 != Uuid::nil())
+                    .collect()
+            })
+    } else {
+        let host_ids = parse_host_ids_text(trimmed)?;
+        Some(
+            host_ids
+                .into_iter()
+                .map(|host_id| JumpProfile {
+                    host_id,
+                    username_override: None,
+                    port_override: None,
+                    alias: None,
+                })
+                .collect(),
+        )
+    }
+}
+
+fn encode_jump_steps_text(steps: &[JumpProfile]) -> String {
+    let drafts = steps
+        .iter()
+        .cloned()
+        .map(JumpStepDraft::from)
+        .collect::<Vec<_>>();
+    serde_json::to_string(&drafts).unwrap_or_else(|_| "[]".to_owned())
+}
+
+fn toggle_jump_step_text(text: &str, host_id: HostId) -> String {
+    let mut steps = parse_jump_steps_text(text).unwrap_or_default();
+    if let Some(index) = steps
+        .iter()
+        .position(|existing| existing.host_id == host_id)
+    {
+        steps.remove(index);
+    } else {
+        steps.push(JumpProfile {
+            host_id,
+            username_override: None,
+            port_override: None,
+            alias: None,
+        });
+    }
+    encode_jump_steps_text(&steps)
+}
+
+fn update_jump_step_host_text(text: &str, step_index: usize, host_id: HostId) -> String {
+    let mut steps = parse_jump_steps_text(text).unwrap_or_default();
+    let Some(step) = steps.get_mut(step_index) else {
+        return text.to_owned();
+    };
+    step.host_id = host_id;
+    encode_jump_steps_text(&steps)
+}
+
+fn update_jump_step_username_text(text: &str, step_index: usize, username: &str) -> String {
+    let mut steps = parse_jump_steps_text(text).unwrap_or_default();
+    let Some(step) = steps.get_mut(step_index) else {
+        return text.to_owned();
+    };
+    let username = username.trim();
+    step.username_override = (!username.is_empty()).then(|| username.to_owned());
+    encode_jump_steps_text(&steps)
+}
+
+fn update_jump_step_port_text(text: &str, step_index: usize, port: &str) -> String {
+    let mut steps = parse_jump_steps_text(text).unwrap_or_default();
+    let Some(step) = steps.get_mut(step_index) else {
+        return text.to_owned();
+    };
+    step.port_override = port.trim().parse::<u16>().ok().filter(|port| *port > 0);
+    encode_jump_steps_text(&steps)
+}
+
+fn update_jump_step_alias_text(text: &str, step_index: usize, alias: &str) -> String {
+    let mut steps = parse_jump_steps_text(text).unwrap_or_default();
+    let Some(step) = steps.get_mut(step_index) else {
+        return text.to_owned();
+    };
+    let alias = alias.trim();
+    step.alias = (!alias.is_empty()).then(|| alias.to_owned());
+    encode_jump_steps_text(&steps)
+}
+
+fn move_jump_step_text(text: &str, step_index: usize, move_up: bool) -> String {
+    let mut steps = parse_jump_steps_text(text).unwrap_or_default();
+    if step_index >= steps.len() {
+        return text.to_owned();
+    }
+    if move_up {
+        if step_index == 0 {
+            return text.to_owned();
+        }
+        steps.swap(step_index, step_index - 1);
+    } else {
+        if step_index + 1 >= steps.len() {
+            return text.to_owned();
+        }
+        steps.swap(step_index, step_index + 1);
+    }
+    encode_jump_steps_text(&steps)
+}
+
+fn jump_step_host_id_text(text: &str, step_index: usize) -> String {
+    parse_jump_steps_text(text)
+        .and_then(|steps| steps.get(step_index).map(|step| step.host_id.0.to_string()))
+        .unwrap_or_default()
+}
+
+fn jump_step_username_text(text: &str, step_index: usize) -> String {
+    parse_jump_steps_text(text)
+        .and_then(|steps| {
+            steps
+                .get(step_index)
+                .and_then(|step| step.username_override.clone())
+        })
+        .unwrap_or_default()
+}
+
+fn jump_step_port_text(text: &str, step_index: usize) -> String {
+    parse_jump_steps_text(text)
+        .and_then(|steps| {
+            steps
+                .get(step_index)
+                .and_then(|step| step.port_override.map(|port| port.to_string()))
+        })
+        .unwrap_or_default()
+}
+
+fn jump_step_alias_text(text: &str, step_index: usize) -> String {
+    parse_jump_steps_text(text)
+        .and_then(|steps| steps.get(step_index).and_then(|step| step.alias.clone()))
+        .unwrap_or_default()
+}
+
+fn jump_step_label_text(text: &str, step_index: usize, window: &AppWindow) -> String {
+    let Some(step) = parse_jump_steps_text(text).and_then(|steps| steps.get(step_index).cloned())
+    else {
+        return String::new();
+    };
+    let hosts = window.get_hosts();
+    let host_name = (0..hosts.row_count())
+        .find_map(|index| hosts.row_data(index))
+        .filter(|host| host.id.as_str() == step.host_id.0.to_string())
+        .map(|host| host.name.to_string())
+        .unwrap_or_else(|| step.host_id.0.to_string());
+    step.alias.unwrap_or(host_name)
+}
+
+fn jump_step_endpoint_text(text: &str, step_index: usize, window: &AppWindow) -> String {
+    let Some(step) = parse_jump_steps_text(text).and_then(|steps| steps.get(step_index).cloned())
+    else {
+        return String::new();
+    };
+    let hosts = window.get_hosts();
+    (0..hosts.row_count())
+        .find_map(|index| hosts.row_data(index))
+        .filter(|host| host.id.as_str() == step.host_id.0.to_string())
+        .map(|host| host.endpoint.to_string())
+        .unwrap_or_default()
+}
+
+fn jump_host_order(text: &str, host_id: HostId) -> i32 {
+    parse_jump_steps_text(text)
+        .and_then(|steps| {
+            steps
+                .iter()
+                .position(|existing| existing.host_id == host_id)
+                .map(|index| index as i32 + 1)
+        })
+        .unwrap_or(0)
+}
+
+fn jump_step_count(text: &str) -> i32 {
+    parse_jump_steps_text(text)
+        .map(|steps| steps.len() as i32)
+        .unwrap_or(0)
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct JumpStepDraft {
+    host_id: String,
+    username_override: Option<String>,
+    port_override: Option<u16>,
+    alias: Option<String>,
+}
+
+impl From<JumpStepDraft> for JumpProfile {
+    fn from(value: JumpStepDraft) -> Self {
+        JumpProfile {
+            host_id: HostId(Uuid::parse_str(value.host_id.trim()).unwrap_or_else(|_| Uuid::nil())),
+            username_override: value.username_override,
+            port_override: value.port_override,
+            alias: value.alias,
+        }
+    }
+}
+
+impl From<JumpProfile> for JumpStepDraft {
+    fn from(value: JumpProfile) -> Self {
+        Self {
+            host_id: value.host_id.0.to_string(),
+            username_override: value.username_override,
+            port_override: value.port_override,
+            alias: value.alias,
+        }
+    }
+}
+
+fn parse_host_id_text(text: &str) -> Option<HostId> {
+    Uuid::parse_str(text.trim()).ok().map(HostId)
+}
+
+fn host_row_matches_query(query: &str, host: &HostRow) -> bool {
+    let query = query.trim().to_lowercase();
+    query.is_empty()
+        || host.name.to_lowercase().contains(&query)
+        || host.endpoint.to_lowercase().contains(&query)
+        || host.auth.to_lowercase().contains(&query)
+        || host.group.to_lowercase().contains(&query)
+        || host.tags.to_lowercase().contains(&query)
+        || host.status.to_lowercase().contains(&query)
 }
 
 fn is_host_id_separator(ch: char) -> bool {
@@ -252,9 +594,82 @@ fn report_network_parse_error(weak: &slint::Weak<AppWindow>, state: &SharedAppSt
     };
     let message = {
         let state_ref = state.borrow();
-        crate::app::view_model::tr_for_state(&state_ref, "proxy.invalid_resource_id").to_owned()
+        crate::app::view_model::tr_for_state(
+            state_ref.as_desktop_state_view(),
+            "proxy.invalid_resource_id",
+        )
+        .to_owned()
     };
     state.borrow_mut().ui.set_last_error(message);
-    super::sync_window(&window, &state.borrow());
+    super::sync_window(&window, state.borrow().as_desktop_state_view());
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn host_id(value: u128) -> HostId {
+        HostId(Uuid::from_u128(value))
+    }
+
+    #[test]
+    fn parse_host_ids_text_accepts_common_separators() {
+        let first = host_id(1);
+        let second = host_id(2);
+        let text = format!("{}，{}\n{}", first.0, second.0, first.0);
+
+        assert_eq!(parse_host_ids_text(&text), Some(vec![first, second, first]));
+    }
+
+    #[test]
+    fn host_row_matches_query_checks_visible_host_fields() {
+        let host = HostRow {
+            id: "host-id".into(),
+            name: "Production API".into(),
+            endpoint: "prod.example.com:22".into(),
+            icon_key: "server".into(),
+            auth: "Agent".into(),
+            group: "Backend".into(),
+            group_id: "group-id".into(),
+            group_header: "Backend".into(),
+            group_header_id: "group-id".into(),
+            tags: "prod api".into(),
+            status_key: "Created".into(),
+            status: "Ready".into(),
+            accent_index: 0,
+        };
+
+        assert!(host_row_matches_query("", &host));
+        assert!(host_row_matches_query("api", &host));
+        assert!(host_row_matches_query("example.com", &host));
+        assert!(host_row_matches_query("backend", &host));
+        assert!(!host_row_matches_query("staging", &host));
+    }
+
+    #[test]
+    fn toggle_jump_step_text_recovers_from_invalid_existing_text() {
+        let host = host_id(7);
+
+        assert_eq!(
+            toggle_jump_step_text("not-a-uuid", host),
+            format!(
+                "[{{\"host_id\":\"{}\",\"username_override\":null,\"port_override\":null,\"alias\":null}}]",
+                host.0
+            )
+        );
+    }
+
+    #[test]
+    fn jump_step_helpers_track_selected_hosts() {
+        let first = host_id(1);
+        let second = host_id(2);
+
+        let appended = toggle_jump_step_text("[]", first);
+        let appended = toggle_jump_step_text(&appended, second);
+
+        assert_eq!(jump_host_order(&appended, first), 1);
+        assert_eq!(jump_host_order(&appended, second), 2);
+        assert_eq!(jump_step_count(&appended), 2);
+    }
 }

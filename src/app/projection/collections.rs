@@ -44,7 +44,7 @@ pub(super) fn sync_collection_models(window: &AppWindow, model: &AppViewModel) {
     window.set_quick_group_parent_options(group_option_model(
         &model.create_group_dialog.parent_options,
     ));
-    // 终端、SFTP、工具面板等集合都只在这里写入 Slint，不回头修改 AppState。
+    // 终端、SFTP、工具面板等集合都只在这里写入 Slint，不回头修改状态。
     window.set_tabs(tab_model(&terminal_page.tabs));
     window.set_sftp_entries(sftp_entry_model(&terminal_page.sftp.entries));
     window.set_activity(activity_model(&model.activity));
@@ -57,9 +57,11 @@ pub(super) fn sync_collection_models(window: &AppWindow, model: &AppViewModel) {
     window.set_tunnels(tool_item_model(&terminal_page.tunnels));
     window
         .set_network_runtime_tunnels(network_item_model(&model.network_workspace.runtime_tunnels));
-    window.set_network_saved_tunnels(network_item_model(&model.network_workspace.resources));
-    window.set_network_proxy_assets(network_item_model(&[]));
-    window.set_network_route_definitions(network_item_model(&[]));
+    window.set_network_jump_chain_assets(network_item_model(
+        &model.network_workspace.jump_chain_assets,
+    ));
+    window.set_network_proxy_assets(network_item_model(&model.network_workspace.proxy_assets));
+    window.set_network_forward_assets(network_item_model(&model.network_workspace.forward_assets));
     window.set_credentials(tool_item_model(&security_page.credentials));
     window.set_credential_rows(credential_row_model(&security_page.credential_rows));
     window.set_credential_group_contents(credential_group_content_model(

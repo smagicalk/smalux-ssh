@@ -1,6 +1,6 @@
 //! 后端命令队列执行泵。
 //!
-//! `AppState` 不直接持有 SSH、PTY 或 SFTP 连接，它只把用户意图转换成
+//! `CoreState` 不直接持有 SSH、PTY 或 SFTP 连接，它只把用户意图转换成
 //! `BackendCommand` 放进队列。执行泵负责把这些命令交给后端执行器，并把后端返回的
 //! `BackendEvent` 重新归约回纯状态。这样 UI 层可以完全不知道命令是同步执行、后台线程
 //! 执行，还是以后换成异步 runtime 执行。
@@ -11,6 +11,7 @@
 //!   主线程只派发下一条可执行命令，worker 完成后再把结果投回状态层。
 
 use crate::backend::{BackendCommand, BackendEvent, BackendExecutionError, BackendExecutor};
+use crate::core::CoreState;
 
 mod command_eligibility;
 mod execution_failure;
@@ -41,7 +42,7 @@ impl BackendCommandResult {
     }
 }
 
-impl AppState {
+impl CoreState {
     /// 将当前队列中的后端命令交给执行器，并把返回事件归约到状态。
     pub fn drain_backend_queue(
         &mut self,
@@ -155,5 +156,42 @@ impl AppState {
         }
 
         outcome
+    }
+}
+
+impl AppState {
+    /// 兼容旧测试和当前桌面 UI 的包装入口。
+    ///
+    /// 真正的后端队列执行已经在 `CoreState`，这里只把错误复制到当前桌面 UI 草稿，
+    /// 让通知区继续复用同一条展示路径。
+    pub fn drain_backend_queue(
+        &mut self,
+        executor: &mut (impl BackendExecutor + ?Sized),
+    ) -> AppUpdateOutcome {
+        let mut outcome = self.core.drain_backend_queue(executor);
+        self.copy_core_error_to_ui(&mut outcome);
+        outcome
+    }
+
+    /// 从核心队列取出下一条 worker 命令。
+    pub fn next_backend_command_for_worker(&mut self) -> AppUpdateOutcome {
+        self.core.next_backend_command_for_worker()
+    }
+
+    /// 兼容桌面 worker 回传入口，并把核心错误同步到 UI 草稿。
+    pub fn apply_backend_command_result(
+        &mut self,
+        command: BackendCommand,
+        result: Result<Vec<BackendEvent>, BackendExecutionError>,
+    ) -> AppUpdateOutcome {
+        let mut outcome = self.core.apply_backend_command_result(command, result);
+        self.copy_core_error_to_ui(&mut outcome);
+        outcome
+    }
+
+    fn copy_core_error_to_ui(&mut self, outcome: &mut AppUpdateOutcome) {
+        if let Some(error) = &outcome.error {
+            outcome.state_changed |= self.ui.set_last_error(error.clone());
+        }
     }
 }

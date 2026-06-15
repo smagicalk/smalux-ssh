@@ -1,10 +1,11 @@
 //! 会话标签页激活流程。
 
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind, SessionStatus, SessionTab};
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
-impl AppState {
+impl CoreState {
     pub(in crate::model::app_state) fn activate_session_tab(
         &mut self,
         session_id: SessionId,

@@ -1,8 +1,9 @@
 //! SFTP 传输取消调度。
 
+use crate::core::CoreState;
 use crate::model::TransferId;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use cancel_commands::{has_pending_sftp_browser_refresh, remove_queued_sftp_transfer_command};
 use cancel_loading::clear_loading_for_cancelled_transfer;
 use cancel_lookup::{TransferLookup, unique_transfer_task};
@@ -14,7 +15,7 @@ mod cancel_loading;
 #[path = "cancel_lookup.rs"]
 mod cancel_lookup;
 
-impl AppState {
+impl CoreState {
     /// 取消尚未交给后端执行器的 SFTP 传输。
     pub(in crate::model::app_state) fn cancel_sftp_transfer(
         &mut self,

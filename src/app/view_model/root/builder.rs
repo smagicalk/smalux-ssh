@@ -1,6 +1,6 @@
 //! App 根展示模型构建。
 
-use crate::model::AppState;
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
 
 use super::super::activity::activity;
 use super::super::common::{background_summary, theme_palette};
@@ -13,7 +13,9 @@ use super::super::labels::{
     host_list_mode_key, host_list_mode_label, page_key, page_label, theme_label,
     tool_panel_mode_key, tool_panel_mode_label,
 };
-use super::super::network::{network_resource_items, runtime_tunnel_items};
+use super::super::network::{
+    network_forward_items, network_jump_chain_items, network_proxy_items, runtime_tunnel_items,
+};
 use super::super::palette::command_palette_results;
 use super::super::settings::settings;
 use super::super::sftp::active_sftp;
@@ -29,7 +31,8 @@ use super::types::{
 use super::workspace_text::workspace_text;
 
 /// 从核心状态创建 UI 展示模型。
-pub(in crate::app) fn app_view_model(state: &AppState) -> AppViewModel {
+pub(in crate::app) fn app_view_model(state: impl AsDesktopStateView) -> AppViewModel {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let settings = settings(state);
     let terminal = active_terminal(state);
@@ -52,7 +55,9 @@ pub(in crate::app) fn app_view_model(state: &AppState) -> AppViewModel {
     let credential_detail_fields = credential_detail_fields(state);
     let known_hosts = known_host_items(state);
     let runtime_tunnels = runtime_tunnel_items(state);
-    let network_resources = network_resource_items(state);
+    let network_proxies = network_proxy_items(state);
+    let network_jump_chains = network_jump_chain_items(state);
+    let network_forwards = network_forward_items(state);
 
     AppViewModel {
         host_count: state.storage.host_count().to_string(),
@@ -108,8 +113,11 @@ pub(in crate::app) fn app_view_model(state: &AppState) -> AppViewModel {
             target_options: snippet_target_options.clone(),
         },
         network_workspace: NetworkWorkspaceViewModel {
+            search_query: state.ui.workspace.network_search_query.clone(),
             runtime_tunnels,
-            resources: network_resources,
+            proxy_assets: network_proxies,
+            jump_chain_assets: network_jump_chains,
+            forward_assets: network_forwards,
         },
         settings_workspace: SettingsWorkspaceViewModel {
             settings: settings.clone(),
@@ -133,7 +141,7 @@ pub(in crate::app) fn app_view_model(state: &AppState) -> AppViewModel {
     }
 }
 
-fn new_session_local_visible(state: &AppState) -> bool {
+fn new_session_local_visible(state: DesktopStateView<'_>) -> bool {
     let query = state
         .ui
         .workspace
@@ -154,7 +162,7 @@ fn new_session_local_visible(state: &AppState) -> bool {
         .any(|candidate| candidate.contains(query.as_str()))
 }
 
-fn pending_delete_host_name(state: &AppState) -> String {
+fn pending_delete_host_name(state: DesktopStateView<'_>) -> String {
     state
         .ui
         .workspace
@@ -170,7 +178,7 @@ fn pending_delete_host_name(state: &AppState) -> String {
         .unwrap_or_default()
 }
 
-fn pending_delete_group_name(state: &AppState) -> String {
+fn pending_delete_group_name(state: DesktopStateView<'_>) -> String {
     state
         .ui
         .workspace
@@ -186,7 +194,7 @@ fn pending_delete_group_name(state: &AppState) -> String {
         .unwrap_or_default()
 }
 
-fn pending_delete_group_caption(state: &AppState) -> &'static str {
+fn pending_delete_group_caption(state: DesktopStateView<'_>) -> &'static str {
     let locale = locale_for_state(state);
     let Some(group_id) = state.ui.workspace.pending_delete_group_id else {
         return tr(locale, "group.delete_empty_caption");
@@ -199,7 +207,7 @@ fn pending_delete_group_caption(state: &AppState) -> &'static str {
     }
 }
 
-fn group_has_contents(state: &AppState, group_id: crate::model::GroupId) -> bool {
+fn group_has_contents(state: DesktopStateView<'_>, group_id: crate::model::GroupId) -> bool {
     state
         .storage
         .hosts

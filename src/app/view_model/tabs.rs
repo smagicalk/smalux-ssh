@@ -1,6 +1,6 @@
 //! 会话标签和终端展示模型。
 
-use crate::model::AppState;
+use crate::app::state::AsDesktopStateView;
 
 use super::i18n::{english_locale, locale_for_state};
 use super::labels::{session_kind_label, session_status_label};
@@ -22,7 +22,8 @@ pub(in crate::app) struct SessionTabViewModel {
     pub active: bool,
 }
 
-pub(super) fn tabs(state: &AppState) -> Vec<SessionTabViewModel> {
+pub(super) fn tabs(state: impl AsDesktopStateView) -> Vec<SessionTabViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
 
     state

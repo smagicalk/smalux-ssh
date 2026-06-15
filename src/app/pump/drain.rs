@@ -1,9 +1,10 @@
 //! 后端输出泵的排队逻辑。
 
 use crate::backend::BackendCommand;
+use crate::core::CoreState;
 
 pub(super) fn enqueue_drain_commands(
-    state: &mut crate::model::AppState,
+    state: &mut CoreState,
     session_ids: impl IntoIterator<Item = crate::model::SessionId>,
 ) {
     for session_id in session_ids {
@@ -17,10 +18,7 @@ pub(super) fn enqueue_drain_commands(
     }
 }
 
-fn has_pending_drain_command(
-    state: &crate::model::AppState,
-    session_id: crate::model::SessionId,
-) -> bool {
+fn has_pending_drain_command(state: &CoreState, session_id: crate::model::SessionId) -> bool {
     state.backend_commands.iter().any(|command| {
         matches!(
             command,

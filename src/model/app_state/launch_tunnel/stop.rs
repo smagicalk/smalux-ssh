@@ -1,12 +1,23 @@
 //! 隧道停止调度。
 
 use crate::backend::{BackendCommand, TunnelStopRequest};
+use crate::core::CoreState;
 use crate::model::{SessionId, TunnelStatus};
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::queued_outcome;
-use super::super::{AppState, AppUpdateOutcome};
 
-impl AppState {
+impl CoreState {
+    /// 停止指定隧道规则的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn stop_tunnel_action(
+        &mut self,
+        session_id: SessionId,
+        rule_name: String,
+    ) -> AppUpdateOutcome {
+        self.stop_tunnel(session_id, rule_name)
+    }
+
     /// 停止指定隧道规则。
     pub(in crate::model::app_state) fn stop_tunnel(
         &mut self,

@@ -2,17 +2,15 @@
 
 use uuid::Uuid;
 
+use crate::core::CoreState;
 use crate::model::{CommandHistoryId, CommandHistoryItem, HostId};
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::unix_now_secs;
-use super::super::{AppState, AppUpdateOutcome};
 
-impl AppState {
+impl CoreState {
     /// 重新执行一条带主机作用域的历史命令。
-    pub(in crate::model::app_state) fn run_command_history(
-        &mut self,
-        history_id: CommandHistoryId,
-    ) -> AppUpdateOutcome {
+    pub(crate) fn run_command_history(&mut self, history_id: CommandHistoryId) -> AppUpdateOutcome {
         let Some(history) = self
             .storage
             .command_history

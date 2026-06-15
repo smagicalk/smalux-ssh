@@ -1,8 +1,7 @@
 //! 当前终端区域展示模型。
 
-use crate::model::{
-    AppState, DEFAULT_LOCAL_TERMINAL_TITLE, LOCAL_TERMINAL_SESSION_ID, SessionKind,
-};
+use crate::app::state::AsDesktopStateView;
+use crate::model::{DEFAULT_LOCAL_TERMINAL_TITLE, LOCAL_TERMINAL_SESSION_ID, SessionKind};
 
 use super::super::i18n::{locale_for_state, tr};
 use super::super::labels::{session_kind_label, session_status_label};
@@ -22,7 +21,8 @@ pub(in crate::app) struct TerminalViewModel {
     pub can_reconnect_shell: bool,
 }
 
-pub(in crate::app) fn active_terminal(state: &AppState) -> TerminalViewModel {
+pub(in crate::app) fn active_terminal(state: impl AsDesktopStateView) -> TerminalViewModel {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let active_tab = state
         .terminal

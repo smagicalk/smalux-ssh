@@ -127,6 +127,10 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .col(text(HostProxy::ProxyKind))
                 .col(text(HostProxy::ProxyHost))
                 .col(integer(HostProxy::ProxyPort))
+                .col(text_with_default(HostProxy::AuthKind, "none"))
+                .col(nullable_text(HostProxy::AuthUsername))
+                .col(nullable_text(HostProxy::AuthPasswordSecretRef))
+                .col(boolean_with_default(HostProxy::RemoteDns, false))
                 .foreign_key(
                     ForeignKey::create()
                         .name("fk_host_proxy_host")
@@ -183,6 +187,10 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .col(text(ProxyAssets::ProxyKind))
                 .col(text(ProxyAssets::ProxyHost))
                 .col(integer(ProxyAssets::ProxyPort))
+                .col(text_with_default(ProxyAssets::AuthKind, "none"))
+                .col(nullable_text(ProxyAssets::AuthUsername))
+                .col(nullable_text(ProxyAssets::AuthPasswordSecretRef))
+                .col(boolean_with_default(ProxyAssets::RemoteDns, false))
                 .col(integer(ProxyAssets::SortOrder))
                 .to_owned(),
         )
@@ -208,6 +216,9 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .col(string_pk(JumpChainSteps::Id, 80))
                 .col(string(JumpChainSteps::ChainId, 36))
                 .col(string(JumpChainSteps::JumpHostId, 36))
+                .col(nullable_text(JumpChainSteps::UsernameOverride))
+                .col(nullable_integer(JumpChainSteps::PortOverride))
+                .col(nullable_text(JumpChainSteps::Alias))
                 .col(integer(JumpChainSteps::SortOrder))
                 .foreign_key(
                     ForeignKey::create()
@@ -248,6 +259,7 @@ pub(super) async fn create_hosts(manager: &SchemaManager<'_>) -> Result<(), DbEr
                 .col(text(ForwardAssets::TargetHost))
                 .col(integer(ForwardAssets::TargetPort))
                 .col(boolean(ForwardAssets::AutoStart))
+                .col(boolean_with_default(ForwardAssets::ExitOnFailure, false))
                 .col(integer(ForwardAssets::SortOrder))
                 .to_owned(),
         )
@@ -417,6 +429,10 @@ pub(super) enum HostProxy {
     ProxyKind,
     ProxyHost,
     ProxyPort,
+    AuthKind,
+    AuthUsername,
+    AuthPasswordSecretRef,
+    RemoteDns,
 }
 
 #[derive(DeriveIden)]
@@ -437,6 +453,10 @@ pub(super) enum ProxyAssets {
     ProxyKind,
     ProxyHost,
     ProxyPort,
+    AuthKind,
+    AuthUsername,
+    AuthPasswordSecretRef,
+    RemoteDns,
     SortOrder,
 }
 
@@ -454,6 +474,9 @@ pub(super) enum JumpChainSteps {
     Id,
     ChainId,
     JumpHostId,
+    UsernameOverride,
+    PortOverride,
+    Alias,
     SortOrder,
 }
 
@@ -469,6 +492,7 @@ pub(super) enum ForwardAssets {
     TargetHost,
     TargetPort,
     AutoStart,
+    ExitOnFailure,
     SortOrder,
 }
 

@@ -96,6 +96,20 @@ pub(super) fn bind(window: &AppWindow, state: &SharedAppState) {
     {
         let weak = window.as_weak();
         let state = Rc::clone(state);
+        window.on_update_network_search(move |query| {
+            // 网络资源页搜索只影响 Network 页投影，不改变持久化数据。
+            apply_and_sync(
+                &weak,
+                &state,
+                Message::UpdateNetworkSearchQuery {
+                    query: query.to_string(),
+                },
+            );
+        });
+    }
+    {
+        let weak = window.as_weak();
+        let state = Rc::clone(state);
         window.on_resize_hosts_panel(move |width| {
             // 宽度直接进入核心状态，便于以后做设置持久化或窗口恢复。
             apply_and_sync(&weak, &state, Message::ResizeHostsPanel { width });

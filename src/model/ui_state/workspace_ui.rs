@@ -38,6 +38,8 @@ pub struct WorkspaceUiState {
     pub credential_search_query: String,
     #[serde(default)]
     pub snippet_search_query: String,
+    #[serde(default)]
+    pub network_search_query: String,
     pub host_tree_root_collapsed: bool,
     pub collapsed_host_tree_groups: Vec<crate::model::GroupId>,
     #[serde(default)]
@@ -71,6 +73,7 @@ impl Default for WorkspaceUiState {
             host_search_query: String::new(),
             credential_search_query: String::new(),
             snippet_search_query: String::new(),
+            network_search_query: String::new(),
             host_tree_root_collapsed: false,
             collapsed_host_tree_groups: Vec::new(),
             collapsed_credential_tree_nodes: Vec::new(),

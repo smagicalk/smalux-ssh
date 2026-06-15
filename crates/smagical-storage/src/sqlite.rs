@@ -580,11 +580,11 @@ mod tests {
         AgentSource, AuthProfile, BackgroundProfile, CommandHistoryId, CommandHistoryItem,
         CredentialId, CredentialKind, CredentialMetadata, GroupId, Host, HostGroup, HostId,
         HostNetworkSelection, ImageSource, JumpChainAsset, JumpChainId, KeyAlgorithm,
-        KnownHostEntry, ProxyAsset, ProxyId, ProxyProfile, RecentConnection, SecretMaterialKind,
-        SecretRecord, SecretRef, SessionId, SessionKind, SftpBookmark, Snippet, SnippetArgument,
-        SnippetGroup, SnippetGroupId, SnippetId, SnippetScope, SnippetSupportTarget,
-        SnippetSupportTargetId, SplitAxis, TunnelKind, TunnelRule, WindowState, WorkspaceState,
-        WorkspaceTabSnapshot,
+        KnownHostEntry, ProxyAsset, ProxyAuth, ProxyId, ProxyProfile, RecentConnection,
+        SecretMaterialKind, SecretRecord, SecretRef, SessionId, SessionKind, SftpBookmark, Snippet,
+        SnippetArgument, SnippetGroup, SnippetGroupId, SnippetId, SnippetScope,
+        SnippetSupportTarget, SnippetSupportTargetId, SplitAxis, TunnelKind, TunnelRule,
+        WindowState, WorkspaceState, WorkspaceTabSnapshot,
     };
     use uuid::Uuid;
 
@@ -616,6 +616,8 @@ mod tests {
             profile: ProxyProfile::Socks5 {
                 host: "127.0.0.1".to_owned(),
                 port: 1080,
+                auth: ProxyAuth::None,
+                remote_dns: false,
             },
         }
     }
@@ -624,7 +626,13 @@ mod tests {
         JumpChainAsset {
             id: JumpChainId(Uuid::new_v4()),
             name: "prod-chain".to_owned(),
-            steps: vec![smagical_core::JumpProfile { host_id }],
+            steps: vec![smagical_core::JumpProfile {
+                host_id,
+                username_override: None,
+                port_override: None,
+                alias: None,
+            }],
+            stop_on_failure: true,
         }
     }
 
@@ -647,13 +655,21 @@ mod tests {
                 ProxyProfile::Socks5 {
                     host: "127.0.0.1".to_owned(),
                     port: 1080,
+                    auth: ProxyAuth::None,
+                    remote_dns: false,
                 },
                 ProxyProfile::Http {
                     host: "proxy.example.com".to_owned(),
                     port: 8080,
+                    auth: ProxyAuth::None,
                 },
             ],
-            jumps: vec![smagical_core::JumpProfile { host_id: id }],
+            jumps: vec![smagical_core::JumpProfile {
+                host_id: id,
+                username_override: None,
+                port_override: None,
+                alias: None,
+            }],
             theme_override: Some(smagical_core::ThemeProfile {
                 name: "Host Dark".to_owned(),
                 font_family: "JetBrains Mono".to_owned(),
@@ -782,6 +798,7 @@ mod tests {
             target_host: String::new(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         });
         storage.upsert_theme(ThemeProfileRecord {
             name: "Imported Theme".to_owned(),

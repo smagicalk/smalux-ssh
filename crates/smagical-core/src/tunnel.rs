@@ -14,6 +14,8 @@ pub struct TunnelRule {
     pub target_host: String,
     pub target_port: u16,
     pub auto_start: bool,
+    #[serde(default)]
+    pub exit_on_failure: bool,
 }
 
 impl TunnelRule {
@@ -136,6 +138,7 @@ mod tests {
             target_host: "10.0.0.5".to_owned(),
             target_port: 5432,
             auto_start: true,
+            exit_on_failure: false,
         };
 
         let encoded = toml::to_string(&rule).expect("隧道规则应该可以序列化为 TOML");
@@ -159,6 +162,7 @@ mod tests {
             target_host: String::new(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         };
 
         assert_eq!(rule.validate(), Ok(()));
@@ -175,6 +179,7 @@ mod tests {
             target_host: "10.0.0.5".to_owned(),
             target_port: 5432,
             auto_start: false,
+            exit_on_failure: false,
         };
         let empty_target = TunnelRule {
             name: "bad-local".to_owned(),
@@ -184,6 +189,7 @@ mod tests {
             target_host: String::new(),
             target_port: 5432,
             auto_start: false,
+            exit_on_failure: false,
         };
 
         assert_eq!(
@@ -206,6 +212,7 @@ mod tests {
             target_host: " 10.0.0.5 ".to_owned(),
             target_port: 5432,
             auto_start: false,
+            exit_on_failure: false,
         };
 
         let normalized = rule.normalized();

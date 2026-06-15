@@ -1,9 +1,10 @@
+use crate::core::CoreState;
 use crate::model::{CredentialGroup, CredentialGroupId, CredentialKind};
 use uuid::Uuid;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
-impl AppState {
+impl CoreState {
     /// 创建根级密钥分组。
     pub(in crate::model::app_state) fn create_credential_group(
         &mut self,

@@ -1,15 +1,16 @@
 //! 证书类凭据材料生成。
 
+use crate::core::CoreState;
 use crate::model::{
-    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, QuickHostAuthField,
-    SecretMaterialKind, SecretRecord,
+    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, SecretMaterialKind,
+    SecretRecord,
 };
 use russh::keys::{
     HashAlg,
     ssh_key::{certificate, rand_core::OsRng},
 };
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::credential_certificate_params::{
     current_unix_seconds, parse_certificate_principals, parse_certificate_serial,
     parse_certificate_type, parse_certificate_valid_days,
@@ -19,9 +20,9 @@ use super::credential_ids::new_credential_id;
 use super::credential_payload::inspect_credential_payload;
 use super::credential_refs::next_secret_ref;
 
-impl AppState {
+impl CoreState {
     /// 用已保存的 CA 私钥签发 OpenSSH 用户/主机证书，并保存为证书凭据。
-    pub(in crate::model::app_state) fn generate_certificate_credential(
+    pub(crate) fn generate_certificate_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -226,9 +227,6 @@ impl AppState {
             fingerprint: Some(fingerprint),
         });
         self.storage.upsert_credential_inspection(inspection);
-        self.ui
-            .set_quick_host_auth_field(QuickHostAuthField::CertificateRef, &secret_ref.0);
-
         AppUpdateOutcome {
             state_changed: true,
             ..AppUpdateOutcome::default()

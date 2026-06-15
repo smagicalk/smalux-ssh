@@ -957,6 +957,8 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(zh.proxy_section_route, "代理池");
     assert_eq!(zh.proxy_section_forward, "端口转发");
     assert_eq!(zh.proxy_section_host, "跳板链");
+    assert_eq!(zh.proxy_search_empty, "没有匹配的网络资源");
+    assert_eq!(zh.proxy_clear_selection, "清空");
     assert_eq!(
         zh.proxy_jump_caption,
         "按顺序进入堡垒机、网关或隔离网段主机。"
@@ -1015,6 +1017,8 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(en.proxy_section_route, "Proxy Pool");
     assert_eq!(en.proxy_section_forward, "Port Forwarding");
     assert_eq!(en.proxy_section_host, "Jump Chain");
+    assert_eq!(en.proxy_search_empty, "No matching network resources");
+    assert_eq!(en.proxy_clear_selection, "Clear");
     assert_eq!(
         en.proxy_jump_caption,
         "Enter bastions, gateways, or isolated hosts in order."
@@ -1030,6 +1034,10 @@ fn app_view_model_projects_workspace_text_by_language() {
     assert_eq!(
         en.proxy_host_hint_caption,
         "Jumps are SSH entry hops; proxies are network exits."
+    );
+    assert_eq!(
+        en.proxy_search_placeholder,
+        "Search proxies, jumps, forwards, hosts, or ports"
     );
     assert_eq!(en.security_private_keys, "Private keys");
     assert_eq!(en.security_certificates, "Certificates");
@@ -1111,9 +1119,14 @@ fn app_view_model_projects_network_workspace_items() {
         proxies: vec![ProxyProfile::Socks5 {
             host: "127.0.0.1".to_owned(),
             port: 1080,
+            auth: crate::model::ProxyAuth::None,
+            remote_dns: false,
         }],
         jumps: vec![JumpProfile {
             host_id: jump_host_id,
+            username_override: None,
+            port_override: None,
+            alias: None,
         }],
         theme_override: None,
         background_override: None,
@@ -1125,6 +1138,7 @@ fn app_view_model_projects_network_workspace_items() {
         profile: ProxyProfile::Http {
             host: "proxy.example.com".to_owned(),
             port: 8080,
+            auth: crate::model::ProxyAuth::None,
         },
     });
     state.storage.upsert_jump_chain_asset(JumpChainAsset {
@@ -1132,7 +1146,11 @@ fn app_view_model_projects_network_workspace_items() {
         name: "Prod Chain".to_owned(),
         steps: vec![JumpProfile {
             host_id: jump_host_id,
+            username_override: None,
+            port_override: None,
+            alias: None,
         }],
+        stop_on_failure: true,
     });
     state.storage.upsert_forward_asset(ForwardAsset {
         id: forward_id,
@@ -1146,7 +1164,9 @@ fn app_view_model_projects_network_workspace_items() {
             target_host: "10.0.0.10".to_owned(),
             target_port: 5432,
             auto_start: false,
+            exit_on_failure: false,
         },
+        exit_on_failure: false,
     });
     state.sessions.start_tunnel(
         session_id,
@@ -1158,6 +1178,7 @@ fn app_view_model_projects_network_workspace_items() {
             target_host: String::new(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         },
         Some(route_host_id),
         1,
@@ -1168,22 +1189,24 @@ fn app_view_model_projects_network_workspace_items() {
 
     assert_eq!(vm.network_workspace.runtime_tunnels.len(), 1);
     assert_eq!(vm.network_workspace.runtime_tunnels[0].title, "runtime");
-    assert_eq!(vm.network_workspace.resources.len(), 3);
+    assert_eq!(vm.network_workspace.proxy_assets.len(), 1);
+    assert_eq!(vm.network_workspace.jump_chain_assets.len(), 1);
+    assert_eq!(vm.network_workspace.forward_assets.len(), 1);
     assert!(
         vm.network_workspace
-            .resources
+            .proxy_assets
             .iter()
             .any(|item| { item.kind_key == "ProxyAsset" && item.title == "Office Proxy" })
     );
     assert!(
         vm.network_workspace
-            .resources
+            .jump_chain_assets
             .iter()
             .any(|item| { item.kind_key == "JumpChainAsset" && item.title == "Prod Chain" })
     );
     assert!(
         vm.network_workspace
-            .resources
+            .forward_assets
             .iter()
             .any(|item| { item.kind_key == "ForwardAsset" && item.title == "DB Forward" })
     );
@@ -1192,6 +1215,17 @@ fn app_view_model_projects_network_workspace_items() {
             && item.primary_action_key == "stop"
             && item.primary_action_enabled
     }));
+
+    state.ui.workspace.set_network_search_query("jump");
+    let filtered = app_view_model(&state);
+    assert_eq!(filtered.network_workspace.search_query, "jump");
+    assert!(filtered.network_workspace.proxy_assets.is_empty());
+    assert_eq!(filtered.network_workspace.jump_chain_assets.len(), 1);
+    assert!(filtered.network_workspace.forward_assets.is_empty());
+    assert_eq!(
+        filtered.network_workspace.jump_chain_assets[0].title,
+        "Prod Chain"
+    );
 }
 
 #[test]

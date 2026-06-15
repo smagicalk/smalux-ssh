@@ -184,6 +184,7 @@ mod tests {
             target_host: String::new(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         }
     }
 

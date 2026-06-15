@@ -1,7 +1,7 @@
 //! 当前 Slint 桌面 UI 的原生文件选择器适配层。
 //!
 //! 这个模块刻意放在 `app` 内：文件选择是 UI 关注点，导入、导出、备份和凭据持久化
-//! 仍然由核心 `AppState` 消息处理器负责。
+//! 仍然由 `CoreState` 或桌面 Adapter 消息处理器负责。
 
 use std::path::{Path, PathBuf};
 

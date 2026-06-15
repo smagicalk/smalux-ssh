@@ -1,10 +1,11 @@
 //! 后端事件应用和共享执行器入口。
 
 use crate::backend::{BackendEvent, apply_backend_event};
+use crate::core::CoreState;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
-impl AppState {
+impl CoreState {
     pub(in crate::model::app_state) fn apply_backend_event(
         &mut self,
         event: BackendEvent,

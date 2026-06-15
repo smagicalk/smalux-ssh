@@ -11,9 +11,8 @@
 //! 如果未来重写 UI，这个模块通常会被整体替换；核心 `model` 和
 //! `view_model` 可以继续保留。
 
-use crate::model::AppState;
-
 use super::AppWindow;
+use super::state::AsDesktopStateView;
 use super::view_model::{AppViewModel, active_terminal, app_view_model};
 
 mod collections;
@@ -29,12 +28,14 @@ use terminal::sync_terminal_model;
 use workspace::sync_workspace_state;
 
 /// 将当前应用状态同步到 Slint 窗口。
-pub(super) fn sync_window(window: &AppWindow, state: &AppState) {
+pub(super) fn sync_window(window: &AppWindow, state: impl AsDesktopStateView) {
+    let state = state.as_desktop_state_view();
     sync_view_model(window, &app_view_model(state));
 }
 
 /// 只同步当前终端面板，用于回车和本地 PTY 输出刷新。
-pub(super) fn sync_terminal_pane(window: &AppWindow, state: &AppState) {
+pub(super) fn sync_terminal_pane(window: &AppWindow, state: impl AsDesktopStateView) {
+    let state = state.as_desktop_state_view();
     let model = active_terminal(state);
     sync_terminal_model(window, &model);
 }

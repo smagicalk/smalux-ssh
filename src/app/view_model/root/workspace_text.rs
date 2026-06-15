@@ -3,12 +3,13 @@
 //! 这个模块只负责把 i18n key 投影到 `WorkspaceText`。根构建器只负责组合各类
 //! view model，不再承载几百行文案映射。
 
-use crate::model::AppState;
+use crate::app::state::AsDesktopStateView;
 
 use super::super::i18n::{locale_for_state, tr};
 use super::types::WorkspaceText;
 
-pub(super) fn workspace_text(state: &AppState) -> WorkspaceText {
+pub(super) fn workspace_text(state: impl AsDesktopStateView) -> WorkspaceText {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
 
     WorkspaceText {
@@ -60,6 +61,9 @@ pub(super) fn workspace_text(state: &AppState) -> WorkspaceText {
         proxy_resources_section: tr(locale, "proxy.resources_section"),
         proxy_runtime_empty: tr(locale, "proxy.runtime_empty"),
         proxy_resources_empty: tr(locale, "proxy.resources_empty"),
+        proxy_search_placeholder: tr(locale, "proxy.search_placeholder"),
+        proxy_search_empty: tr(locale, "proxy.search_empty"),
+        proxy_clear_selection: tr(locale, "proxy.clear_selection"),
         proxy_new_proxy: tr(locale, "proxy.new_proxy"),
         proxy_new_jump: tr(locale, "proxy.new_jump"),
         proxy_new_forward: tr(locale, "proxy.new_forward"),
@@ -77,11 +81,19 @@ pub(super) fn workspace_text(state: &AppState) -> WorkspaceText {
         proxy_bind_label: tr(locale, "proxy.field_bind"),
         proxy_target_label: tr(locale, "proxy.field_target"),
         proxy_host_ids_label: tr(locale, "proxy.host_ids_label"),
+        proxy_note_label: tr(locale, "proxy.field_note"),
+        proxy_used_by_label: tr(locale, "proxy.field_used_by"),
         proxy_host_ids_placeholder: tr(locale, "proxy.host_ids_placeholder"),
         proxy_bind_host_placeholder: tr(locale, "proxy.bind_host_placeholder"),
         proxy_target_host_placeholder: tr(locale, "proxy.target_host_placeholder"),
         proxy_tags_placeholder: tr(locale, "proxy.tags_placeholder"),
         proxy_auto_start: tr(locale, "proxy.auto_start"),
+        proxy_exit_on_failure: tr(locale, "proxy.exit_on_failure"),
+        proxy_auth_none: tr(locale, "proxy.auth_none"),
+        proxy_auth_user_password: tr(locale, "proxy.auth_user_password"),
+        proxy_auth_username: tr(locale, "proxy.auth_username"),
+        proxy_auth_password_ref: tr(locale, "proxy.auth_password_ref"),
+        proxy_remote_dns: tr(locale, "proxy.remote_dns"),
         proxy_kind_socks5: tr(locale, "proxy.kind_socks5"),
         proxy_kind_http: tr(locale, "proxy.kind_http"),
         proxy_kind_local: tr(locale, "host.network_forward_local"),

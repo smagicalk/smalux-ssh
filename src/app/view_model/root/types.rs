@@ -101,8 +101,11 @@ pub(in crate::app) struct SnippetWorkspaceViewModel {
 /// Network 页需要的 Rust 侧页面模型。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(in crate::app) struct NetworkWorkspaceViewModel {
+    pub search_query: String,
     pub runtime_tunnels: Vec<NetworkNavItemViewModel>,
-    pub resources: Vec<NetworkNavItemViewModel>,
+    pub proxy_assets: Vec<NetworkNavItemViewModel>,
+    pub jump_chain_assets: Vec<NetworkNavItemViewModel>,
+    pub forward_assets: Vec<NetworkNavItemViewModel>,
 }
 
 /// 设置页需要的 Rust 侧页面模型。
@@ -161,6 +164,9 @@ pub(in crate::app) struct WorkspaceText {
     pub proxy_resources_section: &'static str,
     pub proxy_runtime_empty: &'static str,
     pub proxy_resources_empty: &'static str,
+    pub proxy_search_placeholder: &'static str,
+    pub proxy_search_empty: &'static str,
+    pub proxy_clear_selection: &'static str,
     pub proxy_new_proxy: &'static str,
     pub proxy_new_jump: &'static str,
     pub proxy_new_forward: &'static str,
@@ -178,11 +184,19 @@ pub(in crate::app) struct WorkspaceText {
     pub proxy_bind_label: &'static str,
     pub proxy_target_label: &'static str,
     pub proxy_host_ids_label: &'static str,
+    pub proxy_note_label: &'static str,
+    pub proxy_used_by_label: &'static str,
     pub proxy_host_ids_placeholder: &'static str,
     pub proxy_bind_host_placeholder: &'static str,
     pub proxy_target_host_placeholder: &'static str,
     pub proxy_tags_placeholder: &'static str,
     pub proxy_auto_start: &'static str,
+    pub proxy_exit_on_failure: &'static str,
+    pub proxy_auth_none: &'static str,
+    pub proxy_auth_user_password: &'static str,
+    pub proxy_auth_username: &'static str,
+    pub proxy_auth_password_ref: &'static str,
+    pub proxy_remote_dns: &'static str,
     pub proxy_kind_socks5: &'static str,
     pub proxy_kind_http: &'static str,
     pub proxy_kind_local: &'static str,

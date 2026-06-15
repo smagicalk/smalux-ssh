@@ -81,6 +81,15 @@ where
     column
 }
 
+pub(super) fn boolean_with_default<T>(name: T, default_value: bool) -> ColumnDef
+where
+    T: IntoIden,
+{
+    let mut column = ColumnDef::new(name);
+    column.boolean().not_null().default(default_value);
+    column
+}
+
 pub(super) fn nullable_boolean<T>(name: T) -> ColumnDef
 where
     T: IntoIden,

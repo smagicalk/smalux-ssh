@@ -1,6 +1,7 @@
 //! 凭据分组内容展示模型。
 
-use crate::model::{AppState, CredentialGroup, CredentialKind, CredentialMetadata, SecretRecord};
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
+use crate::model::{CredentialGroup, CredentialKind, CredentialMetadata, SecretRecord};
 
 use super::i18n::{Locale, locale_for_state, tr};
 use super::tools_credentials_common::{
@@ -11,8 +12,9 @@ use super::tools_credentials_common::{
 use super::tools_types::CredentialGroupContentViewModel;
 
 pub(in crate::app::view_model) fn credential_group_contents(
-    state: &AppState,
+    state: impl AsDesktopStateView,
 ) -> Vec<CredentialGroupContentViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let empty = tr(locale, "tool.empty_value");
     let mut rows = Vec::new();
@@ -35,7 +37,7 @@ pub(in crate::app::view_model) fn credential_group_contents(
 }
 
 fn credential_group_content_for_root(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     locale: Locale,
 ) -> Vec<CredentialGroupContentViewModel> {
     [
@@ -76,7 +78,7 @@ fn credential_group_content_for_root(
 }
 
 fn credential_group_content_for_kind(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     kind: &CredentialKind,
     locale: Locale,
     empty: &str,
@@ -129,7 +131,7 @@ fn credential_group_content_for_kind(
 }
 
 fn credential_group_content_for_custom_groups(
-    state: &AppState,
+    state: DesktopStateView<'_>,
     kind: &CredentialKind,
     locale: Locale,
     empty: &str,

@@ -11,9 +11,10 @@ fn backend_queue_pump_keeps_sftp_session_connected_on_sftp_operation_error() {
         initial_dir: "/home/ops".to_owned(),
     });
     state.backend_commands.drain();
+    let session_id = state.sessions.tabs[0].id;
     state
         .sessions
-        .set_status(state.sessions.tabs[0].id, SessionStatus::Connected);
+        .set_status(session_id, SessionStatus::Connected);
     state.apply(Message::RefreshSftp { host_id });
     let mut executor = FailingSftpExecutor;
 

@@ -3,7 +3,11 @@ use std::path::PathBuf;
 
 fn main() {
     generate_i18n_catalog();
+    compile_desktop_ui();
+}
 
+#[cfg(feature = "desktop")]
+fn compile_desktop_ui() {
     let mut ui_files = std::fs::read_dir("ui")
         .expect("UI 目录应该存在")
         .map(|entry| entry.expect("UI 文件应该可以读取").path())
@@ -26,6 +30,9 @@ fn main() {
     }
     slint_build::compile("ui/main.slint").expect("Slint UI 应该可以编译");
 }
+
+#[cfg(not(feature = "desktop"))]
+fn compile_desktop_ui() {}
 
 fn generate_i18n_catalog() {
     let mut locale_files = std::fs::read_dir("assets/i18n")

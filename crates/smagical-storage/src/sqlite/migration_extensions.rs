@@ -46,6 +46,7 @@ pub(super) async fn create_extension_tables(manager: &SchemaManager<'_>) -> Resu
                 .col(text(TunnelRules::TargetHost))
                 .col(integer(TunnelRules::TargetPort))
                 .col(boolean(TunnelRules::AutoStart))
+                .col(boolean_with_default(TunnelRules::ExitOnFailure, false))
                 .col(integer(TunnelRules::SortOrder))
                 .col(timestamp(TunnelRules::CreatedAtUnixSecs))
                 .col(timestamp(TunnelRules::UpdatedAtUnixSecs))
@@ -76,6 +77,7 @@ pub(super) enum TunnelRules {
     TargetHost,
     TargetPort,
     AutoStart,
+    ExitOnFailure,
     SortOrder,
     CreatedAtUnixSecs,
     UpdatedAtUnixSecs,

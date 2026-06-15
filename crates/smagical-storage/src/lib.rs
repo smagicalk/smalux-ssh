@@ -203,8 +203,8 @@ mod tests {
     use super::*;
     use smagical_core::{
         AuthProfile, CommandHistoryId, ForwardAsset, ForwardId, GroupId, HostId,
-        HostNetworkSelection, JumpChainAsset, JumpChainId, ProxyAsset, ProxyId, RecentConnection,
-        SecretRef, TunnelKind, TunnelRule,
+        HostNetworkSelection, JumpChainAsset, JumpChainId, ProxyAsset, ProxyAuth, ProxyId,
+        RecentConnection, SecretRef, TunnelKind, TunnelRule,
     };
     use uuid::Uuid;
 
@@ -245,6 +245,8 @@ mod tests {
             profile: smagical_core::ProxyProfile::Socks5 {
                 host: "127.0.0.1".to_owned(),
                 port: 1080,
+                auth: ProxyAuth::None,
+                remote_dns: false,
             },
         }
     }
@@ -255,7 +257,11 @@ mod tests {
             name: "生产堡垒链".to_owned(),
             steps: vec![smagical_core::JumpProfile {
                 host_id: HostId(Uuid::new_v4()),
+                username_override: None,
+                port_override: None,
+                alias: None,
             }],
+            stop_on_failure: true,
         }
     }
 
@@ -268,6 +274,7 @@ mod tests {
             target_host: "ignored-for-dynamic".to_owned(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         }
     }
 
@@ -277,6 +284,7 @@ mod tests {
             name: "本地数据库".to_owned(),
             tags: vec!["db".to_owned()],
             rule: sample_tunnel_rule(),
+            exit_on_failure: false,
         }
     }
 

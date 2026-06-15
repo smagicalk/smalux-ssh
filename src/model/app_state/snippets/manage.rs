@@ -2,13 +2,14 @@
 
 use uuid::Uuid;
 
+use crate::core::CoreState;
 use crate::model::{
     Snippet, SnippetArgument, SnippetGroup, SnippetGroupId, SnippetId, SnippetImplementation,
     SnippetImplementationId, SnippetScope, SnippetShell, SnippetSupportTarget,
     SnippetSupportTargetId, SnippetVariable, variables_from_template,
 };
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::outcome::{missing_host, missing_snippet, missing_snippet_group};
 
 const SNIPPET_NAME_LIMIT: usize = 64;
@@ -16,7 +17,7 @@ const SNIPPET_GROUP_NAME_LIMIT: usize = 48;
 const SNIPPET_TARGET_KEY_LIMIT: usize = 64;
 const SNIPPET_TARGET_NAME_LIMIT: usize = 48;
 
-impl AppState {
+impl CoreState {
     /// 创建通用快捷命令。
     pub(in crate::model::app_state) fn create_snippet(
         &mut self,

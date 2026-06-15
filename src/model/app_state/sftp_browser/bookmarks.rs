@@ -1,12 +1,13 @@
 //! SFTP 书签调度。
 
+use crate::core::CoreState;
 use crate::model::{HostId, SftpBookmark};
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::normalize_remote_dir;
-use super::super::{AppState, AppUpdateOutcome};
 use super::session::{SftpCurrentDirLookup, missing_active_sftp_session, missing_sftp_browser};
 
-impl AppState {
+impl CoreState {
     /// 将当前 SFTP 浏览目录保存为书签。
     pub(in crate::model::app_state) fn save_sftp_bookmark(
         &mut self,

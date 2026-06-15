@@ -1,6 +1,6 @@
 //! 凭据工具页入口展示模型。
 
-use crate::model::AppState;
+use crate::app::state::AsDesktopStateView;
 
 use super::i18n::locale_for_state;
 use super::tools_credentials_common::{
@@ -8,7 +8,10 @@ use super::tools_credentials_common::{
 };
 use super::tools_types::ToolItemViewModel;
 
-pub(in crate::app::view_model) fn credential_items(state: &AppState) -> Vec<ToolItemViewModel> {
+pub(in crate::app::view_model) fn credential_items(
+    state: impl AsDesktopStateView,
+) -> Vec<ToolItemViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     state
         .storage

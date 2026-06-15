@@ -2,10 +2,13 @@
 
 use std::path::Path;
 
-use super::{AppState, AppUpdateOutcome};
+use crate::core::CoreState;
 
-impl AppState {
-    pub(in crate::model::app_state) fn export_current_theme(
+use super::AppUpdateOutcome;
+
+impl CoreState {
+    /// 导出当前主题资料到指定文件。
+    pub(crate) fn export_current_theme_action(
         &mut self,
         target_path: &str,
         format: crate::theme::ThemeExchangeFormat,
@@ -24,10 +27,13 @@ impl AppState {
         }
     }
 
-    pub(in crate::model::app_state) fn copy_current_built_in_theme(&mut self) -> AppUpdateOutcome {
-        let mut document = crate::theme::built_in_theme_document(self.ui.workspace.theme);
+    /// 复制当前选中的内置主题为可编辑主题资料，并立即应用。
+    pub(crate) fn copy_current_built_in_theme_action(&mut self) -> AppUpdateOutcome {
+        let built_in_theme =
+            crate::model::BuiltInTheme::from_preference(self.config.workspace.built_in_theme);
+        let mut document = crate::theme::built_in_theme_document(built_in_theme);
         document.name = unique_theme_name(self, &format!("{} 自定义", document.name));
-        document.id = unique_theme_id(self.ui.workspace.theme.key(), &document.name);
+        document.id = unique_theme_id(built_in_theme.key(), &document.name);
 
         let profile_toml = match document.to_toml() {
             Ok(profile_toml) => profile_toml,
@@ -47,10 +53,8 @@ impl AppState {
         }
     }
 
-    pub(in crate::model::app_state) fn import_theme(
-        &mut self,
-        source_path: &str,
-    ) -> AppUpdateOutcome {
+    /// 从文件导入主题资料，并立即应用。
+    pub(crate) fn import_theme_action(&mut self, source_path: &str) -> AppUpdateOutcome {
         let Some(source_path) = normalized_path(source_path) else {
             return settings_error("导入源路径不能为空");
         };
@@ -63,29 +67,26 @@ impl AppState {
             Ok(document) => document,
             Err(error) => return settings_error(format!("导入主题失败：{error}")),
         };
-        let theme_name = document.name.clone();
         let profile_toml = match document.to_toml() {
             Ok(profile_toml) => profile_toml,
             Err(error) => return settings_error(format!("导入主题失败：{error}")),
         };
         self.storage
             .upsert_theme(crate::storage::ThemeProfileRecord {
-                name: theme_name.clone(),
+                name: document.name.clone(),
                 profile_toml,
                 builtin: false,
             });
-
         self.apply_theme_document(document);
+
         AppUpdateOutcome {
             state_changed: true,
             ..AppUpdateOutcome::default()
         }
     }
 
-    pub(in crate::model::app_state) fn apply_theme_profile(
-        &mut self,
-        name: &str,
-    ) -> AppUpdateOutcome {
+    /// 应用已保存主题资料。
+    pub(crate) fn apply_theme_profile_action(&mut self, name: &str) -> AppUpdateOutcome {
         let Some(theme) = self.storage.theme_by_name(name.trim()) else {
             return settings_error(format!("主题资料不存在：{}", name.trim()));
         };
@@ -102,10 +103,8 @@ impl AppState {
         }
     }
 
-    pub(in crate::model::app_state) fn remove_theme_profile(
-        &mut self,
-        name: &str,
-    ) -> AppUpdateOutcome {
+    /// 删除已保存主题资料，不改变当前已应用的全局主题配置。
+    pub(crate) fn remove_theme_profile_action(&mut self, name: &str) -> AppUpdateOutcome {
         let removed = self.storage.remove_theme(name.trim());
         if !removed {
             return settings_error(format!("主题资料不存在：{}", name.trim()));
@@ -118,10 +117,8 @@ impl AppState {
         }
     }
 
-    pub(in crate::model::app_state) fn backup_storage(
-        &mut self,
-        target_path: &str,
-    ) -> AppUpdateOutcome {
+    /// 备份 SQLite 存储文件。
+    pub(crate) fn backup_storage_action(&mut self, target_path: &str) -> AppUpdateOutcome {
         let Some(target_path) = normalized_path(target_path) else {
             return settings_error("备份目标路径不能为空");
         };
@@ -139,10 +136,8 @@ impl AppState {
         }
     }
 
-    pub(in crate::model::app_state) fn export_storage_snapshot(
-        &mut self,
-        target_path: &str,
-    ) -> AppUpdateOutcome {
+    /// 导出当前 SQLite 快照。
+    pub(crate) fn export_storage_snapshot_action(&mut self, target_path: &str) -> AppUpdateOutcome {
         let Some(target_path) = normalized_path(target_path) else {
             return settings_error("导出目标路径不能为空");
         };
@@ -160,10 +155,8 @@ impl AppState {
         }
     }
 
-    pub(in crate::model::app_state) fn import_storage_snapshot(
-        &mut self,
-        source_path: &str,
-    ) -> AppUpdateOutcome {
+    /// 从快照文件导入存储，并重载核心存储状态。
+    pub(crate) fn import_storage_snapshot_action(&mut self, source_path: &str) -> AppUpdateOutcome {
         let Some(source_path) = normalized_path(source_path) else {
             return settings_error("导入源路径不能为空");
         };
@@ -171,18 +164,14 @@ impl AppState {
             return settings_error("没有可用的 SQLite 存储后端");
         };
 
-        let import_result = backend.import_snapshot_from(source_path);
-
-        match import_result {
-            Ok(()) => self.reload_storage_after_import(),
+        match backend.import_snapshot_from(source_path) {
+            Ok(()) => self.reload_storage_after_import_action(),
             Err(error) => settings_error(format!("导入快照失败：{error}")),
         }
     }
 
-    pub(in crate::model::app_state) fn import_sqlite_backup(
-        &mut self,
-        source_path: &str,
-    ) -> AppUpdateOutcome {
+    /// 从 SQLite 备份文件导入存储，并重载核心存储状态。
+    pub(crate) fn import_sqlite_backup_action(&mut self, source_path: &str) -> AppUpdateOutcome {
         let Some(source_path) = normalized_path(source_path) else {
             return settings_error("导入源路径不能为空");
         };
@@ -190,15 +179,14 @@ impl AppState {
             return settings_error("没有可用的 SQLite 存储后端");
         };
 
-        let import_result = backend.import_sqlite_backup_from(source_path);
-
-        match import_result {
-            Ok(()) => self.reload_storage_after_import(),
+        match backend.import_sqlite_backup_from(source_path) {
+            Ok(()) => self.reload_storage_after_import_action(),
             Err(error) => settings_error(format!("导入 SQLite 备份失败：{error}")),
         }
     }
 
-    fn reload_storage_after_import(&mut self) -> AppUpdateOutcome {
+    /// 导入成功后重新加载持久化状态到核心。
+    pub(crate) fn reload_storage_after_import_action(&mut self) -> AppUpdateOutcome {
         let Some(backend) = self.storage_backend.as_ref() else {
             return settings_error("没有可用的 SQLite 存储后端");
         };
@@ -209,11 +197,6 @@ impl AppState {
 
         self.storage = storage;
         self.config = self.storage.app_config.clone();
-        self.ui.visual_settings = crate::model::VisualSettingsDraft::from_profiles(
-            &self.config.theme,
-            &self.config.background,
-        );
-        self.apply_workspace_preferences();
         AppUpdateOutcome {
             state_changed: true,
             ..AppUpdateOutcome::default()
@@ -227,10 +210,6 @@ impl AppState {
             font_size: document.font.terminal.size as f32,
         };
         self.storage.app_config = self.config.clone();
-        self.ui.visual_settings = crate::model::VisualSettingsDraft::from_profiles(
-            &self.config.theme,
-            &self.config.background,
-        );
     }
 
     fn theme_document_would_change_profile(&self, document: &crate::theme::ThemeDocument) -> bool {
@@ -246,13 +225,13 @@ impl AppState {
             parse_theme_document(&theme.profile_toml, &theme.name)
         } else {
             Ok(crate::theme::built_in_theme_document(
-                self.ui.workspace.theme,
+                crate::model::BuiltInTheme::from_preference(self.config.workspace.built_in_theme),
             ))
         }
     }
 }
 
-fn unique_theme_name(state: &AppState, base: &str) -> String {
+fn unique_theme_name(state: &CoreState, base: &str) -> String {
     if state.storage.theme_by_name(base).is_none() {
         return base.to_owned();
     }

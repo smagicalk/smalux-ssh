@@ -1,10 +1,9 @@
 //! 隧道标签页查询。
 
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind};
 
-use super::super::AppState;
-
-impl AppState {
+impl CoreState {
     /// 判断同名隧道标签是否已经打开，避免后端同名隧道互相覆盖。
     pub(super) fn has_open_tunnel_tab(&self, rule_name: &str) -> bool {
         self.sessions.tabs.iter().any(|tab| {

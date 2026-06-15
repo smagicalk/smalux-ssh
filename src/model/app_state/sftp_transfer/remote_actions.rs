@@ -1,14 +1,15 @@
 //! SFTP 远端路径操作调度。
 
 use crate::backend::SftpRequest;
+use crate::core::CoreState;
 use crate::model::HostId;
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::join_remote_path;
 use super::super::launch_sftp::session::missing_sftp_browser;
-use super::super::{AppState, AppUpdateOutcome};
 use super::path::is_plain_remote_name;
 
-impl AppState {
+impl CoreState {
     /// 删除远程文件。
     pub(in crate::model::app_state) fn remove_sftp_file(
         &mut self,
@@ -26,16 +27,26 @@ impl AppState {
         self.queue_sftp_path_action(host_id, SftpRequest::RemoveFile { remote_path })
     }
 
-    /// 在当前远程目录创建子目录。
-    pub(in crate::model::app_state) fn create_sftp_dir(
+    /// 创建 SFTP 远端目录的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn create_sftp_dir_named_action(
         &mut self,
         host_id: HostId,
+        new_dir_name: String,
+    ) -> AppUpdateOutcome {
+        self.create_sftp_dir_named(host_id, new_dir_name)
+    }
+
+    /// 在当前远程目录创建子目录。
+    pub(in crate::model::app_state) fn create_sftp_dir_named(
+        &mut self,
+        host_id: HostId,
+        new_dir_name: String,
     ) -> AppUpdateOutcome {
         let Some(current_dir) = self.current_sftp_dir_for_host(host_id) else {
             return missing_sftp_browser(host_id);
         };
 
-        let new_dir_name = self.ui.sftp_new_dir_name_for(host_id).trim().to_owned();
         if new_dir_name.is_empty() {
             return AppUpdateOutcome {
                 error: Some("SFTP 新目录名不能为空".to_owned()),

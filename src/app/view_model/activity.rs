@@ -1,6 +1,6 @@
 //! 右侧活动栏展示模型。
 
-use crate::model::AppState;
+use crate::app::state::AsDesktopStateView;
 
 use super::common::background_summary;
 use super::i18n::{locale_for_state, tr};
@@ -13,7 +13,8 @@ pub(in crate::app) struct ActivityViewModel {
     pub value: String,
 }
 
-pub(super) fn activity(state: &AppState) -> Vec<ActivityViewModel> {
+pub(super) fn activity(state: impl AsDesktopStateView) -> Vec<ActivityViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
 
     vec![

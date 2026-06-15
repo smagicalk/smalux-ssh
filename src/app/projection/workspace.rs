@@ -60,6 +60,9 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_proxy_resources_section_label(text.proxy_resources_section.into());
     window.set_proxy_runtime_empty_label(text.proxy_runtime_empty.into());
     window.set_proxy_resources_empty_label(text.proxy_resources_empty.into());
+    window.set_proxy_search_placeholder_label(text.proxy_search_placeholder.into());
+    window.set_proxy_search_empty_label(text.proxy_search_empty.into());
+    window.set_proxy_clear_selection_label(text.proxy_clear_selection.into());
     window.set_proxy_new_proxy_label(text.proxy_new_proxy.into());
     window.set_proxy_new_jump_label(text.proxy_new_jump.into());
     window.set_proxy_new_forward_label(text.proxy_new_forward.into());
@@ -77,11 +80,19 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_proxy_bind_label(text.proxy_bind_label.into());
     window.set_proxy_target_label(text.proxy_target_label.into());
     window.set_proxy_host_ids_label(text.proxy_host_ids_label.into());
+    window.set_proxy_note_label(text.proxy_note_label.into());
+    window.set_proxy_used_by_label(text.proxy_used_by_label.into());
     window.set_proxy_host_ids_placeholder(text.proxy_host_ids_placeholder.into());
     window.set_proxy_bind_host_placeholder(text.proxy_bind_host_placeholder.into());
     window.set_proxy_target_host_placeholder(text.proxy_target_host_placeholder.into());
     window.set_proxy_tags_placeholder(text.proxy_tags_placeholder.into());
     window.set_proxy_auto_start_label(text.proxy_auto_start.into());
+    window.set_proxy_exit_on_failure_label(text.proxy_exit_on_failure.into());
+    window.set_proxy_auth_none_label(text.proxy_auth_none.into());
+    window.set_proxy_auth_user_password_label(text.proxy_auth_user_password.into());
+    window.set_proxy_auth_username_label(text.proxy_auth_username.into());
+    window.set_proxy_auth_password_ref_label(text.proxy_auth_password_ref.into());
+    window.set_proxy_remote_dns_label(text.proxy_remote_dns.into());
     window.set_proxy_kind_socks5_label(text.proxy_kind_socks5.into());
     window.set_proxy_kind_http_label(text.proxy_kind_http.into());
     window.set_proxy_kind_local_label(text.proxy_kind_local.into());
@@ -443,6 +454,7 @@ pub(super) fn sync_workspace_state(window: &AppWindow, model: &AppViewModel) {
     window.set_host_search_query(model.host_search_query.as_str().into());
     window.set_credential_search_query(model.security_workspace.search_query.as_str().into());
     window.set_snippet_search_query(model.snippet_workspace.search_query.as_str().into());
+    window.set_network_search_query(model.network_workspace.search_query.as_str().into());
     window.set_create_host_dialog_open(model.create_host_dialog_open);
     window.set_create_group_parent_dialog_open(model.create_group_parent_dialog_open);
     window.set_create_group_dialog_open(model.create_group_dialog_open);

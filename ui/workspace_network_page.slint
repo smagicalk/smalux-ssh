@@ -1,26 +1,48 @@
 import { ScrollView } from "std-widgets.slint";
-import { NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkStatRow } from "./models.slint";
+import { HostRow, NetworkDetailFieldRow, NetworkItemRow, NetworkRelatedItemRow, NetworkStatRow } from "./models.slint";
 import { AppTheme } from "./theme.slint";
 import { CompactButton, ConfirmDialog, DialogAuthOption, DialogButton, DialogCloseButton, DialogField } from "./common.slint";
-import { HostIcon } from "./hosts.slint";
+import { HostIcon, HostSearchField } from "./hosts.slint";
 import { CredentialDetailField } from "./security_credential_detail_parts.slint";
 import { SnippetStatCard } from "./snippet_detail_parts.slint";
 
 component NetworkNavSectionHeader inherits Rectangle {
     in property <string> label;
+    in property <int> count: 0;
 
-    height: 24px;
+    height: 30px;
     background: AppTheme.transparent;
 
     Text {
-        y: 0px;
-        width: parent.width;
+        x: 2px;
+        y: 4px;
+        width: parent.width - 54px;
         height: parent.height;
         text: root.label;
         color: AppTheme.section-text;
         font-size: 10px;
         font-weight: 700;
         vertical-alignment: center;
+    }
+
+    if root.count > 0: Rectangle {
+        x: parent.width - self.width;
+        y: 8px;
+        width: 42px;
+        height: 18px;
+        border-radius: 6px;
+        border-width: 1px;
+        border-color: AppTheme.border-soft;
+        background: AppTheme.surface-bg;
+
+        Text {
+            text: root.count;
+            color: AppTheme.text-muted;
+            font-size: 9px;
+            font-weight: 700;
+            horizontal-alignment: center;
+            vertical-alignment: center;
+        }
     }
 }
 
@@ -32,11 +54,13 @@ component NetworkNavItem inherits Rectangle {
 
     property <bool> active: root.item.id == root.selected-id;
 
-    height: 50px;
-    border-radius: 7px;
+    property <bool> running: root.item.primary_action_key == "stop";
+
+    height: 40px;
+    border-radius: 6px;
     border-width: 1px;
-    border-color: root.active ? AppTheme.border-strong : AppTheme.border-soft;
-    background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
+    border-color: root.active ? AppTheme.border-strong : AppTheme.transparent;
+    background: root.active ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.transparent;
 
     touch := TouchArea {
         clicked => {
@@ -45,51 +69,267 @@ component NetworkNavItem inherits Rectangle {
     }
 
     HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        spacing: 8px;
+        padding-left: 4px;
+        padding-right: 6px;
+        spacing: 7px;
 
         Rectangle {
-            width: 3px;
+            width: 14px;
             height: parent.height;
 
             Rectangle {
-                y: (parent.height - self.height) / 2;
-                width: 3px;
-                height: 22px;
-                border-radius: 2px;
-                background: root.active ? AppTheme.accent : AppTheme.border-strong;
+                x: 6px;
+                y: 0px;
+                width: 1px;
+                height: parent.height;
+                background: AppTheme.border-soft;
             }
+
+            Rectangle {
+                x: 3px;
+                y: (parent.height - self.height) / 2;
+                width: 7px;
+                height: 1px;
+                background: AppTheme.border-soft;
+            }
+
+            Rectangle {
+                x: 4px;
+                y: (parent.height - self.height) / 2;
+                width: 7px;
+                height: 7px;
+                border-radius: 4px;
+                border-width: 1px;
+                border-color: root.active ? AppTheme.accent : AppTheme.border-strong;
+                background: root.active ? AppTheme.accent : AppTheme.card-bg;
+            }
+        }
+
+        HostIcon {
+            width: 22px;
+            height: 22px;
+            icon-key: root.item.icon_key;
+            accent-index: root.item.accent_index;
+            status-key: root.running ? "Connected" : "Created";
         }
 
         VerticalLayout {
             horizontal-stretch: 1;
-            spacing: 2px;
+            spacing: 1px;
             Text {
                 text: root.item.title;
-                color: AppTheme.text-strong;
-                font-size: 12px;
+                color: root.active ? AppTheme.text-strong : AppTheme.text;
+                font-size: 11px;
                 font-weight: 700;
                 overflow: elide;
+                vertical-alignment: center;
             }
             Text {
                 text: root.item.subtitle;
                 color: AppTheme.text-muted;
-                font-size: 10px;
+                font-size: 9px;
                 overflow: elide;
             }
         }
 
-        if root.item.primary_action_key == "stop": CompactButton {
-            width: 44px;
-            label: root.item.primary_action_label;
-            enabled: root.item.primary_action_enabled;
-            tone: "danger";
-            compact: true;
-            clicked => {
-                root.stop-tunnel(root.item.session_id, root.item.title);
+        if root.running: Rectangle {
+            width: 8px;
+            height: parent.height;
+
+            Rectangle {
+                x: 1px;
+                y: (parent.height - self.height) / 2;
+                width: 3px;
+                height: 18px;
+                border-radius: 2px;
+                background: AppTheme.accent;
             }
         }
+    }
+}
+
+component NetworkActionBar inherits Rectangle {
+    in property <string> proxy-label;
+    in property <string> jump-label;
+    in property <string> forward-label;
+    callback new-proxy();
+    callback new-jump();
+    callback new-forward();
+
+    height: 84px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.surface-bg;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 7px;
+
+        HorizontalLayout {
+            height: 30px;
+            spacing: 7px;
+            CompactButton {
+                horizontal-stretch: 1;
+                label: root.proxy-label;
+                tone: "neutral";
+                clicked => { root.new-proxy(); }
+            }
+            CompactButton {
+                horizontal-stretch: 1;
+                label: root.jump-label;
+                tone: "neutral";
+                clicked => { root.new-jump(); }
+            }
+        }
+
+        CompactButton {
+            height: 30px;
+            horizontal-stretch: 1;
+            label: root.forward-label;
+            tone: "neutral";
+            clicked => { root.new-forward(); }
+        }
+    }
+}
+
+component NetworkSectionEmpty inherits Rectangle {
+    in property <string> label;
+
+    height: 30px;
+    background: AppTheme.transparent;
+
+    Text {
+        x: 24px;
+        width: parent.width - 28px;
+        height: parent.height;
+        text: root.label;
+        color: AppTheme.text-muted;
+        font-size: 10px;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component NetworkDetailActionButton inherits Rectangle {
+    in property <string> label;
+    in property <string> tone: "neutral";
+    in property <bool> enabled: true;
+    callback clicked();
+
+    height: 28px;
+    min-width: 72px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: !root.enabled ? AppTheme.border-soft : root.tone == "danger" ? AppTheme.button-danger-border : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: !root.enabled ? AppTheme.panel-bg : root.tone == "danger" ? (touch.pressed ? AppTheme.button-danger-pressed : touch.has-hover ? AppTheme.button-danger-hover : AppTheme.button-danger-bg) : touch.pressed ? AppTheme.button-secondary-pressed : touch.has-hover ? AppTheme.button-secondary-hover : AppTheme.surface-bg;
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        x: 10px;
+        width: parent.width - 20px;
+        height: parent.height;
+        text: root.label;
+        color: !root.enabled ? AppTheme.text-muted : root.tone == "danger" ? AppTheme.button-danger-text : AppTheme.text;
+        font-size: 10px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component NetworkDetailSection inherits Rectangle {
+    in property <string> title;
+
+    height: 24px;
+    background: AppTheme.transparent;
+
+    Text {
+        x: 2px;
+        width: parent.width - 4px;
+        height: parent.height;
+        text: root.title;
+        color: AppTheme.section-text;
+        font-size: 10px;
+        font-weight: 700;
+        vertical-alignment: center;
+    }
+}
+
+component NetworkNoteBlock inherits Rectangle {
+    in property <string> note;
+
+    min-height: 58px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.surface-bg;
+
+    Rectangle {
+        x: 0px;
+        y: 8px;
+        width: 3px;
+        height: parent.height - 16px;
+        border-radius: 2px;
+        background: AppTheme.accent-blue;
+    }
+
+    Text {
+        x: 14px;
+        y: 10px;
+        width: parent.width - 26px;
+        text: root.note;
+        color: AppTheme.text-muted;
+        font-size: 11px;
+        wrap: word-wrap;
+    }
+}
+
+component NetworkEmptyDetail inherits Rectangle {
+    in property <string> title;
+    in property <string> caption;
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 8px;
+        Rectangle { vertical-stretch: 1; }
+        Rectangle {
+            x: (parent.width - self.width) / 2;
+            width: 46px;
+            height: 46px;
+            border-radius: 10px;
+            border-width: 1px;
+            border-color: AppTheme.border-soft;
+            background: AppTheme.surface-bg;
+
+            HostIcon {
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                icon-key: "router";
+                accent-index: 3;
+                status-key: "Created";
+            }
+        }
+        Text {
+            text: root.title;
+            color: AppTheme.text-strong;
+            font-size: 16px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+        Text {
+            text: root.caption;
+            color: AppTheme.text-muted;
+            font-size: 11px;
+            horizontal-alignment: center;
+            wrap: word-wrap;
+        }
+        Rectangle { vertical-stretch: 1; }
     }
 }
 
@@ -133,6 +373,171 @@ component NetworkRelatedItem inherits Rectangle {
     }
 }
 
+component NetworkDialogHeader inherits Rectangle {
+    in property <string> icon-text;
+    in property <string> title;
+    in property <string> subtitle;
+    callback close();
+
+    height: 42px;
+
+    HorizontalLayout {
+        spacing: 12px;
+
+        Rectangle {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            border-width: 1px;
+            border-color: AppTheme.button-primary-border;
+            background: AppTheme.button-primary-bg;
+
+            Text {
+                text: root.icon-text;
+                color: AppTheme.button-primary-text;
+                font-size: 16px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            height: 42px;
+            background: AppTheme.transparent;
+
+            Text {
+                x: 0px;
+                y: 3px;
+                width: parent.width;
+                height: 18px;
+                text: root.title;
+                color: AppTheme.text-strong;
+                font-size: 17px;
+                font-weight: 700;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+
+            Text {
+                x: 0px;
+                y: 24px;
+                width: parent.width;
+                height: 14px;
+                text: root.subtitle;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                vertical-alignment: center;
+                overflow: elide;
+            }
+        }
+
+        DialogCloseButton { clicked => { root.close(); } }
+    }
+}
+
+component NetworkChoiceTile inherits Rectangle {
+    in property <string> label;
+    in property <string> caption;
+    in property <bool> active;
+    callback clicked();
+
+    height: 52px;
+    border-radius: 11px;
+    border-width: 1px;
+    border-color: root.active ? AppTheme.button-primary-border-hover : touch.has-hover ? AppTheme.border-strong : AppTheme.border-soft;
+    background: root.active ? AppTheme.button-primary-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    Text {
+        x: 10px;
+        y: root.caption == "" ? (parent.height - 16px) / 2 : 9px;
+        width: parent.width - 20px;
+        height: 16px;
+        text: root.label;
+        color: root.active ? AppTheme.button-primary-text : AppTheme.text;
+        font-size: 11px;
+        font-weight: 700;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    if root.caption != "": Text {
+        x: 10px;
+        y: 28px;
+        width: parent.width - 20px;
+        height: 14px;
+        text: root.caption;
+        color: root.active ? AppTheme.success-text-soft : AppTheme.text-muted;
+        font-size: 9px;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+}
+
+component NetworkField inherits Rectangle {
+    in property <string> label;
+    in property <string> field-value;
+    in property <string> placeholder;
+    callback edited(value: string);
+    callback accepted(value: string);
+
+    height: 58px;
+    border-radius: 11px;
+    border-width: 1px;
+    border-color: AppTheme.border-soft;
+    background: AppTheme.input-bg;
+
+    Text {
+        x: 12px;
+        y: 8px;
+        width: parent.width - 24px;
+        height: 13px;
+        text: root.label;
+        color: AppTheme.text-soft;
+        font-size: 10px;
+        font-weight: 700;
+        vertical-alignment: center;
+        overflow: elide;
+    }
+
+    Text {
+        x: 12px;
+        y: 28px;
+        width: parent.width - 24px;
+        height: 18px;
+        text: root.placeholder;
+        color: AppTheme.input-placeholder;
+        font-size: 11px;
+        vertical-alignment: center;
+        visible: input.text == "";
+        overflow: elide;
+    }
+
+    input := TextInput {
+        x: 12px;
+        y: 28px;
+        width: parent.width - 24px;
+        height: 18px;
+        text: root.field-value;
+        single-line: true;
+        color: AppTheme.text;
+        font-size: 11px;
+        text-cursor-width: 1px;
+        selection-background-color: AppTheme.input-selection;
+        selection-foreground-color: AppTheme.text-strong;
+        vertical-alignment: center;
+        edited => { root.edited(self.text); }
+        accepted => { root.accepted(self.text); }
+    }
+}
+
 component NetworkProxyDialog inherits Rectangle {
     in-out property <string> asset-id;
     in-out property <string> name;
@@ -140,6 +545,10 @@ component NetworkProxyDialog inherits Rectangle {
     in-out property <string> host;
     in-out property <string> port;
     in-out property <string> tags;
+    in-out property <string> auth-kind;
+    in-out property <string> auth-username;
+    in-out property <string> auth-password-ref;
+    in-out property <bool> remote-dns;
     in property <string> title-label;
     in property <string> socks5-label;
     in property <string> http-label;
@@ -149,9 +558,14 @@ component NetworkProxyDialog inherits Rectangle {
     in property <string> port-label;
     in property <string> tags-label;
     in property <string> tags-placeholder;
+    in property <string> auth-none-label;
+    in property <string> auth-user-password-label;
+    in property <string> auth-username-label;
+    in property <string> auth-password-ref-label;
+    in property <string> remote-dns-label;
     in property <string> save-label;
     in property <string> cancel-label;
-    callback save(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string, auth-kind: string, auth-username: string, auth-password-ref: string, remote-dns: bool) -> bool;
     callback close();
 
     background: AppTheme.overlay-bg;
@@ -159,94 +573,156 @@ component NetworkProxyDialog inherits Rectangle {
     Rectangle {
         x: (root.width - self.width) / 2;
         y: max(24px, (root.height - self.height) / 2);
-        width: min(root.width - 64px, 520px);
-        height: 454px;
-        border-radius: 10px;
+        width: min(root.width - 52px, 620px);
+        height: 702px;
+        border-radius: 14px;
         border-width: 1px;
         border-color: AppTheme.border-strong;
         background: AppTheme.dialog-bg;
 
         VerticalLayout {
-            padding-left: 18px;
-            padding-right: 18px;
-            padding-top: 16px;
+            padding-left: 22px;
+            padding-right: 22px;
+            padding-top: 20px;
             padding-bottom: 18px;
-            spacing: 10px;
+            spacing: 14px;
 
-            HorizontalLayout {
-                height: 28px;
-                spacing: 10px;
-                Text {
-                    text: root.title-label;
-                    color: AppTheme.text-strong;
-                    font-size: 16px;
-                    font-weight: 700;
-                    horizontal-stretch: 1;
-                    vertical-alignment: center;
-                }
-                DialogCloseButton { clicked => { root.close(); } }
+            NetworkDialogHeader {
+                icon-text: "#";
+                title: root.title-label;
+                subtitle: root.proxy-kind == "Http" ? root.http-label : root.socks5-label;
+                close => { root.close(); }
             }
 
-            HorizontalLayout {
-                height: 44px;
-                spacing: 8px;
-                DialogAuthOption {
-                    horizontal-stretch: 1;
-                    label: root.socks5-label;
-                    caption: "";
-                    active: root.proxy-kind != "Http";
-                    clicked => { root.proxy-kind = "Socks5"; }
-                }
-                DialogAuthOption {
-                    horizontal-stretch: 1;
-                    label: root.http-label;
-                    caption: "";
-                    active: root.proxy-kind == "Http";
-                    clicked => { root.proxy-kind = "Http"; }
+            Rectangle {
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        height: 52px;
+                        spacing: 10px;
+                        NetworkChoiceTile {
+                            horizontal-stretch: 1;
+                            label: root.socks5-label;
+                            caption: "";
+                            active: root.proxy-kind != "Http";
+                            clicked => { root.proxy-kind = "Socks5"; }
+                        }
+                        NetworkChoiceTile {
+                            horizontal-stretch: 1;
+                            label: root.http-label;
+                            caption: "";
+                            active: root.proxy-kind == "Http";
+                            clicked => { root.proxy-kind = "Http"; }
+                        }
+                    }
+
+                    NetworkField {
+                        label: root.name-label;
+                        placeholder: root.name-placeholder;
+                        field-value: root.name;
+                        edited(value) => { root.name = value; }
+                        accepted(value) => { root.name = value; }
+                    }
+                    HorizontalLayout {
+                        spacing: 10px;
+                        NetworkField {
+                            horizontal-stretch: 1;
+                            label: root.address-label;
+                            placeholder: root.address-label;
+                            field-value: root.host;
+                            edited(value) => { root.host = value; }
+                            accepted(value) => { root.host = value; }
+                        }
+                        NetworkField {
+                            width: 128px;
+                            label: root.port-label;
+                            placeholder: root.port-label;
+                            field-value: root.port;
+                            edited(value) => { root.port = value; }
+                            accepted(value) => { root.port = value; }
+                        }
+                    }
+                    NetworkField {
+                        label: root.tags-label;
+                        placeholder: root.tags-placeholder;
+                        field-value: root.tags;
+                        edited(value) => { root.tags = value; }
+                        accepted(value) => { root.tags = value; }
+                    }
                 }
             }
 
-            DialogField {
-                label: root.name-label;
-                placeholder: root.name-placeholder;
-                field-value: root.name;
-                edited(value) => { root.name = value; }
-                accepted(value) => { root.name = value; }
-            }
-            DialogField {
-                label: root.address-label;
-                placeholder: root.address-label;
-                field-value: root.host;
-                edited(value) => { root.host = value; }
-                accepted(value) => { root.host = value; }
-            }
-            DialogField {
-                label: root.port-label;
-                placeholder: root.port-label;
-                field-value: root.port;
-                edited(value) => { root.port = value; }
-                accepted(value) => { root.port = value; }
-            }
-            DialogField {
-                label: root.tags-label;
-                placeholder: root.tags-placeholder;
-                field-value: root.tags;
-                edited(value) => { root.tags = value; }
-                accepted(value) => { root.tags = value; }
+            Rectangle {
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.card-bg;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        height: 52px;
+                        spacing: 10px;
+                        NetworkChoiceTile {
+                            horizontal-stretch: 1;
+                            label: root.auth-none-label;
+                            caption: "";
+                            active: root.auth-kind == "" || root.auth-kind == "None";
+                            clicked => { root.auth-kind = "None"; }
+                        }
+                        NetworkChoiceTile {
+                            horizontal-stretch: 1;
+                            label: root.auth-user-password-label;
+                            caption: "";
+                            active: root.auth-kind == "UserPassword";
+                            clicked => { root.auth-kind = "UserPassword"; }
+                        }
+                    }
+
+                    if root.auth-kind == "UserPassword": NetworkField {
+                        label: root.auth-username-label;
+                        placeholder: root.auth-username-label;
+                        field-value: root.auth-username;
+                        edited(value) => { root.auth-username = value; }
+                        accepted(value) => { root.auth-username = value; }
+                    }
+
+                    if root.auth-kind == "UserPassword": NetworkField {
+                        label: root.auth-password-ref-label;
+                        placeholder: root.auth-password-ref-label;
+                        field-value: root.auth-password-ref;
+                        edited(value) => { root.auth-password-ref = value; }
+                        accepted(value) => { root.auth-password-ref = value; }
+                    }
+
+                    if root.proxy-kind != "Http": NetworkChoiceTile {
+                        label: root.remote-dns-label;
+                        caption: "";
+                        active: root.remote-dns;
+                        clicked => { root.remote-dns = !root.remote-dns; }
+                    }
+                }
             }
 
             Rectangle { vertical-stretch: 1; }
 
             HorizontalLayout {
                 height: 34px;
-                spacing: 8px;
+                spacing: 10px;
                 Rectangle { horizontal-stretch: 1; }
                 DialogButton { label: root.cancel-label; primary: false; clicked => { root.close(); } }
                 DialogButton {
                     label: root.save-label;
                     primary: true;
                     clicked => {
-                        if root.save(root.asset-id, root.name, root.proxy-kind, root.host, root.port, root.tags) {
+                        if root.save(root.asset-id, root.name, root.proxy-kind, root.host, root.port, root.tags, root.auth-kind, root.auth-username, root.auth-password-ref, root.remote-dns) {
                             root.close();
                         }
                     }
@@ -256,73 +732,417 @@ component NetworkProxyDialog inherits Rectangle {
     }
 }
 
+component NetworkJumpHostOption inherits Rectangle {
+    in property <HostRow> host;
+    in property <bool> selected;
+    in property <int> order: 0;
+    callback clicked(host-id: string);
+
+    height: 46px;
+    border-radius: 7px;
+    border-width: 1px;
+    border-color: root.selected ? AppTheme.border-strong : touch.has-hover ? AppTheme.border : AppTheme.border-soft;
+    background: root.selected ? AppTheme.selection-bg : touch.pressed ? AppTheme.surface-pressed : touch.has-hover ? AppTheme.surface-hover : AppTheme.card-bg;
+
+    touch := TouchArea {
+        clicked => { root.clicked(root.host.id); }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 9px;
+
+        HostIcon {
+            width: 24px;
+            height: 24px;
+            icon-key: root.host.icon_key;
+            status-key: root.host.status_key;
+            accent-index: root.host.accent_index;
+        }
+
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 2px;
+
+            Text {
+                text: root.host.name;
+                color: AppTheme.text-strong;
+                font-size: 11px;
+                font-weight: 700;
+                overflow: elide;
+            }
+
+            Text {
+                text: root.host.endpoint;
+                color: AppTheme.text-muted;
+                font-size: 10px;
+                overflow: elide;
+            }
+        }
+
+        if root.selected: Rectangle {
+            width: 28px;
+            height: 22px;
+            border-radius: 7px;
+            border-width: 1px;
+            border-color: AppTheme.border-strong;
+            background: AppTheme.badge-success-bg;
+
+            Text {
+                text: root.order;
+                color: AppTheme.text-strong;
+                font-size: 10px;
+                font-weight: 700;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        if !root.selected: Text {
+            width: 54px;
+            text: root.host.group == "" ? root.host.status : root.host.group;
+            color: AppTheme.text-soft;
+            font-size: 10px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
 component NetworkJumpDialog inherits Rectangle {
     in-out property <string> asset-id;
     in-out property <string> name;
     in-out property <string> host-ids;
+    in property <[HostRow]> hosts: [];
     in property <string> title-label;
     in property <string> name-label;
     in property <string> name-placeholder;
     in property <string> host-ids-label;
     in property <string> host-ids-placeholder;
+    in property <string> search-placeholder;
+    in property <string> search-empty-label;
+    in property <string> selected-count-label;
+    in property <string> clear-selection-label;
+    in property <string> username-label;
+    in property <string> port-label;
+    in property <string> alias-label;
     in property <string> save-label;
     in property <string> cancel-label;
+    callback update-step-host(step-text: string, step-index: int, host-id: string) -> string;
+    callback update-step-username(step-text: string, step-index: int, username: string) -> string;
+    callback update-step-port(step-text: string, step-index: int, port: string) -> string;
+    callback update-step-alias(step-text: string, step-index: int, alias: string) -> string;
+    callback move-step-up(step-text: string, step-index: int) -> string;
+    callback move-step-down(step-text: string, step-index: int) -> string;
+    pure callback step-host-id(step-text: string, step-index: int) -> string;
+    pure callback step-username(step-text: string, step-index: int) -> string;
+    pure callback step-port(step-text: string, step-index: int) -> string;
+    pure callback step-alias(step-text: string, step-index: int) -> string;
+    pure callback step-label(step-text: string, step-index: int) -> string;
+    pure callback step-endpoint(step-text: string, step-index: int) -> string;
+    pure callback host-selected(host-ids: string, host-id: string) -> bool;
+    pure callback host-order(host-ids: string, host-id: string) -> int;
+    pure callback host-matches(query: string, host: HostRow) -> bool;
+    pure callback has-host-match(query: string) -> bool;
+    pure callback selected-host-count(host-ids: string) -> int;
+    callback clear-hosts() -> string;
+    callback toggle-host(host-ids: string, host-id: string) -> string;
     callback save(asset-id: string, name: string, host-ids: string) -> bool;
     callback close();
+
+    property <string> host-filter-query: "";
+    property <int> selected-count: root.selected-host-count(root.host-ids);
+
+    function close-dialog() {
+        root.host-filter-query = "";
+        root.close();
+    }
 
     background: AppTheme.overlay-bg;
 
     Rectangle {
         x: (root.width - self.width) / 2;
         y: max(24px, (root.height - self.height) / 2);
-        width: min(root.width - 64px, 520px);
-        height: 278px;
-        border-radius: 10px;
+        width: min(root.width - 36px, 988px);
+        height: 684px;
+        border-radius: 14px;
         border-width: 1px;
         border-color: AppTheme.border-strong;
         background: AppTheme.dialog-bg;
 
         VerticalLayout {
-            padding: 18px;
-            spacing: 10px;
-            HorizontalLayout {
-                height: 28px;
-                Text {
-                    text: root.title-label;
-                    color: AppTheme.text-strong;
-                    font-size: 16px;
-                    font-weight: 700;
-                    horizontal-stretch: 1;
-                    vertical-alignment: center;
-                }
-                DialogCloseButton { clicked => { root.close(); } }
+            padding-left: 22px;
+            padding-right: 22px;
+            padding-top: 20px;
+            padding-bottom: 18px;
+            spacing: 14px;
+            NetworkDialogHeader {
+                icon-text: "->";
+                title: root.title-label;
+                subtitle: root.selected-count-label + ": " + root.selected-count;
+                close => { root.close-dialog(); }
             }
-            DialogField {
+            NetworkField {
                 label: root.name-label;
                 placeholder: root.name-placeholder;
                 field-value: root.name;
                 edited(value) => { root.name = value; }
                 accepted(value) => { root.name = value; }
             }
-            DialogField {
-                label: root.host-ids-label;
-                placeholder: root.host-ids-placeholder;
-                field-value: root.host-ids;
-                edited(value) => { root.host-ids = value; }
-                accepted(value) => { root.host-ids = value; }
+
+            Rectangle {
+                height: 452px;
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+                clip: true;
+
+                HorizontalLayout {
+                    padding: 12px;
+                    spacing: 12px;
+
+                    Rectangle {
+                        width: 292px;
+                        border-radius: 12px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.card-bg;
+
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+
+                            VerticalLayout {
+                                spacing: 2px;
+                                Text {
+                                    text: root.host-ids-label;
+                                    color: AppTheme.text-soft;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                }
+                                Text {
+                                    text: root.host-ids-placeholder;
+                                    color: AppTheme.text-muted;
+                                    font-size: 9px;
+                                    overflow: elide;
+                                }
+                            }
+
+                            HostSearchField {
+                                value: root.host-filter-query;
+                                placeholder: root.search-placeholder;
+                                edited(value) => { root.host-filter-query = value; }
+                                accepted(value) => { root.host-filter-query = value; }
+                            }
+
+                            ScrollView {
+                                vertical-stretch: 1;
+                                VerticalLayout {
+                                    spacing: 7px;
+
+                                    if root.hosts.length == 0: Text {
+                                        text: root.host-ids-placeholder;
+                                        color: AppTheme.text-muted;
+                                        font-size: 10px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    for host in root.hosts: NetworkJumpHostOption {
+                                        visible: root.host-matches(root.host-filter-query, host);
+                                        host: host;
+                                        selected: root.host-selected(root.host-ids, host.id);
+                                        order: root.host-order(root.host-ids, host.id);
+                                        clicked(host-id) => {
+                                            root.host-ids = root.toggle-host(root.host-ids, host-id);
+                                        }
+                                    }
+
+                                    if root.hosts.length > 0 && !root.has-host-match(root.host-filter-query): Text {
+                                        text: root.search-empty-label;
+                                        color: AppTheme.text-muted;
+                                        font-size: 10px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 12px;
+                        border-width: 1px;
+                        border-color: AppTheme.border-soft;
+                        background: AppTheme.card-bg;
+
+                        VerticalLayout {
+                            padding: 14px;
+                            spacing: 10px;
+
+                            HorizontalLayout {
+                                height: 24px;
+                                spacing: 8px;
+                                Text {
+                                    text: root.selected-count-label + ": " + root.selected-count;
+                                    color: AppTheme.text-muted;
+                                    font-size: 10px;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                }
+                                DialogButton {
+                                    width: 76px;
+                                    label: root.clear-selection-label;
+                                    primary: false;
+                                    enabled: root.selected-count > 0;
+                                    clicked => { root.host-ids = root.clear-hosts(); }
+                                }
+                            }
+
+                            ScrollView {
+                                vertical-stretch: 1;
+                                VerticalLayout {
+                                    spacing: 10px;
+
+                                    if root.selected-count == 0: Text {
+                                        text: root.host-ids-placeholder;
+                                        color: AppTheme.text-muted;
+                                        font-size: 10px;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    for host in root.hosts: Rectangle {
+                                        visible: root.host-order(root.host-ids, host.id) > 0;
+                                        border-radius: 12px;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border-soft;
+                                        background: AppTheme.raised-bg;
+                                        min-height: 154px;
+
+                                        VerticalLayout {
+                                            padding: 14px;
+                                            spacing: 10px;
+
+                                            HorizontalLayout {
+                                                height: 22px;
+                                                spacing: 8px;
+                                                Text {
+                                                    text: root.step-label(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                    color: AppTheme.text-strong;
+                                                    font-size: 11px;
+                                                    font-weight: 700;
+                                                    horizontal-stretch: 1;
+                                                    vertical-alignment: center;
+                                                    overflow: elide;
+                                                }
+                                                CompactButton {
+                                                    label: "^";
+                                                    compact: true;
+                                                    enabled: root.host-order(root.host-ids, host.id) > 1;
+                                                    clicked => {
+                                                        root.host-ids = root.move-step-up(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                    }
+                                                }
+                                                CompactButton {
+                                                    label: "v";
+                                                    compact: true;
+                                                    enabled: root.host-order(root.host-ids, host.id) < root.selected-count;
+                                                    clicked => {
+                                                        root.host-ids = root.move-step-down(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                    }
+                                                }
+                                                CompactButton {
+                                                    label: "x";
+                                                    tone: "danger";
+                                                    compact: true;
+                                                    clicked => {
+                                                        let host-id = root.step-host-id(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                        root.host-ids = root.toggle-host(root.host-ids, host-id);
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                height: 46px;
+                                                border-radius: 10px;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border-soft;
+                                                background: AppTheme.input-bg;
+
+                                                VerticalLayout {
+                                                    padding-left: 10px;
+                                                    padding-right: 10px;
+                                                    padding-top: 5px;
+                                                    padding-bottom: 5px;
+                                                    spacing: 2px;
+                                                    Text {
+                                                        text: root.step-label(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                        color: AppTheme.text-strong;
+                                                        font-size: 11px;
+                                                        font-weight: 700;
+                                                        overflow: elide;
+                                                    }
+                                                    Text {
+                                                        text: root.step-endpoint(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                        color: AppTheme.text-muted;
+                                                        font-size: 9px;
+                                                        overflow: elide;
+                                                    }
+                                                }
+                                            }
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                NetworkField {
+                                                    horizontal-stretch: 1;
+                                                    label: root.username-label;
+                                                    placeholder: root.username-label;
+                                                    field-value: root.step-username(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                    edited(value) => { root.host-ids = root.update-step-username(root.host-ids, root.host-order(root.host-ids, host.id) - 1, value); }
+                                                    accepted(value) => { root.host-ids = root.update-step-username(root.host-ids, root.host-order(root.host-ids, host.id) - 1, value); }
+                                                }
+                                                NetworkField {
+                                                    width: 132px;
+                                                    label: root.port-label;
+                                                    placeholder: root.port-label;
+                                                    field-value: root.step-port(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                    edited(value) => { root.host-ids = root.update-step-port(root.host-ids, root.host-order(root.host-ids, host.id) - 1, value); }
+                                                    accepted(value) => { root.host-ids = root.update-step-port(root.host-ids, root.host-order(root.host-ids, host.id) - 1, value); }
+                                                }
+                                            }
+
+                                            NetworkField {
+                                                label: root.alias-label;
+                                                placeholder: root.alias-label;
+                                                field-value: root.step-alias(root.host-ids, root.host-order(root.host-ids, host.id) - 1);
+                                                edited(value) => { root.host-ids = root.update-step-alias(root.host-ids, root.host-order(root.host-ids, host.id) - 1, value); }
+                                                accepted(value) => { root.host-ids = root.update-step-alias(root.host-ids, root.host-order(root.host-ids, host.id) - 1, value); }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             Rectangle { vertical-stretch: 1; }
             HorizontalLayout {
                 height: 34px;
-                spacing: 8px;
+                spacing: 10px;
                 Rectangle { horizontal-stretch: 1; }
-                DialogButton { label: root.cancel-label; primary: false; clicked => { root.close(); } }
+                DialogButton { label: root.cancel-label; primary: false; clicked => { root.close-dialog(); } }
                 DialogButton {
                     label: root.save-label;
                     primary: true;
                     clicked => {
                         if root.save(root.asset-id, root.name, root.host-ids) {
-                            root.close();
+                            root.close-dialog();
                         }
                     }
                 }
@@ -341,6 +1161,7 @@ component NetworkForwardDialog inherits Rectangle {
     in-out property <string> target-port;
     in-out property <string> tags;
     in-out property <bool> auto-start;
+    in-out property <bool> exit-on-failure;
     in property <string> title-label;
     in property <string> name-label;
     in property <string> name-placeholder;
@@ -355,9 +1176,10 @@ component NetworkForwardDialog inherits Rectangle {
     in property <string> remote-kind-label;
     in property <string> dynamic-kind-label;
     in property <string> auto-start-label;
+    in property <string> exit-on-failure-label;
     in property <string> save-label;
     in property <string> cancel-label;
-    callback save(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
+    callback save(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool, exit-on-failure: bool) -> bool;
     callback close();
 
     background: AppTheme.overlay-bg;
@@ -365,94 +1187,116 @@ component NetworkForwardDialog inherits Rectangle {
     Rectangle {
         x: (root.width - self.width) / 2;
         y: max(18px, (root.height - self.height) / 2);
-        width: min(root.width - 64px, 560px);
-        height: 568px;
-        border-radius: 10px;
+        width: min(root.width - 52px, 632px);
+        height: 640px;
+        border-radius: 14px;
         border-width: 1px;
         border-color: AppTheme.border-strong;
         background: AppTheme.dialog-bg;
 
         VerticalLayout {
-            padding: 18px;
-            spacing: 10px;
-            HorizontalLayout {
-                height: 28px;
-                Text {
-                    text: root.title-label;
-                    color: AppTheme.text-strong;
-                    font-size: 16px;
-                    font-weight: 700;
-                    horizontal-stretch: 1;
-                    vertical-alignment: center;
+            padding: 22px;
+            spacing: 14px;
+            NetworkDialogHeader {
+                icon-text: "<>";
+                title: root.title-label;
+                subtitle: root.forward-kind == "Dynamic" ? root.dynamic-kind-label : root.forward-kind == "Remote" ? root.remote-kind-label : root.local-kind-label;
+                close => { root.close(); }
+            }
+            Rectangle {
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.dialog-section-bg;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    HorizontalLayout {
+                        height: 52px;
+                        spacing: 10px;
+                        NetworkChoiceTile { horizontal-stretch: 1; label: root.local-kind-label; caption: ""; active: root.forward-kind == "Local"; clicked => { root.forward-kind = "Local"; } }
+                        NetworkChoiceTile { horizontal-stretch: 1; label: root.remote-kind-label; caption: ""; active: root.forward-kind == "Remote"; clicked => { root.forward-kind = "Remote"; } }
+                        NetworkChoiceTile { horizontal-stretch: 1; label: root.dynamic-kind-label; caption: ""; active: root.forward-kind == "Dynamic"; clicked => { root.forward-kind = "Dynamic"; } }
+                    }
+                    NetworkField {
+                        label: root.name-label;
+                        placeholder: root.name-placeholder;
+                        field-value: root.name;
+                        edited(value) => { root.name = value; }
+                        accepted(value) => { root.name = value; }
+                    }
+                    HorizontalLayout {
+                        height: 50px;
+                        spacing: 10px;
+                        NetworkField {
+                            horizontal-stretch: 1;
+                            label: root.bind-label;
+                            placeholder: root.bind-host-placeholder;
+                            field-value: root.bind-host;
+                            edited(value) => { root.bind-host = value; }
+                            accepted(value) => { root.bind-host = value; }
+                        }
+                        NetworkField {
+                            width: 128px;
+                            label: root.port-label;
+                            placeholder: root.port-label;
+                            field-value: root.bind-port;
+                            edited(value) => { root.bind-port = value; }
+                            accepted(value) => { root.bind-port = value; }
+                        }
+                    }
+                    HorizontalLayout {
+                        height: 50px;
+                        spacing: 10px;
+                        NetworkField {
+                            horizontal-stretch: 1;
+                            label: root.target-label;
+                            placeholder: root.target-host-placeholder;
+                            field-value: root.target-host;
+                            edited(value) => { root.target-host = value; }
+                            accepted(value) => { root.target-host = value; }
+                        }
+                        NetworkField {
+                            width: 128px;
+                            label: root.port-label;
+                            placeholder: root.port-label;
+                            field-value: root.target-port;
+                            edited(value) => { root.target-port = value; }
+                            accepted(value) => { root.target-port = value; }
+                        }
+                    }
+                    NetworkField {
+                        label: root.tags-label;
+                        placeholder: root.tags-placeholder;
+                        field-value: root.tags;
+                        edited(value) => { root.tags = value; }
+                        accepted(value) => { root.tags = value; }
+                    }
                 }
-                DialogCloseButton { clicked => { root.close(); } }
             }
-            HorizontalLayout {
-                height: 44px;
-                spacing: 8px;
-                DialogAuthOption { horizontal-stretch: 1; label: root.local-kind-label; caption: ""; active: root.forward-kind == "Local"; clicked => { root.forward-kind = "Local"; } }
-                DialogAuthOption { horizontal-stretch: 1; label: root.remote-kind-label; caption: ""; active: root.forward-kind == "Remote"; clicked => { root.forward-kind = "Remote"; } }
-                DialogAuthOption { horizontal-stretch: 1; label: root.dynamic-kind-label; caption: ""; active: root.forward-kind == "Dynamic"; clicked => { root.forward-kind = "Dynamic"; } }
-            }
-            DialogField {
-                label: root.name-label;
-                placeholder: root.name-placeholder;
-                field-value: root.name;
-                edited(value) => { root.name = value; }
-                accepted(value) => { root.name = value; }
-            }
-            HorizontalLayout {
-                height: 50px;
-                spacing: 8px;
-                DialogField {
-                    horizontal-stretch: 1;
-                    label: root.bind-label;
-                    placeholder: root.bind-host-placeholder;
-                    field-value: root.bind-host;
-                    edited(value) => { root.bind-host = value; }
-                    accepted(value) => { root.bind-host = value; }
+            Rectangle {
+                border-radius: 12px;
+                border-width: 1px;
+                border-color: AppTheme.border-soft;
+                background: AppTheme.card-bg;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 10px;
+                    NetworkChoiceTile {
+                        label: root.auto-start-label;
+                        caption: root.auto-start ? root.auto-start-label : "";
+                        active: root.auto-start;
+                        clicked => { root.auto-start = !root.auto-start; }
+                    }
+                    NetworkChoiceTile {
+                        label: root.exit-on-failure-label;
+                        caption: root.exit-on-failure ? root.exit-on-failure-label : "";
+                        active: root.exit-on-failure;
+                        clicked => { root.exit-on-failure = !root.exit-on-failure; }
+                    }
                 }
-                DialogField {
-                    width: 128px;
-                    label: root.port-label;
-                    placeholder: root.port-label;
-                    field-value: root.bind-port;
-                    edited(value) => { root.bind-port = value; }
-                    accepted(value) => { root.bind-port = value; }
-                }
-            }
-            HorizontalLayout {
-                height: 50px;
-                spacing: 8px;
-                DialogField {
-                    horizontal-stretch: 1;
-                    label: root.target-label;
-                    placeholder: root.target-host-placeholder;
-                    field-value: root.target-host;
-                    edited(value) => { root.target-host = value; }
-                    accepted(value) => { root.target-host = value; }
-                }
-                DialogField {
-                    width: 128px;
-                    label: root.port-label;
-                    placeholder: root.port-label;
-                    field-value: root.target-port;
-                    edited(value) => { root.target-port = value; }
-                    accepted(value) => { root.target-port = value; }
-                }
-            }
-            DialogField {
-                label: root.tags-label;
-                placeholder: root.tags-placeholder;
-                field-value: root.tags;
-                edited(value) => { root.tags = value; }
-                accepted(value) => { root.tags = value; }
-            }
-            DialogAuthOption {
-                label: root.auto-start-label;
-                caption: root.auto-start ? root.auto-start-label : "";
-                active: root.auto-start;
-                clicked => { root.auto-start = !root.auto-start; }
             }
             Rectangle { vertical-stretch: 1; }
             HorizontalLayout {
@@ -464,7 +1308,7 @@ component NetworkForwardDialog inherits Rectangle {
                     label: root.save-label;
                     primary: true;
                     clicked => {
-                        if root.save(root.asset-id, root.name, root.forward-kind, root.bind-host, root.bind-port, root.target-host, root.target-port, root.tags, root.auto-start) {
+                        if root.save(root.asset-id, root.name, root.forward-kind, root.bind-host, root.bind-port, root.target-host, root.target-port, root.tags, root.auto-start, root.exit-on-failure) {
                             root.close();
                         }
                     }
@@ -480,10 +1324,14 @@ export component NetworkWorkspacePage inherits Rectangle {
     in property <string> saved-section-label: "";
     in property <string> runtime-empty-label: "";
     in property <string> resources-empty-label: "";
+    in property <string> detail-label: "";
     in property <string> proxy-section-label: "";
     in property <string> routes-section-label: "";
     in property <string> empty-title-label: "";
     in property <string> empty-caption-label: "";
+    in property <string> search-placeholder: "";
+    in property <string> search-empty-label: "";
+    in property <string> clear-selection-label: "";
     in property <string> new-proxy-label: "";
     in property <string> new-jump-label: "";
     in property <string> new-forward-label: "";
@@ -501,20 +1349,30 @@ export component NetworkWorkspacePage inherits Rectangle {
     in property <string> bind-label: "";
     in property <string> target-label: "";
     in property <string> host-ids-label: "";
+    in property <string> note-label: "";
+    in property <string> used-by-label: "";
     in property <string> host-ids-placeholder: "";
     in property <string> bind-host-placeholder: "";
     in property <string> target-host-placeholder: "";
     in property <string> tags-placeholder: "";
     in property <string> auto-start-label: "";
+    in property <string> exit-on-failure-label: "";
+    in property <string> auth-none-label: "";
+    in property <string> auth-user-password-label: "";
+    in property <string> auth-username-label: "";
+    in property <string> auth-password-ref-label: "";
+    in property <string> remote-dns-label: "";
     in property <string> socks5-kind-label: "";
     in property <string> http-kind-label: "";
     in property <string> local-kind-label: "";
     in property <string> remote-kind-label: "";
     in property <string> dynamic-kind-label: "";
+    in property <[HostRow]> hosts: [];
+    in property <string> search-query: "";
     in property <[NetworkItemRow]> runtime-tunnels: [];
-    in property <[NetworkItemRow]> saved-tunnels: [];
+    in property <[NetworkItemRow]> jump-chain-assets: [];
     in property <[NetworkItemRow]> proxy-assets: [];
-    in property <[NetworkItemRow]> route-definitions: [];
+    in property <[NetworkItemRow]> forward-assets: [];
     in property <string> selected-id: "";
     in property <string> selected-title: "";
     in property <string> selected-caption: "";
@@ -537,19 +1395,45 @@ export component NetworkWorkspacePage inherits Rectangle {
     in property <string> selected-edit-host: "";
     in property <string> selected-edit-port: "";
     in property <string> selected-edit-tags: "";
+    in property <string> selected-edit-auth-kind: "";
+    in property <string> selected-edit-auth-username: "";
+    in property <string> selected-edit-auth-password-ref: "";
+    in property <bool> selected-edit-remote-dns: false;
     in property <string> selected-edit-bind-host: "";
     in property <string> selected-edit-bind-port: "";
     in property <string> selected-edit-target-host: "";
     in property <string> selected-edit-target-port: "";
     in property <bool> selected-edit-auto-start: false;
+    in property <bool> selected-edit-exit-on-failure: false;
     in property <string> selected-edit-host-ids: "";
 
     callback select-network-item(item: NetworkItemRow);
+    callback update-search(query: string);
     callback stop-tunnel(session-id: string, rule-name: string);
-    callback save-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string) -> bool;
+    callback save-proxy(asset-id: string, name: string, proxy-kind: string, host: string, port: string, tags: string, auth-kind: string, auth-username: string, auth-password-ref: string, remote-dns: bool) -> bool;
     callback save-jump-chain(asset-id: string, name: string, host-ids: string) -> bool;
-    callback save-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool) -> bool;
-    callback remove-asset(kind-key: string, asset-id: string);
+    callback save-forward(asset-id: string, name: string, kind: string, bind-host: string, bind-port: string, target-host: string, target-port: string, tags: string, auto-start: bool, exit-on-failure: bool) -> bool;
+    callback remove-asset(kind-key: string, asset-id: string) -> bool;
+    callback clear-selection();
+    pure callback jump-host-selected(host-ids: string, host-id: string) -> bool;
+    pure callback jump-host-order(host-ids: string, host-id: string) -> int;
+    pure callback jump-host-matches(query: string, host: HostRow) -> bool;
+    pure callback has-jump-host-match(query: string) -> bool;
+    pure callback selected-jump-host-count(host-ids: string) -> int;
+    callback clear-jump-hosts() -> string;
+    callback toggle-jump-host(host-ids: string, host-id: string) -> string;
+    callback update-jump-step-host(step-text: string, step-index: int, host-id: string) -> string;
+    callback update-jump-step-username(step-text: string, step-index: int, username: string) -> string;
+    callback update-jump-step-port(step-text: string, step-index: int, port: string) -> string;
+    callback update-jump-step-alias(step-text: string, step-index: int, alias: string) -> string;
+    callback move-jump-step-up(step-text: string, step-index: int) -> string;
+    callback move-jump-step-down(step-text: string, step-index: int) -> string;
+    pure callback jump-step-host-id(step-text: string, step-index: int) -> string;
+    pure callback jump-step-username(step-text: string, step-index: int) -> string;
+    pure callback jump-step-port(step-text: string, step-index: int) -> string;
+    pure callback jump-step-alias(step-text: string, step-index: int) -> string;
+    pure callback jump-step-label(step-text: string, step-index: int) -> string;
+    pure callback jump-step-endpoint(step-text: string, step-index: int) -> string;
 
     property <bool> has-selection: root.selected-id != "";
     property <bool> selected-asset: root.selected-asset-id != "";
@@ -557,142 +1441,263 @@ export component NetworkWorkspacePage inherits Rectangle {
     property <bool> jump-dialog-open: false;
     property <bool> forward-dialog-open: false;
     property <bool> remove-dialog-open: false;
+    property <bool> search-active: root.search-query != "";
+    property <bool> search-empty: root.search-active
+        && root.runtime-tunnels.length == 0
+        && root.jump-chain-assets.length == 0
+        && root.proxy-assets.length == 0
+        && root.forward-assets.length == 0;
     property <string> draft-asset-id: "";
     property <string> draft-name: "";
     property <string> draft-kind: "Socks5";
     property <string> draft-host: "";
     property <string> draft-port: "";
     property <string> draft-tags: "";
+    property <string> draft-auth-kind: "None";
+    property <string> draft-auth-username: "";
+    property <string> draft-auth-password-ref: "";
+    property <bool> draft-remote-dns: false;
     property <string> draft-bind-host: "127.0.0.1";
     property <string> draft-bind-port: "";
     property <string> draft-target-host: "";
     property <string> draft-target-port: "";
     property <string> draft-host-ids: "";
     property <bool> draft-auto-start: false;
+    property <bool> draft-exit-on-failure: false;
+
+    function close-dialogs() {
+        root.proxy-dialog-open = false;
+        root.jump-dialog-open = false;
+        root.forward-dialog-open = false;
+        root.remove-dialog-open = false;
+    }
+
+    function reset-draft() {
+        root.draft-asset-id = "";
+        root.draft-name = "";
+        root.draft-kind = "";
+        root.draft-host = "";
+        root.draft-port = "";
+        root.draft-tags = "";
+        root.draft-auth-kind = "None";
+        root.draft-auth-username = "";
+        root.draft-auth-password-ref = "";
+        root.draft-remote-dns = false;
+        root.draft-bind-host = "127.0.0.1";
+        root.draft-bind-port = "";
+        root.draft-target-host = "";
+        root.draft-target-port = "";
+        root.draft-host-ids = "";
+        root.draft-auto-start = false;
+        root.draft-exit-on-failure = false;
+    }
+
+    function open-new-proxy-dialog() {
+        root.close-dialogs();
+        root.reset-draft();
+        root.draft-kind = "Socks5";
+        root.draft-port = "1080";
+        root.proxy-dialog-open = true;
+    }
+
+    function open-new-jump-dialog() {
+        root.close-dialogs();
+        root.reset-draft();
+        root.jump-dialog-open = true;
+    }
+
+    function open-new-forward-dialog() {
+        root.close-dialogs();
+        root.reset-draft();
+        root.draft-kind = "Local";
+        root.forward-dialog-open = true;
+    }
+
+    function open-edit-dialog() {
+        root.close-dialogs();
+        root.draft-asset-id = root.selected-asset-id;
+        root.draft-name = root.selected-title;
+        root.draft-kind = root.selected-edit-kind-key;
+        root.draft-host = root.selected-edit-host;
+        root.draft-port = root.selected-edit-port;
+        root.draft-tags = root.selected-edit-tags;
+        root.draft-auth-kind = root.selected-edit-auth-kind == "" ? "None" : root.selected-edit-auth-kind;
+        root.draft-auth-username = root.selected-edit-auth-username;
+        root.draft-auth-password-ref = root.selected-edit-auth-password-ref;
+        root.draft-remote-dns = root.selected-edit-remote-dns;
+        root.draft-bind-host = root.selected-edit-bind-host;
+        root.draft-bind-port = root.selected-edit-bind-port;
+        root.draft-target-host = root.selected-edit-target-host;
+        root.draft-target-port = root.selected-edit-target-port;
+        root.draft-auto-start = root.selected-edit-auto-start;
+        root.draft-exit-on-failure = root.selected-edit-exit-on-failure;
+        root.draft-host-ids = root.selected-edit-host-ids;
+        if root.selected-kind-key == "ProxyAsset" {
+            root.proxy-dialog-open = true;
+        } else if root.selected-kind-key == "JumpChainAsset" {
+            root.jump-dialog-open = true;
+        } else if root.selected-kind-key == "ForwardAsset" {
+            root.forward-dialog-open = true;
+        }
+    }
 
     background: AppTheme.window-bg;
     vertical-stretch: 1;
     horizontal-stretch: 1;
 
     HorizontalLayout {
-        spacing: 8px;
+        spacing: 10px;
 
         Rectangle {
-            width: 296px;
+            width: 318px;
             vertical-stretch: 1;
-            border-radius: 8px;
+            border-radius: 0px;
             border-width: 1px;
             border-color: AppTheme.border-soft;
-            background: AppTheme.card-bg;
+            background: AppTheme.panel-bg;
             clip: true;
 
-            ScrollView {
-                width: parent.width;
-                height: parent.height;
+            VerticalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                padding-top: 12px;
+                padding-bottom: 12px;
+                spacing: 10px;
 
-                VerticalLayout {
-                    padding: 12px;
-                    spacing: 10px;
+                HorizontalLayout {
+                    height: 30px;
+                    spacing: 8px;
 
                     Text {
                         text: root.title;
                         color: AppTheme.text-strong;
                         font-size: 15px;
                         font-weight: 700;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
                     }
+                }
 
-                    HorizontalLayout {
-                        height: 28px;
-                        spacing: 6px;
-                        CompactButton {
-                            horizontal-stretch: 1;
-                            label: root.new-proxy-label;
-                            tone: "neutral";
-                            clicked => {
-                                root.draft-asset-id = "";
-                                root.draft-name = "";
-                                root.draft-kind = "Socks5";
-                                root.draft-host = "";
-                                root.draft-port = "1080";
-                                root.draft-tags = "";
-                                root.proxy-dialog-open = true;
+                HostSearchField {
+                    value: root.search-query;
+                    placeholder: root.search-placeholder;
+                    edited(value) => {
+                        root.clear-selection();
+                        root.update-search(value);
+                    }
+                    accepted(value) => {
+                        root.clear-selection();
+                        root.update-search(value);
+                    }
+                }
+
+                NetworkActionBar {
+                    proxy-label: root.new-proxy-label;
+                    jump-label: root.new-jump-label;
+                    forward-label: root.new-forward-label;
+                    new-proxy => { root.open-new-proxy-dialog(); }
+                    new-jump => { root.open-new-jump-dialog(); }
+                    new-forward => { root.open-new-forward-dialog(); }
+                }
+
+                ScrollView {
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        spacing: 3px;
+
+                        if root.search-empty: Rectangle {
+                            height: 70px;
+                            border-radius: 7px;
+                            border-width: 1px;
+                            border-color: AppTheme.border-soft;
+                            background: AppTheme.surface-bg;
+                            Text {
+                                x: 12px;
+                                y: 0px;
+                                width: parent.width - 24px;
+                                height: parent.height;
+                                text: root.search-empty-label;
+                                color: AppTheme.text-muted;
+                                font-size: 10px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                wrap: word-wrap;
                             }
                         }
-                        CompactButton {
-                            horizontal-stretch: 1;
-                            label: root.new-jump-label;
-                            tone: "neutral";
-                            clicked => {
-                                root.draft-asset-id = "";
-                                root.draft-name = "";
-                                root.draft-host-ids = "";
-                                root.jump-dialog-open = true;
+
+                        if !root.search-empty: NetworkNavSectionHeader {
+                            label: root.runtime-section-label;
+                            count: root.runtime-tunnels.length;
+                        }
+                        if !root.search-empty && root.runtime-tunnels.length == 0: NetworkSectionEmpty {
+                            label: root.runtime-empty-label;
+                        }
+                        if !root.search-empty: VerticalLayout {
+                            spacing: 1px;
+                            for item in root.runtime-tunnels: NetworkNavItem {
+                                item: item;
+                                selected-id: root.selected-id;
+                                selected(item) => { root.select-network-item(item); }
+                                stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
                             }
                         }
-                        CompactButton {
-                            horizontal-stretch: 1;
-                            label: root.new-forward-label;
-                            tone: "neutral";
-                            clicked => {
-                                root.draft-asset-id = "";
-                                root.draft-name = "";
-                                root.draft-kind = "Local";
-                                root.draft-bind-host = "127.0.0.1";
-                                root.draft-bind-port = "";
-                                root.draft-target-host = "";
-                                root.draft-target-port = "";
-                                root.draft-tags = "";
-                                root.draft-auto-start = false;
-                                root.forward-dialog-open = true;
+
+                        if !root.search-empty: Rectangle { height: 8px; }
+
+                        if !root.search-empty: NetworkNavSectionHeader {
+                            label: root.saved-section-label;
+                            count: root.jump-chain-assets.length;
+                        }
+                        if !root.search-empty && root.jump-chain-assets.length == 0: NetworkSectionEmpty {
+                            label: root.resources-empty-label;
+                        }
+                        if !root.search-empty: VerticalLayout {
+                            spacing: 1px;
+                            for item in root.jump-chain-assets: NetworkNavItem {
+                                item: item;
+                                selected-id: root.selected-id;
+                                selected(item) => { root.select-network-item(item); }
+                                stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
                             }
                         }
-                    }
 
-                    NetworkNavSectionHeader { label: root.runtime-section-label; }
-                    if root.runtime-tunnels.length == 0: Text {
-                        text: root.runtime-empty-label;
-                        color: AppTheme.text-muted;
-                        font-size: 10px;
-                    }
-                    for item in root.runtime-tunnels: NetworkNavItem {
-                        item: item;
-                        selected-id: root.selected-id;
-                        selected(item) => { root.select-network-item(item); }
-                        stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
-                    }
+                        if !root.search-empty: Rectangle { height: 8px; }
 
-                    NetworkNavSectionHeader { label: root.saved-section-label; }
-                    if root.saved-tunnels.length == 0: Text {
-                        text: root.resources-empty-label;
-                        color: AppTheme.text-muted;
-                        font-size: 10px;
-                    }
-                    for item in root.saved-tunnels: NetworkNavItem {
-                        item: item;
-                        selected-id: root.selected-id;
-                        selected(item) => { root.select-network-item(item); }
-                        stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
-                    }
-
-                    if root.proxy-section-label != "": NetworkNavSectionHeader { label: root.proxy-section-label; }
-                    if root.proxy-section-label != "": VerticalLayout {
-                        spacing: 10px;
-                        for item in root.proxy-assets: NetworkNavItem {
-                            item: item;
-                            selected-id: root.selected-id;
-                            selected(item) => { root.select-network-item(item); }
-                            stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                        if !root.search-empty && root.proxy-section-label != "": NetworkNavSectionHeader {
+                            label: root.proxy-section-label;
+                            count: root.proxy-assets.length;
                         }
-                    }
+                        if !root.search-empty && root.proxy-section-label != "" && root.proxy-assets.length == 0: NetworkSectionEmpty {
+                            label: root.resources-empty-label;
+                        }
+                        if !root.search-empty && root.proxy-section-label != "": VerticalLayout {
+                            spacing: 1px;
+                            for item in root.proxy-assets: NetworkNavItem {
+                                item: item;
+                                selected-id: root.selected-id;
+                                selected(item) => { root.select-network-item(item); }
+                                stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                            }
+                        }
 
-                    if root.routes-section-label != "": NetworkNavSectionHeader { label: root.routes-section-label; }
-                    if root.routes-section-label != "": VerticalLayout {
-                        spacing: 10px;
-                        for item in root.route-definitions: NetworkNavItem {
-                            item: item;
-                            selected-id: root.selected-id;
-                            selected(item) => { root.select-network-item(item); }
-                            stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                        if !root.search-empty: Rectangle { height: 8px; }
+
+                        if !root.search-empty && root.routes-section-label != "": NetworkNavSectionHeader {
+                            label: root.routes-section-label;
+                            count: root.forward-assets.length;
+                        }
+                        if !root.search-empty && root.routes-section-label != "" && root.forward-assets.length == 0: NetworkSectionEmpty {
+                            label: root.resources-empty-label;
+                        }
+                        if !root.search-empty && root.routes-section-label != "": VerticalLayout {
+                            spacing: 1px;
+                            for item in root.forward-assets: NetworkNavItem {
+                                item: item;
+                                selected-id: root.selected-id;
+                                selected(item) => { root.select-network-item(item); }
+                                stop-tunnel(session-id, rule-name) => { root.stop-tunnel(session-id, rule-name); }
+                            }
                         }
                     }
                 }
@@ -702,31 +1707,17 @@ export component NetworkWorkspacePage inherits Rectangle {
         Rectangle {
             horizontal-stretch: 1;
             vertical-stretch: 1;
-            border-radius: 8px;
+            border-radius: 0px;
             border-width: 1px;
             border-color: AppTheme.border-soft;
             background: AppTheme.card-bg;
             clip: true;
 
-            if !root.has-selection: VerticalLayout {
-                padding: 18px;
-                spacing: 6px;
-                Rectangle { vertical-stretch: 1; }
-                Text {
-                    text: root.empty-title-label;
-                    color: AppTheme.text-strong;
-                    font-size: 15px;
-                    font-weight: 700;
-                    horizontal-alignment: center;
-                }
-                Text {
-                    text: root.empty-caption-label;
-                    color: AppTheme.text-muted;
-                    font-size: 11px;
-                    horizontal-alignment: center;
-                    wrap: word-wrap;
-                }
-                Rectangle { vertical-stretch: 1; }
+            if !root.has-selection: NetworkEmptyDetail {
+                width: parent.width;
+                height: parent.height;
+                title: root.empty-title-label;
+                caption: root.empty-caption-label;
             }
 
             if root.has-selection: ScrollView {
@@ -734,149 +1725,158 @@ export component NetworkWorkspacePage inherits Rectangle {
                 height: parent.height;
 
                 VerticalLayout {
-                    padding: 12px;
-                    spacing: 10px;
+                    padding: 18px;
+                    spacing: 12px;
 
-                    HorizontalLayout {
-                        height: 42px;
-                        spacing: 10px;
-
-                        HostIcon {
-                            icon-key: root.selected-icon-key;
-                            accent-index: root.selected-accent-index;
-                            status-key: "Created";
-                        }
-
-                        VerticalLayout {
-                            horizontal-stretch: 1;
-                            spacing: 3px;
-
-                            Text {
-                                text: root.selected-title;
-                                color: AppTheme.text-strong;
-                                font-size: 16px;
-                                font-weight: 700;
-                                overflow: elide;
-                            }
-
-                            Text {
-                                text: root.selected-caption;
-                                color: AppTheme.text-muted;
-                                font-size: 10px;
-                                overflow: elide;
-                            }
-                        }
-
-                        Rectangle {
-                            width: 110px;
-                            height: 24px;
-                            border-radius: 6px;
-                            border-width: 1px;
-                            border-color: AppTheme.border-soft;
-                            background: AppTheme.surface-bg;
-
-                            Text {
-                                x: 8px;
-                                y: 0px;
-                                width: parent.width - 16px;
-                                height: parent.height;
-                                text: root.selected-kind;
-                                color: AppTheme.text-muted;
-                                font-size: 10px;
-                                font-weight: 700;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                                overflow: elide;
-                            }
-                        }
-
-                        if root.primary-action-key == "stop": CompactButton {
-                            width: 52px;
-                            label: root.primary-action-label;
-                            enabled: root.primary-action-enabled;
-                            tone: "danger";
-                            compact: true;
-                            clicked => { root.stop-tunnel(root.action-session-id, root.action-rule-name); }
-                        }
-
-                        if root.selected-asset: CompactButton {
-                            width: 52px;
-                            label: root.edit-label;
-                            compact: true;
-                            clicked => {
-                                root.draft-asset-id = root.selected-asset-id;
-                                root.draft-name = root.selected-title;
-                                root.draft-kind = root.selected-edit-kind-key;
-                                root.draft-host = root.selected-edit-host;
-                                root.draft-port = root.selected-edit-port;
-                                root.draft-tags = root.selected-edit-tags;
-                                root.draft-bind-host = root.selected-edit-bind-host;
-                                root.draft-bind-port = root.selected-edit-bind-port;
-                                root.draft-target-host = root.selected-edit-target-host;
-                                root.draft-target-port = root.selected-edit-target-port;
-                                root.draft-auto-start = root.selected-edit-auto-start;
-                                root.draft-host-ids = root.selected-edit-host-ids;
-                                if root.selected-kind-key == "ProxyAsset" {
-                                    root.proxy-dialog-open = true;
-                                } else if root.selected-kind-key == "JumpChainAsset" {
-                                    root.jump-dialog-open = true;
-                                } else if root.selected-kind-key == "ForwardAsset" {
-                                    root.forward-dialog-open = true;
-                                }
-                            }
-                        }
-
-                        if root.selected-asset: CompactButton {
-                            width: 52px;
-                            label: root.delete-label;
-                            tone: "danger";
-                            compact: true;
-                            clicked => { root.remove-dialog-open = true; }
-                        }
-                    }
-
-                    if root.stats.length > 0: HorizontalLayout {
-                        height: 58px;
-                        spacing: 8px;
-                        for stat in root.stats: SnippetStatCard {
-                            horizontal-stretch: 1;
-                            label: stat.label;
-                            value: stat.value;
-                        }
-                    }
-
-                    if root.selected-note != "": Rectangle {
-                        border-radius: 7px;
+                    Rectangle {
+                        min-height: 86px;
+                        border-radius: 8px;
                         border-width: 1px;
                         border-color: AppTheme.border-soft;
                         background: AppTheme.surface-bg;
-                        min-height: 54px;
 
-                        Text {
-                            x: 12px;
-                            y: 10px;
-                            width: parent.width - 24px;
-                            text: root.selected-note;
-                            color: AppTheme.text-muted;
-                            font-size: 11px;
-                            wrap: word-wrap;
+                        HorizontalLayout {
+                            padding-left: 14px;
+                            padding-right: 14px;
+                            spacing: 12px;
+
+                            HostIcon {
+                                width: 34px;
+                                height: 34px;
+                                icon-key: root.selected-icon-key;
+                                accent-index: root.selected-accent-index;
+                                status-key: root.primary-action-key == "stop" ? "Connected" : "Created";
+                            }
+
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 4px;
+
+                                Text {
+                                    text: root.selected-title;
+                                    color: AppTheme.text-strong;
+                                    font-size: 18px;
+                                    font-weight: 700;
+                                    overflow: elide;
+                                }
+
+                                Text {
+                                    text: root.selected-caption;
+                                    color: AppTheme.text-muted;
+                                    font-size: 11px;
+                                    overflow: elide;
+                                }
+
+                                Text {
+                                    text: root.selected-meta;
+                                    color: AppTheme.text-soft;
+                                    font-size: 10px;
+                                    overflow: elide;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 116px;
+                                height: 28px;
+                                border-radius: 7px;
+                                border-width: 1px;
+                                border-color: AppTheme.border-soft;
+                                background: AppTheme.card-bg;
+
+                                Text {
+                                    x: 8px;
+                                    width: parent.width - 16px;
+                                    height: parent.height;
+                                    text: root.selected-kind;
+                                    color: AppTheme.text-secondary;
+                                    font-size: 10px;
+                                    font-weight: 700;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
                         }
                     }
 
+                    if root.primary-action-key == "stop" || root.selected-asset: HorizontalLayout {
+                        height: 30px;
+                        spacing: 8px;
+                        Rectangle { horizontal-stretch: 1; }
+
+                        if root.primary-action-key == "stop": NetworkDetailActionButton {
+                            label: root.primary-action-label;
+                            enabled: root.primary-action-enabled;
+                            tone: "danger";
+                            clicked => { root.stop-tunnel(root.action-session-id, root.action-rule-name); }
+                        }
+
+                        if root.selected-asset: NetworkDetailActionButton {
+                            label: root.edit-label;
+                            clicked => { root.open-edit-dialog(); }
+                        }
+
+                        if root.selected-asset: NetworkDetailActionButton {
+                            label: root.delete-label;
+                            tone: "danger";
+                            clicked => {
+                                root.close-dialogs();
+                                root.remove-dialog-open = true;
+                            }
+                        }
+                    }
+
+                    if root.stats.length > 0: VerticalLayout {
+                        spacing: 6px;
+                        NetworkDetailSection { title: root.selected-asset ? root.detail-label : root.runtime-section-label; }
+                        HorizontalLayout {
+                            height: 58px;
+                            spacing: 8px;
+                            for stat in root.stats: SnippetStatCard {
+                                horizontal-stretch: 1;
+                                label: stat.label;
+                                value: stat.value;
+                            }
+                        }
+                    }
+
+                    if root.selected-note != "": VerticalLayout {
+                        spacing: 6px;
+                        NetworkDetailSection { title: root.selected-kind; }
+                        NetworkNoteBlock { note: root.selected-note; }
+                    }
+
                     if root.detail-fields.length > 0: VerticalLayout {
-                        spacing: 0px;
-                        for field in root.detail-fields: CredentialDetailField {
-                            label: field.label;
-                            value: field.value;
-                            active: true;
-                            copy-value(value) => { false }
+                        spacing: 6px;
+                        NetworkDetailSection { title: root.note-label; }
+                        Rectangle {
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: AppTheme.border-soft;
+                            background: AppTheme.surface-bg;
+                            min-height: root.detail-fields.length * 58px + 10px;
+
+                            VerticalLayout {
+                                padding: 8px;
+                                spacing: 2px;
+                                for field in root.detail-fields: CredentialDetailField {
+                                    label: field.label;
+                                    value: field.value;
+                                    active: true;
+                                    copy-value(value) => { false }
+                                }
+                            }
                         }
                     }
 
                     if root.related-items.length > 0: VerticalLayout {
-                        spacing: 8px;
-                        for item in root.related-items: NetworkRelatedItem {
-                            item: item;
+                        spacing: 6px;
+                        NetworkDetailSection { title: root.used-by-label; }
+                        VerticalLayout {
+                            spacing: 8px;
+                            for item in root.related-items: NetworkRelatedItem {
+                                item: item;
+                            }
                         }
                     }
                 }
@@ -893,6 +1893,10 @@ export component NetworkWorkspacePage inherits Rectangle {
         host: root.draft-host;
         port: root.draft-port;
         tags: root.draft-tags;
+        auth-kind: root.draft-auth-kind;
+        auth-username: root.draft-auth-username;
+        auth-password-ref: root.draft-auth-password-ref;
+        remote-dns: root.draft-remote-dns;
         title-label: root.new-proxy-label;
         socks5-label: root.socks5-kind-label;
         http-label: root.http-kind-label;
@@ -902,9 +1906,20 @@ export component NetworkWorkspacePage inherits Rectangle {
         port-label: root.port-label;
         tags-label: root.tags-label;
         tags-placeholder: root.tags-placeholder;
+        auth-none-label: root.auth-none-label;
+        auth-user-password-label: root.auth-user-password-label;
+        auth-username-label: root.auth-username-label;
+        auth-password-ref-label: root.auth-password-ref-label;
+        remote-dns-label: root.remote-dns-label;
         save-label: root.save-label;
         cancel-label: root.cancel-label;
-        save(asset-id, name, proxy-kind, host, port, tags) => { root.save-proxy(asset-id, name, proxy-kind, host, port, tags) }
+        save(asset-id, name, proxy-kind, host, port, tags, auth-kind, auth-username, auth-password-ref, remote-dns) => {
+            let success = root.save-proxy(asset-id, name, proxy-kind, host, port, tags, auth-kind, auth-username, auth-password-ref, remote-dns);
+            if success {
+                root.clear-selection();
+            }
+            success
+        }
         close => { root.proxy-dialog-open = false; }
     }
 
@@ -914,14 +1929,47 @@ export component NetworkWorkspacePage inherits Rectangle {
         asset-id: root.draft-asset-id;
         name: root.draft-name;
         host-ids: root.draft-host-ids;
+        hosts: root.hosts;
         title-label: root.new-jump-label;
         name-label: root.name-label;
         name-placeholder: root.name-placeholder;
         host-ids-label: root.host-ids-label;
         host-ids-placeholder: root.host-ids-placeholder;
+        search-placeholder: root.search-placeholder;
+        search-empty-label: root.search-empty-label;
+        selected-count-label: root.host-ids-label;
+        clear-selection-label: root.clear-selection-label;
+        username-label: root.auth-username-label;
+        port-label: root.port-label;
+        alias-label: root.name-label;
         save-label: root.save-label;
         cancel-label: root.cancel-label;
-        save(asset-id, name, host-ids) => { root.save-jump-chain(asset-id, name, host-ids) }
+        host-selected(host-ids, host-id) => { root.jump-host-selected(host-ids, host-id) }
+        host-order(host-ids, host-id) => { root.jump-host-order(host-ids, host-id) }
+        host-matches(query, host) => { root.jump-host-matches(query, host) }
+        has-host-match(query) => { root.has-jump-host-match(query) }
+        selected-host-count(host-ids) => { root.selected-jump-host-count(host-ids) }
+        clear-hosts() => { root.clear-jump-hosts() }
+        toggle-host(host-ids, host-id) => { root.toggle-jump-host(host-ids, host-id) }
+        update-step-host(step-text, step-index, host-id) => { root.update-jump-step-host(step-text, step-index, host-id) }
+        update-step-username(step-text, step-index, username) => { root.update-jump-step-username(step-text, step-index, username) }
+        update-step-port(step-text, step-index, port) => { root.update-jump-step-port(step-text, step-index, port) }
+        update-step-alias(step-text, step-index, alias) => { root.update-jump-step-alias(step-text, step-index, alias) }
+        move-step-up(step-text, step-index) => { root.move-jump-step-up(step-text, step-index) }
+        move-step-down(step-text, step-index) => { root.move-jump-step-down(step-text, step-index) }
+        step-host-id(step-text, step-index) => { root.jump-step-host-id(step-text, step-index) }
+        step-username(step-text, step-index) => { root.jump-step-username(step-text, step-index) }
+        step-port(step-text, step-index) => { root.jump-step-port(step-text, step-index) }
+        step-alias(step-text, step-index) => { root.jump-step-alias(step-text, step-index) }
+        step-label(step-text, step-index) => { root.jump-step-label(step-text, step-index) }
+        step-endpoint(step-text, step-index) => { root.jump-step-endpoint(step-text, step-index) }
+        save(asset-id, name, host-ids) => {
+            let success = root.save-jump-chain(asset-id, name, host-ids);
+            if success {
+                root.clear-selection();
+            }
+            success
+        }
         close => { root.jump-dialog-open = false; }
     }
 
@@ -937,6 +1985,7 @@ export component NetworkWorkspacePage inherits Rectangle {
         target-port: root.draft-target-port;
         tags: root.draft-tags;
         auto-start: root.draft-auto-start;
+        exit-on-failure: root.draft-exit-on-failure;
         title-label: root.new-forward-label;
         name-label: root.name-label;
         name-placeholder: root.name-placeholder;
@@ -951,9 +2000,16 @@ export component NetworkWorkspacePage inherits Rectangle {
         remote-kind-label: root.remote-kind-label;
         dynamic-kind-label: root.dynamic-kind-label;
         auto-start-label: root.auto-start-label;
+        exit-on-failure-label: root.exit-on-failure-label;
         save-label: root.save-label;
         cancel-label: root.cancel-label;
-        save(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) => { root.save-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start) }
+        save(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start, exit-on-failure) => {
+            let success = root.save-forward(asset-id, name, kind, bind-host, bind-port, target-host, target-port, tags, auto-start, exit-on-failure);
+            if success {
+                root.clear-selection();
+            }
+            success
+        }
         close => { root.forward-dialog-open = false; }
     }
 
@@ -968,7 +2024,10 @@ export component NetworkWorkspacePage inherits Rectangle {
         cancel => { root.remove-dialog-open = false; }
         confirm => {
             root.remove-dialog-open = false;
-            root.remove-asset(root.selected-kind-key, root.selected-asset-id);
+            let success = root.remove-asset(root.selected-kind-key, root.selected-asset-id);
+            if success {
+                root.clear-selection();
+            }
         }
     }
 }

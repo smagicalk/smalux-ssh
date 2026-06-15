@@ -4,9 +4,10 @@
 //! 终端场景做即时回显。UI 层不需要知道这些分支。
 
 use crate::backend::BackendCommand;
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind};
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use terminal_input_echo::echo_local_terminal_input;
 use terminal_input_history::record_terminal_input_history;
 
@@ -15,11 +16,22 @@ mod terminal_input_echo;
 #[path = "terminal_input_history.rs"]
 mod terminal_input_history;
 
-impl AppState {
-    /// 把当前终端输入草稿发送到 Shell 后端。
+impl CoreState {
+    /// 发送终端输入的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn send_terminal_input_action(
+        &mut self,
+        session_id: SessionId,
+        input: String,
+    ) -> AppUpdateOutcome {
+        self.send_terminal_input(session_id, input)
+    }
+
+    /// 把终端输入发送到 Shell 后端。
     pub(in crate::model::app_state) fn send_terminal_input(
         &mut self,
         session_id: SessionId,
+        input: String,
     ) -> AppUpdateOutcome {
         // 先从 session tab 读取会话类型和 host_id；terminal tab 只负责缓冲区，不存业务语义。
         let Some(tab) = self
@@ -62,7 +74,6 @@ impl AppState {
             };
         };
 
-        let input = self.ui.terminal_input_for(session_id).to_owned();
         let trimmed = input.trim().to_owned();
         // 远程 shell 禁止发送空命令；本地终端允许空输入，用于模拟按下 Enter。
         if trimmed.is_empty() && !matches!(tab.kind, SessionKind::LocalShell) {
@@ -84,7 +95,6 @@ impl AppState {
         });
         // 本地终端先做 UI 回显，远程终端等待真实输出事件。
         echo_local_terminal_input(&mut self.terminal, session_id, &tab.kind, &trimmed, &input);
-        self.ui.clear_terminal_input(session_id);
 
         AppUpdateOutcome {
             state_changed: true,

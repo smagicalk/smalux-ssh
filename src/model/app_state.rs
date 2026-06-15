@@ -1,13 +1,13 @@
 //! 应用根状态和消息调度。
 //!
-//! 这个模块是 UI 与核心行为之间的主入口：
+//! 这个模块是桌面 UI 草稿和核心行为之间的过渡分发器：
 //!
 //! - `Message` 描述“用户或后台发生了什么”。
-//! - `AppState::apply` 负责把消息分发到对应的单一职责模块。
+//! - `AppState::apply` 负责把仍依赖 UI 草稿的消息分发到对应单一职责模块。
 //! - `AppUpdateOutcome` 描述一次状态变更是否产生了错误、后端命令或需要刷新。
 //!
-//! 新 UI 不需要知道 Slint 回调、Slint 模型或窗口属性；只需要构造 `Message`，
-//! 调用 `AppState::apply`，再读取 view model 即可。
+//! 新 UI 不需要知道 Slint 回调、Slint 模型或窗口属性；核心运行优先从
+//! `CoreState` 开始，需要复用现有桌面交互草稿时再临时走 `AppState`。
 
 #[cfg(test)]
 use super::{HostId, SnippetId, VisualSettingsDraftField, WorkspacePage};

@@ -1,7 +1,7 @@
 //! 设置页操作回调。
 //!
 //! 设置页回调把 UI 的选择、导入导出路径和格式 key 转换为核心消息。这里不直接读写主题
-//! 文件或 SQLite 文件，真正的文件操作在 `AppState`/storage/theme 模块中完成。
+//! 文件或 SQLite 文件，真正的文件操作在 `CoreState`/storage/theme 模块中完成。
 
 use super::{AppWindow, SharedAppState};
 

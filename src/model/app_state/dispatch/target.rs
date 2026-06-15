@@ -121,6 +121,7 @@ fn is_ui_message(message: &Message) -> bool {
             | Message::UpdateHostSearchQuery { .. }
             | Message::UpdateCredentialSearchQuery { .. }
             | Message::UpdateSnippetSearchQuery { .. }
+            | Message::UpdateNetworkSearchQuery { .. }
             | Message::ToggleSnippetTreeNode { .. }
             | Message::UpdateNewSessionSearchQuery { .. }
             | Message::ResizeHostsPanel { .. }

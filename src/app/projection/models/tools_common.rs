@@ -53,11 +53,16 @@ pub(in crate::app::projection) fn network_item_model(
             edit_host: item.edit_host.as_str().into(),
             edit_port: item.edit_port.as_str().into(),
             edit_tags: item.edit_tags.as_str().into(),
+            edit_auth_kind: item.edit_auth_kind.as_str().into(),
+            edit_auth_username: item.edit_auth_username.as_str().into(),
+            edit_auth_password_ref: item.edit_auth_password_ref.as_str().into(),
+            edit_remote_dns: item.edit_remote_dns,
             edit_bind_host: item.edit_bind_host.as_str().into(),
             edit_bind_port: item.edit_bind_port.as_str().into(),
             edit_target_host: item.edit_target_host.as_str().into(),
             edit_target_port: item.edit_target_port.as_str().into(),
             edit_auto_start: item.edit_auto_start,
+            edit_exit_on_failure: item.edit_exit_on_failure,
             edit_host_ids: item.edit_host_ids.as_str().into(),
         })
         .collect::<Vec<_>>();

@@ -6,13 +6,14 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, PtyRequest};
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind, WorkspacePage};
 use crate::terminal::TerminalTabState;
 
 use super::super::{AppState, AppUpdateOutcome};
 
 pub(in crate::model::app_state) fn ensure_local_terminal_tab(
-    state: &mut AppState,
+    state: &mut CoreState,
     session_id: SessionId,
 ) -> bool {
     let title = local_terminal_title(state, session_id);
@@ -39,7 +40,7 @@ pub(in crate::model::app_state) fn ensure_local_terminal_tab(
     !had_session || !had_terminal
 }
 
-fn local_terminal_title(state: &AppState, session_id: SessionId) -> String {
+fn local_terminal_title(state: &CoreState, session_id: SessionId) -> String {
     if let Some(tab) = state.sessions.tabs.iter().find(|tab| tab.id == session_id) {
         // 已存在 session 时沿用原标题，避免重复 ensure 改变用户看到的 tab 名称。
         return tab.title.clone();
@@ -63,7 +64,13 @@ fn local_terminal_title(state: &AppState, session_id: SessionId) -> String {
         .expect("本地终端标题生成应始终能找到可用编号")
 }
 
-impl AppState {
+impl CoreState {
+    /// 新建本地终端的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn open_local_terminal_action(&mut self) -> AppUpdateOutcome {
+        self.open_local_terminal()
+    }
+
     /// 新建一个本地终端标签页，并把本地 PTY 启动请求排入后端队列。
     pub(in crate::model::app_state) fn open_local_terminal(&mut self) -> AppUpdateOutcome {
         let session_id = SessionId(Uuid::new_v4());
@@ -77,12 +84,6 @@ impl AppState {
             .map(|tab| PtyRequest::xterm(tab.size))
             .unwrap_or_else(|| PtyRequest::xterm(crate::terminal::TerminalSize::default()));
 
-        self.ui.workspace.active_page = WorkspacePage::Terminal;
-        // 打开本地终端时保持主机侧栏展开，和打开远程 shell 的工作区体验一致。
-        let hosts_panel_changed = self.ui.workspace.hosts_panel_collapsed;
-        if hosts_panel_changed {
-            self.ui.workspace.set_hosts_panel_collapsed(false);
-        }
         self.backend_commands
             .push(BackendCommand::OpenLocalShell { session_id, pty });
 
@@ -90,6 +91,25 @@ impl AppState {
             state_changed: true,
             queued_backend_commands: 1,
             ..AppUpdateOutcome::default()
+        }
+    }
+}
+
+impl AppState {
+    /// 桌面端打开本地终端后切换到终端页，并保持主机侧栏展开。
+    pub(in crate::model::app_state) fn open_local_terminal(&mut self) -> AppUpdateOutcome {
+        let outcome = self.core.open_local_terminal();
+        if outcome.changed() {
+            self.ui.workspace.active_page = WorkspacePage::Terminal;
+        }
+        let hosts_panel_changed = self.ui.workspace.hosts_panel_collapsed;
+        if hosts_panel_changed {
+            self.ui.workspace.set_hosts_panel_collapsed(false);
+        }
+
+        AppUpdateOutcome {
+            state_changed: outcome.state_changed || hosts_panel_changed,
+            ..outcome
         }
     }
 }

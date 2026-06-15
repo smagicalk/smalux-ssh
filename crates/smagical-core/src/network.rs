@@ -4,15 +4,48 @@
 
 use serde::{Deserialize, Deserializer, Serialize};
 
-use crate::{ForwardId, HostId, JumpChainId, ProxyId, TunnelRule};
+use crate::{ForwardId, HostId, JumpChainId, ProxyId, SecretRef, TunnelRule};
+
+/// 代理认证方式。
+///
+/// 这里不保存明文密码，只保存可选的 `SecretRef`。后续设置页启用加密存储后，
+/// 代理认证可以直接复用凭据模块的加密能力。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProxyAuth {
+    /// 不使用代理认证。
+    None,
+    /// SOCKS5 用户名密码认证，或普通 HTTP Basic 代理认证。
+    UserPassword {
+        username: String,
+        password: Option<SecretRef>,
+    },
+}
+
+impl Default for ProxyAuth {
+    fn default() -> Self {
+        Self::None
+    }
+}
 
 /// 连接代理配置。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProxyProfile {
     /// SOCKS5 代理。
-    Socks5 { host: String, port: u16 },
+    Socks5 {
+        host: String,
+        port: u16,
+        #[serde(default)]
+        auth: ProxyAuth,
+        #[serde(default)]
+        remote_dns: bool,
+    },
     /// HTTP CONNECT 代理。
-    Http { host: String, port: u16 },
+    Http {
+        host: String,
+        port: u16,
+        #[serde(default)]
+        auth: ProxyAuth,
+    },
 }
 
 /// 跳板机链路中的一个节点。
@@ -20,6 +53,15 @@ pub enum ProxyProfile {
 pub struct JumpProfile {
     /// 跳板机引用已保存主机，避免在链路里复制整份主机配置。
     pub host_id: HostId,
+    /// 可选用户名覆盖；为空时使用被引用主机自己的用户名。
+    #[serde(default)]
+    pub username_override: Option<String>,
+    /// 可选端口覆盖；为空时使用被引用主机自己的端口。
+    #[serde(default)]
+    pub port_override: Option<u16>,
+    /// 可选别名，便于在长跳板链中标记节点角色。
+    #[serde(default)]
+    pub alias: Option<String>,
 }
 
 /// 可复用代理资产。
@@ -46,6 +88,9 @@ pub struct JumpChainAsset {
     /// 跳板步骤，按顺序进入。
     #[serde(default)]
     pub steps: Vec<JumpProfile>,
+    /// 连接失败时是否立即停止后续链路。
+    #[serde(default = "default_stop_on_failure")]
+    pub stop_on_failure: bool,
 }
 
 /// 可复用端口转发资产。
@@ -60,6 +105,15 @@ pub struct ForwardAsset {
     pub tags: Vec<String>,
     /// 实际端口转发规则。
     pub rule: TunnelRule,
+    /// 转发建立失败时是否视为连接失败。
+    ///
+    /// 对应 OpenSSH 的 `ExitOnForwardFailure` 行为；这影响自动启动转发的可靠性。
+    #[serde(default)]
+    pub exit_on_failure: bool,
+}
+
+fn default_stop_on_failure() -> bool {
+    true
 }
 
 /// 主机引用的网络资源选择。

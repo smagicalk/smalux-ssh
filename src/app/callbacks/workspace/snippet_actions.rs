@@ -52,6 +52,7 @@ pub(super) fn bind(window: &AppWindow, state: &SharedAppState) {
                 return "根分组".into();
             };
             state
+                .core
                 .storage
                 .snippet_groups
                 .iter()
@@ -96,6 +97,7 @@ pub(super) fn bind(window: &AppWindow, state: &SharedAppState) {
                 let scope = {
                     let state = state.borrow();
                     let Some(snippet) = state
+                        .core
                         .storage
                         .snippets
                         .iter()

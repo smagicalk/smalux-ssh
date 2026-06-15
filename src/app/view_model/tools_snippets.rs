@@ -1,6 +1,7 @@
 //! 片段工具页展示模型。
 
-use crate::model::{AppState, Snippet, SnippetGroup, SnippetGroupId, SnippetScope};
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
+use crate::model::{Snippet, SnippetGroup, SnippetGroupId, SnippetScope};
 
 use super::i18n::{locale_for_state, tr};
 use super::tools_types::{SnippetRowViewModel, ToolItemViewModel};
@@ -8,7 +9,10 @@ use super::tools_types::{SnippetRowViewModel, ToolItemViewModel};
 const SNIPPET_TREE_GUIDE_LEVELS: usize = 8;
 type SnippetTreeGuides = [bool; SNIPPET_TREE_GUIDE_LEVELS];
 
-pub(in crate::app::view_model) fn snippet_items(state: &AppState) -> Vec<ToolItemViewModel> {
+pub(in crate::app::view_model) fn snippet_items(
+    state: impl AsDesktopStateView,
+) -> Vec<ToolItemViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     state
         .storage
@@ -29,7 +33,10 @@ pub(in crate::app::view_model) fn snippet_items(state: &AppState) -> Vec<ToolIte
         .collect()
 }
 
-pub(in crate::app::view_model) fn snippet_rows(state: &AppState) -> Vec<SnippetRowViewModel> {
+pub(in crate::app::view_model) fn snippet_rows(
+    state: impl AsDesktopStateView,
+) -> Vec<SnippetRowViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let query = state
         .ui
@@ -90,8 +97,9 @@ pub(in crate::app::view_model) fn snippet_rows(state: &AppState) -> Vec<SnippetR
 }
 
 pub(in crate::app::view_model) fn snippet_target_options(
-    state: &AppState,
+    state: impl AsDesktopStateView,
 ) -> Vec<SnippetRowViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let mut rows = Vec::new();
     let mut snippets = state.storage.snippets.iter().collect::<Vec<_>>();
@@ -113,7 +121,7 @@ fn append_snippet_group_rows(
     query: &str,
     collapsed_nodes: &[String],
     search_active: bool,
-    state: &AppState,
+    state: DesktopStateView<'_>,
     locale: super::i18n::Locale,
 ) -> bool {
     let mut visible = false;
@@ -194,7 +202,7 @@ fn append_snippet_rows_for_group(
     depth: i32,
     accent_index: i32,
     query: &str,
-    state: &AppState,
+    state: DesktopStateView<'_>,
     locale: super::i18n::Locale,
 ) -> bool {
     let mut group_snippets = snippets
@@ -691,7 +699,7 @@ fn descendant_snippet_count(
 
 fn snippet_scope_label(
     snippet: &Snippet,
-    state: &AppState,
+    state: DesktopStateView<'_>,
     locale: super::i18n::Locale,
 ) -> (String, &'static str) {
     match snippet.scope {

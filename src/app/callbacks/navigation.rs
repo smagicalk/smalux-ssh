@@ -1,7 +1,7 @@
 //! 工作区页面导航回调。
 //!
 //! 导航回调是最薄的一类 Adapter：每个 Slint 点击事件只映射到一个
-//! `WorkspacePage`，实际的当前页面状态由核心 `AppState` 保存。
+//! `WorkspacePage`，实际的当前页面状态由桌面 `UiState` 保存。
 
 use std::rc::Rc;
 

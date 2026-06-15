@@ -5,14 +5,18 @@
 
 use uuid::Uuid;
 
+use crate::core::CoreState;
 use crate::model::{
-    AppState, AppUpdateOutcome, ForwardAsset, ForwardId, HostId, JumpChainAsset, JumpChainId,
-    JumpProfile, ProxyAsset, ProxyId, ProxyProfile, TunnelKind, TunnelRule,
+    AppUpdateOutcome, ForwardAsset, ForwardId, HostId, JumpChainAsset, JumpChainId, JumpProfile,
+    ProxyAsset, ProxyAuth, ProxyId, ProxyProfile, SecretMaterialKind, SecretRecord, SecretRef,
+    TunnelKind, TunnelRule,
 };
+
+use super::credential_refs::next_secret_ref;
 
 const NETWORK_ASSET_NAME_LIMIT: usize = 64;
 
-impl AppState {
+impl CoreState {
     /// 创建或更新代理资产。
     pub(in crate::model::app_state) fn save_proxy_asset(
         &mut self,
@@ -22,6 +26,10 @@ impl AppState {
         host: String,
         port: String,
         tags: String,
+        auth_kind: String,
+        auth_username: String,
+        auth_password_ref: String,
+        remote_dns: bool,
     ) -> AppUpdateOutcome {
         let name = normalized_name(&name);
         if name.is_empty() {
@@ -48,9 +56,25 @@ impl AppState {
         let Some(port) = parse_port(&port) else {
             return error("代理端口无效");
         };
+        let auth = match proxy_auth_from_inputs(
+            self,
+            proxy_id,
+            &name,
+            &auth_kind,
+            auth_username,
+            auth_password_ref,
+        ) {
+            Ok(auth) => auth,
+            Err(message) => return error(&message),
+        };
         let profile = match proxy_kind.trim() {
-            "Http" | "http" | "HTTP" | "HTTP CONNECT" => ProxyProfile::Http { host, port },
-            _ => ProxyProfile::Socks5 { host, port },
+            "Http" | "http" | "HTTP" | "HTTP CONNECT" => ProxyProfile::Http { host, port, auth },
+            _ => ProxyProfile::Socks5 {
+                host,
+                port,
+                auth,
+                remote_dns,
+            },
         };
 
         self.storage.upsert_proxy_asset(ProxyAsset {
@@ -67,7 +91,7 @@ impl AppState {
         &mut self,
         chain_id: Option<JumpChainId>,
         name: String,
-        host_ids: Vec<HostId>,
+        steps: Vec<JumpProfile>,
     ) -> AppUpdateOutcome {
         let name = normalized_name(&name);
         if name.is_empty() {
@@ -87,29 +111,34 @@ impl AppState {
             return error("跳板链名称已存在");
         }
 
-        let mut normalized_host_ids = Vec::new();
-        for host_id in host_ids {
-            if !normalized_host_ids.contains(&host_id) {
-                normalized_host_ids.push(host_id);
+        let mut normalized_steps = Vec::new();
+        for step in steps {
+            if normalized_steps
+                .iter()
+                .any(|existing: &JumpProfile| existing.host_id == step.host_id)
+            {
+                continue;
             }
+            normalized_steps.push(step);
         }
-        if normalized_host_ids.is_empty() {
+        if normalized_steps.is_empty() {
             return error("跳板链至少需要一个主机节点");
         }
-        if normalized_host_ids
-            .iter()
-            .any(|host_id| !self.storage.hosts.iter().any(|host| host.id == *host_id))
-        {
+        if normalized_steps.iter().any(|step| {
+            !self
+                .storage
+                .hosts
+                .iter()
+                .any(|host| host.id == step.host_id)
+        }) {
             return error("跳板链包含不存在的主机");
         }
 
         self.storage.upsert_jump_chain_asset(JumpChainAsset {
             id: chain_id.unwrap_or_else(|| JumpChainId(Uuid::new_v4())),
             name,
-            steps: normalized_host_ids
-                .into_iter()
-                .map(|host_id| JumpProfile { host_id })
-                .collect(),
+            steps: normalized_steps,
+            stop_on_failure: true,
         });
         changed()
     }
@@ -127,6 +156,7 @@ impl AppState {
         target_port: String,
         tags: String,
         auto_start: bool,
+        exit_on_failure: bool,
     ) -> AppUpdateOutcome {
         let name = normalized_name(&name);
         if name.is_empty() {
@@ -167,6 +197,7 @@ impl AppState {
             target_host,
             target_port,
             auto_start,
+            exit_on_failure,
         }
         .normalized();
         if let Err(error) = rule.validate() {
@@ -181,6 +212,7 @@ impl AppState {
             name,
             tags: parse_tags(&tags),
             rule,
+            exit_on_failure,
         });
         changed()
     }
@@ -260,6 +292,69 @@ fn parse_tags(tags: &str) -> Vec<String> {
         .collect()
 }
 
+fn proxy_auth_from_inputs(
+    state: &mut CoreState,
+    proxy_id: Option<ProxyId>,
+    proxy_name: &str,
+    auth_kind: &str,
+    auth_username: String,
+    auth_password_text: String,
+) -> Result<ProxyAuth, String> {
+    match auth_kind.trim() {
+        "UserPassword" | "Basic" | "user_password" | "basic" => {
+            let username = auth_username.trim().to_owned();
+            if username.is_empty() {
+                return Err("代理认证用户名不能为空".to_owned());
+            }
+            let secret_ref =
+                save_proxy_password_secret(state, proxy_id, proxy_name, auth_password_text.trim())?;
+            Ok(ProxyAuth::UserPassword {
+                username,
+                password: Some(secret_ref),
+            })
+        }
+        _ => Ok(ProxyAuth::None),
+    }
+}
+
+fn save_proxy_password_secret(
+    state: &mut CoreState,
+    proxy_id: Option<ProxyId>,
+    proxy_name: &str,
+    password: &str,
+) -> Result<SecretRef, String> {
+    if password.is_empty() {
+        return Err("代理认证密码不能为空".to_owned());
+    }
+
+    let secret_ref = proxy_existing_password_ref(state, proxy_id)
+        .unwrap_or_else(|| next_secret_ref(state, "network-proxies", "proxy-password", proxy_name));
+
+    state.storage.upsert_secret(SecretRecord::local_plaintext(
+        secret_ref.clone(),
+        SecretMaterialKind::Password,
+        password.as_bytes().to_vec(),
+    ));
+
+    Ok(secret_ref)
+}
+
+fn proxy_existing_password_ref(state: &CoreState, proxy_id: Option<ProxyId>) -> Option<SecretRef> {
+    let proxy_id = proxy_id?;
+    let asset = state.storage.proxy_asset_by_id(proxy_id)?;
+    match &asset.profile {
+        ProxyProfile::Socks5 {
+            auth: ProxyAuth::UserPassword { password, .. },
+            ..
+        }
+        | ProxyProfile::Http {
+            auth: ProxyAuth::UserPassword { password, .. },
+            ..
+        } => password.clone(),
+        _ => None,
+    }
+}
+
 fn tunnel_kind_from_key(kind: &str) -> TunnelKind {
     match kind.trim() {
         "Remote" | "remote" => TunnelKind::Remote,
@@ -268,7 +363,7 @@ fn tunnel_kind_from_key(kind: &str) -> TunnelKind {
     }
 }
 
-fn host_names_for_ids(state: &AppState, host_ids: Vec<HostId>) -> Vec<String> {
+fn host_names_for_ids(state: &CoreState, host_ids: Vec<HostId>) -> Vec<String> {
     host_ids
         .into_iter()
         .map(|host_id| {

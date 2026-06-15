@@ -4,19 +4,20 @@
 //! 1. 主机密钥拒绝时写入 Known Hosts 的未信任记录；
 //! 2. 给当前会话或 SFTP 浏览器写入失败事件；
 //! 3. 丢弃同一会话仍在队列中的依赖命令；
-//! 4. 把最后错误写入 UI 状态，供通知栏或状态栏展示。
+//! 4. 通过 `AppUpdateOutcome::error` 把错误交给具体 UI Adapter 展示。
 
 use crate::backend::{BackendEvent, BackendExecutionError};
+use crate::core::CoreState;
 use crate::model::SessionId;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::pending::{
     discard_pending_commands_for_failed_session, discard_pending_sftp_writes_for_failed_session,
 };
 use super::transfers::{FailedTransfer, transfer_failed_event};
 
 pub(super) fn handle_backend_execution_error(
-    state: &mut AppState,
+    state: &mut CoreState,
     outcome: &mut AppUpdateOutcome,
     session_id: SessionId,
     failed_transfer: Option<FailedTransfer>,
@@ -56,7 +57,6 @@ pub(super) fn handle_backend_execution_error(
     outcome.state_changed |= discarded.removed_count > 0;
     apply_backend_events(state, outcome, discarded.failure_events);
 
-    outcome.state_changed |= state.ui.set_last_error(reason.clone());
     outcome.error = Some(reason);
 }
 
@@ -88,7 +88,7 @@ fn sftp_operation_failed(error: &BackendExecutionError) -> bool {
 
 /// 按既有事件归约路径应用失败事件，避免失败路径绕过正常状态更新规则。
 fn apply_backend_events(
-    state: &mut AppState,
+    state: &mut CoreState,
     outcome: &mut AppUpdateOutcome,
     events: impl IntoIterator<Item = BackendEvent>,
 ) {

@@ -3,19 +3,31 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, SftpRequest};
+use crate::core::CoreState;
 use crate::model::{HostId, TransferDirection, TransferId, TransferStatus, TransferTask};
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::queued_outcome;
 use super::super::launch_sftp::session::missing_active_sftp_session;
-use super::super::{AppState, AppUpdateOutcome};
-use super::path::basename_local_path;
 
-impl AppState {
-    /// 将当前远程文件下载到本地路径草稿。
-    pub(in crate::model::app_state) fn download_sftp(
+impl CoreState {
+    /// 下载 SFTP 文件的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn download_sftp_to_path_action(
         &mut self,
         host_id: HostId,
         remote_path: String,
+        local_path: String,
+    ) -> AppUpdateOutcome {
+        self.download_sftp_to_path(host_id, remote_path, local_path)
+    }
+
+    /// 将远程文件下载到指定本地路径。
+    pub(in crate::model::app_state) fn download_sftp_to_path(
+        &mut self,
+        host_id: HostId,
+        remote_path: String,
+        local_path: String,
     ) -> AppUpdateOutcome {
         let remote_path = remote_path.trim().to_owned();
         if remote_path.is_empty() || remote_path == "/" {
@@ -24,21 +36,12 @@ impl AppState {
                 ..AppUpdateOutcome::default()
             };
         }
-
-        let local_path = self.ui.sftp_local_path_for(host_id).trim().to_owned();
-        let local_path = if local_path.is_empty() {
-            match basename_local_path(&remote_path) {
-                Some(name) => name,
-                None => {
-                    return AppUpdateOutcome {
-                        error: Some("SFTP 本地路径不能为空".to_owned()),
-                        ..AppUpdateOutcome::default()
-                    };
-                }
-            }
-        } else {
-            local_path
-        };
+        if local_path.is_empty() {
+            return AppUpdateOutcome {
+                error: Some("SFTP 本地路径不能为空".to_owned()),
+                ..AppUpdateOutcome::default()
+            };
+        }
         let Some(session_id) = self.claim_sftp_session_id_for_host(host_id) else {
             return missing_active_sftp_session(host_id);
         };

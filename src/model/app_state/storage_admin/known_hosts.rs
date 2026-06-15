@@ -3,9 +3,11 @@
 //! Known Hosts 属于安全决策数据。状态层只提供明确动作：信任指定记录或删除指定记录；
 //! 不在这里做自动信任，也不根据 UI 文本推断安全状态。
 
-use super::super::{AppState, AppUpdateOutcome};
+use crate::core::CoreState;
 
-impl AppState {
+use super::super::AppUpdateOutcome;
+
+impl CoreState {
     /// 将指定 Known Hosts 记录标记为可信。
     pub(in crate::model::app_state) fn trust_known_host(
         &mut self,

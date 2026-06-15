@@ -11,9 +11,10 @@ fn backend_queue_pump_discards_pending_sftp_transfers_after_sftp_error() {
         initial_dir: "/home/ops".to_owned(),
     });
     state.backend_commands.drain();
+    let session_id = state.sessions.tabs[0].id;
     state
         .sessions
-        .set_status(state.sessions.tabs[0].id, SessionStatus::Connected);
+        .set_status(session_id, SessionStatus::Connected);
     state.apply(Message::UpdateSftpActionDraft {
         host_id,
         field: crate::model::SftpActionDraftField::LocalPath,

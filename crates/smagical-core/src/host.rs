@@ -135,9 +135,14 @@ mod tests {
             proxies: vec![ProxyProfile::Socks5 {
                 host: "127.0.0.1".to_owned(),
                 port: 1080,
+                auth: crate::ProxyAuth::None,
+                remote_dns: false,
             }],
             jumps: vec![JumpProfile {
                 host_id: HostId(Uuid::new_v4()),
+                username_override: None,
+                port_override: None,
+                alias: None,
             }],
             theme_override: Some(ThemeProfile {
                 name: "Host Dark".to_owned(),
@@ -244,7 +249,7 @@ port = 1080
         assert_eq!(host.network, HostNetworkSelection::default());
         assert!(matches!(
             host.proxies.first(),
-            Some(ProxyProfile::Socks5 { host, port }) if host == "127.0.0.1" && *port == 1080
+            Some(ProxyProfile::Socks5 { host, port, .. }) if host == "127.0.0.1" && *port == 1080
         ));
     }
 }

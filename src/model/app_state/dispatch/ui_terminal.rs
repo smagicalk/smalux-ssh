@@ -10,28 +10,68 @@ impl AppState {
         Some(match message {
             Message::OpenLocalTerminal => self.open_local_terminal(),
             Message::UpdateTerminalInputDraft { session_id, input } => {
-                self.update_terminal_input_draft(*session_id, input.clone())
+                self.ui.set_terminal_input(*session_id, input.clone());
+                draft_changed()
             }
             Message::AppendTerminalInputDraft { session_id, text } => {
-                self.append_terminal_input_draft(*session_id, text.clone())
+                let filtered = printable_terminal_input(text);
+                if filtered.is_empty() {
+                    AppUpdateOutcome::default()
+                } else {
+                    self.ui.append_terminal_input(*session_id, filtered);
+                    draft_changed()
+                }
             }
             Message::BackspaceTerminalInputDraft { session_id } => {
-                self.backspace_terminal_input_draft(*session_id)
+                let before = self.ui.terminal_input_for(*session_id).to_owned();
+                self.ui.backspace_terminal_input(*session_id);
+                AppUpdateOutcome {
+                    state_changed: before != self.ui.terminal_input_for(*session_id),
+                    ..AppUpdateOutcome::default()
+                }
             }
-            Message::SendTerminalInput { session_id } => self.send_terminal_input(*session_id),
+            Message::SendTerminalInput { session_id } => {
+                let input = self.ui.terminal_input_for(*session_id).to_owned();
+                let outcome = self.core.send_terminal_input(*session_id, input);
+                if outcome.error.is_none() && outcome.state_changed {
+                    self.ui.clear_terminal_input(*session_id);
+                }
+                outcome
+            }
             Message::UpdateHostCommandDraft { host_id, command } => {
-                self.update_host_command_draft(*host_id, command.clone())
+                self.ui.set_remote_command(*host_id, command.clone());
+                draft_changed()
             }
             Message::UpdateHostSftpInitialDirDraft {
                 host_id,
                 initial_dir,
-            } => self.update_host_sftp_initial_dir_draft(*host_id, initial_dir.clone()),
+            } => {
+                self.ui.set_sftp_initial_dir(*host_id, initial_dir.clone());
+                draft_changed()
+            }
             Message::UpdateSftpActionDraft {
                 host_id,
                 field,
                 value,
-            } => self.update_sftp_action_draft(*host_id, field.clone(), value.clone()),
+            } => {
+                self.ui
+                    .set_sftp_action_field(*host_id, field.clone(), value.clone());
+                draft_changed()
+            }
             _ => return None,
         })
     }
+}
+
+fn draft_changed() -> AppUpdateOutcome {
+    AppUpdateOutcome {
+        state_changed: true,
+        ..AppUpdateOutcome::default()
+    }
+}
+
+fn printable_terminal_input(text: &str) -> String {
+    text.chars()
+        .filter(|ch| !ch.is_control() && !('\u{e000}'..='\u{f8ff}').contains(ch))
+        .collect()
 }

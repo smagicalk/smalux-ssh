@@ -140,8 +140,8 @@ impl StorageManager {
 mod tests {
     use super::*;
     use smagical_core::{
-        AuthProfile, Host, HostId, HostNetworkSelection, JumpProfile, ProxyProfile, SecretRef,
-        TunnelKind, TunnelRule,
+        AuthProfile, Host, HostId, HostNetworkSelection, JumpProfile, ProxyAuth, ProxyProfile,
+        SecretRef, TunnelKind, TunnelRule,
     };
     use uuid::Uuid;
 
@@ -153,6 +153,8 @@ mod tests {
             profile: ProxyProfile::Socks5 {
                 host: host.to_owned(),
                 port,
+                auth: ProxyAuth::None,
+                remote_dns: false,
             },
         }
     }
@@ -191,7 +193,13 @@ mod tests {
         JumpChainAsset {
             id,
             name: "prod-chain".to_owned(),
-            steps: vec![JumpProfile { host_id }],
+            steps: vec![JumpProfile {
+                host_id,
+                username_override: None,
+                port_override: None,
+                alias: None,
+            }],
+            stop_on_failure: true,
         }
     }
 
@@ -208,7 +216,9 @@ mod tests {
                 target_host: "db.internal".to_owned(),
                 target_port: 5432,
                 auto_start: false,
+                exit_on_failure: false,
             },
+            exit_on_failure: false,
         }
     }
 

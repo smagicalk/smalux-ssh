@@ -1,20 +1,28 @@
 //! Network 页展示模型。
 
-use crate::model::{AppState, ProxyProfile, TunnelRule, TunnelStatus};
+use crate::app::state::{AsDesktopStateView, DesktopStateView};
+use crate::model::{ProxyAuth, ProxyProfile, TunnelRule, TunnelStatus};
 
 use super::common::host_name;
 use super::i18n::{locale_for_state, tr};
 use super::tools_types::NetworkNavItemViewModel;
 
 pub(in crate::app::view_model) fn runtime_tunnel_items(
-    state: &AppState,
+    state: impl AsDesktopStateView,
 ) -> Vec<NetworkNavItemViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
+    let query = state
+        .ui
+        .workspace
+        .network_search_query
+        .trim()
+        .to_lowercase();
     state
         .sessions
         .tunnels
         .iter()
-        .map(|tunnel| {
+        .filter_map(|tunnel| {
             let endpoint = state
                 .storage
                 .tunnel_rules
@@ -26,7 +34,7 @@ pub(in crate::app::view_model) fn runtime_tunnel_items(
                 .host_id
                 .map(|host_id| host_name(state, host_id))
                 .unwrap_or_else(|| tr(locale, "common.unknown_host").to_owned());
-            NetworkNavItemViewModel {
+            let item = NetworkNavItemViewModel {
                 id: format!("runtime:{}:{}", tunnel.session_id.0, tunnel.rule_name),
                 title: tunnel.rule_name.clone(),
                 subtitle: host_label.clone(),
@@ -64,28 +72,45 @@ pub(in crate::app::view_model) fn runtime_tunnel_items(
                 edit_host: String::new(),
                 edit_port: String::new(),
                 edit_tags: String::new(),
+                edit_auth_kind: String::new(),
+                edit_auth_username: String::new(),
+                edit_auth_password_ref: String::new(),
+                edit_remote_dns: false,
                 edit_bind_host: String::new(),
                 edit_bind_port: String::new(),
                 edit_target_host: String::new(),
                 edit_target_port: String::new(),
                 edit_auto_start: false,
+                edit_exit_on_failure: false,
                 edit_host_ids: String::new(),
-            }
+            };
+            network_item_matches(&item, &query).then_some(item)
         })
         .collect()
 }
 
-pub(in crate::app::view_model) fn network_resource_items(
-    state: &AppState,
+pub(in crate::app::view_model) fn network_proxy_items(
+    state: impl AsDesktopStateView,
 ) -> Vec<NetworkNavItemViewModel> {
-    let mut items = Vec::new();
-    items.extend(proxy_asset_items(state));
-    items.extend(jump_chain_asset_items(state));
-    items.extend(forward_asset_items(state));
-    items
+    let state = state.as_desktop_state_view();
+    filtered_network_items(state, proxy_asset_items(state))
 }
 
-fn proxy_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
+pub(in crate::app::view_model) fn network_jump_chain_items(
+    state: impl AsDesktopStateView,
+) -> Vec<NetworkNavItemViewModel> {
+    let state = state.as_desktop_state_view();
+    filtered_network_items(state, jump_chain_asset_items(state))
+}
+
+pub(in crate::app::view_model) fn network_forward_items(
+    state: impl AsDesktopStateView,
+) -> Vec<NetworkNavItemViewModel> {
+    let state = state.as_desktop_state_view();
+    filtered_network_items(state, forward_asset_items(state))
+}
+
+fn proxy_asset_items(state: DesktopStateView<'_>) -> Vec<NetworkNavItemViewModel> {
     let locale = locale_for_state(state);
     state
         .storage
@@ -120,25 +145,31 @@ fn proxy_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
                 detail_primary_value: proxy_endpoint_label(&asset.profile),
                 detail_secondary_label: tr(locale, "proxy.field_tags").to_owned(),
                 detail_secondary_value: network_tags_label(&asset.tags, locale),
-                body_label: tr(locale, "proxy.field_used_by").to_owned(),
-                body_value: used_by_label(&used_by, locale),
+                body_label: tr(locale, "proxy.field_auth").to_owned(),
+                body_value: proxy_auth_detail_label(&asset.profile, locale),
                 asset_id: asset.id.0.to_string(),
                 edit_kind_key: proxy_kind_key(&asset.profile).to_owned(),
                 edit_host: proxy_host(&asset.profile).to_owned(),
                 edit_port: proxy_port(&asset.profile).to_string(),
                 edit_tags: asset.tags.join(", "),
+                edit_auth_kind: proxy_auth_kind_key(proxy_auth(&asset.profile)).to_owned(),
+                edit_auth_username: proxy_auth_username(proxy_auth(&asset.profile)).to_owned(),
+                edit_auth_password_ref: proxy_auth_password_ref(proxy_auth(&asset.profile))
+                    .unwrap_or_default(),
+                edit_remote_dns: proxy_remote_dns(&asset.profile),
                 edit_bind_host: String::new(),
                 edit_bind_port: String::new(),
                 edit_target_host: String::new(),
                 edit_target_port: String::new(),
                 edit_auto_start: false,
+                edit_exit_on_failure: false,
                 edit_host_ids: String::new(),
             }
         })
         .collect()
 }
 
-fn jump_chain_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
+fn jump_chain_asset_items(state: DesktopStateView<'_>) -> Vec<NetworkNavItemViewModel> {
     let locale = locale_for_state(state);
     state
         .storage
@@ -193,23 +224,23 @@ fn jump_chain_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
                 edit_host: String::new(),
                 edit_port: String::new(),
                 edit_tags: String::new(),
+                edit_auth_kind: String::new(),
+                edit_auth_username: String::new(),
+                edit_auth_password_ref: String::new(),
+                edit_remote_dns: false,
                 edit_bind_host: String::new(),
                 edit_bind_port: String::new(),
                 edit_target_host: String::new(),
                 edit_target_port: String::new(),
                 edit_auto_start: false,
-                edit_host_ids: asset
-                    .steps
-                    .iter()
-                    .map(|step| step.host_id.0.to_string())
-                    .collect::<Vec<_>>()
-                    .join(", "),
+                edit_exit_on_failure: false,
+                edit_host_ids: encode_jump_steps(&asset.steps),
             }
         })
         .collect()
 }
 
-fn forward_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
+fn forward_asset_items(state: DesktopStateView<'_>) -> Vec<NetworkNavItemViewModel> {
     let locale = locale_for_state(state);
     state
         .storage
@@ -244,13 +275,17 @@ fn forward_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
                 detail_primary_value: format!("{}:{}", asset.rule.bind_host, asset.rule.bind_port),
                 detail_secondary_label: tr(locale, "proxy.field_target").to_owned(),
                 detail_secondary_value: tunnel_target_label(&asset.rule, locale),
-                body_label: tr(locale, "proxy.field_used_by").to_owned(),
-                body_value: used_by_label(&used_by, locale),
+                body_label: tr(locale, "proxy.field_forward_policy").to_owned(),
+                body_value: forward_policy_label(asset.exit_on_failure, locale),
                 asset_id: asset.id.0.to_string(),
                 edit_kind_key: tunnel_kind_key(&asset.rule).to_owned(),
                 edit_host: String::new(),
                 edit_port: String::new(),
                 edit_tags: asset.tags.join(", "),
+                edit_auth_kind: String::new(),
+                edit_auth_username: String::new(),
+                edit_auth_password_ref: String::new(),
+                edit_remote_dns: false,
                 edit_bind_host: asset.rule.bind_host.clone(),
                 edit_bind_port: asset.rule.bind_port.to_string(),
                 edit_target_host: asset.rule.target_host.clone(),
@@ -260,6 +295,7 @@ fn forward_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
                     asset.rule.target_port.to_string()
                 },
                 edit_auto_start: asset.rule.auto_start,
+                edit_exit_on_failure: asset.exit_on_failure,
                 edit_host_ids: String::new(),
             }
         })
@@ -268,10 +304,10 @@ fn forward_asset_items(state: &AppState) -> Vec<NetworkNavItemViewModel> {
 
 fn proxy_profile_label(profile: &ProxyProfile, locale: super::i18n::Locale) -> String {
     match profile {
-        ProxyProfile::Socks5 { host, port } => {
+        ProxyProfile::Socks5 { host, port, .. } => {
             format!("{} {host}:{port}", tr(locale, "proxy.kind_socks5"))
         }
-        ProxyProfile::Http { host, port } => {
+        ProxyProfile::Http { host, port, .. } => {
             format!("{} {host}:{port}", tr(locale, "proxy.kind_http"))
         }
     }
@@ -305,10 +341,100 @@ fn proxy_port(profile: &ProxyProfile) -> u16 {
 
 fn proxy_endpoint_label(profile: &ProxyProfile) -> String {
     match profile {
-        ProxyProfile::Socks5 { host, port } | ProxyProfile::Http { host, port } => {
+        ProxyProfile::Socks5 { host, port, .. } | ProxyProfile::Http { host, port, .. } => {
             format!("{host}:{port}")
         }
     }
+}
+
+fn proxy_auth(profile: &ProxyProfile) -> &ProxyAuth {
+    match profile {
+        ProxyProfile::Socks5 { auth, .. } | ProxyProfile::Http { auth, .. } => auth,
+    }
+}
+
+fn proxy_remote_dns(profile: &ProxyProfile) -> bool {
+    match profile {
+        ProxyProfile::Socks5 { remote_dns, .. } => *remote_dns,
+        ProxyProfile::Http { .. } => false,
+    }
+}
+
+fn proxy_auth_kind_key(auth: &ProxyAuth) -> &'static str {
+    match auth {
+        ProxyAuth::None => "None",
+        ProxyAuth::UserPassword { .. } => "UserPassword",
+    }
+}
+
+fn proxy_auth_username(auth: &ProxyAuth) -> &str {
+    match auth {
+        ProxyAuth::None => "",
+        ProxyAuth::UserPassword { username, .. } => username,
+    }
+}
+
+fn proxy_auth_password_ref(auth: &ProxyAuth) -> Option<String> {
+    match auth {
+        ProxyAuth::None => None,
+        ProxyAuth::UserPassword { password, .. } => {
+            password.as_ref().map(|secret| secret.0.clone())
+        }
+    }
+}
+
+fn proxy_auth_detail_label(profile: &ProxyProfile, locale: super::i18n::Locale) -> String {
+    let auth_label = match proxy_auth(profile) {
+        ProxyAuth::None => tr(locale, "proxy.auth_none").to_owned(),
+        ProxyAuth::UserPassword { username, password } => {
+            let secret_label = if password.is_some() {
+                tr(locale, "proxy.auth_secret_set")
+            } else {
+                tr(locale, "proxy.auth_secret_empty")
+            };
+            format!(
+                "{} / {} / {}",
+                tr(locale, "proxy.auth_user_password"),
+                username,
+                secret_label
+            )
+        }
+    };
+    if proxy_remote_dns(profile) {
+        format!("{auth_label} / {}", tr(locale, "proxy.remote_dns_enabled"))
+    } else {
+        auth_label
+    }
+}
+
+fn forward_policy_label(exit_on_failure: bool, locale: super::i18n::Locale) -> String {
+    if exit_on_failure {
+        tr(locale, "proxy.exit_on_failure_enabled").to_owned()
+    } else {
+        tr(locale, "proxy.exit_on_failure_disabled").to_owned()
+    }
+}
+
+fn encode_jump_steps(steps: &[crate::model::JumpProfile]) -> String {
+    #[derive(serde::Serialize)]
+    struct JumpStepValue<'a> {
+        host_id: String,
+        username_override: &'a Option<String>,
+        port_override: Option<u16>,
+        alias: &'a Option<String>,
+    }
+
+    let values = steps
+        .iter()
+        .map(|step| JumpStepValue {
+            host_id: step.host_id.0.to_string(),
+            username_override: &step.username_override,
+            port_override: step.port_override,
+            alias: &step.alias,
+        })
+        .collect::<Vec<_>>();
+
+    serde_json::to_string(&values).unwrap_or_else(|_| "[]".to_owned())
 }
 
 fn network_tags_label(tags: &[String], locale: super::i18n::Locale) -> String {
@@ -364,4 +490,34 @@ fn tunnel_status_label(status: &TunnelStatus, locale: super::i18n::Locale) -> &'
         TunnelStatus::Stopping => tr(locale, "tool.tunnel_status_stopping"),
         TunnelStatus::Failed => tr(locale, "tool.tunnel_status_failed"),
     }
+}
+
+fn network_item_matches(item: &NetworkNavItemViewModel, query: &str) -> bool {
+    query.is_empty()
+        || item.title.to_lowercase().contains(query)
+        || item.subtitle.to_lowercase().contains(query)
+        || item.meta.to_lowercase().contains(query)
+        || item.kind_label.to_lowercase().contains(query)
+        || item.note.to_lowercase().contains(query)
+        || item.stat_primary_value.to_lowercase().contains(query)
+        || item.stat_secondary_value.to_lowercase().contains(query)
+        || item.detail_primary_value.to_lowercase().contains(query)
+        || item.detail_secondary_value.to_lowercase().contains(query)
+        || item.body_value.to_lowercase().contains(query)
+}
+
+fn filtered_network_items(
+    state: DesktopStateView<'_>,
+    items: Vec<NetworkNavItemViewModel>,
+) -> Vec<NetworkNavItemViewModel> {
+    let query = state
+        .ui
+        .workspace
+        .network_search_query
+        .trim()
+        .to_lowercase();
+    items
+        .into_iter()
+        .filter(|item| network_item_matches(item, &query))
+        .collect()
 }

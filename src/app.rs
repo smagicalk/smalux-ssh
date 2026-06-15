@@ -1,7 +1,7 @@
 //! Slint 应用装配入口。
 //!
-//! 这里是当前桌面 UI 的最外层 Adapter。它知道 Slint，也知道核心
-//! `AppState`，但不直接实现 SSH、存储、终端或业务状态变更。
+//! 这里是当前桌面 UI 的最外层 Adapter。它知道 Slint，也持有桌面组合状态，
+//! 但不直接实现 SSH、存储、终端或业务状态变更。
 //!
 //! 启动流程固定为：
 //!
@@ -10,8 +10,8 @@
 //! 3. `pump::start_backend_pump` 把后端事件送回核心状态。
 //! 4. `projection::sync_window` 把核心状态投影到 Slint 属性。
 //!
-//! 如果未来重写 UI，新的 UI 只需要复用这条思路：持有 `AppState`，
-//! 提交 `Message`，再从 `view_model::app_view_model` 读取展示模型。
+//! 如果未来重写 UI，新的 UI 只需要复用这条思路：持有 `CoreState` 或自己的
+//! Adapter 状态，提交 `Message`，再按需复用 view model 或建立新的投影层。
 
 mod bootstrap;
 mod callbacks;
@@ -19,6 +19,7 @@ mod file_dialog;
 mod ids;
 mod projection;
 mod pump;
+mod state;
 mod view_model;
 
 use std::cell::RefCell;
@@ -28,7 +29,7 @@ use uuid::Uuid;
 
 use crate::config::{AppConfig, HostListModePreference};
 use crate::model::{
-    AgentSource, AppState, AuthProfile, CommandHistoryId, CommandHistoryItem, CredentialGroup,
+    AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, CredentialGroup,
     CredentialGroupId, CredentialId, CredentialInspection, CredentialKind, CredentialMetadata,
     GroupId, Host, HostGroup, HostId, HostNetworkSelection, KeyAlgorithm, KnownHostEntry,
     ProxyProfile, RecentConnection, SecretMaterialKind, SecretRecord, SecretRef, SftpBookmark,
@@ -37,6 +38,7 @@ use crate::model::{
     SnippetSupportTargetId, SnippetVariable, TunnelKind, TunnelRule,
 };
 use crate::storage::{SqliteStorage, StorageManager, ThemeProfileRecord};
+use state::{AsDesktopStateView, DesktopAppState};
 
 slint::include_modules!();
 
@@ -46,8 +48,8 @@ const SEED_PREVIEW_DATA_ARG: &str = "--seed-preview-data";
 /// 持有核心状态。
 ///
 /// 这只是 Slint Adapter 的共享方式，不是核心层约束。其他 UI 可以改成
-/// `Arc<Mutex<_>>`、通道或自己的状态容器，只要仍然通过 `Message` 改状态即可。
-type SharedAppState = Rc<RefCell<AppState>>;
+/// `Arc<Mutex<_>>`、通道或自己的状态容器，只要仍然通过核心/桌面状态接口即可。
+type SharedAppState = Rc<RefCell<DesktopAppState>>;
 
 /// 启动桌面应用。
 pub fn run() -> anyhow::Result<()> {
@@ -63,7 +65,7 @@ pub fn run() -> anyhow::Result<()> {
 
     callbacks::bind(&window, Rc::clone(&state));
     pump::start_backend_pump(&window, Rc::clone(&state));
-    projection::sync_window(&window, &state.borrow());
+    projection::sync_window(&window, state.borrow().as_desktop_state_view());
 
     window.run()?;
     Ok(())
@@ -184,8 +186,15 @@ fn preview_storage() -> StorageManager {
         host.proxies = vec![ProxyProfile::Socks5 {
             host: "127.0.0.1".to_owned(),
             port: 1080,
+            auth: crate::model::ProxyAuth::None,
+            remote_dns: true,
         }];
-        host.jumps = vec![crate::model::JumpProfile { host_id: jump_host }];
+        host.jumps = vec![crate::model::JumpProfile {
+            host_id: jump_host,
+            username_override: None,
+            port_override: None,
+            alias: None,
+        }];
     }
 
     seed_credentials(&mut storage);
@@ -418,6 +427,7 @@ fn seed_extensions(storage: &mut StorageManager, api_host: HostId, db_host: Host
         target_host: "10.20.0.15".to_owned(),
         target_port: 5432,
         auto_start: false,
+        exit_on_failure: false,
     });
     storage.upsert_tunnel_rule(TunnelRule {
         name: "动态代理".to_owned(),
@@ -427,6 +437,7 @@ fn seed_extensions(storage: &mut StorageManager, api_host: HostId, db_host: Host
         target_host: String::new(),
         target_port: 0,
         auto_start: false,
+        exit_on_failure: false,
     });
 }
 

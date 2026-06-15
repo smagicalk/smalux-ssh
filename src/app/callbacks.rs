@@ -4,7 +4,7 @@
 //!
 //! - 从 Slint 回调接收字符串、布尔值和 UI 事件。
 //! - 解析成核心 ID、枚举或 `Message`。
-//! - 调用 `AppState::apply` 修改核心状态。
+//! - 调用桌面状态入口提交 `Message`。
 //! - 状态变化后调用 `projection::sync_window` 重新投影 UI。
 //!
 //! 这里允许知道 Slint 的回调名，但不应该实现核心业务规则。业务规则应该放在
@@ -18,6 +18,7 @@ use super::ids::{
     parse_command_history_id, parse_host_id, parse_optional_group_id, parse_session_id,
 };
 use super::projection::sync_window;
+use super::state::AsDesktopStateView;
 use super::{AppWindow, SharedAppState};
 
 /// 绑定所有 Slint 顶层回调。
@@ -60,22 +61,20 @@ fn apply_and_sync_success(
     let mut success = true;
     {
         let mut state = state.borrow_mut();
-        let storage_before = state.storage.clone();
-        let outcome = state.apply(message);
+        let (outcome, persist_error) = state.apply_messages_with_persistence([message]);
         success &= outcome.error.is_none();
 
-        if state.storage != storage_before {
-            if let Err(error) = state.persist_storage() {
-                tracing::error!(error = %error, "保存本地存储失败");
-                state
-                    .ui
-                    .set_last_error(format!("保存本地存储失败：{error}"));
-                success = false;
-            }
+        if let Some(error) = persist_error {
+            tracing::error!(error = %error, "保存本地存储失败");
+            state
+                .ui
+                .set_last_error(format!("保存本地存储失败：{error}"));
+            success = false;
         }
     }
 
-    sync_window(&window, &state.borrow());
+    let state = state.borrow();
+    sync_window(&window, state.as_desktop_state_view());
     success
 }
 
@@ -84,7 +83,7 @@ fn apply_and_sync_success(
 /// 用于高频输入或需要局部刷新路径的地方。调用者必须确保后续会用更小范围的
 /// projection 同步 UI，否则界面会停留在旧状态。
 fn apply_without_sync(state: &SharedAppState, message: Message) {
-    state.borrow_mut().apply(message);
+    state.borrow_mut().apply_message(message);
 }
 
 /// 提交单条消息并刷新 UI，但跳过后端 pump 相关处理。
@@ -101,20 +100,18 @@ fn apply_and_sync_without_drain(
 
     {
         let mut state = state.borrow_mut();
-        let storage_before = state.storage.clone();
-        state.apply(message);
+        let (_, persist_error) = state.apply_messages_with_persistence([message]);
 
-        if state.storage != storage_before {
-            if let Err(error) = state.persist_storage() {
-                tracing::error!(error = %error, "保存本地存储失败");
-                state
-                    .ui
-                    .set_last_error(format!("保存本地存储失败：{error}"));
-            }
+        if let Some(error) = persist_error {
+            tracing::error!(error = %error, "保存本地存储失败");
+            state
+                .ui
+                .set_last_error(format!("保存本地存储失败：{error}"));
         }
     }
 
-    sync_window(&window, &state.borrow());
+    let state = state.borrow();
+    sync_window(&window, state.as_desktop_state_view());
 }
 
 fn apply_messages_and_sync<const N: usize>(
@@ -128,23 +125,18 @@ fn apply_messages_and_sync<const N: usize>(
 
     {
         let mut state = state.borrow_mut();
-        let storage_before = state.storage.clone();
+        let (_, persist_error) = state.apply_messages_with_persistence(messages);
 
-        for message in messages {
-            state.apply(message);
-        }
-
-        if state.storage != storage_before {
-            if let Err(error) = state.persist_storage() {
-                tracing::error!(error = %error, "保存本地存储失败");
-                state
-                    .ui
-                    .set_last_error(format!("保存本地存储失败：{error}"));
-            }
+        if let Some(error) = persist_error {
+            tracing::error!(error = %error, "保存本地存储失败");
+            state
+                .ui
+                .set_last_error(format!("保存本地存储失败：{error}"));
         }
     }
 
-    sync_window(&window, &state.borrow());
+    let state = state.borrow();
+    sync_window(&window, state.as_desktop_state_view());
 }
 
 /// 把 Slint 传回来的工具面板 key 解析成核心枚举。
@@ -162,7 +154,7 @@ fn parse_tool_panel_mode(mode: &str) -> Option<crate::model::ToolPanelMode> {
     }
 }
 
-fn active_terminal_host_id(state: &crate::model::AppState) -> Option<crate::model::HostId> {
+fn active_terminal_host_id(state: &crate::core::CoreState) -> Option<crate::model::HostId> {
     let session_id = state
         .terminal
         .active_tab

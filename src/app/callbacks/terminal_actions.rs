@@ -8,6 +8,7 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 
 use crate::app::projection::sync_terminal_pane;
+use crate::app::state::AsDesktopStateView;
 use crate::model::Message;
 
 use super::{AppWindow, SharedAppState, apply_and_sync, apply_without_sync, parse_session_id};
@@ -71,19 +72,21 @@ pub(super) fn bind(window: &AppWindow, state: SharedAppState) {
             {
                 let mut state = state.borrow_mut();
                 // 发送前先写入最新文本，覆盖可能尚未触发 edited 的输入框内容。
-                state.apply(Message::UpdateTerminalInputDraft {
-                    session_id,
-                    input: text.to_string(),
-                });
-                // SendTerminalInput 会校验会话、写历史、排队后端输入并清空草稿。
-                state.apply(Message::SendTerminalInput { session_id });
+                state.apply_messages([
+                    Message::UpdateTerminalInputDraft {
+                        session_id,
+                        input: text.to_string(),
+                    },
+                    // SendTerminalInput 会校验会话、写历史、排队后端输入并清空草稿。
+                    Message::SendTerminalInput { session_id },
+                ]);
             }
 
             let Some(window) = weak.upgrade() else {
                 return;
             };
             // 只同步终端面板，避免回车后整窗列表重建导致输入体验抖动。
-            sync_terminal_pane(&window, &state.borrow());
+            sync_terminal_pane(&window, state.borrow().as_desktop_state_view());
         });
     }
 }

@@ -1,7 +1,8 @@
 //! 凭据左侧树形列表展示模型。
 
+use crate::app::state::AsDesktopStateView;
 use crate::model::{
-    AppState, CredentialGroup, CredentialGroupId, CredentialKind, CredentialMetadata, SecretRecord,
+    CredentialGroup, CredentialGroupId, CredentialKind, CredentialMetadata, SecretRecord,
 };
 
 use super::i18n::{Locale, locale_for_state, tr};
@@ -16,7 +17,10 @@ use super::tools_types::CredentialRowViewModel;
 const CREDENTIAL_TREE_GUIDE_LEVELS: usize = 8;
 type CredentialTreeGuides = [bool; CREDENTIAL_TREE_GUIDE_LEVELS];
 
-pub(in crate::app::view_model) fn credential_rows(state: &AppState) -> Vec<CredentialRowViewModel> {
+pub(in crate::app::view_model) fn credential_rows(
+    state: impl AsDesktopStateView,
+) -> Vec<CredentialRowViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let empty = tr(locale, "tool.empty_value");
     let query = state

@@ -1,7 +1,7 @@
 use super::*;
 use crate::model::{
-    AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId, LanguageMode,
-    RecentConnection,
+    AgentSource, AppState, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId,
+    LanguageMode, RecentConnection,
 };
 use uuid::Uuid;
 

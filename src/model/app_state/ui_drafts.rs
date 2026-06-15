@@ -14,13 +14,3 @@ mod quick_host;
 mod terminal_input;
 #[path = "ui_drafts/terminal_input_send.rs"]
 mod terminal_input_send;
-
-use super::AppUpdateOutcome;
-
-pub(super) fn draft_changed() -> AppUpdateOutcome {
-    // 草稿变化只代表需要重新投影 UI，不会排队后端命令，也不会修改业务数据。
-    AppUpdateOutcome {
-        state_changed: true,
-        ..AppUpdateOutcome::default()
-    }
-}

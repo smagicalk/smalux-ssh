@@ -1,8 +1,8 @@
 use super::*;
 use crate::model::{
-    AgentSource, AuthProfile, CredentialKind, CredentialMetadata, ForwardAsset, ForwardId, GroupId,
-    Host, HostGroup, HostId, JumpChainAsset, JumpChainId, KeyAlgorithm, LanguageMode, ProxyAsset,
-    ProxyId, ProxyProfile, SecretRef, TunnelKind, TunnelRule,
+    AgentSource, AppState, AuthProfile, CredentialKind, CredentialMetadata, ForwardAsset,
+    ForwardId, GroupId, Host, HostGroup, HostId, JumpChainAsset, JumpChainId, KeyAlgorithm,
+    LanguageMode, ProxyAsset, ProxyId, ProxyProfile, SecretRef, TunnelKind, TunnelRule,
 };
 use uuid::Uuid;
 
@@ -425,6 +425,7 @@ fn quick_host_projects_network_resource_options() {
         profile: ProxyProfile::Http {
             host: "proxy.example.com".to_owned(),
             port: 8080,
+            auth: crate::model::ProxyAuth::None,
         },
     });
     state.storage.upsert_jump_chain_asset(JumpChainAsset {
@@ -432,7 +433,11 @@ fn quick_host_projects_network_resource_options() {
         name: "prod-jump".to_owned(),
         steps: vec![crate::model::JumpProfile {
             host_id: jump_host_id,
+            username_override: None,
+            port_override: None,
+            alias: None,
         }],
+        stop_on_failure: true,
     });
     state.storage.upsert_forward_asset(ForwardAsset {
         id: forward_id,
@@ -446,7 +451,9 @@ fn quick_host_projects_network_resource_options() {
             target_host: "10.0.0.5".to_owned(),
             target_port: 5432,
             auto_start: false,
+            exit_on_failure: false,
         },
+        exit_on_failure: false,
     });
     state.ui.quick_host.network.proxy_ids.push(proxy_id);
     state.ui.quick_host.network.forward_ids.push(forward_id);

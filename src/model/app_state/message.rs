@@ -1,17 +1,16 @@
 //! UI 与后台任务之间传递的消息。
 //!
-//! `Message` 是核心层的操作语言。它不携带 Slint 类型，也不依赖具体窗口框架。
-//! 当前 Slint UI、未来 Web UI 或命令行 UI 都应该先把自己的事件解析成这里的
-//! 消息，再交给 `AppState::apply`。
+//! `Message` 是应用状态的操作语言。它不携带 Slint 类型，也不依赖具体窗口框架。
+//! 纯核心消息可以交给 `CoreState`；仍涉及输入框、弹窗、筛选和页面状态的消息
+//! 暂时由当前桌面 Adapter 组合 `CoreState + UiState` 处理。
 //!
 //! 约定：
 //!
 //! - UI 字符串输入在进入消息前尽量转成核心 ID 或枚举，例如 `HostId`、
 //!   `GroupId`、`WorkspacePage`。
-//! - 消息只描述意图，不直接执行网络或文件操作；需要后端执行的工作会被
-//!   `AppState` 转成后端命令队列。
-//! - 如果新增 UI 功能，优先新增明确的消息，而不是让 UI 直接改 `AppState`
-//!   的内部字段。
+//! - 消息只描述意图，不直接执行网络或文件操作；需要后端执行的工作会被状态层
+//!   转成后端命令队列。
+//! - 如果新增 UI 功能，优先新增明确的消息，而不是让 UI 直接改内部字段。
 
 use crate::backend::BackendEvent;
 use crate::model::{
@@ -197,11 +196,15 @@ pub enum Message {
         host: String,
         port: String,
         tags: String,
+        auth_kind: String,
+        auth_username: String,
+        auth_password_ref: String,
+        remote_dns: bool,
     },
     SaveJumpChainAsset {
         chain_id: Option<JumpChainId>,
         name: String,
-        host_ids: Vec<HostId>,
+        steps: Vec<crate::model::JumpProfile>,
     },
     SaveForwardAsset {
         forward_id: Option<ForwardId>,
@@ -213,6 +216,7 @@ pub enum Message {
         target_port: String,
         tags: String,
         auto_start: bool,
+        exit_on_failure: bool,
     },
     RemoveProxyAsset {
         proxy_id: ProxyId,
@@ -224,6 +228,9 @@ pub enum Message {
         forward_id: ForwardId,
     },
     UpdateSnippetSearchQuery {
+        query: String,
+    },
+    UpdateNetworkSearchQuery {
         query: String,
     },
     ToggleSnippetTreeNode {

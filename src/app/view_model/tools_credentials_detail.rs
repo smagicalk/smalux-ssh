@@ -1,8 +1,8 @@
 //! 凭据详情字段展示模型。
 
+use crate::app::state::AsDesktopStateView;
 use crate::model::{
-    AppState, CredentialGroup, CredentialInspection, CredentialKind, CredentialMetadata,
-    SecretRecord,
+    CredentialGroup, CredentialInspection, CredentialKind, CredentialMetadata, SecretRecord,
 };
 
 use super::i18n::{Locale, locale_for_state, tr};
@@ -13,8 +13,9 @@ use super::tools_credentials_common::{
 use super::tools_types::CredentialDetailFieldViewModel;
 
 pub(in crate::app::view_model) fn credential_detail_fields(
-    state: &AppState,
+    state: impl AsDesktopStateView,
 ) -> Vec<CredentialDetailFieldViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let empty = tr(locale, "tool.empty_value");
     let mut rows = Vec::new();

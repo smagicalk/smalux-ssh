@@ -8,6 +8,7 @@ fn workspace_ui_defaults_to_hosts_follow_system_language() {
     assert_eq!(state.language, LanguageMode::FollowSystem);
     assert_eq!(state.host_list_mode, HostListMode::Tree);
     assert!(state.host_search_query.is_empty());
+    assert!(state.network_search_query.is_empty());
     assert!(state.collapsed_credential_tree_nodes.is_empty());
     assert!(!state.create_host_dialog_open);
     assert_eq!(state.hosts_panel_width, DEFAULT_HOSTS_PANEL_WIDTH);
@@ -61,6 +62,15 @@ fn host_search_query_is_ui_only_state() {
     state.set_host_search_query("prod");
 
     assert_eq!(state.host_search_query, "prod");
+}
+
+#[test]
+fn network_search_query_is_ui_only_state() {
+    let mut state = WorkspaceUiState::default();
+
+    state.set_network_search_query("proxy");
+
+    assert_eq!(state.network_search_query, "proxy");
 }
 
 #[test]

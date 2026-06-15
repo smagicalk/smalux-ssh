@@ -1,11 +1,14 @@
 //! Known Hosts 工具页展示模型。
 
-use crate::model::AppState;
+use crate::app::state::AsDesktopStateView;
 
 use super::i18n::{locale_for_state, tr};
 use super::tools_types::KnownHostViewModel;
 
-pub(in crate::app::view_model) fn known_host_items(state: &AppState) -> Vec<KnownHostViewModel> {
+pub(in crate::app::view_model) fn known_host_items(
+    state: impl AsDesktopStateView,
+) -> Vec<KnownHostViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     state
         .storage

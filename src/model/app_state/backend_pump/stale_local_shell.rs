@@ -4,11 +4,12 @@
 //! `BackendEvent::Failed` 收尾，让终端标签页和普通 SSH shell 保持同一种失败状态。
 
 use crate::backend::BackendEvent;
+use crate::core::CoreState;
 use crate::model::SessionId;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
-impl AppState {
+impl CoreState {
     pub(super) fn skip_stale_local_shell_command(
         &mut self,
         session_id: SessionId,

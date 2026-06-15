@@ -1,11 +1,10 @@
 //! Tunnel 标签页关闭前置判断和运行态清理。
 
 use crate::backend::BackendCommand;
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind, SessionTab, TunnelStatus};
 
-use super::super::AppState;
-
-impl AppState {
+impl CoreState {
     pub(super) fn tunnel_requires_stop_before_close(
         &self,
         session_id: SessionId,

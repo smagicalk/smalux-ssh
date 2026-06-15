@@ -39,11 +39,16 @@ pub(in crate::app) struct NetworkNavItemViewModel {
     pub edit_host: String,
     pub edit_port: String,
     pub edit_tags: String,
+    pub edit_auth_kind: String,
+    pub edit_auth_username: String,
+    pub edit_auth_password_ref: String,
+    pub edit_remote_dns: bool,
     pub edit_bind_host: String,
     pub edit_bind_port: String,
     pub edit_target_host: String,
     pub edit_target_port: String,
     pub edit_auto_start: bool,
+    pub edit_exit_on_failure: bool,
     pub edit_host_ids: String,
 }
 

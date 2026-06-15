@@ -1369,12 +1369,26 @@ fn network_proxy_asset_can_be_created_updated_and_removed() {
         host: " 127.0.0.1 ".to_owned(),
         port: "1080".to_owned(),
         tags: "office, shared".to_owned(),
+        auth_kind: "UserPassword".to_owned(),
+        auth_username: "proxy-user".to_owned(),
+        auth_password_ref: "proxy-password-1".to_owned(),
+        remote_dns: true,
     });
 
     assert!(created.changed());
     assert_eq!(state.storage.proxy_asset_count(), 1);
     let proxy_id = state.storage.proxy_assets[0].id;
     assert_eq!(state.storage.proxy_assets[0].name, "办公网关");
+    assert!(matches!(
+        &state.storage.proxy_assets[0].profile,
+        crate::model::ProxyProfile::Socks5 {
+            auth: crate::model::ProxyAuth::UserPassword { username, password },
+            remote_dns: true,
+            ..
+        } if username == "proxy-user"
+            && password.as_ref().is_some_and(|secret| secret.0.starts_with("secret://network-proxies/"))
+    ));
+    assert_eq!(state.storage.secret_count(), 1);
 
     let updated = state.apply(Message::SaveProxyAsset {
         proxy_id: Some(proxy_id),
@@ -1383,6 +1397,10 @@ fn network_proxy_asset_can_be_created_updated_and_removed() {
         host: "proxy.internal".to_owned(),
         port: "8080".to_owned(),
         tags: "office".to_owned(),
+        auth_kind: "None".to_owned(),
+        auth_username: String::new(),
+        auth_password_ref: String::new(),
+        remote_dns: false,
     });
 
     assert!(updated.changed());
@@ -1404,6 +1422,10 @@ fn referenced_network_proxy_asset_reports_used_hosts_on_delete() {
         host: "127.0.0.1".to_owned(),
         port: "1080".to_owned(),
         tags: String::new(),
+        auth_kind: "None".to_owned(),
+        auth_username: String::new(),
+        auth_password_ref: String::new(),
+        remote_dns: false,
     });
     let proxy_id = state.storage.proxy_assets[0].id;
     state
@@ -1436,7 +1458,12 @@ fn network_jump_chain_asset_validates_hosts_and_blocks_referenced_delete() {
     let created = state.apply(Message::SaveJumpChainAsset {
         chain_id: None,
         name: "生产跳板".to_owned(),
-        host_ids: vec![host_id],
+        steps: vec![crate::model::JumpProfile {
+            host_id,
+            username_override: None,
+            port_override: None,
+            alias: None,
+        }],
     });
 
     assert!(created.changed());
@@ -1464,11 +1491,13 @@ fn network_forward_asset_can_be_created_updated_and_removed() {
         target_port: "5432".to_owned(),
         tags: "db".to_owned(),
         auto_start: false,
+        exit_on_failure: true,
     });
 
     assert!(created.changed());
     assert_eq!(state.storage.forward_asset_count(), 1);
     let forward_id = state.storage.forward_assets[0].id;
+    assert!(state.storage.forward_assets[0].exit_on_failure);
 
     let updated = state.apply(Message::SaveForwardAsset {
         forward_id: Some(forward_id),
@@ -1480,6 +1509,7 @@ fn network_forward_asset_can_be_created_updated_and_removed() {
         target_port: String::new(),
         tags: "proxy".to_owned(),
         auto_start: false,
+        exit_on_failure: false,
     });
 
     assert!(updated.changed());

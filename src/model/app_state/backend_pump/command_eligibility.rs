@@ -5,10 +5,9 @@
 //! 执行”的判定，不做状态修改；真正的清理交给 `stale_commands`。
 
 use crate::backend::{BackendCommand, SftpRequest};
+use crate::core::CoreState;
 
-use super::super::AppState;
-
-impl AppState {
+impl CoreState {
     pub(super) fn can_execute_backend_command(&self, command: &BackendCommand) -> bool {
         match command {
             // 连接类命令要求会话仍存在，并且目标主机没有在命令入队后被删除。

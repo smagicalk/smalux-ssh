@@ -1,11 +1,15 @@
 //! 隧道工具页展示模型。
 
-use crate::model::{AppState, TunnelStatus};
+use crate::app::state::AsDesktopStateView;
+use crate::model::TunnelStatus;
 
 use super::i18n::{locale_for_state, tr};
 use super::tools_types::ToolItemViewModel;
 
-pub(in crate::app::view_model) fn tunnel_items(state: &AppState) -> Vec<ToolItemViewModel> {
+pub(in crate::app::view_model) fn tunnel_items(
+    state: impl AsDesktopStateView,
+) -> Vec<ToolItemViewModel> {
+    let state = state.as_desktop_state_view();
     let locale = locale_for_state(state);
     let saved = state
         .storage

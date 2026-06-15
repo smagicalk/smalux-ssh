@@ -11,7 +11,8 @@ mod types;
 #[path = "quick_host/ui.rs"]
 mod ui;
 
-pub use draft::{MAX_QUICK_HOST_NAME_CHARS, QuickHostDraft, truncate_host_name};
+pub use crate::model::host_draft::truncate_host_name;
+pub use draft::QuickHostDraft;
 pub use error::QuickHostDraftError;
 pub use types::{
     QuickHostAgentSource, QuickHostAuthDraft, QuickHostAuthField, QuickHostAuthKind,

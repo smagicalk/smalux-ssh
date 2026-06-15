@@ -6,7 +6,8 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-use crate::model::{AppState, LanguageMode};
+use crate::app::state::AsDesktopStateView;
+use crate::model::LanguageMode;
 
 pub(super) type Locale = &'static str;
 
@@ -27,7 +28,8 @@ static CATALOG: OnceLock<Catalog> = OnceLock::new();
 
 include!(concat!(env!("OUT_DIR"), "/i18n_catalog.rs"));
 
-pub(super) fn locale_for_state(state: &AppState) -> Locale {
+pub(super) fn locale_for_state(state: impl AsDesktopStateView) -> Locale {
+    let state = state.as_desktop_state_view();
     // FollowSystem 只影响 locale 选择；具体 key 和回退策略仍由 tr_from_files 统一处理。
     match state.ui.workspace.language {
         LanguageMode::Chinese => resolve_locale("zh-CN"),
@@ -44,7 +46,10 @@ pub(super) fn tr(locale: Locale, key: &'static str) -> &'static str {
     tr_from_files(&catalog_root().files, locale, key)
 }
 
-pub(in crate::app) fn tr_for_state(state: &AppState, key: &'static str) -> &'static str {
+pub(in crate::app) fn tr_for_state(
+    state: impl AsDesktopStateView,
+    key: &'static str,
+) -> &'static str {
     tr(locale_for_state(state), key)
 }
 

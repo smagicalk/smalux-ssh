@@ -5,8 +5,9 @@
 //! 提示和传输进度收尾，保证界面不会一直停在“连接中/传输中”。
 
 use crate::backend::BackendCommand;
+use crate::core::CoreState;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
 #[path = "stale_connect.rs"]
 mod stale_connect;
@@ -17,7 +18,7 @@ mod stale_remote_command;
 #[path = "stale_sftp.rs"]
 mod stale_sftp;
 
-impl AppState {
+impl CoreState {
     pub(super) fn skip_stale_backend_command(
         &mut self,
         command: &BackendCommand,

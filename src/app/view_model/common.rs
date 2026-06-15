@@ -1,11 +1,13 @@
 //! 展示模型公共辅助函数。
 
-use crate::model::{AppState, BuiltInTheme, Host, HostId};
+use crate::app::state::AsDesktopStateView;
+use crate::model::{BuiltInTheme, Host, HostId};
 use crate::theme::{ResolvedThemePalette, built_in_palette};
 
 use super::i18n::tr_for_state;
 
-pub(super) fn background_summary(state: &AppState) -> String {
+pub(super) fn background_summary(state: impl AsDesktopStateView) -> String {
+    let state = state.as_desktop_state_view();
     let background = state.config.background.normalized();
     format!(
         "{}{} · {:.0}% · {} {:.0}px",
@@ -21,7 +23,8 @@ pub(super) fn theme_palette(theme: BuiltInTheme) -> ResolvedThemePalette {
     built_in_palette(theme)
 }
 
-pub(super) fn group_label(state: &AppState, host: &Host) -> String {
+pub(super) fn group_label(state: impl AsDesktopStateView, host: &Host) -> String {
+    let state = state.as_desktop_state_view();
     host.group_id
         .and_then(|group_id| {
             state
@@ -34,7 +37,8 @@ pub(super) fn group_label(state: &AppState, host: &Host) -> String {
         .unwrap_or_else(|| tr_for_state(state, "common.default_group").to_owned())
 }
 
-pub(super) fn tags_label(state: &AppState, host: &Host) -> String {
+pub(super) fn tags_label(state: impl AsDesktopStateView, host: &Host) -> String {
+    let state = state.as_desktop_state_view();
     if host.tags.is_empty() {
         tr_for_state(state, "common.untagged").to_owned()
     } else {
@@ -42,7 +46,8 @@ pub(super) fn tags_label(state: &AppState, host: &Host) -> String {
     }
 }
 
-pub(super) fn host_name(state: &AppState, host_id: HostId) -> String {
+pub(super) fn host_name(state: impl AsDesktopStateView, host_id: HostId) -> String {
+    let state = state.as_desktop_state_view();
     state
         .storage
         .hosts

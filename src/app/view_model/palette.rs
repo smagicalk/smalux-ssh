@@ -3,7 +3,7 @@
 mod history;
 mod matching;
 
-use crate::model::AppState;
+use crate::app::state::AsDesktopStateView;
 
 use super::common::tags_label;
 use super::i18n::{locale_for_state, tr};
@@ -20,7 +20,10 @@ pub(in crate::app) struct CommandPaletteItemViewModel {
     pub kind: &'static str,
 }
 
-pub(super) fn command_palette_results(state: &AppState) -> Vec<CommandPaletteItemViewModel> {
+pub(super) fn command_palette_results(
+    state: impl AsDesktopStateView,
+) -> Vec<CommandPaletteItemViewModel> {
+    let state = state.as_desktop_state_view();
     let query = state
         .ui
         .workspace

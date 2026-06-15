@@ -684,6 +684,7 @@ async fn load_tunnel_rules(
                 target_host: model.target_host,
                 target_port: to_u16(model.target_port)?,
                 auto_start: model.auto_start,
+                exit_on_failure: model.exit_on_failure,
             })
         })
         .collect()
@@ -705,6 +706,7 @@ async fn save_tunnel_rules(
             target_host: Set(rule.target_host),
             target_port: Set(rule.target_port as i32),
             auto_start: Set(rule.auto_start),
+            exit_on_failure: Set(rule.exit_on_failure),
             sort_order: Set(index as i32),
             created_at_unix_secs: Set(now),
             updated_at_unix_secs: Set(now),

@@ -140,6 +140,10 @@ pub mod host_proxy {
         pub proxy_kind: String,
         pub proxy_host: String,
         pub proxy_port: i32,
+        pub auth_kind: String,
+        pub auth_username: Option<String>,
+        pub auth_password_secret_ref: Option<String>,
+        pub remote_dns: bool,
     }
 
     #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -184,6 +188,10 @@ pub mod proxy_asset {
         pub proxy_kind: String,
         pub proxy_host: String,
         pub proxy_port: i32,
+        pub auth_kind: String,
+        pub auth_username: Option<String>,
+        pub auth_password_secret_ref: Option<String>,
+        pub remote_dns: bool,
         pub sort_order: i32,
     }
 
@@ -225,6 +233,9 @@ pub mod jump_chain_step {
         pub id: String,
         pub chain_id: String,
         pub jump_host_id: String,
+        pub username_override: Option<String>,
+        pub port_override: Option<i32>,
+        pub alias: Option<String>,
         pub sort_order: i32,
     }
 
@@ -252,6 +263,7 @@ pub mod forward_asset {
         pub target_host: String,
         pub target_port: i32,
         pub auto_start: bool,
+        pub exit_on_failure: bool,
         pub sort_order: i32,
     }
 
@@ -770,6 +782,7 @@ pub mod tunnel_rule {
         pub target_host: String,
         pub target_port: i32,
         pub auto_start: bool,
+        pub exit_on_failure: bool,
         pub sort_order: i32,
         pub created_at_unix_secs: i64,
         pub updated_at_unix_secs: i64,

@@ -1,12 +1,13 @@
 //! 会话标签页关闭流程。
 
 use crate::backend::BackendCommand;
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind};
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::pending::should_disconnect_on_close;
 
-impl AppState {
+impl CoreState {
     pub(in crate::model::app_state) fn close_session_tab(
         &mut self,
         session_id: SessionId,

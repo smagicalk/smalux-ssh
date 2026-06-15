@@ -1,11 +1,11 @@
 //! SFTP browser 在标签页关闭后的归属清理。
 
+use crate::core::CoreState;
 use crate::model::{SessionKind, SessionTab};
 
-use super::super::AppState;
 use super::activate::sftp_tab_can_accept_browser_owner;
 
-impl AppState {
+impl CoreState {
     pub(super) fn remove_sftp_browser_after_tab_close(&mut self, tab: &SessionTab) -> bool {
         if !matches!(tab.kind, SessionKind::Sftp) {
             return false;
@@ -36,15 +36,6 @@ impl AppState {
             return false;
         };
 
-        let Some(browser) = self
-            .sessions
-            .sftp_browsers
-            .iter_mut()
-            .find(|browser| browser.host_id == host_id && browser.session_id == tab.id)
-        else {
-            return false;
-        };
-
         let Some(next_session_id) = self
             .sessions
             .tabs
@@ -57,6 +48,15 @@ impl AppState {
                     && sftp_tab_can_accept_browser_owner(&other.status)
             })
             .map(|other| other.id)
+        else {
+            return false;
+        };
+
+        let Some(browser) = self
+            .sessions
+            .sftp_browsers
+            .iter_mut()
+            .find(|browser| browser.host_id == host_id && browser.session_id == tab.id)
         else {
             return false;
         };

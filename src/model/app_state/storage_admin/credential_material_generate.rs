@@ -1,20 +1,21 @@
 //! 凭据材料的本地生成与保存。
 
+use crate::core::CoreState;
 use crate::model::{
-    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, QuickHostAuthField,
-    SecretMaterialKind, SecretRecord,
+    CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm, SecretMaterialKind,
+    SecretRecord,
 };
 use russh::keys::{HashAlg, ssh_key::LineEnding};
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::credential_groups::validate_credential_group;
 use super::credential_ids::new_credential_id;
 use super::credential_payload::{generate_private_key, inspect_credential_payload};
 use super::credential_refs::next_secret_ref;
 
-impl AppState {
+impl CoreState {
     /// 生成新的 OpenSSH 私钥，并创建对应的凭据元数据。
-    pub(in crate::model::app_state) fn generate_private_key_credential(
+    pub(crate) fn generate_private_key_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -92,9 +93,6 @@ impl AppState {
             fingerprint: Some(fingerprint),
         });
         self.storage.upsert_credential_inspection(inspection);
-        self.ui
-            .set_quick_host_auth_field(QuickHostAuthField::PrivateKeyRef, &secret_ref.0);
-
         AppUpdateOutcome {
             state_changed: true,
             ..AppUpdateOutcome::default()
@@ -102,7 +100,7 @@ impl AppState {
     }
 
     /// 保存密码到本地 Secret 存储，并创建对应的凭据元数据。
-    pub(in crate::model::app_state) fn save_password_credential(
+    pub(crate) fn save_password_credential(
         &mut self,
         name: String,
         group_id: Option<CredentialGroupId>,
@@ -156,9 +154,6 @@ impl AppState {
             fingerprint: None,
         });
         self.storage.upsert_credential_inspection(inspection);
-        self.ui
-            .set_quick_host_auth_field(QuickHostAuthField::PasswordSecretRef, &secret_ref.0);
-
         AppUpdateOutcome {
             state_changed: true,
             ..AppUpdateOutcome::default()

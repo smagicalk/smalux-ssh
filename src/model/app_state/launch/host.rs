@@ -1,12 +1,12 @@
 //! 启动流程共享主机查询和连接命令。
 
 use crate::backend::{BackendCommand, ConnectionTarget};
+use crate::core::CoreState;
 use crate::model::{Host, HostId, KnownHostEntry, RecentConnection, SessionId};
 
-use super::super::AppState;
 use super::unix_now_secs;
 
-impl AppState {
+impl CoreState {
     pub(in crate::model::app_state) fn host_by_id(&self, host_id: HostId) -> Option<Host> {
         self.storage
             .hosts

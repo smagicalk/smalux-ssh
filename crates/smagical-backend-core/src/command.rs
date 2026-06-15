@@ -280,6 +280,7 @@ mod tests {
             target_host: String::new(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         })
         .expect("动态隧道规则应该有效");
         let commands = vec![

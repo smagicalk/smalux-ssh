@@ -17,6 +17,9 @@ fn workspace_ui_messages_update_layout_state_only() {
     state.apply(Message::UpdateHostSearchQuery {
         query: "prod".to_owned(),
     });
+    state.apply(Message::UpdateNetworkSearchQuery {
+        query: "proxy".to_owned(),
+    });
     state.apply(Message::ResizeHostsPanel { width: 260 });
     state.apply(Message::ResizeActivityPanel { width: 300 });
     state.apply(Message::ResizeToolPanel { width: 360 });
@@ -43,6 +46,7 @@ fn workspace_ui_messages_update_layout_state_only() {
         HostListModePreference::Card
     );
     assert_eq!(state.ui.workspace.host_search_query, "prod");
+    assert_eq!(state.ui.workspace.network_search_query, "proxy");
     assert_eq!(state.ui.workspace.hosts_panel_width, 260);
     assert_eq!(state.ui.workspace.activity_panel_width, 300);
     assert_eq!(state.ui.workspace.tool_panel_width, 360);
@@ -72,31 +76,6 @@ fn repeated_navigation_toggles_hosts_panel_collapse() {
     assert!(expand.changed());
     assert_eq!(state.ui.workspace.active_page, WorkspacePage::Terminal);
     assert!(!state.ui.workspace.hosts_panel_collapsed);
-}
-
-#[test]
-fn workspace_preferences_restore_host_list_mode() {
-    let mut state = AppState::default();
-    state.config.workspace.host_list_mode = HostListModePreference::Card;
-
-    state.apply_workspace_preferences();
-
-    assert!(matches!(
-        state.ui.workspace.host_list_mode,
-        crate::model::HostListMode::Card
-    ));
-}
-
-#[test]
-fn workspace_preferences_restore_settings_page_choices() {
-    let mut state = AppState::default();
-    state.config.workspace.language = LanguagePreference::English;
-    state.config.workspace.built_in_theme = BuiltInThemePreference::Dracula;
-
-    state.apply_workspace_preferences();
-
-    assert_eq!(state.ui.workspace.language, LanguageMode::English);
-    assert_eq!(state.ui.workspace.theme, BuiltInTheme::Dracula);
 }
 
 #[test]

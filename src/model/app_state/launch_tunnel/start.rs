@@ -3,14 +3,25 @@
 use uuid::Uuid;
 
 use crate::backend::{BackendCommand, TunnelStartRequest};
-use crate::model::{HostId, SessionId, SessionStatus, TunnelRule, WorkspacePage};
+use crate::core::CoreState;
+use crate::model::{HostId, SessionId, SessionStatus, TunnelRule};
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::{
     connect_command_with_known_hosts, missing_host, queued_outcome, unix_now_secs,
 };
-use super::super::{AppState, AppUpdateOutcome};
 
-impl AppState {
+impl CoreState {
+    /// 启动端口转发或动态隧道的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
+    pub(crate) fn start_tunnel_action(
+        &mut self,
+        host_id: HostId,
+        rule: TunnelRule,
+    ) -> AppUpdateOutcome {
+        self.start_tunnel(host_id, rule)
+    }
+
     /// 启动端口转发或动态隧道，并建立对应的管理标签页。
     pub(in crate::model::app_state) fn start_tunnel(
         &mut self,
@@ -44,7 +55,6 @@ impl AppState {
             .open_tunnel_tab(session_id, host.id, &request.rule);
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
-        self.ui.workspace.active_page = WorkspacePage::Tunnels;
         self.sessions
             .start_tunnel(session_id, &request.rule, Some(host.id), unix_now_secs());
         self.record_recent_connection(&host);

@@ -569,12 +569,15 @@ fn quick_host_network_messages_update_draft_and_save_host_selection() {
         profile: ProxyProfile::Socks5 {
             host: "127.0.0.1".to_owned(),
             port: 1080,
+            auth: crate::model::ProxyAuth::None,
+            remote_dns: false,
         },
     });
     state.storage.upsert_jump_chain_asset(JumpChainAsset {
         id: crate::model::JumpChainId(Uuid::new_v4()),
         name: "prod-jump".to_owned(),
         steps: Vec::new(),
+        stop_on_failure: true,
     });
     state.storage.upsert_forward_asset(ForwardAsset {
         id: forward_id,
@@ -588,7 +591,9 @@ fn quick_host_network_messages_update_draft_and_save_host_selection() {
             target_host: "10.0.0.5".to_owned(),
             target_port: 5432,
             auto_start: false,
+            exit_on_failure: false,
         },
+        exit_on_failure: false,
     });
 
     let proxy = state.apply(Message::ToggleQuickHostNetworkProxy { proxy_id });

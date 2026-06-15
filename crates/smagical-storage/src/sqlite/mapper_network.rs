@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use sea_orm::{ActiveValue::Set, DatabaseConnection, EntityTrait, QueryOrder};
 
 use smagical_core::{
-    ForwardAsset, ForwardId, HostId, JumpChainAsset, JumpChainId, JumpProfile, ProxyAsset, ProxyId,
-    ProxyProfile, TunnelKind, TunnelRule,
+    ForwardAsset, ForwardId, HostId, JumpChainAsset, JumpChainId, JumpProfile, ProxyAsset,
+    ProxyAuth, ProxyId, ProxyProfile, SecretRef, TunnelKind, TunnelRule,
 };
 
 use super::entity;
@@ -28,6 +28,10 @@ pub(super) async fn load_proxy_assets(
                     &model.proxy_kind,
                     &model.proxy_host,
                     model.proxy_port,
+                    &model.auth_kind,
+                    model.auth_username,
+                    model.auth_password_secret_ref,
+                    model.remote_dns,
                 )?,
             })
         })
@@ -39,14 +43,18 @@ pub(super) async fn save_proxy_assets(
     assets: &[ProxyAsset],
 ) -> Result<(), StoragePersistenceError> {
     for (index, asset) in assets.iter().enumerate() {
-        let (proxy_kind, proxy_host, proxy_port) = proxy_profile_to_parts(&asset.profile);
+        let parts = proxy_profile_to_parts(&asset.profile);
         entity::proxy_asset::Entity::insert(entity::proxy_asset::ActiveModel {
             id: Set(asset.id.0.to_string()),
             name: Set(asset.name.clone()),
             tags_toml: Set(encode_string_list_toml(&asset.tags)?),
-            proxy_kind: Set(proxy_kind.to_owned()),
-            proxy_host: Set(proxy_host.clone()),
-            proxy_port: Set(proxy_port as i32),
+            proxy_kind: Set(parts.kind.to_owned()),
+            proxy_host: Set(parts.host),
+            proxy_port: Set(parts.port as i32),
+            auth_kind: Set(parts.auth_kind.to_owned()),
+            auth_username: Set(parts.auth_username),
+            auth_password_secret_ref: Set(parts.auth_password_secret_ref),
+            remote_dns: Set(parts.remote_dns),
             sort_order: Set(index as i32),
         })
         .exec(db)
@@ -83,6 +91,9 @@ pub(super) async fn load_jump_chain_assets(
                 .map(|step| {
                     Ok(JumpProfile {
                         host_id: HostId(parse_uuid(&step.jump_host_id)?),
+                        username_override: step.username_override,
+                        port_override: step.port_override.map(to_u16).transpose()?,
+                        alias: step.alias,
                     })
                 })
                 .collect::<Result<Vec<_>, StoragePersistenceError>>()?;
@@ -90,6 +101,7 @@ pub(super) async fn load_jump_chain_assets(
                 id: JumpChainId(parse_uuid(&model.id)?),
                 name: model.name,
                 steps,
+                stop_on_failure: true,
             })
         })
         .collect()
@@ -114,6 +126,9 @@ pub(super) async fn save_jump_chain_assets(
                 id: Set(format!("{chain_id}:step:{step_index}")),
                 chain_id: Set(chain_id.clone()),
                 jump_host_id: Set(step.host_id.0.to_string()),
+                username_override: Set(step.username_override.clone()),
+                port_override: Set(step.port_override.map(|port| port as i32)),
+                alias: Set(step.alias.clone()),
                 sort_order: Set(step_index as i32),
             })
             .exec(db)
@@ -144,7 +159,9 @@ pub(super) async fn load_forward_assets(
                     target_host: model.target_host,
                     target_port: to_u16(model.target_port)?,
                     auto_start: model.auto_start,
+                    exit_on_failure: model.exit_on_failure,
                 },
+                exit_on_failure: model.exit_on_failure,
             })
         })
         .collect()
@@ -166,6 +183,7 @@ pub(super) async fn save_forward_assets(
             target_host: Set(rule.target_host),
             target_port: Set(rule.target_port as i32),
             auto_start: Set(rule.auto_start),
+            exit_on_failure: Set(asset.exit_on_failure),
             sort_order: Set(index as i32),
         })
         .exec(db)
@@ -174,10 +192,25 @@ pub(super) async fn save_forward_assets(
     Ok(())
 }
 
-pub(super) fn proxy_profile_to_parts(proxy: &ProxyProfile) -> (&'static str, String, u16) {
+pub(super) struct ProxyProfileParts {
+    pub(super) kind: &'static str,
+    pub(super) host: String,
+    pub(super) port: u16,
+    pub(super) auth_kind: &'static str,
+    pub(super) auth_username: Option<String>,
+    pub(super) auth_password_secret_ref: Option<String>,
+    pub(super) remote_dns: bool,
+}
+
+pub(super) fn proxy_profile_to_parts(proxy: &ProxyProfile) -> ProxyProfileParts {
     match proxy {
-        ProxyProfile::Socks5 { host, port } => ("socks5", host.clone(), *port),
-        ProxyProfile::Http { host, port } => ("http", host.clone(), *port),
+        ProxyProfile::Socks5 {
+            host,
+            port,
+            auth,
+            remote_dns,
+        } => proxy_parts("socks5", host, *port, auth, *remote_dns),
+        ProxyProfile::Http { host, port, auth } => proxy_parts("http", host, *port, auth, false),
     }
 }
 
@@ -185,18 +218,70 @@ pub(super) fn proxy_parts_to_profile(
     proxy_kind: &str,
     proxy_host: &str,
     proxy_port: i32,
+    auth_kind: &str,
+    auth_username: Option<String>,
+    auth_password_secret_ref: Option<String>,
+    remote_dns: bool,
 ) -> Result<ProxyProfile, StoragePersistenceError> {
     let port = to_u16(proxy_port)?;
+    let auth = proxy_auth_from_parts(auth_kind, auth_username, auth_password_secret_ref);
     Ok(match proxy_kind {
         "http" => ProxyProfile::Http {
             host: proxy_host.to_owned(),
             port,
+            auth,
         },
         _ => ProxyProfile::Socks5 {
             host: proxy_host.to_owned(),
             port,
+            auth,
+            remote_dns,
         },
     })
+}
+
+fn proxy_parts(
+    kind: &'static str,
+    host: &str,
+    port: u16,
+    auth: &ProxyAuth,
+    remote_dns: bool,
+) -> ProxyProfileParts {
+    let (auth_kind, auth_username, auth_password_secret_ref) = proxy_auth_to_parts(auth);
+    ProxyProfileParts {
+        kind,
+        host: host.to_owned(),
+        port,
+        auth_kind,
+        auth_username,
+        auth_password_secret_ref,
+        remote_dns,
+    }
+}
+
+fn proxy_auth_to_parts(auth: &ProxyAuth) -> (&'static str, Option<String>, Option<String>) {
+    match auth {
+        ProxyAuth::None => ("none", None, None),
+        ProxyAuth::UserPassword { username, password } => (
+            "user_password",
+            Some(username.clone()),
+            password.as_ref().map(|secret| secret.0.clone()),
+        ),
+    }
+}
+
+fn proxy_auth_from_parts(
+    auth_kind: &str,
+    auth_username: Option<String>,
+    auth_password_secret_ref: Option<String>,
+) -> ProxyAuth {
+    match auth_kind {
+        "user_password" | "basic" => ProxyAuth::UserPassword {
+            username: auth_username.unwrap_or_default(),
+            password: auth_password_secret_ref.map(SecretRef),
+        },
+        _ => ProxyAuth::None,
+    }
 }
 
 pub(super) fn tunnel_kind_from_str(kind: &str) -> TunnelKind {

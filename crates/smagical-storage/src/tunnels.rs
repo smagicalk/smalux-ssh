@@ -46,6 +46,7 @@ mod tests {
             target_host: "ignored-for-dynamic".to_owned(),
             target_port: 0,
             auto_start: false,
+            exit_on_failure: false,
         }
     }
 

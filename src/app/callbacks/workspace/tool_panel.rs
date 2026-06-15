@@ -35,8 +35,9 @@ fn host_without_sftp_browser(
     }
 
     let state = state.borrow();
-    active_terminal_host_id(&state).filter(|host_id| {
+    active_terminal_host_id(&state.core).filter(|host_id| {
         !state
+            .core
             .sessions
             .sftp_browsers
             .iter()

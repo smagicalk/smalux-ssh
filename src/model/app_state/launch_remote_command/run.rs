@@ -3,16 +3,17 @@
 use uuid::Uuid;
 
 use crate::backend::BackendCommand;
-use crate::model::{HostId, SessionId, SessionStatus, WorkspacePage};
+use crate::core::CoreState;
+use crate::model::{HostId, SessionId, SessionStatus};
 use crate::terminal::TerminalTabState;
 
+use super::super::AppUpdateOutcome;
 use super::super::launch::{connect_command_with_known_hosts, missing_host, queued_outcome};
-use super::super::{AppState, AppUpdateOutcome};
 use super::request::remote_command_request;
 
-impl AppState {
+impl CoreState {
     /// 执行一次性远程命令，并记录主机作用域命令历史。
-    pub(in crate::model::app_state) fn run_remote_command(
+    pub(crate) fn run_remote_command(
         &mut self,
         host_id: HostId,
         command: String,
@@ -43,7 +44,6 @@ impl AppState {
         );
         self.sessions
             .set_status(session_id, SessionStatus::Connecting);
-        self.ui.workspace.active_page = WorkspacePage::Terminal;
         self.terminal.open_tab(terminal_tab);
         self.record_recent_connection(&host);
         let known_hosts = self.storage.known_hosts.clone();

@@ -5,11 +5,10 @@
 //! 不能自动覆盖旧记录。
 
 use crate::backend::BackendExecutionError;
+use crate::core::CoreState;
 use crate::model::{HostKeyVerification, KnownHostEntry};
 
-use super::super::AppState;
-
-impl AppState {
+impl CoreState {
     pub(super) fn record_rejected_host_key(&mut self, error: &BackendExecutionError) -> bool {
         let BackendExecutionError::HostKeyRejected {
             host,

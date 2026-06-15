@@ -76,6 +76,11 @@ impl WorkspaceUiState {
         self.snippet_search_query = query.into();
     }
 
+    /// 更新网络资源页搜索条件。
+    pub fn set_network_search_query(&mut self, query: impl Into<String>) {
+        self.network_search_query = query.into();
+    }
+
     /// 折叠或展开主机树中的指定分组。
     pub fn toggle_host_tree_group(&mut self, group_id: Option<GroupId>) {
         let Some(group_id) = group_id else {

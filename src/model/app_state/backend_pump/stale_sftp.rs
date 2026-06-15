@@ -4,12 +4,13 @@
 //! 命令过期时要按类型收尾，否则会出现 loading 不消失或传输条永远进行中的问题。
 
 use crate::backend::{BackendCommand, SftpRequest};
+use crate::core::CoreState;
 use crate::model::SessionId;
 
+use super::super::AppUpdateOutcome;
 use super::super::transfers::{failed_transfer_for_command, transfer_failed_event};
-use super::super::{AppState, AppUpdateOutcome};
 
-impl AppState {
+impl CoreState {
     pub(super) fn skip_stale_sftp_command(
         &mut self,
         session_id: SessionId,

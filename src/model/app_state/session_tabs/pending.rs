@@ -1,11 +1,10 @@
 //! 标签页关闭时的待执行后端命令清理。
 
 use crate::backend::{BackendCommand, SftpRequest};
+use crate::core::CoreState;
 use crate::model::{SessionId, SessionKind, SessionTab, TransferId};
 
-use super::super::AppState;
-
-impl AppState {
+impl CoreState {
     pub(super) fn remove_pending_backend_commands_for_session(
         &mut self,
         session_id: SessionId,

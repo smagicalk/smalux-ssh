@@ -1,6 +1,6 @@
+use crate::model::host_draft::MAX_QUICK_HOST_NAME_CHARS;
 use crate::model::ui_state::{
-    MAX_QUICK_HOST_NAME_CHARS, QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraft,
-    QuickHostDraftError,
+    QuickHostAuthDraft, QuickHostAuthKind, QuickHostDraft, QuickHostDraftError,
 };
 
 use super::super::common::host_id;

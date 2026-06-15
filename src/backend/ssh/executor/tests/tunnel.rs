@@ -22,6 +22,7 @@ fn start_tunnel_requires_connected_session() {
                 target_host: String::new(),
                 target_port: 0,
                 auto_start: false,
+                exit_on_failure: false,
             })
             .expect("动态隧道请求应该有效"),
         })

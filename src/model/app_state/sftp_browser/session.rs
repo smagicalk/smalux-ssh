@@ -1,10 +1,11 @@
 //! SFTP 浏览器的可用会话选择和错误构造。
 
+use crate::core::CoreState;
 use crate::model::{HostId, SessionId, SessionKind, SessionStatus};
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
-impl AppState {
+impl CoreState {
     pub(in crate::model::app_state) fn claimed_current_sftp_dir_for_host(
         &mut self,
         host_id: HostId,

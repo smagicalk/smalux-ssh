@@ -4,12 +4,13 @@
 //! 命令依赖连接成功，因此这里会同时丢弃同一会话的待执行命令。
 
 use crate::backend::BackendEvent;
+use crate::core::CoreState;
 use crate::model::SessionId;
 
+use super::super::AppUpdateOutcome;
 use super::super::pending::discard_pending_commands_for_failed_session;
-use super::super::{AppState, AppUpdateOutcome};
 
-impl AppState {
+impl CoreState {
     pub(super) fn skip_stale_connect_command(&mut self, session_id: SessionId) -> AppUpdateOutcome {
         let reason = "连接命令已失效，后续启动命令未执行".to_owned();
         // 先让会话本身进入失败态，保证 UI 不会卡在连接中。
