@@ -4,6 +4,10 @@ $tool = Join-Path $PSScriptRoot "../../.tools/slint-tr-extractor/bin/slint-tr-ex
 $slintFile = Join-Path $PSScriptRoot "ui/main.slint"
 $output = Join-Path $PSScriptRoot "messages.po"
 
+if (!(Test-Path $tool)) {
+  cargo install slint-tr-extractor --version 1.16.1 --root (Join-Path $PSScriptRoot "../../.tools/slint-tr-extractor")
+}
+
 & $tool `
   -o $output `
   --package-name "smagical-ui" `

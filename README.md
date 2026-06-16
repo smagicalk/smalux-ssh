@@ -50,3 +50,11 @@ cargo run -p smagical-ui
 当前提取工具版本：
 
 - `slint-tr-extractor = 1.16.1`
+
+提取命令：
+
+```powershell
+& 'F:/code/rust/smagicalssh/crates/smagical-ui/extract-translations.ps1'
+```
+
+脚本会在本地缺少工具时自动安装到 `.tools/slint-tr-extractor/`，该目录不进入版本控制。
