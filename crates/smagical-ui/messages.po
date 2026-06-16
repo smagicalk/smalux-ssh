@@ -14,10 +14,13 @@ msgstr "smagicalssh"
 
 #: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
 #: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
+#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
 msgctxt "AppWindow"
 msgid "暂无主机"
 msgstr ""
 
+#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
+#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
 #: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
 #: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
 #: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
