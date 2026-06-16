@@ -1,0 +1,31 @@
+export component AppWindow inherits Window {
+    in property <string> host-summary: @tr("暂无主机");
+
+    title: @tr("smagicalssh");
+    width: 960px;
+    height: 640px;
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 12px;
+
+        Text {
+            text: @tr("smagicalssh");
+            font-size: 28px;
+        }
+
+        Rectangle {
+            border-width: 1px;
+            border-color: #3a3f4b;
+            background: #16181d;
+            min-height: 96px;
+
+            Text {
+                text: host-summary;
+                color: #e6e8ee;
+                vertical-alignment: center;
+                horizontal-alignment: left;
+            }
+        }
+    }
+}

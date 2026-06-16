@@ -1,0 +1,24 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: smagical-ui 0.1.0\n"
+"Language: zh-CN\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "暂无主机"
+msgstr "暂无主机"
+
+msgid "smagicalssh"
+msgstr "smagicalssh"
+
+#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
+msgctxt "AppWindow"
+msgid "暂无主机"
+msgstr ""
+
+#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
+#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
+msgctxt "AppWindow"
+msgid "smagicalssh"
+msgstr ""
