@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn run_command_history_reuses_recorded_host_and_command() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -28,20 +28,19 @@ fn run_command_history_reuses_recorded_host_and_command() {
 
 #[test]
 fn run_command_history_reports_missing_history() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let history_id = crate::model::CommandHistoryId(uuid::Uuid::new_v4());
 
     let outcome = state.apply(Message::RunCommandHistory { history_id });
 
     assert!(outcome.changed());
     assert!(outcome.error.is_some());
-    assert_eq!(state.ui.last_error.as_deref(), outcome.error.as_deref());
     assert!(state.backend_commands.is_empty());
 }
 
 #[test]
 fn run_command_history_rejects_global_history_without_host() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let history_id = crate::model::CommandHistoryId(uuid::Uuid::new_v4());
     state
         .storage

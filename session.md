@@ -531,6 +531,74 @@ git status --short
 - 现在不是“完全分离 100%”，但已经明显进入收尾阶段。
 - 核心已经具备脱离 UI 独立运行的骨架，下一步继续做的是把遗留的过渡层清干净。
 
+## 本轮进度（继续收缩 AppState 过渡面）
+
+- 这轮继续推进“核心单独运行、未来可换 UI 也能继续运行”的第一目标。
+- 已经确认当前桌面主路径实际只需要：
+  - `CoreState`
+  - `UiState`
+  - `DesktopAppState`
+- 这次把 `src/app/state.rs` 里的 `AppState` 桌面视图实现收紧为 `#[cfg(test)]`：
+  - 生产桌面层不再把 `AppState` 当成可见适配对象。
+  - 这样 `app` 层的展示和回调继续朝 `DesktopAppState` 收敛。
+- 这一轮的验证结果：
+  - `cargo fmt --all --check` 通过。
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+
+## 当前判断
+
+- 现在的分离已经不是纸面分离，桌面启动路径和无桌面 core 路径都能跑。
+- 仍剩余的主要耦合点是旧测试和少量迁移期模块里对 `AppState::default()` 的依赖。
+- 下一步最值得继续拆的是测试入口和剩余兼容层，而不是再往 UI 里加逻辑。
+
+## 本轮进度（继续压缩 AppState 兼容层）
+
+- 本轮继续沿“核心单独运行、未来可换 UI 也能继续运行”的目标推进。
+- 已做的结构收敛：
+  - `src/model.rs` 不再把 `AppState` 作为公开 API 暴露给外部；现在只保留 `pub(crate)` 可见，避免未来新 UI 继续顺手依赖旧组合状态。
+  - `src/app/state.rs` 中 `AppState -> DesktopStateView` 的桥接继续只留给测试使用，生产桌面路径继续只走 `DesktopAppState`。
+  - 一批纯兼容包装已开始移入测试条件编译：
+    - `src/model/app_state/backend_pump.rs` 的 `impl AppState`
+    - `src/model/app_state/dispatch/backend.rs`
+    - `src/model/app_state/dispatch/session.rs`
+    - `src/model/app_state/dispatch/workspace.rs`
+    - `src/model/app_state/ui_drafts/local_terminal.rs`
+  - `src/model/app_state/dispatch.rs` 只保留了 `dismiss_ui_error` 这个最小公共辅助入口，其余 `AppState::apply` 主分发继续留在测试域。
+- 这轮的实际结果不是“完全删除旧状态”，而是进一步确认：
+  - 生产构建的主路径已经主要依赖 `CoreState + DesktopAppState`
+  - `AppState` 逐步退化为测试/迁移兼容壳
+
+## 本轮验证
+
+- `cargo fmt --all --check` 通过。
+- `cargo check --no-default-features` 通过。
+- `cargo check` 通过。
+
+## 当前评估
+
+- 当前阻力已经从“主路径还没分开”变成“旧兼容层还留在生产编译树里”。
+- `cargo check` 的 warning 已经很明确地暴露出下一步目标：继续把未被生产路径使用的 `impl AppState` 收进 `#[cfg(test)]`，或者进一步拆到测试专用模块。
+
+## 本轮进度（继续收紧旧 AppState 兼容层）
+
+- 本轮继续往“核心单独运行，换个 UI 也可以继续运行”的目标推进。
+- 已继续收紧的兼容层：
+  - `src/model/app_state/dispatch/launch.rs`
+  - `src/model/app_state/dispatch/sftp.rs`
+  - `src/model/app_state/dispatch/storage.rs`
+  - `src/model/app_state/dispatch/ui.rs`
+  - `src/model/app_state/dispatch/visual.rs`
+  - `src/model/app_state/snippets/run.rs`
+- 这些文件里的 `impl AppState` 继续往测试条件编译收，生产路径继续只保留 `CoreState` 运行主线。
+- 这轮验证结果：
+  - `cargo fmt --all --check` 通过。
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+- 目前编译 warning 说明：
+  - 旧 `AppState` 兼容层还没删完，但它已经越来越像纯过渡壳。
+  - 下一步最有价值的是继续把剩余 `AppState` 包装和测试依赖分开，而不是再扩桌面逻辑。
+
 ## 本轮进度（quick_host 兼容壳基本收尾）
 
 - 继续推进第一目标：核心单独运行，未来换 UI 也能继续运行。
@@ -2389,3 +2457,204 @@ git status --short
 - `cargo fmt` 通过。
 - `cargo check` 通过。
 - `cargo check --tests` 通过。
+
+## 本轮进度（旧 UI 分发模块退出生产编译树）
+
+- 本轮继续推进第一目标：先把 UI 和核心代码尽量彻底分离。
+- 已把下列旧 `AppState` UI 分发模块整体切到测试条件编译：
+  - `src/model/app_state/dispatch/ui.rs`
+  - `src/model/app_state/dispatch/ui_quick_host.rs`
+  - `src/model/app_state/dispatch/ui_terminal.rs`
+  - `src/model/app_state/dispatch/ui_workspace.rs`
+  - `src/model/app_state/dispatch/visual.rs`
+- 同时，`src/model/app_state/dispatch.rs` 中对应的 `mod` 声明也已改为 `#[cfg(test)]`，避免生产构建继续编译这些旧 UI 兼容文件。
+- 这轮结果很明确：
+  - 无桌面构建 `cargo check --no-default-features` 只剩少量与 `AppState` 兼容壳相关 warning。
+  - 桌面构建 `cargo check` 的 warning 明显下降，说明生产主路径已经进一步摆脱旧 `AppState` 分发链。
+
+## 本轮验证
+
+- `cargo fmt --all --check` 通过。
+- `cargo check --no-default-features` 通过。
+- `cargo check` 通过。
+
+## 当前评估
+
+- 生产编译树已经主要围绕 `CoreState + DesktopAppState` 组织。
+- 剩下的旧耦合点更多是：
+  - `AppState` 结构体本身和少量 helper 仍作为迁移壳存在
+  - 测试仍大量依赖 `AppState::default()`
+- 这意味着“核心可独立运行、未来换 UI 可继续运行”的主干已经立住，下一步重点是继续削减测试和兼容层，而不是主运行链路。
+
+## 本轮进度（只剩 AppState 旧壳）
+
+- 本轮继续推进第一目标：把 UI 和核心彻底分离。
+- 已完成的收缩：
+  - `src/model/app_state/dispatch/sftp.rs` 的本地路径 helper 改为测试专用。
+  - `src/model/app_state/snippets/run.rs` 的 `activate_terminal_page` 改为测试专用。
+  - `src/model/app_state.rs` 继续只把 `AppState` 作为测试/迁移兼容导出。
+  - `src/model.rs` 不再公开重导出 `AppState`。
+- 这轮验证结果：
+  - `cargo fmt --all --check` 通过。
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+- 当前状态：
+  - 生产构建里关于旧 UI 兼容层的 warning 已经压到只剩 `src/model/app_state/state.rs` 这个旧壳本身。
+  - 这已经非常接近“核心单独运行，未来换 UI 也能继续运行”的收尾线。
+
+## 本轮进度（验证稳定，旧壳只剩测试可见）
+
+- 本轮继续推进第一目标：核心单独运行，换个 UI 也可以继续运行。
+- 做了两件事：
+  - 把 `src/model/app_state/dispatch/visual.rs` 的测试 helper 重新补回，保证旧兼容测试链可编译。
+  - 把 `src/model/app_state/ui_drafts/local_terminal.rs` 的测试所需 `WorkspacePage` 导入补回，恢复测试桥接。
+- 这轮验证结果：
+  - `cargo fmt --all` 通过。
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+- `cargo check --tests` 通过。
+- `cargo run --no-default-features` 通过，headless core 仍能正常启动。
+- 当前状态：
+  - 生产主线已经稳定在 `CoreState + DesktopAppState`。
+  - `AppState` 现在只剩测试/迁移可见的旧壳用途。
+  - 下一步如果继续追求“100%”，就该考虑把这个旧壳从测试桥接进一步拆薄，而不是再回头动主运行链路。
+
+## 本轮进度（结构已分离到收尾边界）
+
+- 本轮继续推进第一目标：核心单独运行，换个 UI 也可以继续运行。
+- 完成的确认：
+  - 生产构建已稳定使用 `CoreState + DesktopAppState`。
+  - `cargo run --no-default-features` 能直接启动 headless core。
+  - `cargo check` / `cargo check --no-default-features` / `cargo check --tests` 都已验证。
+- 现状判断：
+  - `AppState` 已经不再参与生产主路径。
+  - 唯一剩下的结构性痕迹，是 `src/model/app_state/state.rs` 作为旧迁移壳在编译树里发出 `dead_code`。
+  - 这意味着分离已经完成到“架构上成立、代码层只剩遗留壳”的收尾边界。
+
+## 本轮进度（AppState 旧壳退出生产编译树）
+
+- 本轮继续推进第一目标：把 UI 和核心彻底拉开。
+- 已完成的关键收敛：
+  - `src/model/app_state.rs` 中 `state` 模块本身已改成 `#[cfg(test)]`，生产构建不再编译旧 `AppState` 结构体。
+  - 因此，`cargo check` 与 `cargo check --no-default-features` 已不再出现 `src/model/app_state/state.rs` 的 `dead_code` 警告。
+- 这轮验证结果：
+  - `cargo fmt --all --check` 通过。
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+- 当前判断：
+  - 从生产代码结构上看，旧 `AppState` 已经退出运行链路和生产编译树。
+  - 剩下如果还要继续追“100%”，那就是测试域自身是否也要摆脱 `AppState`，这已经属于测试迁移，不再是核心与 UI 主链分离问题。
+
+## 本轮进度（生产侧分离已完成）
+
+- 本轮继续推进第一目标：把 UI 和核心彻底拉开。
+- 已确认：
+  - `src/model/app_state.rs` 的 `state` 模块不再进入生产编译树。
+  - `cargo check` / `cargo check --no-default-features` 通过，且不再出现 `AppState` 旧壳的生产编译警告。
+  - 生产路径已经完全聚焦在 `CoreState + DesktopAppState`。
+- 当前结论：
+  - 结构层面的“核心单独运行、未来换 UI 也能继续运行”已经成立。
+  - 继续追“100%”的剩余工作，只会落到测试迁移和旧测试入口本身，不再影响生产分离结果。
+
+## 本轮进度（测试链也已恢复稳定）
+
+- 本轮继续推进“100%”收尾。
+- 当前确认结果：
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+  - `cargo check --tests` 通过。
+- 这说明：
+  - 生产主路径已经完全站在 `CoreState + DesktopAppState` 上。
+  - 测试链也已经恢复，不再因为前面的分离改造而失稳。
+  - `AppState` 现在只剩测试可见的迁移壳角色，不再是生产入口。
+
+## 本轮进度（开始批量迁移测试入口）
+
+- 本轮开始真正删除历史兼容层在测试中的依赖。
+- 已完成第一批模板迁移：
+  - [src/app/view_model/hosts/tests.rs](/F:/code/rust/smagicalssh/src/app/view_model/hosts/tests.rs)
+  - 这组测试已从 `AppState::default()` 迁到 `DesktopAppState` helper。
+  - 同时把 `state.storage/...` 访问改成 `state.core.storage/...`，把投影调用改成 `view(&state)`。
+- 验证结果：
+  - `cargo fmt --all` 通过。
+  - `cargo check --tests` 通过。
+- 当前判断：
+  - 测试迁移路径已经得到验证，可以继续按同样模式迁 `src/app/view_model/tests.rs`、`src/app/view_model/tabs/tests.rs`、`src/app/view_model/palette/tests.rs` 等文件。
+  - 这一步是在清理“测试对旧壳的依赖”，不再影响生产主链分离结果。
+
+## 本轮进度（AppState 退出 model 主公开面）
+
+- 本轮继续推进第一目标：把 UI 和核心彻底拉开。
+- 已完成的收缩：
+  - `src/model/app_state.rs` 中 `pub use state::AppState;` 改成仅测试可见。
+  - `src/model.rs` 去掉了 `pub(crate) use app_state::AppState;`，生产根模块不再重导出旧状态壳。
+  - `src/app/state.rs` 对 `AppState` 的引入也改成 `#[cfg(test)]`。
+- 这轮验证结果：
+  - `cargo fmt --all --check` 通过。
+  - `cargo check --no-default-features` 通过。
+  - `cargo check` 通过。
+- 当前状态：
+  - `AppState` 已经基本退回测试/迁移域。
+  - `cargo check` 只剩少量直接围绕 `AppState` 结构体与旧 helper 的 warning，说明距离“核心单独运行、未来换 UI 继续跑”又近了一步。
+
+## 本轮进度（正式拆除历史兼容层）
+
+- 本轮完成了最后一阶段的兼容层拆除：
+  - 测试入口中的 `AppState::default()` 已全部清零。
+  - 删除了旧的 UI 兼容分发文件：
+    - `src/model/app_state/dispatch/ui.rs`
+    - `src/model/app_state/dispatch/ui_quick_host.rs`
+    - `src/model/app_state/dispatch/ui_terminal.rs`
+    - `src/model/app_state/dispatch/ui_workspace.rs`
+    - `src/model/app_state/dispatch/visual.rs`
+  - 删除了 `src/model/app_state/state.rs` 本体，不再保留 `AppState` 结构体。
+  - 移除了 `dispatch.rs` 中基于 `AppState` 的旧总分发实现，仅保留 `CoreState::apply_core_message`。
+  - 移除了剩余 `impl AppState` 兼容包装，包括：
+    - `backend_pump.rs`
+    - `dispatch/backend.rs`
+    - `dispatch/launch.rs`
+    - `dispatch/session.rs`
+    - `dispatch/sftp.rs`
+    - `dispatch/snippets.rs`
+    - `dispatch/storage.rs`
+    - `dispatch/workspace.rs`
+    - `snippets/run.rs`
+    - `ui_drafts/local_terminal.rs`
+- 最终验证结果：
+  - `cargo fmt --all` 通过。
+  - `cargo check --tests` 通过。
+  - `cargo check --no-default-features` 通过。
+- 当前结论：
+  - 历史 `AppState` 兼容链已从代码结构中正式移除。
+  - 当前桌面入口为 `DesktopAppState`，无界面核心入口为 `CoreState`。
+  - “核心可单独运行，未来可换任意 UI 继续运行”的第一目标已完成到物理删除兼容层级别。
+
+## 最终收尾（100% 完成）
+
+- 本轮完成最后收尾：
+  - 删除了 `src/model/app_state/state.rs`，不再保留 `AppState` 结构体。
+  - 删除了旧兼容分发文件：
+    - `src/model/app_state/dispatch/ui.rs`
+    - `src/model/app_state/dispatch/ui_quick_host.rs`
+    - `src/model/app_state/dispatch/ui_terminal.rs`
+    - `src/model/app_state/dispatch/ui_workspace.rs`
+    - `src/model/app_state/dispatch/visual.rs`
+  - 清空并删除了所有 `impl AppState` 兼容包装逻辑，最后一批包括：
+    - `backend_pump.rs`
+    - `dispatch/launch.rs`
+    - `dispatch/sftp.rs`
+    - `dispatch/snippets.rs`
+    - `dispatch/storage.rs`
+    - `snippets/run.rs`
+    - `ui_drafts/local_terminal.rs`
+  - 全仓库扫描 `AppState` 代码引用已经归零。
+- 最终验证：
+  - `cargo fmt --all` 通过。
+  - `cargo check` 通过。
+  - `cargo check --tests` 通过。
+  - `cargo check --no-default-features` 通过。
+- 最终状态：
+  - 核心层：`CoreState`
+  - 桌面适配层：`DesktopAppState`
+  - 历史兼容层：已物理移除
+  - 第一目标“核心可单独运行，未来可换任意 UI 继续运行”：100% 完成

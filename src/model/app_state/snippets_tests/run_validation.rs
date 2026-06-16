@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn run_snippet_rejects_snippet_from_other_host() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let other_host_id = HostId(Uuid::new_v4());
@@ -24,7 +24,7 @@ fn run_snippet_rejects_snippet_from_other_host() {
 
 #[test]
 fn run_snippet_rejects_empty_rendered_command_without_side_effects() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let mut snippet = parameterized_host_snippet(host_id, "{{maybe}}");
@@ -49,7 +49,7 @@ fn run_snippet_rejects_empty_rendered_command_without_side_effects() {
 
 #[test]
 fn run_snippet_on_active_host_requires_remote_tab() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let snippet = host_snippet(HostId(Uuid::new_v4()), "uptime");
     let snippet_id = snippet.id;
     state.storage.upsert_snippet(snippet);

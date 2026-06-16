@@ -1,4 +1,4 @@
-use super::super::*;
+use crate::core::CoreState;
 use crate::model::{
     AgentSource, AuthProfile, Host, HostId, Message, SessionId, SessionKind, SplitAxis,
     WorkspaceState, WorkspaceTabSnapshot,
@@ -30,7 +30,7 @@ fn host() -> Host {
 
 #[test]
 fn save_workspace_snapshot_records_current_tabs_and_layout() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = host();
     let host_id = host.id;
     let session_id = SessionId(Uuid::new_v4());
@@ -57,7 +57,7 @@ fn save_workspace_snapshot_records_current_tabs_and_layout() {
 
 #[test]
 fn restore_workspace_snapshot_rebuilds_session_and_terminal_tabs() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = host();
     let host_id = host.id;
     let shell_id = SessionId(Uuid::new_v4());
@@ -95,7 +95,7 @@ fn restore_workspace_snapshot_rebuilds_session_and_terminal_tabs() {
 
 #[test]
 fn clear_workspace_snapshot_removes_saved_workspace() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state
         .storage
         .save_workspace(WorkspaceState::empty("restore"));

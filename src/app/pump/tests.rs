@@ -1,6 +1,7 @@
 use super::drain::enqueue_drain_commands;
 use crate::backend::BackendCommand;
-use crate::model::{AppState, DEFAULT_LOCAL_TERMINAL_TITLE, SessionStatus};
+use crate::core::CoreState;
+use crate::model::{DEFAULT_LOCAL_TERMINAL_TITLE, SessionStatus};
 use uuid::Uuid;
 
 fn session_id() -> crate::model::SessionId {
@@ -9,7 +10,7 @@ fn session_id() -> crate::model::SessionId {
 
 #[test]
 fn pump_drain_queue_targets_only_connected_interactive_shells() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let local_id = session_id();
     let shell_id = session_id();
     let remote_command_id = session_id();
@@ -55,7 +56,7 @@ fn pump_drain_queue_targets_only_connected_interactive_shells() {
 
 #[test]
 fn pump_drain_queue_deduplicates_pending_session_drains() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let shell_id = session_id();
 
     state

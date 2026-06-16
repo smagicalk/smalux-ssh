@@ -2,29 +2,29 @@ use super::*;
 
 #[test]
 fn start_tunnel_normalizes_rule_before_opening_runtime() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let host = sample_host();
     let host_id = host.id;
     let mut rule = tunnel_rule(TunnelKind::Local);
     rule.name = " local-db ".to_owned();
     rule.bind_host = " 127.0.0.1 ".to_owned();
     rule.target_host = " 10.0.0.5 ".to_owned();
-    state.storage.upsert_host(host);
+    state.core.storage.upsert_host(host);
 
-    let outcome = state.apply(Message::StartTunnel { host_id, rule });
+    let outcome = state.apply_message(Message::StartTunnel { host_id, rule });
 
     assert!(outcome.changed());
-    assert_eq!(state.sessions.tunnels[0].rule_name, "local-db");
+    assert_eq!(state.core.sessions.tunnels[0].rule_name, "local-db");
     assert_eq!(
-        state.sessions.tabs[0].title,
+        state.core.sessions.tabs[0].title,
         "L 127.0.0.1:15432 -> 10.0.0.5:5432"
     );
     assert!(matches!(
-        &state.sessions.tabs[0].kind,
+        &state.core.sessions.tabs[0].kind,
         SessionKind::Tunnel { rule_name } if rule_name == "local-db"
     ));
     assert!(matches!(
-        state.backend_commands.drain().as_slice(),
+        state.core.backend_commands.drain().as_slice(),
         [
             BackendCommand::Connect { .. },
             BackendCommand::StartTunnel { request, .. },

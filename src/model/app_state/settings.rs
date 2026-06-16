@@ -8,6 +8,7 @@ use super::AppUpdateOutcome;
 
 impl CoreState {
     /// 导出当前主题资料到指定文件。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn export_current_theme_action(
         &mut self,
         target_path: &str,
@@ -28,6 +29,7 @@ impl CoreState {
     }
 
     /// 复制当前选中的内置主题为可编辑主题资料，并立即应用。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn copy_current_built_in_theme_action(&mut self) -> AppUpdateOutcome {
         let built_in_theme =
             crate::model::BuiltInTheme::from_preference(self.config.workspace.built_in_theme);
@@ -54,6 +56,7 @@ impl CoreState {
     }
 
     /// 从文件导入主题资料，并立即应用。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn import_theme_action(&mut self, source_path: &str) -> AppUpdateOutcome {
         let Some(source_path) = normalized_path(source_path) else {
             return settings_error("导入源路径不能为空");
@@ -86,6 +89,7 @@ impl CoreState {
     }
 
     /// 应用已保存主题资料。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn apply_theme_profile_action(&mut self, name: &str) -> AppUpdateOutcome {
         let Some(theme) = self.storage.theme_by_name(name.trim()) else {
             return settings_error(format!("主题资料不存在：{}", name.trim()));
@@ -104,6 +108,7 @@ impl CoreState {
     }
 
     /// 删除已保存主题资料，不改变当前已应用的全局主题配置。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn remove_theme_profile_action(&mut self, name: &str) -> AppUpdateOutcome {
         let removed = self.storage.remove_theme(name.trim());
         if !removed {
@@ -118,6 +123,7 @@ impl CoreState {
     }
 
     /// 备份 SQLite 存储文件。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn backup_storage_action(&mut self, target_path: &str) -> AppUpdateOutcome {
         let Some(target_path) = normalized_path(target_path) else {
             return settings_error("备份目标路径不能为空");
@@ -137,6 +143,7 @@ impl CoreState {
     }
 
     /// 导出当前 SQLite 快照。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn export_storage_snapshot_action(&mut self, target_path: &str) -> AppUpdateOutcome {
         let Some(target_path) = normalized_path(target_path) else {
             return settings_error("导出目标路径不能为空");
@@ -156,6 +163,7 @@ impl CoreState {
     }
 
     /// 从快照文件导入存储，并重载核心存储状态。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn import_storage_snapshot_action(&mut self, source_path: &str) -> AppUpdateOutcome {
         let Some(source_path) = normalized_path(source_path) else {
             return settings_error("导入源路径不能为空");
@@ -171,6 +179,7 @@ impl CoreState {
     }
 
     /// 从 SQLite 备份文件导入存储，并重载核心存储状态。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn import_sqlite_backup_action(&mut self, source_path: &str) -> AppUpdateOutcome {
         let Some(source_path) = normalized_path(source_path) else {
             return settings_error("导入源路径不能为空");
@@ -186,6 +195,7 @@ impl CoreState {
     }
 
     /// 导入成功后重新加载持久化状态到核心。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn reload_storage_after_import_action(&mut self) -> AppUpdateOutcome {
         let Some(backend) = self.storage_backend.as_ref() else {
             return settings_error("没有可用的 SQLite 存储后端");
@@ -203,6 +213,7 @@ impl CoreState {
         }
     }
 
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     fn apply_theme_document(&mut self, document: crate::theme::ThemeDocument) {
         self.config.theme = crate::model::ThemeProfile {
             name: document.name,
@@ -212,12 +223,14 @@ impl CoreState {
         self.storage.app_config = self.config.clone();
     }
 
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     fn theme_document_would_change_profile(&self, document: &crate::theme::ThemeDocument) -> bool {
         self.config.theme.name != document.name
             || self.config.theme.font_family != document.font.terminal.family
             || self.config.theme.font_size != document.font.terminal.size as f32
     }
 
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     fn current_theme_document(
         &self,
     ) -> Result<crate::theme::ThemeDocument, crate::theme::ThemeError> {
@@ -231,6 +244,7 @@ impl CoreState {
     }
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn unique_theme_name(state: &CoreState, base: &str) -> String {
     if state.storage.theme_by_name(base).is_none() {
         return base.to_owned();
@@ -246,6 +260,7 @@ fn unique_theme_name(state: &CoreState, base: &str) -> String {
     }
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn unique_theme_id(theme_key: &str, theme_name: &str) -> String {
     let mut id = String::new();
     for ch in theme_key.chars() {
@@ -270,11 +285,13 @@ fn unique_theme_id(theme_key: &str, theme_name: &str) -> String {
     }
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn normalized_path(value: &str) -> Option<&Path> {
     let trimmed = value.trim();
     (!trimmed.is_empty()).then(|| Path::new(trimmed))
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn write_text_file(path: &Path, content: String) -> Result<(), String> {
     if path.exists() {
         return Err(format!("导出目标已存在：{}", path.display()));
@@ -285,6 +302,7 @@ fn write_text_file(path: &Path, content: String) -> Result<(), String> {
     std::fs::write(path, content).map_err(|error| format!("写入文件失败：{error}"))
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn parse_theme_document(
     content: &str,
     source_name: &str,
@@ -292,6 +310,7 @@ fn parse_theme_document(
     crate::theme::ThemeDocument::from_import(content, source_name)
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn settings_error(message: impl Into<String>) -> AppUpdateOutcome {
     AppUpdateOutcome {
         state_changed: false,

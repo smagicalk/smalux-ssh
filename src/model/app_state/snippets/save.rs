@@ -8,10 +8,12 @@ use crate::model::{HostId, Snippet, SnippetId, SnippetScope};
 use super::super::AppUpdateOutcome;
 use super::outcome::missing_host;
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 const HOST_SNIPPET_NAME_LIMIT: usize = 48;
 
 impl CoreState {
     /// 将一条命令保存为主机级快捷命令。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn save_host_command_snippet_action(
         &mut self,
         host_id: HostId,
@@ -46,6 +48,7 @@ impl CoreState {
     }
 }
 
+#[cfg_attr(not(feature = "desktop"), allow(dead_code))]
 fn snippet_name(command: &str) -> String {
     let mut name: String = command.chars().take(HOST_SNIPPET_NAME_LIMIT).collect();
     if command.chars().count() > HOST_SNIPPET_NAME_LIMIT {

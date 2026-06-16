@@ -7,6 +7,7 @@ use super::super::AppUpdateOutcome;
 
 impl CoreState {
     /// 应用已经过草稿校验的全局视觉配置。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn apply_visual_profiles_action(
         &mut self,
         theme: ThemeProfile,

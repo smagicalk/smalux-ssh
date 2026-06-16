@@ -1,8 +1,10 @@
 use super::*;
+use crate::app::state::DesktopAppState;
 use crate::backend::{BackendCommand, BackendEvent};
+use crate::core::CoreState;
 use crate::model::{
     AgentSource, AuthProfile, Host, SessionStatus, TunnelKind, TunnelRule, TunnelRuntimeState,
-    TunnelStatus,
+    TunnelStatus, UiState,
 };
 
 mod activation;
@@ -10,6 +12,16 @@ mod base;
 mod close_tabs;
 mod sftp_selection;
 mod terminal_input;
+
+fn core_state() -> CoreState {
+    CoreState::default()
+}
+
+fn desktop_state() -> DesktopAppState {
+    let core = CoreState::default();
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
 
 fn sample_host() -> Host {
     Host {

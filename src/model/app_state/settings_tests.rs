@@ -1,7 +1,7 @@
 use std::fs;
 use std::path::PathBuf;
 
-use super::AppState;
+use crate::core::CoreState;
 use crate::model::{AgentSource, AuthProfile, BuiltInTheme, Host, HostId, Message};
 use crate::storage::SqliteStorage;
 use crate::theme::{ThemeExchangeFormat, built_in_theme_document};
@@ -42,7 +42,7 @@ fn settings_storage_backup_writes_loadable_sqlite_copy() {
     let sqlite_path = temp_path("settings-backup-source", "sqlite");
     let backup_path = temp_path("settings-backup-target", "sqlite");
     let backend = SqliteStorage::new(&sqlite_path);
-    let mut state = AppState::default().with_storage_backend(backend);
+    let mut state = CoreState::default().with_storage_backend(backend);
     state.storage.upsert_host(host("production"));
 
     let outcome = state.apply(Message::BackupStorage {
@@ -66,8 +66,8 @@ fn settings_snapshot_import_replaces_current_state() {
     let snapshot_path = temp_path("settings-import-source", "toml");
     let source_backend = SqliteStorage::new(&source_path);
     let target_backend = SqliteStorage::new(&target_path);
-    let mut source_state = AppState::default().with_storage_backend(source_backend);
-    let mut target_state = AppState::default().with_storage_backend(target_backend);
+    let mut source_state = CoreState::default().with_storage_backend(source_backend);
+    let mut target_state = CoreState::default().with_storage_backend(target_backend);
     source_state.storage.upsert_host(host("source"));
     target_state.storage.upsert_host(host("target"));
 
@@ -90,7 +90,7 @@ fn settings_snapshot_import_replaces_current_state() {
 
 #[test]
 fn settings_storage_operations_report_missing_backend() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::BackupStorage {
         target_path: temp_path("missing-backend", "sqlite")
@@ -98,21 +98,14 @@ fn settings_storage_operations_report_missing_backend() {
             .into_owned(),
     });
 
-    assert!(outcome.error.is_some());
-    assert!(
-        state
-            .ui
-            .last_error
-            .as_deref()
-            .is_some_and(|error| error.contains("SQLite"))
-    );
+    assert!(outcome.error.is_some_and(|error| error.contains("SQLite")));
 }
 
 #[test]
 fn settings_file_operations_reject_empty_paths() {
     let sqlite_path = temp_path("settings-empty-path", "sqlite");
     let backend = SqliteStorage::new(&sqlite_path);
-    let mut state = AppState::default().with_storage_backend(backend);
+    let mut state = CoreState::default().with_storage_backend(backend);
 
     let backup = state.apply(Message::BackupStorage {
         target_path: "   ".to_owned(),
@@ -174,7 +167,7 @@ fn settings_storage_file_operations_report_conflicting_paths() {
     let backup_path = temp_path("settings-conflict-backup", "sqlite");
     let snapshot_path = temp_path("settings-conflict-snapshot", "toml");
     let backend = SqliteStorage::new(&sqlite_path);
-    let mut state = AppState::default().with_storage_backend(backend);
+    let mut state = CoreState::default().with_storage_backend(backend);
     state.storage.upsert_host(host("production"));
     fs::write(&backup_path, "existing").expect("existing backup marker should write");
     fs::write(&snapshot_path, "existing").expect("existing snapshot marker should write");
@@ -214,7 +207,7 @@ fn settings_storage_file_operations_report_conflicting_paths() {
 #[test]
 fn settings_theme_export_writes_current_builtin_theme_document() {
     let export_path = temp_path("theme-export", "toml");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::SetBuiltInTheme {
         theme: BuiltInTheme::Dracula,
     });
@@ -234,7 +227,7 @@ fn settings_theme_export_writes_current_builtin_theme_document() {
 #[test]
 fn settings_theme_export_supports_common_external_formats() {
     let export_path = temp_path("theme-export-vscode", "json");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::SetBuiltInTheme {
         theme: BuiltInTheme::Dracula,
     });
@@ -253,7 +246,7 @@ fn settings_theme_export_supports_common_external_formats() {
 #[test]
 fn settings_theme_export_reports_unsupported_iterm2() {
     let export_path = temp_path("theme-export-iterm", "itermcolors");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ExportCurrentTheme {
         target_path: export_path.to_string_lossy().into_owned(),
@@ -271,7 +264,7 @@ fn settings_theme_export_current_profile_uses_stored_custom_theme() {
     document.name = "Stored Nord".to_owned();
     document.font.terminal.family = "Maple Mono".to_owned();
     document.font.terminal.size = 17;
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state
         .storage
         .upsert_theme(crate::storage::ThemeProfileRecord {
@@ -297,7 +290,7 @@ fn settings_theme_export_current_profile_uses_stored_custom_theme() {
 
 #[test]
 fn copy_current_built_in_theme_creates_custom_profile_and_applies_it() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::SetBuiltInTheme {
         theme: BuiltInTheme::Dracula,
     });
@@ -342,7 +335,7 @@ fn settings_theme_import_updates_global_theme_profile() {
         document.to_toml().expect("theme should encode"),
     )
     .expect("theme fixture should write");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -361,7 +354,6 @@ fn settings_theme_import_updates_global_theme_profile() {
             .map(|theme| theme.builtin),
         Some(false)
     );
-    assert_eq!(state.ui.visual_settings.theme_name, "Imported Nord");
     let _ = fs::remove_file(import_path);
 }
 
@@ -386,7 +378,7 @@ size = 16
 "##,
     )
     .expect("partial theme fixture should write");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -413,7 +405,7 @@ fn settings_theme_import_accepts_vscode_json_and_stores_native_toml() {
         .export(ThemeExchangeFormat::VsCodeJson)
         .expect("VS Code theme should export");
     fs::write(&import_path, exported.content).expect("theme fixture should write");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -439,7 +431,7 @@ fn settings_theme_import_accepts_windows_terminal_json() {
         .export(ThemeExchangeFormat::WindowsTerminalJson)
         .expect("Windows Terminal theme should export");
     fs::write(&import_path, exported.content).expect("theme fixture should write");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -460,7 +452,7 @@ fn settings_theme_import_accepts_alacritty_toml() {
         .export(ThemeExchangeFormat::AlacrittyToml)
         .expect("Alacritty theme should export");
     fs::write(&import_path, exported.content).expect("theme fixture should write");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -482,7 +474,7 @@ fn settings_theme_import_accepts_alacritty_toml() {
 fn settings_theme_import_reports_unsupported_iterm2() {
     let import_path = temp_path("theme-import-iterm", "itermcolors");
     fs::write(&import_path, "<plist></plist>").expect("theme fixture should write");
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -499,7 +491,7 @@ fn settings_theme_profile_can_be_applied_from_storage() {
     document.name = "Stored Nord".to_owned();
     document.font.terminal.family = "Maple Mono".to_owned();
     document.font.terminal.size = 17;
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state
         .storage
         .upsert_theme(crate::storage::ThemeProfileRecord {
@@ -517,7 +509,6 @@ fn settings_theme_profile_can_be_applied_from_storage() {
     assert_eq!(state.config.theme.font_family, "Maple Mono");
     assert_eq!(state.config.theme.font_size, 17.0);
     assert_eq!(state.storage.app_config.theme, state.config.theme);
-    assert_eq!(state.ui.visual_settings.theme_name, "Stored Nord");
 }
 
 #[test]
@@ -526,7 +517,7 @@ fn settings_theme_profile_reapply_current_profile_is_noop() {
     document.name = "Stored Nord".to_owned();
     document.font.terminal.family = "Maple Mono".to_owned();
     document.font.terminal.size = 17;
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state
         .storage
         .upsert_theme(crate::storage::ThemeProfileRecord {
@@ -544,14 +535,13 @@ fn settings_theme_profile_reapply_current_profile_is_noop() {
 
     assert!(!outcome.changed());
     assert_eq!(state.config.theme.name, "Stored Nord");
-    assert_eq!(state.ui.visual_settings.theme_name, "Stored Nord");
 }
 
 #[test]
 fn settings_theme_profile_remove_updates_storage_without_resetting_current_theme() {
     let mut document = built_in_theme_document(BuiltInTheme::NordDark);
     document.name = "Disposable Nord".to_owned();
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state
         .storage
         .upsert_theme(crate::storage::ThemeProfileRecord {
@@ -587,7 +577,7 @@ fn settings_theme_import_roundtrips_through_sqlite_storage() {
         document.to_toml().expect("theme should encode"),
     )
     .expect("theme fixture should write");
-    let mut state = AppState::default().with_storage_backend(backend.clone());
+    let mut state = CoreState::default().with_storage_backend(backend.clone());
 
     let outcome = state.apply(Message::ImportTheme {
         source_path: import_path.to_string_lossy().into_owned(),
@@ -619,7 +609,7 @@ fn settings_theme_profile_apply_roundtrips_current_config_through_sqlite_storage
     document.name = "Persistent Nord".to_owned();
     document.font.terminal.family = "JetBrains Mono".to_owned();
     document.font.terminal.size = 18;
-    let mut state = AppState::default().with_storage_backend(backend.clone());
+    let mut state = CoreState::default().with_storage_backend(backend.clone());
     state
         .storage
         .upsert_theme(crate::storage::ThemeProfileRecord {
@@ -646,7 +636,7 @@ fn settings_theme_profile_apply_roundtrips_current_config_through_sqlite_storage
 
 #[test]
 fn settings_theme_profile_missing_name_reports_error() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.apply(Message::ApplyThemeProfile {
         name: "Missing".to_owned(),

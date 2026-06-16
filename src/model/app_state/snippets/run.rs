@@ -3,10 +3,10 @@
 use crate::core::CoreState;
 use crate::model::{
     HostId, Snippet, SnippetArgument, SnippetId, SnippetImplementation, SnippetRenderError,
-    SnippetSupportTargetId, WorkspacePage,
+    SnippetSupportTargetId,
 };
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 use super::outcome::{missing_host, missing_snippet};
 
 impl CoreState {
@@ -65,6 +65,7 @@ impl CoreState {
     }
 
     /// 使用指定支持目标渲染并运行快捷命令。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn run_snippet_target_action(
         &mut self,
         host_id: HostId,
@@ -118,73 +119,6 @@ impl CoreState {
         self.storage
             .record_snippet_implementation_arguments(implementation.id, valid_arguments);
         self.run_remote_command(host_id, command, false)
-    }
-}
-
-impl AppState {
-    /// 在当前活动远程标签关联的主机上执行快捷命令。
-    pub(in crate::model::app_state) fn run_snippet_on_active_host(
-        &mut self,
-        snippet_id: SnippetId,
-    ) -> AppUpdateOutcome {
-        let Some(host_id) = self.active_remote_host_id() else {
-            return AppUpdateOutcome {
-                error: Some("请先打开或选中一个远程主机终端".to_owned()),
-                ..AppUpdateOutcome::default()
-            };
-        };
-
-        self.run_snippet(host_id, snippet_id)
-    }
-
-    /// 在当前活动远程标签关联的主机上执行指定支持目标。
-    pub(in crate::model::app_state) fn run_snippet_target_on_active_host(
-        &mut self,
-        snippet_id: SnippetId,
-        target_id: SnippetSupportTargetId,
-    ) -> AppUpdateOutcome {
-        let Some(host_id) = self.active_remote_host_id() else {
-            return AppUpdateOutcome {
-                error: Some("请先打开或选中一个远程主机终端".to_owned()),
-                ..AppUpdateOutcome::default()
-            };
-        };
-
-        self.run_snippet_target(host_id, snippet_id, target_id)
-    }
-
-    /// 渲染并执行适用于主机的快捷命令。
-    pub(in crate::model::app_state) fn run_snippet(
-        &mut self,
-        host_id: HostId,
-        snippet_id: SnippetId,
-    ) -> AppUpdateOutcome {
-        let outcome = self.core.run_snippet_action(host_id, snippet_id);
-        activate_terminal_page(&mut self.ui.workspace.active_page, &outcome);
-        outcome
-    }
-
-    /// 渲染并执行指定支持目标。
-    pub(in crate::model::app_state) fn run_snippet_target(
-        &mut self,
-        host_id: HostId,
-        snippet_id: SnippetId,
-        target_id: SnippetSupportTargetId,
-    ) -> AppUpdateOutcome {
-        let outcome = self
-            .core
-            .run_snippet_target_action(host_id, snippet_id, target_id);
-        activate_terminal_page(&mut self.ui.workspace.active_page, &outcome);
-        outcome
-    }
-
-    fn active_remote_host_id(&self) -> Option<HostId> {
-        let active_tab = self.sessions.active_tab?;
-        self.sessions
-            .tabs
-            .iter()
-            .find(|tab| tab.id == active_tab)
-            .and_then(|tab| tab.host_id)
     }
 }
 
@@ -273,12 +207,6 @@ fn rendered_snippet_command(
         });
     }
     Ok(command)
-}
-
-fn activate_terminal_page(active_page: &mut WorkspacePage, outcome: &AppUpdateOutcome) {
-    if outcome.changed() {
-        *active_page = WorkspacePage::Terminal;
-    }
 }
 
 fn snippet_implementation_for_target(

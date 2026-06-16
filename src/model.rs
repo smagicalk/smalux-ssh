@@ -7,7 +7,7 @@ mod app_state;
 mod host_draft;
 mod ui_state;
 
-pub use app_state::*;
+pub use app_state::{AppUpdateOutcome, BackendCommandResult, Message};
 pub use host_draft::*;
 pub use ui_state::*;
 

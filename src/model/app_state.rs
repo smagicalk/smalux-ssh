@@ -1,13 +1,7 @@
-//! 应用根状态和消息调度。
+//! 过渡期应用消息分发与历史兼容模块。
 //!
-//! 这个模块是桌面 UI 草稿和核心行为之间的过渡分发器：
-//!
-//! - `Message` 描述“用户或后台发生了什么”。
-//! - `AppState::apply` 负责把仍依赖 UI 草稿的消息分发到对应单一职责模块。
-//! - `AppUpdateOutcome` 描述一次状态变更是否产生了错误、后端命令或需要刷新。
-//!
-//! 新 UI 不需要知道 Slint 回调、Slint 模型或窗口属性；核心运行优先从
-//! `CoreState` 开始，需要复用现有桌面交互草稿时再临时走 `AppState`。
+//! 当前桌面主路径已经迁移到 `CoreState` 与 `DesktopAppState`。这里剩余模块主要用于
+//! 清理最后一层历史兼容实现。
 
 #[cfg(test)]
 use super::{HostId, SnippetId, VisualSettingsDraftField, WorkspacePage};
@@ -33,7 +27,6 @@ mod settings_tests;
 mod snippets;
 #[cfg(test)]
 mod snippets_tests;
-mod state;
 mod storage_admin;
 #[cfg(test)]
 mod tests;
@@ -49,4 +42,3 @@ mod workspace_ui;
 pub use backend_pump::BackendCommandResult;
 pub use message::Message;
 pub use outcome::AppUpdateOutcome;
-pub use state::AppState;

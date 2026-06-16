@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn activate_sftp_tab_message_switches_session_without_terminal_tab() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let first_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let second_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());

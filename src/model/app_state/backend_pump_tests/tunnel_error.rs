@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_marks_tunnel_failed_on_executor_error() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

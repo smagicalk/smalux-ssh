@@ -1,10 +1,21 @@
 use super::*;
 use crate::model::{
-    AgentSource, AppState, AuthProfile, CredentialKind, CredentialMetadata, ForwardAsset,
-    ForwardId, GroupId, Host, HostGroup, HostId, JumpChainAsset, JumpChainId, KeyAlgorithm,
-    LanguageMode, ProxyAsset, ProxyId, ProxyProfile, SecretRef, TunnelKind, TunnelRule,
+    AgentSource, AuthProfile, CredentialKind, CredentialMetadata, ForwardAsset, ForwardId, GroupId,
+    Host, HostGroup, HostId, JumpChainAsset, JumpChainId, KeyAlgorithm, LanguageMode, ProxyAsset,
+    ProxyId, ProxyProfile, SecretRef, TunnelKind, TunnelRule,
 };
+use crate::{app::state::DesktopAppState, core::CoreState, model::UiState};
 use uuid::Uuid;
+
+fn desktop_state() -> DesktopAppState {
+    let core = CoreState::default();
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
+
+fn view<'a>(state: &'a DesktopAppState) -> crate::app::state::DesktopStateView<'a> {
+    state.as_desktop_state_view()
+}
 
 fn agent_host(name: &str, address: &str, tags: &[&str]) -> Host {
     Host {
@@ -30,9 +41,9 @@ fn agent_host(name: &str, address: &str, tags: &[&str]) -> Host {
 
 #[test]
 fn host_rows_do_not_expose_auth_secrets() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: HostId(Uuid::new_v4()),
         name: "root".to_owned(),
         group_id: None,
@@ -51,7 +62,7 @@ fn host_rows_do_not_expose_auth_secrets() {
         background_override: None,
     });
 
-    let rows = hosts(&state);
+    let rows = hosts(view(&state));
 
     assert_eq!(rows[0].auth, "Password");
     assert!(!rows[0].endpoint.contains("password"));
@@ -59,28 +70,30 @@ fn host_rows_do_not_expose_auth_secrets() {
 
 #[test]
 fn host_rows_project_icon_key() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let mut host = agent_host("database", "db.example.com", &["prod"]);
     host.icon_key = "database".to_owned();
-    state.storage.upsert_host(host);
+    state.core.storage.upsert_host(host);
 
-    let rows = hosts(&state);
+    let rows = hosts(view(&state));
 
     assert_eq!(rows[0].icon_key, "database");
 }
 
 #[test]
 fn host_rows_follow_search_query() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state
+        .core
         .storage
         .upsert_host(agent_host("Production", "prod.example.com", &["prod"]));
     state
+        .core
         .storage
         .upsert_host(agent_host("Staging", "staging.example.com", &["stage"]));
     state.ui.workspace.set_host_search_query("prod");
 
-    let rows = hosts(&state);
+    let rows = hosts(view(&state));
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].name, "Production");
@@ -88,30 +101,30 @@ fn host_rows_follow_search_query() {
 
 #[test]
 fn host_tree_projects_empty_and_nested_groups() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let parent_id = GroupId(Uuid::new_v4());
     let empty_child_id = GroupId(Uuid::new_v4());
     let host_child_id = GroupId(Uuid::new_v4());
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: parent_id,
         name: "生产".to_owned(),
         parent_id: None,
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: empty_child_id,
         name: "空文件夹".to_owned(),
         parent_id: Some(parent_id),
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: host_child_id,
         name: "华东".to_owned(),
         parent_id: Some(parent_id),
     });
     let mut host = agent_host("API", "api.example.com", &["prod"]);
     host.group_id = Some(host_child_id);
-    state.storage.upsert_host(host);
+    state.core.storage.upsert_host(host);
 
-    let rows = host_tree(&state);
+    let rows = host_tree(view(&state));
 
     let root = rows
         .iter()
@@ -141,27 +154,27 @@ fn host_tree_projects_empty_and_nested_groups() {
 
 #[test]
 fn host_tree_marks_ancestor_guides_for_later_siblings() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let first_id = GroupId(Uuid::new_v4());
     let first_child_id = GroupId(Uuid::new_v4());
     let second_id = GroupId(Uuid::new_v4());
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: first_id,
         name: "aaa".to_owned(),
         parent_id: None,
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: first_child_id,
         name: "aa".to_owned(),
         parent_id: Some(first_id),
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: second_id,
         name: "bb".to_owned(),
         parent_id: None,
     });
 
-    let rows = host_tree(&state);
+    let rows = host_tree(view(&state));
 
     let first = rows
         .iter()
@@ -183,22 +196,22 @@ fn host_tree_marks_ancestor_guides_for_later_siblings() {
 
 #[test]
 fn host_tree_hides_descendants_of_collapsed_group() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let parent_id = GroupId(Uuid::new_v4());
     let child_id = GroupId(Uuid::new_v4());
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: parent_id,
         name: "生产".to_owned(),
         parent_id: None,
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: child_id,
         name: "华东".to_owned(),
         parent_id: Some(parent_id),
     });
     state.ui.workspace.toggle_host_tree_group(Some(parent_id));
 
-    let rows = host_tree(&state);
+    let rows = host_tree(view(&state));
 
     assert!(
         rows.iter()
@@ -213,16 +226,16 @@ fn host_tree_hides_descendants_of_collapsed_group() {
 
 #[test]
 fn host_tree_root_can_collapse_all_children() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let group_id = GroupId(Uuid::new_v4());
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: group_id,
         name: "生产".to_owned(),
         parent_id: None,
     });
     state.ui.workspace.toggle_host_tree_group(None);
 
-    let rows = host_tree(&state);
+    let rows = host_tree(view(&state));
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].kind, "Root");
@@ -231,23 +244,23 @@ fn host_tree_root_can_collapse_all_children() {
 
 #[test]
 fn create_group_dialog_projects_parent_options() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let parent_id = GroupId(Uuid::new_v4());
     let child_id = GroupId(Uuid::new_v4());
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: parent_id,
         name: "生产".to_owned(),
         parent_id: None,
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: child_id,
         name: "华东".to_owned(),
         parent_id: Some(parent_id),
     });
     state.ui.quick_group.parent_id = Some(child_id);
 
-    let vm = create_group_dialog(&state);
+    let vm = create_group_dialog(view(&state));
 
     assert_eq!(vm.parent_path, "生产 / 华东");
     assert_eq!(vm.parent_options[0].path, "未分组");
@@ -261,7 +274,7 @@ fn create_group_dialog_projects_parent_options() {
 
 #[test]
 fn host_rows_use_group_accent_mapping() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let first_group_id = GroupId(Uuid::new_v4());
     let mut second_group_id = GroupId(Uuid::new_v4());
     while accent_index_for_group_id(Some(first_group_id))
@@ -269,30 +282,30 @@ fn host_rows_use_group_accent_mapping() {
     {
         second_group_id = GroupId(Uuid::new_v4());
     }
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: first_group_id,
         name: "生产".to_owned(),
         parent_id: None,
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: second_group_id,
         name: "测试".to_owned(),
         parent_id: None,
     });
     let mut host = agent_host("Production", "prod.example.com", &["prod"]);
     host.group_id = Some(first_group_id);
-    state.storage.upsert_host(host.clone());
+    state.core.storage.upsert_host(host.clone());
 
-    let rows = hosts(&state);
+    let rows = hosts(view(&state));
     let accent = rows[0].accent_index;
 
     assert!((0..=4).contains(&accent));
     assert_eq!(accent, accent_index_for_group_id(Some(first_group_id)));
 
     host.group_id = Some(second_group_id);
-    state.storage.upsert_host(host);
+    state.core.storage.upsert_host(host);
 
-    let changed_rows = hosts(&state);
+    let changed_rows = hosts(view(&state));
 
     assert_eq!(
         changed_rows[0].accent_index,
@@ -303,23 +316,23 @@ fn host_rows_use_group_accent_mapping() {
 
 #[test]
 fn quick_host_projects_group_path_options_and_selection() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let parent_id = GroupId(Uuid::new_v4());
     let child_id = GroupId(Uuid::new_v4());
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: child_id,
         name: "华东".to_owned(),
         parent_id: Some(parent_id),
     });
-    state.storage.upsert_group(HostGroup {
+    state.core.storage.upsert_group(HostGroup {
         id: parent_id,
         name: "生产".to_owned(),
         parent_id: None,
     });
     state.ui.select_quick_host_group(Some(child_id));
 
-    let vm = quick_host(&state);
+    let vm = quick_host(view(&state));
 
     assert_eq!(vm.group_path, "生产 / 华东");
     assert_eq!(vm.group_options[0].path, "未分组");
@@ -345,8 +358,8 @@ fn quick_host_projects_group_path_options_and_selection() {
 
 #[test]
 fn quick_host_projects_key_and_certificate_options() {
-    let mut state = AppState::default();
-    state.storage.upsert_credential(CredentialMetadata {
+    let mut state = desktop_state();
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "prod-key".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -356,7 +369,7 @@ fn quick_host_projects_key_and_certificate_options() {
         key_algorithm: Some(KeyAlgorithm::Ed25519),
         fingerprint: None,
     });
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "prod-cert".to_owned(),
         kind: CredentialKind::Certificate,
@@ -366,7 +379,7 @@ fn quick_host_projects_key_and_certificate_options() {
         key_algorithm: None,
         fingerprint: Some("SHA256:cert".to_owned()),
     });
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "password".to_owned(),
         kind: CredentialKind::Password,
@@ -379,7 +392,7 @@ fn quick_host_projects_key_and_certificate_options() {
     state.ui.quick_host.auth.private_key_ref = "secret://keys/prod".to_owned();
     state.ui.quick_host.auth.certificate_ref = "secret://certs/prod".to_owned();
 
-    let vm = quick_host(&state);
+    let vm = quick_host(view(&state));
 
     assert_eq!(vm.private_key_options.len(), 1);
     assert_eq!(vm.private_key_options[0].label, "prod-key");
@@ -393,13 +406,13 @@ fn quick_host_projects_key_and_certificate_options() {
 
 #[test]
 fn quick_host_projects_network_resource_options() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let proxy_id = ProxyId(Uuid::new_v4());
     let chain_id = JumpChainId(Uuid::new_v4());
     let forward_id = ForwardId(Uuid::new_v4());
     let jump_host_id = HostId(Uuid::new_v4());
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: jump_host_id,
         name: "跳板机".to_owned(),
         group_id: None,
@@ -418,7 +431,7 @@ fn quick_host_projects_network_resource_options() {
         theme_override: None,
         background_override: None,
     });
-    state.storage.upsert_proxy_asset(ProxyAsset {
+    state.core.storage.upsert_proxy_asset(ProxyAsset {
         id: proxy_id,
         name: "corp-proxy".to_owned(),
         tags: Vec::new(),
@@ -428,7 +441,7 @@ fn quick_host_projects_network_resource_options() {
             auth: crate::model::ProxyAuth::None,
         },
     });
-    state.storage.upsert_jump_chain_asset(JumpChainAsset {
+    state.core.storage.upsert_jump_chain_asset(JumpChainAsset {
         id: chain_id,
         name: "prod-jump".to_owned(),
         steps: vec![crate::model::JumpProfile {
@@ -439,7 +452,7 @@ fn quick_host_projects_network_resource_options() {
         }],
         stop_on_failure: true,
     });
-    state.storage.upsert_forward_asset(ForwardAsset {
+    state.core.storage.upsert_forward_asset(ForwardAsset {
         id: forward_id,
         name: "db-forward".to_owned(),
         tags: Vec::new(),
@@ -458,7 +471,7 @@ fn quick_host_projects_network_resource_options() {
     state.ui.quick_host.network.proxy_ids.push(proxy_id);
     state.ui.quick_host.network.forward_ids.push(forward_id);
 
-    let vm = quick_host(&state);
+    let vm = quick_host(view(&state));
 
     assert_eq!(vm.network_proxy_options.len(), 1);
     assert_eq!(vm.network_proxy_options[0].label, "corp-proxy");
@@ -476,29 +489,30 @@ fn quick_host_projects_network_resource_options() {
 
 #[test]
 fn new_session_hosts_hide_empty_tags_after_localization() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     state
+        .core
         .storage
         .upsert_host(agent_host("Production", "prod.example.com", &[]));
 
-    let host = new_session_hosts(&state).remove(0);
+    let host = new_session_hosts(view(&state)).remove(0);
 
-    assert_eq!(hosts(&state)[0].tags, "默认");
+    assert_eq!(hosts(view(&state))[0].tags, "默认");
     assert_eq!(host.tags, "");
 }
 
 #[test]
 fn new_session_hosts_compact_real_tags_without_locale_sentinel() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
-    state.storage.upsert_host(agent_host(
+    state.core.storage.upsert_host(agent_host(
         "Production",
         "prod.example.com",
         &["prod", "api", "east"],
     ));
 
-    let host = new_session_hosts(&state).remove(0);
+    let host = new_session_hosts(view(&state)).remove(0);
 
     assert_eq!(host.tags, "prod +2");
 }

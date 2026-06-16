@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn run_snippet_renders_and_runs_remote_command() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = host_snippet(host_id, "df -h");
@@ -30,7 +30,7 @@ fn run_snippet_renders_and_runs_remote_command() {
 
 #[test]
 fn run_snippet_on_active_host_uses_current_remote_tab() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = host_snippet(host_id, "uptime");
@@ -49,7 +49,7 @@ fn run_snippet_on_active_host_uses_current_remote_tab() {
 
 #[test]
 fn run_snippet_target_uses_target_implementation() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = multi_target_snippet(host_id);

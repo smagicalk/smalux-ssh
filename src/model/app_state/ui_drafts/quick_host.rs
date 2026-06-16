@@ -12,6 +12,7 @@ use super::super::AppUpdateOutcome;
 
 impl CoreState {
     /// 保存或更新一个已经过桌面草稿校验的主机记录。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn save_host_record(
         &mut self,
         host: Host,
@@ -42,6 +43,7 @@ impl CoreState {
     }
 
     /// 复制一个已保存主机。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn duplicate_host_record(&mut self, host_id: HostId) -> AppUpdateOutcome {
         let Some(source) = self
             .storage

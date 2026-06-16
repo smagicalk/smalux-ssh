@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_discards_failed_session_tail_commands() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -15,7 +15,6 @@ fn backend_queue_pump_discards_failed_session_tail_commands() {
     assert_eq!(outcome.executed_backend_commands, 0);
     assert_eq!(outcome.applied_backend_events, 1);
     assert!(outcome.error.as_deref().unwrap_or("").contains("不支持"));
-    assert_eq!(state.ui.last_error.as_deref(), outcome.error.as_deref());
     assert!(state.backend_commands.is_empty());
     assert!(matches!(
         &state.sessions.tabs[0].status,
@@ -25,7 +24,7 @@ fn backend_queue_pump_discards_failed_session_tail_commands() {
 
 #[test]
 fn backend_queue_pump_marks_failed_remote_command_history_finished() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -53,7 +52,7 @@ fn backend_queue_pump_marks_failed_remote_command_history_finished() {
 
 #[test]
 fn backend_queue_pump_keeps_other_session_commands_after_terminal_error() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let first = sample_host();
     let second = sample_host();
     let first_id = first.id;

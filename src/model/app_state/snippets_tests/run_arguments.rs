@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn run_snippet_reports_missing_variable_until_arguments_exist() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = parameterized_host_snippet(host_id, "systemctl restart {{service}}");
@@ -22,7 +22,7 @@ fn run_snippet_reports_missing_variable_until_arguments_exist() {
 
 #[test]
 fn update_snippet_argument_allows_parameterized_snippet_to_run() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = parameterized_host_snippet(host_id, "systemctl restart {{service}}");
@@ -61,7 +61,7 @@ fn update_snippet_argument_allows_parameterized_snippet_to_run() {
 
 #[test]
 fn run_snippet_with_arguments_records_arguments_and_runs() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = parameterized_host_snippet(host_id, "systemctl restart {{service}}");
@@ -104,7 +104,7 @@ fn run_snippet_with_arguments_records_arguments_and_runs() {
 
 #[test]
 fn run_snippet_with_arguments_does_not_record_invalid_run() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let snippet = parameterized_host_snippet(host_id, "systemctl restart {{service}}");

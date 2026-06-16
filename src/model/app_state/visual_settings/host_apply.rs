@@ -8,6 +8,7 @@ use super::super::outcome::missing_host;
 
 impl CoreState {
     /// 应用已经过草稿校验的主机视觉覆盖。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn apply_host_visual_profiles_action(
         &mut self,
         host_id: HostId,

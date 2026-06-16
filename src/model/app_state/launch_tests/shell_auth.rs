@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn password_host_can_still_open_shell_without_exposing_secret() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let mut host = sample_host();
     host.auth = AuthProfile::Password {
         username: "root".to_owned(),

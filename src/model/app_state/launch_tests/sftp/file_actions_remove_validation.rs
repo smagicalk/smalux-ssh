@@ -2,22 +2,22 @@ use super::*;
 
 #[test]
 fn remove_sftp_file_rejects_empty_and_root_paths() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let host = sample_host();
     let host_id = host.id;
-    state.storage.upsert_host(host);
+    state.core.storage.upsert_host(host);
 
-    state.apply(Message::OpenSftp {
+    state.apply_message(Message::OpenSftp {
         host_id,
         initial_dir: "/home/ops".to_owned(),
     });
-    state.backend_commands.drain();
+    state.core.backend_commands.drain();
 
-    let empty_outcome = state.apply(Message::RemoveSftpFile {
+    let empty_outcome = state.apply_message(Message::RemoveSftpFile {
         host_id,
         remote_path: "  ".to_owned(),
     });
-    let root_outcome = state.apply(Message::RemoveSftpFile {
+    let root_outcome = state.apply_message(Message::RemoveSftpFile {
         host_id,
         remote_path: " / ".to_owned(),
     });
@@ -38,5 +38,5 @@ fn remove_sftp_file_rejects_empty_and_root_paths() {
             .unwrap_or("")
             .contains("根目录")
     );
-    assert!(state.backend_commands.is_empty());
+    assert!(state.core.backend_commands.is_empty());
 }

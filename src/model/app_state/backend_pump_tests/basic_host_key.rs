@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_records_unknown_host_key_candidate() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -27,7 +27,7 @@ fn backend_queue_pump_records_unknown_host_key_candidate() {
 
 #[test]
 fn backend_queue_pump_does_not_overwrite_trusted_host_on_mismatch() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

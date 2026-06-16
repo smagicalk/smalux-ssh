@@ -2,9 +2,10 @@ use super::*;
 
 #[test]
 fn remove_sftp_bookmark_updates_storage_or_reports_missing() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let host_id = HostId(uuid::Uuid::new_v4());
     state
+        .core
         .storage
         .upsert_sftp_bookmark(crate::model::SftpBookmark {
             host_id,
@@ -12,17 +13,17 @@ fn remove_sftp_bookmark_updates_storage_or_reports_missing() {
             remote_path: "/var/log".to_owned(),
         });
 
-    let remove_outcome = state.apply(Message::RemoveSftpBookmark {
+    let remove_outcome = state.apply_message(Message::RemoveSftpBookmark {
         host_id,
         remote_path: "/var/log".to_owned(),
     });
-    let missing_outcome = state.apply(Message::RemoveSftpBookmark {
+    let missing_outcome = state.apply_message(Message::RemoveSftpBookmark {
         host_id,
         remote_path: "/var/log".to_owned(),
     });
 
     assert!(remove_outcome.changed());
-    assert_eq!(state.storage.sftp_bookmark_count(), 0);
+    assert_eq!(state.core.storage.sftp_bookmark_count(), 0);
     assert!(missing_outcome.changed());
     assert!(missing_outcome.error.is_some());
 }

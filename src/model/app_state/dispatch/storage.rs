@@ -3,9 +3,8 @@
 //! 这里处理已经保存的数据的确认删除和安全资产维护。真正的落盘由 UI Adapter
 //! 在状态变化后统一调用 `persist_storage`，领域函数只负责修改内存快照。
 
+use super::super::{AppUpdateOutcome, Message};
 use crate::core::CoreState;
-
-use super::super::{AppState, AppUpdateOutcome, Message};
 
 impl CoreState {
     /// 分发当前已经纯核心化的存储消息。
@@ -165,66 +164,6 @@ impl CoreState {
                 error: Some("当前存储消息仍依赖桌面草稿状态，不能只在 CoreState 中运行".to_owned()),
                 ..AppUpdateOutcome::default()
             },
-        }
-    }
-}
-
-impl AppState {
-    /// 分发存储管理消息。
-    ///
-    /// 删除主机和分组采用 request/confirm 两步：request 只记录待确认目标，
-    /// confirm 才真正修改存储，方便 UI 展示确认弹窗。
-    pub(super) fn dispatch_storage_message(&mut self, message: Message) -> AppUpdateOutcome {
-        match message {
-            Message::SaveProxyAsset { .. }
-            | Message::SaveJumpChainAsset { .. }
-            | Message::SaveForwardAsset { .. }
-            | Message::RemoveProxyAsset { .. }
-            | Message::RemoveJumpChainAsset { .. }
-            | Message::RemoveForwardAsset { .. }
-            | Message::TrustKnownHost { .. }
-            | Message::RemoveKnownHost { .. }
-            | Message::CreateCredentialGroup { .. }
-            | Message::RenameCredentialGroup { .. }
-            | Message::RemoveCredentialGroup { .. }
-            | Message::UpdateCredentialMetadata { .. }
-            | Message::UpdateCredentialSecret { .. }
-            | Message::ExportCredentialSecret { .. }
-            | Message::DuplicateCredential { .. }
-            | Message::RemoveCredential { .. }
-            | Message::MoveCredential { .. }
-            | Message::MoveCredentialGroup { .. }
-            | Message::CreateCredentialMetadata { .. }
-            | Message::GeneratePrivateKeyCredential { .. }
-            | Message::SavePasswordCredential { .. }
-            | Message::ImportPrivateKeyCredential { .. }
-            | Message::ImportPrivateKeyTextCredential { .. }
-            | Message::ImportCertificateCredential { .. }
-            | Message::ImportCertificateTextCredential { .. }
-            | Message::GenerateCertificateCredential { .. } => {
-                self.core.dispatch_storage_message(message)
-            }
-            Message::ConfirmRemoveHost => {
-                let Some(host_id) = self.ui.workspace.pending_delete_host_id.take() else {
-                    return AppUpdateOutcome {
-                        error: Some("没有待删除的主机".to_owned()),
-                        ..AppUpdateOutcome::default()
-                    };
-                };
-
-                self.core.remove_host_record_action(host_id)
-            }
-            Message::ConfirmRemoveGroup => {
-                let Some(group_id) = self.ui.workspace.pending_delete_group_id.take() else {
-                    return AppUpdateOutcome {
-                        error: Some("没有待删除的分组".to_owned()),
-                        ..AppUpdateOutcome::default()
-                    };
-                };
-
-                self.core.remove_group_record_recursive_action(group_id)
-            }
-            _ => unreachable!("非存储管理消息不应进入存储管理路由"),
         }
     }
 }

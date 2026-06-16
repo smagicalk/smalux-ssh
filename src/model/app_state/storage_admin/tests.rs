@@ -1,4 +1,4 @@
-use super::super::*;
+use crate::core::CoreState;
 use crate::model::{
     AuthProfile, CredentialGroupId, CredentialKind, CredentialMetadata, Host, HostNetworkSelection,
     KeyAlgorithm, KnownHostEntry, Message, SecretMaterialKind, SecretRecord, SecretRef,
@@ -9,7 +9,7 @@ use russh::keys::{
 };
 use std::fs;
 
-fn credential_secret_ref(state: &AppState, name: &str) -> String {
+fn credential_secret_ref(state: &CoreState, name: &str) -> String {
     state
         .storage
         .credentials
@@ -69,7 +69,7 @@ fn certificate_fixture_payload() -> String {
 
 #[test]
 fn create_credential_group_adds_root_group() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome =
         state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
@@ -82,7 +82,7 @@ fn create_credential_group_adds_root_group() {
 
 #[test]
 fn create_credential_group_can_use_existing_parent() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let parent_id = state.storage.credential_groups[0].id;
@@ -102,7 +102,7 @@ fn create_credential_group_can_use_existing_parent() {
 
 #[test]
 fn create_credential_group_rejects_missing_parent() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let outcome = state.create_credential_group(
         "API".to_owned(),
@@ -116,7 +116,7 @@ fn create_credential_group_rejects_missing_parent() {
 
 #[test]
 fn rename_credential_group_updates_existing_group_name() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
@@ -128,7 +128,7 @@ fn rename_credential_group_updates_existing_group_name() {
 
 #[test]
 fn remove_credential_group_reports_state_change_and_failure() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
@@ -145,7 +145,7 @@ fn remove_credential_group_reports_state_change_and_failure() {
 
 #[test]
 fn remove_credential_group_rejects_group_with_children() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let parent_id = state.storage.credential_groups[0].id;
@@ -162,8 +162,8 @@ fn remove_credential_group_rejects_group_with_children() {
 }
 
 #[test]
-fn create_private_key_credential_metadata_selects_quick_host_key_ref() {
-    let mut state = AppState::default();
+fn create_private_key_credential_metadata_saves_record() {
+    let mut state = CoreState::default();
 
     let outcome = state.create_credential_metadata(
         CredentialKind::PrivateKey,
@@ -176,15 +176,11 @@ fn create_private_key_credential_metadata_selects_quick_host_key_ref() {
     assert!(outcome.changed());
     assert_eq!(state.storage.credential_count(), 1);
     assert_eq!(state.storage.credentials[0].name, "deploy key");
-    assert_eq!(
-        state.ui.quick_host.auth.private_key_ref,
-        "secret://keys/deploy"
-    );
 }
 
 #[test]
 fn create_private_key_credential_metadata_can_target_group() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
 
@@ -202,7 +198,7 @@ fn create_private_key_credential_metadata_can_target_group() {
 
 #[test]
 fn import_private_key_credential_saves_secret_payload_and_metadata() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
     let path = std::env::temp_dir().join(format!(
@@ -238,17 +234,12 @@ fn import_private_key_credential_saves_secret_payload_and_metadata() {
     assert!(inspection.parse_error.is_none());
     assert_eq!(inspection.algorithm, Some(KeyAlgorithm::Ed25519));
     assert!(inspection.public_key.is_some());
-    assert_eq!(
-        state.ui.quick_host.auth.private_key_ref,
-        secret.secret_ref.0
-    );
-
     let _ = fs::remove_file(path);
 }
 
 #[test]
 fn import_private_key_text_credential_saves_secret_payload_and_metadata() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
     let payload = private_key_fixture_payload();
@@ -278,15 +269,11 @@ fn import_private_key_text_credential_saves_secret_payload_and_metadata() {
             .parse_error
             .is_none()
     );
-    assert_eq!(
-        state.ui.quick_host.auth.private_key_ref,
-        secret.secret_ref.0
-    );
 }
 
 #[test]
 fn import_private_key_text_credential_detects_algorithm_from_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let mut rng = OsRng;
     let private_key = PrivateKey::random(&mut rng, Algorithm::Ed25519)
         .expect("private key fixture should generate");
@@ -310,7 +297,7 @@ fn import_private_key_text_credential_detects_algorithm_from_payload() {
 
 #[test]
 fn import_certificate_text_credential_detects_algorithm_from_openssh_token() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let payload = certificate_fixture_payload();
 
     let outcome = state.import_certificate_text_credential(
@@ -329,7 +316,7 @@ fn import_certificate_text_credential_detects_algorithm_from_openssh_token() {
 
 #[test]
 fn generate_private_key_credential_saves_openssh_key_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
 
@@ -370,10 +357,6 @@ fn generate_private_key_credential_saves_openssh_key_payload() {
     assert_eq!(inspection.algorithm, Some(KeyAlgorithm::Ed25519));
     assert_eq!(inspection.fingerprint, credential.fingerprint);
     assert!(inspection.public_key.is_some());
-    assert_eq!(
-        state.ui.quick_host.auth.private_key_ref,
-        secret.secret_ref.0
-    );
 }
 
 #[test]
@@ -383,7 +366,7 @@ fn generate_private_key_credential_supports_all_selectable_algorithms() {
         KeyAlgorithm::Rsa,
         KeyAlgorithm::Ecdsa,
     ] {
-        let mut state = AppState::default();
+        let mut state = CoreState::default();
         let name = format!("generated-{algorithm:?}");
 
         let outcome = state.generate_private_key_credential(name, None, Some(algorithm.clone()));
@@ -415,7 +398,7 @@ fn generate_private_key_credential_supports_all_selectable_algorithms() {
 
 #[test]
 fn generate_certificate_credential_signs_subject_key_and_saves_certificate_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产证书".to_owned(), CredentialKind::Certificate, None);
     let certificate_group_id = state.storage.credential_groups[0].id;
     state.generate_private_key_credential("ca key".to_owned(), None, Some(KeyAlgorithm::Ed25519));
@@ -479,14 +462,6 @@ fn generate_certificate_credential_signs_subject_key_and_saves_certificate_paylo
         certificate.valid_principals(),
         &["deploy".to_owned(), "root".to_owned(),]
     );
-    assert_eq!(
-        state.ui.quick_host.auth.certificate_ref,
-        credential
-            .secret
-            .as_ref()
-            .expect("secret ref should exist")
-            .0
-    );
     let inspection = state
         .storage
         .credential_inspections
@@ -507,7 +482,7 @@ fn generate_certificate_credential_signs_subject_key_and_saves_certificate_paylo
 
 #[test]
 fn generate_certificate_credential_rejects_missing_principal() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.generate_private_key_credential("ca key".to_owned(), None, Some(KeyAlgorithm::Ed25519));
     state.generate_private_key_credential(
         "subject key".to_owned(),
@@ -542,7 +517,7 @@ fn generate_certificate_credential_rejects_missing_principal() {
 
 #[test]
 fn generate_certificate_credential_rejects_mismatched_group_kind() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let private_key_group_id = state.storage.credential_groups[0].id;
     state.generate_private_key_credential("ca key".to_owned(), None, Some(KeyAlgorithm::Ed25519));
@@ -575,7 +550,7 @@ fn generate_certificate_credential_rejects_mismatched_group_kind() {
 
 #[test]
 fn save_password_credential_saves_secret_payload_and_metadata() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密码".to_owned(), CredentialKind::Password, None);
     let group_id = state.storage.credential_groups[0].id;
 
@@ -604,15 +579,11 @@ fn save_password_credential_saves_secret_payload_and_metadata() {
     assert!(inspection.parse_error.is_none());
     assert_eq!(inspection.password_length, Some(6));
     assert!(inspection.public_key.is_none());
-    assert_eq!(
-        state.ui.quick_host.auth.password_secret_ref,
-        secret.secret_ref.0
-    );
 }
 
 #[test]
 fn import_certificate_credential_saves_secret_payload_and_metadata() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产证书".to_owned(), CredentialKind::Certificate, None);
     let group_id = state.storage.credential_groups[0].id;
     let path = std::env::temp_dir().join(format!(
@@ -655,17 +626,12 @@ fn import_certificate_credential_saves_secret_payload_and_metadata() {
             .and_then(|certificate| certificate.serial),
         Some(42)
     );
-    assert_eq!(
-        state.ui.quick_host.auth.certificate_ref,
-        secret.secret_ref.0
-    );
-
     let _ = fs::remove_file(path);
 }
 
 #[test]
 fn import_certificate_text_credential_saves_secret_payload_and_metadata() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产证书".to_owned(), CredentialKind::Certificate, None);
     let group_id = state.storage.credential_groups[0].id;
     let payload = certificate_fixture_payload();
@@ -696,15 +662,11 @@ fn import_certificate_text_credential_saves_secret_payload_and_metadata() {
             .parse_error
             .is_none()
     );
-    assert_eq!(
-        state.ui.quick_host.auth.certificate_ref,
-        secret.secret_ref.0
-    );
 }
 
 #[test]
 fn import_credential_rejects_unparseable_private_key_and_certificate() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let private_key = state.import_private_key_text_credential(
         "bad key".to_owned(),
@@ -728,7 +690,7 @@ fn import_credential_rejects_unparseable_private_key_and_certificate() {
 
 #[test]
 fn create_credential_metadata_rejects_mismatched_group_kind() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("证书".to_owned(), CredentialKind::Certificate, None);
     let group_id = state.storage.credential_groups[0].id;
 
@@ -745,8 +707,8 @@ fn create_credential_metadata_rejects_mismatched_group_kind() {
 }
 
 #[test]
-fn create_certificate_credential_metadata_selects_quick_host_certificate_ref() {
-    let mut state = AppState::default();
+fn create_certificate_credential_metadata_saves_record() {
+    let mut state = CoreState::default();
 
     let outcome = state.create_credential_metadata(
         CredentialKind::Certificate,
@@ -758,15 +720,11 @@ fn create_certificate_credential_metadata_selects_quick_host_certificate_ref() {
 
     assert!(outcome.changed());
     assert_eq!(state.storage.credential_count(), 1);
-    assert_eq!(
-        state.ui.quick_host.auth.certificate_ref,
-        "secret://certs/deploy"
-    );
 }
 
 #[test]
 fn create_credential_metadata_rejects_empty_required_fields() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     assert!(
         state
@@ -797,7 +755,7 @@ fn create_credential_metadata_rejects_empty_required_fields() {
 
 #[test]
 fn update_credential_metadata_renames_without_touching_secret_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://keys/deploy".to_owned());
     state.storage.upsert_secret(SecretRecord::local_plaintext(
         secret_ref.clone(),
@@ -836,7 +794,7 @@ fn update_credential_metadata_renames_without_touching_secret_payload() {
 
 #[test]
 fn update_credential_secret_refreshes_payload_metadata_and_inspection() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://keys/deploy".to_owned());
     state.storage.upsert_secret(SecretRecord::local_plaintext(
         secret_ref.clone(),
@@ -884,7 +842,7 @@ fn update_credential_secret_refreshes_payload_metadata_and_inspection() {
 
 #[test]
 fn update_credential_secret_replaces_password_without_trimming() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://passwords/admin".to_owned());
     state.storage.upsert_secret(SecretRecord::local_plaintext(
         secret_ref.clone(),
@@ -918,7 +876,7 @@ fn update_credential_secret_replaces_password_without_trimming() {
 
 #[test]
 fn update_credential_secret_rejects_missing_or_unsupported_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "agent".to_owned(),
@@ -944,7 +902,7 @@ fn update_credential_secret_rejects_missing_or_unsupported_payload() {
 
 #[test]
 fn update_credential_secret_rejects_unparseable_private_key_without_overwriting() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://keys/deploy".to_owned());
     let old_payload = private_key_fixture_payload();
     state.storage.upsert_secret(SecretRecord::local_plaintext(
@@ -979,7 +937,7 @@ fn update_credential_secret_rejects_unparseable_private_key_without_overwriting(
 
 #[test]
 fn update_credential_secret_can_restore_missing_local_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://certs/deploy".to_owned());
     state.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
@@ -1015,7 +973,7 @@ fn update_credential_secret_can_restore_missing_local_payload() {
 
 #[test]
 fn update_credential_metadata_moves_to_matching_group() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
     state.storage.upsert_credential(CredentialMetadata {
@@ -1046,7 +1004,7 @@ fn update_credential_metadata_moves_to_matching_group() {
 
 #[test]
 fn update_credential_metadata_rejects_duplicate_name() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy".to_owned(),
@@ -1077,7 +1035,7 @@ fn update_credential_metadata_rejects_duplicate_name() {
 
 #[test]
 fn update_credential_metadata_rejects_mismatched_group_kind() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("证书".to_owned(), CredentialKind::Certificate, None);
     let group_id = state.storage.credential_groups[0].id;
     state.storage.upsert_credential(CredentialMetadata {
@@ -1104,7 +1062,7 @@ fn update_credential_metadata_rejects_mismatched_group_kind() {
 
 #[test]
 fn move_credential_updates_group_when_target_kind_matches() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
     state.storage.upsert_credential(CredentialMetadata {
@@ -1126,7 +1084,7 @@ fn move_credential_updates_group_when_target_kind_matches() {
 
 #[test]
 fn move_credential_group_rejects_descendant_target() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let parent_id = state.storage.credential_groups[0].id;
     state.create_credential_group(
@@ -1144,7 +1102,7 @@ fn move_credential_group_rejects_descendant_target() {
 
 #[test]
 fn remove_credential_reports_state_change_and_failure() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy".to_owned(),
@@ -1165,7 +1123,7 @@ fn remove_credential_reports_state_change_and_failure() {
 
 #[test]
 fn remove_credential_deletes_unreferenced_secret_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://keys/deploy".to_owned());
     state.storage.upsert_secret(SecretRecord::local_plaintext(
         secret_ref.clone(),
@@ -1192,7 +1150,7 @@ fn remove_credential_deletes_unreferenced_secret_payload() {
 
 #[test]
 fn export_credential_secret_writes_local_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://keys/deploy".to_owned());
     let payload = b"private-key";
     let target_path = std::env::temp_dir().join(format!(
@@ -1228,7 +1186,7 @@ fn export_credential_secret_writes_local_payload() {
 
 #[test]
 fn duplicate_credential_copies_group_and_generates_unique_name() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.create_credential_group("生产密钥".to_owned(), CredentialKind::PrivateKey, None);
     let group_id = state.storage.credential_groups[0].id;
     state.storage.upsert_credential(CredentialMetadata {
@@ -1258,7 +1216,7 @@ fn duplicate_credential_copies_group_and_generates_unique_name() {
 
 #[test]
 fn duplicate_credential_copies_local_secret_payload() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let secret_ref = SecretRef("secret://keys/deploy".to_owned());
     let payload = private_key_fixture_payload().into_bytes();
     state.storage.upsert_secret(SecretRecord::local_plaintext(
@@ -1320,7 +1278,7 @@ fn duplicate_credential_copies_local_secret_payload() {
 
 #[test]
 fn known_host_can_be_trusted_and_removed() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.storage.upsert_known_host(KnownHostEntry {
         host: "example.com".to_owned(),
         port: 22,
@@ -1360,7 +1318,7 @@ fn sample_network_host(network: HostNetworkSelection) -> Host {
 
 #[test]
 fn network_proxy_asset_can_be_created_updated_and_removed() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let created = state.apply(Message::SaveProxyAsset {
         proxy_id: None,
@@ -1414,7 +1372,7 @@ fn network_proxy_asset_can_be_created_updated_and_removed() {
 
 #[test]
 fn referenced_network_proxy_asset_reports_used_hosts_on_delete() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::SaveProxyAsset {
         proxy_id: None,
         name: "办公网关".to_owned(),
@@ -1450,7 +1408,7 @@ fn referenced_network_proxy_asset_reports_used_hosts_on_delete() {
 
 #[test]
 fn network_jump_chain_asset_validates_hosts_and_blocks_referenced_delete() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_network_host(HostNetworkSelection::default());
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -1479,7 +1437,7 @@ fn network_jump_chain_asset_validates_hosts_and_blocks_referenced_delete() {
 
 #[test]
 fn network_forward_asset_can_be_created_updated_and_removed() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let created = state.apply(Message::SaveForwardAsset {
         forward_id: None,

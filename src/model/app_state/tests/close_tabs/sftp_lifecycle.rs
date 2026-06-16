@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn close_session_tab_message_removes_last_sftp_browser_for_host() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());
     state
@@ -19,7 +19,7 @@ fn close_session_tab_message_removes_last_sftp_browser_for_host() {
 
 #[test]
 fn close_session_tab_message_keeps_sftp_browser_when_same_host_tab_remains() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let first_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let second_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());

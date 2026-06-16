@@ -1,11 +1,21 @@
 use super::*;
+use crate::app::state::DesktopAppState;
 use crate::backend::BackendCommand;
-use crate::model::{AgentSource, AuthProfile, Host, SecretRef, SessionKind, SessionStatus};
+use crate::core::CoreState;
+use crate::model::{
+    AgentSource, AuthProfile, Host, SecretRef, SessionKind, SessionStatus, UiState,
+};
 
 mod remote_command;
 mod sftp;
 mod shell;
 mod tunnel;
+
+fn desktop_state() -> DesktopAppState {
+    let core = CoreState::default();
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
 
 fn sample_host() -> Host {
     Host {

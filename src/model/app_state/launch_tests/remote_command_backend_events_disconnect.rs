@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn remote_command_disconnect_marks_history_finished_without_exit_code() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

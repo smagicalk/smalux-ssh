@@ -2,15 +2,16 @@ use super::*;
 
 #[test]
 fn local_terminal_input_is_visible_and_queues_on_enter() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenLocalTerminal);
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenLocalTerminal);
     let session_id = state
+        .core
         .sessions
         .active_tab
         .expect("local terminal should open");
-    state.backend_commands.drain();
+    state.core.backend_commands.drain();
 
-    let text = state.apply(Message::UpdateTerminalInputDraft {
+    let text = state.apply_message(Message::UpdateTerminalInputDraft {
         session_id,
         input: "echo smagicalssh-local".to_owned(),
     });
@@ -20,37 +21,39 @@ fn local_terminal_input_is_visible_and_queues_on_enter() {
         "echo smagicalssh-local"
     );
 
-    let enter = state.apply(Message::SendTerminalInput { session_id });
+    let enter = state.apply_message(Message::SendTerminalInput { session_id });
 
     assert!(enter.changed());
-    assert_eq!(state.backend_commands.pending_count(), 1);
+    assert_eq!(state.core.backend_commands.pending_count(), 1);
     assert_eq!(state.ui.terminal_input_for(session_id), "");
     assert_eq!(
-        state.terminal.tabs[0].buffer,
+        state.core.terminal.tabs[0].buffer,
         vec![format!(
             "{} echo smagicalssh-local",
             crate::backend::LocalShellProfile::default_for_platform().prompt
         )]
     );
     assert!(matches!(
-        state.backend_commands.front(),
+        state.core.backend_commands.front(),
         Some(BackendCommand::SendShellInput { session_id: queued_session_id, input })
             if *queued_session_id == session_id && input == "echo smagicalssh-local\n"
     ));
-    assert_eq!(state.storage.command_history_count(), 1);
-    assert_eq!(state.storage.command_history[0].host_id, None);
+    assert_eq!(state.core.storage.command_history_count(), 1);
+    assert_eq!(state.core.storage.command_history[0].host_id, None);
 }
 
 #[test]
 fn local_terminal_starts_without_help_banner() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenLocalTerminal);
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenLocalTerminal);
     let session_id = state
+        .core
         .sessions
         .active_tab
         .expect("local terminal should open");
 
     let tab = state
+        .core
         .terminal
         .tabs
         .iter()
@@ -62,15 +65,17 @@ fn local_terminal_starts_without_help_banner() {
 
 #[test]
 fn open_local_terminal_message_creates_and_activates_new_tab_each_time() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
 
-    let first = state.apply(Message::OpenLocalTerminal);
+    let first = state.apply_message(Message::OpenLocalTerminal);
     let first_session_id = state
+        .core
         .sessions
         .active_tab
         .expect("first tab should be active");
-    let second = state.apply(Message::OpenLocalTerminal);
+    let second = state.apply_message(Message::OpenLocalTerminal);
     let second_session_id = state
+        .core
         .sessions
         .active_tab
         .expect("second tab should be active");
@@ -78,26 +83,26 @@ fn open_local_terminal_message_creates_and_activates_new_tab_each_time() {
     assert!(first.changed());
     assert!(second.changed());
     assert_ne!(first_session_id, second_session_id);
-    assert_eq!(state.sessions.tab_count(), 2);
-    assert_eq!(state.terminal.tab_count(), 2);
+    assert_eq!(state.core.sessions.tab_count(), 2);
+    assert_eq!(state.core.terminal.tab_count(), 2);
     assert_eq!(
-        state.sessions.tabs[0].title,
+        state.core.sessions.tabs[0].title,
         crate::model::DEFAULT_LOCAL_TERMINAL_TITLE
     );
-    assert_eq!(state.sessions.tabs[1].title, "Local Shell 2");
+    assert_eq!(state.core.sessions.tabs[1].title, "Local Shell 2");
     assert_eq!(
-        state.terminal.tabs[0].title,
+        state.core.terminal.tabs[0].title,
         crate::model::DEFAULT_LOCAL_TERMINAL_TITLE
     );
-    assert_eq!(state.terminal.tabs[1].title, "Local Shell 2");
-    assert_eq!(state.sessions.active_tab, Some(second_session_id));
-    assert_eq!(state.terminal.active_tab, Some(second_session_id));
+    assert_eq!(state.core.terminal.tabs[1].title, "Local Shell 2");
+    assert_eq!(state.core.sessions.active_tab, Some(second_session_id));
+    assert_eq!(state.core.terminal.active_tab, Some(second_session_id));
     assert_eq!(
         state.ui.workspace.active_page,
         crate::model::WorkspacePage::Terminal
     );
     assert!(matches!(
-        state.backend_commands.drain().as_slice(),
+        state.core.backend_commands.drain().as_slice(),
         [
             BackendCommand::OpenLocalShell {
                 session_id: first_queued,
@@ -113,18 +118,19 @@ fn open_local_terminal_message_creates_and_activates_new_tab_each_time() {
 
 #[test]
 fn open_local_terminal_reuses_first_available_title_number() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenLocalTerminal);
-    state.apply(Message::OpenLocalTerminal);
-    state.apply(Message::OpenLocalTerminal);
-    let second_session_id = state.sessions.tabs[1].id;
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenLocalTerminal);
+    state.apply_message(Message::OpenLocalTerminal);
+    state.apply_message(Message::OpenLocalTerminal);
+    let second_session_id = state.core.sessions.tabs[1].id;
 
-    state.apply(Message::CloseSessionTab {
+    state.apply_message(Message::CloseSessionTab {
         session_id: second_session_id,
     });
-    state.apply(Message::OpenLocalTerminal);
+    state.apply_message(Message::OpenLocalTerminal);
 
     let titles: Vec<&str> = state
+        .core
         .sessions
         .tabs
         .iter()
@@ -142,28 +148,29 @@ fn open_local_terminal_reuses_first_available_title_number() {
 
 #[test]
 fn new_local_terminal_input_queues_to_its_own_session() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenLocalTerminal);
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenLocalTerminal);
     let session_id = state
+        .core
         .sessions
         .active_tab
         .expect("local terminal should be active");
-    state.backend_commands.drain();
+    state.core.backend_commands.drain();
 
-    state.apply(Message::UpdateTerminalInputDraft {
+    state.apply_message(Message::UpdateTerminalInputDraft {
         session_id,
         input: "echo second-local".to_owned(),
     });
-    let outcome = state.apply(Message::SendTerminalInput { session_id });
+    let outcome = state.apply_message(Message::SendTerminalInput { session_id });
 
     assert!(outcome.changed());
     assert!(matches!(
-        state.backend_commands.front(),
+        state.core.backend_commands.front(),
         Some(BackendCommand::SendShellInput { session_id: queued_session_id, input })
             if *queued_session_id == session_id && input == "echo second-local\n"
     ));
     assert_eq!(
-        state.terminal.tabs[0].buffer,
+        state.core.terminal.tabs[0].buffer,
         vec![format!(
             "{} echo second-local",
             crate::backend::LocalShellProfile::default_for_platform().prompt
@@ -173,50 +180,52 @@ fn new_local_terminal_input_queues_to_its_own_session() {
 
 #[test]
 fn local_terminal_empty_enter_queues_newline_without_history() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenLocalTerminal);
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenLocalTerminal);
     let session_id = state
+        .core
         .sessions
         .active_tab
         .expect("local terminal should open");
-    state.backend_commands.drain();
+    state.core.backend_commands.drain();
 
-    state.apply(Message::UpdateTerminalInputDraft {
+    state.apply_message(Message::UpdateTerminalInputDraft {
         session_id,
         input: String::new(),
     });
 
-    let outcome = state.apply(Message::SendTerminalInput { session_id });
+    let outcome = state.apply_message(Message::SendTerminalInput { session_id });
 
     assert!(outcome.changed());
     assert_eq!(state.ui.terminal_input_for(session_id), "");
     assert!(matches!(
-        state.backend_commands.front(),
+        state.core.backend_commands.front(),
         Some(BackendCommand::SendShellInput { session_id: queued_session_id, input })
             if *queued_session_id == session_id && input == "\n"
     ));
-    assert_eq!(state.storage.command_history_count(), 0);
+    assert_eq!(state.core.storage.command_history_count(), 0);
 }
 
 #[test]
 fn local_terminal_repeated_send_after_clear_does_not_duplicate_echo() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenLocalTerminal);
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenLocalTerminal);
     let session_id = state
+        .core
         .sessions
         .active_tab
         .expect("local terminal should open");
-    state.backend_commands.drain();
+    state.core.backend_commands.drain();
 
-    state.apply(Message::UpdateTerminalInputDraft {
+    state.apply_message(Message::UpdateTerminalInputDraft {
         session_id,
         input: "pwd".to_owned(),
     });
-    state.apply(Message::SendTerminalInput { session_id });
-    state.apply(Message::SendTerminalInput { session_id });
+    state.apply_message(Message::SendTerminalInput { session_id });
+    state.apply_message(Message::SendTerminalInput { session_id });
 
     assert_eq!(
-        state.terminal.tabs[0].buffer,
+        state.core.terminal.tabs[0].buffer,
         vec![format!(
             "{} pwd",
             crate::backend::LocalShellProfile::default_for_platform().prompt

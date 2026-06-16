@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn update_snippet_argument_reports_unknown_variable() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let snippet_id = SnippetId(Uuid::new_v4());
 
     let outcome = state.apply(Message::UpdateSnippetArgument {
@@ -17,7 +17,7 @@ fn update_snippet_argument_reports_unknown_variable() {
 
 #[test]
 fn remove_snippet_deletes_existing_snippet_and_reports_missing() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host_id = HostId(Uuid::new_v4());
     let snippet = host_snippet(host_id, "uptime");
     let snippet_id = snippet.id;
@@ -34,7 +34,7 @@ fn remove_snippet_deletes_existing_snippet_and_reports_missing() {
 
 #[test]
 fn create_snippet_extracts_variables_and_assigns_group() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::CreateSnippetGroup {
         name: "服务".to_owned(),
         parent_id: None,
@@ -62,7 +62,7 @@ fn create_snippet_extracts_variables_and_assigns_group() {
 
 #[test]
 fn update_snippet_refreshes_variables_and_keeps_matching_arguments() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let mut snippet = Snippet::with_default_implementation(
         SnippetId(Uuid::new_v4()),
         "restart".to_owned(),
@@ -117,7 +117,7 @@ fn update_snippet_refreshes_variables_and_keeps_matching_arguments() {
 
 #[test]
 fn snippet_group_messages_create_move_and_remove_empty_groups() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
 
     let created = state.apply(Message::CreateSnippetGroup {
         name: "  运维  ".to_owned(),
@@ -138,7 +138,7 @@ fn snippet_group_messages_create_move_and_remove_empty_groups() {
 
 #[test]
 fn snippet_group_delete_rejects_non_empty_group_and_move_snippet_works() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::CreateSnippetGroup {
         name: "服务".to_owned(),
         parent_id: None,
@@ -163,7 +163,7 @@ fn snippet_group_delete_rejects_non_empty_group_and_move_snippet_works() {
 
 #[test]
 fn snippet_group_move_rejects_cycles_and_allows_moving_back_to_root() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::CreateSnippetGroup {
         name: "运维".to_owned(),
         parent_id: None,
@@ -196,7 +196,7 @@ fn snippet_group_move_rejects_cycles_and_allows_moving_back_to_root() {
 
 #[test]
 fn snippet_move_can_return_to_root_group() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::CreateSnippetGroup {
         name: "服务".to_owned(),
         parent_id: None,
@@ -222,7 +222,7 @@ fn snippet_move_can_return_to_root_group() {
 
 #[test]
 fn snippet_group_recursive_delete_removes_children_and_snippets() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     state.apply(Message::CreateSnippetGroup {
         name: "运维".to_owned(),
         parent_id: None,
@@ -255,7 +255,7 @@ fn snippet_group_recursive_delete_removes_children_and_snippets() {
 
 #[test]
 fn snippet_target_messages_create_share_update_split_and_remove_targets() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host_id = HostId(Uuid::new_v4());
     let snippet = parameterized_host_snippet(host_id, "ls {{path}}");
     let snippet_id = snippet.id;
@@ -402,7 +402,7 @@ fn snippet_target_messages_create_share_update_split_and_remove_targets() {
 
 #[test]
 fn snippet_target_batch_create_rejects_duplicate_target_without_partial_write() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host_id = HostId(Uuid::new_v4());
     let snippet = parameterized_host_snippet(host_id, "ls {{path}}");
     let snippet_id = snippet.id;
@@ -430,7 +430,7 @@ fn snippet_target_batch_create_rejects_duplicate_target_without_partial_write() 
 
 #[test]
 fn snippet_target_sync_updates_shared_implementation_target_set() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host_id = HostId(Uuid::new_v4());
     let snippet = parameterized_host_snippet(host_id, "systemctl status {{service}}");
     let snippet_id = snippet.id;

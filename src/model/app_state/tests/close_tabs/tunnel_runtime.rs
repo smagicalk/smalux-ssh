@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn close_tunnel_tab_removes_only_matching_session_runtime() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let closed_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let current_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());
@@ -42,7 +42,7 @@ fn close_tunnel_tab_removes_only_matching_session_runtime() {
 
 #[test]
 fn close_tunnel_tab_ignores_other_session_running_same_rule() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let closed_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let current_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());

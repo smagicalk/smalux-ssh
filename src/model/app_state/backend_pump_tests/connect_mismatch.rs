@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_skips_mismatched_connect_commands() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let mut stale_target_host = sample_host();
     stale_target_host.name = "stale".to_owned();

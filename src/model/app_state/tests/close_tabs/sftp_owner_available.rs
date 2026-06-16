@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn close_current_sftp_tab_reassigns_browser_to_available_session() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let connected_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let disconnected_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let current_id = crate::model::SessionId(uuid::Uuid::new_v4());
@@ -34,7 +34,7 @@ fn close_current_sftp_tab_reassigns_browser_to_available_session() {
 
 #[test]
 fn close_current_sftp_tab_removes_browser_when_only_disconnected_tabs_remain() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let disconnected_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let current_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());

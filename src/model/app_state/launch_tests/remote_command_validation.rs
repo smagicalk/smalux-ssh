@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn run_remote_command_rejects_empty_command_without_side_effects() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -23,7 +23,7 @@ fn run_remote_command_rejects_empty_command_without_side_effects() {
 
 #[test]
 fn run_remote_command_reports_missing_host_without_history() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host_id = HostId(uuid::Uuid::new_v4());
 
     let outcome = state.apply(Message::RunRemoteCommand {

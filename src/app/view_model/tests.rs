@@ -1,20 +1,31 @@
 use super::*;
+use crate::app::state::DesktopAppState;
+use crate::core::CoreState;
 use crate::model::{
-    AgentSource, AppState, AuthProfile, CredentialGroup, CredentialGroupId, CredentialInspection,
+    AgentSource, AuthProfile, CredentialGroup, CredentialGroupId, CredentialInspection,
     CredentialKind, CredentialMetadata, ForwardAsset, ForwardId, Host, HostId,
     HostNetworkSelection, JumpChainAsset, JumpChainId, JumpProfile, KeyAlgorithm, KnownHostEntry,
     LanguageMode, Message, ProxyAsset, ProxyId, ProxyProfile, QuickHostAuthField,
     QuickHostAuthKind, QuickHostDraftField, SecretMaterialKind, SecretRecord, SecretRef, SessionId,
     Snippet, SnippetGroup, SnippetGroupId, SnippetImplementation, SnippetImplementationId,
     SnippetScope, SnippetShell, SnippetSupportTarget, SnippetSupportTargetId, TunnelKind,
-    TunnelRule, TunnelRuntimeState, TunnelStatus,
+    TunnelRule, TunnelRuntimeState, TunnelStatus, UiState,
 };
 use crate::storage::{SqliteStorage, ThemeProfileRecord};
 use uuid::Uuid;
 
+fn desktop_state() -> DesktopAppState {
+    desktop_state_with_core(CoreState::default())
+}
+
+fn desktop_state_with_core(core: CoreState) -> DesktopAppState {
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
+
 #[test]
 fn app_view_model_uses_local_terminal_when_no_tab_is_open() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
 
     let vm = app_view_model(&state);
@@ -29,7 +40,7 @@ fn app_view_model_uses_local_terminal_when_no_tab_is_open() {
 
 #[test]
 fn app_view_model_projects_workspace_page_models() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
     state.ui.workspace.credential_search_query = "deploy".to_owned();
     state.ui.workspace.snippet_search_query = "nginx".to_owned();
@@ -57,9 +68,9 @@ fn app_view_model_projects_workspace_page_models() {
 
 #[test]
 fn auth_label_covers_password_without_secret_leakage() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: HostId(Uuid::new_v4()),
         name: "root".to_owned(),
         group_id: None,
@@ -85,9 +96,9 @@ fn auth_label_covers_password_without_secret_leakage() {
 
 #[test]
 fn app_view_model_filters_new_session_hosts_without_changing_host_list() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: HostId(Uuid::new_v4()),
         name: "Production".to_owned(),
         group_id: None,
@@ -106,7 +117,7 @@ fn app_view_model_filters_new_session_hosts_without_changing_host_list() {
         theme_override: None,
         background_override: None,
     });
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: HostId(Uuid::new_v4()),
         name: "Staging".to_owned(),
         group_id: None,
@@ -136,8 +147,8 @@ fn app_view_model_filters_new_session_hosts_without_changing_host_list() {
 
 #[test]
 fn app_view_model_keeps_local_terminal_visible_for_local_new_session_search() {
-    let mut state = AppState::default();
-    state.storage.upsert_host(Host {
+    let mut state = desktop_state();
+    state.core.storage.upsert_host(Host {
         id: HostId(Uuid::new_v4()),
         name: "Production".to_owned(),
         group_id: None,
@@ -166,11 +177,11 @@ fn app_view_model_keeps_local_terminal_visible_for_local_new_session_search() {
 
 #[test]
 fn app_view_model_projects_snippet_tree_and_filters_by_search() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
     let host_id = HostId(Uuid::new_v4());
     let snippet_group_id = SnippetGroupId(Uuid::new_v4());
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: host_id,
         name: "Production".to_owned(),
         group_id: None,
@@ -189,13 +200,14 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
         theme_override: None,
         background_override: None,
     });
-    state.storage.upsert_snippet_group(SnippetGroup {
+    state.core.storage.upsert_snippet_group(SnippetGroup {
         id: snippet_group_id,
         name: "Operations".to_owned(),
         parent_id: None,
         sort_order: 0,
     });
     state
+        .core
         .storage
         .upsert_snippet(Snippet::with_default_implementation(
             crate::model::SnippetId(Uuid::new_v4()),
@@ -247,7 +259,7 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
         implementation_id: shared_implementation_id,
         sort_order: 2,
     });
-    state.storage.upsert_snippet(restart_snippet);
+    state.core.storage.upsert_snippet(restart_snippet);
 
     let vm = app_view_model(&state);
 
@@ -361,14 +373,17 @@ fn app_view_model_projects_snippet_tree_and_filters_by_search() {
 
 #[test]
 fn app_view_model_projects_known_hosts_for_tool_panel() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
-    state.storage.upsert_known_host(KnownHostEntry::untrusted(
-        "example.com",
-        22,
-        KeyAlgorithm::Ed25519,
-        "SHA256:new",
-    ));
+    state
+        .core
+        .storage
+        .upsert_known_host(KnownHostEntry::untrusted(
+            "example.com",
+            22,
+            KeyAlgorithm::Ed25519,
+            "SHA256:new",
+        ));
 
     let vm = app_view_model(&state);
 
@@ -385,13 +400,16 @@ fn app_view_model_projects_known_hosts_for_tool_panel() {
 
 #[test]
 fn app_view_model_projects_credentials_for_security_page() {
-    let mut state = AppState::default();
-    state.storage.upsert_secret(SecretRecord::local_plaintext(
-        SecretRef("key:deploy".to_owned()),
-        SecretMaterialKind::PrivateKey,
-        b"private-key".to_vec(),
-    ));
-    state.storage.upsert_credential(CredentialMetadata {
+    let mut state = desktop_state();
+    state
+        .core
+        .storage
+        .upsert_secret(SecretRecord::local_plaintext(
+            SecretRef("key:deploy".to_owned()),
+            SecretMaterialKind::PrivateKey,
+            b"private-key".to_vec(),
+        ));
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -426,15 +444,18 @@ fn app_view_model_projects_credentials_for_security_page() {
 
 #[test]
 fn app_view_model_projects_credential_detail_fields_from_inspection() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let credential_id = crate::model::CredentialId(uuid::Uuid::new_v4());
-    state.storage.upsert_secret(SecretRecord::local_plaintext(
-        SecretRef("secret://keys/deploy".to_owned()),
-        SecretMaterialKind::PrivateKey,
-        b"private-key".to_vec(),
-    ));
-    state.storage.upsert_credential(CredentialMetadata {
+    state
+        .core
+        .storage
+        .upsert_secret(SecretRecord::local_plaintext(
+            SecretRef("secret://keys/deploy".to_owned()),
+            SecretMaterialKind::PrivateKey,
+            b"private-key".to_vec(),
+        ));
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: credential_id,
         name: "deploy".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -445,6 +466,7 @@ fn app_view_model_projects_credential_detail_fields_from_inspection() {
         fingerprint: Some("SHA256:old".to_owned()),
     });
     state
+        .core
         .storage
         .upsert_credential_inspection(CredentialInspection {
             credential_id,
@@ -484,8 +506,8 @@ fn app_view_model_projects_credential_detail_fields_from_inspection() {
 
 #[test]
 fn app_view_model_omits_agent_credentials_from_security_page() {
-    let mut state = AppState::default();
-    state.storage.upsert_credential(CredentialMetadata {
+    let mut state = desktop_state();
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "local-agent".to_owned(),
         kind: CredentialKind::Agent,
@@ -514,17 +536,17 @@ fn app_view_model_omits_agent_credentials_from_security_page() {
 
 #[test]
 fn app_view_model_projects_custom_credential_groups() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let group_id = CredentialGroupId(Uuid::new_v4());
     let child_id = CredentialGroupId(Uuid::new_v4());
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: group_id,
         name: "生产密钥".to_owned(),
         kind: CredentialKind::PrivateKey,
         parent_id: None,
         sort_order: 0,
     });
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: child_id,
         name: "API".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -554,25 +576,25 @@ fn app_view_model_projects_custom_credential_groups() {
 
 #[test]
 fn app_view_model_projects_credential_group_contents_for_detail_panel() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let group_id = CredentialGroupId(Uuid::new_v4());
     let child_id = CredentialGroupId(Uuid::new_v4());
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: group_id,
         name: "生产密钥".to_owned(),
         kind: CredentialKind::PrivateKey,
         parent_id: None,
         sort_order: 0,
     });
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: child_id,
         name: "API".to_owned(),
         kind: CredentialKind::PrivateKey,
         parent_id: Some(group_id),
         sort_order: 0,
     });
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "root-key".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -582,7 +604,7 @@ fn app_view_model_projects_credential_group_contents_for_detail_panel() {
         key_algorithm: Some(KeyAlgorithm::Ed25519),
         fingerprint: None,
     });
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "prod-key".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -650,25 +672,25 @@ fn app_view_model_projects_credential_group_contents_for_detail_panel() {
 
 #[test]
 fn app_view_model_marks_credential_tree_guides_for_later_siblings() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let first_group_id = CredentialGroupId(Uuid::new_v4());
     let child_group_id = CredentialGroupId(Uuid::new_v4());
     let second_group_id = CredentialGroupId(Uuid::new_v4());
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: first_group_id,
         name: "生产密钥".to_owned(),
         kind: CredentialKind::PrivateKey,
         parent_id: None,
         sort_order: 0,
     });
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: child_group_id,
         name: "API".to_owned(),
         kind: CredentialKind::PrivateKey,
         parent_id: Some(first_group_id),
         sort_order: 0,
     });
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: second_group_id,
         name: "测试密钥".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -703,17 +725,17 @@ fn app_view_model_marks_credential_tree_guides_for_later_siblings() {
 
 #[test]
 fn app_view_model_collapses_credential_tree_nodes_without_affecting_search() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let group_id = CredentialGroupId(Uuid::new_v4());
     let child_id = CredentialGroupId(Uuid::new_v4());
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: group_id,
         name: "生产密钥".to_owned(),
         kind: CredentialKind::PrivateKey,
         parent_id: None,
         sort_order: 0,
     });
-    state.storage.upsert_credential_group(CredentialGroup {
+    state.core.storage.upsert_credential_group(CredentialGroup {
         id: child_id,
         name: "API".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -760,8 +782,8 @@ fn app_view_model_collapses_credential_tree_nodes_without_affecting_search() {
 
 #[test]
 fn app_view_model_filters_credential_rows_by_search_query() {
-    let mut state = AppState::default();
-    state.storage.upsert_credential(CredentialMetadata {
+    let mut state = desktop_state();
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -771,7 +793,7 @@ fn app_view_model_filters_credential_rows_by_search_query() {
         key_algorithm: Some(KeyAlgorithm::Ed25519),
         fingerprint: Some("SHA256:key".to_owned()),
     });
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "db-cert".to_owned(),
         kind: CredentialKind::Certificate,
@@ -799,8 +821,8 @@ fn app_view_model_filters_credential_rows_by_search_query() {
 
 #[test]
 fn app_view_model_does_not_count_agent_credentials_in_security_search_root() {
-    let mut state = AppState::default();
-    state.storage.upsert_credential(CredentialMetadata {
+    let mut state = desktop_state();
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -810,7 +832,7 @@ fn app_view_model_does_not_count_agent_credentials_in_security_search_root() {
         key_algorithm: Some(KeyAlgorithm::Ed25519),
         fingerprint: Some("SHA256:key".to_owned()),
     });
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy-agent".to_owned(),
         kind: CredentialKind::Agent,
@@ -836,9 +858,9 @@ fn app_view_model_does_not_count_agent_credentials_in_security_search_root() {
 
 #[test]
 fn app_view_model_localizes_tool_panel_fallback_labels() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
-    state.storage.upsert_credential(CredentialMetadata {
+    state.core.storage.upsert_credential(CredentialMetadata {
         id: crate::model::CredentialId(uuid::Uuid::new_v4()),
         name: "deploy-key".to_owned(),
         kind: CredentialKind::PrivateKey,
@@ -848,7 +870,7 @@ fn app_view_model_localizes_tool_panel_fallback_labels() {
         key_algorithm: None,
         fingerprint: None,
     });
-    state.sessions.tunnels.push(TunnelRuntimeState {
+    state.core.sessions.tunnels.push(TunnelRuntimeState {
         session_id: SessionId(Uuid::new_v4()),
         rule_name: "local-db".to_owned(),
         host_id: None,
@@ -867,7 +889,7 @@ fn app_view_model_localizes_tool_panel_fallback_labels() {
 
 #[test]
 fn app_view_model_projects_quick_host_form() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state
         .ui
         .set_quick_host_field(QuickHostDraftField::Name, "prod".to_owned());
@@ -901,8 +923,8 @@ fn app_view_model_projects_quick_host_form() {
 
 #[test]
 fn app_view_model_projects_create_host_dialog_state() {
-    let mut state = AppState::default();
-    state.apply(Message::OpenCreateHostDialog);
+    let mut state = desktop_state();
+    state.apply_message(Message::OpenCreateHostDialog);
 
     let vm = app_view_model(&state);
 
@@ -911,7 +933,7 @@ fn app_view_model_projects_create_host_dialog_state() {
 
 #[test]
 fn app_view_model_projects_create_host_dialog_text_by_language() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
 
     state.ui.workspace.language = LanguageMode::Chinese;
     let zh = app_view_model(&state).create_host_dialog;
@@ -928,7 +950,7 @@ fn app_view_model_projects_create_host_dialog_text_by_language() {
 
 #[test]
 fn app_view_model_projects_edit_host_dialog_text() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     state.ui.quick_host.editing_host_id = Some(HostId(Uuid::new_v4()));
 
@@ -941,7 +963,7 @@ fn app_view_model_projects_edit_host_dialog_text() {
 
 #[test]
 fn app_view_model_projects_workspace_text_by_language() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
 
     state.ui.workspace.language = LanguageMode::Chinese;
     let zh = app_view_model(&state).workspace_text;
@@ -1070,7 +1092,7 @@ fn app_view_model_projects_workspace_text_by_language() {
 
 #[test]
 fn app_view_model_projects_network_workspace_items() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
     let jump_host_id = HostId(Uuid::new_v4());
     let route_host_id = HostId(Uuid::new_v4());
@@ -1079,7 +1101,7 @@ fn app_view_model_projects_network_workspace_items() {
     let chain_id = JumpChainId(Uuid::new_v4());
     let forward_id = ForwardId(Uuid::new_v4());
 
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: jump_host_id,
         name: "Jump Box".to_owned(),
         group_id: None,
@@ -1098,7 +1120,7 @@ fn app_view_model_projects_network_workspace_items() {
         theme_override: None,
         background_override: None,
     });
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: route_host_id,
         name: "Prod API".to_owned(),
         group_id: None,
@@ -1131,7 +1153,7 @@ fn app_view_model_projects_network_workspace_items() {
         theme_override: None,
         background_override: None,
     });
-    state.storage.upsert_proxy_asset(ProxyAsset {
+    state.core.storage.upsert_proxy_asset(ProxyAsset {
         id: proxy_id,
         name: "Office Proxy".to_owned(),
         tags: vec!["shared".to_owned()],
@@ -1141,7 +1163,7 @@ fn app_view_model_projects_network_workspace_items() {
             auth: crate::model::ProxyAuth::None,
         },
     });
-    state.storage.upsert_jump_chain_asset(JumpChainAsset {
+    state.core.storage.upsert_jump_chain_asset(JumpChainAsset {
         id: chain_id,
         name: "Prod Chain".to_owned(),
         steps: vec![JumpProfile {
@@ -1152,7 +1174,7 @@ fn app_view_model_projects_network_workspace_items() {
         }],
         stop_on_failure: true,
     });
-    state.storage.upsert_forward_asset(ForwardAsset {
+    state.core.storage.upsert_forward_asset(ForwardAsset {
         id: forward_id,
         name: "DB Forward".to_owned(),
         tags: vec!["db".to_owned()],
@@ -1168,7 +1190,7 @@ fn app_view_model_projects_network_workspace_items() {
         },
         exit_on_failure: false,
     });
-    state.sessions.start_tunnel(
+    state.core.sessions.start_tunnel(
         session_id,
         &crate::model::TunnelRule {
             name: "runtime".to_owned(),
@@ -1183,7 +1205,10 @@ fn app_view_model_projects_network_workspace_items() {
         Some(route_host_id),
         1,
     );
-    state.sessions.mark_tunnel_running(session_id, "runtime");
+    state
+        .core
+        .sessions
+        .mark_tunnel_running(session_id, "runtime");
 
     let vm = app_view_model(&state);
 
@@ -1230,17 +1255,17 @@ fn app_view_model_projects_network_workspace_items() {
 
 #[test]
 fn app_view_model_projects_settings_options_and_storage_summary() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
-    state.apply(Message::SetBuiltInTheme {
+    state.apply_message(Message::SetBuiltInTheme {
         theme: crate::model::BuiltInTheme::Dracula,
     });
-    state.storage.upsert_theme(ThemeProfileRecord {
+    state.core.storage.upsert_theme(ThemeProfileRecord {
         name: "Imported".to_owned(),
         profile_toml: "name = \"Imported\"".to_owned(),
         builtin: false,
     });
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: HostId(Uuid::new_v4()),
         name: "Production".to_owned(),
         group_id: None,
@@ -1479,11 +1504,11 @@ fn app_view_model_projects_settings_options_and_storage_summary() {
 
 #[test]
 fn app_view_model_marks_current_custom_theme_profile_selected() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
-    state.config.theme.name = "Imported".to_owned();
-    state.storage.app_config = state.config.clone();
-    state.storage.upsert_theme(ThemeProfileRecord {
+    state.core.config.theme.name = "Imported".to_owned();
+    state.core.storage.app_config = state.core.config.clone();
+    state.core.storage.upsert_theme(ThemeProfileRecord {
         name: "Imported".to_owned(),
         profile_toml: "name = \"Imported\"".to_owned(),
         builtin: false,
@@ -1506,7 +1531,9 @@ fn app_view_model_marks_current_custom_theme_profile_selected() {
 fn app_view_model_projects_sqlite_storage_settings_status() {
     let sqlite_path =
         std::env::temp_dir().join(format!("smagicalssh-settings-vm-{}.sqlite", Uuid::new_v4()));
-    let mut state = AppState::default().with_storage_backend(SqliteStorage::new(&sqlite_path));
+    let mut state = desktop_state_with_core(
+        CoreState::default().with_storage_backend(SqliteStorage::new(&sqlite_path)),
+    );
     state.ui.workspace.language = LanguageMode::English;
 
     let settings = app_view_model(&state).settings_workspace.settings;
@@ -1522,7 +1549,7 @@ fn app_view_model_projects_sqlite_storage_settings_status() {
 
 #[test]
 fn app_view_model_localizes_theme_name() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
 
     state.ui.workspace.language = LanguageMode::Chinese;
     assert_eq!(app_view_model(&state).theme_name, "专业暗色");
@@ -1533,7 +1560,7 @@ fn app_view_model_localizes_theme_name() {
 
 #[test]
 fn app_view_model_projects_pending_remove_host_dialog() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let host = Host {
         id: HostId(Uuid::new_v4()),
@@ -1555,8 +1582,8 @@ fn app_view_model_projects_pending_remove_host_dialog() {
         background_override: None,
     };
     let host_id = host.id;
-    state.storage.upsert_host(host);
-    state.apply(Message::RequestRemoveHost { host_id });
+    state.core.storage.upsert_host(host);
+    state.apply_message(Message::RequestRemoveHost { host_id });
 
     let vm = app_view_model(&state);
 
@@ -1566,7 +1593,7 @@ fn app_view_model_projects_pending_remove_host_dialog() {
 
 #[test]
 fn app_view_model_keeps_logic_keys_stable_when_text_is_chinese() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
 
     let vm = app_view_model(&state);
@@ -1579,11 +1606,11 @@ fn app_view_model_keeps_logic_keys_stable_when_text_is_chinese() {
 
 #[test]
 fn app_view_model_localizes_connected_status_but_keeps_status_key_stable() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     let host_id = HostId(Uuid::new_v4());
     let session_id = crate::model::SessionId(Uuid::new_v4());
-    state.storage.upsert_host(Host {
+    state.core.storage.upsert_host(Host {
         id: host_id,
         name: "prod".to_owned(),
         group_id: None,
@@ -1602,8 +1629,12 @@ fn app_view_model_localizes_connected_status_but_keeps_status_key_stable() {
         theme_override: None,
         background_override: None,
     });
-    state.sessions.open_shell_tab(session_id, host_id, "prod");
     state
+        .core
+        .sessions
+        .open_shell_tab(session_id, host_id, "prod");
+    state
+        .core
         .sessions
         .set_status(session_id, crate::model::SessionStatus::Connected);
 
@@ -1617,7 +1648,7 @@ fn app_view_model_localizes_connected_status_but_keeps_status_key_stable() {
 
 #[test]
 fn app_view_model_keeps_sftp_panel_on_active_host_without_browser() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let sftp_host = Host {
         id: HostId(Uuid::new_v4()),
         name: "files".to_owned(),
@@ -1658,14 +1689,14 @@ fn app_view_model_keeps_sftp_panel_on_active_host_without_browser() {
     };
     let sftp_host_id = sftp_host.id;
     let shell_host_id = shell_host.id;
-    state.storage.upsert_host(sftp_host);
-    state.storage.upsert_host(shell_host);
-    state.sessions.open_sftp_tab(
+    state.core.storage.upsert_host(sftp_host);
+    state.core.storage.upsert_host(shell_host);
+    state.core.sessions.open_sftp_tab(
         crate::model::SessionId(Uuid::new_v4()),
         sftp_host_id,
         "/var/log",
     );
-    state.sessions.open_shell_tab(
+    state.core.sessions.open_shell_tab(
         crate::model::SessionId(Uuid::new_v4()),
         shell_host_id,
         "shell",

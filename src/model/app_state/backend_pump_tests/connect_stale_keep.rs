@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_keeps_other_session_tail_after_stale_connect_command() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let mut stale_target_host = sample_host();
     stale_target_host.name = "stale".to_owned();

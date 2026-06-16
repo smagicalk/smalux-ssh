@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_skips_tunnel_stop_when_session_is_terminal() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let rule = sample_tunnel_rule();

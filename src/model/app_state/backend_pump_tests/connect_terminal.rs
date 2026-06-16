@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_skips_terminal_connect_commands() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());

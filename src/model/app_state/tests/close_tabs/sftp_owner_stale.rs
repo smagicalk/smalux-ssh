@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn close_stale_sftp_tab_keeps_current_browser_owner() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let first_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let second_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());

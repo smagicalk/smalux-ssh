@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn start_tunnel_rejects_invalid_rule_without_side_effects() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

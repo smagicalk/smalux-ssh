@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn stop_tunnel_message_rejects_empty_rule_name() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let session_id = SessionId(uuid::Uuid::new_v4());
 
     let outcome = state.apply(Message::StopTunnel {
@@ -17,7 +17,7 @@ fn stop_tunnel_message_rejects_empty_rule_name() {
 
 #[test]
 fn stop_tunnel_message_rejects_duplicate_stop_without_queueing_command() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let rule = tunnel_rule(TunnelKind::Local);

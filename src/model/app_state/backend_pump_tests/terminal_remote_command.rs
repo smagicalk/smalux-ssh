@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_skips_terminal_remote_command_requests() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -41,7 +41,7 @@ fn backend_queue_pump_skips_terminal_remote_command_requests() {
 
 #[test]
 fn backend_queue_pump_finishes_history_for_skipped_terminal_remote_command() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

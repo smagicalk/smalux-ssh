@@ -20,7 +20,7 @@ mod pending;
 mod stale_commands;
 mod transfers;
 
-use super::{AppState, AppUpdateOutcome};
+use super::AppUpdateOutcome;
 use execution_failure::handle_backend_execution_error;
 use transfers::{FailedTransfer, failed_transfer_for_command};
 
@@ -156,42 +156,5 @@ impl CoreState {
         }
 
         outcome
-    }
-}
-
-impl AppState {
-    /// 兼容旧测试和当前桌面 UI 的包装入口。
-    ///
-    /// 真正的后端队列执行已经在 `CoreState`，这里只把错误复制到当前桌面 UI 草稿，
-    /// 让通知区继续复用同一条展示路径。
-    pub fn drain_backend_queue(
-        &mut self,
-        executor: &mut (impl BackendExecutor + ?Sized),
-    ) -> AppUpdateOutcome {
-        let mut outcome = self.core.drain_backend_queue(executor);
-        self.copy_core_error_to_ui(&mut outcome);
-        outcome
-    }
-
-    /// 从核心队列取出下一条 worker 命令。
-    pub fn next_backend_command_for_worker(&mut self) -> AppUpdateOutcome {
-        self.core.next_backend_command_for_worker()
-    }
-
-    /// 兼容桌面 worker 回传入口，并把核心错误同步到 UI 草稿。
-    pub fn apply_backend_command_result(
-        &mut self,
-        command: BackendCommand,
-        result: Result<Vec<BackendEvent>, BackendExecutionError>,
-    ) -> AppUpdateOutcome {
-        let mut outcome = self.core.apply_backend_command_result(command, result);
-        self.copy_core_error_to_ui(&mut outcome);
-        outcome
-    }
-
-    fn copy_core_error_to_ui(&mut self, outcome: &mut AppUpdateOutcome) {
-        if let Some(error) = &outcome.error {
-            outcome.state_changed |= self.ui.set_last_error(error.clone());
-        }
     }
 }

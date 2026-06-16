@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn remote_command_exit_updates_latest_history_exit_code() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -36,7 +36,7 @@ fn remote_command_exit_updates_latest_history_exit_code() {
 
 #[test]
 fn remote_command_exit_updates_history_by_session_history_id() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -71,7 +71,7 @@ fn remote_command_exit_updates_history_by_session_history_id() {
 
 #[test]
 fn remote_command_exit_keeps_legacy_history_fallback() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());

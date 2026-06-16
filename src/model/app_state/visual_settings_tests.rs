@@ -1,6 +1,15 @@
 use super::*;
+use crate::app::state::DesktopAppState;
+use crate::core::CoreState;
+use crate::model::UiState;
 use crate::model::{AgentSource, AuthProfile, Host, HostId, ImageSource, Message};
 use uuid::Uuid;
+
+fn desktop_state() -> DesktopAppState {
+    let core = CoreState::default();
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
 
 fn sample_host() -> Host {
     Host {

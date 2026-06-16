@@ -202,9 +202,9 @@ pub(super) fn parse_key_algorithm(algorithm: &str) -> Option<KeyAlgorithm> {
 mod tests {
     use super::*;
     use crate::model::{
-        AppState, CredentialGroup, CredentialGroupId, CredentialKind, CredentialMetadata,
-        KeyAlgorithm, QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField,
-        SecretMaterialKind, SecretRecord, SecretRef,
+        CredentialGroup, CredentialGroupId, CredentialKind, CredentialMetadata, KeyAlgorithm,
+        QuickHostAuthField, QuickHostAuthKind, QuickHostDraftField, SecretMaterialKind,
+        SecretRecord, SecretRef,
     };
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
 
     #[test]
     fn credential_secret_text_reads_local_payload_on_demand() {
-        let mut state = AppState::default();
+        let mut state = CoreState::default();
         state.storage.upsert_secret(SecretRecord::local_plaintext(
             SecretRef("key:deploy".to_owned()),
             SecretMaterialKind::PrivateKey,
@@ -239,7 +239,7 @@ mod tests {
 
     #[test]
     fn credential_secret_text_ignores_groups_and_missing_payloads() {
-        let mut state = AppState::default();
+        let mut state = CoreState::default();
         state.storage.upsert_credential(CredentialMetadata {
             id: crate::model::CredentialId(uuid::Uuid::new_v4()),
             name: "deploy".to_owned(),
@@ -304,7 +304,7 @@ mod tests {
 
     #[test]
     fn credential_drop_target_resolves_kind_and_group() {
-        let mut state = AppState::default();
+        let mut state = CoreState::default();
         let group_id = CredentialGroupId(uuid::Uuid::new_v4());
         state.storage.upsert_credential_group(CredentialGroup {
             id: group_id,

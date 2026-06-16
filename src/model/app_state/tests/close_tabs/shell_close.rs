@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn close_session_tab_message_closes_shell_and_queues_disconnect() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());
     state

@@ -1,9 +1,21 @@
 use super::*;
+use crate::app::state::{DesktopAppState, DesktopStateView};
+use crate::core::CoreState;
 use crate::model::{
-    AgentSource, AppState, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId,
-    LanguageMode, RecentConnection,
+    AgentSource, AuthProfile, CommandHistoryId, CommandHistoryItem, Host, HostId, LanguageMode,
+    RecentConnection, UiState,
 };
 use uuid::Uuid;
+
+fn desktop_state() -> DesktopAppState {
+    let core = CoreState::default();
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
+
+fn view(state: &DesktopAppState) -> DesktopStateView<'_> {
+    state.as_desktop_state_view()
+}
 
 fn host(name: &str, address: &str, tags: &[&str]) -> Host {
     Host {
@@ -29,20 +41,24 @@ fn host(name: &str, address: &str, tags: &[&str]) -> Host {
 
 #[test]
 fn command_palette_includes_matching_hosts_recent_and_history() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
     let prod = host("Production API", "api.example.com", &["prod", "linux"]);
     let prod_id = prod.id;
-    state.storage.upsert_host(prod);
+    state.core.storage.upsert_host(prod);
     state
+        .core
         .storage
         .upsert_host(host("Jump Box", "jump.internal", &["bastion"]));
-    state.storage.record_recent_connection(RecentConnection {
-        host_id: prod_id,
-        label: "Production API".to_owned(),
-        connected_at_unix_secs: 1,
-    });
-    state.storage.add_command_history(CommandHistoryItem {
+    state
+        .core
+        .storage
+        .record_recent_connection(RecentConnection {
+            host_id: prod_id,
+            label: "Production API".to_owned(),
+            connected_at_unix_secs: 1,
+        });
+    state.core.storage.add_command_history(CommandHistoryItem {
         id: CommandHistoryId(Uuid::new_v4()),
         host_id: Some(prod_id),
         command: "systemctl status api".to_owned(),
@@ -53,7 +69,7 @@ fn command_palette_includes_matching_hosts_recent_and_history() {
     });
     state.ui.workspace.open_command_palette("production");
 
-    let rows = command_palette_results(&state);
+    let rows = command_palette_results(view(&state));
 
     assert_eq!(rows.len(), 2);
     assert!(rows.iter().any(|row| row.kind_key == "Host"));
@@ -64,14 +80,15 @@ fn command_palette_includes_matching_hosts_recent_and_history() {
 
 #[test]
 fn command_palette_keeps_logic_kind_stable_when_localized() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;
     state
+        .core
         .storage
         .upsert_host(host("Production API", "api.example.com", &["prod"]));
     state.ui.workspace.open_command_palette("production");
 
-    let rows = command_palette_results(&state);
+    let rows = command_palette_results(view(&state));
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].kind_key, "Host");
@@ -80,12 +97,12 @@ fn command_palette_keeps_logic_kind_stable_when_localized() {
 
 #[test]
 fn command_palette_searches_history_commands() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::English;
     let prod = host("Production API", "api.example.com", &["prod"]);
     let prod_id = prod.id;
-    state.storage.upsert_host(prod);
-    state.storage.add_command_history(CommandHistoryItem {
+    state.core.storage.upsert_host(prod);
+    state.core.storage.add_command_history(CommandHistoryItem {
         id: CommandHistoryId(Uuid::new_v4()),
         host_id: Some(prod_id),
         command: "journalctl -u api".to_owned(),
@@ -96,7 +113,7 @@ fn command_palette_searches_history_commands() {
     });
     state.ui.workspace.open_command_palette("journal");
 
-    let rows = command_palette_results(&state);
+    let rows = command_palette_results(view(&state));
 
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].kind, "History");

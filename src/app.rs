@@ -19,7 +19,7 @@ mod file_dialog;
 mod ids;
 mod projection;
 mod pump;
-mod state;
+pub(crate) mod state;
 mod view_model;
 
 use std::cell::RefCell;

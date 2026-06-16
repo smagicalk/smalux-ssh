@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_skips_terminal_open_shell_commands() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
@@ -36,7 +36,7 @@ fn backend_queue_pump_skips_terminal_open_shell_commands() {
 
 #[test]
 fn backend_queue_pump_skips_terminal_shell_drain_commands() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
@@ -70,7 +70,7 @@ fn backend_queue_pump_skips_terminal_shell_drain_commands() {
 
 #[test]
 fn backend_queue_pump_skips_terminal_shell_input_commands() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());

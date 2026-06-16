@@ -8,6 +8,7 @@ use super::super::outcome::missing_host;
 
 impl CoreState {
     /// 清除主机视觉覆盖的稳定核心入口。
+    #[cfg_attr(not(feature = "desktop"), allow(dead_code))]
     pub(crate) fn clear_host_visual_profiles_action(
         &mut self,
         host_id: HostId,

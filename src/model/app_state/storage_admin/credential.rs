@@ -11,8 +11,6 @@ use crate::model::{
 use russh::keys::PrivateKey;
 use std::path::Path;
 
-#[cfg(test)]
-use super::super::AppState;
 use super::super::AppUpdateOutcome;
 use super::credential_groups::validate_credential_group;
 use super::credential_ids::new_credential_id;
@@ -522,21 +520,5 @@ impl CoreState {
             return Err(format!("{display_name}内容为空"));
         };
         decode_plaintext_private_key(payload, display_name)
-    }
-}
-
-#[cfg(test)]
-impl AppState {
-    /// 创建或更新凭据元数据，并把新引用回填到当前创建主机草稿。
-    pub(crate) fn create_credential_metadata(
-        &mut self,
-        kind: CredentialKind,
-        name: String,
-        group_id: Option<CredentialGroupId>,
-        secret_ref: String,
-        algorithm: Option<KeyAlgorithm>,
-    ) -> AppUpdateOutcome {
-        self.core
-            .create_credential_metadata(kind, name, group_id, secret_ref, algorithm)
     }
 }

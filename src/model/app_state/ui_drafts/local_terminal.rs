@@ -7,10 +7,10 @@ use uuid::Uuid;
 
 use crate::backend::{BackendCommand, PtyRequest};
 use crate::core::CoreState;
-use crate::model::{SessionId, SessionKind, WorkspacePage};
+use crate::model::{SessionId, SessionKind};
 use crate::terminal::TerminalTabState;
 
-use super::super::{AppState, AppUpdateOutcome};
+use super::super::AppUpdateOutcome;
 
 pub(in crate::model::app_state) fn ensure_local_terminal_tab(
     state: &mut CoreState,
@@ -91,25 +91,6 @@ impl CoreState {
             state_changed: true,
             queued_backend_commands: 1,
             ..AppUpdateOutcome::default()
-        }
-    }
-}
-
-impl AppState {
-    /// 桌面端打开本地终端后切换到终端页，并保持主机侧栏展开。
-    pub(in crate::model::app_state) fn open_local_terminal(&mut self) -> AppUpdateOutcome {
-        let outcome = self.core.open_local_terminal();
-        if outcome.changed() {
-            self.ui.workspace.active_page = WorkspacePage::Terminal;
-        }
-        let hosts_panel_changed = self.ui.workspace.hosts_panel_collapsed;
-        if hosts_panel_changed {
-            self.ui.workspace.set_hosts_panel_collapsed(false);
-        }
-
-        AppUpdateOutcome {
-            state_changed: outcome.state_changed || hosts_panel_changed,
-            ..outcome
         }
     }
 }

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn remote_command_failure_marks_history_finished_without_exit_code() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -32,7 +32,7 @@ fn remote_command_failure_marks_history_finished_without_exit_code() {
 
 #[test]
 fn remote_command_history_ignores_late_exit_after_failure() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

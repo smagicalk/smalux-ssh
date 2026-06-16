@@ -1,5 +1,6 @@
 use super::*;
 use crate::backend::BackendCommand;
+use crate::core::CoreState;
 use crate::model::{
     AuthProfile, Host, SecretRef, Snippet, SnippetArgument, SnippetImplementation,
     SnippetImplementationId, SnippetScope, SnippetShell, SnippetSupportTarget,

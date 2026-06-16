@@ -1,11 +1,13 @@
 use super::*;
+use crate::app::state::DesktopAppState;
 use crate::backend::{
     BackendCommand, BackendCommandKind, BackendEvent, BackendExecutionError, BackendExecutor,
     NoopBackendExecutor, ScriptedBackendExecutor, ScriptedBackendResponse,
 };
+use crate::core::CoreState;
 use crate::model::{
     AgentSource, AuthProfile, Host, HostKeyVerification, KeyAlgorithm, KnownHostEntry,
-    SessionStatus, TransferStatus, TunnelKind, TunnelRule, TunnelStatus,
+    SessionStatus, TransferStatus, TunnelKind, TunnelRule, TunnelStatus, UiState,
 };
 
 #[path = "backend_pump_tests/basic.rs"]
@@ -20,6 +22,12 @@ mod sftp;
 mod terminal;
 #[path = "backend_pump_tests/tunnel.rs"]
 mod tunnel;
+
+fn desktop_state() -> DesktopAppState {
+    let core = CoreState::default();
+    let ui = UiState::from_visual(&core.config.theme, &core.config.background);
+    DesktopAppState { core, ui }
+}
 
 fn sample_host() -> Host {
     Host {
@@ -84,7 +92,7 @@ impl BackendExecutor for RejectingHostKeyExecutor {
 
 #[test]
 fn backend_queue_pump_noops_when_queue_is_empty() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let mut executor = ScriptedBackendExecutor::new();
 
     let outcome = state.drain_backend_queue(&mut executor);

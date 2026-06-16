@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn default_state_starts_empty() {
-    let state = AppState::default();
+    let state = core_state();
 
     assert_eq!(state.config.app_name, "smagicalssh");
     assert_eq!(state.sessions.active_count(), 0);
@@ -13,7 +13,7 @@ fn default_state_starts_empty() {
 
 #[test]
 fn backend_event_message_updates_existing_session_state() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -35,7 +35,7 @@ fn backend_event_message_updates_existing_session_state() {
 
 #[test]
 fn remove_credential_message_updates_storage() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     state
         .storage
         .upsert_credential(crate::model::CredentialMetadata {
@@ -59,7 +59,7 @@ fn remove_credential_message_updates_storage() {
 
 #[test]
 fn update_credential_metadata_message_updates_storage() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     state
         .storage
         .upsert_credential(crate::model::CredentialMetadata {
@@ -90,7 +90,7 @@ fn update_credential_metadata_message_updates_storage() {
 
 #[test]
 fn update_credential_secret_message_updates_storage() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let secret_ref = crate::model::SecretRef("secret://passwords/deploy".to_owned());
     state
         .storage
@@ -126,7 +126,7 @@ fn update_credential_secret_message_updates_storage() {
 
 #[test]
 fn trust_known_host_message_marks_entry_trusted() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     state
         .storage
         .upsert_known_host(crate::model::KnownHostEntry {
@@ -148,7 +148,7 @@ fn trust_known_host_message_marks_entry_trusted() {
 
 #[test]
 fn remove_known_host_message_deletes_entry() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     state
         .storage
         .upsert_known_host(crate::model::KnownHostEntry::untrusted(

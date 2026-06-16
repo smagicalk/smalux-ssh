@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn select_sftp_entry_message_updates_browser_selection() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
@@ -26,7 +26,7 @@ fn select_sftp_entry_message_updates_browser_selection() {
 
 #[test]
 fn select_sftp_entry_reassigns_disconnected_browser_owner() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let host = sample_host();
     let host_id = host.id;
     let fallback_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
@@ -65,7 +65,7 @@ fn select_sftp_entry_reassigns_disconnected_browser_owner() {
 
 #[test]
 fn select_sftp_entry_rejects_disconnected_browser_without_fallback_session() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let host = sample_host();
     let host_id = host.id;
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());

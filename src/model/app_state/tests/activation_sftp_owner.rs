@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn activate_sftp_tab_message_reassigns_browser_owner() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let first_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let second_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());
@@ -26,7 +26,7 @@ fn activate_sftp_tab_message_reassigns_browser_owner() {
 
 #[test]
 fn activate_disconnected_sftp_tab_keeps_available_browser_owner() {
-    let mut state = AppState::default();
+    let mut state = core_state();
     let connected_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let disconnected_session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     let host_id = crate::model::HostId(uuid::Uuid::new_v4());

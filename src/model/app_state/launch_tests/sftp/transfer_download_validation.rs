@@ -2,22 +2,22 @@ use super::*;
 
 #[test]
 fn download_sftp_rejects_empty_and_root_remote_paths() {
-    let mut state = AppState::default();
+    let mut state = desktop_state();
     let host = sample_host();
     let host_id = host.id;
-    state.storage.upsert_host(host);
+    state.core.storage.upsert_host(host);
 
-    state.apply(Message::OpenSftp {
+    state.apply_message(Message::OpenSftp {
         host_id,
         initial_dir: "/home/ops".to_owned(),
     });
-    state.backend_commands.drain();
+    state.core.backend_commands.drain();
 
-    let empty_outcome = state.apply(Message::DownloadSftp {
+    let empty_outcome = state.apply_message(Message::DownloadSftp {
         host_id,
         remote_path: "  ".to_owned(),
     });
-    let root_outcome = state.apply(Message::DownloadSftp {
+    let root_outcome = state.apply_message(Message::DownloadSftp {
         host_id,
         remote_path: " / ".to_owned(),
     });
@@ -38,6 +38,6 @@ fn download_sftp_rejects_empty_and_root_remote_paths() {
             .unwrap_or("")
             .contains("根目录")
     );
-    assert_eq!(state.sessions.transfer_count(), 0);
-    assert!(state.backend_commands.is_empty());
+    assert_eq!(state.core.sessions.transfer_count(), 0);
+    assert!(state.core.backend_commands.is_empty());
 }

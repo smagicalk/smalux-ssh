@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn backend_queue_pump_executes_commands_and_applies_events() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);
@@ -41,7 +41,7 @@ fn backend_queue_pump_executes_commands_and_applies_events() {
 
 #[test]
 fn backend_queue_pump_executes_disconnect_for_closed_tabs() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let session_id = crate::model::SessionId(uuid::Uuid::new_v4());
     state
         .backend_commands
@@ -64,7 +64,7 @@ fn backend_queue_pump_executes_disconnect_for_closed_tabs() {
 
 #[test]
 fn backend_worker_command_path_defers_execution_and_applies_result() {
-    let mut state = AppState::default();
+    let mut state = CoreState::default();
     let host = sample_host();
     let host_id = host.id;
     state.storage.upsert_host(host);

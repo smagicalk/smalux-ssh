@@ -3,8 +3,8 @@
 //! 这里专门处理凭据元数据和 Known Hosts 的增删改，避免把存储管理逻辑继续塞进
 //! `app_state.rs` 主文件。
 //!
-//! 这个模块仍然属于核心状态层：核心动作只操作 `StorageManager`，旧 `AppState`
-//! 包装继续承接过渡期的确认状态兼容。
+//! 这个模块仍然属于核心状态层：核心动作只操作 `StorageManager`，桌面确认流程由
+//! `DesktopAppState` 适配层承接。
 
 #[path = "storage_admin/credential.rs"]
 mod credential;
