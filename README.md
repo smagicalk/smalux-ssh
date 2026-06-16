@@ -57,4 +57,4 @@ cargo run -p smagical-ui
 & 'F:/code/rust/smagicalssh/crates/smagical-ui/extract-translations.ps1'
 ```
 
-脚本会在本地缺少工具时自动安装到 `.tools/slint-tr-extractor/`，该目录不进入版本控制。
+脚本默认直接调用全局安装的 `slint-tr-extractor`。
