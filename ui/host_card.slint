@@ -75,6 +75,7 @@ export component HostCard inherits Rectangle {
     in property <string> auth;
     in property <string> group;
     in property <string> tags;
+    in property <string> network-summary;
     in property <string> status-key;
     in property <string> status;
     in property <int> accent-index: 0;
@@ -90,7 +91,7 @@ export component HostCard inherits Rectangle {
     property <color> accent-color: root.accent-index == 0 ? AppTheme.accent : root.accent-index == 1 ? AppTheme.accent-violet : root.accent-index == 2 ? AppTheme.warning : root.accent-index == 3 ? AppTheme.info-text : root.accent-index == 4 ? AppTheme.danger-text-soft : AppTheme.success-text;
     property <color> state-color: root.status-key == "Connected" ? AppTheme.accent : root.status-key == "Connecting" ? AppTheme.warning : root.status-key == "Failed" ? AppTheme.danger : root.accent-color;
 
-    height: 104px;
+    height: 116px;
     border-radius: 8px;
     border-width: 1px;
     border-color: root.status-key == "Connected" ? AppTheme.accent : AppTheme.border-soft;
@@ -138,6 +139,13 @@ export component HostCard inherits Rectangle {
                     Text { text: name; color: AppTheme.text-strong; font-size: 12px; font-weight: 700; height: 16px; overflow: elide; }
                     Text { text: endpoint; color: AppTheme.text-soft; font-size: 10px; height: 13px; overflow: elide; }
                     Text { text: tags; color: root.accent-color; font-size: 9px; height: 12px; overflow: elide; }
+                    if root.network-summary != "": Text {
+                        text: root.network-summary;
+                        color: AppTheme.text-muted;
+                        font-size: 9px;
+                        height: 12px;
+                        overflow: elide;
+                    }
                 }
 
                 VerticalLayout {

@@ -5,18 +5,17 @@
 - 项目路径：`F:/code/rust/smagicalssh`
 - 项目目标：Rust + Slint 跨平台 SSH 工作台，面向主机管理、终端、SFTP、隧道、凭据、片段、历史、主题和设置。
 - 用户核心要求：继续完成核心，同时保持“模块化、功能化、单一化”；后续用户可能自己重写 UI，因此核心、view model、projection、Slint 页面装配必须清晰分层。
-- 当前优先级：网络引用模型已经接到主机页，下一步优先补 Network 页资源库 CRUD 和 UI 预览；UI 可以继续打磨，但不要把核心逻辑写进 Slint。
+- 当前状态：`CoreState` 与 `DesktopAppState` 已分离，历史 `AppState` 兼容层已物理移除；当前正在继续整理目录结构与命名，让功能模块更清晰。
+- 当前优先级：继续收敛 `src/model/app_state` 与 `src/app/state` 的模块命名和职责边界，保持 UI 与核心分层清楚。
 - 回复要求：始终用简体中文；命令、标识符、日志和报错保留原文。
 
 ## 当前验证基线
 
 - 最近验证通过：
-  - `cargo fmt`
-  - `cargo check --color never`
-  - `cargo test --color never`，`440 passed`
-  - `cargo test -p smagical-core --color never`，`36 passed`
-  - `cargo test -p smagical-storage --color never`，`44 passed`
-  - `cargo build --color never`
+  - `cargo fmt --all`
+  - `cargo check`
+  - `cargo check --tests`
+  - `cargo check --no-default-features`
 - 2026-06-10 网络内核最近验证：
   - 单主机单代理兼容测试：`host_deserializes_legacy_single_proxy_field` 通过。
   - SQLite 旧 `host_proxy` 单行表自动修复测试通过。

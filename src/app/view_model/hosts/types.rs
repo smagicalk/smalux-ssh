@@ -13,6 +13,7 @@ pub(in crate::app) struct HostViewModel {
     pub group_header: String,
     pub group_header_id: String,
     pub tags: String,
+    pub network_summary: String,
     pub status_key: &'static str,
     pub status: &'static str,
     pub accent_index: i32,

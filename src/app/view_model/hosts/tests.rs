@@ -315,6 +315,55 @@ fn host_rows_use_group_accent_mapping() {
 }
 
 #[test]
+fn host_rows_project_network_resource_summary() {
+    let mut state = desktop_state();
+    let proxy_id = ProxyId(Uuid::new_v4());
+    let chain_id = JumpChainId(Uuid::new_v4());
+    let forward_id = ForwardId(Uuid::new_v4());
+    state.core.storage.upsert_proxy_asset(ProxyAsset {
+        id: proxy_id,
+        name: "corp-proxy".to_owned(),
+        tags: Vec::new(),
+        profile: ProxyProfile::Http {
+            host: "proxy.example.com".to_owned(),
+            port: 8080,
+            auth: crate::model::ProxyAuth::None,
+        },
+    });
+    state.core.storage.upsert_jump_chain_asset(JumpChainAsset {
+        id: chain_id,
+        name: "prod-jump".to_owned(),
+        steps: Vec::new(),
+        stop_on_failure: true,
+    });
+    state.core.storage.upsert_forward_asset(ForwardAsset {
+        id: forward_id,
+        name: "db-forward".to_owned(),
+        tags: Vec::new(),
+        rule: TunnelRule {
+            name: "db-forward".to_owned(),
+            kind: TunnelKind::Local,
+            bind_host: "127.0.0.1".to_owned(),
+            bind_port: 15432,
+            target_host: "10.0.0.5".to_owned(),
+            target_port: 5432,
+            auto_start: false,
+            exit_on_failure: false,
+        },
+        exit_on_failure: false,
+    });
+    let mut host = agent_host("Production", "prod.example.com", &["prod"]);
+    host.network.proxy_ids.push(proxy_id);
+    host.network.jump_chain_ids.push(chain_id);
+    host.network.forward_ids.push(forward_id);
+    state.core.storage.upsert_host(host);
+
+    let rows = hosts(view(&state));
+
+    assert_eq!(rows[0].network_summary, "1 代理 · 1 跳板链 · 1 转发");
+}
+
+#[test]
 fn quick_host_projects_group_path_options_and_selection() {
     let mut state = desktop_state();
     state.ui.workspace.language = LanguageMode::Chinese;

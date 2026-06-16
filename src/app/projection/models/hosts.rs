@@ -28,6 +28,7 @@ pub(in crate::app::projection) fn host_model(items: &[HostViewModel]) -> ModelRc
             group_header: host.group_header.as_str().into(),
             group_header_id: host.group_header_id.as_str().into(),
             tags: host.tags.as_str().into(),
+            network_summary: host.network_summary.as_str().into(),
             status_key: host.status_key.into(),
             status: host.status.into(),
             accent_index: host.accent_index,

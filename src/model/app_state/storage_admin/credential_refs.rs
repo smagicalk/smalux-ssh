@@ -1,7 +1,7 @@
 use crate::core::CoreState;
 use crate::model::{AuthProfile, CredentialKind, CredentialMetadata, SecretRef};
 
-pub(super) fn next_credential_copy_name(
+pub(crate) fn next_credential_copy_name(
     credentials: &[CredentialMetadata],
     base_name: &str,
 ) -> String {
@@ -17,7 +17,7 @@ pub(super) fn next_credential_copy_name(
     candidate
 }
 
-pub(super) fn next_secret_ref(
+pub(crate) fn next_secret_ref(
     state: &CoreState,
     namespace: &str,
     fallback: &str,
@@ -38,7 +38,7 @@ pub(super) fn next_secret_ref(
     SecretRef(candidate)
 }
 
-pub(super) fn credential_secret_namespace(kind: &CredentialKind) -> (&'static str, &'static str) {
+pub(crate) fn credential_secret_namespace(kind: &CredentialKind) -> (&'static str, &'static str) {
     match kind {
         CredentialKind::Password => ("passwords", "password"),
         CredentialKind::PrivateKey => ("keys", "private-key"),
@@ -47,7 +47,7 @@ pub(super) fn credential_secret_namespace(kind: &CredentialKind) -> (&'static st
     }
 }
 
-pub(super) fn auth_profile_uses_secret_ref(auth: &AuthProfile, secret_ref: &SecretRef) -> bool {
+pub(crate) fn auth_profile_uses_secret_ref(auth: &AuthProfile, secret_ref: &SecretRef) -> bool {
     match auth {
         AuthProfile::Password { secret, .. } => secret == secret_ref,
         AuthProfile::Key {

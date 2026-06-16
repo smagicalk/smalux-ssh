@@ -315,12 +315,47 @@ fn host_rows_for_query(
                 } else {
                     tag_display::compact(state, host)
                 },
+                network_summary: host_network_summary(state, host),
                 status_key: host_status_key(state, host.id),
                 status: host_status_label(state, host.id, locale),
                 accent_index: accent_index_for_group_id(host.group_id),
             }
         })
         .collect()
+}
+
+fn host_network_summary(state: DesktopStateView<'_>, host: &Host) -> String {
+    let locale = locale_for_state(state);
+    let proxy_count = host.network.proxy_ids.len();
+    let jump_count = host.network.jump_chain_ids.len();
+    let forward_count = host.network.forward_ids.len();
+    if proxy_count == 0 && jump_count == 0 && forward_count == 0 {
+        return String::new();
+    }
+
+    let mut parts = Vec::new();
+    if proxy_count > 0 {
+        parts.push(format!(
+            "{} {}",
+            proxy_count,
+            tr(locale, "host.network_proxy_label")
+        ));
+    }
+    if jump_count > 0 {
+        parts.push(format!(
+            "{} {}",
+            jump_count,
+            tr(locale, "host.network_jump_label")
+        ));
+    }
+    if forward_count > 0 {
+        parts.push(format!(
+            "{} {}",
+            forward_count,
+            tr(locale, "host.network_forward_label")
+        ));
+    }
+    parts.join(" · ")
 }
 
 pub(super) fn create_group_dialog(state: impl AsDesktopStateView) -> CreateGroupDialogViewModel {

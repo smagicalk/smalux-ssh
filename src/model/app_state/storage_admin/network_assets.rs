@@ -12,7 +12,7 @@ use crate::model::{
     TunnelKind, TunnelRule,
 };
 
-use super::credential_refs::next_secret_ref;
+use crate::model::app_state::credentials::credential_refs::next_secret_ref;
 
 const NETWORK_ASSET_NAME_LIMIT: usize = 64;
 

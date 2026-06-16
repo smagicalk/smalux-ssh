@@ -13,6 +13,18 @@ Rust 跨平台桌面 SSH 工作台，目标是参考并整合 XTerminal、Termor
 
 项目已经从“需求草案”进入“核心能力持续收敛”阶段，当前重点不是继续扩散功能点，而是把领域模型、存储结构、页面 view model 和 Slint 装配边界做稳。
 
+当前核心架构状态：
+
+- `CoreState`：无 GUI 依赖的核心运行态
+- `DesktopAppState`：当前桌面适配层，组合 `core + ui`
+- 历史 `AppState` 兼容层已物理移除
+
+这意味着：
+
+- `cargo check --no-default-features` 可通过，核心可以独立编译
+- 桌面层已经只承担 UI 草稿、页面切换、投影和回调绑定
+- 未来替换 UI 时，不需要再经过历史兼容状态壳
+
 已稳定接入的核心链路：
 
 - SSH 连接、认证、交互式 shell、本地终端
@@ -74,6 +86,11 @@ Rust 跨平台桌面 SSH 工作台，目标是参考并整合 XTerminal、Termor
 - `src/app`: UI adapter、callback、projection、view model
 - `ui/*.slint`: Slint 页面与组件
 
+当前状态容器：
+
+- `CoreState`：核心入口，负责会话、终端、存储、后端命令和领域规则
+- `DesktopAppState`：桌面入口，负责 UI 草稿、弹窗、当前页、输入框和选择态
+
 分层原则：
 
 - `core` 只放纯数据模型和规则
@@ -81,6 +98,7 @@ Rust 跨平台桌面 SSH 工作台，目标是参考并整合 XTerminal、Termor
 - `backend` 只管执行协议和运行态
 - `app/view_model/projection` 负责把核心状态投影到 Slint
 - `ui` 只负责页面与交互，不承载业务逻辑
+- 桌面特有副作用只留在 `DesktopAppState`，不回流到核心
 
 ## 已实现重点
 

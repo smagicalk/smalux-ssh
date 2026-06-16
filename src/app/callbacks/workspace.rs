@@ -635,6 +635,7 @@ mod tests {
             group_header: "Backend".into(),
             group_header_id: "group-id".into(),
             tags: "prod api".into(),
+            network_summary: "1 代理".into(),
             status_key: "Created".into(),
             status: "Ready".into(),
             accent_index: 0,

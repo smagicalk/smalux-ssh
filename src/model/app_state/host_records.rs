@@ -1,40 +1,9 @@
-//! 本地安全资产的管理操作。
+//! 已保存主机与分组记录的核心动作。
 //!
-//! 这里专门处理凭据元数据和 Known Hosts 的增删改，避免把存储管理逻辑继续塞进
-//! `app_state.rs` 主文件。
-//!
-//! 这个模块仍然属于核心状态层：核心动作只操作 `StorageManager`，桌面确认流程由
-//! `DesktopAppState` 适配层承接。
-
-#[path = "storage_admin/credential.rs"]
-mod credential;
-#[path = "storage_admin/credential_certificate_params.rs"]
-mod credential_certificate_params;
-#[path = "storage_admin/credential_groups.rs"]
-mod credential_groups;
-#[path = "storage_admin/credential_ids.rs"]
-mod credential_ids;
-#[path = "storage_admin/credential_material.rs"]
-mod credential_material;
-#[path = "storage_admin/credential_material_certificate.rs"]
-mod credential_material_certificate;
-#[path = "storage_admin/credential_material_generate.rs"]
-mod credential_material_generate;
-#[path = "storage_admin/credential_payload.rs"]
-mod credential_payload;
-#[path = "storage_admin/credential_refs.rs"]
-mod credential_refs;
-#[path = "storage_admin/known_hosts.rs"]
-mod known_hosts;
-#[path = "storage_admin/network_assets.rs"]
-mod network_assets;
-#[cfg(test)]
-#[path = "storage_admin/tests.rs"]
-mod tests;
-
-use crate::model::{GroupId, HostId};
+//! 这里只处理主机/分组记录本身，不再和凭据、Known Hosts、网络资源混在一个大模块里。
 
 use crate::core::CoreState;
+use crate::model::{GroupId, HostId};
 
 use super::AppUpdateOutcome;
 
@@ -66,7 +35,6 @@ impl CoreState {
 
     /// 删除已保存主机，并清理主机相关的本地索引。
     fn remove_host_by_id(&mut self, host_id: HostId) -> AppUpdateOutcome {
-        // 当前只从主机集合移除；后续如果 SQLite 层增加外键/软删除，可以保持调用点不变。
         if self.storage.remove_host(host_id) {
             return AppUpdateOutcome {
                 state_changed: true,
