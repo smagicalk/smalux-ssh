@@ -1,0 +1,39 @@
+schema-version = 1
+id = "builtin.ui.darcula"
+name = "Darcula"
+kind = "ui"
+period = "night"
+author = "Derived from JetBrains Darcula"
+source = "https://github.com/JetBrains/intellij-community"
+
+[ui]
+color-scheme = "dark"
+window-background = "#2B2B2B"
+panel-background = "#3C3F41"
+surface-background = "#313335"
+control-background = "#45494A"
+foreground = "#BBBBBB"
+secondary-foreground = "#A0A0A0"
+disabled-foreground = "#777777"
+accent = "#589DF6"
+hover-background = "#4C5052"
+pressed-background = "#5C6164"
+selected-background = "#4B6EAF"
+selected-foreground = "#DEDEDE"
+border = "#515151"
+focus-border = "#466D94"
+success = "#008F50"
+warning = "#AC7920"
+danger = "#E74848"
+info = "#589DF6"
+
+[metrics]
+radius-small = 2
+radius-medium = 4
+radius-large = 8
+spacing-small = 4
+spacing-medium = 8
+spacing-large = 16
+border-width = 1
+control-height = 32
+icon-size = 16

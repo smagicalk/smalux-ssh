@@ -1,0 +1,135 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { SearchInput } from "search-input.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 命令项结构体
+export struct PaletteItemData {
+    id: string,
+    category: string, // "host" | "command" | "theme" | "action"
+    icon-text: string,
+    title: string,
+    subtitle: string,
+}
+
+/// 全局浮动指令面板 (Command Palette / Ctrl+K)
+export component CommandPalette inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[PaletteItemData]> items: [
+        { id: "1", category: "host", icon-text: "🖥️", title: "prod-server-01", subtitle: "192.168.1.100:22 (生产环境)" },
+        { id: "2", category: "host", icon-text: "🖥️", title: "k8s-master-node", subtitle: "10.0.0.12:22 (集群控制面)" },
+        { id: "3", category: "command", icon-text: "⚡", title: "docker ps --format", subtitle: "查看运行中的容器列表" },
+        { id: "4", category: "command", icon-text: "⚡", title: "df -h && free -m", subtitle: "检查系统磁盘与内存占用" },
+        { id: "5", category: "theme", icon-text: "🎨", title: "切换主题: Darcula", subtitle: "经典深色暗调主题" },
+        { id: "6", category: "theme", icon-text: "🎨", title: "切换主题: Monokai", subtitle: "高对比色彩斑斓代码配色" },
+    ];
+
+    callback close();
+    callback item-selected(string /* id */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088; // 半透明暗色背景
+
+        // 点击遮罩外部关闭
+        TouchArea {
+            clicked => { root.close(); }
+        }
+
+        // 居中面板卡片
+        Rectangle {
+            width: 520px;
+            height: 380px;
+            x: (parent.width - self.width) / 2;
+            y: 80px;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 10px;
+
+                // 顶部输入框
+                SearchInput {
+                    placeholder: @tr("输入主机名、命令或 > 执行操作 (Esc 退出)...");
+                    accepted(text) => {
+                        // 回车默认触发第一项
+                        if root.items.length > 0 {
+                            root.item-selected(root.items[0].id);
+                            root.close();
+                        }
+                    }
+                }
+
+                // 快捷提示条
+                HorizontalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+                    spacing: 12px;
+
+                    Text {
+                        text: @tr("按 ↑↓ 导航  |  Enter 确认  |  Esc 关闭");
+                        font-size: 11px;
+                        color: AppTheme.disabled-foreground;
+                    }
+                }
+
+                // 结果列表
+                ScrollView {
+                    VerticalLayout {
+                        spacing: 4px;
+
+                        for item in root.items: Rectangle {
+                            height: 48px;
+                            border-radius: AppTheme.radius-medium;
+                            background: item-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                            item-touch := TouchArea {
+                                clicked => {
+                                    root.item-selected(item.id);
+                                    root.close();
+                                }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 12px;
+                                alignment: center;
+
+                                Text {
+                                    text: item.icon-text;
+                                    font-size: 16px;
+                                    vertical-alignment: center;
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+
+                                    Text {
+                                        text: item.title;
+                                        font-size: 13px;
+                                        font-weight: 600;
+                                        color: AppTheme.foreground;
+                                        horizontal-alignment: left;
+                                    }
+
+                                    Text {
+                                        text: item.subtitle;
+                                        font-size: 11px;
+                                        color: AppTheme.secondary-foreground;
+                                        horizontal-alignment: left;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

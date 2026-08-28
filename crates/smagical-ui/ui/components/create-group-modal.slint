@@ -1,0 +1,362 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "group-tree-selector.slint";
+
+export { GroupTreeSelector, GroupOptionData }
+
+/// 新建主机分组弹窗组件 (Create Group Modal)
+///
+/// 用于在主机资产管理中创建新分组的模态对话框。
+/// 核心特性：
+/// 1. 顶部防误触半透明暗色遮罩（仅拦截穿透，须明确点击取消或关闭按键）；
+/// 2. 居中 460x420px 精致卡片容器，内容 100% 满宽填满无空白；
+/// 3. 内嵌 200px 独立 GroupTreeSelector 选择所属上级分组；
+/// 4. 定制化深色无白底输入框，左侧固定图标，右侧绝对锚定清空按钮；
+/// 5. 底部取消与确认创建按钮（支持 Enter 快捷键快速提交）。
+export component CreateGroupModal inherits Rectangle {
+    /// 弹窗显隐控制开关 (true: 显示弹窗, false: 隐藏弹窗)
+    in property <bool> is-open: false;
+    /// 上级分组树形选项数据列表
+    in property <[GroupOptionData]> group-options: [
+        { id: "root", name: "根目录 (顶级分组)", level: 0, parent-id: "", has-children: true, is-expanded: true },
+        { id: "grp-prod", name: "生产集群 (Production)", level: 1, parent-id: "root", has-children: true, is-expanded: true },
+        { id: "grp-k8s", name: "Kubernetes 集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
+        { id: "grp-db", name: "核心数据库集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
+        { id: "grp-edge", name: "边缘网关与缓存", level: 1, parent-id: "root", has-children: false, is-expanded: false },
+        { id: "grp-ai", name: "AI 算力集群 (GPU)", level: 1, parent-id: "root", has-children: false, is-expanded: false },
+        { id: "grp-dr", name: "容灾与测试环境", level: 1, parent-id: "root", has-children: false, is-expanded: false },
+    ];
+    /// 默认预选的上级分组 ID (默认为 "root" 顶级根目录)
+    in property <string> default-parent-id: "root";
+    /// 当前选中的目标父级分组 ID
+    in-out property <string> selected-parent-id: root.default-parent-id;
+    /// 用户当前输入的新分组名称
+    in-out property <string> group-name: "";
+
+    /// 关闭弹窗回调事件（当点击右上角✕按键或底部取消按钮时触发）
+    callback close();
+    /// 确认创建新分组回调事件，参数 1: 所属父分组 ID, 参数 2: 新分组名称
+    callback confirm(string /* parent_id */, string /* name */);
+    /// 切换树形选择器中指定分组折叠/展开状态的回调事件
+    callback toggle-group(string /* id */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088; // 半透明暗色背景
+
+        // 仅拦截遮罩区域点击穿透，不触发关闭（防止用户误触导致输入内容丢失）
+        TouchArea {
+            // 拦截遮罩背景
+        }
+
+        // 居中弹窗卡片 (尺寸加大、窗口严格居中、高度精准占满)
+        Rectangle {
+            width: 460px;
+            height: 420px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 11px;
+                alignment: start;
+
+                // 1. 弹窗标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/folder-plus.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: @tr("新建主机分组");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 关闭按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        close-touch := TouchArea {
+                            clicked => {
+                                root.group-name = "";
+                                root.close();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 分割线
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                // 2. 选择上级分组 (高度 200px，视野开阔，自带平滑滚动)
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 6px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 14px;
+
+                        Text {
+                            text: @tr("选择所属上级分组:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: root.selected-parent-id == "root" ? @tr("当前选定: 顶级根目录") : @tr("当前选定: 子分组");
+                            font-size: 10px;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 独立树状选择器
+                    GroupTreeSelector {
+                        options: root.group-options;
+                        selected-id <=> root.selected-parent-id;
+                        toggle-group(id) => { root.toggle-group(id); }
+                        height: 200px;
+                    }
+                }
+
+                // 3. 输入新分组名称 (满宽 100% 占满，纯暗色背景，超长文本动态向左偏移保持最新输入始终可见)
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 4px;
+
+                    Text {
+                        text: @tr("新分组名称:");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        height: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        width: 100%;
+                        height: 36px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: name-input.has-focus ? 1.5px : 1px;
+                        border-color: name-input.has-focus ? AppTheme.accent : AppTheme.border;
+                        clip: true;
+
+                        animate border-color { duration: 120ms; }
+
+                        TouchArea {
+                            clicked => { name-input.focus(); }
+                        }
+
+                        // 1. 最左侧：固定文件夹图标 (距离左边 10px，永不位移)
+                        Image {
+                            source: @image-url("../assets/icons/folder.svg");
+                            x: 10px;
+                            y: (parent.height - self.height) / 2;
+                            width: 13px;
+                            height: 13px;
+                            image-fit: contain;
+                            colorize: name-input.has-focus ? AppTheme.accent : AppTheme.secondary-foreground;
+
+                            animate colorize { duration: 120ms; }
+                        }
+
+                        // 2. 中间：文本输入区 (左侧避开图标 31px，右侧给清空按钮预留 28px)
+                        Rectangle {
+                            x: 31px;
+                            y: 0px;
+                            width: parent.width - 31px - (root.group-name != "" ? 28px : 10px);
+                            height: 100%;
+                            clip: true;
+
+                            if root.group-name == "" && !name-input.has-focus: Text {
+                                text: @tr("请输入分组名称，例如: 微服务集群、测试数据库...");
+                                font-size: 11px;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                                horizontal-alignment: left;
+                                x: 0px;
+                                width: 100%;
+                                height: 100%;
+                                overflow: elide;
+                            }
+
+                            name-input := TextInput {
+                                text <=> root.group-name;
+                                width: 100%;
+                                height: 100%;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                                horizontal-alignment: left;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+
+                                accepted => {
+                                    if root.group-name != "" {
+                                        root.confirm(root.selected-parent-id, root.group-name);
+                                        root.group-name = "";
+                                        root.close();
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. 最右端：一键清空按钮 (绝对固定在输入框最右端，距离右侧 8px)
+                        if root.group-name != "": Rectangle {
+                            x: parent.width - self.width - 8px;
+                            y: (parent.height - self.height) / 2;
+                            width: 18px;
+                            height: 18px;
+                            border-radius: 9px;
+                            background: clear-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                            clear-touch := TouchArea {
+                                clicked => {
+                                    root.group-name = "";
+                                    name-input.focus();
+                                }
+                                mouse-cursor: pointer;
+                            }
+
+                            Image {
+                                source: @image-url("../assets/icons/window-close.svg");
+                                width: 8px;
+                                height: 8px;
+                                image-fit: contain;
+                                colorize: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
+                        }
+                    }
+                }
+
+                // 4. 底部动作按钮
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 10px;
+                    height: 32px;
+
+                    // 取消按钮
+                    Rectangle {
+                        width: 76px;
+                        height: 32px;
+                        border-radius: AppTheme.radius-medium;
+                        background: cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: cancel-touch.has-hover ? AppTheme.border.darker(10%) : AppTheme.border;
+
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        cancel-touch := TouchArea {
+                            clicked => {
+                                root.group-name = "";
+                                root.close();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Text {
+                            text: @tr("取消");
+                            font-size: 12px;
+                            font-weight: 500;
+                            color: AppTheme.foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 确认创建按钮
+                    Rectangle {
+                        width: 96px;
+                        height: 32px;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.group-name != "" ? (confirm-touch.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: root.group-name != "" ? AppTheme.accent : AppTheme.border;
+
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        confirm-touch := TouchArea {
+                            clicked => {
+                                if root.group-name != "" {
+                                    root.confirm(root.selected-parent-id, root.group-name);
+                                    root.group-name = "";
+                                    root.close();
+                                }
+                            }
+                            mouse-cursor: root.group-name != "" ? pointer : default;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 5px;
+
+                            if root.group-name != "": Image {
+                                source: @image-url("../assets/icons/plus.svg");
+                                width: 11px;
+                                height: 11px;
+                                image-fit: contain;
+                                colorize: #ffffff;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            Text {
+                                text: @tr("确认创建");
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: root.group-name != "" ? #ffffff : AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

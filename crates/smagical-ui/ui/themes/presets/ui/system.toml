@@ -1,0 +1,12 @@
+schema-version = 1
+id = "builtin.ui.system"
+name = "System"
+kind = "ui"
+
+[ui]
+color-scheme = "system"
+
+[metrics]
+radius-medium = 4
+spacing-medium = 8
+control-height = 32

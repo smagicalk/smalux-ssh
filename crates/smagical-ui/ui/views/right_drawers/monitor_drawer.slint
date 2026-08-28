@@ -1,0 +1,139 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { ProgressBar } from "../../components/progress-bar.slint";
+
+/// 系统监控数据结构
+export struct SystemMetricsData {
+    cpu-usage: float,      // 0.0 ~ 1.0 (例如 0.42)
+    memory-usage: float,   // 0.0 ~ 1.0 (例如 0.68)
+    disk-usage: float,     // 0.0 ~ 1.0 (例如 0.35)
+    net-rx-rate: string,   // "4.8 MB/s"
+    net-tx-rate: string,   // "1.2 MB/s"
+    uptime-days: int,      // 18
+    process-count: int,    // 142
+    os-name: string,       // "Ubuntu 22.04.3 LTS (x86_64)"
+}
+
+/// 实时系统监控抽屉 (Monitor Drawer)
+export component MonitorDrawer inherits DrawerContainer {
+    title: @tr("主机实时监控");
+    collapse-icon: "▶";
+
+    in property <SystemMetricsData> metrics: {
+        cpu-usage: 0.42,
+        memory-usage: 0.68,
+        disk-usage: 0.35,
+        net-rx-rate: "4.8 MB/s",
+        net-tx-rate: "1.2 MB/s",
+        uptime-days: 18,
+        process-count: 142,
+        os-name: "Ubuntu 22.04 LTS",
+    };
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 12px;
+
+        // 主机系统概要
+        Rectangle {
+            height: 48px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 6px;
+                spacing: 2px;
+                alignment: center;
+
+                Text {
+                    text: root.metrics.os-name;
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: left;
+                }
+
+                Text {
+                    text: @tr("运行: {} 天  |  进程: {}", root.metrics.uptime-days, root.metrics.process-count);
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: left;
+                }
+            }
+        }
+
+        // 1. CPU 负载
+        VerticalLayout {
+            spacing: 4px;
+
+            HorizontalLayout {
+                Text { text: @tr("CPU 使用率"); font-size: 11px; color: AppTheme.foreground; horizontal-alignment: left; }
+                Text { text: Math.round(root.metrics.cpu-usage * 100) + "%"; font-size: 11px; font-weight: 700; color: AppTheme.accent; horizontal-alignment: right; }
+            }
+
+            ProgressBar {
+                progress: root.metrics.cpu-usage;
+            }
+        }
+
+        // 2. 内存占用
+        VerticalLayout {
+            spacing: 4px;
+
+            HorizontalLayout {
+                Text { text: @tr("内存占用 (RAM)"); font-size: 11px; color: AppTheme.foreground; horizontal-alignment: left; }
+                Text { text: Math.round(root.metrics.memory-usage * 100) + "%"; font-size: 11px; font-weight: 700; color: root.metrics.memory-usage > 0.8 ? AppTheme.danger : AppTheme.warning; horizontal-alignment: right; }
+            }
+
+            ProgressBar {
+                progress: root.metrics.memory-usage;
+            }
+        }
+
+        // 3. 磁盘空间
+        VerticalLayout {
+            spacing: 4px;
+
+            HorizontalLayout {
+                Text { text: @tr("磁盘空间 (/dev/sda1)"); font-size: 11px; color: AppTheme.foreground; horizontal-alignment: left; }
+                Text { text: Math.round(root.metrics.disk-usage * 100) + "%"; font-size: 11px; font-weight: 700; color: AppTheme.foreground; horizontal-alignment: right; }
+            }
+
+            ProgressBar {
+                progress: root.metrics.disk-usage;
+            }
+        }
+
+        // 4. 实时网络吞吐
+        Rectangle {
+            height: 52px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 12px;
+                alignment: center;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    Text { text: @tr("↓ 下载速率"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    Text { text: root.metrics.net-rx-rate; font-size: 12px; font-weight: 700; color: AppTheme.success; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    Text { text: @tr("↑ 上传速率"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    Text { text: root.metrics.net-tx-rate; font-size: 12px; font-weight: 700; color: AppTheme.accent; }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,186 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { TabItem } from "../../components/tab-item.slint";
+
+/// 会话 Tab 数据结构
+export struct TabData {
+    id: string,
+    title: string,
+    status: string,
+}
+
+/// 顶部统一标题与多会话标签栏 (Top Header / Tab Bar / Native Window Controls)
+export component TabBar inherits Rectangle {
+    in property <[TabData]> tabs: [
+        { id: "1", title: "prod-server-01", status: "online" },
+        { id: "2", title: "k8s-control-plane", status: "warning" },
+        { id: "3", title: "db-cluster-primary", status: "online" },
+        { id: "4", title: "redis-cache-shard-0", status: "online" },
+        { id: "5", title: "auth-gateway-edge", status: "online" },
+        { id: "6", title: "ai-inference-gpu", status: "online" },
+        { id: "7", title: "backup-node-dr", status: "offline" },
+    ];
+    in-out property <string> active-tab-id: "1";
+    in property <bool> is-maximized: false;
+    in-out property <bool> is-dark-mode: true;
+    in-out property <length> tab-scroll-offset: 0px;
+
+    callback select-tab(string /* id */);
+    callback close-tab(string /* id */);
+    callback new-tab();
+    callback open-command-palette();
+    callback toggle-color-mode();
+    callback open-settings();
+    callback minimize-window();
+    callback maximize-window();
+    callback close-window();
+
+    height: 38px;
+    background: AppTheme.panel-background;
+
+    // 底部分割线
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        width: 100%;
+        background: AppTheme.border;
+    }
+
+    // 整个标题栏底层双击最大化
+    TouchArea {
+        double-clicked => { root.maximize-window(); }
+    }
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // 1. 左侧独立品牌区 (38px 高度下绝对垂直居中)
+        VerticalLayout {
+            alignment: center;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 10px;
+                spacing: 8px;
+
+                Rectangle {
+                    width: 20px;
+                    height: 20px;
+                    border-radius: 4px;
+                    background: AppTheme.accent;
+
+                    Text {
+                        text: ">_";
+                        font-size: 10px;
+                        font-weight: 800;
+                        color: #ffffff;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+
+                Text {
+                    text: "smalux";
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 2. 中间弹性拉伸拖拽区 (纯净极简)
+        Rectangle {
+            horizontal-stretch: 1;
+        }
+
+        // 3. 右侧原生标准窗口控制区 (纯净系统三键: 最小化、最大化/还原、关闭)
+        HorizontalLayout {
+            padding: 0px;
+            spacing: 0px;
+            alignment: end;
+
+            // 3.1 最小化 (Minimize)
+            Rectangle {
+                width: 44px;
+                height: 37px;
+                background: min-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                Image {
+                    source: @image-url("../../assets/icons/window-minimize.svg");
+                    width: 10px;
+                    height: 10px;
+                    image-fit: contain;
+                    colorize: min-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                min-touch := TouchArea {
+                    clicked => { root.minimize-window(); }
+                    mouse-cursor: pointer;
+                }
+            }
+
+            // 3.2 最大化 / 还原 (Maximize / Restore)
+            Rectangle {
+                width: 44px;
+                height: 37px;
+                background: max-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                // 还原态显示单矩形
+                if !root.is-maximized: Image {
+                    source: @image-url("../../assets/icons/window-maximize.svg");
+                    width: 10px;
+                    height: 10px;
+                    image-fit: contain;
+                    colorize: max-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                // 最大化态显示双矩形
+                if root.is-maximized: Image {
+                    source: @image-url("../../assets/icons/window-restore.svg");
+                    width: 10px;
+                    height: 10px;
+                    image-fit: contain;
+                    colorize: max-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                max-touch := TouchArea {
+                    clicked => { root.maximize-window(); }
+                    mouse-cursor: pointer;
+                }
+            }
+
+            // 3.3 关闭 (Close) - 原生红底 (#E81123)
+            Rectangle {
+                width: 44px;
+                height: 37px;
+                background: close-touch.pressed ? #c4111f : close-touch.has-hover ? #e81123 : transparent;
+
+                animate background { duration: 80ms; }
+
+                Image {
+                    source: @image-url("../../assets/icons/window-close.svg");
+                    width: 10px;
+                    height: 10px;
+                    image-fit: contain;
+                    colorize: close-touch.has-hover ? #ffffff : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                close-touch := TouchArea {
+                    clicked => { root.close-window(); }
+                    mouse-cursor: pointer;
+                }
+            }
+        }
+    }
+}

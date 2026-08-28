@@ -1,0 +1,189 @@
+import { AppTheme } from "../themes/app-theme.slint";
+
+/// 分组树状层级选项数据结构 (Group Option Data)
+///
+/// 用于在树形选择器中表示一个单选分组节点的数据模型。
+export struct GroupOptionData {
+    /// 唯一分组标识符 (例如: "root"、"grp-prod"、"grp-custom-101")
+    id: string,
+    /// 显示给用户看的分组名称 (例如: "生产集群 (Production)")
+    name: string,
+    /// 树形层级深度，从 0 开始计数，用于计算左侧缩进距离 (缩进 = level * 14px)
+    level: int,
+    /// 所属父分组的唯一标识符，顶级根节点为空字符串 ""
+    parent-id: string,
+    /// 该分组节点下是否包含子分组（若为 true 则在左侧呈现折叠/展开指示三角）
+    has-children: bool,
+    /// 当前分组在选择器中是否处于展开状态（true: 展示子节点并显示向下三角，false: 折叠子节点并显示向右三角）
+    is-expanded: bool,
+}
+
+/// 通用树状分组选择器组件 (Group Tree Selector)
+///
+/// 专为模态弹窗、侧边栏及树状层级浏览设计的高复用选择控件。
+/// 核心特性：
+/// 1. 完整支持任意层级的子分组折叠与展开；
+/// 2. 左侧独立 18px 折叠小三角热区，点击与双击均支持展开/收起；
+/// 3. 单选圆圈与高亮边框指示当前选中的所属父级；
+/// 4. 内置 Flickable 滚动容器与自隐藏悬浮 3px 超薄滚动条；
+/// 5. 统一矢量图标配色，自适应深浅色主题。
+export component GroupTreeSelector inherits Rectangle {
+    /// 树状展示的分组选项数据模型数组
+    in property <[GroupOptionData]> options: [
+        { id: "root", name: "根目录 (顶级分组)", level: 0, parent-id: "", has-children: true, is-expanded: true },
+        { id: "grp-prod", name: "生产集群 (Production)", level: 1, parent-id: "root", has-children: true, is-expanded: true },
+        { id: "grp-k8s", name: "Kubernetes 集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
+        { id: "grp-db", name: "核心数据库集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
+        { id: "grp-edge", name: "边缘网关与缓存", level: 1, parent-id: "root", has-children: false, is-expanded: false },
+        { id: "grp-ai", name: "AI 算力集群 (GPU)", level: 1, parent-id: "root", has-children: false, is-expanded: false },
+        { id: "grp-dr", name: "容灾与测试环境", level: 1, parent-id: "root", has-children: false, is-expanded: false },
+    ];
+    /// 当前选中的目标分组 ID，支持与外部组件双向数据绑定 (<=>)
+    in-out property <string> selected-id: "root";
+
+    /// 当用户点击切换选中分组时触发的回调函数，参数为选中的分组 id
+    callback selection-changed(string /* id */);
+    /// 当用户点击折叠/展开小三角或双击分组行时触发的回调函数，参数为被折叠/展开的分组 id
+    callback toggle-group(string /* id */);
+
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.control-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    clip: true;
+
+    tree-hover := TouchArea {
+        // 捕获悬停态以触发滚动条优雅淡入
+    }
+
+    tree-flick := Flickable {
+        width: 100%;
+        height: 100%;
+        interactive: true;
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+            width: 100%;
+
+            for item in root.options: Rectangle {
+                height: 26px;
+
+                HorizontalLayout {
+                    padding-left: 4px + item.level * 14px;
+                    padding-right: 6px;
+                    spacing: 2px;
+                    alignment: start;
+
+                    // 1. 折叠三角指示与独立点击区域 (宽 18px，悬停高亮，点击折叠/展开)
+                    if item.has-children: Rectangle {
+                        width: 18px;
+                        height: 24px;
+                        border-radius: 3px;
+                        background: chevron-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        Image {
+                            source: item.is-expanded ? @image-url("../assets/icons/chevron-down.svg") : @image-url("../assets/icons/chevron-right.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: chevron-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        chevron-touch := TouchArea {
+                            clicked => { root.toggle-group(item.id); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    if !item.has-children: Rectangle {
+                        width: 18px;
+                        height: 24px;
+                    }
+
+                    // 2. 节点主体区域 (单选点 + 文件夹图标 + 文件夹名称，点击选定为所属上级，双击折叠/展开)
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 24px;
+                        border-radius: 3px;
+                        background: item.id == root.selected-id ? AppTheme.selected-background : select-touch.has-hover ? AppTheme.hover-background : transparent;
+                        border-width: item.id == root.selected-id ? 1px : 0px;
+                        border-color: AppTheme.accent;
+
+                        animate background { duration: 100ms; }
+
+                        select-touch := TouchArea {
+                            clicked => {
+                                root.selected-id = item.id;
+                                root.selection-changed(item.id);
+                            }
+                            double-clicked => {
+                                if item.has-children {
+                                    root.toggle-group(item.id);
+                                }
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 4px;
+                            padding-right: 6px;
+                            spacing: 6px;
+                            alignment: start;
+
+                            // 单选指示圆圈
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 8px;
+                                    height: 8px;
+                                    border-radius: 4px;
+                                    border-width: 1.5px;
+                                    border-color: item.id == root.selected-id ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    background: item.id == root.selected-id ? AppTheme.accent : transparent;
+                                }
+                            }
+
+                            // 统一文件夹图标
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../assets/icons/folder.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    image-fit: contain;
+                                    colorize: item.id == root.selected-id ? AppTheme.accent : AppTheme.secondary-foreground;
+                                }
+                            }
+
+                            // 统一分组名称文字
+                            Text {
+                                text: item.name;
+                                font-size: 11px;
+                                font-weight: item.id == root.selected-id ? 600 : 400;
+                                color: item.id == root.selected-id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 超薄自隐藏悬浮滚动条
+    if tree-flick.viewport-height > tree-flick.height: Rectangle {
+        x: parent.width - self.width - 2px;
+        y: Math.max(2px, Math.min(parent.height - self.height - 2px, (-tree-flick.viewport-y / tree-flick.viewport-height) * tree-flick.height));
+        width: 3px;
+        height: Math.max(20px, (tree-flick.height / tree-flick.viewport-height) * tree-flick.height);
+        border-radius: 1.5px;
+        background: tree-hover.has-hover ? AppTheme.secondary-foreground.transparentize(20%) : AppTheme.secondary-foreground.transparentize(80%);
+        opacity: tree-hover.has-hover ? 0.9 : 0.0;
+
+        animate opacity { duration: 200ms; }
+    }
+}

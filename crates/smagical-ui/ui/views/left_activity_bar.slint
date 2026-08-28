@@ -1,0 +1,125 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { ActionBarItem } from "../components/action-bar-item.slint";
+
+/// 最左侧 48px 活动图标栏组件 (Left Activity Bar)
+///
+/// 模拟 VS Code 经典活动栏设计，提供顶级业务模块导航与系统设置入口。
+/// 核心特性：
+/// 1. 业务图标区：主机管理 -> 文件管理 -> 凭据保管 -> 指令片段 -> 网络隧道 -> 历史会话；
+/// 2. 底部系统区：数据备份与导入、偏好设置、深色/浅色一键切换；
+/// 3. 原生 SVG 矢量渲染与精准高亮指示条。
+export component LeftActivityBar inherits Rectangle {
+    /// 当前选中的激活 Tab 模块 ID (例如: "hosts", "files", "credentials", "snippets", "tunnels", "history", "backup", "settings")
+    in property <string> active-tab: "hosts";
+    /// 当前是否处于深色模式 (用于更新底部日/夜间切换图标)
+    in-out property <bool> is-dark-mode: true;
+
+    /// 当用户点击任意顶级 Tab 图标时触发的回调事件，参数为 tab_id 字符串
+    callback tab-clicked(string /* tab_id */);
+    /// 当用户点击底部深浅色切换图标时触发的回调事件
+    callback toggle-color-mode();
+
+    width: 48px;
+    background: AppTheme.panel-background;
+
+    // 右侧 1px 分割线
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        height: 100%;
+        background: AppTheme.border;
+    }
+
+    VerticalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+        alignment: space-between;
+
+        // 上半区 (业务资产)
+        VerticalLayout {
+            spacing: 6px;
+            alignment: center;
+
+            // 1. 主机资产
+            ActionBarItem {
+                icon: @image-url("../assets/icons/server.svg");
+                tooltip: @tr("主机管理");
+                is-active: root.active-tab == "hosts";
+                clicked => { root.tab-clicked("hosts"); }
+            }
+
+            // 2. 文件管理
+            ActionBarItem {
+                icon: @image-url("../assets/icons/folder.svg");
+                tooltip: @tr("文件管理");
+                is-active: root.active-tab == "files";
+                clicked => { root.tab-clicked("files"); }
+            }
+
+            // 3. 凭据保管
+            ActionBarItem {
+                icon: @image-url("../assets/icons/key.svg");
+                tooltip: @tr("凭据保管");
+                is-active: root.active-tab == "credentials";
+                clicked => { root.tab-clicked("credentials"); }
+            }
+
+            // 4. 指令片段
+            ActionBarItem {
+                icon: @image-url("../assets/icons/terminal.svg");
+                tooltip: @tr("指令片段");
+                is-active: root.active-tab == "snippets";
+                clicked => { root.tab-clicked("snippets"); }
+            }
+
+            // 5. 网络隧道
+            ActionBarItem {
+                icon: @image-url("../assets/icons/tunnel.svg");
+                tooltip: @tr("网络隧道");
+                is-active: root.active-tab == "tunnels";
+                clicked => { root.tab-clicked("tunnels"); }
+            }
+
+            // 6. 历史会话 (移动至网络隧道下方)
+            ActionBarItem {
+                icon: @image-url("../assets/icons/clock.svg");
+                tooltip: @tr("历史会话");
+                is-active: root.active-tab == "history";
+                clicked => { root.tab-clicked("history"); }
+            }
+        }
+
+        // 下半区 (系统维护与外观，VS Code 经典左下角设计)
+        VerticalLayout {
+            spacing: 6px;
+            alignment: center;
+
+            // 7. 数据备份
+            ActionBarItem {
+                icon: @image-url("../assets/icons/archive.svg");
+                tooltip: @tr("数据备份与导入");
+                is-active: root.active-tab == "backup";
+                clicked => { root.tab-clicked("backup"); }
+            }
+
+            // 8. 偏好设置
+            ActionBarItem {
+                icon: @image-url("../assets/icons/settings.svg");
+                tooltip: @tr("偏好设置");
+                is-active: root.active-tab == "settings";
+                clicked => { root.tab-clicked("settings"); }
+            }
+
+            // 9. 深色 / 浅色主题切换
+            ActionBarItem {
+                icon: root.is-dark-mode ? @image-url("../assets/icons/moon.svg") : @image-url("../assets/icons/sun.svg");
+                tooltip: root.is-dark-mode ? @tr("切换至浅色模式") : @tr("切换至深色模式");
+                is-active: false;
+                clicked => { root.toggle-color-mode(); }
+            }
+        }
+    }
+}

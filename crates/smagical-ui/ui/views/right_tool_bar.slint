@@ -1,0 +1,69 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { ActionBarItem } from "../components/action-bar-item.slint";
+
+/// 最右侧 48px 工具图标栏 (原生 SVG 矢量渲染)
+export component RightToolBar inherits Rectangle {
+    in property <string> active-tool: "monitor"; // "monitor" | "snippets" | "sftp" | "notes" | "ai"
+
+    callback tool-clicked(string /* tool_id */);
+
+    width: 48px;
+    background: AppTheme.panel-background;
+
+    // 左侧 1px 分割线
+    Rectangle {
+        x: 0px;
+        width: 1px;
+        height: 100%;
+        background: AppTheme.border;
+    }
+
+    VerticalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+        alignment: start;
+
+        // 1. 系统监控
+        ActionBarItem {
+            icon: @image-url("../assets/icons/activity.svg");
+            tooltip: @tr("系统监控");
+            is-active: root.active-tool == "monitor";
+            clicked => { root.tool-clicked("monitor"); }
+        }
+
+        // 2. 快捷命令
+        ActionBarItem {
+            icon: @image-url("../assets/icons/zap.svg");
+            tooltip: @tr("快捷命令库");
+            is-active: root.active-tool == "snippets";
+            clicked => { root.tool-clicked("snippets"); }
+        }
+
+        // 3. 快速 SFTP
+        ActionBarItem {
+            icon: @image-url("../assets/icons/arrow-up-down.svg");
+            tooltip: @tr("SFTP 传输");
+            is-active: root.active-tool == "sftp";
+            clicked => { root.tool-clicked("sftp"); }
+        }
+
+        // 4. 会话备忘
+        ActionBarItem {
+            icon: @image-url("../assets/icons/file-text.svg");
+            tooltip: @tr("会话备忘笔记");
+            is-active: root.active-tool == "notes";
+            clicked => { root.tool-clicked("notes"); }
+        }
+
+        // 5. AI 终端助手
+        ActionBarItem {
+            icon: @image-url("../assets/icons/sparkles.svg");
+            tooltip: @tr("AI 终端助手");
+            is-active: root.active-tool == "ai";
+            clicked => { root.tool-clicked("ai"); }
+        }
+    }
+}

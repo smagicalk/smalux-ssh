@@ -1,0 +1,593 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { SearchInput } from "../../components/search-input.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 主机项数据结构 (Host Item Data)
+///
+/// 专用于卡片列表平铺视图模式的数据模型。
+export struct HostItemData {
+    /// 主机全局唯一标识符
+    id: string,
+    /// 主机名称 (如 "prod-server-01")
+    name: string,
+    /// 主机 IP 地址或可解析域名
+    address: string,
+    /// SSH 服务连接端口 (默认为 22)
+    port: int,
+    /// 所属分组的显示名称 (如 "生产集群")
+    group: string,
+    /// 主机运行健康状态 ("online": 在线, "warning": 告警, "error": 异常, "offline": 离线)
+    status: string,
+    /// 网络延迟测速结果 (单位毫秒)
+    ping-ms: int,
+}
+
+/// 树形结构节点模型 (Host Tree Node)
+///
+/// 专用于树状层级折叠视图模式的数据模型，支持无限层级嵌套。
+export struct HostTreeNode {
+    /// 节点的唯一标识符
+    id: string,
+    /// 节点的显示名称 (如 "Kubernetes 集群" 或 "k8s-control-plane")
+    name: string,
+    /// 当前节点是否为分组文件夹 (true: 分组, false: 主机资产)
+    is-group: bool,
+    /// 父级分组的 ID (顶级根节点为空字符串 "")
+    parent-id: string,
+    /// 树形层级深度，用于计算左侧缩进 (缩进 = level * 14px)
+    level: int,
+    /// 当前分组是否处于展开状态 (仅 is-group 为 true 时有效)
+    is-expanded: bool,
+    /// 主机 IP 地址 (仅主机节点有效)
+    address: string,
+    /// 连接端口 (仅主机节点有效)
+    port: int,
+    /// 在线健康状态 ("online", "warning", "error", "offline")
+    status: string,
+    /// 网络延迟 (毫秒)
+    ping-ms: int,
+    /// 分组文件夹内包含的主机数量 (仅 is-group 为 true 时有效)
+    item-count: int,
+}
+
+/// 主机管理抽屉组件 (Hosts Drawer)
+///
+/// 负责展示主机资产的树形层级视图与卡片列表视图，支持实时搜索、折叠展开与横向平滑滚动。
+export component HostsDrawer inherits DrawerContainer {
+    title: @tr("主机管理");
+    collapse-icon: "◀";
+
+    /// 当前视图模式: "tree" (树形层级嵌套模式) | "card" (卡片列表平铺模式)
+    in-out property <string> view-mode: "tree";
+    /// 当前选中的高亮主机 ID
+    in-out property <string> selected-host-id: "1";
+
+    /// 树形层级嵌套数据源 (支持任意层级嵌套与动态展开收缩)
+    in-out property <[HostTreeNode]> tree-nodes: [
+        // 顶级分组 1: 生产集群 (含二级子分组与直属主机)
+        { id: "grp-prod", name: "生产集群 (Production)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 5 },
+        { id: "grp-k8s", name: "Kubernetes 集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "warning", ping-ms: 0, item-count: 2 },
+        { id: "2", name: "k8s-control-plane", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.1", port: 6443, status: "warning", ping-ms: 68, item-count: 0 },
+        { id: "host-k8s-w1", name: "k8s-worker-node-01", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.11", port: 22, status: "online", ping-ms: 24, item-count: 0 },
+        { id: "grp-db", name: "核心数据库集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
+        { id: "3", name: "db-cluster-primary", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.50", port: 5432, status: "online", ping-ms: 18, item-count: 0 },
+        { id: "host-db-s1", name: "db-cluster-standby", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.51", port: 5432, status: "online", ping-ms: 20, item-count: 0 },
+        { id: "1", name: "prod-server-01", is-group: false, parent-id: "grp-prod", level: 1, is-expanded: false, address: "192.168.1.100", port: 22, status: "online", ping-ms: 21, item-count: 0 },
+        
+        // 顶级分组 2: 边缘与微服务
+        { id: "grp-edge", name: "边缘网关与缓存", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
+        { id: "5", name: "auth-gateway-edge", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "47.98.12.33", port: 443, status: "online", ping-ms: 35, item-count: 0 },
+        { id: "4", name: "redis-cache-shard-0", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "10.0.2.10", port: 6379, status: "online", ping-ms: 12, item-count: 0 },
+
+        // 顶级分组 3: AI 推理集群
+        { id: "grp-ai", name: "AI 算力集群 (GPU)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 1 },
+        { id: "6", name: "ai-inference-gpu", is-group: false, parent-id: "grp-ai", level: 1, is-expanded: false, address: "10.0.8.200", port: 22, status: "online", ping-ms: 14, item-count: 0 },
+
+        // 顶级分组 4: 容灾备份与测试
+        { id: "grp-dr", name: "容灾与测试环境", is-group: true, parent-id: "", level: 0, is-expanded: false, address: "", port: 0, status: "offline", ping-ms: 0, item-count: 2 },
+        { id: "7", name: "backup-node-dr", is-group: false, parent-id: "grp-dr", level: 1, is-expanded: false, address: "192.168.100.250", port: 22, status: "offline", ping-ms: 0, item-count: 0 },
+        { id: "host-staging", name: "staging-api-test", is-group: false, parent-id: "grp-dr", level: 1, is-expanded: false, address: "10.0.12.88", port: 22, status: "offline", ping-ms: 0, item-count: 0 },
+    ];
+
+    /// 卡片模式扁平列表数据源
+    in property <[HostItemData]> hosts: [
+        { id: "1", name: "prod-server-01", address: "192.168.1.100", port: 22, group: "生产集群", status: "online", ping-ms: 21 },
+        { id: "2", name: "k8s-control-plane", address: "10.0.0.1", port: 6443, group: "K8s集群", status: "warning", ping-ms: 68 },
+        { id: "3", name: "db-cluster-primary", address: "10.0.1.50", port: 5432, group: "数据库", status: "online", ping-ms: 18 },
+        { id: "4", name: "redis-cache-shard-0", address: "10.0.2.10", port: 6379, group: "缓存集群", status: "online", ping-ms: 12 },
+        { id: "5", name: "auth-gateway-edge", address: "47.98.12.33", port: 443, group: "边缘网关", status: "online", ping-ms: 35 },
+        { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping-ms: 14 },
+        { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping-ms: 0 },
+    ];
+
+    /// 单击选中主机事件回调
+    callback host-selected(string /* id */);
+    /// 双击打开主机终端连接事件回调
+    callback host-double-clicked(string /* id */);
+    /// 折叠或展开指定分组事件回调
+    callback toggle-group(string /* group-id */);
+    /// 搜索框输入变更事件回调
+    callback search-changed(string /* query */);
+    /// 打开本地 Shell 事件回调
+    callback open-local-shell(string /* type */);
+    /// 点击新建主机按钮事件回调
+    callback create-new-host();
+    /// 点击新建分组按钮事件回调
+    callback create-new-group();
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+
+        // 1. 顶部操作栏 (搜索框 + 树形/卡片视图切换器)
+        HorizontalLayout {
+            spacing: 6px;
+
+            // 搜索输入框 (实时搜索与清空)
+            SearchInput {
+                placeholder: @tr("搜索主机、IP或分组...");
+                horizontal-stretch: 1;
+                changed(query) => { root.search-changed(query); }
+                clear => { root.search-changed(""); }
+            }
+
+            // 视图模式切换胶囊 (树形 vs 卡片)
+            Rectangle {
+                width: 58px;
+                height: 28px;
+                border-radius: 4px;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding: 2px;
+                    spacing: 2px;
+
+                    // 树形模式按钮
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 3px;
+                        background: root.view-mode == "tree" ? AppTheme.control-background : tree-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+                        border-width: root.view-mode == "tree" ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        animate background { duration: 120ms; }
+
+                        Image {
+                            source: @image-url("../../assets/icons/tree.svg");
+                            width: 13px;
+                            height: 13px;
+                            image-fit: contain;
+                            colorize: root.view-mode == "tree" ? AppTheme.accent : tree-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        tree-btn-touch := TouchArea {
+                            clicked => { root.view-mode = "tree"; }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 卡片模式按钮
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 3px;
+                        background: root.view-mode == "card" ? AppTheme.control-background : card-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+                        border-width: root.view-mode == "card" ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        animate background { duration: 120ms; }
+
+                        Image {
+                            source: @image-url("../../assets/icons/layout-grid.svg");
+                            width: 13px;
+                            height: 13px;
+                            image-fit: contain;
+                            colorize: root.view-mode == "card" ? AppTheme.accent : card-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        card-btn-touch := TouchArea {
+                            clicked => { root.view-mode = "card"; }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 列表统计与快捷创建栏
+        HorizontalLayout {
+            padding-left: 4px;
+            padding-right: 4px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+
+                Text {
+                    text: root.view-mode == "tree" ? @tr("树形层级视图") : @tr("全部主机列表");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    height: 16px;
+                    border-radius: 8px;
+                    background: AppTheme.control-background;
+
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+
+                        Text {
+                            text: root.hosts.length + " 台";
+                            font-size: 9px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // 新建主机与分组动作
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: end;
+
+                // 新建分组
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: add-grp-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    Image {
+                        source: @image-url("../../assets/icons/folder-plus.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: add-grp-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    add-grp-touch := TouchArea {
+                        clicked => { root.create-new-group(); }
+                        mouse-cursor: pointer;
+                    }
+                }
+
+                // 新建主机
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: add-host-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    Image {
+                        source: @image-url("../../assets/icons/plus.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: add-host-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    add-host-touch := TouchArea {
+                        clicked => { root.create-new-host(); }
+                        mouse-cursor: pointer;
+                    }
+                }
+            }
+        }
+
+        // 4. 核心工作区 (支持海量节点平滑滚动、自隐藏超薄滚动条、树形横纵双向与卡片纯纵向滚动)
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            scroll-hover := TouchArea {
+                // 仅用于捕获区域悬停态以触发滚动条优雅淡入
+            }
+
+            scroll-area := Flickable {
+                width: 100%;
+                height: 100%;
+                interactive: true;
+
+                // 4.1 树形层级结构视图 (Tree View: 支持文件夹展开/折叠与多层缩进，超宽时自动激活横向滚动)
+                if root.view-mode == "tree": VerticalLayout {
+                    spacing: 2px;
+
+                    for node in root.tree-nodes: Rectangle {
+                        height: node.is-group ? 28px : 30px;
+                        min-width: parent.width;
+                        border-radius: 4px;
+                        background: node.id == root.selected-host-id && !node.is-group ? AppTheme.control-background : tree-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
+                        border-width: node.id == root.selected-host-id && !node.is-group ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        animate background { duration: 120ms; }
+
+                        tree-touch := TouchArea {
+                            clicked => {
+                                if node.is-group {
+                                    root.toggle-group(node.id);
+                                } else {
+                                    root.selected-host-id = node.id;
+                                    root.host-selected(node.id);
+                                }
+                            }
+                            double-clicked => {
+                                if !node.is-group {
+                                    root.host-double-clicked(node.id);
+                                }
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            // 层级缩进 (level * 14px)
+                            padding-left: 6px + node.level * 14px;
+                            padding-right: 12px;
+                            spacing: 6px;
+                            alignment: space-between;
+
+                            // 左侧：折叠箭头 + 图标 + 名称
+                            HorizontalLayout {
+                                spacing: 5px;
+                                alignment: start;
+
+                                // 文件夹折叠/展开指示三角
+                                if node.is-group: VerticalLayout {
+                                    alignment: center;
+
+                                    Image {
+                                        source: node.is-expanded ? @image-url("../../assets/icons/chevron-down.svg") : @image-url("../../assets/icons/chevron-right.svg");
+                                        width: 10px;
+                                        height: 10px;
+                                        image-fit: contain;
+                                        colorize: AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                // 文件夹图标 / 主机终端图标
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    if node.is-group: Image {
+                                        source: @image-url("../../assets/icons/folder.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: AppTheme.secondary-foreground;
+                                    }
+
+                                    if !node.is-group: Image {
+                                        source: @image-url("../../assets/icons/server.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        image-fit: contain;
+                                        colorize: node.id == root.selected-host-id ? AppTheme.accent : tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                // 主机在线/离线状态指示灯
+                                if !node.is-group: VerticalLayout {
+                                    alignment: center;
+
+                                    StatusDot {
+                                        status: node.status;
+                                        dot-size: 5px;
+                                    }
+                                }
+
+                                // 节点名称 (自然展开，超宽时触发平滑横向滚动)
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    Text {
+                                        text: node.name;
+                                        font-size: 11px;
+                                        font-weight: node.is-group ? 600 : node.id == root.selected-host-id ? 600 : 400;
+                                        color: node.is-group ? AppTheme.foreground : node.id == root.selected-host-id ? AppTheme.foreground : tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 右侧：如果是分组则显示包含数量；如果是主机则显示延迟与端口
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: end;
+
+                                if node.is-group: VerticalLayout {
+                                    alignment: center;
+
+                                    Text {
+                                        text: "(" + node.item-count + ")";
+                                        font-size: 10px;
+                                        color: AppTheme.disabled-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                if !node.is-group && node.ping-ms > 0: VerticalLayout {
+                                    alignment: center;
+
+                                    Text {
+                                        text: node.ping-ms + "ms";
+                                        font-size: 9px;
+                                        font-weight: 500;
+                                        color: node.ping-ms > 50 ? AppTheme.warning : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4.2 卡片模式视图 (Card View: 现代化富卡片，严格锁定 100% 宽度，仅纯竖向滚动)
+                if root.view-mode == "card": VerticalLayout {
+                    spacing: 6px;
+                    width: 100%;
+
+                    for host in root.hosts: Rectangle {
+                        height: 50px;
+                        border-radius: 4px;
+                        background: host.id == root.selected-host-id ? AppTheme.control-background : card-item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background;
+                        border-width: 1px;
+                        border-color: host.id == root.selected-host-id ? AppTheme.border : card-item-touch.has-hover ? AppTheme.border : AppTheme.border.transparentize(50%);
+
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        card-item-touch := TouchArea {
+                            clicked => {
+                                root.selected-host-id = host.id;
+                                root.host-selected(host.id);
+                            }
+                            double-clicked => { root.host-double-clicked(host.id); }
+                            mouse-cursor: pointer;
+                        }
+
+                        VerticalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            padding-top: 5px;
+                            padding-bottom: 5px;
+                            spacing: 3px;
+                            alignment: center;
+
+                            // 卡片顶行：状态灯 + 主机名称 + 分组徽章
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+
+                                    VerticalLayout {
+                                        alignment: center;
+
+                                        StatusDot {
+                                            status: host.status;
+                                            dot-size: 6px;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: host.name;
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.foreground;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                // 分组胶囊
+                                Rectangle {
+                                    height: 16px;
+                                    border-radius: 3px;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border.transparentize(40%);
+
+                                    HorizontalLayout {
+                                        padding-left: 5px;
+                                        padding-right: 5px;
+
+                                        Text {
+                                            text: host.group;
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 卡片底行：IP 地址与端口 + 延迟时间
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: space-between;
+
+                                Text {
+                                    text: host.address + ":" + host.port;
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+
+                                if host.ping-ms > 0: HorizontalLayout {
+                                    spacing: 3px;
+                                    alignment: end;
+
+                                    Text {
+                                        text: "●";
+                                        font-size: 6px;
+                                        color: host.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: host.ping-ms + "ms";
+                                        font-size: 10px;
+                                        font-weight: 600;
+                                        color: host.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 悬浮自隐藏极细竖向滚动条 (3px 胶囊，默认完全透明隐藏，悬停时淡入)
+            if scroll-area.viewport-height > scroll-area.height: Rectangle {
+                x: parent.width - self.width - 2px;
+                y: Math.max(2px, Math.min(parent.height - self.height - 2px, (-scroll-area.viewport-y / scroll-area.viewport-height) * scroll-area.height));
+                width: 3px;
+                height: Math.max(24px, (scroll-area.height / scroll-area.viewport-height) * scroll-area.height);
+                border-radius: 1.5px;
+                background: scroll-hover.has-hover ? AppTheme.secondary-foreground.transparentize(20%) : AppTheme.secondary-foreground.transparentize(80%);
+                opacity: scroll-hover.has-hover ? 0.9 : 0.0;
+
+                animate opacity { duration: 250ms; easing: ease-out; }
+                animate background { duration: 150ms; }
+            }
+
+            // 悬浮自隐藏横向滚动条 (在树形模式内容超宽时呈现，悬停时高亮)
+            if root.view-mode == "tree" && scroll-area.viewport-width > scroll-area.width: Rectangle {
+                x: Math.max(2px, Math.min(parent.width - self.width - 2px, (-scroll-area.viewport-x / scroll-area.viewport-width) * scroll-area.width));
+                y: parent.height - self.height - 2px;
+                height: 4px;
+                width: Math.max(28px, (scroll-area.width / scroll-area.viewport-width) * scroll-area.width);
+                border-radius: 2px;
+                background: scroll-hover.has-hover ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(60%);
+                opacity: scroll-hover.has-hover ? 0.95 : 0.45;
+
+                animate opacity { duration: 250ms; easing: ease-out; }
+                animate background { duration: 150ms; }
+            }
+        }
+    }
+}
+

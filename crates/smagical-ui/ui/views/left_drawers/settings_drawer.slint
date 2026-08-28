@@ -1,0 +1,122 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 主题选择项
+export struct ThemeOption {
+    id: string,
+    name: string,
+    color-preview: brush,
+}
+
+/// 偏好设置抽屉 (Settings Drawer)
+export component SettingsDrawer inherits DrawerContainer {
+    title: @tr("偏好设置");
+    collapse-icon: "◀";
+
+    in property <[ThemeOption]> themes: [
+        { id: "builtin.ui.darcula", name: "Darcula (经典暗调)", color-preview: #2b2b2b },
+        { id: "builtin.ui.monokai", name: "Monokai Pro (鲜亮)", color-preview: #2d2a2e },
+        { id: "builtin.ui.onedark", name: "One Dark (深雅)", color-preview: #282c34 },
+        { id: "builtin.ui.solarized_dark", name: "Solarized Dark", color-preview: #002b36 },
+        { id: "builtin.ui.system", name: "跟随系统 (System)", color-preview: #3c3f41 },
+    ];
+
+    in property <string> current-theme-id: "builtin.ui.darcula";
+
+    callback switch-theme(string /* theme_id */);
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 12px;
+
+        Text {
+            text: @tr("◐ UI & 终端主题");
+            font-size: 12px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+
+        // 主题选择列表
+        ScrollView {
+            VerticalLayout {
+                spacing: 4px;
+
+                for t in root.themes: Rectangle {
+                    height: 38px;
+                    border-radius: AppTheme.radius-medium;
+                    background: t.id == root.current-theme-id ? AppTheme.selected-background : t-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    t-touch := TouchArea {
+                        clicked => { root.switch-theme(t.id); }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        // 色块预览圆点
+                        Rectangle {
+                            width: 14px;
+                            height: 14px;
+                            border-radius: 7px;
+                            background: t.color-preview;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                        }
+
+                        Text {
+                            text: t.name;
+                            font-size: 11px;
+                            color: t.id == root.current-theme-id ? AppTheme.selected-foreground : AppTheme.foreground;
+                            horizontal-alignment: left;
+                        }
+
+                        if t.id == root.current-theme-id: Text {
+                            text: "✓";
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: AppTheme.accent;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 终端参数预览卡片
+        Rectangle {
+            height: 80px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 4px;
+
+                Text {
+                    text: @tr("⌨️ 终端首选项");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                }
+
+                Text {
+                    text: @tr("等宽字体: JetBrains Mono / Fira Code");
+                    font-size: 10px;
+                    color: AppTheme.foreground;
+                }
+
+                Text {
+                    text: @tr("字号: 13px  |  光标: 闪烁块状");
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                }
+            }
+        }
+    }
+}

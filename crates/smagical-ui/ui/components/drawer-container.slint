@@ -1,0 +1,153 @@
+import { AppTheme } from "../themes/app-theme.slint";
+
+/// 通用 240px 抽屉外壳容器 (Drawer Container)
+export component DrawerContainer inherits Rectangle {
+    in property <string> title: @tr("面板");
+    in property <string> collapse-icon: "◀";
+
+    callback collapse();
+
+    background: AppTheme.panel-background;
+
+    // 左抽屉右边缘分割线
+    if collapse-icon == "◀": Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        height: 100%;
+        background: AppTheme.border;
+    }
+
+    // 右抽屉左边缘分割线
+    if collapse-icon == "▶": Rectangle {
+        x: 0px;
+        width: 1px;
+        height: 100%;
+        background: AppTheme.border;
+    }
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // 抽屉头部 (简洁清爽设计，36px 绝对垂直居中)
+        Rectangle {
+            height: 36px;
+            background: AppTheme.panel-background;
+
+            // 头部底部分割线
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+
+            // 左侧抽屉头部布局 (标题在最左端，收起按钮在最右端，绝对垂直居中)
+            if collapse-icon == "◀": HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                spacing: 8px;
+
+                // 标题 (靠最左，垂直居中)
+                Text {
+                    text: root.title;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                }
+
+                // 弹性占位 (撑满中间全部空间，将按钮推至最右侧)
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
+                // 按钮垂直居中容器
+                VerticalLayout {
+                    alignment: center;
+
+                    // 左侧抽屉收起按钮 (panel-left-close)
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: left-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        animate background { duration: 100ms; }
+
+                        Image {
+                            source: @image-url("../assets/icons/panel-left-close.svg");
+                            width: 14px;
+                            height: 14px;
+                            image-fit: contain;
+                            colorize: left-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        left-close-touch := TouchArea {
+                            clicked => { root.collapse(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+
+            // 右侧抽屉头部布局 (收起按钮在最左端面向中央视口，标题在右侧，绝对垂直居中)
+            if collapse-icon == "▶": HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 12px;
+                spacing: 8px;
+
+                // 按钮垂直居中容器 (收起按钮在最左端)
+                VerticalLayout {
+                    alignment: center;
+
+                    // 右侧抽屉收起按钮 (放置在左端，面向终端中央视口)
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: right-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        animate background { duration: 100ms; }
+
+                        Image {
+                            source: @image-url("../assets/icons/panel-right-close.svg");
+                            width: 14px;
+                            height: 14px;
+                            image-fit: contain;
+                            colorize: right-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        right-close-touch := TouchArea {
+                            clicked => { root.collapse(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+
+                // 标题 (紧随收起按钮，垂直居中)
+                Text {
+                    text: root.title;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                }
+
+                // 弹性占位 (撑满右侧全部空间)
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+            }
+        }
+
+        // 内容区域
+        @children
+    }
+}

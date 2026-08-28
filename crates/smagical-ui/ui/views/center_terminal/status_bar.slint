@@ -1,0 +1,88 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+
+/// 底部全局状态栏 (Status Bar)
+export component StatusBar inherits Rectangle {
+    in property <int> active-sessions-count: 2;
+    in property <string> ping-display: "21ms";
+    in property <string> encoding: "UTF-8";
+    in property <string> grid-size: "136x42";
+    in property <string> net-rate: "↑ 1.4MB/s ↓ 5.2MB/s";
+    in property <string> current-theme-name: "Darcula";
+
+    height: 24px;
+    background: AppTheme.panel-background;
+
+    // 顶部分割线
+    Rectangle {
+        y: 0px;
+        height: 1px;
+        width: 100%;
+        background: AppTheme.border;
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 12px;
+        alignment: center;
+
+        // 会话统计
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: center;
+
+            StatusDot { status: "online"; dot-size: 6px; }
+
+            Text {
+                text: @tr("{} 个会话活动", root.active-sessions-count);
+                font-size: 10px;
+                color: AppTheme.foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 网络吞吐
+        Text {
+            text: root.net-rate;
+            font-size: 10px;
+            color: AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+
+        // 弹性占位
+        Rectangle { horizontal-stretch: 1; }
+
+        // 编码格式
+        Text {
+            text: root.encoding;
+            font-size: 10px;
+            color: AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+
+        // 视口尺寸
+        Text {
+            text: root.grid-size;
+            font-size: 10px;
+            color: AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+
+        // 延迟
+        Text {
+            text: @tr("延迟: {}", root.ping-display);
+            font-size: 10px;
+            color: AppTheme.success;
+            vertical-alignment: center;
+        }
+
+        // 主题标识
+        Text {
+            text: "◐ " + root.current-theme-name;
+            font-size: 10px;
+            color: AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+    }
+}

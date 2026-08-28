@@ -1,0 +1,100 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+
+/// 数据备份抽屉 (Backup Drawer)
+export component BackupDrawer inherits DrawerContainer {
+    title: @tr("数据备份与导入");
+    collapse-icon: "◀";
+
+    callback export-backup();
+    callback import-openssh();
+    callback import-termius();
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 12px;
+
+        Text {
+            text: @tr("⤓ 配置备份与迁移");
+            font-size: 12px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+
+        // 导出备份按钮
+        Rectangle {
+            height: 38px;
+            border-radius: AppTheme.radius-medium;
+            background: export-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                spacing: 8px;
+                alignment: center;
+
+                Text { text: "⤓"; font-size: 14px; color: AppTheme.accent; vertical-alignment: center; }
+                Text { text: @tr("导出完整加密备份包 (.toml)"); font-size: 11px; color: AppTheme.foreground; vertical-alignment: center; }
+            }
+
+            export-touch := TouchArea {
+                clicked => { root.export-backup(); }
+                mouse-cursor: pointer;
+            }
+        }
+
+        Text {
+            text: @tr("📥 从外部工具一键导入");
+            font-size: 12px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+
+        // 从 ~/.ssh/config 导入
+        Rectangle {
+            height: 38px;
+            border-radius: AppTheme.radius-medium;
+            background: ssh-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                spacing: 8px;
+                alignment: center;
+
+                Text { text: "⎈"; font-size: 14px; color: AppTheme.secondary-foreground; vertical-alignment: center; }
+                Text { text: @tr("导入系统 ~/.ssh/config 主机"); font-size: 11px; color: AppTheme.foreground; vertical-alignment: center; }
+            }
+
+            ssh-touch := TouchArea {
+                clicked => { root.import-openssh(); }
+                mouse-cursor: pointer;
+            }
+        }
+
+        // 从 Termius / Xshell 导入
+        Rectangle {
+            height: 38px;
+            border-radius: AppTheme.radius-medium;
+            background: ext-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                spacing: 8px;
+                alignment: center;
+
+                Text { text: "»"; font-size: 14px; color: AppTheme.secondary-foreground; vertical-alignment: center; }
+                Text { text: @tr("导入 Termius / Xshell 资产"); font-size: 11px; color: AppTheme.foreground; vertical-alignment: center; }
+            }
+
+            ext-touch := TouchArea {
+                clicked => { root.import-termius(); }
+                mouse-cursor: pointer;
+            }
+        }
+    }
+}

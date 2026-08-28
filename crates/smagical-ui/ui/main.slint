@@ -1,31 +1,435 @@
+import { AppTheme, AppColorScheme } from "themes/app-theme.slint";
+export { Palette }from "std-widgets.slint";
+export { AppTheme, AppColorScheme }from "themes/app-theme.slint";
+export { TabData } from "views/center_terminal/tab_bar.slint";
+export { HostItemData, HostTreeNode } from "views/left_drawers/hosts_drawer.slint";
+export { GroupOptionData } from "components/create-group-modal.slint";
+
+// 基础组件
+import {
+    CommandPalette,
+    PaletteItemData,
+} from "components/command-palette.slint";
+import {
+    CreateGroupModal,
+    GroupOptionData,
+} from "components/create-group-modal.slint";
+
+// 左侧视图
+import { LeftActivityBar } from "views/left_activity_bar.slint";
+import {
+    HostsDrawer,
+    HostItemData,
+    HostTreeNode,
+} from "views/left_drawers/hosts_drawer.slint";
+import {
+    HistoryDrawer,
+    HistoryItemData,
+} from "views/left_drawers/history_drawer.slint";
+import {
+    FilesDrawer,
+    BookmarkItemData,
+} from "views/left_drawers/files_drawer.slint";
+import {
+    CredentialsDrawer,
+    CredentialItemData,
+} from "views/left_drawers/credentials_drawer.slint";
+import {
+    SnippetsDrawer,
+    SnippetItemData,
+} from "views/left_drawers/snippets_drawer.slint";
+import {
+    TunnelsDrawer,
+    TunnelItemData,
+} from "views/left_drawers/tunnels_drawer.slint";
+import { BackupDrawer } from "views/left_drawers/backup_drawer.slint";
+import {
+    SettingsDrawer,
+    ThemeOption,
+} from "views/left_drawers/settings_drawer.slint";
+
+// 中央主视图
+import { TabBar, TabData } from "views/center_terminal/tab_bar.slint";
+import {
+    TerminalViewport,
+} from "views/center_terminal/terminal_viewport.slint";
+import { StatusBar } from "views/center_terminal/status_bar.slint";
+
+// 右侧视图
+import {
+    MonitorDrawer,
+    SystemMetricsData,
+} from "views/right_drawers/monitor_drawer.slint";
+import {
+    SnippetToolDrawer,
+    QuickCmdData,
+} from "views/right_drawers/snippet_tool_drawer.slint";
+import {
+    SftpToolDrawer,
+    SftpFileItemData,
+} from "views/right_drawers/sftp_tool_drawer.slint";
+import { NotesToolDrawer } from "views/right_drawers/notes_tool_drawer.slint";
+import { AiToolDrawer } from "views/right_drawers/ai_tool_drawer.slint";
+import { RightToolBar } from "views/right_tool_bar.slint";
+
 export component AppWindow inherits Window {
-    in property <string> host-summary: @tr("暂无主机");
+    title: @tr("smalux - 现代 Rust SSH 终端工作台");
+    preferred-width: 1280px;
+    preferred-height: 800px;
+    min-width: 960px;
+    min-height: 600px;
+    background: AppTheme.window-background;
+    no-frame: true; // 隐藏系统原生边框
 
-    title: @tr("smagicalssh");
-    width: 960px;
-    height: 640px;
+    // 状态属性
+    in-out property <string> active-left-tab: "hosts";
+    in-out property <bool> is-left-drawer-open: true;
+    in-out property <string> active-right-tool: "monitor";
+    in-out property <bool> is-right-drawer-open: true;
+    in-out property <bool> is-command-palette-open: false;
+    in-out property <bool> is-broadcast-mode: false;
+    in-out property <bool> is-window-maximized: false;
+    in-out property <bool> is-dark-mode: true;
+    in-out property <string> current-theme-name: "Darcula";
+    in-out property <string> active-session-tab: "1";
+    in-out property <bool> has-active-session: true;
+    in-out property <[TabData]> tabs: [
+        { id: "1", title: "prod-server-01", status: "online" },
+        { id: "2", title: "k8s-control-plane", status: "warning" },
+        { id: "3", title: "db-cluster-primary", status: "online" },
+        { id: "4", title: "redis-cache-shard-0", status: "online" },
+        { id: "5", title: "auth-gateway-edge", status: "online" },
+        { id: "6", title: "ai-inference-gpu", status: "online" },
+        { id: "7", title: "backup-node-dr", status: "offline" },
+    ];
+    in-out property <[HostTreeNode]> tree-nodes: [
+        { id: "grp-prod", name: "生产集群 (Production)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 5 },
+        { id: "grp-k8s", name: "Kubernetes 集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "warning", ping-ms: 0, item-count: 2 },
+        { id: "2", name: "k8s-control-plane", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.1", port: 6443, status: "warning", ping-ms: 68, item-count: 0 },
+        { id: "host-k8s-w1", name: "k8s-worker-node-01", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.11", port: 22, status: "online", ping-ms: 24, item-count: 0 },
+        { id: "grp-db", name: "核心数据库集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
+        { id: "3", name: "db-cluster-primary", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.50", port: 5432, status: "online", ping-ms: 18, item-count: 0 },
+        { id: "host-db-s1", name: "db-cluster-standby", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.51", port: 5432, status: "online", ping-ms: 20, item-count: 0 },
+        { id: "1", name: "prod-server-01", is-group: false, parent-id: "grp-prod", level: 1, is-expanded: false, address: "192.168.1.100", port: 22, status: "online", ping-ms: 21, item-count: 0 },
+        { id: "grp-edge", name: "边缘网关与缓存", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
+        { id: "5", name: "auth-gateway-edge", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "47.98.12.33", port: 443, status: "online", ping-ms: 35, item-count: 0 },
+        { id: "4", name: "redis-cache-shard-0", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "10.0.2.10", port: 6379, status: "online", ping-ms: 12, item-count: 0 },
+        { id: "grp-ai", name: "AI 算力集群 (GPU)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 1 },
+        { id: "6", name: "ai-inference-gpu", is-group: false, parent-id: "grp-ai", level: 1, is-expanded: false, address: "10.0.8.200", port: 22, status: "online", ping-ms: 14, item-count: 0 },
+        { id: "grp-dr", name: "容灾与测试环境", is-group: true, parent-id: "", level: 0, is-expanded: false, address: "", port: 0, status: "offline", ping-ms: 0, item-count: 2 },
+    ];
+    in-out property <[HostItemData]> hosts: [
+        { id: "1", name: "prod-server-01", address: "192.168.1.100", port: 22, group: "生产集群", status: "online", ping-ms: 21 },
+        { id: "2", name: "k8s-control-plane", address: "10.0.0.1", port: 6443, group: "K8s集群", status: "warning", ping-ms: 68 },
+        { id: "3", name: "db-cluster-primary", address: "10.0.1.50", port: 5432, group: "数据库", status: "online", ping-ms: 18 },
+        { id: "4", name: "redis-cache-shard-0", address: "10.0.2.10", port: 6379, group: "缓存集群", status: "online", ping-ms: 12 },
+        { id: "5", name: "auth-gateway-edge", address: "47.98.12.33", port: 443, group: "边缘网关", status: "online", ping-ms: 35 },
+        { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping-ms: 14 },
+        { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping-ms: 0 },
+    ];
+    in-out property <bool> is-create-group-open: false;
+    in-out property <string> create-group-default-parent: "root";
+    in-out property <[GroupOptionData]> group-options: [
+        { id: "root", name: "根目录 (顶级分组)", level: 0, parent-id: "" },
+        { id: "grp-prod", name: "生产集群 (Production)", level: 1, parent-id: "root" },
+        { id: "grp-k8s", name: "Kubernetes 集群", level: 2, parent-id: "grp-prod" },
+        { id: "grp-db", name: "核心数据库集群", level: 2, parent-id: "grp-prod" },
+        { id: "grp-edge", name: "边缘网关与缓存", level: 1, parent-id: "root" },
+        { id: "grp-ai", name: "AI 算力集群 (GPU)", level: 1, parent-id: "root" },
+        { id: "grp-dr", name: "容灾与测试环境", level: 1, parent-id: "root" },
+    ];
+    in-out property <length> left-drawer-width: 240px;
+    in-out property <length> right-drawer-width: 240px;
 
-    VerticalLayout {
-        padding: 24px;
-        spacing: 12px;
+    // 各种业务回调
+    callback trigger-command-palette();
+    callback switch-theme(string /* theme_id */);
+    callback toggle-color-mode();
+    callback toggle-tree-group(string /* id */);
+    callback filter-hosts(string /* query */);
+    callback create-group(string /* parent_id */, string /* name */);
+    callback toggle-group-option(string /* id */);
+    callback open-host(string /* id */);
+    callback send-snippet(string /* cmd */);
+    callback close-tab(string /* id */);
+    callback minimize-window();
+    callback maximize-window();
+    callback close-window();
 
-        Text {
-            text: @tr("smagicalssh");
-            font-size: 28px;
-        }
-
-        Rectangle {
-            border-width: 1px;
-            border-color: #3a3f4b;
-            background: #16181d;
-            min-height: 96px;
-
-            Text {
-                text: host-summary;
-                color: #e6e8ee;
-                vertical-alignment: center;
-                horizontal-alignment: left;
+    // 全局快捷键拦截
+    forward-focus: main-focus;
+    main-focus := FocusScope {
+        key-pressed(event) => {
+            if event.modifiers.control && (event.text == "k" || event.text == "K" || event.text == "p" || event.text == "P") {
+                root.is-command-palette-open = !root.is-command-palette-open;
+                accept
+            } else if event.text == Key.Escape && root.is-command-palette-open {
+                root.is-command-palette-open = false;
+                accept
+            } else {
+                reject
             }
+        }
+    }
+
+    // 顶层主容器 (外层带边框圆角)
+    Rectangle {
+        border-radius: 8px;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        background: AppTheme.window-background;
+        clip: true;
+
+        VerticalLayout {
+            padding: 0px;
+            spacing: 0px;
+
+            // 1. 顶层全宽控制栏 (TabBar + 纯净系统窗口控制)
+            TabBar {
+                is-maximized: root.is-window-maximized;
+                is-dark-mode: root.is-dark-mode;
+                active-tab-id: root.active-session-tab;
+                select-tab(id) => { root.active-session-tab = id; }
+                new-tab => {
+                    root.active-left-tab = "hosts";
+                    root.is-left-drawer-open = true;
+                }
+                minimize-window => { root.minimize-window(); }
+                maximize-window => {
+                    root.maximize-window();
+                }
+                close-window => { root.close-window(); }
+            }
+
+            // 2. 中间五栏主工作区 (整齐划一平铺)
+            HorizontalLayout {
+                vertical-stretch: 1;
+                padding: 0px;
+                spacing: 0px;
+
+                // 2.1 最左侧 48px 图标栏 (集成左下角外观切换)
+                LeftActivityBar {
+                    active-tab: root.active-left-tab;
+                    is-dark-mode: root.is-dark-mode;
+                    toggle-color-mode => { root.toggle-color-mode(); }
+                    tab-clicked(id) => {
+                        if root.active-left-tab == id && root.is-left-drawer-open {
+                            root.is-left-drawer-open = false;
+                        } else {
+                            root.active-left-tab = id;
+                            root.is-left-drawer-open = true;
+                        }
+                    }
+                }
+
+                // 2.2 左侧可伸缩二级抽屉
+                if root.is-left-drawer-open: Rectangle {
+                    width: root.left-drawer-width;
+                    clip: true;
+
+                    if root.active-left-tab == "hosts": HostsDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                        tree-nodes: root.tree-nodes;
+                        hosts: root.hosts;
+                        toggle-group(id) => { root.toggle-tree-group(id); }
+                        search-changed(query) => { root.filter-hosts(query); }
+                        create-new-group => { root.is-create-group-open = true; }
+                        host-double-clicked(id) => { root.open-host(id); }
+                        open-local-shell(type) => { root.open-host("local-" + type); }
+                    }
+
+                    if root.active-left-tab == "history": HistoryDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                        reconnect(id) => { root.open-host(id); }
+                    }
+
+                    if root.active-left-tab == "files": FilesDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                    }
+
+                    if root.active-left-tab == "credentials": CredentialsDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                    }
+
+                    if root.active-left-tab == "snippets": SnippetsDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                        execute-snippet(cmd) => { root.send-snippet(cmd); }
+                    }
+
+                    if root.active-left-tab == "tunnels": TunnelsDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                    }
+
+                    if root.active-left-tab == "backup": BackupDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                    }
+
+                    if root.active-left-tab == "settings": SettingsDrawer {
+                        collapse => { root.is-left-drawer-open = false; }
+                        switch-theme(id) => { root.switch-theme(id); }
+                    }
+                }
+
+                // 2.2.1 左侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
+                if root.is-left-drawer-open: Rectangle {
+                    width: 5px;
+                    background: left-split-touch.has-hover || left-split-touch.pressed ? AppTheme.accent : AppTheme.panel-background;
+                    animate background { duration: 120ms; }
+
+                    // 左边框
+                    Rectangle {
+                        x: 0px;
+                        width: 1px;
+                        height: 100%;
+                        background: AppTheme.border;
+                    }
+
+                    // 右边框
+                    Rectangle {
+                        x: parent.width - 1px;
+                        width: 1px;
+                        height: 100%;
+                        background: AppTheme.border;
+                    }
+
+                    left-split-touch := TouchArea {
+                        mouse-cursor: col-resize;
+                        moved => {
+                            if self.pressed {
+                                root.left-drawer-width = Math.max(160px, Math.min(520px, root.left-drawer-width + self.mouse-x - self.pressed-x));
+                            }
+                        }
+                        double-clicked => {
+                            root.left-drawer-width = 240px;
+                        }
+                    }
+                }
+
+                // 2.3 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
+                TerminalViewport {
+                    horizontal-stretch: 1;
+                    has-active-session: root.has-active-session;
+                    tabs: root.tabs;
+                    active-tab-id: root.active-session-tab;
+                    select-tab(id) => { root.active-session-tab = id; }
+                    close-tab(id) => { root.close-tab(id); }
+                    new-tab => {
+                        root.active-left-tab = "hosts";
+                        root.is-left-drawer-open = true;
+                    }
+                    session-name: root.active-session-tab == "1" ? "prod-server-01" : root.active-session-tab == "2" ? "k8s-control-plane" : root.active-session-tab == "3" ? "db-cluster-primary" : root.active-session-tab == "4" ? "redis-cache-shard-0" : root.active-session-tab == "5" ? "auth-gateway-edge" : root.active-session-tab == "6" ? "ai-inference-gpu" : "backup-node-dr";
+                    host-address: root.active-session-tab == "1" ? "192.168.1.100:22" : root.active-session-tab == "2" ? "10.0.0.1:6443" : root.active-session-tab == "3" ? "10.0.1.50:5432" : root.active-session-tab == "4" ? "10.0.2.10:6379" : root.active-session-tab == "5" ? "47.98.12.33:443" : root.active-session-tab == "6" ? "10.0.8.200:22" : "192.168.100.250:22";
+                }
+
+                // 2.3.1 右侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
+                if root.is-right-drawer-open: Rectangle {
+                    width: 5px;
+                    background: right-split-touch.has-hover || right-split-touch.pressed ? AppTheme.accent : AppTheme.panel-background;
+                    animate background { duration: 120ms; }
+
+                    // 左边框
+                    Rectangle {
+                        x: 0px;
+                        width: 1px;
+                        height: 100%;
+                        background: AppTheme.border;
+                    }
+
+                    // 右边框
+                    Rectangle {
+                        x: parent.width - 1px;
+                        width: 1px;
+                        height: 100%;
+                        background: AppTheme.border;
+                    }
+
+                    right-split-touch := TouchArea {
+                        mouse-cursor: col-resize;
+                        moved => {
+                            if self.pressed {
+                                root.right-drawer-width = Math.max(180px, Math.min(520px, root.right-drawer-width - (self.mouse-x - self.pressed-x)));
+                            }
+                        }
+                        double-clicked => {
+                            root.right-drawer-width = 240px;
+                        }
+                    }
+                }
+
+                // 2.4 右侧可伸缩工具抽屉
+                if root.is-right-drawer-open: Rectangle {
+                    width: root.right-drawer-width;
+                    clip: true;
+
+                    if root.active-right-tool == "monitor": MonitorDrawer {
+                        collapse => { root.is-right-drawer-open = false; }
+                    }
+
+                    if root.active-right-tool == "snippets": SnippetToolDrawer {
+                        collapse => { root.is-right-drawer-open = false; }
+                        send-to-terminal(cmd) => { root.send-snippet(cmd); }
+                    }
+
+                    if root.active-right-tool == "sftp": SftpToolDrawer {
+                        collapse => { root.is-right-drawer-open = false; }
+                    }
+
+                    if root.active-right-tool == "notes": NotesToolDrawer {
+                        collapse => { root.is-right-drawer-open = false; }
+                    }
+
+                    if root.active-right-tool == "ai": AiToolDrawer {
+                        collapse => { root.is-right-drawer-open = false; }
+                        apply-suggested-cmd(cmd) => { root.send-snippet(cmd); }
+                    }
+                }
+
+                // 2.5 最右侧 48px 工具图标栏
+                RightToolBar {
+                    active-tool: root.active-right-tool;
+                    tool-clicked(id) => {
+                        if root.active-right-tool == id && root.is-right-drawer-open {
+                            root.is-right-drawer-open = false;
+                        } else {
+                            root.active-right-tool = id;
+                            root.is-right-drawer-open = true;
+                        }
+                    }
+                }
+            }
+
+            // 3. 底层全宽状态栏
+            StatusBar {
+                current-theme-name: root.current-theme-name;
+            }
+        }
+    }
+
+    // 浮动 Ctrl+K 指令面板
+    CommandPalette {
+        is-open: root.is-command-palette-open;
+        close => { root.is-command-palette-open = false; }
+        item-selected(id) => {
+            if id == "5" {
+                root.switch-theme("builtin.ui.darcula");
+            } else if id == "6" {
+                root.switch-theme("builtin.ui.monokai");
+            } else {
+                root.open-host(id);
+            }
+        }
+    }
+
+    // 新建主机分组弹窗 (支持树状层级上级选择与名称输入)
+    CreateGroupModal {
+        is-open: root.is-create-group-open;
+        default-parent-id: root.create-group-default-parent;
+        group-options: root.group-options;
+        toggle-group(id) => { root.toggle-group-option(id); }
+        close => { root.is-create-group-open = false; }
+        confirm(parent-id, name) => {
+            root.create-group(parent-id, name);
+            root.is-create-group-open = false;
         }
     }
 }

@@ -1,0 +1,61 @@
+import { Palette } from "std-widgets.slint";
+
+export enum AppColorScheme {
+    system,
+    light,
+    dark
+}
+
+// Runtime theme surface. Rust writes resolved custom themes into these properties.
+export global AppTheme {
+    in-out property <string> theme-id: "builtin.ui.system";
+    in-out property <AppColorScheme> color-scheme: AppColorScheme.system;
+    in-out property <bool> use-system-palette: true;
+    in-out property <brush> custom-window-background: #2b2b2b;
+    in-out property <brush> custom-panel-background: #3c3f41;
+    in-out property <brush> custom-surface-background: #313335;
+    in-out property <brush> custom-control-background: #45494a;
+    in-out property <brush> custom-foreground: #bbbbbb;
+    in-out property <brush> custom-secondary-foreground: #a0a0a0;
+    in-out property <brush> custom-disabled-foreground: #777777;
+    in-out property <brush> custom-accent: #589df6;
+    in-out property <brush> custom-hover-background: #4c5052;
+    in-out property <brush> custom-pressed-background: #5c6164;
+    in-out property <brush> custom-selected-background: #4b6eaf;
+    in-out property <brush> custom-selected-foreground: #dedede;
+    in-out property <brush> custom-border: #515151;
+    in-out property <brush> custom-focus-border: #466d94;
+    in-out property <brush> custom-success: #008f50;
+    in-out property <brush> custom-warning: #ac7920;
+    in-out property <brush> custom-danger: #e74848;
+    in-out property <brush> custom-info: #589df6;
+
+    out property <brush> window-background: use-system-palette ? Palette.background : custom-window-background;
+    out property <brush> panel-background: use-system-palette ? Palette.alternate-background : custom-panel-background;
+    out property <brush> surface-background: use-system-palette ? Palette.background : custom-surface-background;
+    out property <brush> control-background: use-system-palette ? Palette.control-background : custom-control-background;
+    out property <brush> foreground: use-system-palette ? Palette.foreground : custom-foreground;
+    out property <brush> secondary-foreground: use-system-palette ? Palette.alternate-foreground : custom-secondary-foreground;
+    out property <brush> disabled-foreground: use-system-palette ? Palette.control-foreground : custom-disabled-foreground;
+    out property <brush> accent: use-system-palette ? Palette.accent-background : custom-accent;
+    out property <brush> hover-background: custom-hover-background;
+    out property <brush> pressed-background: custom-pressed-background;
+    out property <brush> selected-background: use-system-palette ? Palette.selection-background : custom-selected-background;
+    out property <brush> selected-foreground: use-system-palette ? Palette.selection-foreground : custom-selected-foreground;
+    out property <brush> border: use-system-palette ? Palette.border : custom-border;
+    out property <brush> focus-border: custom-focus-border;
+    out property <brush> success: custom-success;
+    out property <brush> warning: custom-warning;
+    out property <brush> danger: custom-danger;
+    out property <brush> info: custom-info;
+
+    in-out property <length> radius-small: 2px;
+    in-out property <length> radius-medium: 4px;
+    in-out property <length> radius-large: 8px;
+    in-out property <length> spacing-small: 4px;
+    in-out property <length> spacing-medium: 8px;
+    in-out property <length> spacing-large: 16px;
+    in-out property <length> border-width: 1px;
+    in-out property <length> control-height: 32px;
+    in-out property <length> icon-size: 16px;
+}

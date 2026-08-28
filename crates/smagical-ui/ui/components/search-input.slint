@@ -1,0 +1,110 @@
+import { AppTheme } from "../themes/app-theme.slint";
+
+/// 统一暗色搜索输入框组件 (极简线框风格，支持整框点击聚焦与真实 SVG 图标)
+export component SearchInput inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder: @tr("搜索...");
+    
+    callback accepted(string);
+    callback changed(string);
+    callback clear();
+
+    height: 28px;
+    border-radius: AppTheme.radius-medium;
+    border-width: 1px;
+    border-color: input.has-focus ? AppTheme.focus-border : AppTheme.border;
+    background: AppTheme.control-background;
+
+    animate border-color { duration: 150ms; }
+
+    // 点击输入框任意背景区域直接聚焦到输入框
+    TouchArea {
+        clicked => { input.focus(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+
+        // 1. 最左侧：搜索矢量图标 (垂直居中，固定在最左边)
+        VerticalLayout {
+            alignment: center;
+            width: 14px;
+
+            Image {
+                source: @image-url("../assets/icons/search.svg");
+                width: 12px;
+                height: 12px;
+                image-fit: contain;
+                colorize: input.has-focus ? AppTheme.accent : AppTheme.secondary-foreground;
+                animate colorize { duration: 150ms; }
+            }
+        }
+
+        // 2. 中间：输入框与从左到右的 Placeholder 文字 (拉满剩余宽度，严格左对齐)
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+
+            if input.text == "" && !input.has-focus: Text {
+                text: root.placeholder;
+                font-size: 11px;
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+                horizontal-alignment: left;
+                x: 0px;
+                width: 100%;
+                height: 100%;
+                overflow: elide;
+            }
+
+            input := TextInput {
+                width: 100%;
+                height: 100%;
+                horizontal-alignment: left;
+                vertical-alignment: center;
+                font-size: 11px;
+                color: AppTheme.foreground;
+                selection-background-color: AppTheme.selected-background;
+                selection-foreground-color: AppTheme.selected-foreground;
+
+                accepted => { root.accepted(self.text); }
+                edited => { root.changed(self.text); }
+            }
+        }
+
+        // 3. 最右侧：一键清空按钮 (仅在有输入文本时显示)
+        if input.text != "": VerticalLayout {
+            alignment: center;
+            width: 16px;
+
+            Rectangle {
+                width: 16px;
+                height: 16px;
+                border-radius: 8px;
+                background: clear-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                Image {
+                    source: @image-url("../assets/icons/window-close.svg");
+                    width: 8px;
+                    height: 8px;
+                    image-fit: contain;
+                    colorize: AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                clear-touch := TouchArea {
+                    clicked => {
+                        input.text = "";
+                        root.changed("");
+                        root.clear();
+                    }
+                    mouse-cursor: pointer;
+                }
+            }
+        }
+    }
+}
+

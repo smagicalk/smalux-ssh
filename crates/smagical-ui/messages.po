@@ -2,29 +2,582 @@
 msgid ""
 msgstr ""
 "Project-Id-Version: smagical-ui 0.1.0\n"
+"POT-Creation-Date: 2026-07-19 10:08+0000\n"
 "Language: zh-CN\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 
+#: crates/smagical-ui/ui/main.slint:6
+msgctxt "AppWindow"
 msgid "暂无主机"
 msgstr "暂无主机"
 
-msgid "smagicalssh"
-msgstr "smagicalssh"
-
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:2
+#: crates/smagical-ui/ui/main.slint:8 crates/smagical-ui/ui/main.slint:18
 msgctxt "AppWindow"
-msgid "暂无主机"
+msgid "smalux"
+msgstr "smalux"
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:33
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:33
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:33
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:33
+msgctxt "AppWindow"
+msgid "smalux - 现代 Rust SSH 终端工作台"
 msgstr ""
 
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
-#: F:\code\rust\smagicalssh\crates\smagical-ui\ui\main.slint:4
-msgctxt "AppWindow"
-msgid "smagicalssh"
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:56
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:56
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:56
+msgctxt "CommandPalette"
+msgid "输入主机名、命令或 > 执行操作 (Esc 退出)..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:73
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:73
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:73
+msgctxt "CommandPalette"
+msgid "按 ↑↓ 导航  |  Enter 确认  |  Esc 关闭"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:5
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:5
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:5
+msgctxt "DrawerContainer"
+msgid "面板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:8
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:8
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:8
+msgctxt "DrawerContainer"
+msgid "新建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\search-input.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\search-input.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\search-input.slint:6
+msgctxt "SearchInput"
+msgid "搜索..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\tab-item.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\tab-item.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\tab-item.slint:6
+msgctxt "TabItem"
+msgid "会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:35
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:35
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:35
+msgctxt "LeftActivityBar"
+msgid "主机管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:43
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:43
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:43
+msgctxt "LeftActivityBar"
+msgid "历史会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:51
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:51
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:51
+msgctxt "LeftActivityBar"
+msgid "文件管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:59
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:59
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:59
+msgctxt "LeftActivityBar"
+msgid "凭据保管"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:67
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:67
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:67
+msgctxt "LeftActivityBar"
+msgid "指令片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:75
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:75
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:75
+msgctxt "LeftActivityBar"
+msgid "网络隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:89
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:89
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:89
+msgctxt "LeftActivityBar"
+msgid "数据备份与导入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:97
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:97
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:97
+msgctxt "LeftActivityBar"
+msgid "偏好设置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:30
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:30
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:30
+msgctxt "RightToolBar"
+msgid "系统监控"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:38
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:38
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:38
+msgctxt "RightToolBar"
+msgid "快捷命令库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:46
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:46
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:46
+msgctxt "RightToolBar"
+msgid "SFTP 传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:54
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:54
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:54
+msgctxt "RightToolBar"
+msgid "会话备忘笔记"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:62
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:62
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:62
+msgctxt "RightToolBar"
+msgid "AI 终端助手"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\status_bar.slint:38
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\status_bar.slint:38
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\status_bar.slint:38
+msgctxt "StatusBar"
+msgid "{} 个会话活动"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\status_bar.slint:74
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\status_bar.slint:74
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\status_bar.slint:74
+msgctxt "StatusBar"
+msgid "延迟: {}"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:113
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:113
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:113
+msgctxt "TabBar"
+msgid "搜索..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:155
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:155
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:155
+msgctxt "TabBar"
+msgid "广播: 开"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:155
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:155
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_bar.slint:155
+msgctxt "TabBar"
+msgid "广播: 关"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:70
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:70
+msgctxt "TerminalViewport"
+msgid "◫ 垂直分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:84
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:84
+msgctxt "TerminalViewport"
+msgid "◫ 水平分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:98
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:98
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:98
+msgctxt "TerminalViewport"
+msgid "清屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:113
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:113
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:113
+msgctxt "TerminalViewport"
+msgid "断开"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:246
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:246
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:246
+msgctxt "TerminalViewport"
+msgid "请从左侧选择主机发起连接，或按 Ctrl+K 快速检索"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:6
+msgctxt "BackupDrawer"
+msgid "数据备份与导入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:19
+msgctxt "BackupDrawer"
+msgid "📦 配置备份与迁移"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:39
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:39
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:39
+msgctxt "BackupDrawer"
+msgid "导出完整加密备份包 (.toml)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:49
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:49
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:49
+msgctxt "BackupDrawer"
+msgid "📥 从外部工具一键导入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:69
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:69
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:69
+msgctxt "BackupDrawer"
+msgid "导入系统 ~/.ssh/config 主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:92
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:92
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:92
+msgctxt "BackupDrawer"
+msgid "导入 Termius / Xshell 资产"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:15
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:15
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:15
+msgctxt "CredentialsDrawer"
+msgid "凭据保管"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:18
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:18
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:18
+msgctxt "CredentialsDrawer"
+msgid "新建凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:53
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:53
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:53
+msgctxt "CredentialsDrawer"
+msgid "凭据保管箱已就绪 (AES-256)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:14
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:14
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:14
+msgctxt "FilesDrawer"
+msgid "文件管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:17
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:17
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:17
+msgctxt "FilesDrawer"
+msgid "添加书签"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:36
+msgctxt "FilesDrawer"
+msgid "📁 常用远程目录书签"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:16
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:16
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:16
+msgctxt "HistoryDrawer"
+msgid "历史会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:40
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:40
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:40
+msgctxt "HistoryDrawer"
+msgid "最近连接记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:53
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:53
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:53
+msgctxt "HistoryDrawer"
+msgid "清空"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:20
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:20
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:20
+msgctxt "HostsDrawer"
+msgid "主机管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:23
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:23
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:23
+msgctxt "HostsDrawer"
+msgid "新建主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:42
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:42
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:42
+msgctxt "HostsDrawer"
+msgid "搜索主机名或 IP..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:58
+msgctxt "HostsDrawer"
+msgid "🖥️ 本地 Shell"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:114
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:114
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:114
+msgctxt "HostsDrawer"
+msgid "远程服务器 ({})"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:14
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:14
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:14
+msgctxt "SettingsDrawer"
+msgid "偏好设置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:35
+msgctxt "SettingsDrawer"
+msgid "🎨 UI & 终端主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:103
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:103
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:103
+msgctxt "SettingsDrawer"
+msgid "⌨️ 终端首选项"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:110
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:110
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:110
+msgctxt "SettingsDrawer"
+msgid "等宽字体: JetBrains Mono / Fira Code"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:116
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:116
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:116
+msgctxt "SettingsDrawer"
+msgid "字号: 13px  |  光标: 闪烁块状"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:15
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:15
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:15
+msgctxt "SnippetsDrawer"
+msgid "指令片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:18
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:18
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:18
+msgctxt "SnippetsDrawer"
+msgid "新建指令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:18
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:18
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:18
+msgctxt "TunnelsDrawer"
+msgid "网络隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:21
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:21
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:21
+msgctxt "TunnelsDrawer"
+msgid "新建隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:7
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:7
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:7
+msgctxt "AiToolDrawer"
+msgid "AI 终端助手"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:33
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:33
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:33
+msgctxt "AiToolDrawer"
+msgid "输入自然语言，自动生成 Linux Shell 指令与参数"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:39
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:39
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:39
+msgctxt "AiToolDrawer"
+msgid "例如: 查找大于100MB的日志文件..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:44
+msgctxt "AiToolDrawer"
+msgid "💡 推荐生成指令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:78
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:78
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:78
+msgctxt "AiToolDrawer"
+msgid "▶ 填入终端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:19
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:19
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:19
+msgctxt "MonitorDrawer"
+msgid "系统监控"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:60
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:60
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:60
+msgctxt "MonitorDrawer"
+msgid "运行: {} 天  |  进程: {}"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:73
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:73
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:73
+msgctxt "MonitorDrawer"
+msgid "CPU 使用率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:87
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:87
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:87
+msgctxt "MonitorDrawer"
+msgid "内存占用 (RAM)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:101
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:101
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:101
+msgctxt "MonitorDrawer"
+msgid "磁盘空间 (/dev/sda1)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:127
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:127
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:127
+msgctxt "MonitorDrawer"
+msgid "↓ 下载速率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:134
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:134
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:134
+msgctxt "MonitorDrawer"
+msgid "↑ 上传速率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:6
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:6
+msgctxt "NotesToolDrawer"
+msgid "会话备忘笔记"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:17
+msgctxt "NotesToolDrawer"
+msgid "📝 当前主机会话专用备忘录 (自动保存)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:14
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:14
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:14
+msgctxt "SftpToolDrawer"
+msgid "快速 SFTP 传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:64
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:64
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:64
+msgctxt "SftpToolDrawer"
+msgid "↑ 上传文件到当前目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\snippet_tool_drawer.slint:13
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\snippet_tool_drawer.slint:13
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\snippet_tool_drawer.slint:13
+msgctxt "SnippetToolDrawer"
+msgid "快捷命令库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:19
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:19
+msgctxt "BackupDrawer"
+msgid "⤓ 配置备份与迁移"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:36
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:36
+msgctxt "FilesDrawer"
+msgid "▤ 常用远程目录书签"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:58
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:58
+msgctxt "HostsDrawer"
+msgid "⊞ 本地 Shell"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:35
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:35
+msgctxt "SettingsDrawer"
+msgid "◐ UI & 终端主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:44
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:44
+msgctxt "AiToolDrawer"
+msgid "» 推荐生成指令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:17
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:17
+msgctxt "NotesToolDrawer"
+msgid "✎ 当前主机会话专用备忘录 (自动保存)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:80
+msgctxt "TerminalViewport"
+msgid "垂直分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:104
+msgctxt "TerminalViewport"
+msgid "水平分屏"
 msgstr ""

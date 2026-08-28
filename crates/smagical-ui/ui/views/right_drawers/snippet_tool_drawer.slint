@@ -1,0 +1,83 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 快捷指令结构
+export struct QuickCmdData {
+    title: string,
+    command: string,
+}
+
+/// 右侧快捷命令库抽屉 (Snippet Tool Drawer)
+export component SnippetToolDrawer inherits DrawerContainer {
+    title: @tr("快捷命令库");
+    collapse-icon: "▶";
+
+    in property <[QuickCmdData]> quick-cmds: [
+        { title: "查看容器", command: "docker ps" },
+        { title: "磁盘分析", command: "df -h" },
+        { title: "服务状态", command: "systemctl status nginx" },
+        { title: "跟踪系统日志", command: "tail -f /var/log/syslog" },
+        { title: "内存与Swap", command: "free -h" },
+        { title: "端口监听", command: "netstat -tulnp" },
+    ];
+
+    callback send-to-terminal(string /* command */);
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+
+        ScrollView {
+            VerticalLayout {
+                spacing: 4px;
+
+                for cmd in root.quick-cmds: Rectangle {
+                    height: 42px;
+                    border-radius: AppTheme.radius-medium;
+                    background: cmd-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    cmd-touch := TouchArea {
+                        clicked => { root.send-to-terminal(cmd.command); }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+
+                            Text {
+                                text: cmd.title;
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.foreground;
+                                overflow: elide;
+                            }
+
+                            Text {
+                                text: cmd.command;
+                                font-size: 9px;
+                                color: AppTheme.secondary-foreground;
+                                overflow: elide;
+                            }
+                        }
+
+                        Text {
+                            text: "▶";
+                            font-size: 9px;
+                            color: AppTheme.accent;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

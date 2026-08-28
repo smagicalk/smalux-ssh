@@ -1,0 +1,126 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 指令片段数据结构
+export struct SnippetItemData {
+    id: string,
+    title: string,
+    command: string,
+    category: string,
+}
+
+/// 指令片段抽屉 (Snippets Drawer)
+export component SnippetsDrawer inherits DrawerContainer {
+    title: @tr("指令片段");
+    collapse-icon: "◀";
+
+    in property <[SnippetItemData]> snippets: [
+        { id: "1", title: "查看容器状态", command: "docker ps --format 'table {{.Names}}  {{.Status}}  {{.Ports}}'", category: "Docker" },
+        { id: "2", title: "清理悬空镜像", command: "docker image prune -a --force", category: "Docker" },
+        { id: "3", title: "系统空间与内存", command: "df -h && free -m && uptime", category: "System" },
+        { id: "4", title: "重载 Nginx 配置", command: "nginx -t && systemctl reload nginx", category: "Nginx" },
+        { id: "5", title: "实时日志跟踪", command: "journalctl -u nginx -f -n 100", category: "System" },
+    ];
+
+    callback execute-snippet(string /* command */);
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+
+        ScrollView {
+            VerticalLayout {
+                spacing: 4px;
+
+                for snip in root.snippets: Rectangle {
+                    height: 56px;
+                    border-radius: AppTheme.radius-medium;
+                    background: snip-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    snip-touch := TouchArea {
+                        clicked => { root.execute-snippet(snip.command); }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        Text {
+                            text: "»";
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: snip.title;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: AppTheme.foreground;
+                                }
+
+                                Rectangle {
+                                    height: 14px;
+                                    border-radius: 2px;
+                                    background: AppTheme.control-background;
+
+                                    HorizontalLayout {
+                                        padding-left: 4px;
+                                        padding-right: 4px;
+
+                                        Text {
+                                            text: snip.category;
+                                            font-size: 9px;
+                                            color: AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: snip.command;
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                overflow: elide;
+                            }
+                        }
+
+                        // 运行按钮
+                        Rectangle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: AppTheme.radius-small;
+                            background: run-touch.has-hover ? AppTheme.accent : AppTheme.control-background;
+
+                            Text {
+                                text: "▶";
+                                font-size: 10px;
+                                color: run-touch.has-hover ? #ffffff : AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+
+                            run-touch := TouchArea {
+                                clicked => { root.execute-snippet(snip.command); }
+                                mouse-cursor: pointer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

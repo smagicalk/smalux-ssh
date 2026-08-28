@@ -1,0 +1,126 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 隧道项数据结构
+export struct TunnelItemData {
+    id: string,
+    name: string,
+    tunnel-type: string, // "Local" | "Remote" | "Dynamic"
+    local-port: int,
+    remote-target: string,
+    is-running: bool,
+}
+
+/// 网络隧道抽屉 (Tunnels Drawer)
+export component TunnelsDrawer inherits DrawerContainer {
+    title: @tr("网络隧道");
+    collapse-icon: "◀";
+
+    in property <[TunnelItemData]> tunnels: [
+        { id: "1", name: "MySQL 远程库映射", tunnel-type: "Local", local-port: 33066, remote-target: "127.0.0.1:3306", is-running: true },
+        { id: "2", name: "Redis 缓存映射", tunnel-type: "Local", local-port: 63799, remote-target: "127.0.0.1:6379", is-running: true },
+        { id: "3", name: "SOCKS5 动态代理", tunnel-type: "Dynamic", local-port: 10808, remote-target: "Dynamic", is-running: false },
+    ];
+
+    callback toggle-tunnel(string /* id */);
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+
+        ScrollView {
+            VerticalLayout {
+                spacing: 4px;
+
+                for tun in root.tunnels: Rectangle {
+                    height: 56px;
+                    border-radius: AppTheme.radius-medium;
+                    background: tun-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    tun-touch := TouchArea {
+                        clicked => { root.toggle-tunnel(tun.id); }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        // 运行指示灯
+                        StatusDot {
+                            status: tun.is-running ? "online" : "offline";
+                            dot-size: 7px;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: tun.name;
+                                    font-size: 12px;
+                                    font-weight: 600;
+                                    color: AppTheme.foreground;
+                                }
+
+                                Rectangle {
+                                    height: 14px;
+                                    border-radius: 2px;
+                                    background: AppTheme.control-background;
+
+                                    HorizontalLayout {
+                                        padding-left: 4px;
+                                        padding-right: 4px;
+
+                                        Text {
+                                            text: tun.tunnel-type;
+                                            font-size: 9px;
+                                            color: AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: ":" + tun.local-port + " ➔ " + tun.remote-target;
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+
+                        // 开关按钮
+                        Rectangle {
+                            width: 32px;
+                            height: 18px;
+                            border-radius: 9px;
+                            background: tun.is-running ? AppTheme.success : AppTheme.control-background;
+
+                            Rectangle {
+                                x: tun.is-running ? parent.width - self.width - 2px : 2px;
+                                y: 2px;
+                                width: 14px;
+                                height: 14px;
+                                border-radius: 7px;
+                                background: #ffffff;
+                                animate x { duration: 150ms; }
+                            }
+
+                            sw-touch := TouchArea {
+                                clicked => { root.toggle-tunnel(tun.id); }
+                                mouse-cursor: pointer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,24 @@
+import { AppTheme } from "../themes/app-theme.slint";
+
+/// 系统监控平滑进度条控件 (支持根据数值自动变色：正常绿色、中度黄色、重度红色)
+export component ProgressBar inherits Rectangle {
+    in property <float> progress: 0.0; // 0.0 ~ 1.0 (例如 0.42 代表 42%)
+    in property <brush> fill-color: progress > 0.85 ? AppTheme.danger : progress > 0.70 ? AppTheme.warning : AppTheme.accent;
+
+    height: 6px;
+    border-radius: 3px;
+    background: AppTheme.control-background;
+
+    // 填充条
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: Math.min(root.width, Math.max(0px, root.width * progress));
+        height: root.height;
+        border-radius: 3px;
+        background: fill-color;
+
+        animate width { duration: 250ms; easing: ease-out; }
+        animate background { duration: 200ms; }
+    }
+}

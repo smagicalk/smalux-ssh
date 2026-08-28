@@ -1,0 +1,92 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { SearchInput } from "../../components/search-input.slint";
+
+/// AI 终端助手抽屉 (AI Tool Drawer)
+export component AiToolDrawer inherits DrawerContainer {
+    title: @tr("AI 运维副驾驶");
+    collapse-icon: "▶";
+
+    callback ask-ai(string /* query */);
+    callback apply-suggested-cmd(string /* cmd */);
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 10px;
+
+        // 提示卡片
+        Rectangle {
+            height: 48px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 8px;
+                alignment: center;
+
+                Text { text: "✦"; font-size: 16px; color: AppTheme.accent; vertical-alignment: center; }
+                Text { text: @tr("输入自然语言，自动生成 Linux Shell 指令与参数"); font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; }
+            }
+        }
+
+        // 提问输入框
+        SearchInput {
+            placeholder: @tr("例如: 查找大于100MB的日志文件...");
+            accepted(q) => { root.ask-ai(q); }
+        }
+
+        Text {
+            text: @tr("» 推荐生成指令");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+
+        // 建议结果卡片
+        Rectangle {
+            height: 72px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.control-background;
+            border-width: 1px;
+            border-color: AppTheme.focus-border;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 4px;
+                alignment: center;
+
+                Text {
+                    text: "find /var/log -type f -size +100M -exec ls -lh {} \\;";
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.accent;
+                    overflow: elide;
+                }
+
+                Rectangle {
+                    height: 22px;
+                    width: 90px;
+                    border-radius: AppTheme.radius-small;
+                    background: apply-touch.has-hover ? AppTheme.accent : AppTheme.panel-background;
+
+                    Text {
+                        text: @tr("▶ 填入终端");
+                        font-size: 10px;
+                        color: apply-touch.has-hover ? #ffffff : AppTheme.foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    apply-touch := TouchArea {
+                        clicked => { root.apply-suggested-cmd("find /var/log -type f -size +100M -exec ls -lh {} \\;"); }
+                        mouse-cursor: pointer;
+                    }
+                }
+            }
+        }
+    }
+}

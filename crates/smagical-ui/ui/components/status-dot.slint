@@ -1,0 +1,15 @@
+import { AppTheme } from "../themes/app-theme.slint";
+
+/// 状态圆点指示灯 (🟢 在线/极速, 🟡 延迟/警告, 🔴 异常/断开, ⚪ 未连接)
+export component StatusDot inherits Rectangle {
+    in property <string> status: "online"; // "online" | "warning" | "error" | "offline"
+    in property <length> dot-size: 8px;
+
+    width: dot-size;
+    height: dot-size;
+    border-radius: dot-size / 2;
+
+    background: status == "online" ? AppTheme.success :
+                status == "warning" ? AppTheme.warning :
+                status == "error" ? AppTheme.danger : AppTheme.disabled-foreground;
+}
