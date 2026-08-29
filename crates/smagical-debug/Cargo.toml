@@ -1,0 +1,20 @@
+[package]
+name = "smagical-debug"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "smalux-ssh 开发者调试控制面板、场景预设生成器、tracing 全局日志系统与运行时探针工具包"
+
+[dependencies]
+anyhow.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+directories.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tracing-appender.workspace = true
+
+[dev-dependencies]
+uuid.workspace = true

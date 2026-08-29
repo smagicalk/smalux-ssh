@@ -2,6 +2,7 @@
 members = [
     "crates/smagical-core",
     "crates/smagical-ui",
+    "crates/smagical-debug",
 ]
 resolver = "3"
 
@@ -22,3 +23,6 @@ uuid = { version = "1", features = ["v4", "serde"] }
 slint = { version = "1.16.1", features = ["unstable-winit-030"] }
 slint-build = "1.16.1"
 directories = "6"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time", "json"] }
+tracing-appender = "0.2"

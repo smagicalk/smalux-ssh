@@ -9,6 +9,9 @@ export component StatusBar inherits Rectangle {
     in property <string> grid-size: "136x42";
     in property <string> net-rate: "↑ 1.4MB/s ↓ 5.2MB/s";
     in property <string> current-theme-name: "Darcula";
+    in property <bool> is-debug-open: false;
+
+    callback toggle-debug-panel();
 
     height: 24px;
     background: AppTheme.panel-background;
@@ -75,6 +78,43 @@ export component StatusBar inherits Rectangle {
             font-size: 10px;
             color: AppTheme.success;
             vertical-alignment: center;
+        }
+
+        // 调试控制台胶囊
+        Rectangle {
+            height: 18px;
+            border-radius: 3px;
+            background: root.is-debug-open ? AppTheme.accent.transparentize(80%) : dbg-touch.has-hover ? AppTheme.hover-background : transparent;
+            border-width: root.is-debug-open ? 1px : 0px;
+            border-color: AppTheme.accent;
+
+            HorizontalLayout {
+                padding-left: 5px;
+                padding-right: 5px;
+                spacing: 3px;
+                alignment: center;
+
+                Image {
+                    source: @image-url("../../assets/icons/bug.svg");
+                    width: 11px;
+                    height: 11px;
+                    colorize: root.is-debug-open ? AppTheme.accent : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("调试");
+                    font-size: 9px;
+                    font-weight: root.is-debug-open ? 600 : 400;
+                    color: root.is-debug-open ? AppTheme.accent : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            dbg-touch := TouchArea {
+                clicked => { root.toggle-debug-panel(); }
+                mouse-cursor: pointer;
+            }
         }
 
         // 主题标识

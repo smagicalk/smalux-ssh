@@ -10,7 +10,9 @@ build = "build.rs"
 [dependencies]
 anyhow.workspace = true
 slint.workspace = true
+tracing.workspace = true
 smagical-core = { path = "../smagical-core" }
+smagical-debug = { path = "../smagical-debug" }
 
 [build-dependencies]
 slint-build.workspace = true

@@ -105,7 +105,15 @@ export component LeftActivityBar inherits Rectangle {
                 clicked => { root.tab-clicked("backup"); }
             }
 
-            // 8. 偏好设置
+            // 8. 开发者调试控制面板
+            ActionBarItem {
+                icon: @image-url("../assets/icons/bug.svg");
+                tooltip: @tr("开发者调试控制台");
+                is-active: root.active-tab == "debug";
+                clicked => { root.tab-clicked("debug"); }
+            }
+
+            // 9. 偏好设置
             ActionBarItem {
                 icon: @image-url("../assets/icons/settings.svg");
                 tooltip: @tr("偏好设置");

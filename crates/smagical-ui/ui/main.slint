@@ -1,9 +1,10 @@
 import { AppTheme, AppColorScheme } from "themes/app-theme.slint";
-export { Palette }from "std-widgets.slint";
-export { AppTheme, AppColorScheme }from "themes/app-theme.slint";
+export { Palette } from "std-widgets.slint";
+export { AppTheme, AppColorScheme } from "themes/app-theme.slint";
 export { TabData } from "views/center_terminal/tab_bar.slint";
 export { HostItemData, HostTreeNode } from "views/left_drawers/hosts_drawer.slint";
 export { GroupOptionData } from "components/create-group-modal.slint";
+export { LogEntryData } from "components/debug-modal.slint";
 
 // 基础组件
 import {
@@ -14,6 +15,10 @@ import {
     CreateGroupModal,
     GroupOptionData,
 } from "components/create-group-modal.slint";
+import {
+    DebugModal,
+    LogEntryData,
+} from "components/debug-modal.slint";
 
 // 左侧视图
 import { LeftActivityBar } from "views/left_activity_bar.slint";
@@ -87,6 +92,7 @@ export component AppWindow inherits Window {
     in-out property <string> active-right-tool: "monitor";
     in-out property <bool> is-right-drawer-open: true;
     in-out property <bool> is-command-palette-open: false;
+    in-out property <bool> is-debug-modal-open: false;
     in-out property <bool> is-broadcast-mode: false;
     in-out property <bool> is-window-maximized: false;
     in-out property <bool> is-dark-mode: true;
@@ -142,6 +148,8 @@ export component AppWindow inherits Window {
     ];
     in-out property <length> left-drawer-width: 240px;
     in-out property <length> right-drawer-width: 240px;
+    /// 开发者调试实时事件日志列表
+    in-out property <[LogEntryData]> debug-logs: [];
 
     // 各种业务回调
     callback trigger-command-palette();
@@ -158,16 +166,41 @@ export component AppWindow inherits Window {
     callback maximize-window();
     callback close-window();
 
-    // 全局快捷键拦截
+    // 开发者调试面板专用回调
+    callback debug-batch-generate(string /* prefix */, string /* count_str */, string /* ip_prefix */, string /* start_ip_str */, string /* port_str */, string /* group */, string /* status_mode */, bool /* overwrite */);
+    callback debug-batch-update-status(string /* status_mode */);
+    callback debug-batch-update-port(string /* new_port_str */);
+    callback debug-inject-preset(string /* preset_id */);
+    callback debug-quick-add-host(string /* name */, string /* ip */, string /* port_str */, string /* group */);
+    callback debug-quick-add-group(string /* name */, string /* parent_id */);
+    callback debug-clear-data();
+    callback debug-reset-default-data();
+    callback debug-clear-logs();
+    callback debug-emit-test-log(string /* level */);
+
+    // 全局快捷键拦截 (支持 F12 或 Ctrl+Shift+D 随时呼出调试弹窗)
     forward-focus: main-focus;
     main-focus := FocusScope {
         key-pressed(event) => {
             if event.modifiers.control && (event.text == "k" || event.text == "K" || event.text == "p" || event.text == "P") {
                 root.is-command-palette-open = !root.is-command-palette-open;
                 accept
-            } else if event.text == Key.Escape && root.is-command-palette-open {
-                root.is-command-palette-open = false;
+            } else if event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D")) {
+                root.is-debug-modal-open = !root.is-debug-modal-open;
                 accept
+            } else if event.text == Key.Escape {
+                if root.is-command-palette-open {
+                    root.is-command-palette-open = false;
+                    accept
+                } else if root.is-debug-modal-open {
+                    root.is-debug-modal-open = false;
+                    accept
+                } else if root.is-create-group-open {
+                    root.is-create-group-open = false;
+                    accept
+                } else {
+                    reject
+                }
             } else {
                 reject
             }
@@ -215,7 +248,10 @@ export component AppWindow inherits Window {
                     is-dark-mode: root.is-dark-mode;
                     toggle-color-mode => { root.toggle-color-mode(); }
                     tab-clicked(id) => {
-                        if root.active-left-tab == id && root.is-left-drawer-open {
+                        if id == "debug" {
+                            // 点击调试图标直接唤起全局独立浮动弹窗
+                            root.is-debug-modal-open = !root.is-debug-modal-open;
+                        } else if root.active-left-tab == id && root.is-left-drawer-open {
                             root.is-left-drawer-open = false;
                         } else {
                             root.active-left-tab = id;
@@ -406,6 +442,10 @@ export component AppWindow inherits Window {
             // 3. 底层全宽状态栏
             StatusBar {
                 current-theme-name: root.current-theme-name;
+                is-debug-open: root.is-debug-modal-open;
+                toggle-debug-panel => {
+                    root.is-debug-modal-open = !root.is-debug-modal-open;
+                }
             }
         }
     }
@@ -436,5 +476,36 @@ export component AppWindow inherits Window {
             root.create-group(parent-id, name);
             root.is-create-group-open = false;
         }
+    }
+
+    // 独立浮动开发者调试与批量数据控制弹窗 (全页面任意时刻可呼出)
+    DebugModal {
+        is-open: root.is-debug-modal-open;
+        total-nodes-count: root.tree-nodes.length;
+        visible-nodes-count: root.tree-nodes.length;
+        host-cards-count: root.hosts.length;
+        tree-viewport-width: root.tree-content-width;
+        current-theme-name: root.current-theme-name;
+        is-dark-mode: root.is-dark-mode;
+        logs: root.debug-logs;
+        close => { root.is-debug-modal-open = false; }
+        batch-generate(prefix, count, ip-prefix, start-ip, port, group, status-mode, overwrite) => {
+            root.debug-batch-generate(prefix, count, ip-prefix, start-ip, port, group, status-mode, overwrite);
+        }
+        batch-update-status(status-mode) => {
+            root.debug-batch-update-status(status-mode);
+        }
+        batch-update-port(port) => {
+            root.debug-batch-update-port(port);
+        }
+        inject-preset(id) => { root.debug-inject-preset(id); }
+        quick-add-host(name, ip, port, group) => { root.debug-quick-add-host(name, ip, port, group); }
+        quick-add-group(name, parent-id) => { root.debug-quick-add-group(name, parent-id); }
+        clear-all-data => { root.debug-clear-data(); }
+        reset-default-data => { root.debug-reset-default-data(); }
+        clear-logs => { root.debug-clear-logs(); }
+        emit-test-log(level) => { root.debug-emit-test-log(level); }
+        switch-theme(id) => { root.switch-theme(id); }
+        toggle-color-mode => { root.toggle-color-mode(); }
     }
 }
