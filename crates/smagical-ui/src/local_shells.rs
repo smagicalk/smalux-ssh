@@ -124,20 +124,21 @@ fn detect_windows_shells() -> Vec<LocalShellItemData> {
             break;
         }
     }
-    if !has_git_bash {
-        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
-            let user_git = format!("{}\\Programs\\Git\\bin\\bash.exe", local_app_data);
-            if Path::new(&user_git).exists() {
-                shells.push(LocalShellItemData {
-                    id: "local-gitbash".into(),
-                    title: "Git Bash".into(),
-                    subtitle: format!("MINGW64 Git Bash ({})", user_git).into(),
-                    tag: "Git".into(),
-                });
-                has_git_bash = true;
-            }
+    if !has_git_bash
+        && let Ok(local_app_data) = std::env::var("LOCALAPPDATA")
+    {
+        let user_git = format!("{}\\Programs\\Git\\bin\\bash.exe", local_app_data);
+        if Path::new(&user_git).exists() {
+            shells.push(LocalShellItemData {
+                id: "local-gitbash".into(),
+                title: "Git Bash".into(),
+                subtitle: format!("MINGW64 Git Bash ({})", user_git).into(),
+                tag: "Git".into(),
+            });
+            has_git_bash = true;
         }
     }
+
     if !has_git_bash && which_in_path("bash.exe") {
         shells.push(LocalShellItemData {
             id: "local-gitbash".into(),

@@ -75,10 +75,10 @@ where
         
         // 过滤掉部分过于嘈杂的外部依赖内部 trace/debug（如 winit, slint 内部布局渲染等）
         let target = meta.target();
-        if target.starts_with("winit") || target.starts_with("calloop") || target.starts_with("slint::") {
-            if *meta.level() > Level::INFO {
-                return;
-            }
+        if (target.starts_with("winit") || target.starts_with("calloop") || target.starts_with("slint::"))
+            && *meta.level() > Level::INFO
+        {
+            return;
         }
 
         let mut visitor = MessageVisitor::default();
@@ -170,17 +170,17 @@ pub fn clean_expired_logs(log_dir: &Path, max_retention_days: u64, max_files: us
         let path = entry.path();
         if path.is_file() {
             let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if file_name.starts_with("smalux.log") || file_name.ends_with(".log") {
-                if let Ok(metadata) = entry.metadata() {
-                    let modified = metadata.modified().unwrap_or(now);
-                    log_files.push((path, modified));
-                }
+            if (file_name.starts_with("smalux.log") || file_name.ends_with(".log"))
+                && let Ok(metadata) = entry.metadata()
+            {
+                let modified = metadata.modified().unwrap_or(now);
+                log_files.push((path, modified));
             }
         }
     }
 
     // 按修改时间从新到旧排序
-    log_files.sort_by(|a, b| b.1.cmp(&a.1));
+    log_files.sort_by_key(|b| std::cmp::Reverse(b.1));
 
     // 1. 删除超出最大保留数量的旧文件
     if log_files.len() > max_files {
@@ -192,10 +192,10 @@ pub fn clean_expired_logs(log_dir: &Path, max_retention_days: u64, max_files: us
 
     // 2. 删除超出保留天数的过期文件
     for (path, modified) in log_files {
-        if let Ok(age) = now.duration_since(modified) {
-            if age > max_duration {
-                let _ = fs::remove_file(path);
-            }
+        if let Ok(age) = now.duration_since(modified)
+            && age > max_duration
+        {
+            let _ = fs::remove_file(path);
         }
     }
 }

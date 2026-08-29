@@ -306,41 +306,42 @@ pub fn run() -> anyhow::Result<()> {
                 if let (Some(src_idx), Some(tgt_idx)) = (
                     cards.iter().position(|c| c.id == src_str.as_str()),
                     cards.iter().position(|c| c.id == target_str.as_str()),
-                ) {
-                    if src_idx != tgt_idx {
-                        let item = cards.remove(src_idx);
-                        let target_insert_idx = if pos_str == "before" {
-                            if src_idx < tgt_idx { tgt_idx.saturating_sub(1) } else { tgt_idx }
-                        } else {
-                            if src_idx < tgt_idx { tgt_idx } else { tgt_idx + 1 }
-                        };
-                        let final_pos = target_insert_idx.min(cards.len());
-                        let item_name = item.name.to_string();
-                        let tgt_name = cards.get(tgt_idx.min(cards.len().saturating_sub(1))).map(|c| c.name.to_string()).unwrap_or_default();
-                        cards.insert(final_pos, item);
+                )
+                    && src_idx != tgt_idx
+                {
+                    let item = cards.remove(src_idx);
+                    let target_insert_idx = if pos_str == "before" {
+                        if src_idx < tgt_idx { tgt_idx.saturating_sub(1) } else { tgt_idx }
+                    } else {
+                        if src_idx < tgt_idx { tgt_idx } else { tgt_idx + 1 }
+                    };
+                    let final_pos = target_insert_idx.min(cards.len());
+                    let item_name = item.name.to_string();
+                    let tgt_name = cards.get(tgt_idx.min(cards.len().saturating_sub(1))).map(|c| c.name.to_string()).unwrap_or_default();
+                    cards.insert(final_pos, item);
 
-                        // 同步列表排序至存储层
-                        let ordered_ids: Vec<String> = cards.iter().map(|c| c.id.to_string()).collect();
-                        let _ = core_state_move.storage().hosts().update_list_order(&ordered_ids);
+                    // 同步列表排序至存储层
+                    let ordered_ids: Vec<String> = cards.iter().map(|c| c.id.to_string()).collect();
+                    let _ = core_state_move.storage().hosts().update_list_order(&ordered_ids);
 
-                        let q = search_query_move.borrow().clone();
-                        let display_cards: Vec<HostItemData> = if q.is_empty() {
-                            cards.clone()
-                        } else {
-                            cards.iter().filter(|h| {
-                                h.name.to_lowercase().contains(&q)
-                                    || h.address.to_lowercase().contains(&q)
-                                    || h.group.to_lowercase().contains(&q)
-                            }).cloned().collect()
-                        };
-                        w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
+                    let q = search_query_move.borrow().clone();
+                    let display_cards: Vec<HostItemData> = if q.is_empty() {
+                        cards.clone()
+                    } else {
+                        cards.iter().filter(|h| {
+                            h.name.to_lowercase().contains(&q)
+                                || h.address.to_lowercase().contains(&q)
+                                || h.group.to_lowercase().contains(&q)
+                        }).cloned().collect()
+                    };
+                    w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
-                        tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
-                        sync_ui_debug_logs(&w);
-                    }
+                    tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
+                    sync_ui_debug_logs(&w);
                 }
                 return;
             }
+
 
             // 2. 树形层级模式 (Tree View Mode): 物理资产层级结构与文件夹迁移
             let mut tree = master_tree_move.borrow_mut();
