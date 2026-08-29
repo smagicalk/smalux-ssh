@@ -151,11 +151,26 @@ export component AppWindow inherits Window {
     /// 开发者调试实时事件日志列表
     in-out property <[LogEntryData]> debug-logs: [];
 
+    /// 树节点拖拽交互状态
+    in-out property <bool> is-dragging: false;
+    in-out property <string> drag-source-id: "";
+    in-out property <string> drag-source-name: "";
+    in-out property <bool> drag-source-is-group: false;
+    in-out property <string> drop-target-id: "";
+    in-out property <string> drop-target-name: "";
+    in-out property <int> drop-target-index: -1;
+    in-out property <string> drop-position: "inside"; // "before" | "inside" | "after" | "root" | ""
+    in-out property <bool> drop-target-valid: true;
+    in-out property <length> drag-x: 0px;
+    in-out property <length> drag-y: 0px;
+
     // 各种业务回调
     callback trigger-command-palette();
     callback switch-theme(string /* theme_id */);
     callback toggle-color-mode();
-    callback toggle-tree-group(string /* id */);
+    callback toggle-tree-group(string /* group-id */);
+    callback move-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
+    callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
     callback filter-hosts(string /* query */);
     callback create-group(string /* parent_id */, string /* name */);
     callback toggle-group-option(string /* id */);
@@ -272,7 +287,20 @@ export component AppWindow inherits Window {
                         collapse => { root.is-left-drawer-open = false; }
                         tree-nodes: root.tree-nodes;
                         hosts: root.hosts;
+                        is-dragging <=> root.is-dragging;
+                        drag-source-id <=> root.drag-source-id;
+                        drag-source-name <=> root.drag-source-name;
+                        drag-source-is-group <=> root.drag-source-is-group;
+                        drop-target-id <=> root.drop-target-id;
+                        drop-target-name <=> root.drop-target-name;
+                        drop-target-index <=> root.drop-target-index;
+                        drop-position <=> root.drop-position;
+                        drop-target-valid <=> root.drop-target-valid;
+                        drag-x <=> root.drag-x;
+                        drag-y <=> root.drag-y;
                         toggle-group(id) => { root.toggle-tree-group(id); }
+                        move-node(src, target, pos) => { root.move-tree-node(src, target, pos); }
+                        request-drag-hover(src, idx, offset) => { root.request-drag-hover(src, idx, offset); }
                         search-changed(query) => { root.filter-hosts(query); }
                         create-new-group => { root.is-create-group-open = true; }
                         host-double-clicked(id) => { root.open-host(id); }

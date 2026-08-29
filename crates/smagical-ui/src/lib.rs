@@ -128,10 +128,229 @@ fn ensure_raw_group_hierarchy(tree: &mut Vec<RawTreeNode>, path: &str) -> (Strin
     (current_parent_id, current_level, last_name)
 }
 
-/// 获取系统初始化主控树结构数据 (来自 smagical-debug minimal 预设)
+/// 移动与调序树形节点（主机或分组）
+///
+/// 支持四种落点模式：
+/// - "inside": 移入目标分组内部作为其子节点
+/// - "before": 插在目标节点上方（成为目标节点的同级前序节点）
+/// - "after": 插在目标节点下方（成为目标节点的同级后序节点）
+/// - "root": 移至顶级根目录
+fn move_and_reorder_raw_node(
+    tree: &mut Vec<RawTreeNode>,
+    source_id: &str,
+    target_id: &str,
+    drop_position: &str,
+) -> Result<(String /* source_name */, String /* target_name */), String> {
+    let source_idx = tree
+        .iter()
+        .position(|n| n.id == source_id)
+        .ok_or_else(|| "未找到源节点".to_string())?;
+
+    let is_source_group = tree[source_idx].is_group;
+    let source_name = tree[source_idx].name.clone();
+    let old_level = tree[source_idx].level;
+
+    // 自身拖拽且无需调序保护
+    if source_id == target_id {
+        if drop_position == "inside" {
+            return Err("不能将节点移入自身内部".to_string());
+        }
+        return Ok((source_name.clone(), source_name));
+    }
+
+    // 收集源节点的所有后裔节点 ID（如果源节点是分组）
+    let mut source_descendant_ids = HashSet::new();
+    if is_source_group {
+        let mut queue = vec![source_id.to_string()];
+        while let Some(parent) = queue.pop() {
+            for n in tree.iter() {
+                if n.parent_id == parent {
+                    source_descendant_ids.insert(n.id.clone());
+                    if n.is_group {
+                        queue.push(n.id.clone());
+                    }
+                }
+            }
+        }
+    }
+
+    // 循环引用检测：严禁将父节点移动/插入到其任意子孙节点中
+    if source_descendant_ids.contains(target_id) {
+        return Err("不能将父分组移动至其子孙节点中 (循环引用)".to_string());
+    }
+
+    // 计算目标 Parent ID 和目标层级 Level
+    let (new_parent_id, new_level, target_name) = if drop_position == "root" || target_id == "root" || target_id.is_empty() {
+        ("".to_string(), 0, "顶级根目录".to_string())
+    } else {
+        let target_node = tree
+            .iter()
+            .find(|n| n.id == target_id)
+            .ok_or_else(|| "未找到目标节点".to_string())?;
+
+        if drop_position == "inside" {
+            if !target_node.is_group {
+                return Err("只能移入文件夹分组内部".to_string());
+            }
+            (target_node.id.clone(), target_node.level + 1, target_node.name.clone())
+        } else {
+            // "before" 或 "after": 与目标节点同级
+            (target_node.parent_id.clone(), target_node.level, target_node.name.clone())
+        }
+    };
+
+    let level_delta = new_level - old_level;
+
+    // 提取源子树所有节点 (源节点及其所有后代)
+    let mut is_subtree_set = HashSet::new();
+    is_subtree_set.insert(source_id.to_string());
+    for id in &source_descendant_ids {
+        is_subtree_set.insert(id.clone());
+    }
+
+    let mut subtree_nodes = Vec::new();
+    let mut remaining_tree = Vec::new();
+
+    for mut node in tree.drain(..) {
+        if is_subtree_set.contains(&node.id) {
+            if node.id == source_id {
+                node.parent_id = new_parent_id.clone();
+                node.level = new_level;
+            } else {
+                node.level += level_delta;
+            }
+            subtree_nodes.push(node);
+        } else {
+            remaining_tree.push(node);
+        }
+    }
+
+    // 根据落点位置重插入到 remaining_tree
+    if drop_position == "before" {
+        let target_pos = remaining_tree
+            .iter()
+            .position(|n| n.id == target_id)
+            .unwrap_or(0);
+        for (i, node) in subtree_nodes.into_iter().enumerate() {
+            remaining_tree.insert(target_pos + i, node);
+        }
+    } else if drop_position == "after" {
+        let target_pos = remaining_tree
+            .iter()
+            .position(|n| n.id == target_id)
+            .unwrap_or_else(|| remaining_tree.len().saturating_sub(1));
+
+        let mut insert_pos = target_pos + 1;
+        // 如果目标也是分组，则插入到该目标分组的整个子树后面
+        if remaining_tree[target_pos].is_group {
+            let mut target_descendants = HashSet::new();
+            let mut q = vec![target_id.to_string()];
+            while let Some(p) = q.pop() {
+                for n in &remaining_tree {
+                    if n.parent_id == p {
+                        target_descendants.insert(n.id.clone());
+                        if n.is_group {
+                            q.push(n.id.clone());
+                        }
+                    }
+                }
+            }
+            while insert_pos < remaining_tree.len() && target_descendants.contains(&remaining_tree[insert_pos].id) {
+                insert_pos += 1;
+            }
+        }
+
+        for (i, node) in subtree_nodes.into_iter().enumerate() {
+            remaining_tree.insert(insert_pos + i, node);
+        }
+    } else if drop_position == "inside" {
+        let target_pos = remaining_tree
+            .iter()
+            .position(|n| n.id == target_id)
+            .unwrap_or(0);
+
+        let mut insert_pos = target_pos + 1;
+        let mut target_descendants = HashSet::new();
+        let mut q = vec![target_id.to_string()];
+        while let Some(p) = q.pop() {
+            for n in &remaining_tree {
+                if n.parent_id == p {
+                    target_descendants.insert(n.id.clone());
+                    if n.is_group {
+                        q.push(n.id.clone());
+                    }
+                }
+            }
+        }
+        while insert_pos < remaining_tree.len() && target_descendants.contains(&remaining_tree[insert_pos].id) {
+            insert_pos += 1;
+        }
+
+        for (i, node) in subtree_nodes.into_iter().enumerate() {
+            remaining_tree.insert(insert_pos + i, node);
+        }
+    } else {
+        // "root"
+        remaining_tree.extend(subtree_nodes);
+    }
+
+    // 重新统计各分组的 item_count
+    for i in 0..remaining_tree.len() {
+        if remaining_tree[i].is_group {
+            let grp_id = remaining_tree[i].id.clone();
+            let count = remaining_tree.iter().filter(|n| n.parent_id == grp_id).count() as i32;
+            remaining_tree[i].item_count = count;
+        }
+    }
+
+    *tree = remaining_tree;
+
+    Ok((source_name, target_name))
+}
+
+/// 对树形结构节点进行标准化排序 (Canonical Hierarchy Sort: 文件夹始终置顶在上方，主机在下方)
+///
+/// 排序规则：
+/// 1. 同级节点中，文件夹/分组（is_group == true）始终排在最前面，主机排在后面；
+/// 2. 分组之间保持名称自然排序；主机之间按名称自然排序；
+/// 3. 分组的直接子节点严格紧随父分组之后（深度优先遍历 DFS），保持层级结构清晰。
+fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
+    let mut result = Vec::with_capacity(tree.len());
+
+    fn collect_children(parent_id: &str, tree: &[RawTreeNode], result: &mut Vec<RawTreeNode>) {
+        let mut children: Vec<&RawTreeNode> = tree.iter().filter(|n| n.parent_id == parent_id).collect();
+        // 关键逻辑：is_group == true 优先排在前面；若同为分组或同为主机，则按名称自然排序
+        children.sort_by(|a, b| {
+            b.is_group
+                .cmp(&a.is_group)
+                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+        });
+
+        for child in children {
+            result.push(child.clone());
+            if child.is_group {
+                collect_children(&child.id, tree, result);
+            }
+        }
+    }
+
+    collect_children("", tree, &mut result);
+
+    // 容错：如果有孤立节点（其 parent_id 不在树中），追加至末尾
+    for node in tree {
+        if !result.iter().any(|r| r.id == node.id) {
+            result.push(node.clone());
+        }
+    }
+
+    result
+}
+
+/// 获取系统初始化主控树结构数据 (来自 smagical-debug minimal 预设，默认文件夹在上方)
 fn get_initial_master_tree() -> Vec<RawTreeNode> {
     let (tree, _) = get_preset_by_id("minimal");
-    tree.into_iter().map(RawTreeNode::from).collect()
+    let raw_tree: Vec<RawTreeNode> = tree.into_iter().map(RawTreeNode::from).collect();
+    sort_tree_hierarchy(&raw_tree)
 }
 
 /// 构建新建分组弹窗中的上级分组树形选项数据模型 (Group Options Data)。
@@ -204,6 +423,7 @@ fn build_group_options(tree: &[RawTreeNode], expanded: &HashSet<String>) -> Vec<
 /// 构建主界面当前可见的树形视图节点 (Visible Tree Nodes)。
 ///
 /// 遵循级联折叠逻辑：当某个父级分组折叠时，其下所有子节点（无论深度）均被隐藏。
+/// 保持节点数组中的真实顺序（支持用户自由拖拽调序）。
 ///
 /// # 参数
 /// * `tree` - 完整的全量节点树
@@ -558,6 +778,153 @@ pub fn run() -> anyhow::Result<()> {
             let gname = tree.iter().find(|n| n.id == id_str).map(|n| n.name.as_str()).unwrap_or(id_str.as_str());
             tracing::debug!(target: "smagical_ui::tree", "{}分组: {}", if is_expanding { "展开" } else { "折叠" }, gname);
             sync_ui_debug_logs(&w);
+        }
+    });
+
+    // 绑定拖拽调序与移动节点回调 (支持主机/分组跨层级移动、同级调序、防环路与联动刷新)
+    let window_weak = window.as_weak();
+    let master_tree_move = Rc::clone(&master_tree);
+    let expanded_move = Rc::clone(&expanded_groups);
+    let selector_expanded_move = Rc::clone(&selector_expanded_groups);
+    let search_query_move = Rc::clone(&search_query);
+    window.on_move_tree_node(move |src_id, target_id, drop_position| {
+        if let Some(w) = window_weak.upgrade() {
+            let src_str = src_id.to_string();
+            let target_str = target_id.to_string();
+            let pos_str = drop_position.to_string();
+            let mut tree = master_tree_move.borrow_mut();
+
+            match move_and_reorder_raw_node(&mut tree, &src_str, &target_str, &pos_str) {
+                Ok((src_name, target_name)) => {
+                    // 如果移动到了具体分组内部，自动将该目标分组及其祖先加入展开集合
+                    let mut exp = expanded_move.borrow_mut();
+                    if pos_str == "inside" && !target_str.is_empty() {
+                        let mut curr = target_str.clone();
+                        while !curr.is_empty() {
+                            exp.insert(curr.clone());
+                            if let Some(p) = tree.iter().find(|n| n.id == curr) {
+                                curr = p.parent_id.clone();
+                            } else {
+                                break;
+                            }
+                        }
+                    }
+
+                    // 刷新树形视图与选择器选项
+                    let q = search_query_move.borrow().clone();
+                    let next_nodes = if q.is_empty() {
+                        build_visible_tree_nodes(&tree, &exp)
+                    } else {
+                        build_search_tree_nodes(&tree, &q)
+                    };
+                    w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
+                    w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+
+                    let next_options = build_group_options(&tree, &selector_expanded_move.borrow());
+                    w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_options))));
+
+                    // 如果被移动的是主机节点，同步更新卡片模式列表中的所属分组显示
+                    let current_cards: Vec<HostItemData> = w.get_hosts().iter().collect();
+                    let updated_cards: Vec<HostItemData> = current_cards
+                        .into_iter()
+                        .map(|mut card| {
+                            if card.id == src_str.as_str() {
+                                if let Some(n) = tree.iter().find(|item| item.id == src_str) {
+                                    if !n.parent_id.is_empty() {
+                                        if let Some(p) = tree.iter().find(|item| item.id == n.parent_id) {
+                                            card.group = p.name.clone().into();
+                                        }
+                                    } else {
+                                        card.group = "未分组".into();
+                                    }
+                                }
+                            }
+                            card
+                        })
+                        .collect();
+                    w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(updated_cards))));
+
+                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动节点 [{}] (模式: {}, 目标: [{}])", src_name, pos_str, target_name);
+                    sync_ui_debug_logs(&w);
+                }
+                Err(err_msg) => {
+                    tracing::warn!(target: "smagical_ui::hosts", "调序/移动节点失败: {}", err_msg);
+                    sync_ui_debug_logs(&w);
+                }
+            }
+        }
+    });
+
+    // 绑定实时拖拽悬停落点计算回调 (单一底线基准：文件夹下线入分组，主机下线排后面)
+    let window_weak = window.as_weak();
+    let master_tree_hover = Rc::clone(&master_tree);
+    window.on_request_drag_hover(move |src_id, target_idx, _offset_in_row| {
+        if let Some(w) = window_weak.upgrade() {
+            let src_str = src_id.to_string();
+            let visible_nodes = w.get_tree_nodes();
+            let total_len = visible_nodes.row_count();
+
+            if target_idx < 0 {
+                w.set_drop_target_index(-1);
+                w.set_drop_target_id("root".into());
+                w.set_drop_target_name("顶级根目录 (未分组)".into());
+                w.set_drop_position("root".into());
+                w.set_drop_target_valid(true);
+            } else if (target_idx as usize) < total_len {
+                if let Some(target) = visible_nodes.row_data(target_idx as usize) {
+                    let is_target_group = target.is_group;
+                    let target_id = target.id.to_string();
+                    let target_name = target.name.to_string();
+
+                    // 核心规则：
+                    // 1. 拖到文件夹（或文件夹下线） -> 移入该文件夹内部 ("inside")
+                    // 2. 拖到文件夹下的主机（或主机下线） -> 排在该主机的下面 ("after")
+                    let position = if is_target_group {
+                        "inside"
+                    } else {
+                        "after"
+                    };
+
+                    // 循环引用与自身校验 (读取 master_tree)
+                    let tree = master_tree_hover.borrow();
+                    let mut is_valid = true;
+                    if target_id == src_str {
+                        is_valid = false;
+                    } else {
+                        let is_src_group = tree.iter().find(|n| n.id == src_str).map(|n| n.is_group).unwrap_or(false);
+                        if is_src_group {
+                            let mut curr = if position == "inside" {
+                                target_id.clone()
+                            } else {
+                                target.parent_id.to_string()
+                            };
+                            while !curr.is_empty() {
+                                if curr == src_str {
+                                    is_valid = false;
+                                    break;
+                                }
+                                if let Some(pn) = tree.iter().find(|n| n.id == curr) {
+                                    curr = pn.parent_id.clone();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    w.set_drop_target_index(target_idx);
+                    w.set_drop_target_id(target_id.into());
+                    w.set_drop_target_name(target_name.into());
+                    w.set_drop_position(position.into());
+                    w.set_drop_target_valid(is_valid);
+                }
+            } else {
+                w.set_drop_target_index(-1);
+                w.set_drop_target_id("".into());
+                w.set_drop_target_name("".into());
+                w.set_drop_position("".into());
+                w.set_drop_target_valid(false);
+            }
         }
     });
 
@@ -1215,4 +1582,154 @@ pub fn run() -> anyhow::Result<()> {
 
     window.run()?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_tree() -> Vec<RawTreeNode> {
+        vec![
+            RawTreeNode {
+                id: "grp-a".into(),
+                name: "分组A".into(),
+                is_group: true,
+                parent_id: "".into(),
+                level: 0,
+                address: "".into(),
+                port: 0,
+                status: "online".into(),
+                ping_ms: 0,
+                item_count: 2,
+            },
+            RawTreeNode {
+                id: "grp-a-sub".into(),
+                name: "子分组A1".into(),
+                is_group: true,
+                parent_id: "grp-a".into(),
+                level: 1,
+                address: "".into(),
+                port: 0,
+                status: "online".into(),
+                ping_ms: 0,
+                item_count: 1,
+            },
+            RawTreeNode {
+                id: "host-1".into(),
+                name: "host-01".into(),
+                is_group: false,
+                parent_id: "grp-a-sub".into(),
+                level: 2,
+                address: "10.0.0.1".into(),
+                port: 22,
+                status: "online".into(),
+                ping_ms: 10,
+                item_count: 0,
+            },
+            RawTreeNode {
+                id: "grp-b".into(),
+                name: "分组B".into(),
+                is_group: true,
+                parent_id: "".into(),
+                level: 0,
+                address: "".into(),
+                port: 0,
+                status: "online".into(),
+                ping_ms: 0,
+                item_count: 0,
+            },
+            RawTreeNode {
+                id: "host-root".into(),
+                name: "host-root-node".into(),
+                is_group: false,
+                parent_id: "".into(),
+                level: 0,
+                address: "10.0.0.99".into(),
+                port: 22,
+                status: "online".into(),
+                ping_ms: 5,
+                item_count: 0,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_move_host_inside_group() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "host-1", "grp-b", "inside");
+        assert!(res.is_ok());
+        let (src_name, target_name) = res.unwrap();
+        assert_eq!(src_name, "host-01");
+        assert_eq!(target_name, "分组B");
+
+        let host = tree.iter().find(|n| n.id == "host-1").unwrap();
+        assert_eq!(host.parent_id, "grp-b");
+        assert_eq!(host.level, 1);
+    }
+
+    #[test]
+    fn test_reorder_before() {
+        let mut tree = create_test_tree();
+        // 将 grp-b 拖到 grp-a 前面 (Before 调序)
+        let res = move_and_reorder_raw_node(&mut tree, "grp-b", "grp-a", "before");
+        assert!(res.is_ok());
+
+        assert_eq!(tree[0].id, "grp-b");
+        assert_eq!(tree[1].id, "grp-a");
+    }
+
+    #[test]
+    fn test_reorder_after() {
+        let mut tree = create_test_tree();
+        // 将 host-root 拖到 grp-a 后面 (After 调序)
+        let res = move_and_reorder_raw_node(&mut tree, "host-root", "grp-a", "after");
+        assert!(res.is_ok());
+
+        // grp-a 包含其子树 (grp-a, grp-a-sub, host-1)，host-root 应位于子树后面
+        let host_pos = tree.iter().position(|n| n.id == "host-root").unwrap();
+        let host1_pos = tree.iter().position(|n| n.id == "host-1").unwrap();
+        assert!(host_pos > host1_pos);
+    }
+
+    #[test]
+    fn test_move_host_to_root() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "host-1", "root", "root");
+        assert!(res.is_ok());
+
+        let host = tree.iter().find(|n| n.id == "host-1").unwrap();
+        assert_eq!(host.parent_id, "");
+        assert_eq!(host.level, 0);
+    }
+
+    #[test]
+    fn test_move_group_with_children() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "grp-a-sub", "grp-b", "inside");
+        assert!(res.is_ok());
+
+        let sub = tree.iter().find(|n| n.id == "grp-a-sub").unwrap();
+        assert_eq!(sub.parent_id, "grp-b");
+        assert_eq!(sub.level, 1);
+
+        let host = tree.iter().find(|n| n.id == "host-1").unwrap();
+        assert_eq!(host.parent_id, "grp-a-sub");
+        assert_eq!(host.level, 2);
+    }
+
+    #[test]
+    fn test_prevent_cycle_moving_parent_to_child() {
+        let mut tree = create_test_tree();
+        // grp-a 是 grp-a-sub 的父级，不能将 grp-a 移入 grp-a-sub
+        let res = move_and_reorder_raw_node(&mut tree, "grp-a", "grp-a-sub", "inside");
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("循环引用"));
+    }
+
+    #[test]
+    fn test_cannot_move_inside_self() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "grp-a", "grp-a", "inside");
+        assert!(res.is_err());
+    }
 }
