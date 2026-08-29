@@ -315,8 +315,8 @@ export component HostsDrawer inherits DrawerContainer {
             }
         }
 
-        // 2.5 拖拽时的顶级根目录放置区 (位于工作区顶部独立区域，清晰不遮挡任何节点)
-        if root.is-dragging: Rectangle {
+        // 2.5 拖拽时的顶级根目录放置区 (仅在树形模式呈现，列表模式无物理分组概念无需显示)
+        if root.is-dragging && root.view-mode == "tree": Rectangle {
             height: 28px;
             border-radius: 4px;
             background: (root.drop-target-id == "root" || root.drop-target-id == "") ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
@@ -592,24 +592,76 @@ export component HostsDrawer inherits DrawerContainer {
                     spacing: 6px;
                     alignment: start;
 
-                    for host in root.hosts: Rectangle {
+                    for host[idx] in root.hosts: Rectangle {
                         height: 50px;
                         width: 100%;
                         border-radius: 4px;
+                        opacity: (root.is-dragging && host.id == root.drag-source-id) ? 0.35 : 1.0;
                         background: host.id == root.selected-host-id ? AppTheme.control-background : card-item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background;
                         border-width: 1px;
                         border-color: host.id == root.selected-host-id ? AppTheme.border : card-item-touch.has-hover ? AppTheme.border : AppTheme.border.transparentize(50%);
 
-                        animate background { duration: 120ms; }
-                        animate border-color { duration: 120ms; }
+                        animate background { duration: root.is-dragging ? 0ms : 120ms; }
+                        animate border-color { duration: root.is-dragging ? 0ms : 120ms; }
+                        animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
 
                         card-item-touch := TouchArea {
-                            clicked => {
-                                root.selected-host-id = host.id;
-                                root.host-selected(host.id);
+                            pointer-event(event) => {
+                                if event.kind == PointerEventKind.down {
+                                    root.drag-source-id = host.id;
+                                    root.drag-source-name = host.name;
+                                    root.drag-source-is-group = false;
+                                    root.is-dragging = false;
+                                    root.drop-target-index = -1;
+                                }
+                                if event.kind == PointerEventKind.up {
+                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" && root.drop-target-id != root.drag-source-id {
+                                        root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                    }
+                                    root.is-dragging = false;
+                                    root.drag-source-id = "";
+                                    root.drop-target-id = "";
+                                    root.drop-target-name = "";
+                                    root.drop-target-index = -1;
+                                    root.drop-position = "inside";
+                                }
+                                if event.kind == PointerEventKind.cancel {
+                                    root.is-dragging = false;
+                                    root.drag-source-id = "";
+                                    root.drop-target-id = "";
+                                    root.drop-target-name = "";
+                                    root.drop-target-index = -1;
+                                    root.drop-position = "inside";
+                                }
                             }
-                            double-clicked => { root.host-double-clicked(host.id); }
-                            mouse-cursor: pointer;
+                            moved => {
+                                if self.pressed {
+                                    if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
+                                        root.is-dragging = true;
+                                        root.drag-source-id = host.id;
+                                        root.drag-source-name = host.name;
+                                        root.drag-source-is-group = false;
+                                        root.drag-x = self.mouse-x;
+                                        let total_y = idx * 56px + self.mouse-y;
+                                        root.drag-y = total_y;
+
+                                        let target_idx = Math.max(0, Math.min(root.hosts.length - 1, Math.floor((total_y + 24px) / 56px)));
+                                        root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                                    }
+                                }
+                            }
+                            clicked => {
+                                if !root.is-dragging {
+                                    root.selected-host-id = host.id;
+                                    root.host-selected(host.id);
+                                }
+                            }
+                            double-clicked => {
+                                if !root.is-dragging {
+                                    root.host-double-clicked(host.id);
+                                }
+                            }
+                            mouse-cursor: root.is-dragging ? copy : pointer;
                         }
 
                         VerticalLayout {
@@ -703,6 +755,27 @@ export component HostsDrawer inherits DrawerContainer {
                                         vertical-alignment: center;
                                     }
                                 }
+                            }
+                        }
+
+                        // 核心：唯一下线指示条 (Bottom Insertion Line: 拖拽到该卡片下方放置)
+                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid: Rectangle {
+                            x: 0px;
+                            y: parent.height - 2px;
+                            width: parent.width;
+                            height: 2.5px;
+                            background: AppTheme.accent;
+                            border-radius: 1px;
+                            z: 20;
+
+                            // 左端高亮吸附小圆点
+                            Rectangle {
+                                x: 0px;
+                                y: -2px;
+                                width: 6.5px;
+                                height: 6.5px;
+                                border-radius: 3.25px;
+                                background: AppTheme.accent;
                             }
                         }
                     }

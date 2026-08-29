@@ -1,0 +1,384 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { SearchInput } from "search-input.slint";
+import { HostItemData } from "../views/left_drawers/hosts_drawer.slint";
+
+export struct LocalShellItemData {
+    id: string,
+    title: string,
+    subtitle: string,
+    tag: string,
+}
+
+/// 快速新建终端会话中心弹窗 (New Session Modal)
+///
+/// 居中卡片式列表设计，纯净无彩度主题原生色，支持本地环境与远程主机搜索过滤
+export component NewSessionModal inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[LocalShellItemData]> local-items: [];
+    in property <[HostItemData]> host-items: [];
+
+    callback close();
+    callback item-selected(string /* id */);
+    callback search-changed(string /* query */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088; // 半透明暗色背景
+        z: 90;
+
+        // 点击遮罩外部空白区域关闭
+        TouchArea {
+            clicked => { root.close(); }
+        }
+
+        // 居中面板卡片
+        Rectangle {
+            width: 540px;
+            height: 480px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: 8px;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+
+            // 拦截卡片内部点击，避免误触发遮罩关闭
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+
+                // 1. 顶部标题栏与标准 SVG 关闭按钮
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: center;
+
+                        Image {
+                            source: @image-url("../assets/icons/terminal.svg");
+                            width: 14px;
+                            height: 14px;
+                            colorize: AppTheme.foreground;
+                        }
+
+                        Text {
+                            text: @tr("新建终端会话");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 12px;
+                            height: 12px;
+                            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        close-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+
+                // 2. 搜索过滤输入框 (支持过滤本地终端与远程主机)
+                SearchInput {
+                    placeholder: @tr("搜索本地终端或远程主机 (支持名称 / IP / 分组)...");
+                    changed(text) => { root.search-changed(text); }
+                }
+
+                // 3. 可滚动卡片列表区域
+                Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: list-content.preferred-height;
+
+                    list-content := VerticalLayout {
+                        spacing: 8px;
+                        padding-right: 4px;
+
+                        // === Section 1: 本地终端环境 ===
+                        if root.local-items.length > 0: VerticalLayout {
+                            spacing: 6px;
+
+                            Text {
+                                text: @tr("💻 本地终端环境 (Local Shells)");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                            }
+
+                            for item in root.local-items: Rectangle {
+                                height: 42px;
+                                border-radius: 6px;
+                                background: item-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+                                border-width: 1px;
+                                border-color: item-touch.has-hover ? AppTheme.border : transparent;
+                                clip: true;
+
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding: 0px;
+                                    spacing: 0px;
+
+                                    // 1. 图标靠左，占据整行高度 (精致小巧，绝对垂直居中)
+                                    Rectangle {
+                                        width: 44px;
+                                        height: 100%;
+                                        background: item-touch.has-hover ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
+
+                                        Image {
+                                            source: @image-url("../assets/icons/terminal.svg");
+                                            width: 15px;
+                                            height: 15px;
+                                            colorize: item-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                    }
+
+                                    // 2. 右侧信息展示区域 (横向从左到右，严格靠左对齐，垂直居中)
+                                    HorizontalLayout {
+                                        horizontal-stretch: 1;
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 8px;
+
+                                        // 中间文字描述 (严格靠左，垂直居中)
+                                        VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 1;
+                                            spacing: 2px;
+
+                                            Text {
+                                                text: item.title;
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                                color: AppTheme.foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+
+                                            Text {
+                                                text: item.subtitle;
+                                                font-size: 10px;
+                                                color: AppTheme.secondary-foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+                                        }
+
+                                        // 右侧环境标签 (垂直居中)
+                                        VerticalLayout {
+                                            alignment: center;
+
+                                            Rectangle {
+                                                height: 20px;
+                                                border-radius: 3px;
+                                                background: AppTheme.control-background;
+
+                                                HorizontalLayout {
+                                                    padding-left: 6px;
+                                                    padding-right: 6px;
+                                                    alignment: center;
+
+                                                    Text {
+                                                        text: item.tag;
+                                                        font-size: 10px;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                item-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.item-selected(item.id);
+                                    }
+                                }
+                            }
+                        }
+
+                        // === 本地与主机的中间分割线 ===
+                        if root.local-items.length > 0 && root.host-items.length > 0: VerticalLayout {
+                            padding-top: 4px;
+                            padding-bottom: 4px;
+                            Rectangle {
+                                height: 1px;
+                                background: AppTheme.border.transparentize(30%);
+                            }
+                        }
+
+                        // === Section 2: 远程主机资产 ===
+                        if root.host-items.length > 0: VerticalLayout {
+                            spacing: 6px;
+
+                            Text {
+                                text: @tr("🌐 远程主机资产 (Remote SSH Hosts)");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                            }
+
+                            for host in root.host-items: Rectangle {
+                                height: 42px;
+                                border-radius: 6px;
+                                background: host-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+                                border-width: 1px;
+                                border-color: host-touch.has-hover ? AppTheme.border : transparent;
+                                clip: true;
+
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding: 0px;
+                                    spacing: 0px;
+
+                                    // 1. 图标靠左，占据整行高度 (精致小巧，绝对垂直居中)
+                                    Rectangle {
+                                        width: 44px;
+                                        height: 100%;
+                                        background: host-touch.has-hover ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
+
+                                        Image {
+                                            source: @image-url("../assets/icons/server.svg");
+                                            width: 15px;
+                                            height: 15px;
+                                            colorize: host-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                    }
+
+                                    // 2. 右侧信息展示区域 (横向从左到右，严格靠左对齐，垂直居中)
+                                    HorizontalLayout {
+                                        horizontal-stretch: 1;
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 8px;
+
+                                        // 中间文字描述 (严格靠左，垂直居中)
+                                        VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 1;
+                                            spacing: 2px;
+
+                                            Text {
+                                                text: host.name;
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                                color: AppTheme.foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+
+                                            Text {
+                                                text: host.address + (host.port > 0 ? (":" + host.port) : "");
+                                                font-size: 10px;
+                                                color: AppTheme.secondary-foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+                                        }
+
+                                        // 右侧所属分组标签 (垂直居中)
+                                        if host.group != "": VerticalLayout {
+                                            alignment: center;
+
+                                            Rectangle {
+                                                height: 20px;
+                                                border-radius: 3px;
+                                                background: AppTheme.control-background;
+
+                                                HorizontalLayout {
+                                                    padding-left: 6px;
+                                                    padding-right: 6px;
+                                                    alignment: center;
+
+                                                    Text {
+                                                        text: host.group;
+                                                        font-size: 10px;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                host-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.item-selected(host.id);
+                                    }
+                                }
+                            }
+                        }
+
+                        // 无搜索结果提示
+                        if root.local-items.length == 0 && root.host-items.length == 0: VerticalLayout {
+                            alignment: center;
+                            height: 120px;
+                            spacing: 8px;
+
+                            Text {
+                                text: @tr("未找到匹配的本地终端或远程主机");
+                                font-size: 12px;
+                                color: AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 4. 底部快捷操作提示
+                Rectangle {
+                    height: 20px;
+                    Text {
+                        text: @tr("💡 提示：点击任意条目即可快速创建并激活新终端会话");
+                        font-size: 10px;
+                        color: AppTheme.disabled-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+        }
+    }
+}

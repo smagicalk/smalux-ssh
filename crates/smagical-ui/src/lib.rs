@@ -4,6 +4,9 @@
 
 #![deny(missing_docs)]
 
+/// 本地终端环境探测模块。
+pub mod local_shells;
+
 /// Slint 主题资源注册、内置预设和运行时应用接口。
 pub mod theme;
 
@@ -24,8 +27,8 @@ mod generated {
 }
 
 pub use generated::{
-    AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData, HostTreeNode, LogEntryData,
-    TabData,
+    AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData, HostTreeNode,
+    LocalShellItemData, LogEntryData, TabData,
 };
 
 /// 原始树形节点数据结构 (Raw Tree Node)
@@ -578,6 +581,59 @@ fn sync_ui_debug_logs(w: &AppWindow) {
     }
 }
 
+/// 活跃终端会话运行时信息
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+struct TerminalSessionInfo {
+    session_id: String,
+    host_id: String,
+    host_name: String,
+    host_address: String,
+    host_status: String,
+    ping_ms: i32,
+    display_title: String,
+}
+
+/// 同步活跃终端会话列表与视口状态到 Slint UI
+fn sync_active_session_ui(
+    w: &AppWindow,
+    sessions: &[TerminalSessionInfo],
+    active_session_id: &str,
+) {
+    if sessions.is_empty() {
+        w.set_tabs(slint::ModelRc::default());
+        w.set_active_session_tab("".into());
+        w.set_has_active_session(false);
+        w.set_active_session_name("".into());
+        w.set_active_host_address("".into());
+        w.set_active_host_ping_ms(0);
+        w.set_active_host_status("offline".into());
+    } else {
+        let active_sess = sessions
+            .iter()
+            .find(|s| s.session_id == active_session_id)
+            .or_else(|| sessions.last())
+            .unwrap();
+
+        let tab_data: Vec<TabData> = sessions
+            .iter()
+            .map(|s| TabData {
+                id: s.session_id.clone().into(),
+                title: s.display_title.clone().into(),
+                status: s.host_status.clone().into(),
+            })
+            .collect();
+
+        w.set_tabs(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(tab_data))));
+        w.set_active_session_tab(active_sess.session_id.clone().into());
+        w.set_has_active_session(true);
+        w.set_active_session_name(active_sess.display_title.clone().into());
+        w.set_active_host_address(active_sess.host_address.clone().into());
+        w.set_active_host_ping_ms(active_sess.ping_ms);
+        w.set_active_host_status(active_sess.host_status.clone().into());
+    }
+}
+
 /// 创建并运行桌面应用主窗口。
 pub fn run() -> anyhow::Result<()> {
     let mut core = CoreState::new();
@@ -589,6 +645,15 @@ pub fn run() -> anyhow::Result<()> {
     // 默认应用 Darcula 主题
     apply_theme_by_id(&window, &themes, "builtin.ui.darcula")?;
     window.set_current_theme_name("Darcula".into());
+
+    // 活跃会话管理状态 (初始清空全部 Tab)
+    let active_sessions: Rc<RefCell<Vec<TerminalSessionInfo>>> = Rc::new(RefCell::new(Vec::new()));
+    let next_session_num: Rc<RefCell<usize>> = Rc::new(RefCell::new(1));
+    sync_active_session_ui(&window, &active_sessions.borrow(), "");
+
+    // 初始化探测当前操作系统可用本地 Shell 列表
+    let initial_shells = local_shells::detect_local_shells();
+    window.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_shells))));
 
     tracing::info!(target: "smagical_ui", "Smalux-SSH 桌面应用工作台就绪");
     sync_ui_debug_logs(&window);
@@ -652,41 +717,42 @@ pub fn run() -> anyhow::Result<()> {
 
     // 绑定关闭 Tab 回调 (实时从列表中移除该会话，并智能切换至邻近 Tab)
     let window_weak = window.as_weak();
-    window.on_close_tab(move |id| {
+    let active_sessions_close = Rc::clone(&active_sessions);
+    window.on_close_tab(move |sess_id| {
         if let Some(w) = window_weak.upgrade() {
-            let tabs = w.get_tabs();
-            let mut new_tabs: Vec<TabData> = Vec::new();
-            let id_str = id.as_str();
-            let active_id = w.get_active_session_tab();
-            let mut next_active = active_id.clone();
-            let count = tabs.row_count();
+            let id_str = sess_id.to_string();
+            let mut sessions = active_sessions_close.borrow_mut();
+            let cur_active = w.get_active_session_tab().to_string();
 
-            for idx in 0..count {
-                if let Some(tab) = tabs.row_data(idx) {
-                    if tab.id != id_str {
-                        new_tabs.push(tab);
-                    } else if tab.id == active_id {
-                        // 如果关闭的是当前激活的 Tab，则智能切到前一个或后一个
-                        if idx > 0 {
-                            if let Some(prev) = tabs.row_data(idx - 1) {
-                                next_active = prev.id;
-                            }
-                        } else if idx + 1 < count {
-                            if let Some(next) = tabs.row_data(idx + 1) {
-                                next_active = next.id;
-                            }
-                        }
+            let mut next_active = cur_active.clone();
+            if let Some(idx) = sessions.iter().position(|s| s.session_id == id_str) {
+                if cur_active == id_str {
+                    if idx > 0 {
+                        next_active = sessions[idx - 1].session_id.clone();
+                    } else if idx + 1 < sessions.len() {
+                        next_active = sessions[idx + 1].session_id.clone();
+                    } else {
+                        next_active = "".to_string();
                     }
                 }
+                sessions.remove(idx);
             }
 
-            if new_tabs.is_empty() {
-                w.set_has_active_session(false);
-            } else {
-                w.set_active_session_tab(next_active);
-                let model = std::rc::Rc::new(slint::VecModel::from(new_tabs));
-                w.set_tabs(slint::ModelRc::from(model));
-            }
+            sync_active_session_ui(&w, &sessions, &next_active);
+            tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+    // 绑定切换 Tab 回调 (点击 Tab 时激活对应的会话)
+    let window_weak = window.as_weak();
+    let active_sessions_select = Rc::clone(&active_sessions);
+    window.on_select_tab(move |sess_id| {
+        if let Some(w) = window_weak.upgrade() {
+            let id_str = sess_id.to_string();
+            let sessions = active_sessions_select.borrow();
+            sync_active_session_ui(&w, &sessions, &id_str);
+            tracing::debug!(target: "smagical_ui::session", "切换至终端会话: {}", id_str);
         }
     });
 
@@ -729,6 +795,7 @@ pub fn run() -> anyhow::Result<()> {
             ping_ms: h.ping_ms,
         })
         .collect();
+    let master_cards = Rc::new(RefCell::new(initial_cards.clone()));
     window.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(initial_cards))));
 
     // 绑定上级分组选择器折叠 / 展开回调 (支持弹窗内自由收缩/展开子节点)
@@ -781,9 +848,10 @@ pub fn run() -> anyhow::Result<()> {
         }
     });
 
-    // 绑定拖拽调序与移动节点回调 (支持主机/分组跨层级移动、同级调序、防环路与联动刷新)
+    // 绑定拖拽调序与移动节点回调 (支持树形层级迁移与列表纯展示调序双独立机制)
     let window_weak = window.as_weak();
     let master_tree_move = Rc::clone(&master_tree);
+    let master_cards_move = Rc::clone(&master_cards);
     let expanded_move = Rc::clone(&expanded_groups);
     let selector_expanded_move = Rc::clone(&selector_expanded_groups);
     let search_query_move = Rc::clone(&search_query);
@@ -792,6 +860,47 @@ pub fn run() -> anyhow::Result<()> {
             let src_str = src_id.to_string();
             let target_str = target_id.to_string();
             let pos_str = drop_position.to_string();
+            let view_mode = w.get_hosts_view_mode().to_string();
+
+            // 1. 卡片平铺列表模式 (Card View Mode): 纯视觉显示排序调整，绝对锁定所属分组 (parent_id/group) 不变
+            if view_mode == "card" {
+                let mut cards = master_cards_move.borrow_mut();
+                if let (Some(src_idx), Some(tgt_idx)) = (
+                    cards.iter().position(|c| c.id == src_str.as_str()),
+                    cards.iter().position(|c| c.id == target_str.as_str()),
+                ) {
+                    if src_idx != tgt_idx {
+                        let item = cards.remove(src_idx);
+                        let target_insert_idx = if src_idx < tgt_idx {
+                            tgt_idx // 移出后前面少了一个元素，原 tgt 后面位置变为 tgt_idx
+                        } else {
+                            tgt_idx + 1
+                        };
+                        let final_pos = target_insert_idx.min(cards.len());
+                        let item_name = item.name.to_string();
+                        let tgt_name = cards.get(tgt_idx.min(cards.len().saturating_sub(1))).map(|c| c.name.to_string()).unwrap_or_default();
+                        cards.insert(final_pos, item);
+
+                        let q = search_query_move.borrow().clone();
+                        let display_cards: Vec<HostItemData> = if q.is_empty() {
+                            cards.clone()
+                        } else {
+                            cards.iter().filter(|h| {
+                                h.name.to_lowercase().contains(&q)
+                                    || h.address.to_lowercase().contains(&q)
+                                    || h.group.to_lowercase().contains(&q)
+                            }).cloned().collect()
+                        };
+                        w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
+
+                        tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定)", item_name, tgt_name);
+                        sync_ui_debug_logs(&w);
+                    }
+                }
+                return;
+            }
+
+            // 2. 树形层级模式 (Tree View Mode): 物理资产层级结构与文件夹迁移
             let mut tree = master_tree_move.borrow_mut();
 
             match move_and_reorder_raw_node(&mut tree, &src_str, &target_str, &pos_str) {
@@ -823,46 +932,53 @@ pub fn run() -> anyhow::Result<()> {
                     let next_options = build_group_options(&tree, &selector_expanded_move.borrow());
                     w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_options))));
 
-                    // 如果被移动的是主机节点，同步更新卡片模式列表中的所属分组显示
-                    let current_cards: Vec<HostItemData> = w.get_hosts().iter().collect();
-                    let updated_cards: Vec<HostItemData> = current_cards
-                        .into_iter()
-                        .map(|mut card| {
-                            if card.id == src_str.as_str() {
-                                if let Some(n) = tree.iter().find(|item| item.id == src_str) {
-                                    if !n.parent_id.is_empty() {
-                                        if let Some(p) = tree.iter().find(|item| item.id == n.parent_id) {
-                                            card.group = p.name.clone().into();
-                                        }
-                                    } else {
-                                        card.group = "未分组".into();
-                                    }
-                                }
-                            }
-                            card
-                        })
-                        .collect();
-                    w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(updated_cards))));
+                    // 树形模式下移动了主机：同步更新列表模式中的所属分组徽章，同时保留用户在列表模式下的自定义相对排序
+                    let new_group_name = if let Some(n) = tree.iter().find(|item| item.id == src_str) {
+                        if !n.parent_id.is_empty() {
+                            tree.iter().find(|item| item.id == n.parent_id).map(|item| item.name.clone()).unwrap_or_else(|| "未分组".to_string())
+                        } else {
+                            "未分组".to_string()
+                        }
+                    } else {
+                        "未分组".to_string()
+                    };
 
-                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动节点 [{}] (模式: {}, 目标: [{}])", src_name, pos_str, target_name);
+                    let mut cards = master_cards_move.borrow_mut();
+                    for card in cards.iter_mut() {
+                        if card.id == src_str.as_str() {
+                            card.group = new_group_name.clone().into();
+                        }
+                    }
+
+                    let display_cards: Vec<HostItemData> = if q.is_empty() {
+                        cards.clone()
+                    } else {
+                        cards.iter().filter(|h| {
+                            h.name.to_lowercase().contains(&q)
+                                || h.address.to_lowercase().contains(&q)
+                                || h.group.to_lowercase().contains(&q)
+                        }).cloned().collect()
+                    };
+                    w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
+
+                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}])", src_name, pos_str, target_name);
                     sync_ui_debug_logs(&w);
                 }
                 Err(err_msg) => {
-                    tracing::warn!(target: "smagical_ui::hosts", "调序/移动节点失败: {}", err_msg);
+                    tracing::warn!(target: "smagical_ui::hosts", "调序/移动树节点失败: {}", err_msg);
                     sync_ui_debug_logs(&w);
                 }
             }
         }
     });
 
-    // 绑定实时拖拽悬停落点计算回调 (单一底线基准：文件夹下线入分组，主机下线排后面)
+    // 绑定实时拖拽悬停落点计算回调 (支持树形层级与卡片平铺双模式)
     let window_weak = window.as_weak();
     let master_tree_hover = Rc::clone(&master_tree);
     window.on_request_drag_hover(move |src_id, target_idx, _offset_in_row| {
         if let Some(w) = window_weak.upgrade() {
             let src_str = src_id.to_string();
-            let visible_nodes = w.get_tree_nodes();
-            let total_len = visible_nodes.row_count();
+            let view_mode = w.get_hosts_view_mode().to_string();
 
             if target_idx < 0 {
                 w.set_drop_target_index(-1);
@@ -870,7 +986,40 @@ pub fn run() -> anyhow::Result<()> {
                 w.set_drop_target_name("顶级根目录 (未分组)".into());
                 w.set_drop_position("root".into());
                 w.set_drop_target_valid(true);
-            } else if (target_idx as usize) < total_len {
+                return;
+            }
+
+            // 1. 卡片平铺列表模式 (Card View Mode)
+            if view_mode == "card" {
+                let current_hosts = w.get_hosts();
+                let total_len = current_hosts.row_count();
+                if (target_idx as usize) < total_len {
+                    if let Some(target) = current_hosts.row_data(target_idx as usize) {
+                        let target_id = target.id.to_string();
+                        let target_name = target.name.to_string();
+                        let is_valid = target_id != src_str;
+
+                        w.set_drop_target_index(target_idx);
+                        w.set_drop_target_id(target_id.into());
+                        w.set_drop_target_name(target_name.into());
+                        w.set_drop_position("after".into());
+                        w.set_drop_target_valid(is_valid);
+                    }
+                } else {
+                    w.set_drop_target_index(-1);
+                    w.set_drop_target_id("".into());
+                    w.set_drop_target_name("".into());
+                    w.set_drop_position("".into());
+                    w.set_drop_target_valid(false);
+                }
+                return;
+            }
+
+            // 2. 树形层级模式 (Tree View Mode)
+            let visible_nodes = w.get_tree_nodes();
+            let total_len = visible_nodes.row_count();
+
+            if (target_idx as usize) < total_len {
                 if let Some(target) = visible_nodes.row_data(target_idx as usize) {
                     let is_target_group = target.is_group;
                     let target_id = target.id.to_string();
@@ -1008,9 +1157,10 @@ pub fn run() -> anyhow::Result<()> {
         }
     });
 
-    // 绑定主机实时搜索过滤回调 (双向联动树形视图与卡片列表)
+    // 绑定主机实时搜索过滤回调 (双向联动树形视图与卡片列表，保持自定义排序)
     let window_weak = window.as_weak();
     let master_tree_filter = Rc::clone(&master_tree);
+    let master_cards_filter = Rc::clone(&master_cards);
     let expanded_clone = Rc::clone(&expanded_groups);
     let search_query_filter = Rc::clone(&search_query);
     window.on_filter_hosts(move |query| {
@@ -1028,8 +1178,9 @@ pub fn run() -> anyhow::Result<()> {
             w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
-            // 2. 动态过滤卡片列表
-            let filtered_cards: Vec<HostItemData> = MASTER_HOST_CARDS
+            // 2. 动态过滤卡片列表 (基于当前 master_cards 列表及用户自定义排序)
+            let cards = master_cards_filter.borrow();
+            let filtered_cards: Vec<HostItemData> = cards
                 .iter()
                 .filter(|h| {
                     if q.is_empty() {
@@ -1040,15 +1191,7 @@ pub fn run() -> anyhow::Result<()> {
                             || h.group.to_lowercase().contains(&q)
                     }
                 })
-                .map(|h| HostItemData {
-                    id: h.id.into(),
-                    name: h.name.into(),
-                    address: h.address.into(),
-                    port: h.port,
-                    group: h.group.into(),
-                    status: h.status.into(),
-                    ping_ms: h.ping_ms,
-                })
+                .cloned()
                 .collect();
             w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(filtered_cards))));
 
@@ -1059,42 +1202,198 @@ pub fn run() -> anyhow::Result<()> {
         }
     });
 
-    // 绑定主机打开回调 (从左侧主机列表点击时打开或激活对应的 Tab)
+    // 绑定主机打开回调 (从左侧主机列表双击时打开或多开对应的终端 Tab)
     let window_weak = window.as_weak();
-    window.on_open_host(move |id| {
+    let master_tree_open = Rc::clone(&master_tree);
+    let active_sessions_open = Rc::clone(&active_sessions);
+    let next_session_num_open = Rc::clone(&next_session_num);
+    window.on_open_host(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
-            let tabs = w.get_tabs();
-            let id_str = id.to_string();
-            let mut found = false;
-            for idx in 0..tabs.row_count() {
-                if let Some(tab) = tabs.row_data(idx) {
-                    if tab.id == id_str {
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            if !found {
-                let mut list: Vec<TabData> = (0..tabs.row_count()).filter_map(|i| tabs.row_data(i)).collect();
-                let title = match id_str.as_str() {
-                    "host-prod-01" => "prod-server-01",
-                    "host-k8s-master" => "k8s-control-plane",
-                    "host-db-pg" => "db-cluster-primary",
-                    "host-redis" => "redis-cache-shard-0",
-                    _ => "new-terminal-session",
+            let h_id = host_id.to_string();
+
+            // 支持启动本地终端环境 (动态匹配探测到的环境)
+            if h_id.starts_with("local-") {
+                let mut sessions = active_sessions_open.borrow_mut();
+                let mut num = next_session_num_open.borrow_mut();
+
+                let sess_id = format!("sess-{}", *num);
+                *num += 1;
+
+                let all_shells = local_shells::detect_local_shells();
+                let (base_name, addr) = if let Some(sh) = all_shells.iter().find(|s| s.id == h_id.as_str()) {
+                    (sh.title.to_string(), format!("Local ({})", sh.subtitle))
+                } else {
+                    let fallback_name = match h_id.as_str() {
+                        "local-pwsh7" => "PowerShell 7",
+                        "local-powershell" => "PowerShell",
+                        "local-wsl" => "WSL (Linux)",
+                        "local-cmd" => "Command Prompt",
+                        "local-gitbash" => "Git Bash",
+                        "local-bash" => "Bash",
+                        "local-zsh" => "Zsh",
+                        "local-fish" => "Fish",
+                        "local-sh" => "Sh",
+                        "local-nushell" => "Nushell",
+                        _ => "Local Shell",
+                    };
+                    (fallback_name.to_string(), "Local Terminal".to_string())
                 };
-                list.push(TabData {
-                    id: id.clone(),
-                    title: title.into(),
-                    status: "online".into(),
-                });
-                w.set_has_active_session(true);
-                let model = std::rc::Rc::new(slint::VecModel::from(list));
-                w.set_tabs(slint::ModelRc::from(model));
+
+                let count = sessions.iter().filter(|s| s.host_id == h_id).count();
+                let display_title = if count == 0 {
+                    base_name.clone()
+                } else {
+                    format!("{} ({})", base_name, count + 1)
+                };
+
+                let new_sess = TerminalSessionInfo {
+                    session_id: sess_id.clone(),
+                    host_id: h_id.clone(),
+                    host_name: base_name,
+                    host_address: addr,
+                    host_status: "online".to_string(),
+                    ping_ms: 0,
+                    display_title: display_title.clone(),
+                };
+
+                sessions.push(new_sess);
+                sync_active_session_ui(&w, &sessions, &sess_id);
+
+                tracing::info!(target: "smagical_ui::session", "启动本地终端环境: {} -> Session ID: {}", display_title, sess_id);
+                sync_ui_debug_logs(&w);
+                return;
             }
-            w.set_active_session_tab(id);
-            tracing::info!(target: "smagical_ui::session", "打开主机终端会话: {}", id_str);
-            sync_ui_debug_logs(&w);
+
+            let tree = master_tree_open.borrow();
+
+            // 查找目标主机节点
+            if let Some(node) = tree.iter().find(|n| n.id == h_id && !n.is_group) {
+                let mut sessions = active_sessions_open.borrow_mut();
+                let mut num = next_session_num_open.borrow_mut();
+
+                let sess_id = format!("sess-{}", *num);
+                *num += 1;
+
+                // 计算该主机已有多少个活跃会话 (用于智能多开编号: name, name (2), name (3)...)
+                let count = sessions.iter().filter(|s| s.host_id == h_id).count();
+                let display_title = if count == 0 {
+                    node.name.clone()
+                } else {
+                    format!("{} ({})", node.name, count + 1)
+                };
+
+                let addr = if node.address.is_empty() {
+                    "127.0.0.1:22".to_string()
+                } else if node.port > 0 {
+                    format!("{}:{}", node.address, node.port)
+                } else {
+                    node.address.clone()
+                };
+
+                let new_sess = TerminalSessionInfo {
+                    session_id: sess_id.clone(),
+                    host_id: h_id.clone(),
+                    host_name: node.name.clone(),
+                    host_address: addr,
+                    host_status: node.status.clone(),
+                    ping_ms: node.ping_ms,
+                    display_title: display_title.clone(),
+                };
+
+                sessions.push(new_sess);
+                sync_active_session_ui(&w, &sessions, &sess_id);
+
+                tracing::info!(target: "smagical_ui::session", "发起远程终端连接: {} -> Session ID: {}", display_title, sess_id);
+                sync_ui_debug_logs(&w);
+            }
+        }
+    });
+
+    // 绑定新建 Tab 回调 (点击 Tab 栏 + 号时打开快速新建终端会话中心居中弹窗)
+    let window_weak = window.as_weak();
+    let master_tree_reset = Rc::clone(&master_tree);
+    window.on_new_tab(move || {
+        if let Some(w) = window_weak.upgrade() {
+            // 重置搜索框与弹窗列表 (动态探测当前系统的真实终端)
+            let detected_shells = local_shells::detect_local_shells();
+            w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(detected_shells))));
+
+            let tree = master_tree_reset.borrow();
+            let all_hosts: Vec<HostItemData> = tree
+                .iter()
+                .filter(|n| !n.is_group)
+                .map(|n| HostItemData {
+                    id: n.id.clone().into(),
+                    name: n.name.clone().into(),
+                    address: n.address.clone().into(),
+                    port: n.port,
+                    group: "".into(),
+                    status: n.status.clone().into(),
+                    ping_ms: n.ping_ms,
+                })
+                .collect();
+            w.set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_hosts))));
+
+            w.set_is_new_session_modal_open(true);
+        }
+    });
+
+    // 绑定新建终端会话弹窗实时搜索过滤回调
+    let window_weak = window.as_weak();
+    let master_tree_launcher = Rc::clone(&master_tree);
+    window.on_filter_launcher(move |query| {
+        if let Some(w) = window_weak.upgrade() {
+            let q = query.trim().to_lowercase();
+
+            let all_local_shells = local_shells::detect_local_shells();
+
+            let filtered_locals: Vec<LocalShellItemData> = if q.is_empty() {
+                all_local_shells
+            } else {
+                all_local_shells
+                    .into_iter()
+                    .filter(|s| {
+                        let t = s.title.to_lowercase();
+                        let sub = s.subtitle.to_lowercase();
+                        let id = s.id.to_lowercase();
+                        let tag = s.tag.to_lowercase();
+                        t.contains(&q) || sub.contains(&q) || id.contains(&q) || tag.contains(&q)
+                            || (q.contains("wsl") && (id.contains("wsl") || sub.contains("wsl")))
+                            || (q.contains("ps") && (id.contains("powershell") || id.contains("pwsh")))
+                            || (q.contains("bash") && (id.contains("bash") || id.contains("wsl")))
+                            || (q.contains("zsh") && id.contains("zsh"))
+                            || (q.contains("fish") && id.contains("fish"))
+                            || (q.contains("cmd") && id.contains("cmd"))
+                    })
+                    .collect()
+            };
+            w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_locals))));
+
+            let tree = master_tree_launcher.borrow();
+            let filtered_hosts: Vec<HostItemData> = tree
+                .iter()
+                .filter(|n| !n.is_group)
+                .filter(|n| {
+                    if q.is_empty() {
+                        true
+                    } else {
+                        n.name.to_lowercase().contains(&q)
+                            || n.address.to_lowercase().contains(&q)
+                            || n.parent_id.to_lowercase().contains(&q)
+                    }
+                })
+                .map(|n| HostItemData {
+                    id: n.id.clone().into(),
+                    name: n.name.clone().into(),
+                    address: n.address.clone().into(),
+                    port: n.port,
+                    group: "".into(),
+                    status: n.status.clone().into(),
+                    ping_ms: n.ping_ms,
+                })
+                .collect();
+
+            w.set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_hosts))));
         }
     });
 

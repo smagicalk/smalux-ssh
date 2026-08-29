@@ -5,6 +5,7 @@ export { TabData } from "views/center_terminal/tab_bar.slint";
 export { HostItemData, HostTreeNode } from "views/left_drawers/hosts_drawer.slint";
 export { GroupOptionData } from "components/create-group-modal.slint";
 export { LogEntryData } from "components/debug-modal.slint";
+export { LocalShellItemData } from "components/new-session-modal.slint";
 
 // 基础组件
 import {
@@ -19,6 +20,10 @@ import {
     DebugModal,
     LogEntryData,
 } from "components/debug-modal.slint";
+import {
+    NewSessionModal,
+    LocalShellItemData,
+} from "components/new-session-modal.slint";
 
 // 左侧视图
 import { LeftActivityBar } from "views/left_activity_bar.slint";
@@ -97,17 +102,13 @@ export component AppWindow inherits Window {
     in-out property <bool> is-window-maximized: false;
     in-out property <bool> is-dark-mode: true;
     in-out property <string> current-theme-name: "Darcula";
-    in-out property <string> active-session-tab: "1";
-    in-out property <bool> has-active-session: true;
-    in-out property <[TabData]> tabs: [
-        { id: "1", title: "prod-server-01", status: "online" },
-        { id: "2", title: "k8s-control-plane", status: "warning" },
-        { id: "3", title: "db-cluster-primary", status: "online" },
-        { id: "4", title: "redis-cache-shard-0", status: "online" },
-        { id: "5", title: "auth-gateway-edge", status: "online" },
-        { id: "6", title: "ai-inference-gpu", status: "online" },
-        { id: "7", title: "backup-node-dr", status: "offline" },
-    ];
+    in-out property <string> active-session-tab: "";
+    in-out property <bool> has-active-session: false;
+    in-out property <string> active-session-name: "";
+    in-out property <string> active-host-address: "";
+    in-out property <int> active-host-ping-ms: 0;
+    in-out property <string> active-host-status: "online";
+    in-out property <[TabData]> tabs: [];
     in-out property <[HostTreeNode]> tree-nodes: [
         { id: "grp-prod", name: "生产集群 (Production)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 5 },
         { id: "grp-k8s", name: "Kubernetes 集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "warning", ping-ms: 0, item-count: 2 },
@@ -133,6 +134,8 @@ export component AppWindow inherits Window {
         { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping-ms: 14 },
         { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping-ms: 0 },
     ];
+    /// 主机管理视图模式 ("tree" 树形模式 | "card" 列表卡片模式)
+    in-out property <string> hosts-view-mode: "tree";
     /// 当前树形内容最宽尺寸（动态驱动左右平滑滚动）
     in-out property <length> tree-content-width: 240px;
     in-out property <bool> is-create-group-open: false;
@@ -150,6 +153,11 @@ export component AppWindow inherits Window {
     in-out property <length> right-drawer-width: 240px;
     /// 开发者调试实时事件日志列表
     in-out property <[LogEntryData]> debug-logs: [];
+
+    /// 快速新建终端会话弹窗状态与数据
+    in-out property <bool> is-new-session-modal-open: false;
+    in-out property <[LocalShellItemData]> launcher-local-items: [];
+    in-out property <[HostItemData]> launcher-host-items: root.hosts;
 
     /// 树节点拖拽交互状态
     in-out property <bool> is-dragging: false;
@@ -172,11 +180,14 @@ export component AppWindow inherits Window {
     callback move-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
     callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
     callback filter-hosts(string /* query */);
+    callback filter-launcher(string /* query */);
     callback create-group(string /* parent_id */, string /* name */);
     callback toggle-group-option(string /* id */);
     callback open-host(string /* id */);
-    callback send-snippet(string /* cmd */);
+    callback select-tab(string /* id */);
     callback close-tab(string /* id */);
+    callback new-tab();
+    callback send-snippet(string /* cmd */);
     callback minimize-window();
     callback maximize-window();
     callback close-window();
@@ -239,11 +250,10 @@ export component AppWindow inherits Window {
                 is-maximized: root.is-window-maximized;
                 is-dark-mode: root.is-dark-mode;
                 active-tab-id: root.active-session-tab;
-                select-tab(id) => { root.active-session-tab = id; }
-                new-tab => {
-                    root.active-left-tab = "hosts";
-                    root.is-left-drawer-open = true;
-                }
+                tabs: root.tabs;
+                select-tab(id) => { root.select-tab(id); }
+                close-tab(id) => { root.close-tab(id); }
+                new-tab => { root.new-tab(); }
                 minimize-window => { root.minimize-window(); }
                 maximize-window => {
                     root.maximize-window();
@@ -283,6 +293,7 @@ export component AppWindow inherits Window {
                     if root.active-left-tab == "hosts": HostsDrawer {
                         width: 100%;
                         height: 100%;
+                        view-mode <=> root.hosts-view-mode;
                         tree-content-width: root.tree-content-width;
                         collapse => { root.is-left-drawer-open = false; }
                         tree-nodes: root.tree-nodes;
@@ -380,14 +391,12 @@ export component AppWindow inherits Window {
                     has-active-session: root.has-active-session;
                     tabs: root.tabs;
                     active-tab-id: root.active-session-tab;
-                    select-tab(id) => { root.active-session-tab = id; }
+                    select-tab(id) => { root.select-tab(id); }
                     close-tab(id) => { root.close-tab(id); }
-                    new-tab => {
-                        root.active-left-tab = "hosts";
-                        root.is-left-drawer-open = true;
-                    }
-                    session-name: root.active-session-tab == "1" ? "prod-server-01" : root.active-session-tab == "2" ? "k8s-control-plane" : root.active-session-tab == "3" ? "db-cluster-primary" : root.active-session-tab == "4" ? "redis-cache-shard-0" : root.active-session-tab == "5" ? "auth-gateway-edge" : root.active-session-tab == "6" ? "ai-inference-gpu" : "backup-node-dr";
-                    host-address: root.active-session-tab == "1" ? "192.168.1.100:22" : root.active-session-tab == "2" ? "10.0.0.1:6443" : root.active-session-tab == "3" ? "10.0.1.50:5432" : root.active-session-tab == "4" ? "10.0.2.10:6379" : root.active-session-tab == "5" ? "47.98.12.33:443" : root.active-session-tab == "6" ? "10.0.8.200:22" : "192.168.100.250:22";
+                    new-tab => { root.is-new-session-modal-open = true; }
+                    session-name: root.active-session-name;
+                    host-address: root.active-host-address;
+                    ping-ms: root.active-host-ping-ms;
                 }
 
                 // 2.3.1 右侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
@@ -535,5 +544,18 @@ export component AppWindow inherits Window {
         emit-test-log(level) => { root.debug-emit-test-log(level); }
         switch-theme(id) => { root.switch-theme(id); }
         toggle-color-mode => { root.toggle-color-mode(); }
+    }
+
+    // 快速新建终端会话居中卡片弹窗
+    NewSessionModal {
+        is-open: root.is-new-session-modal-open;
+        local-items: root.launcher-local-items;
+        host-items: root.launcher-host-items;
+        close => { root.is-new-session-modal-open = false; }
+        search-changed(q) => { root.filter-launcher(q); }
+        item-selected(id) => {
+            root.is-new-session-modal-open = false;
+            root.open-host(id);
+        }
     }
 }

@@ -5,22 +5,14 @@ import { TabData } from "tab_bar.slint";
 
 /// 终端屏幕与多分屏仿真视口 (Terminal Viewport)
 export component TerminalViewport inherits Rectangle {
-    in property <bool> has-active-session: true;
-    in property <string> session-name: "prod-server-01";
-    in property <string> host-address: "192.168.1.100:22";
-    in property <int> ping-ms: 21;
+    in property <bool> has-active-session: false;
+    in property <string> session-name: "";
+    in property <string> host-address: "";
+    in property <int> ping-ms: 0;
     in-out property <bool> is-split: false;
 
-    in property <[TabData]> tabs: [
-        { id: "1", title: "prod-server-01", status: "online" },
-        { id: "2", title: "k8s-control-plane", status: "warning" },
-        { id: "3", title: "db-cluster-primary", status: "online" },
-        { id: "4", title: "redis-cache-shard-0", status: "online" },
-        { id: "5", title: "auth-gateway-edge", status: "online" },
-        { id: "6", title: "ai-inference-gpu", status: "online" },
-        { id: "7", title: "backup-node-dr", status: "offline" },
-    ];
-    in-out property <string> active-tab-id: "1";
+    in property <[TabData]> tabs: [];
+    in-out property <string> active-tab-id: "";
     in-out property <length> tab-scroll-offset: 0px;
 
     callback select-tab(string /* id */);
@@ -29,11 +21,11 @@ export component TerminalViewport inherits Rectangle {
 
     background: AppTheme.window-background;
 
-    if has-active-session: VerticalLayout {
+    VerticalLayout {
         padding: 0px;
         spacing: 0px;
 
-        // 视口顶部终端专用 Tab 会话栏 (嵌入在终端区域正上方，数学级绝对垂直居中)
+        // 1. 恒常驻留 36px 终端 Tab 会话栏 (即使无会话也稳定显示，杜绝界面抖动)
         Rectangle {
             height: 36px;
             background: AppTheme.panel-background;
@@ -55,7 +47,7 @@ export component TerminalViewport inherits Rectangle {
                 HorizontalLayout {
                     spacing: 6px;
 
-                    // 1. Tab 会话卡片可滑动视口 (垂直居中，支持滚轮横向滑动)
+                    // 1.1 Tab 会话卡片可滑动视口
                     VerticalLayout {
                         alignment: center;
                         horizontal-stretch: 1;
@@ -66,10 +58,9 @@ export component TerminalViewport inherits Rectangle {
                             clip: true;
                             property <length> total-tab-width: root.tabs.length * 144px + 10px;
                             property <length> min-scroll: Math.min(0px, self.width - total-tab-width);
-                            // 动态有效偏移量：自动约束在 [min-scroll, 0px] 之间，当关闭Tab导致总宽变小时自动回弹贴合占满
                             property <length> effective-offset: Math.min(0px, Math.max(min-scroll, root.tab-scroll-offset));
 
-                            // 鼠标滚轮横向丝滑滑移
+                            // 鼠标滚轮横向滑动
                             TouchArea {
                                 scroll-event(event) => {
                                     root.tab-scroll-offset = Math.min(0px, Math.max(tab-scroll-box.min-scroll, tab-scroll-box.effective-offset + event.delta-y + event.delta-x));
@@ -77,8 +68,23 @@ export component TerminalViewport inherits Rectangle {
                                 }
                             }
 
-                            // 内部平铺所有会话 Tabs (精准契合宽度，右侧无多余空白，删除Tab时自动回弹平滑占满)
-                            HorizontalLayout {
+                            // 无活跃会话时的微光提示
+                            if root.tabs.length == 0: HorizontalLayout {
+                                alignment: start;
+                                height: 100%;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: @tr("无活跃终端会话 - 点击右侧 + 或在左侧双击主机发起连接");
+                                        font-size: 11px;
+                                        color: AppTheme.secondary-foreground.transparentize(40%);
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 有会话时平铺 Tabs
+                            if root.tabs.length > 0: HorizontalLayout {
                                 x: tab-scroll-box.effective-offset;
                                 y: 0px;
                                 width: Math.max(parent.width, tab-scroll-box.total-tab-width);
@@ -102,7 +108,7 @@ export component TerminalViewport inherits Rectangle {
                         }
                     }
 
-                    // 2. 右侧终端创建新会话加号按钮 (+)
+                    // 1.2 右侧终端创建新会话加号按钮 (+)
                     VerticalLayout {
                         alignment: center;
 
@@ -131,7 +137,9 @@ export component TerminalViewport inherits Rectangle {
                             }
 
                             new-tab-touch := TouchArea {
-                                clicked => { root.new-tab(); }
+                                clicked => {
+                                    root.new-tab();
+                                }
                                 mouse-cursor: pointer;
                             }
                         }
@@ -140,40 +148,39 @@ export component TerminalViewport inherits Rectangle {
             }
         }
 
-        // 终端字符渲染区域 (与当前选中的 active-tab-id 深度联动)
-        Rectangle {
+        // 2. 下方内容区域 (有会话显示终端字符界面，无会话显示欢迎引导仪表盘)
+        if root.has-active-session: Rectangle {
             background: AppTheme.window-background;
             vertical-stretch: 1;
 
-            // 1. prod-server-01 生产主服务器
-            if root.active-tab-id == "1": VerticalLayout {
+            VerticalLayout {
                 padding: 14px;
-                spacing: 4px;
+                spacing: 5px;
                 alignment: start;
 
                 Text {
-                    text: "Linux production-server-01 5.15.0-88-generic #98-Ubuntu SMP Mon Aug 24 10:15:20 UTC 2026 x86_64";
+                    text: "Linux " + root.session-name + " 5.15.0-88-generic #98-Ubuntu SMP x86_64";
                     font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
                     font-size: 12px;
                     color: AppTheme.secondary-foreground;
                 }
 
                 Text {
-                    text: "Welcome to Ubuntu 22.04.3 LTS (GNU/Linux 5.15.0-88-generic x86_64) - 192.168.1.100:22";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: " * Status: System load: 0.42, 0.38, 0.35 | Memory usage: 48% of 64GB";
+                    text: "Connected to " + root.session-name + " (" + root.host-address + ") | Latency: " + root.ping-ms + "ms";
                     font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
                     font-size: 12px;
                     color: AppTheme.accent;
                 }
 
                 Text {
-                    text: "Last login: Fri Aug 28 20:45:00 2026 from 10.0.0.5";
+                    text: "Welcome to Smalux SSH Remote Terminal Environment";
+                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
+                    font-size: 12px;
+                    color: AppTheme.foreground;
+                }
+
+                Text {
+                    text: "Last login: " + @tr("Just now from Smalux-SSH Client");
                     font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
                     font-size: 12px;
                     color: AppTheme.disabled-foreground;
@@ -182,7 +189,7 @@ export component TerminalViewport inherits Rectangle {
                 Rectangle { height: 6px; }
 
                 Text {
-                    text: "root@production-01:~# docker ps --format 'table {{.Names}}  {{.Status}}  {{.Ports}}'";
+                    text: "root@" + root.session-name + ":~# uname -a";
                     font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
                     font-size: 12px;
                     font-weight: 600;
@@ -190,109 +197,7 @@ export component TerminalViewport inherits Rectangle {
                 }
 
                 Text {
-                    text: "NAMES                STATUS          PORTS";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 700;
-                    color: AppTheme.accent;
-                }
-
-                Text {
-                    text: "api-gateway          Up 3 days       0.0.0.0:80->80/tcp, 0.0.0.0:443->443/tcp";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Text {
-                    text: "auth-service         Up 3 days       0.0.0.0:8080->8080/tcp";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "redis-cache          Up 12 days      0.0.0.0:6379->6379/tcp";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "root@production-01:~# ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.success;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
-                }
-            }
-
-            // 2. k8s-control-plane 控制平面
-            if root.active-tab-id == "2": VerticalLayout {
-                padding: 14px;
-                spacing: 4px;
-                alignment: start;
-
-                Text {
-                    text: "Debian GNU/Linux 12 (bookworm) - Kubernetes v1.30.2 Control Plane (10.0.0.1:6443)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
-
-                Text {
-                    text: "Cluster ID: k8s-prod-cluster-asia-east1 | etcd status: HEALTHY (3/3 nodes in quorum)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.accent;
-                }
-
-                Rectangle { height: 6px; }
-
-                Text {
-                    text: "admin@k8s-master:~# kubectl get nodes -o wide";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "NAME             STATUS   ROLES           AGE   VERSION   INTERNAL-IP   OS-IMAGE";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 700;
-                    color: AppTheme.accent;
-                }
-
-                Text {
-                    text: "master-01        Ready    control-plane   42d   v1.30.2   10.0.0.1      Debian GNU/Linux 12";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Text {
-                    text: "worker-node-01   Ready    <none>          42d   v1.30.2   10.0.0.11     Debian GNU/Linux 12";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Text {
-                    text: "worker-node-02   Ready    <none>          42d   v1.30.2   10.0.0.12     Debian GNU/Linux 12";
+                    text: "Linux " + root.session-name + " 5.15.0-88-generic #98-Ubuntu SMP Mon Aug 24 10:15:20 UTC 2026 x86_64 GNU/Linux";
                     font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
                     font-size: 12px;
                     color: AppTheme.success;
@@ -304,261 +209,7 @@ export component TerminalViewport inherits Rectangle {
                     spacing: 0px;
 
                     Text {
-                        text: "admin@k8s-master:~# ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.warning;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
-                }
-            }
-
-            // 3. db-cluster-primary 数据库主节点
-            if root.active-tab-id == "3": VerticalLayout {
-                padding: 14px;
-                spacing: 4px;
-                alignment: start;
-
-                Text {
-                    text: "PostgreSQL 16.2 on x86_64-pc-linux-gnu, compiled by gcc 12.2.0 (10.0.1.50:5432)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
-
-                Text {
-                    text: "Primary Node: read/write enabled | Replication lag: 0 bytes to standby-01";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.accent;
-                }
-
-                Rectangle { height: 6px; }
-
-                Text {
-                    text: "postgres@db-primary:~$ psql -c \"SELECT pid, state, query_start, query FROM pg_stat_activity WHERE state != 'idle';\"";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "  pid  | state  |         query_start          |                 query";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 700;
-                    color: AppTheme.accent;
-                }
-
-                Text {
-                    text: " 14201 | active | 2026-08-28 21:05:12.184+08   | SELECT * FROM orders WHERE status = 'pending';";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: " 14205 | active | 2026-08-28 21:05:14.020+08   | VACUUM (ANALYZE, VERBOSE) tbl_audit_logs;";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "postgres@db-primary:~$ ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.success;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
-                }
-            }
-
-            // 4. redis-cache-shard-0 缓存集群分片
-            if root.active-tab-id == "4": VerticalLayout {
-                padding: 14px;
-                spacing: 4px;
-                alignment: start;
-
-                Text {
-                    text: "Redis server v=7.2.4 sha=00000000:0 malloc=jemalloc-5.3.0 (10.0.2.10:6379)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
-
-                Text {
-                    text: "Connected clients: 342 | Used memory: 14.82G (maxmemory: 32G) | Fragmentation ratio: 1.05";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.accent;
-                }
-
-                Rectangle { height: 6px; }
-
-                Text {
-                    text: "redis-cli -h 10.0.2.10 INFO stats";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "# Stats: hits: 85203104 (hit_rate: 98.4%) | ops: 14500/s | commands: 89401244";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "10.0.2.10:6379> ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.danger;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
-                }
-            }
-
-            // 5. auth-gateway-edge 边缘鉴权网关
-            if root.active-tab-id == "5": VerticalLayout {
-                padding: 14px;
-                spacing: 4px;
-                alignment: start;
-
-                Text {
-                    text: "OpenResty 1.25.3.1 (Alpine Linux 3.19) - Edge SSL Gateway (47.98.12.33:443)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
-
-                Text {
-                    text: "TLS 1.3 / HTTP/2 active | Rate-limit: 100,000 req/min | WAF Rule Engine: ENABLED";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.accent;
-                }
-
-                Rectangle { height: 6px; }
-
-                Text {
-                    text: "edge-node:~# tail -n 3 /var/log/nginx/access.log";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "192.168.1.100 - [28/Aug/2026:21:08:10 +0800] \"POST /api/v1/auth/token HTTP/2.0\" 200 482 - 12ms";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Text {
-                    text: "10.0.0.1      - [28/Aug/2026:21:08:11 +0800] \"GET /api/v1/user/profile HTTP/2.0\" 200 1204 - 4ms";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "edge-node:~# ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.success;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
-                }
-            }
-
-            // 6. ai-inference-gpu AI 显卡推理节点
-            if root.active-tab-id == "6": VerticalLayout {
-                padding: 14px;
-                spacing: 4px;
-                alignment: start;
-
-                Text {
-                    text: "NVIDIA-SMI 550.54.14   Driver Version: 550.54.14   CUDA Version: 12.4 (10.0.8.200:22)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
-
-                Text {
-                    text: "LLM Engine: vLLM v0.4.1 | Model: Qwen-2.5-72B-Instruct-AWQ (Tensor Parallel 4)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.accent;
-                }
-
-                Rectangle { height: 6px; }
-
-                Text {
-                    text: "root@ai-gpu-node:~# nvidia-smi --query-gpu=name,utilization.gpu,memory.used,memory.total --format=csv,noheader";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "NVIDIA A100-SXM4-80GB, 88 %, 68420 MiB / 81920 MiB\nNVIDIA A100-SXM4-80GB, 92 %, 71200 MiB / 81920 MiB\nNVIDIA A100-SXM4-80GB, 86 %, 67900 MiB / 81920 MiB\nNVIDIA A100-SXM4-80GB, 90 %, 69800 MiB / 81920 MiB";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "root@ai-gpu-node:~# ";
+                        text: "root@" + root.session-name + ":~# ";
                         font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
                         font-size: 12px;
                         font-weight: 700;
@@ -572,85 +223,32 @@ export component TerminalViewport inherits Rectangle {
                     }
                 }
             }
+        }
 
-            // 7. backup-node-dr 容灾备份节点
-            if root.active-tab-id == "7": VerticalLayout {
-                padding: 14px;
-                spacing: 4px;
-                alignment: start;
+        // 空状态 / 欢迎仪表盘 (当无会话时)
+        if !root.has-active-session: Rectangle {
+            background: AppTheme.window-background;
+            vertical-stretch: 1;
 
-                Text {
-                    text: "Arch Linux (Linux 6.8.9-arch1-1) - Immutable Snapshot Vault (192.168.100.250:22)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
+            VerticalLayout {
+                alignment: center;
+                spacing: 16px;
 
                 Text {
-                    text: "ZFS Storage Pool: zpool-vault (RAID-Z2) | Deduplication: 2.14x | Free: 184TB / 240TB";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
+                    text: "✨ smalux-ssh";
+                    font-size: 28px;
+                    font-weight: 700;
                     color: AppTheme.accent;
-                }
-
-                Rectangle { height: 6px; }
-
-                Text {
-                    text: "backup-admin@dr-node:~$ restic snapshots --latest 2";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
+                    horizontal-alignment: center;
                 }
 
                 Text {
-                    text: "ID        Time                 Host        Tags        Paths\na4f9e120  2026-08-28 20:00:00  prod-db-01  daily,db    /var/lib/postgresql/data\nb81c2010  2026-08-28 19:30:00  k8s-etcd    hourly      /var/lib/etcd\nAll snapshots verified. Integrity check: PASSED (0 errors)";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "backup-admin@dr-node:~$ ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.success;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
+                    text: @tr("请从左侧双击主机发起连接，或点击右上角 + 快速新建本地/远程终端");
+                    font-size: 13px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
                 }
             }
-        }
-    }
-
-    // 空状态 / 欢迎仪表盘 (当无会话时)
-    if !has-active-session: VerticalLayout {
-        alignment: center;
-        spacing: 16px;
-
-        Text {
-            text: "✨ smalux-ssh";
-            font-size: 28px;
-            font-weight: 700;
-            color: AppTheme.accent;
-            horizontal-alignment: center;
-        }
-
-        Text {
-            text: @tr("请从左侧选择主机发起连接，或按 Ctrl+K 快速检索");
-            font-size: 13px;
-            color: AppTheme.secondary-foreground;
-            horizontal-alignment: center;
         }
     }
 }

@@ -10,16 +10,8 @@ export struct TabData {
 
 /// 顶部统一标题与多会话标签栏 (Top Header / Tab Bar / Native Window Controls)
 export component TabBar inherits Rectangle {
-    in property <[TabData]> tabs: [
-        { id: "1", title: "prod-server-01", status: "online" },
-        { id: "2", title: "k8s-control-plane", status: "warning" },
-        { id: "3", title: "db-cluster-primary", status: "online" },
-        { id: "4", title: "redis-cache-shard-0", status: "online" },
-        { id: "5", title: "auth-gateway-edge", status: "online" },
-        { id: "6", title: "ai-inference-gpu", status: "online" },
-        { id: "7", title: "backup-node-dr", status: "offline" },
-    ];
-    in-out property <string> active-tab-id: "1";
+    in property <[TabData]> tabs: [];
+    in-out property <string> active-tab-id: "";
     in property <bool> is-maximized: false;
     in-out property <bool> is-dark-mode: true;
     in-out property <length> tab-scroll-offset: 0px;
