@@ -28,6 +28,8 @@ export component DrawerContainer inherits Rectangle {
     VerticalLayout {
         padding: 0px;
         spacing: 0px;
+        width: 100%;
+        height: 100%;
 
         // 抽屉头部 (简洁清爽设计，36px 绝对垂直居中)
         Rectangle {
@@ -147,7 +149,11 @@ export component DrawerContainer inherits Rectangle {
             }
         }
 
-        // 内容区域
-        @children
+        // 内容区域 (严格受限在抽屉剩余可见视口中，使子级 Flickable 能够精准计算真实视口高度)
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+            @children
+        }
     }
 }

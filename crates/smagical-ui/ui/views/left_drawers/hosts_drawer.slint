@@ -63,6 +63,8 @@ export component HostsDrawer inherits DrawerContainer {
     in-out property <string> view-mode: "tree";
     /// 当前选中的高亮主机 ID
     in-out property <string> selected-host-id: "1";
+    /// 当前树形内容的最大呈现宽度（根据节点长名称动态扩展，驱动自适应横向滚动）
+    in-out property <length> tree-content-width: 240px;
 
     /// 树形层级嵌套数据源 (支持任意层级嵌套与动态展开收缩)
     in-out property <[HostTreeNode]> tree-nodes: [
@@ -120,10 +122,13 @@ export component HostsDrawer inherits DrawerContainer {
     VerticalLayout {
         padding: 8px;
         spacing: 8px;
+        width: 100%;
+        height: 100%;
 
         // 1. 顶部操作栏 (搜索框 + 树形/卡片视图切换器)
         HorizontalLayout {
             spacing: 6px;
+            height: 28px;
 
             // 搜索输入框 (实时搜索与清空)
             SearchInput {
@@ -206,6 +211,7 @@ export component HostsDrawer inherits DrawerContainer {
             padding-left: 4px;
             padding-right: 4px;
             alignment: space-between;
+            height: 22px;
 
             HorizontalLayout {
                 spacing: 6px;
@@ -292,27 +298,31 @@ export component HostsDrawer inherits DrawerContainer {
             }
         }
 
-        // 4. 核心工作区 (支持海量节点平滑滚动、自隐藏超薄滚动条、树形横纵双向与卡片纯纵向滚动)
+        // 3. 核心工作区 (支持 Flickable 视口精确映射、滚轮平滑滚动与拖拽)
         Rectangle {
             vertical-stretch: 1;
             clip: true;
-
-            scroll-hover := TouchArea {
-                // 仅用于捕获区域悬停态以触发滚动条优雅淡入
-            }
 
             scroll-area := Flickable {
                 width: 100%;
                 height: 100%;
                 interactive: true;
+                viewport-width: root.view-mode == "tree" ? Math.max(self.width, root.tree-content-width) : self.width;
+                viewport-height: (root.view-mode == "tree" ? root.tree-nodes.length * 31px : root.hosts.length * 56px) + 8px;
 
-                // 4.1 树形层级结构视图 (Tree View: 支持文件夹展开/折叠与多层缩进，超宽时自动激活横向滚动)
+                // 3.1 树形层级结构视图 (Tree View: 根据最宽节点自然撑开，超宽时触发平滑横向滚动)
                 if root.view-mode == "tree": VerticalLayout {
+                    x: 0px;
+                    y: 0px;
+                    width: Math.max(scroll-area.width, root.tree-content-width);
+                    height: root.tree-nodes.length * 31px;
                     spacing: 2px;
+                    alignment: start;
 
                     for node in root.tree-nodes: Rectangle {
                         height: node.is-group ? 28px : 30px;
-                        min-width: parent.width;
+                        width: 100%;
+                        min-width: Math.max(scroll-area.width, root.tree-content-width);
                         border-radius: 4px;
                         background: node.id == root.selected-host-id && !node.is-group ? AppTheme.control-background : tree-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
                         border-width: node.id == root.selected-host-id && !node.is-group ? 1px : 0px;
@@ -439,13 +449,18 @@ export component HostsDrawer inherits DrawerContainer {
                     }
                 }
 
-                // 4.2 卡片模式视图 (Card View: 现代化富卡片，严格锁定 100% 宽度，仅纯竖向滚动)
+                // 3.2 卡片模式视图 (Card View: 现代化富卡片，严格锁定 100% 宽度，仅纯竖向滚动)
                 if root.view-mode == "card": VerticalLayout {
+                    x: 0px;
+                    y: 0px;
+                    width: scroll-area.width;
+                    height: root.hosts.length * 56px;
                     spacing: 6px;
-                    width: 100%;
+                    alignment: start;
 
                     for host in root.hosts: Rectangle {
                         height: 50px;
+                        width: 100%;
                         border-radius: 4px;
                         background: host.id == root.selected-host-id ? AppTheme.control-background : card-item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background;
                         border-width: 1px;
@@ -560,32 +575,60 @@ export component HostsDrawer inherits DrawerContainer {
                 }
             }
 
-            // 悬浮自隐藏极细竖向滚动条 (3px 胶囊，默认完全透明隐藏，悬停时淡入)
+            // 悬浮竖向滚动条 (宽 5px 导轨 + 滑块，支持滚轮与鼠标直接拖拽)
             if scroll-area.viewport-height > scroll-area.height: Rectangle {
-                x: parent.width - self.width - 2px;
-                y: Math.max(2px, Math.min(parent.height - self.height - 2px, (-scroll-area.viewport-y / scroll-area.viewport-height) * scroll-area.height));
-                width: 3px;
-                height: Math.max(24px, (scroll-area.height / scroll-area.viewport-height) * scroll-area.height);
-                border-radius: 1.5px;
-                background: scroll-hover.has-hover ? AppTheme.secondary-foreground.transparentize(20%) : AppTheme.secondary-foreground.transparentize(80%);
-                opacity: scroll-hover.has-hover ? 0.9 : 0.0;
+                x: parent.width - 6px;
+                y: 0px;
+                width: 6px;
+                height: parent.height - (scroll-area.viewport-width > scroll-area.width ? 6px : 0px);
 
-                animate opacity { duration: 250ms; easing: ease-out; }
-                animate background { duration: 150ms; }
+                v-thumb := Rectangle {
+                    x: 0.5px;
+                    y: Math.max(0px, Math.min(parent.height - self.height, (-scroll-area.viewport-y / Math.max(1px, scroll-area.viewport-height - scroll-area.height)) * (parent.height - self.height)));
+                    width: 5px;
+                    height: Math.max(28px, (scroll-area.height / scroll-area.viewport-height) * parent.height);
+                    border-radius: 2.5px;
+                    background: v-touch.has-hover || v-touch.pressed ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(50%);
+
+                    animate background { duration: 120ms; }
+
+                    v-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        moved => {
+                            if self.pressed {
+                                scroll-area.viewport-y = Math.min(0px, Math.max(scroll-area.height - scroll-area.viewport-height, scroll-area.viewport-y - (self.mouse-y - self.pressed-y) * (scroll-area.viewport-height / scroll-area.height)));
+                            }
+                        }
+                    }
+                }
             }
 
-            // 悬浮自隐藏横向滚动条 (在树形模式内容超宽时呈现，悬停时高亮)
+            // 悬浮横向滚动条 (高 5px 导轨 + 滑块，在树形模式内容超宽时呈现，支持 Shift+滚轮与鼠标直接拖拽)
             if root.view-mode == "tree" && scroll-area.viewport-width > scroll-area.width: Rectangle {
-                x: Math.max(2px, Math.min(parent.width - self.width - 2px, (-scroll-area.viewport-x / scroll-area.viewport-width) * scroll-area.width));
-                y: parent.height - self.height - 2px;
-                height: 4px;
-                width: Math.max(28px, (scroll-area.width / scroll-area.viewport-width) * scroll-area.width);
-                border-radius: 2px;
-                background: scroll-hover.has-hover ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(60%);
-                opacity: scroll-hover.has-hover ? 0.95 : 0.45;
+                x: 0px;
+                y: parent.height - 6px;
+                height: 6px;
+                width: parent.width - (scroll-area.viewport-height > scroll-area.height ? 6px : 0px);
 
-                animate opacity { duration: 250ms; easing: ease-out; }
-                animate background { duration: 150ms; }
+                h-thumb := Rectangle {
+                    x: Math.max(0px, Math.min(parent.width - self.width, (-scroll-area.viewport-x / Math.max(1px, scroll-area.viewport-width - scroll-area.width)) * (parent.width - self.width)));
+                    y: 0.5px;
+                    height: 5px;
+                    width: Math.max(36px, (scroll-area.width / scroll-area.viewport-width) * parent.width);
+                    border-radius: 2.5px;
+                    background: h-touch.has-hover || h-touch.pressed ? AppTheme.accent : AppTheme.accent.transparentize(30%);
+
+                    animate background { duration: 120ms; }
+
+                    h-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        moved => {
+                            if self.pressed {
+                                scroll-area.viewport-x = Math.min(0px, Math.max(scroll-area.width - scroll-area.viewport-width, scroll-area.viewport-x - (self.mouse-x - self.pressed-x) * (scroll-area.viewport-width / scroll-area.width)));
+                            }
+                        }
+                    }
+                }
             }
         }
     }

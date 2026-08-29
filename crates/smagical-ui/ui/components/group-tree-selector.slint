@@ -41,8 +41,8 @@ export component GroupTreeSelector inherits Rectangle {
     /// 当前选中的目标分组 ID，支持与外部组件双向数据绑定 (<=>)
     in-out property <string> selected-id: "root";
 
-    /// 当用户点击切换选中分组时触发的回调函数，参数为选中的分组 id
-    callback selection-changed(string /* id */);
+    /// 当用户点击切换选中分组时触发的回调函数，参数 1 为选中的分组 id，参数 2 为选中的分组 name
+    callback selection-changed(string /* id */, string /* name */);
     /// 当用户点击折叠/展开小三角或双击分组行时触发的回调函数，参数为被折叠/展开的分组 id
     callback toggle-group(string /* id */);
 
@@ -117,11 +117,14 @@ export component GroupTreeSelector inherits Rectangle {
                         select-touch := TouchArea {
                             clicked => {
                                 root.selected-id = item.id;
-                                root.selection-changed(item.id);
+                                root.selection-changed(item.id, item.name);
                             }
                             double-clicked => {
                                 if item.has-children {
                                     root.toggle-group(item.id);
+                                } else {
+                                    root.selected-id = item.id;
+                                    root.selection-changed(item.id, item.name);
                                 }
                             }
                             mouse-cursor: pointer;

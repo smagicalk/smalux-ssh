@@ -127,6 +127,8 @@ export component AppWindow inherits Window {
         { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping-ms: 14 },
         { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping-ms: 0 },
     ];
+    /// 当前树形内容最宽尺寸（动态驱动左右平滑滚动）
+    in-out property <length> tree-content-width: 240px;
     in-out property <bool> is-create-group-open: false;
     in-out property <string> create-group-default-parent: "root";
     in-out property <[GroupOptionData]> group-options: [
@@ -228,6 +230,9 @@ export component AppWindow inherits Window {
                     clip: true;
 
                     if root.active-left-tab == "hosts": HostsDrawer {
+                        width: 100%;
+                        height: 100%;
+                        tree-content-width: root.tree-content-width;
                         collapse => { root.is-left-drawer-open = false; }
                         tree-nodes: root.tree-nodes;
                         hosts: root.hosts;

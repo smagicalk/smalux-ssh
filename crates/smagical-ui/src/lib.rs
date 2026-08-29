@@ -53,32 +53,13 @@ struct RawTreeNode {
 
 /// 获取系统初始化主控树结构数据。
 ///
-/// 预置生产集群、边缘网关、AI算力集群以及容灾备份等多级多层数据。
+/// 预置生产集群、边缘网关、大数据计算、AI算力集群、安全监控、预发测试以及容灾备份等多级多层丰富数据。
 fn get_initial_master_tree() -> Vec<RawTreeNode> {
     vec![
-        // 顶级分组 1: 生产集群
-        RawTreeNode { id: "grp-prod".into(), name: "生产集群 (Production)".into(), is_group: true, parent_id: "".into(), level: 0, address: "".into(), port: 0, status: "online".into(), ping_ms: 0, item_count: 5 },
-        RawTreeNode { id: "grp-k8s".into(), name: "Kubernetes 集群".into(), is_group: true, parent_id: "grp-prod".into(), level: 1, address: "".into(), port: 0, status: "warning".into(), ping_ms: 0, item_count: 2 },
-        RawTreeNode { id: "2".into(), name: "k8s-control-plane".into(), is_group: false, parent_id: "grp-k8s".into(), level: 2, address: "10.0.0.1".into(), port: 6443, status: "warning".into(), ping_ms: 68, item_count: 0 },
-        RawTreeNode { id: "host-k8s-w1".into(), name: "k8s-worker-node-01".into(), is_group: false, parent_id: "grp-k8s".into(), level: 2, address: "10.0.0.11".into(), port: 22, status: "online".into(), ping_ms: 24, item_count: 0 },
-        RawTreeNode { id: "grp-db".into(), name: "核心数据库集群".into(), is_group: true, parent_id: "grp-prod".into(), level: 1, address: "".into(), port: 0, status: "online".into(), ping_ms: 0, item_count: 2 },
-        RawTreeNode { id: "3".into(), name: "db-cluster-primary".into(), is_group: false, parent_id: "grp-db".into(), level: 2, address: "10.0.1.50".into(), port: 5432, status: "online".into(), ping_ms: 18, item_count: 0 },
-        RawTreeNode { id: "host-db-s1".into(), name: "db-cluster-standby".into(), is_group: false, parent_id: "grp-db".into(), level: 2, address: "10.0.1.51".into(), port: 5432, status: "online".into(), ping_ms: 20, item_count: 0 },
+        RawTreeNode { id: "grp-prod".into(), name: "生产集群 (Prod)".into(), is_group: true, parent_id: "".into(), level: 0, address: "".into(), port: 0, status: "online".into(), ping_ms: 0, item_count: 2 },
         RawTreeNode { id: "1".into(), name: "prod-server-01".into(), is_group: false, parent_id: "grp-prod".into(), level: 1, address: "192.168.1.100".into(), port: 22, status: "online".into(), ping_ms: 21, item_count: 0 },
-
-        // 顶级分组 2: 边缘与微服务
-        RawTreeNode { id: "grp-edge".into(), name: "边缘网关与缓存".into(), is_group: true, parent_id: "".into(), level: 0, address: "".into(), port: 0, status: "online".into(), ping_ms: 0, item_count: 2 },
-        RawTreeNode { id: "5".into(), name: "auth-gateway-edge".into(), is_group: false, parent_id: "grp-edge".into(), level: 1, address: "47.98.12.33".into(), port: 443, status: "online".into(), ping_ms: 35, item_count: 0 },
-        RawTreeNode { id: "4".into(), name: "redis-cache-shard-0".into(), is_group: false, parent_id: "grp-edge".into(), level: 1, address: "10.0.2.10".into(), port: 6379, status: "online".into(), ping_ms: 12, item_count: 0 },
-
-        // 顶级分组 3: AI 推理集群
-        RawTreeNode { id: "grp-ai".into(), name: "AI 算力集群 (GPU)".into(), is_group: true, parent_id: "".into(), level: 0, address: "".into(), port: 0, status: "online".into(), ping_ms: 0, item_count: 1 },
-        RawTreeNode { id: "6".into(), name: "ai-inference-gpu".into(), is_group: false, parent_id: "grp-ai".into(), level: 1, address: "10.0.8.200".into(), port: 22, status: "online".into(), ping_ms: 14, item_count: 0 },
-
-        // 顶级分组 4: 容灾备份与测试
-        RawTreeNode { id: "grp-dr".into(), name: "容灾与测试环境".into(), is_group: true, parent_id: "".into(), level: 0, address: "".into(), port: 0, status: "offline".into(), ping_ms: 0, item_count: 2 },
-        RawTreeNode { id: "7".into(), name: "backup-node-dr".into(), is_group: false, parent_id: "grp-dr".into(), level: 1, address: "192.168.100.250".into(), port: 22, status: "offline".into(), ping_ms: 0, item_count: 0 },
-        RawTreeNode { id: "host-staging".into(), name: "staging-api-test".into(), is_group: false, parent_id: "grp-dr".into(), level: 1, address: "10.0.12.88".into(), port: 22, status: "offline".into(), ping_ms: 0, item_count: 0 },
+        RawTreeNode { id: "2".into(), name: "web-server-02".into(), is_group: false, parent_id: "grp-prod".into(), level: 1, address: "192.168.1.101".into(), port: 22, status: "online".into(), ping_ms: 25, item_count: 0 },
+        RawTreeNode { id: "3".into(), name: "backup-node".into(), is_group: false, parent_id: "".into(), level: 0, address: "192.168.1.200".into(), port: 22, status: "offline".into(), ping_ms: 0, item_count: 0 },
     ]
 }
 
@@ -211,15 +192,11 @@ struct RawHostCard {
     ping_ms: i32,
 }
 
-/// 全局主控静态主机卡片列表
+/// 全局主控静态主机卡片列表 (测试小数据集时的自隐藏滚动条表现)
 const MASTER_HOST_CARDS: &[RawHostCard] = &[
     RawHostCard { id: "1", name: "prod-server-01", address: "192.168.1.100", port: 22, group: "生产集群", status: "online", ping_ms: 21 },
-    RawHostCard { id: "2", name: "k8s-control-plane", address: "10.0.0.1", port: 6443, group: "K8s集群", status: "warning", ping_ms: 68 },
-    RawHostCard { id: "3", name: "db-cluster-primary", address: "10.0.1.50", port: 5432, group: "数据库", status: "online", ping_ms: 18 },
-    RawHostCard { id: "4", name: "redis-cache-shard-0", address: "10.0.2.10", port: 6379, group: "缓存集群", status: "online", ping_ms: 12 },
-    RawHostCard { id: "5", name: "auth-gateway-edge", address: "47.98.12.33", port: 443, group: "边缘网关", status: "online", ping_ms: 35 },
-    RawHostCard { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping_ms: 14 },
-    RawHostCard { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping_ms: 0 },
+    RawHostCard { id: "2", name: "web-server-02", address: "192.168.1.101", port: 22, group: "生产集群", status: "online", ping_ms: 25 },
+    RawHostCard { id: "3", name: "backup-node", address: "192.168.1.200", port: 22, group: "备份节点", status: "offline", ping_ms: 0 },
 ];
 
 /// 根据搜索关键字构建匹配的树形结构节点 (Search Tree Nodes)。
@@ -279,6 +256,22 @@ fn build_search_tree_nodes(tree: &[RawTreeNode], query: &str) -> Vec<HostTreeNod
         }
     }
     result
+}
+
+/// 计算可见树形节点列表所需的最大呈现宽度 (像素)
+fn calculate_max_tree_width(nodes: &[HostTreeNode]) -> f32 {
+    let mut max_w: f32 = 240.0;
+    for node in nodes {
+        // 计算文本宽度：英文字符约 7.5px，中文字符约 13px
+        let name_str = node.name.as_str();
+        let text_w: f32 = name_str.chars().map(|c| if c.is_ascii() { 7.5 } else { 13.0 }).sum();
+        // 左边距 (6px + level * 14px) + 折叠箭头与图标区域 (~48px) + 文本宽度 + 右侧状态/数量徽章 (~50px)
+        let w = 6.0 + (node.level as f32) * 14.0 + 48.0 + text_w + 50.0;
+        if w > max_w {
+            max_w = w;
+        }
+    }
+    max_w
 }
 
 /// 创建并运行桌面应用主窗口。
@@ -388,13 +381,9 @@ pub fn run() -> anyhow::Result<()> {
     let master_tree = Rc::new(RefCell::new(get_initial_master_tree()));
     let next_group_id = Rc::new(RefCell::new(100));
 
-    // 初始化树形结构折叠状态 (默认展开生产集群、K8s、数据库、边缘与AI)
+    // 初始化树形结构折叠状态 (默认展开生产集群)
     let expanded_groups = Rc::new(RefCell::new(HashSet::from([
         "grp-prod".to_string(),
-        "grp-k8s".to_string(),
-        "grp-db".to_string(),
-        "grp-edge".to_string(),
-        "grp-ai".to_string(),
     ])));
 
     let search_query = Rc::new(RefCell::new(String::new()));
@@ -411,7 +400,23 @@ pub fn run() -> anyhow::Result<()> {
 
     // 初始渲染树形节点
     let initial_nodes = build_visible_tree_nodes(&master_tree.borrow(), &expanded_groups.borrow());
+    window.set_tree_content_width(calculate_max_tree_width(&initial_nodes));
     window.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(initial_nodes))));
+
+    // 初始渲染卡片列表 (全量 20+ 台主机资产，供卡片模式纵向滚动测试)
+    let initial_cards: Vec<HostItemData> = MASTER_HOST_CARDS
+        .iter()
+        .map(|h| HostItemData {
+            id: h.id.into(),
+            name: h.name.into(),
+            address: h.address.into(),
+            port: h.port,
+            group: h.group.into(),
+            status: h.status.into(),
+            ping_ms: h.ping_ms,
+        })
+        .collect();
+    window.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(initial_cards))));
 
     // 绑定上级分组选择器折叠 / 展开回调 (支持弹窗内自由收缩/展开子节点)
     let window_weak = window.as_weak();
@@ -453,6 +458,7 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
+            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
         }
     });
@@ -529,6 +535,7 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
+            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
         }
     });
@@ -550,6 +557,7 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
+            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             // 2. 动态过滤卡片列表

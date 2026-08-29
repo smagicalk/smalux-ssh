@@ -7,11 +7,10 @@ export { GroupTreeSelector, GroupOptionData }
 ///
 /// 用于在主机资产管理中创建新分组的模态对话框。
 /// 核心特性：
-/// 1. 顶部防误触半透明暗色遮罩（仅拦截穿透，须明确点击取消或关闭按键）；
-/// 2. 居中 460x420px 精致卡片容器，内容 100% 满宽填满无空白；
-/// 3. 内嵌 200px 独立 GroupTreeSelector 选择所属上级分组；
-/// 4. 定制化深色无白底输入框，左侧固定图标，右侧绝对锚定清空按钮；
-/// 5. 底部取消与确认创建按钮（支持 Enter 快捷键快速提交）。
+/// 1. 主弹窗轻量紧凑 (440x260px)，聚焦名称输入与确认创建；
+/// 2. 上级分组支持点击打开专属树形选择弹窗 (420x380px)，层级浏览更清晰宽敞；
+/// 3. 定制化深色无白底输入框，左侧固定图标，右侧绝对锚定清空按钮；
+/// 4. 底部取消与确认创建按钮（支持 Enter 快捷键快速提交）。
 export component CreateGroupModal inherits Rectangle {
     /// 弹窗显隐控制开关 (true: 显示弹窗, false: 隐藏弹窗)
     in property <bool> is-open: false;
@@ -29,8 +28,17 @@ export component CreateGroupModal inherits Rectangle {
     in property <string> default-parent-id: "root";
     /// 当前选中的目标父级分组 ID
     in-out property <string> selected-parent-id: root.default-parent-id;
+    /// 当前选中的目标父级分组名称
+    in-out property <string> selected-parent-name: @tr("根目录 (作为顶级分组)");
     /// 用户当前输入的新分组名称
     in-out property <string> group-name: "";
+
+    /// 是否正在展示选择上级分组的二级树形弹窗
+    property <bool> is-picker-open: false;
+    /// 树形选择弹窗中的临时选定分组 ID
+    property <string> temp-selected-id: root.selected-parent-id;
+    /// 树形选择弹窗中的临时选定分组名称
+    property <string> temp-selected-name: root.selected-parent-name;
 
     /// 关闭弹窗回调事件（当点击右上角✕按键或底部取消按钮时触发）
     callback close();
@@ -49,10 +57,12 @@ export component CreateGroupModal inherits Rectangle {
             // 拦截遮罩背景
         }
 
-        // 居中弹窗卡片 (尺寸加大、窗口严格居中、高度精准占满)
+        // ==========================================
+        // 1. 主弹窗卡片 (尺寸紧凑聚焦，440x260px 居中)
+        // ==========================================
         Rectangle {
-            width: 460px;
-            height: 420px;
+            width: 440px;
+            height: 260px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border-radius: AppTheme.radius-large;
@@ -62,10 +72,10 @@ export component CreateGroupModal inherits Rectangle {
 
             VerticalLayout {
                 padding: 16px;
-                spacing: 11px;
+                spacing: 12px;
                 alignment: start;
 
-                // 1. 弹窗标题栏
+                // 1.1 弹窗标题栏
                 HorizontalLayout {
                     alignment: space-between;
                     height: 24px;
@@ -104,6 +114,7 @@ export component CreateGroupModal inherits Rectangle {
                         close-touch := TouchArea {
                             clicked => {
                                 root.group-name = "";
+                                root.is-picker-open = false;
                                 root.close();
                             }
                             mouse-cursor: pointer;
@@ -127,17 +138,17 @@ export component CreateGroupModal inherits Rectangle {
                     background: AppTheme.border;
                 }
 
-                // 2. 选择上级分组 (高度 200px，视野开阔，自带平滑滚动)
+                // 1.2 所属上级分组 (点击整条唤起专属树状弹窗选取)
                 VerticalLayout {
                     width: 100%;
-                    spacing: 6px;
+                    spacing: 5px;
 
                     HorizontalLayout {
                         alignment: space-between;
                         height: 14px;
 
                         Text {
-                            text: @tr("选择所属上级分组:");
+                            text: @tr("所属上级分组:");
                             font-size: 11px;
                             font-weight: 600;
                             color: AppTheme.secondary-foreground;
@@ -145,23 +156,107 @@ export component CreateGroupModal inherits Rectangle {
                         }
 
                         Text {
-                            text: root.selected-parent-id == "root" ? @tr("当前选定: 顶级根目录") : @tr("当前选定: 子分组");
+                            text: root.selected-parent-id == "root" ? @tr("当前: 顶级根目录") : @tr("当前: 子分组");
                             font-size: 10px;
                             color: AppTheme.accent;
                             vertical-alignment: center;
                         }
                     }
 
-                    // 独立树状选择器
-                    GroupTreeSelector {
-                        options: root.group-options;
-                        selected-id <=> root.selected-parent-id;
-                        toggle-group(id) => { root.toggle-group(id); }
-                        height: 200px;
+                    // 上级分组选取条 (点击整条均可弹窗选取)
+                    Rectangle {
+                        width: 100%;
+                        height: 36px;
+                        border-radius: AppTheme.radius-medium;
+                        background: picker-btn-touch.has-hover ? AppTheme.hover-background.transparentize(20%) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: picker-btn-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        picker-btn-touch := TouchArea {
+                            clicked => {
+                                root.temp-selected-id = root.selected-parent-id;
+                                root.temp-selected-name = root.selected-parent-name;
+                                root.is-picker-open = true;
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            alignment: space-between;
+
+                            // 左侧：文件夹图标 + 当前选中的上级分组名称
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                horizontal-stretch: 1;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    width: 14px;
+
+                                    Image {
+                                        source: @image-url("../assets/icons/folder.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: AppTheme.accent;
+                                    }
+                                }
+
+                                Text {
+                                    text: root.selected-parent-name;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: left;
+                                    overflow: elide;
+                                }
+                            }
+
+                            // 右侧：选取 / 更改 胶囊按钮
+                            Rectangle {
+                                width: 72px;
+                                height: 24px;
+                                border-radius: 3px;
+                                background: picker-btn-touch.has-hover ? AppTheme.accent.transparentize(80%) : AppTheme.hover-background;
+                                border-width: 1px;
+                                border-color: picker-btn-touch.has-hover ? AppTheme.accent : AppTheme.border;
+                                y: (parent.height - self.height) / 2;
+
+                                HorizontalLayout {
+                                    alignment: center;
+                                    spacing: 4px;
+
+                                    Image {
+                                        source: @image-url("../assets/icons/tree.svg");
+                                        width: 11px;
+                                        height: 11px;
+                                        image-fit: contain;
+                                        colorize: picker-btn-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+
+                                    Text {
+                                        text: @tr("选取上级");
+                                        font-size: 10px;
+                                        font-weight: 500;
+                                        color: picker-btn-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
-                // 3. 输入新分组名称 (满宽 100% 占满，纯暗色背景，超长文本动态向左偏移保持最新输入始终可见)
+                // 1.3 输入新分组名称
                 VerticalLayout {
                     width: 100%;
                     spacing: 4px;
@@ -274,7 +369,7 @@ export component CreateGroupModal inherits Rectangle {
                     }
                 }
 
-                // 4. 底部动作按钮
+                // 1.4 底部动作按钮
                 HorizontalLayout {
                     alignment: end;
                     spacing: 10px;
@@ -295,6 +390,7 @@ export component CreateGroupModal inherits Rectangle {
                         cancel-touch := TouchArea {
                             clicked => {
                                 root.group-name = "";
+                                root.is-picker-open = false;
                                 root.close();
                             }
                             mouse-cursor: pointer;
@@ -352,6 +448,187 @@ export component CreateGroupModal inherits Rectangle {
                                 font-weight: 600;
                                 color: root.group-name != "" ? #ffffff : AppTheme.disabled-foreground;
                                 vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 2. 选择上级分组 二级树形弹窗 (420x380px，支持完整树形折叠展开与即时确认)
+        // =========================================================================
+        if is-picker-open: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: #00000066; // 遮罩叠层
+
+            TouchArea {
+                // 拦截子遮罩
+            }
+
+            Rectangle {
+                width: 420px;
+                height: 380px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.panel-background;
+                border-width: 1px;
+                border-color: AppTheme.accent;
+
+                VerticalLayout {
+                    padding: 16px;
+                    spacing: 10px;
+                    alignment: start;
+
+                    // 2.1 标题栏
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 24px;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../assets/icons/tree.svg");
+                                    width: 15px;
+                                    height: 15px;
+                                    image-fit: contain;
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+
+                            Text {
+                                text: @tr("选择所属上级分组");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // 关闭选择弹窗
+                        Rectangle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 4px;
+                            background: picker-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                            picker-close-touch := TouchArea {
+                                clicked => { root.is-picker-open = false; }
+                                mouse-cursor: pointer;
+                            }
+
+                            Image {
+                                source: @image-url("../assets/icons/window-close.svg");
+                                width: 10px;
+                                height: 10px;
+                                image-fit: contain;
+                                colorize: picker-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
+                        }
+                    }
+
+                    // 2.2 提示说明
+                    Text {
+                        text: @tr("请在下方树形结构中点选新分组的父级归属（支持多级折叠/展开与双击选定）：");
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                        height: 14px;
+                        vertical-alignment: center;
+                    }
+
+                    // 2.3 树形选择器主体 (高度 220px，宽敞开阔)
+                    GroupTreeSelector {
+                        options: root.group-options;
+                        selected-id <=> root.temp-selected-id;
+                        toggle-group(id) => { root.toggle-group(id); }
+                        selection-changed(id, name) => {
+                            root.temp-selected-id = id;
+                            root.temp-selected-name = name;
+                        }
+                        height: 220px;
+                    }
+
+                    // 2.4 底部操作栏
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 32px;
+
+                        // 当前已选提示
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            horizontal-stretch: 1;
+
+                            Text {
+                                text: @tr("已选: ") + root.temp-selected-name;
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.accent;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+                        }
+
+                        // 按钮组
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: end;
+
+                            // 取消选择
+                            Rectangle {
+                                width: 68px;
+                                height: 30px;
+                                border-radius: AppTheme.radius-medium;
+                                background: picker-cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                picker-cancel-touch := TouchArea {
+                                    clicked => { root.is-picker-open = false; }
+                                    mouse-cursor: pointer;
+                                }
+
+                                Text {
+                                    text: @tr("取消");
+                                    font-size: 11px;
+                                    color: AppTheme.foreground;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // 确定选定
+                            Rectangle {
+                                width: 86px;
+                                height: 30px;
+                                border-radius: AppTheme.radius-medium;
+                                background: picker-confirm-touch.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
+
+                                picker-confirm-touch := TouchArea {
+                                    clicked => {
+                                        root.selected-parent-id = root.temp-selected-id;
+                                        root.selected-parent-name = root.temp-selected-name;
+                                        root.is-picker-open = false;
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                Text {
+                                    text: @tr("确定选定");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: #ffffff;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
                             }
                         }
                     }
