@@ -6,7 +6,11 @@
 
 pub mod domain;
 pub mod state;
+pub mod storage;
 pub mod theme;
 
-pub use domain::host::HostRecord;
+pub use domain::{group::GroupRecord, host::HostRecord};
 pub use state::core_state::CoreState;
+pub use storage::{
+    AppStorage, GroupRepository, HostRepository, MockStorage, StorageError, StorageResult,
+};

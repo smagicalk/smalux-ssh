@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model};
-use smagical_core::CoreState;
+use smagical_core::{AppStorage, CoreState, GroupRecord, HostRecord};
 use smagical_debug::{
     calculate_node_width, generate_batch_hosts, get_preset_by_id, BatchGenerateConfig, DebugRawNode,
 };
@@ -349,11 +349,78 @@ fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
     result
 }
 
-/// 获取系统初始化主控树结构数据 (来自 smagical-debug minimal 预设，默认文件夹在上方)
-fn get_initial_master_tree() -> Vec<RawTreeNode> {
-    let (tree, _) = get_preset_by_id("minimal");
-    let raw_tree: Vec<RawTreeNode> = tree.into_iter().map(RawTreeNode::from).collect();
-    sort_tree_hierarchy(&raw_tree)
+/// 从底层存储门面 (AppStorage) 构建 UI 层专用的全量原始树形节点列表
+fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTreeNode> {
+    let groups = storage.groups().list_all().unwrap_or_default();
+    let hosts = storage.hosts().list_all().unwrap_or_default();
+
+    let mut result = Vec::new();
+
+    fn insert_children(
+        parent_id_opt: Option<&str>,
+        level: i32,
+        groups: &[GroupRecord],
+        hosts: &[HostRecord],
+        out: &mut Vec<RawTreeNode>,
+    ) {
+        // 1. 递归放入当前父级下的所有子分组
+        let current_groups: Vec<&GroupRecord> = groups
+            .iter()
+            .filter(|g| match parent_id_opt {
+                Some(p_id) => g.parent_id.as_deref() == Some(p_id),
+                None => g.parent_id.is_none() || g.parent_id.as_deref() == Some(""),
+            })
+            .collect();
+
+        for g in current_groups {
+            let child_host_count = hosts
+                .iter()
+                .filter(|h| h.parent_group_id.as_deref() == Some(&g.id))
+                .count();
+
+            out.push(RawTreeNode {
+                id: g.id.clone(),
+                name: g.name.clone(),
+                is_group: true,
+                parent_id: g.parent_id.clone().unwrap_or_default(),
+                level,
+                address: String::new(),
+                port: 0,
+                status: "online".to_string(),
+                ping_ms: 0,
+                item_count: child_host_count as i32,
+            });
+
+            insert_children(Some(&g.id), level + 1, groups, hosts, out);
+        }
+
+        // 2. 放入属于当前父级的所有直属主机
+        let current_hosts: Vec<&HostRecord> = hosts
+            .iter()
+            .filter(|h| match parent_id_opt {
+                Some(p_id) => h.parent_group_id.as_deref() == Some(p_id),
+                None => h.parent_group_id.is_none() || h.parent_group_id.as_deref() == Some(""),
+            })
+            .collect();
+
+        for h in current_hosts {
+            out.push(RawTreeNode {
+                id: h.id.clone(),
+                name: h.name.clone(),
+                is_group: false,
+                parent_id: h.parent_group_id.clone().unwrap_or_default(),
+                level,
+                address: h.address.clone(),
+                port: h.port as i32,
+                status: h.status.clone(),
+                ping_ms: h.ping_ms,
+                item_count: 0,
+            });
+        }
+    }
+
+    insert_children(None, 0, &groups, &hosts, &mut result);
+    sort_tree_hierarchy(&result)
 }
 
 /// 构建新建分组弹窗中的上级分组树形选项数据模型 (Group Options Data)。
@@ -468,30 +535,7 @@ fn build_visible_tree_nodes(tree: &[RawTreeNode], expanded: &HashSet<String>) ->
     visible
 }
 
-/// 静态主机卡片视图数据定义 (Raw Host Card)
-struct RawHostCard {
-    /// 主机 ID
-    id: &'static str,
-    /// 主机名称
-    name: &'static str,
-    /// IP 地址或主机名
-    address: &'static str,
-    /// 连接端口
-    port: i32,
-    /// 所属分组标签
-    group: &'static str,
-    /// 在线状态
-    status: &'static str,
-    /// 延迟毫秒数
-    ping_ms: i32,
-}
 
-/// 全局主控静态主机卡片列表 (测试小数据集时的自隐藏滚动条表现)
-const MASTER_HOST_CARDS: &[RawHostCard] = &[
-    RawHostCard { id: "1", name: "prod-server-01", address: "192.168.1.100", port: 22, group: "生产集群", status: "online", ping_ms: 21 },
-    RawHostCard { id: "2", name: "web-server-02", address: "192.168.1.101", port: 22, group: "生产集群", status: "online", ping_ms: 25 },
-    RawHostCard { id: "3", name: "backup-node", address: "192.168.1.200", port: 22, group: "备份节点", status: "offline", ping_ms: 0 },
-];
 
 /// 根据搜索关键字构建匹配的树形结构节点 (Search Tree Nodes)。
 ///
@@ -636,9 +680,6 @@ fn sync_active_session_ui(
 
 /// 创建并运行桌面应用主窗口。
 pub fn run() -> anyhow::Result<()> {
-    let mut core = CoreState::new();
-    core.seed_example_host();
-
     let window = AppWindow::new()?;
     let themes = Rc::new(initialize_theme_service(None)?);
 
@@ -756,18 +797,29 @@ pub fn run() -> anyhow::Result<()> {
         }
     });
 
-    // 初始化主控树形结构与分组生成器
-    let master_tree = Rc::new(RefCell::new(get_initial_master_tree()));
+    // 初始化 CoreState 核心状态引擎 (基于 MockStorage 预设种子存储)
+    let core_state = Rc::new(CoreState::new_mock());
+
+    // 从存储层读取初始主控树形结构与分组生成器
+    let initial_tree = build_raw_tree_from_storage(core_state.storage().as_ref());
+    let master_tree = Rc::new(RefCell::new(initial_tree));
     let next_group_id = Rc::new(RefCell::new(100));
 
-    // 初始化树形结构折叠状态 (默认展开生产集群)
-    let expanded_groups = Rc::new(RefCell::new(HashSet::from([
-        "grp-prod".to_string(),
-    ])));
+    // 从存储层初始化树形结构折叠状态 (读取所有 is_expanded == true 的分组)
+    let initial_expanded: HashSet<String> = core_state
+        .storage()
+        .groups()
+        .list_all()
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|g| g.is_expanded)
+        .map(|g| g.id)
+        .collect();
+    let expanded_groups = Rc::new(RefCell::new(initial_expanded));
 
     let search_query = Rc::new(RefCell::new(String::new()));
 
-    // 初始化上级分组选择器折叠状态 (默认展开根目录与生产集群)
+    // 初始化上级分组选择器折叠状态 (默认展开根目录与顶级分组)
     let selector_expanded_groups = Rc::new(RefCell::new(HashSet::from([
         "root".to_string(),
         "grp-prod".to_string(),
@@ -782,17 +834,24 @@ pub fn run() -> anyhow::Result<()> {
     window.set_tree_content_width(calculate_max_tree_width(&initial_nodes));
     window.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(initial_nodes))));
 
-    // 初始渲染卡片列表 (全量 20+ 台主机资产，供卡片模式纵向滚动测试)
-    let initial_cards: Vec<HostItemData> = MASTER_HOST_CARDS
-        .iter()
-        .map(|h| HostItemData {
-            id: h.id.into(),
-            name: h.name.into(),
-            address: h.address.into(),
-            port: h.port,
-            group: h.group.into(),
-            status: h.status.into(),
-            ping_ms: h.ping_ms,
+    // 从存储层初始渲染卡片列表 (全量主机资产，供卡片模式纵向滚动测试)
+    let all_hosts = core_state.storage().hosts().list_all().unwrap_or_default();
+    let all_groups = core_state.storage().groups().list_all().unwrap_or_default();
+    let initial_cards: Vec<HostItemData> = all_hosts
+        .into_iter()
+        .map(|h| {
+            let group_name = h.parent_group_id.as_deref().and_then(|p_id| {
+                all_groups.iter().find(|g| g.id == p_id).map(|g| g.name.clone())
+            }).unwrap_or_else(|| "未分组".to_string());
+            HostItemData {
+                id: h.id.into(),
+                name: h.name.into(),
+                address: h.address.into(),
+                port: h.port as i32,
+                group: group_name.into(),
+                status: h.status.into(),
+                ping_ms: h.ping_ms,
+            }
         })
         .collect();
     let master_cards = Rc::new(RefCell::new(initial_cards.clone()));
@@ -822,6 +881,7 @@ pub fn run() -> anyhow::Result<()> {
     let master_tree_toggle = Rc::clone(&master_tree);
     let expanded_clone = Rc::clone(&expanded_groups);
     let search_query_toggle = Rc::clone(&search_query);
+    let core_state_toggle = Rc::clone(&core_state);
     window.on_toggle_tree_group(move |id| {
         if let Some(w) = window_weak.upgrade() {
             let mut set = expanded_clone.borrow_mut();
@@ -832,6 +892,9 @@ pub fn run() -> anyhow::Result<()> {
             } else {
                 set.insert(id_str.clone());
             }
+            // 同步至存储层
+            let _ = core_state_toggle.storage().groups().set_expanded(&id_str, is_expanding);
+
             let tree = master_tree_toggle.borrow();
             let q = search_query_toggle.borrow().clone();
             let next_nodes = if q.is_empty() {
@@ -843,7 +906,7 @@ pub fn run() -> anyhow::Result<()> {
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             let gname = tree.iter().find(|n| n.id == id_str).map(|n| n.name.as_str()).unwrap_or(id_str.as_str());
-            tracing::debug!(target: "smagical_ui::tree", "{}分组: {}", if is_expanding { "展开" } else { "折叠" }, gname);
+            tracing::debug!(target: "smagical_ui::tree", "{}分组: {} (已同步存储层)", if is_expanding { "展开" } else { "折叠" }, gname);
             sync_ui_debug_logs(&w);
         }
     });
@@ -855,6 +918,7 @@ pub fn run() -> anyhow::Result<()> {
     let expanded_move = Rc::clone(&expanded_groups);
     let selector_expanded_move = Rc::clone(&selector_expanded_groups);
     let search_query_move = Rc::clone(&search_query);
+    let core_state_move = Rc::clone(&core_state);
     window.on_move_tree_node(move |src_id, target_id, drop_position| {
         if let Some(w) = window_weak.upgrade() {
             let src_str = src_id.to_string();
@@ -871,15 +935,19 @@ pub fn run() -> anyhow::Result<()> {
                 ) {
                     if src_idx != tgt_idx {
                         let item = cards.remove(src_idx);
-                        let target_insert_idx = if src_idx < tgt_idx {
-                            tgt_idx // 移出后前面少了一个元素，原 tgt 后面位置变为 tgt_idx
+                        let target_insert_idx = if pos_str == "before" {
+                            if src_idx < tgt_idx { tgt_idx.saturating_sub(1) } else { tgt_idx }
                         } else {
-                            tgt_idx + 1
+                            if src_idx < tgt_idx { tgt_idx } else { tgt_idx + 1 }
                         };
                         let final_pos = target_insert_idx.min(cards.len());
                         let item_name = item.name.to_string();
                         let tgt_name = cards.get(tgt_idx.min(cards.len().saturating_sub(1))).map(|c| c.name.to_string()).unwrap_or_default();
                         cards.insert(final_pos, item);
+
+                        // 同步列表排序至存储层
+                        let ordered_ids: Vec<String> = cards.iter().map(|c| c.id.to_string()).collect();
+                        let _ = core_state_move.storage().hosts().update_list_order(&ordered_ids);
 
                         let q = search_query_move.borrow().clone();
                         let display_cards: Vec<HostItemData> = if q.is_empty() {
@@ -893,7 +961,7 @@ pub fn run() -> anyhow::Result<()> {
                         };
                         w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
-                        tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定)", item_name, tgt_name);
+                        tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
                         sync_ui_debug_logs(&w);
                     }
                 }
@@ -932,6 +1000,19 @@ pub fn run() -> anyhow::Result<()> {
                     let next_options = build_group_options(&tree, &selector_expanded_move.borrow());
                     w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_options))));
 
+                    // 同步树形结构迁移至存储层 (Host or Group)
+                    if let Some(moved_node) = tree.iter().find(|n| n.id == src_str) {
+                        if moved_node.is_group {
+                            let _ = core_state_move.storage().groups().move_group(
+                                &src_str,
+                                if moved_node.parent_id.is_empty() { None } else { Some(&moved_node.parent_id) },
+                            );
+                        } else if let Some(mut host_rec) = core_state_move.storage().hosts().get_by_id(&src_str).ok().flatten() {
+                            host_rec.parent_group_id = if moved_node.parent_id.is_empty() { None } else { Some(moved_node.parent_id.clone()) };
+                            let _ = core_state_move.storage().hosts().save(&host_rec);
+                        }
+                    }
+
                     // 树形模式下移动了主机：同步更新列表模式中的所属分组徽章，同时保留用户在列表模式下的自定义相对排序
                     let new_group_name = if let Some(n) = tree.iter().find(|item| item.id == src_str) {
                         if !n.parent_id.is_empty() {
@@ -961,7 +1042,7 @@ pub fn run() -> anyhow::Result<()> {
                     };
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
-                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}])", src_name, pos_str, target_name);
+                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已同步存储层)", src_name, pos_str, target_name);
                     sync_ui_debug_logs(&w);
                 }
                 Err(err_msg) => {
@@ -1084,6 +1165,7 @@ pub fn run() -> anyhow::Result<()> {
     let selector_expanded_create = Rc::clone(&selector_expanded_groups);
     let search_query_create = Rc::clone(&search_query);
     let next_gid_create = Rc::clone(&next_group_id);
+    let core_state_create = Rc::clone(&core_state);
     window.on_create_group(move |parent_id, name| {
         if let Some(w) = window_weak.upgrade() {
             let p_id = parent_id.to_string();
@@ -1116,6 +1198,14 @@ pub fn run() -> anyhow::Result<()> {
                 ping_ms: 0,
                 item_count: 0,
             };
+
+            // 同步保存至存储层
+            let group_rec = if target_parent_id.is_empty() {
+                GroupRecord::root(new_id.clone(), g_name.clone())
+            } else {
+                GroupRecord::child(new_id.clone(), g_name.clone(), target_parent_id.clone(), level)
+            };
+            let _ = core_state_create.storage().groups().save(&group_rec);
 
             // 智能定位插入位置：插入到同父节点的子项末尾，或追加到分组后
             let mut insert_pos = tree.len();
@@ -1152,7 +1242,7 @@ pub fn run() -> anyhow::Result<()> {
             w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
-            tracing::info!(target: "smagical_ui::tree", "创建新分组: {} (上级: {})", g_name, if p_id.is_empty() { "根目录" } else { &p_id });
+            tracing::info!(target: "smagical_ui::tree", "创建新分组: {} (上级: {}, 已同步存储层)", g_name, if p_id.is_empty() { "根目录" } else { &p_id });
             sync_ui_debug_logs(&w);
         }
     });
