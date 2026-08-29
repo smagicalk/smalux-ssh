@@ -8,15 +8,17 @@
 
 ```text
 crates/smagical-ui/ui/
-├── main.slint                  # 顶层主窗口组件 (AppWindow: 组织全屏无边框布局与状态连接)
+├── main.slint                  # 顶层主窗口组件 (AppWindow: 组织全屏无边框布局与全局状态桥接)
 ├── assets/                     # 静态资源目录
 │   └── icons/                  # 统一风格的 SVG 矢量图标库 (20+ 矢量图标)
 ├── components/                 # 高复用原子 UI 组件库
 │   ├── action-bar-item.slint   # 活动栏/工具栏图标项组件 (含悬停态、激活条与 Tooltip)
 │   ├── command-palette.slint   # Ctrl+K 全局指令与快捷搜索浮层面板
 │   ├── create-group-modal.slint# 新建主机分组模态弹窗 (集成树状选择与满宽深色输入框)
+│   ├── debug-modal.slint       # 开发者调试工作台弹窗 (全量 Tracing 日志、预设注入、批量造数与状态模拟)
 │   ├── drawer-container.slint  # 统一可折叠侧边抽屉容器 (含标题、折叠按钮与分割线)
 │   ├── group-tree-selector.slint # 通用树状分组选择器 (支持无限层级折叠/展开与单选指示)
+│   ├── new-session-modal.slint # 快速新建终端会话中心弹窗 (本地真实 Shell 探测与远程主机秒级检索)
 │   ├── progress-bar.slint      # 细粒度进度条组件
 │   ├── search-input.slint      # 统一暗色搜索输入框 (支持一键清空与原生光标聚焦)
 │   ├── status-dot.slint        # 主机健康状态圆点 (在线绿/告警黄/异常红/离线灰)
@@ -55,7 +57,6 @@ crates/smagical-ui/ui/
 
 ### 1. 通用树状分组选择器 (`GroupTreeSelector`)
 - **文件路径**：[`components/group-tree-selector.slint`](components/group-tree-selector.slint)
-- **设计目的**：在新建分组弹窗、资产迁移等场景中，提供统一、清晰的树形单选体验；
 - **交互特性**：
   - 左侧独立 `18px` 折叠三角热区，支持点击折叠/展开；
   - 整行双击快捷折叠/展开子节点；
@@ -64,25 +65,33 @@ crates/smagical-ui/ui/
 
 ### 2. 新建主机分组弹窗 (`CreateGroupModal`)
 - **文件路径**：[`components/create-group-modal.slint`](components/create-group-modal.slint)
-- **设计目的**：为主机资产创建多级层级分组；
 - **交互特性**：
   - 居中 `460px x 420px` 精致深色卡片，内容 `100%` 满宽排布无空白；
   - 上半部内嵌 `200px` 高度树形所属上级选择器；
   - 下半部输入框采用纯暗色设计（绝无白底），左侧固定文件夹图标，右侧绝对锚定 `✕` 一键清空按钮；
   - 输入框支持 `Enter` 回车快速提交创建。
 
-### 3. 主机资产管理抽屉 (`HostsDrawer`)
+### 3. 快速新建终端弹窗 (`NewSessionModal`)
+- **文件路径**：[`components/new-session-modal.slint`](components/new-session-modal.slint)
+- **交互特性**：
+  - 点击 TabBar `+` 号按钮触发，居中弹出快速启动中心；
+  - 顶部搜索框支持毫秒级关键字检索；
+  - 上半部分呈现本地真实探测到的 Shell 环境（PowerShell, WSL, Git Bash, CMD 等）；
+  - 下半部分列出已保存的远程主机资产，支持双击/回车一键开通终端会话。
+
+### 4. 开发者调试工作台 (`DebugModal`)
+- **文件路径**：[`components/debug-modal.slint`](components/debug-modal.slint)
+- **交互特性**：
+  - 集成全系统实时 Tracing 日志流，支持按级别过滤与一键清空；
+  - 场景预设一键加载（极简/K8s/微服务/百台压测）；
+  - 批量生成主机测试数据与批量状态/端口变更模拟。
+
+### 5. 主机资产管理抽屉 (`HostsDrawer`)
 - **文件路径**：[`views/left_drawers/hosts_drawer.slint`](views/left_drawers/hosts_drawer.slint)
 - **交互特性**：
   - **双模式自由切换**：支持**树形层级折叠视图**与**卡片列表平铺视图**；
-  - **横向自适应滚动**：超长分组或主机名称自动横向延展，激活底部 `4px` 悬浮主题高亮横向滚动条，支持鼠标拖拽、`Shift + 滚轮` 及触摸板双指轻扫；
+  - **横向自适应滚动**：超长分组或主机名称自动横向延展，激活底部 `4px` 悬浮主题高亮横向滚动条；
   - **实时模糊过滤**：顶部搜索框实时联动过滤主机名、IP、端口及分组。
-
-### 4. 左侧主活动导航栏 (`LeftActivityBar`)
-- **文件路径**：[`views/left_activity_bar.slint`](views/left_activity_bar.slint)
-- **排列顺序**：
-  - 上半区（业务资产）：主机管理 $\to$ 文件管理 $\to$ 凭据保管 $\to$ 指令片段 $\to$ 网络隧道 $\to$ **历史会话**；
-  - 下半区（系统工具）：数据备份与恢复 $\to$ 偏好设置 $\to$ **深色/浅色一键切换**。
 
 ---
 
