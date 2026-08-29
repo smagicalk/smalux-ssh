@@ -1,6 +1,7 @@
 use std::sync::{Arc, RwLock};
-use crate::domain::{group::GroupRecord, host::HostRecord};
+use crate::domain::{group::GroupRecord, host::{HostRecord, HostStatus}};
 use super::{AppStorage, GroupRepository, HostRepository, StorageError, StorageResult};
+
 
 /// 线程安全的内存主机仓储实现
 #[derive(Debug, Default, Clone)]
@@ -162,25 +163,63 @@ impl GroupRepository for MockGroupRepository {
 
     fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
-        
+
         let new_parent_str = new_parent_id.map(|s| s.to_string());
+
+        // 计算新层级
         let new_level = match &new_parent_str {
             Some(p_id) => {
-                let parent = write_guard.iter().find(|g| &g.id == p_id)
-                    .ok_or_else(|| StorageError::NotFound(format!("目标父级分组不存在: {}", p_id)))?;
-                parent.level + 1
+                write_guard.iter().find(|g| &g.id == p_id)
+                    .ok_or_else(|| StorageError::NotFound(format!("目标父级分组不存在: {}", p_id)))?
+                    .level + 1
             }
             None => 0,
         };
 
+        // 获取旧层级
+        let old_level = write_guard.iter().find(|g| g.id == id)
+            .ok_or_else(|| StorageError::NotFound(format!("分组不存在: {}", id)))?
+            .level;
+
+        let level_delta = new_level - old_level;
+
+        // BFS 收集所有后裔分组 ID（先只读，不持有可变引用）
+        let mut descendants: Vec<String> = Vec::new();
+        let mut frontier = vec![id.to_string()];
+        while !frontier.is_empty() {
+            let mut next_frontier = Vec::new();
+            for parent_id in &frontier {
+                for g in write_guard.iter() {
+                    if g.parent_id.as_deref() == Some(parent_id.as_str()) {
+                        descendants.push(g.id.clone());
+                        next_frontier.push(g.id.clone());
+                    }
+                }
+            }
+            frontier = next_frontier;
+        }
+
+        // 更新目标分组自身
         if let Some(g) = write_guard.iter_mut().find(|g| g.id == id) {
             g.parent_id = new_parent_str.clone();
             g.level = new_level;
-            tracing::info!(target: "smagical_core::storage", "MockStorage 迁移分组: {} -> 上级: {:?}", id, new_parent_str);
-            Ok(())
-        } else {
-            Err(StorageError::NotFound(format!("分组不存在: {}", id)))
         }
+
+        // 递归更新所有后裔分组层级
+        if level_delta != 0 {
+            for desc_id in &descendants {
+                if let Some(g) = write_guard.iter_mut().find(|g| &g.id == desc_id) {
+                    g.level += level_delta;
+                }
+            }
+        }
+
+        tracing::info!(
+            target: "smagical_core::storage",
+            "MockStorage 迁移分组: {} -> 上级: {:?} (递归更新 {} 个后裔分组层级)",
+            id, new_parent_str, descendants.len()
+        );
+        Ok(())
     }
 }
 
@@ -266,7 +305,7 @@ impl MockStorage {
                 address: "192.168.1.100".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-prod".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 21,
                 sort_order: 0,
                 notes: "主生产业务服务".to_string(),
@@ -277,7 +316,7 @@ impl MockStorage {
                 address: "10.0.0.1".to_string(),
                 port: 6443,
                 parent_group_id: Some("grp-k8s".to_string()),
-                status: "warning".to_string(),
+                status: HostStatus::Warning,
                 ping_ms: 68,
                 sort_order: 1,
                 notes: "K8s 主控节点".to_string(),
@@ -288,7 +327,7 @@ impl MockStorage {
                 address: "10.0.0.11".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-k8s".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 24,
                 sort_order: 2,
                 notes: "K8s 工作节点 1".to_string(),
@@ -299,7 +338,7 @@ impl MockStorage {
                 address: "10.0.1.50".to_string(),
                 port: 5432,
                 parent_group_id: Some("grp-db".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 18,
                 sort_order: 3,
                 notes: "PostgreSQL 主库".to_string(),
@@ -310,7 +349,7 @@ impl MockStorage {
                 address: "10.0.1.51".to_string(),
                 port: 5432,
                 parent_group_id: Some("grp-db".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 20,
                 sort_order: 4,
                 notes: "PostgreSQL 从库".to_string(),
@@ -321,7 +360,7 @@ impl MockStorage {
                 address: "10.0.2.10".to_string(),
                 port: 6379,
                 parent_group_id: Some("grp-edge".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 12,
                 sort_order: 5,
                 notes: "Redis 缓存分片".to_string(),
@@ -332,7 +371,7 @@ impl MockStorage {
                 address: "47.98.12.33".to_string(),
                 port: 443,
                 parent_group_id: Some("grp-edge".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 35,
                 sort_order: 6,
                 notes: "边缘认证网关".to_string(),
@@ -343,7 +382,7 @@ impl MockStorage {
                 address: "10.0.8.200".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-ai".to_string()),
-                status: "online".to_string(),
+                status: HostStatus::Online,
                 ping_ms: 14,
                 sort_order: 7,
                 notes: "NVIDIA H100 推理卡".to_string(),
@@ -354,7 +393,7 @@ impl MockStorage {
                 address: "192.168.100.250".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-dr".to_string()),
-                status: "offline".to_string(),
+                status: HostStatus::Offline,
                 ping_ms: 0,
                 sort_order: 8,
                 notes: "冷备容灾节点".to_string(),
@@ -365,12 +404,13 @@ impl MockStorage {
                 address: "10.0.12.88".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-dr".to_string()),
-                status: "offline".to_string(),
+                status: HostStatus::Offline,
                 ping_ms: 0,
                 sort_order: 9,
                 notes: "预发接口测试机".to_string(),
             },
         ];
+
 
         tracing::info!(
             target: "smagical_core::storage",

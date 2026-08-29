@@ -10,16 +10,33 @@ pub mod local_shells;
 /// Slint 主题资源注册、内置预设和运行时应用接口。
 pub mod theme;
 
+/// 主机资产树形数据模型与纯函数操作层。
+pub(crate) mod tree_model;
+
+/// 终端会话管理与 Slint UI 同步。
+pub(crate) mod session;
+
+/// Debug 日志面板与全局 Tracing 日志同步。
+pub(crate) mod debug_ui;
+
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
 
 use slint::{ComponentHandle, Model};
-use smagical_core::{AppStorage, CoreState, GroupRecord, HostRecord};
+use smagical_core::{CoreState, GroupRecord};
 use smagical_debug::{
-    calculate_node_width, generate_batch_hosts, get_preset_by_id, BatchGenerateConfig, DebugRawNode,
+    generate_batch_hosts, get_preset_by_id, BatchGenerateConfig,
 };
 use theme::{apply_theme_by_id, initialize_theme_service};
+
+use tree_model::{
+    RawTreeNode, build_raw_tree_from_storage, build_group_options,
+    build_visible_tree_nodes, build_search_tree_nodes, calculate_max_tree_width,
+    ensure_raw_group_hierarchy, move_and_reorder_raw_node,
+};
+use session::{TerminalSessionInfo, sync_active_session_ui};
+use debug_ui::sync_ui_debug_logs;
 
 #[allow(missing_docs, dead_code)]
 mod generated {
@@ -30,654 +47,6 @@ pub use generated::{
     AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData, HostTreeNode,
     LocalShellItemData, LogEntryData, TabData,
 };
-
-/// 原始树形节点数据结构 (Raw Tree Node)
-///
-/// 内部核心状态模型，用于完整表达主机管理中所有的分组节点与主机实例节点。
-#[derive(Clone, Debug)]
-struct RawTreeNode {
-    /// 节点的全局唯一 ID (如: "grp-prod"、"host-k8s-w1")
-    id: String,
-    /// 节点的展示名称 (如: "生产集群 (Production)"、"k8s-control-plane")
-    name: String,
-    /// 是否为分组节点 (true: 文件夹分组, false: 具体主机资产)
-    is_group: bool,
-    /// 所属直接父级节点的 ID (顶级根节点为空字符串 "")
-    parent_id: String,
-    /// 树状层级深度 (0: 顶级根节点, 1: 一级子节点, 2: 二级子节点...)
-    level: i32,
-    /// 主机 IP 地址或域名 (仅主机节点有效，分组节点为空字符串)
-    address: String,
-    /// SSH 连接端口 (例如: 22, 6443, 5432)
-    port: i32,
-    /// 主机在线状态枚举字符串 ("online" 在线, "warning" 告警, "offline" 离线)
-    status: String,
-    /// ICMP 网络延迟测速结果 (单位: 毫秒，0 表示未测速或离线)
-    ping_ms: i32,
-    /// 分组下包含的主机/子节点总数量 (仅分组节点有效)
-    item_count: i32,
-}
-
-impl From<DebugRawNode> for RawTreeNode {
-    fn from(n: DebugRawNode) -> Self {
-        Self {
-            id: n.id,
-            name: n.name,
-            is_group: n.is_group,
-            parent_id: n.parent_id,
-            level: n.level,
-            address: n.address,
-            port: n.port,
-            status: n.status,
-            ping_ms: n.ping_ms,
-            item_count: n.item_count,
-        }
-    }
-}
-
-/// 解析路径（如 "集群/k8s" 或 "亚太/中国区/杭州"）并在树中逐级确保嵌套分组节点存在
-///
-/// 返回 (叶子分组 ID, 叶子分组深度层级, 叶子分组展示名称)
-fn ensure_raw_group_hierarchy(tree: &mut Vec<RawTreeNode>, path: &str) -> (String, i32, String) {
-    let clean_path = path.replace('\\', "/");
-    let segments: Vec<&str> = clean_path
-        .split('/')
-        .map(|s| s.trim())
-        .filter(|s| !s.is_empty())
-        .collect();
-
-    if segments.is_empty() {
-        return ("".to_string(), 0, "未分组".to_string());
-    }
-
-    let mut current_parent_id = "".to_string();
-    let mut current_level = 0;
-    let mut last_name = "默认分组".to_string();
-    let mut cumulative_slug = String::new();
-
-    for (idx, seg) in segments.iter().enumerate() {
-        last_name = seg.to_string();
-        if !cumulative_slug.is_empty() {
-            cumulative_slug.push('-');
-        }
-        cumulative_slug.push_str(&seg.to_lowercase().replace(' ', "-"));
-        let grp_id = format!("grp-{}", cumulative_slug);
-
-        let existing_idx = tree.iter().position(|n| {
-            n.is_group && n.name == *seg && n.parent_id == current_parent_id
-        });
-
-        if let Some(pos) = existing_idx {
-            current_parent_id = tree[pos].id.clone();
-            current_level = tree[pos].level;
-        } else {
-            tree.push(RawTreeNode {
-                id: grp_id.clone(),
-                name: seg.to_string(),
-                is_group: true,
-                parent_id: current_parent_id.clone(),
-                level: idx as i32,
-                address: "".to_string(),
-                port: 0,
-                status: "online".to_string(),
-                ping_ms: 0,
-                item_count: 0,
-            });
-            current_parent_id = grp_id;
-            current_level = idx as i32;
-        }
-    }
-
-    (current_parent_id, current_level, last_name)
-}
-
-/// 移动与调序树形节点（主机或分组）
-///
-/// 支持四种落点模式：
-/// - "inside": 移入目标分组内部作为其子节点
-/// - "before": 插在目标节点上方（成为目标节点的同级前序节点）
-/// - "after": 插在目标节点下方（成为目标节点的同级后序节点）
-/// - "root": 移至顶级根目录
-fn move_and_reorder_raw_node(
-    tree: &mut Vec<RawTreeNode>,
-    source_id: &str,
-    target_id: &str,
-    drop_position: &str,
-) -> Result<(String /* source_name */, String /* target_name */), String> {
-    let source_idx = tree
-        .iter()
-        .position(|n| n.id == source_id)
-        .ok_or_else(|| "未找到源节点".to_string())?;
-
-    let is_source_group = tree[source_idx].is_group;
-    let source_name = tree[source_idx].name.clone();
-    let old_level = tree[source_idx].level;
-
-    // 自身拖拽且无需调序保护
-    if source_id == target_id {
-        if drop_position == "inside" {
-            return Err("不能将节点移入自身内部".to_string());
-        }
-        return Ok((source_name.clone(), source_name));
-    }
-
-    // 收集源节点的所有后裔节点 ID（如果源节点是分组）
-    let mut source_descendant_ids = HashSet::new();
-    if is_source_group {
-        let mut queue = vec![source_id.to_string()];
-        while let Some(parent) = queue.pop() {
-            for n in tree.iter() {
-                if n.parent_id == parent {
-                    source_descendant_ids.insert(n.id.clone());
-                    if n.is_group {
-                        queue.push(n.id.clone());
-                    }
-                }
-            }
-        }
-    }
-
-    // 循环引用检测：严禁将父节点移动/插入到其任意子孙节点中
-    if source_descendant_ids.contains(target_id) {
-        return Err("不能将父分组移动至其子孙节点中 (循环引用)".to_string());
-    }
-
-    // 计算目标 Parent ID 和目标层级 Level
-    let (new_parent_id, new_level, target_name) = if drop_position == "root" || target_id == "root" || target_id.is_empty() {
-        ("".to_string(), 0, "顶级根目录".to_string())
-    } else {
-        let target_node = tree
-            .iter()
-            .find(|n| n.id == target_id)
-            .ok_or_else(|| "未找到目标节点".to_string())?;
-
-        if drop_position == "inside" {
-            if !target_node.is_group {
-                return Err("只能移入文件夹分组内部".to_string());
-            }
-            (target_node.id.clone(), target_node.level + 1, target_node.name.clone())
-        } else {
-            // "before" 或 "after": 与目标节点同级
-            (target_node.parent_id.clone(), target_node.level, target_node.name.clone())
-        }
-    };
-
-    let level_delta = new_level - old_level;
-
-    // 提取源子树所有节点 (源节点及其所有后代)
-    let mut is_subtree_set = HashSet::new();
-    is_subtree_set.insert(source_id.to_string());
-    for id in &source_descendant_ids {
-        is_subtree_set.insert(id.clone());
-    }
-
-    let mut subtree_nodes = Vec::new();
-    let mut remaining_tree = Vec::new();
-
-    for mut node in tree.drain(..) {
-        if is_subtree_set.contains(&node.id) {
-            if node.id == source_id {
-                node.parent_id = new_parent_id.clone();
-                node.level = new_level;
-            } else {
-                node.level += level_delta;
-            }
-            subtree_nodes.push(node);
-        } else {
-            remaining_tree.push(node);
-        }
-    }
-
-    // 根据落点位置重插入到 remaining_tree
-    if drop_position == "before" {
-        let target_pos = remaining_tree
-            .iter()
-            .position(|n| n.id == target_id)
-            .unwrap_or(0);
-        for (i, node) in subtree_nodes.into_iter().enumerate() {
-            remaining_tree.insert(target_pos + i, node);
-        }
-    } else if drop_position == "after" {
-        let target_pos = remaining_tree
-            .iter()
-            .position(|n| n.id == target_id)
-            .unwrap_or_else(|| remaining_tree.len().saturating_sub(1));
-
-        let mut insert_pos = target_pos + 1;
-        // 如果目标也是分组，则插入到该目标分组的整个子树后面
-        if remaining_tree[target_pos].is_group {
-            let mut target_descendants = HashSet::new();
-            let mut q = vec![target_id.to_string()];
-            while let Some(p) = q.pop() {
-                for n in &remaining_tree {
-                    if n.parent_id == p {
-                        target_descendants.insert(n.id.clone());
-                        if n.is_group {
-                            q.push(n.id.clone());
-                        }
-                    }
-                }
-            }
-            while insert_pos < remaining_tree.len() && target_descendants.contains(&remaining_tree[insert_pos].id) {
-                insert_pos += 1;
-            }
-        }
-
-        for (i, node) in subtree_nodes.into_iter().enumerate() {
-            remaining_tree.insert(insert_pos + i, node);
-        }
-    } else if drop_position == "inside" {
-        let target_pos = remaining_tree
-            .iter()
-            .position(|n| n.id == target_id)
-            .unwrap_or(0);
-
-        let mut insert_pos = target_pos + 1;
-        let mut target_descendants = HashSet::new();
-        let mut q = vec![target_id.to_string()];
-        while let Some(p) = q.pop() {
-            for n in &remaining_tree {
-                if n.parent_id == p {
-                    target_descendants.insert(n.id.clone());
-                    if n.is_group {
-                        q.push(n.id.clone());
-                    }
-                }
-            }
-        }
-        while insert_pos < remaining_tree.len() && target_descendants.contains(&remaining_tree[insert_pos].id) {
-            insert_pos += 1;
-        }
-
-        for (i, node) in subtree_nodes.into_iter().enumerate() {
-            remaining_tree.insert(insert_pos + i, node);
-        }
-    } else {
-        // "root"
-        remaining_tree.extend(subtree_nodes);
-    }
-
-    // 重新统计各分组的 item_count
-    for i in 0..remaining_tree.len() {
-        if remaining_tree[i].is_group {
-            let grp_id = remaining_tree[i].id.clone();
-            let count = remaining_tree.iter().filter(|n| n.parent_id == grp_id).count() as i32;
-            remaining_tree[i].item_count = count;
-        }
-    }
-
-    *tree = remaining_tree;
-
-    Ok((source_name, target_name))
-}
-
-/// 对树形结构节点进行标准化排序 (Canonical Hierarchy Sort: 文件夹始终置顶在上方，主机在下方)
-///
-/// 排序规则：
-/// 1. 同级节点中，文件夹/分组（is_group == true）始终排在最前面，主机排在后面；
-/// 2. 分组之间保持名称自然排序；主机之间按名称自然排序；
-/// 3. 分组的直接子节点严格紧随父分组之后（深度优先遍历 DFS），保持层级结构清晰。
-fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
-    let mut result = Vec::with_capacity(tree.len());
-
-    fn collect_children(parent_id: &str, tree: &[RawTreeNode], result: &mut Vec<RawTreeNode>) {
-        let mut children: Vec<&RawTreeNode> = tree.iter().filter(|n| n.parent_id == parent_id).collect();
-        // 关键逻辑：is_group == true 优先排在前面；若同为分组或同为主机，则按名称自然排序
-        children.sort_by(|a, b| {
-            b.is_group
-                .cmp(&a.is_group)
-                .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
-        });
-
-        for child in children {
-            result.push(child.clone());
-            if child.is_group {
-                collect_children(&child.id, tree, result);
-            }
-        }
-    }
-
-    collect_children("", tree, &mut result);
-
-    // 容错：如果有孤立节点（其 parent_id 不在树中），追加至末尾
-    for node in tree {
-        if !result.iter().any(|r| r.id == node.id) {
-            result.push(node.clone());
-        }
-    }
-
-    result
-}
-
-/// 从底层存储门面 (AppStorage) 构建 UI 层专用的全量原始树形节点列表
-fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTreeNode> {
-    let groups = storage.groups().list_all().unwrap_or_default();
-    let hosts = storage.hosts().list_all().unwrap_or_default();
-
-    let mut result = Vec::new();
-
-    fn insert_children(
-        parent_id_opt: Option<&str>,
-        level: i32,
-        groups: &[GroupRecord],
-        hosts: &[HostRecord],
-        out: &mut Vec<RawTreeNode>,
-    ) {
-        // 1. 递归放入当前父级下的所有子分组
-        let current_groups: Vec<&GroupRecord> = groups
-            .iter()
-            .filter(|g| match parent_id_opt {
-                Some(p_id) => g.parent_id.as_deref() == Some(p_id),
-                None => g.parent_id.is_none() || g.parent_id.as_deref() == Some(""),
-            })
-            .collect();
-
-        for g in current_groups {
-            let child_host_count = hosts
-                .iter()
-                .filter(|h| h.parent_group_id.as_deref() == Some(&g.id))
-                .count();
-
-            out.push(RawTreeNode {
-                id: g.id.clone(),
-                name: g.name.clone(),
-                is_group: true,
-                parent_id: g.parent_id.clone().unwrap_or_default(),
-                level,
-                address: String::new(),
-                port: 0,
-                status: "online".to_string(),
-                ping_ms: 0,
-                item_count: child_host_count as i32,
-            });
-
-            insert_children(Some(&g.id), level + 1, groups, hosts, out);
-        }
-
-        // 2. 放入属于当前父级的所有直属主机
-        let current_hosts: Vec<&HostRecord> = hosts
-            .iter()
-            .filter(|h| match parent_id_opt {
-                Some(p_id) => h.parent_group_id.as_deref() == Some(p_id),
-                None => h.parent_group_id.is_none() || h.parent_group_id.as_deref() == Some(""),
-            })
-            .collect();
-
-        for h in current_hosts {
-            out.push(RawTreeNode {
-                id: h.id.clone(),
-                name: h.name.clone(),
-                is_group: false,
-                parent_id: h.parent_group_id.clone().unwrap_or_default(),
-                level,
-                address: h.address.clone(),
-                port: h.port as i32,
-                status: h.status.clone(),
-                ping_ms: h.ping_ms,
-                item_count: 0,
-            });
-        }
-    }
-
-    insert_children(None, 0, &groups, &hosts, &mut result);
-    sort_tree_hierarchy(&result)
-}
-
-/// 构建新建分组弹窗中的上级分组树形选项数据模型 (Group Options Data)。
-///
-/// # 参数
-/// * `tree` - 完整的全量节点树
-/// * `expanded` - 当前已展开的分组 ID 集合
-///
-/// # 返回值
-/// 返回拍平后的单选选项列表，包含根节点与所有祖先节点处于展开状态的分组项。
-fn build_group_options(tree: &[RawTreeNode], expanded: &HashSet<String>) -> Vec<GroupOptionData> {
-    let mut options = Vec::new();
-
-    // 1. 根节点配置 (是否有子分组与是否展开)
-    let root_has_children = tree.iter().any(|n| n.is_group && n.parent_id.is_empty());
-    let root_is_expanded = expanded.contains("root");
-
-    options.push(GroupOptionData {
-        id: "root".into(),
-        name: "根目录 (作为顶级分组)".into(),
-        level: 0,
-        parent_id: "".into(),
-        has_children: root_has_children,
-        is_expanded: root_is_expanded,
-    });
-
-    if !root_is_expanded {
-        return options;
-    }
-
-    for node in tree {
-        if !node.is_group {
-            continue;
-        }
-
-        // 2. 检查祖先链路是否全部处于展开状态
-        let mut is_visible = true;
-        let mut current_parent = if node.parent_id.is_empty() { "root" } else { node.parent_id.as_str() };
-        while !current_parent.is_empty() {
-            if !expanded.contains(current_parent) {
-                is_visible = false;
-                break;
-            }
-            if current_parent == "root" {
-                break;
-            }
-            if let Some(p) = tree.iter().find(|n| n.id == current_parent) {
-                current_parent = if p.parent_id.is_empty() { "root" } else { p.parent_id.as_str() };
-            } else {
-                break;
-            }
-        }
-
-        if is_visible {
-            let has_children = tree.iter().any(|n| n.is_group && n.parent_id == node.id);
-            let is_expanded = has_children && expanded.contains(&node.id);
-            options.push(GroupOptionData {
-                id: node.id.clone().into(),
-                name: node.name.clone().into(),
-                level: node.level + 1,
-                parent_id: if node.parent_id.is_empty() { "root".into() } else { node.parent_id.clone().into() },
-                has_children,
-                is_expanded,
-            });
-        }
-    }
-    options
-}
-
-/// 构建主界面当前可见的树形视图节点 (Visible Tree Nodes)。
-///
-/// 遵循级联折叠逻辑：当某个父级分组折叠时，其下所有子节点（无论深度）均被隐藏。
-/// 保持节点数组中的真实顺序（支持用户自由拖拽调序）。
-///
-/// # 参数
-/// * `tree` - 完整的全量节点树
-/// * `expanded` - 当前已展开的分组 ID 集合
-fn build_visible_tree_nodes(tree: &[RawTreeNode], expanded: &HashSet<String>) -> Vec<HostTreeNode> {
-    let mut visible = Vec::new();
-    for node in tree {
-        let mut is_visible = true;
-        let mut current_parent = node.parent_id.as_str();
-        while !current_parent.is_empty() {
-            if !expanded.contains(current_parent) {
-                is_visible = false;
-                break;
-            }
-            if let Some(parent_node) = tree.iter().find(|n| n.id == current_parent) {
-                current_parent = parent_node.parent_id.as_str();
-            } else {
-                break;
-            }
-        }
-
-        if is_visible {
-            let is_expanded = node.is_group && expanded.contains(&node.id);
-            visible.push(HostTreeNode {
-                id: node.id.clone().into(),
-                name: node.name.clone().into(),
-                is_group: node.is_group,
-                parent_id: node.parent_id.clone().into(),
-                level: node.level,
-                is_expanded,
-                address: node.address.clone().into(),
-                port: node.port,
-                status: node.status.clone().into(),
-                ping_ms: node.ping_ms,
-                item_count: node.item_count,
-            });
-        }
-    }
-    visible
-}
-
-
-
-/// 根据搜索关键字构建匹配的树形结构节点 (Search Tree Nodes)。
-///
-/// 核心特性：
-/// 1. 匹配目标节点及其所有祖先节点，保持树形层级链路完整；
-/// 2. 搜索状态下，所有涉及的中间分组自动强制展开 (`is_expanded: true`)；
-/// 3. 若匹配到分组名称，则自动展示其直属所有子节点。
-fn build_search_tree_nodes(tree: &[RawTreeNode], query: &str) -> Vec<HostTreeNode> {
-    let q = query.to_lowercase();
-    let mut matching_or_needed_ids = HashSet::new();
-
-    // 1. 找出所有匹配的主机或匹配的分组
-    for node in tree {
-        let is_match = node.name.to_lowercase().contains(&q)
-            || node.address.to_lowercase().contains(&q);
-        if is_match {
-            matching_or_needed_ids.insert(node.id.clone());
-            // 如果是分组匹配，它的所有直接子项也展现
-            if node.is_group {
-                for child in tree {
-                    if child.parent_id == node.id {
-                        matching_or_needed_ids.insert(child.id.clone());
-                    }
-                }
-            }
-            // 将所有祖先 ID 加入集合以确保树形链路完整
-            let mut cur_parent = node.parent_id.as_str();
-            while !cur_parent.is_empty() {
-                matching_or_needed_ids.insert(cur_parent.to_string());
-                if let Some(p) = tree.iter().find(|n| n.id == cur_parent) {
-                    cur_parent = p.parent_id.as_str();
-                } else {
-                    break;
-                }
-            }
-        }
-    }
-
-    // 2. 按自然顺序生成可见节点，搜索模式下所有中间分组均默认展开
-    let mut result = Vec::new();
-    for node in tree {
-        if matching_or_needed_ids.contains(&node.id) {
-            result.push(HostTreeNode {
-                id: node.id.clone().into(),
-                name: node.name.clone().into(),
-                is_group: node.is_group,
-                parent_id: node.parent_id.clone().into(),
-                level: node.level,
-                is_expanded: true,
-                address: node.address.clone().into(),
-                port: node.port,
-                status: node.status.clone().into(),
-                ping_ms: node.ping_ms,
-                item_count: node.item_count,
-            });
-        }
-    }
-    result
-}
-
-/// 计算可见树形节点列表所需的最大呈现宽度 (像素)
-fn calculate_max_tree_width(nodes: &[HostTreeNode]) -> f32 {
-    let mut max_w: f32 = 240.0;
-    for node in nodes {
-        let w = calculate_node_width(node.name.as_str(), node.level);
-        if w > max_w {
-            max_w = w;
-        }
-    }
-    max_w
-}
-
-/// 同步全局 Tracing 实时事件日志到 Slint UI 调试抽屉
-fn sync_ui_debug_logs(w: &AppWindow) {
-    if let Ok(buf) = smagical_debug::get_global_log_buffer().lock() {
-        let entries = buf.get_all();
-        let slint_entries: Vec<LogEntryData> = entries
-            .into_iter()
-            .map(|e| LogEntryData {
-                timestamp: e.timestamp.into(),
-                level: e.level.into(),
-                module: e.module.into(),
-                message: e.message.into(),
-            })
-            .collect();
-        w.set_debug_logs(slint::ModelRc::from(Rc::new(slint::VecModel::from(slint_entries))));
-    }
-}
-
-/// 活跃终端会话运行时信息
-#[derive(Clone, Debug)]
-#[allow(dead_code)]
-struct TerminalSessionInfo {
-    session_id: String,
-    host_id: String,
-    host_name: String,
-    host_address: String,
-    host_status: String,
-    ping_ms: i32,
-    display_title: String,
-}
-
-/// 同步活跃终端会话列表与视口状态到 Slint UI
-fn sync_active_session_ui(
-    w: &AppWindow,
-    sessions: &[TerminalSessionInfo],
-    active_session_id: &str,
-) {
-    if sessions.is_empty() {
-        w.set_tabs(slint::ModelRc::default());
-        w.set_active_session_tab("".into());
-        w.set_has_active_session(false);
-        w.set_active_session_name("".into());
-        w.set_active_host_address("".into());
-        w.set_active_host_ping_ms(0);
-        w.set_active_host_status("offline".into());
-    } else {
-        let active_sess = sessions
-            .iter()
-            .find(|s| s.session_id == active_session_id)
-            .or_else(|| sessions.last())
-            .unwrap();
-
-        let tab_data: Vec<TabData> = sessions
-            .iter()
-            .map(|s| TabData {
-                id: s.session_id.clone().into(),
-                title: s.display_title.clone().into(),
-                status: s.host_status.clone().into(),
-            })
-            .collect();
-
-        w.set_tabs(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(tab_data))));
-        w.set_active_session_tab(active_sess.session_id.clone().into());
-        w.set_has_active_session(true);
-        w.set_active_session_name(active_sess.display_title.clone().into());
-        w.set_active_host_address(active_sess.host_address.clone().into());
-        w.set_active_host_ping_ms(active_sess.ping_ms);
-        w.set_active_host_status(active_sess.host_status.clone().into());
-    }
-}
-
 /// 创建并运行桌面应用主窗口。
 pub fn run() -> anyhow::Result<()> {
     let window = AppWindow::new()?;
@@ -692,9 +61,10 @@ pub fn run() -> anyhow::Result<()> {
     let next_session_num: Rc<RefCell<usize>> = Rc::new(RefCell::new(1));
     sync_active_session_ui(&window, &active_sessions.borrow(), "");
 
-    // 初始化探测当前操作系统可用本地 Shell 列表
-    let initial_shells = local_shells::detect_local_shells();
-    window.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_shells))));
+    // [P2 Fix] 启动时一次性探测本地 Shell 环境并缓存，避免每次搜索都重复扫描文件系统
+    let cached_shells = Rc::new(local_shells::detect_local_shells());
+    window.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from((*cached_shells).clone()))));
+
 
     tracing::info!(target: "smagical_ui", "Smalux-SSH 桌面应用工作台就绪");
     sync_ui_debug_logs(&window);
@@ -819,11 +189,15 @@ pub fn run() -> anyhow::Result<()> {
 
     let search_query = Rc::new(RefCell::new(String::new()));
 
-    // 初始化上级分组选择器折叠状态 (默认展开根目录与顶级分组)
-    let selector_expanded_groups = Rc::new(RefCell::new(HashSet::from([
-        "root".to_string(),
-        "grp-prod".to_string(),
-    ])));
+    // [P1 Fix] 动态初始化上级分组选择器展开状态：从存储中读取所有顶级分组（parent_id 为 None），
+    // 替代之前硬编码的 "grp-prod"，确保切换存储后端后仍然正确工作。
+    let mut initial_selector_expanded = HashSet::from(["root".to_string()]);
+    core_state.storage().groups().list_all().unwrap_or_default()
+        .into_iter()
+        .filter(|g| g.parent_id.is_none())
+        .for_each(|g| { initial_selector_expanded.insert(g.id); });
+    let selector_expanded_groups = Rc::new(RefCell::new(initial_selector_expanded));
+
 
     // 初始渲染上级分组选项数据
     let initial_options = build_group_options(&master_tree.borrow(), &selector_expanded_groups.borrow());
@@ -849,7 +223,7 @@ pub fn run() -> anyhow::Result<()> {
                 address: h.address.into(),
                 port: h.port as i32,
                 group: group_name.into(),
-                status: h.status.into(),
+                status: h.status.to_string().into(),
                 ping_ms: h.ping_ms,
             }
         })
@@ -1297,11 +671,12 @@ pub fn run() -> anyhow::Result<()> {
     let master_tree_open = Rc::clone(&master_tree);
     let active_sessions_open = Rc::clone(&active_sessions);
     let next_session_num_open = Rc::clone(&next_session_num);
+    let cached_shells_open = Rc::clone(&cached_shells);
     window.on_open_host(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
 
-            // 支持启动本地终端环境 (动态匹配探测到的环境)
+            // 支持启动本地终端环境 (使用缓存的 Shell 列表，避免重复扫描文件系统)
             if h_id.starts_with("local-") {
                 let mut sessions = active_sessions_open.borrow_mut();
                 let mut num = next_session_num_open.borrow_mut();
@@ -1309,7 +684,7 @@ pub fn run() -> anyhow::Result<()> {
                 let sess_id = format!("sess-{}", *num);
                 *num += 1;
 
-                let all_shells = local_shells::detect_local_shells();
+                let all_shells = &*cached_shells_open;
                 let (base_name, addr) = if let Some(sh) = all_shells.iter().find(|s| s.id == h_id.as_str()) {
                     (sh.title.to_string(), format!("Local ({})", sh.subtitle))
                 } else {
@@ -1402,11 +777,12 @@ pub fn run() -> anyhow::Result<()> {
     // 绑定新建 Tab 回调 (点击 Tab 栏 + 号时打开快速新建终端会话中心居中弹窗)
     let window_weak = window.as_weak();
     let master_tree_reset = Rc::clone(&master_tree);
+    let cached_shells_new_tab = Rc::clone(&cached_shells);
     window.on_new_tab(move || {
         if let Some(w) = window_weak.upgrade() {
-            // 重置搜索框与弹窗列表 (动态探测当前系统的真实终端)
-            let detected_shells = local_shells::detect_local_shells();
-            w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(detected_shells))));
+            // 重置搜索框与弹窗列表 (使用启动时缓存的本地终端列表)
+            w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from((*cached_shells_new_tab).clone()))));
+
 
             let tree = master_tree_reset.borrow();
             let all_hosts: Vec<HostItemData> = tree
@@ -1431,17 +807,17 @@ pub fn run() -> anyhow::Result<()> {
     // 绑定新建终端会话弹窗实时搜索过滤回调
     let window_weak = window.as_weak();
     let master_tree_launcher = Rc::clone(&master_tree);
+    let cached_shells_launcher = Rc::clone(&cached_shells);
     window.on_filter_launcher(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_lowercase();
 
-            let all_local_shells = local_shells::detect_local_shells();
-
+            // [P2 Fix] 使用缓存的 Shell 列表过滤，避免每次按键都重扫文件系统
             let filtered_locals: Vec<LocalShellItemData> = if q.is_empty() {
-                all_local_shells
+                (*cached_shells_launcher).clone()
             } else {
-                all_local_shells
-                    .into_iter()
+                cached_shells_launcher
+                    .iter()
                     .filter(|s| {
                         let t = s.title.to_lowercase();
                         let sub = s.subtitle.to_lowercase();
@@ -1455,9 +831,11 @@ pub fn run() -> anyhow::Result<()> {
                             || (q.contains("fish") && id.contains("fish"))
                             || (q.contains("cmd") && id.contains("cmd"))
                     })
+                    .cloned()
                     .collect()
             };
             w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_locals))));
+
 
             let tree = master_tree_launcher.borrow();
             let filtered_hosts: Vec<HostItemData> = tree
@@ -1596,6 +974,7 @@ pub fn run() -> anyhow::Result<()> {
     let master_tree_bs = Rc::clone(&master_tree);
     let expanded_bs = Rc::clone(&expanded_groups);
     let search_bs = Rc::clone(&search_query);
+    let core_state_bs = Rc::clone(&core_state);
     window.on_debug_batch_update_status(move |status_mode| {
         if let Some(w) = window_weak.upgrade() {
             let st = status_mode.as_str();
@@ -1643,6 +1022,21 @@ pub fn run() -> anyhow::Result<()> {
             }
             w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
+            // [P1 Fix] 同步批量状态更新至存储层
+            if let Ok(stored_hosts) = core_state_bs.storage().hosts().list_all() {
+                let updated: Vec<smagical_core::HostRecord> = stored_hosts.into_iter().map(|mut h| {
+                    let new_status = match st {
+                        "all_online" | "online" => smagical_core::HostStatus::Online,
+                        "all_offline" | "offline" => smagical_core::HostStatus::Offline,
+                        "all_warning" | "warning" => smagical_core::HostStatus::Warning,
+                        _ => smagical_core::HostStatus::Online,
+                    };
+                    h.status = new_status;
+                    h
+                }).collect();
+                let _ = core_state_bs.storage().hosts().save_batch(&updated);
+            }
+
             let q = search_bs.borrow().clone();
             let next_nodes = if q.is_empty() {
                 build_visible_tree_nodes(&tree, &expanded_bs.borrow())
@@ -1656,6 +1050,7 @@ pub fn run() -> anyhow::Result<()> {
             sync_ui_debug_logs(&w);
         }
     });
+
 
     // 0.3 批量更新 SSH 端口
     let window_weak = window.as_weak();
@@ -1758,6 +1153,7 @@ pub fn run() -> anyhow::Result<()> {
     let expanded_qh = Rc::clone(&expanded_groups);
     let selector_qh = Rc::clone(&selector_expanded_groups);
     let search_qh = Rc::clone(&search_query);
+    let core_state_qh = Rc::clone(&core_state);
     let next_hid = Rc::new(RefCell::new(100));
     window.on_debug_quick_add_host(move |name, ip, port_str, group| {
         if let Some(w) = window_weak.upgrade() {
@@ -1790,7 +1186,7 @@ pub fn run() -> anyhow::Result<()> {
                 id: new_id.clone(),
                 name: h_name.clone(),
                 is_group: false,
-                parent_id,
+                parent_id: parent_id.clone(),
                 level,
                 address: h_ip.clone(),
                 port,
@@ -1800,6 +1196,20 @@ pub fn run() -> anyhow::Result<()> {
             };
 
             tree.push(node);
+
+            // [P1 Fix] 同步新增主机至存储层，避免与 storage 双真相来源分叉
+            let host_rec = smagical_core::HostRecord {
+                id: new_id.clone(),
+                name: h_name.clone(),
+                address: h_ip.clone(),
+                port: port as u16,
+                parent_group_id: if parent_id.is_empty() { None } else { Some(parent_id) },
+                status: smagical_core::HostStatus::Online,
+                ping_ms: 22,
+                sort_order: 0,
+                notes: String::new(),
+            };
+            let _ = core_state_qh.storage().hosts().save(&host_rec);
 
             let opts = build_group_options(&tree, &selector_qh.borrow());
             w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
@@ -1831,6 +1241,7 @@ pub fn run() -> anyhow::Result<()> {
             sync_ui_debug_logs(&w);
         }
     });
+
 
     // 3. 快速新增分组 (支持路径嵌套，例如: 集群/k8s)
     let window_weak = window.as_weak();
@@ -1874,17 +1285,26 @@ pub fn run() -> anyhow::Result<()> {
     // 4. 清空全量数据
     let window_weak = window.as_weak();
     let master_tree_clr = Rc::clone(&master_tree);
+    let core_state_clr = Rc::clone(&core_state);
     window.on_debug_clear_data(move || {
         if let Some(w) = window_weak.upgrade() {
             master_tree_clr.borrow_mut().clear();
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::new()))));
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::new()))));
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::new()))));
+            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostTreeNode>::new()))));
+            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostItemData>::new()))));
+            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::GroupOptionData>::new()))));
             w.set_tree_content_width(240.0_f32);
+            // [P1 Fix] 同步清空存储层
+            if let Ok(hosts) = core_state_clr.storage().hosts().list_all() {
+                for h in &hosts { let _ = core_state_clr.storage().hosts().delete(&h.id); }
+            }
+            if let Ok(groups) = core_state_clr.storage().groups().list_all() {
+                for g in &groups { let _ = core_state_clr.storage().groups().delete(&g.id); }
+            }
             tracing::warn!(target: "smagical_debug::data", "全量主机与分组数据已被清空");
             sync_ui_debug_logs(&w);
         }
     });
+
 
     // 5. 恢复默认数据
     let window_weak = window.as_weak();

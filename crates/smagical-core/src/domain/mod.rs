@@ -6,4 +6,4 @@ pub mod group;
 pub mod host;
 
 pub use group::GroupRecord;
-pub use host::HostRecord;
+pub use host::{HostRecord, HostStatus};

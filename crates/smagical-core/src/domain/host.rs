@@ -1,5 +1,57 @@
 use serde::{Deserialize, Serialize};
 
+/// 主机在线状态枚举。
+///
+/// 统一管理主机健康状态标识，避免魔法字符串散落代码各处。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum HostStatus {
+    /// 正常在线
+    Online,
+    /// 告警 / 高延迟
+    Warning,
+    /// 错误 / 不可达
+    Error,
+    /// 离线
+    #[default]
+    Offline,
+}
+
+impl HostStatus {
+    /// 返回对应的静态字符串标识（供 Slint 绑定层使用）。
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            HostStatus::Online  => "online",
+            HostStatus::Warning => "warning",
+            HostStatus::Error   => "error",
+            HostStatus::Offline => "offline",
+        }
+    }
+}
+
+impl std::fmt::Display for HostStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
+impl From<&str> for HostStatus {
+    fn from(s: &str) -> Self {
+        match s {
+            "online"  => HostStatus::Online,
+            "warning" => HostStatus::Warning,
+            "error"   => HostStatus::Error,
+            _         => HostStatus::Offline,
+        }
+    }
+}
+
+impl From<String> for HostStatus {
+    fn from(s: String) -> Self {
+        HostStatus::from(s.as_str())
+    }
+}
+
 /// 主机资产记录模型。
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct HostRecord {
@@ -13,8 +65,8 @@ pub struct HostRecord {
     pub port: u16,
     /// 所属分组的唯一标识符 (None 表示未分组)。
     pub parent_group_id: Option<String>,
-    /// 在线健康状态 ("online", "warning", "error", "offline")。
-    pub status: String,
+    /// 主机在线健康状态。
+    pub status: HostStatus,
     /// 网络延迟测速结果 (单位: 毫秒)。
     pub ping_ms: i32,
     /// 列表模式下的显示排序权重。
@@ -37,12 +89,13 @@ impl HostRecord {
             address: address.into(),
             port,
             parent_group_id: None,
-            status: "online".to_string(),
+            status: HostStatus::Online,
             ping_ms: 0,
             sort_order: 0,
             notes: String::new(),
         }
     }
+
 
     /// 指定所属分组创建主机记录。
     pub fn with_group(
