@@ -594,34 +594,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 (sess_id, info)
             };
 
-            // 自动同步沉淀会话历史记录 (包括远程 SSH 主机与本地 Shell 终端)
-            let now_sec = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(1725019200);
-
-            let hist_rec = if h_id.starts_with("local-") {
-                let shell_type = h_id.strip_prefix("local-").unwrap_or(&h_id);
-                smagical_core::HistoryRecord::new_local(
-                    format!("hist-{}", sess_id),
-                    Some(h_id.clone()),
-                    shell_type.to_string(),
-                    info.host_name.clone(),
-                    now_sec,
-                )
-            } else {
-                smagical_core::HistoryRecord::new_ssh(
-                    format!("hist-{}", sess_id),
-                    Some(h_id.clone()),
-                    info.host_name.clone(),
-                    format!("{}:{}", info.host_address, 22),
-                    22,
-                    "root".to_string(),
-                    now_sec,
-                )
-            };
-            let _ = ctx_open.core_state.storage().history().save(&hist_rec);
+            // 触发 Hook 引擎 post_open 全局生命周期 (自动由 HistoryTrackingHook 沉淀历史并触发审计)
+            let session_ctx = info.to_session_context("pane-active");
+            ctx_open.core_state.hooks().dispatch_post_open(&session_ctx);
             crate::handlers::history_handlers::sync_ui_history(&w, &ctx_open);
+
 
 
 

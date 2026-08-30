@@ -18,9 +18,10 @@ pub use domain::{
 
 pub use hook::{
     CommandInteractionFrame, CommandSource, DangerousCommandGuard, FallbackStrategy, FrameStatus,
-    FunctionalHook, HookDecision, HookEngine, HostMetadata, SessionAuditLogger, SessionContext,
-    TerminalError, TerminalHook,
+    FunctionalHook, HistoryTrackingHook, HookDecision, HookEngine, HostMetadata, SessionAuditLogger,
+    SessionContext, TerminalError, TerminalHook,
 };
+
 
 pub use state::core_state::CoreState;
 pub use storage::{

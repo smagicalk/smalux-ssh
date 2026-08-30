@@ -23,7 +23,39 @@ pub(crate) struct TerminalSessionInfo {
     pub(crate) display_title: String,
 }
 
+impl TerminalSessionInfo {
+    /// 转换为统一的 Core HostMetadata 资产模型
+    pub(crate) fn to_host_metadata(&self) -> smagical_core::HostMetadata {
+        if self.host_id.starts_with("local-") {
+            smagical_core::HostMetadata::local_shell(&self.host_name)
+        } else {
+            let (addr, port) = if let Some((a, p)) = self.host_address.split_once(':') {
+                (a.to_string(), p.parse::<u16>().unwrap_or(22))
+            } else {
+                (self.host_address.clone(), 22)
+            };
+            smagical_core::HostMetadata::remote_ssh(
+                &self.host_id,
+                &self.host_name,
+                addr,
+                port,
+                "root",
+            )
+        }
+    }
+
+    /// 转换为会话运行时上下文 SessionContext
+    pub(crate) fn to_session_context(&self, pane_id: &str) -> smagical_core::SessionContext {
+        smagical_core::SessionContext::new(
+            self.session_id.clone(),
+            pane_id,
+            self.to_host_metadata(),
+        )
+    }
+}
+
 /// 单个分屏窗格内的 Tab 会话组 (Editor Group 模型)
+
 #[derive(Clone, Debug)]
 pub(crate) struct PaneGroup {
     /// 窗格唯一 ID (如: "pane-1", "pane-2")

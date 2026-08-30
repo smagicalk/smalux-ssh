@@ -16,10 +16,12 @@ impl CoreState {
     /// 默认采用预设种子内存存储与内置 Hook 插件创建 CoreState
     pub fn new_mock() -> Self {
         tracing::debug!(target: "smagical_core", "初始化 CoreState 核心状态引擎 (MockStorage 模式)");
+        let storage: Arc<dyn AppStorage> = Arc::new(MockStorage::new_seeded());
         let engine = HookEngine::new();
         engine.register(Arc::new(crate::hook::DangerousCommandGuard::new()));
         engine.register(Arc::new(crate::hook::SessionAuditLogger::new()));
-        Self::with_hooks(Arc::new(MockStorage::new_seeded()), Arc::new(engine))
+        engine.register(Arc::new(crate::hook::HistoryTrackingHook::new(Arc::clone(&storage))));
+        Self::with_hooks(storage, Arc::new(engine))
     }
 
     /// 使用任意存储后端创建 CoreState (自动挂载内置 Hook 插件)
@@ -27,8 +29,10 @@ impl CoreState {
         let engine = HookEngine::new();
         engine.register(Arc::new(crate::hook::DangerousCommandGuard::new()));
         engine.register(Arc::new(crate::hook::SessionAuditLogger::new()));
+        engine.register(Arc::new(crate::hook::HistoryTrackingHook::new(Arc::clone(&storage))));
         Self::with_hooks(storage, Arc::new(engine))
     }
+
 
     /// 使用指定存储后端与自定义 HookEngine 创建 CoreState
     pub fn with_hooks(storage: Arc<dyn AppStorage>, hooks: Arc<HookEngine>) -> Self {

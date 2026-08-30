@@ -10,7 +10,7 @@ pub mod types;
 #[cfg(test)]
 mod tests;
 
-pub use builtin::{DangerousCommandGuard, FunctionalHook, SessionAuditLogger};
+pub use builtin::{DangerousCommandGuard, FunctionalHook, HistoryTrackingHook, SessionAuditLogger};
 pub use decision::{FallbackStrategy, HookDecision};
 pub use engine::HookEngine;
 pub use error::TerminalError;
@@ -18,3 +18,4 @@ pub use traits::TerminalHook;
 pub use types::{
     CommandInteractionFrame, CommandSource, FrameStatus, HostMetadata, SessionContext,
 };
+

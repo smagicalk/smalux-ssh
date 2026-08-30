@@ -88,22 +88,25 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
             sync_ui_debug_logs(&w);
 
-            let now_sec = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(1725019200);
-            let hist_id = format!("hist-{}", id_str);
-            if let Ok(Some(mut hist)) = ctx_close.core_state.storage().history().get_by_id(&hist_id) {
-                hist.mark_closed(now_sec);
-                if let Some((lines_count, snap_text)) = snapshot_opt {
-                    hist.record_snapshot(lines_count);
-                    let _ = ctx_close.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
+            let session_ctx = smagical_core::SessionContext::new(
+                id_str.clone(),
+                active_pid.clone(),
+                smagical_core::HostMetadata::local_shell(&id_str),
+            );
+            if let Some((lines_count, snap_text)) = snapshot_opt {
+                let hist_id = format!("hist-{}", id_str);
+                let _ = ctx_close.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
+                if let Ok(Some(mut h)) = ctx_close.core_state.storage().history().get_by_id(&hist_id) {
+                    h.record_snapshot(lines_count);
+                    let _ = ctx_close.core_state.storage().history().save(&h);
                 }
-                let _ = ctx_close.core_state.storage().history().save(&hist);
-                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close);
             }
+            // 触发 Hook 引擎 post_close 生命周期 (自动由 HistoryTrackingHook 标记关闭并更新状态)
+            ctx_close.core_state.hooks().dispatch_post_close(&session_ctx);
+            crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close);
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 1.1 关闭指定窗格内的指定 Tab 回调
@@ -175,22 +178,25 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
             sync_ui_debug_logs(&w);
 
-            let now_sec = std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .map(|d| d.as_secs())
-                .unwrap_or(1725019200);
-            let hist_id = format!("hist-{}", t_id);
-            if let Ok(Some(mut hist)) = ctx_close_pane.core_state.storage().history().get_by_id(&hist_id) {
-                hist.mark_closed(now_sec);
-                if let Some((lines_count, snap_text)) = snapshot_opt {
-                    hist.record_snapshot(lines_count);
-                    let _ = ctx_close_pane.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
+            let session_ctx = smagical_core::SessionContext::new(
+                t_id.clone(),
+                p_id.clone(),
+                smagical_core::HostMetadata::local_shell(&t_id),
+            );
+            if let Some((lines_count, snap_text)) = snapshot_opt {
+                let hist_id = format!("hist-{}", t_id);
+                let _ = ctx_close_pane.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
+                if let Ok(Some(mut h)) = ctx_close_pane.core_state.storage().history().get_by_id(&hist_id) {
+                    h.record_snapshot(lines_count);
+                    let _ = ctx_close_pane.core_state.storage().history().save(&h);
                 }
-                let _ = ctx_close_pane.core_state.storage().history().save(&hist);
-                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane);
             }
+            // 触发 Hook 引擎 post_close 生命周期
+            ctx_close_pane.core_state.hooks().dispatch_post_close(&session_ctx);
+            crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane);
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 1.2 复制指定 Tab 会话对应的主机 IP / 连接地址
@@ -265,29 +271,30 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 });
                 g.active_tab_id = t_id.clone();
 
-                // 批量清理被移除会话的底层进程与历史记录
-                let now_sec = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(1725019200);
-
+                // 批量清理被移除会话的底层进程并触发 Hook post_close 记录历史
                 let mut terminals = active_terminals_close_others.borrow_mut();
                 for rem_id in removed_tabs {
                     if let Some(mut inst) = terminals.remove(&rem_id) {
                         let snap = inst.snapshot_text(500);
                         let _ = inst.pty.kill();
                         let hist_id = format!("hist-{}", rem_id);
-                        if let Ok(Some(mut hist)) = ctx_close_others.core_state.storage().history().get_by_id(&hist_id) {
-                            hist.mark_closed(now_sec);
-                            if !snap.trim().is_empty() {
+                        if !snap.trim().is_empty() {
+                            let _ = ctx_close_others.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
+                            if let Ok(Some(mut hist)) = ctx_close_others.core_state.storage().history().get_by_id(&hist_id) {
                                 hist.record_snapshot(snap.lines().count() as u32);
-                                let _ = ctx_close_others.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
+                                let _ = ctx_close_others.core_state.storage().history().save(&hist);
                             }
-                            let _ = ctx_close_others.core_state.storage().history().save(&hist);
                         }
+                        let session_ctx = smagical_core::SessionContext::new(
+                            rem_id.clone(),
+                            p_id.clone(),
+                            smagical_core::HostMetadata::local_shell(&rem_id),
+                        );
+                        ctx_close_others.core_state.hooks().dispatch_post_close(&session_ctx);
                     }
                 }
                 crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_others);
+
             }
 
             let is_split = split_tree.is_some();
@@ -730,22 +737,20 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     if let Some(mut inst) = terminals.remove(&t.session_id) {
                         let snap = inst.snapshot_text(500);
                         let _ = inst.pty.kill();
-                        let now_sec = std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .map(|d| d.as_secs())
-                            .unwrap_or(1725019200);
                         let hist_id = format!("hist-{}", t.session_id);
-                        if let Ok(Some(mut hist)) = ctx_close_pane_id.core_state.storage().history().get_by_id(&hist_id) {
-                            hist.mark_closed(now_sec);
-                            if !snap.trim().is_empty() {
+                        if !snap.trim().is_empty() {
+                            let _ = ctx_close_pane_id.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
+                            if let Ok(Some(mut hist)) = ctx_close_pane_id.core_state.storage().history().get_by_id(&hist_id) {
                                 hist.record_snapshot(snap.lines().count() as u32);
-                                let _ = ctx_close_pane_id.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
+                                let _ = ctx_close_pane_id.core_state.storage().history().save(&hist);
                             }
-                            let _ = ctx_close_pane_id.core_state.storage().history().save(&hist);
                         }
+                        let session_ctx = t.to_session_context(&pid);
+                        ctx_close_pane_id.core_state.hooks().dispatch_post_close(&session_ctx);
                     }
                 }
                 crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane_id);
+
             }
 
             if let Some(tree) = split_tree.as_mut() {

@@ -193,3 +193,31 @@ fn test_dynamic_unregister() {
     assert_eq!(engine.len(), 0);
     assert!(engine.is_empty());
 }
+
+#[test]
+fn test_history_tracking_hook_lifecycle() {
+    let storage: Arc<dyn crate::storage::AppStorage> = Arc::new(crate::storage::MockStorage::new());
+    let engine = HookEngine::new();
+
+    engine.register(Arc::new(super::builtin::HistoryTrackingHook::new(Arc::clone(&storage))));
+
+    let host = HostMetadata::remote_ssh("h-101", "生产Web服务", "10.0.0.8", 22, "deploy");
+    let session = SessionContext::new("sess-h101", "pane-1", host);
+
+    // 1. 会话开启 -> 自动写入活跃状态的历史记录
+    engine.dispatch_post_open(&session);
+
+    let hist = storage.history().get_by_id("hist-sess-h101").unwrap().expect("应已写入历史记录");
+    assert_eq!(hist.title, "生产Web服务");
+    assert_eq!(hist.address, "10.0.0.8:22");
+    assert_eq!(hist.exit_status, "active");
+    assert!(hist.disconnected_at.is_none());
+
+    // 2. 会话关闭 -> 自动更新历史记录为 closed / success
+    engine.dispatch_post_close(&session);
+
+    let closed_hist = storage.history().get_by_id("hist-sess-h101").unwrap().expect("应找到历史记录");
+    assert_eq!(closed_hist.exit_status, "success");
+    assert!(closed_hist.disconnected_at.is_some());
+}
+
