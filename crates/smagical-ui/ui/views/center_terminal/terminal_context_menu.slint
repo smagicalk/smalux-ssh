@@ -73,50 +73,35 @@ export component TerminalContextMenu inherits Rectangle {
                     mouse-cursor: root.has-selection ? pointer : default;
                 }
 
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    alignment: center;
+                // 靠左垂直居中图标 (距左边缘 8px，上下留白 (26-14)/2 = 6px)
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    source: @image-url("../../assets/icons/copy.svg");
+                    image-fit: contain;
+                    colorize: copy-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        width: 14px;
-                        height: 100%;
+                // 靠左垂直居中文本 (距左边缘 30px)
+                Text {
+                    x: 30px;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("复制");
+                    font-size: 11px;
+                    color: copy-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
 
-                        Image {
-                            source: @image-url("../../assets/icons/copy.svg");
-                            width: 14px;
-                            height: 14px;
-                            image-fit: contain;
-                            colorize: copy-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        height: 100%;
-
-                        Text {
-                            text: @tr("复制");
-                            font-size: 11px;
-                            color: copy-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        height: 100%;
-
-                        Text {
-                            text: "Ctrl+Shift+C";
-                            font-size: 9px;
-                            color: AppTheme.disabled-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
+                // 靠右垂直居中快捷键
+                Text {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Ctrl+Shift+C";
+                    font-size: 9px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
                 }
             }
 
@@ -134,50 +119,32 @@ export component TerminalContextMenu inherits Rectangle {
                     mouse-cursor: pointer;
                 }
 
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    alignment: center;
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    source: @image-url("../../assets/icons/clipboard.svg");
+                    image-fit: contain;
+                    colorize: paste-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        width: 14px;
-                        height: 100%;
+                Text {
+                    x: 30px;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("粘贴");
+                    font-size: 11px;
+                    color: paste-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
 
-                        Image {
-                            source: @image-url("../../assets/icons/clipboard.svg");
-                            width: 14px;
-                            height: 14px;
-                            image-fit: contain;
-                            colorize: paste-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        height: 100%;
-
-                        Text {
-                            text: @tr("粘贴");
-                            font-size: 11px;
-                            color: paste-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        height: 100%;
-
-                        Text {
-                            text: "Ctrl+Shift+V";
-                            font-size: 9px;
-                            color: AppTheme.disabled-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
+                Text {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Ctrl+Shift+V";
+                    font-size: 9px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
                 }
             }
 
@@ -195,50 +162,32 @@ export component TerminalContextMenu inherits Rectangle {
                     mouse-cursor: pointer;
                 }
 
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    alignment: center;
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    source: @image-url("../../assets/icons/select-all.svg");
+                    image-fit: contain;
+                    colorize: select-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        width: 14px;
-                        height: 100%;
+                Text {
+                    x: 30px;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("全选");
+                    font-size: 11px;
+                    color: select-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
 
-                        Image {
-                            source: @image-url("../../assets/icons/select-all.svg");
-                            width: 14px;
-                            height: 14px;
-                            image-fit: contain;
-                            colorize: select-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        height: 100%;
-
-                        Text {
-                            text: @tr("全选");
-                            font-size: 11px;
-                            color: select-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        height: 100%;
-
-                        Text {
-                            text: "Ctrl+Shift+A";
-                            font-size: 9px;
-                            color: AppTheme.disabled-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
+                Text {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Ctrl+Shift+A";
+                    font-size: 9px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
                 }
             }
 
@@ -266,50 +215,32 @@ export component TerminalContextMenu inherits Rectangle {
                     mouse-cursor: pointer;
                 }
 
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    alignment: center;
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    source: @image-url("../../assets/icons/eraser.svg");
+                    image-fit: contain;
+                    colorize: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        width: 14px;
-                        height: 100%;
+                Text {
+                    x: 30px;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("清屏");
+                    font-size: 11px;
+                    color: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
 
-                        Image {
-                            source: @image-url("../../assets/icons/eraser.svg");
-                            width: 14px;
-                            height: 14px;
-                            image-fit: contain;
-                            colorize: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        height: 100%;
-
-                        Text {
-                            text: @tr("清屏");
-                            font-size: 11px;
-                            color: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        height: 100%;
-
-                        Text {
-                            text: "Ctrl+L";
-                            font-size: 9px;
-                            color: AppTheme.disabled-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
+                Text {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Ctrl+L";
+                    font-size: 9px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
                 }
             }
 
@@ -337,50 +268,32 @@ export component TerminalContextMenu inherits Rectangle {
                     mouse-cursor: pointer;
                 }
 
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    alignment: center;
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    source: @image-url("../../assets/icons/split-v.svg");
+                    image-fit: contain;
+                    colorize: split-r-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        width: 14px;
-                        height: 100%;
+                Text {
+                    x: 30px;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("向右分屏");
+                    font-size: 11px;
+                    color: split-r-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
 
-                        Image {
-                            source: @image-url("../../assets/icons/split-v.svg");
-                            width: 14px;
-                            height: 14px;
-                            image-fit: contain;
-                            colorize: split-r-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        height: 100%;
-
-                        Text {
-                            text: @tr("向右分屏");
-                            font-size: 11px;
-                            color: split-r-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        height: 100%;
-
-                        Text {
-                            text: "Ctrl+Shift+D";
-                            font-size: 9px;
-                            color: AppTheme.disabled-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
+                Text {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Ctrl+Shift+D";
+                    font-size: 9px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
                 }
             }
 
@@ -398,53 +311,36 @@ export component TerminalContextMenu inherits Rectangle {
                     mouse-cursor: pointer;
                 }
 
-                HorizontalLayout {
-                    padding-left: 8px;
-                    padding-right: 8px;
-                    spacing: 8px;
-                    alignment: center;
+                Image {
+                    x: 8px;
+                    y: (parent.height - self.height) / 2;
+                    width: 14px;
+                    height: 14px;
+                    source: @image-url("../../assets/icons/split-h.svg");
+                    image-fit: contain;
+                    colorize: split-d-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
 
-                    VerticalLayout {
-                        alignment: center;
-                        width: 14px;
-                        height: 100%;
+                Text {
+                    x: 30px;
+                    y: (parent.height - self.height) / 2;
+                    text: @tr("向下分屏");
+                    font-size: 11px;
+                    color: split-d-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
 
-                        Image {
-                            source: @image-url("../../assets/icons/split-h.svg");
-                            width: 14px;
-                            height: 14px;
-                            image-fit: contain;
-                            colorize: split-d-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
-                        height: 100%;
-
-                        Text {
-                            text: @tr("向下分屏");
-                            font-size: 11px;
-                            color: split-d-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-
-                    VerticalLayout {
-                        alignment: center;
-                        height: 100%;
-
-                        Text {
-                            text: "Ctrl+Shift+E";
-                            font-size: 9px;
-                            color: AppTheme.disabled-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
+                Text {
+                    x: parent.width - self.width - 8px;
+                    y: (parent.height - self.height) / 2;
+                    text: "Ctrl+Shift+E";
+                    font-size: 9px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
                 }
             }
         }
+
     }
 
 
