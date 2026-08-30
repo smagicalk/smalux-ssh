@@ -1,0 +1,153 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+export component DebugInspectorTab inherits VerticalLayout {
+    in property <length> tree-viewport-width: 240px;
+    in property <int> total-nodes-count: 0;
+    in property <int> visible-nodes-count: 0;
+    in property <int> host-cards-count: 0;
+    in property <string> current-theme-name: "Darcula";
+    in property <bool> is-dark-mode: true;
+
+    callback switch-theme(string);
+    callback toggle-color-mode();
+
+    width: 100%;
+    height: 100%;
+    spacing: 12px;
+    alignment: start;
+
+    Rectangle {
+        height: 110px;
+        width: 100%;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            alignment: start;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+
+                Image {
+                    source: @image-url("../../assets/icons/activity.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: @tr("GUI 布局与数据探针指标");
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 12px;
+
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 2px; alignment: start;
+                    Text { text: @tr("全量节点总数:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + root.total-nodes-count; font-size: 16px; font-weight: 700; color: AppTheme.foreground; }
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 2px; alignment: start;
+                    Text { text: @tr("当前展开可见数:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + root.visible-nodes-count; font-size: 16px; font-weight: 700; color: AppTheme.accent; }
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 2px; alignment: start;
+                    Text { text: @tr("全量卡片总数:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + root.host-cards-count; font-size: 16px; font-weight: 700; color: AppTheme.foreground; }
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1; spacing: 2px; alignment: start;
+                    Text { text: @tr("树视口测算宽度:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + (root.tree-viewport-width / 1px) + " px"; font-size: 16px; font-weight: 700; color: AppTheme.foreground; }
+                }
+            }
+        }
+    }
+
+    // 配色与主题快切
+    Rectangle {
+        height: 110px;
+        width: 100%;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            alignment: start;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text { text: @tr("主题切换与外观治理 (当前: ") + root.current-theme-name + ")"; font-size: 12px; font-weight: 600; color: AppTheme.foreground; }
+
+                Rectangle {
+                    width: 80px; height: 24px; border-radius: AppTheme.radius-small;
+                    background: t-tg.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    t-tg := TouchArea { clicked => { root.toggle-color-mode(); } mouse-cursor: pointer; }
+                    Text { text: root.is-dark-mode ? @tr("浅色模式") : @tr("深色模式"); font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                height: 30px;
+
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: th1.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    th1 := TouchArea { clicked => { root.switch-theme("builtin.ui.darcula"); } mouse-cursor: pointer; }
+                    Text { text: "Darcula"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: th2.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    th2 := TouchArea { clicked => { root.switch-theme("builtin.ui.monokai"); } mouse-cursor: pointer; }
+                    Text { text: "Monokai"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: th3.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    th3 := TouchArea { clicked => { root.switch-theme("builtin.ui.onedark"); } mouse-cursor: pointer; }
+                    Text { text: "One Dark"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: th4.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    th4 := TouchArea { clicked => { root.switch-theme("builtin.ui.solarized-dark"); } mouse-cursor: pointer; }
+                    Text { text: "Solarized"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: th5.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    th5 := TouchArea { clicked => { root.switch-theme("builtin.ui.github-light"); } mouse-cursor: pointer; }
+                    Text { text: "GitHub Light"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+            }
+        }
+    }
+}

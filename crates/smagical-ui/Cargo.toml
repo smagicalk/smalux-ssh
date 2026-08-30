@@ -11,8 +11,20 @@ build = "build.rs"
 anyhow.workspace = true
 slint.workspace = true
 tracing.workspace = true
+portable-pty.workspace = true
+alacritty_terminal.workspace = true
+fontdue.workspace = true
+arboard.workspace = true
+vt100.workspace = true
+directories.workspace = true
 smagical-core = { path = "../smagical-core" }
 smagical-debug = { path = "../smagical-debug" }
+
+
+
+
+
+
 
 [build-dependencies]
 slint-build.workspace = true

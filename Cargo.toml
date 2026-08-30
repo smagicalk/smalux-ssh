@@ -26,3 +26,12 @@ directories = "6"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time", "json"] }
 tracing-appender = "0.2"
+portable-pty = "0.8"
+alacritty_terminal = "0.26"
+fontdue = "0.9"
+arboard = "3"
+vt100 = "0.15"
+
+
+
+

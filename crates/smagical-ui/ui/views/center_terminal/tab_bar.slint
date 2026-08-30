@@ -3,28 +3,48 @@ import { TabItem } from "../../components/tab-item.slint";
 
 /// 会话 Tab 数据结构
 export struct TabData {
+    /// 会话唯一标识 ID (如: "sess-1")
     id: string,
+    /// 会话展示标题 (如: "node-1 #1")
     title: string,
+    /// 会话在线状态标识 ("online" 在线, "warning" 告警, "offline" 离线)
     status: string,
 }
 
 /// 顶部统一标题与多会话标签栏 (Top Header / Tab Bar / Native Window Controls)
+///
+/// 包含左侧品牌 Logo、中间可拖拽标题区以及右侧原生无边框窗口三键 (最小化、最大化/还原、关闭)。
 export component TabBar inherits Rectangle {
+    /// 会话 Tab 列表数据
     in property <[TabData]> tabs: [];
+    /// 当前激活的 Tab 会话 ID
     in-out property <string> active-tab-id: "";
+    /// 窗口是否处于最大化状态
     in property <bool> is-maximized: false;
+    /// 当前是否处于深色模式
     in-out property <bool> is-dark-mode: true;
+    /// Tab 栏横向滚动偏移量
     in-out property <length> tab-scroll-offset: 0px;
 
+    /// 会话选择回调
     callback select-tab(string /* id */);
+    /// 会话关闭回调
     callback close-tab(string /* id */);
+    /// 新建会话回调
     callback new-tab();
+    /// 呼出命令面板回调
     callback open-command-palette();
+    /// 深浅色主题切换回调
     callback toggle-color-mode();
+    /// 打开全局设置回调
     callback open-settings();
+    /// 原生窗口最小化回调
     callback minimize-window();
+    /// 原生窗口最大化/还原回调
     callback maximize-window();
+    /// 原生窗口关闭应用回调
     callback close-window();
+
 
     height: 38px;
     background: AppTheme.panel-background;

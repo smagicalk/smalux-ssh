@@ -16,12 +16,7 @@ export component HistoryDrawer inherits DrawerContainer {
     title: @tr("历史会话");
     collapse-icon: "◀";
 
-    in property <[HistoryItemData]> history-items: [
-        { id: "1", host-name: "prod-server-01", address: "192.168.1.100", time-ago: "10分钟前", duration: "45分钟" },
-        { id: "2", host-name: "k8s-control-plane", address: "10.0.0.12", time-ago: "2小时前", duration: "1小时20分" },
-        { id: "3", host-name: "prod-db-master", address: "192.168.1.102", time-ago: "昨天 16:30", duration: "18分钟" },
-        { id: "4", host-name: "staging-api-test", address: "10.0.12.88", time-ago: "3天前", duration: "5分钟" },
-    ];
+    in property <[HistoryItemData]> history-items: [];
 
     callback reconnect(string /* id */);
     callback clear-all();

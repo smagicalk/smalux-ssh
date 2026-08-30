@@ -1,6 +1,7 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { SearchInput } from "search-input.slint";
 import { HostItemData } from "../views/left_drawers/hosts_drawer.slint";
+import { AppIconButton } from "base/app-icon-button.slint";
 
 export struct LocalShellItemData {
     id: string,
@@ -76,29 +77,12 @@ export component NewSessionModal inherits Rectangle {
                         }
                     }
 
-                    Rectangle {
-                        width: 24px;
-                        height: 24px;
-                        border-radius: 4px;
-                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
-
-                        Image {
-                            source: @image-url("../assets/icons/window-close.svg");
-                            width: 12px;
-                            height: 12px;
-                            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                            x: (parent.width - self.width) / 2;
-                            y: (parent.height - self.height) / 2;
-                        }
-
-                        close-touch := TouchArea {
-                            mouse-cursor: pointer;
-                            clicked => { root.close(); }
-                        }
+                    AppIconButton {
+                        icon: @image-url("../assets/icons/window-close.svg");
+                        clicked => { root.close(); }
                     }
                 }
+
 
                 // 2. 搜索过滤输入框 (支持过滤本地终端与远程主机)
                 SearchInput {

@@ -14,13 +14,8 @@ export component SettingsDrawer inherits DrawerContainer {
     title: @tr("偏好设置");
     collapse-icon: "◀";
 
-    in property <[ThemeOption]> themes: [
-        { id: "builtin.ui.darcula", name: "Darcula (经典暗调)", color-preview: #2b2b2b },
-        { id: "builtin.ui.monokai", name: "Monokai Pro (鲜亮)", color-preview: #2d2a2e },
-        { id: "builtin.ui.onedark", name: "One Dark (深雅)", color-preview: #282c34 },
-        { id: "builtin.ui.solarized_dark", name: "Solarized Dark", color-preview: #002b36 },
-        { id: "builtin.ui.system", name: "跟随系统 (System)", color-preview: #3c3f41 },
-    ];
+    in property <[ThemeOption]> themes: [];
+
 
     in property <string> current-theme-id: "builtin.ui.darcula";
 

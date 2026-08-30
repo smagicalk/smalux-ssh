@@ -18,11 +18,8 @@ export component TunnelsDrawer inherits DrawerContainer {
     title: @tr("网络隧道");
     collapse-icon: "◀";
 
-    in property <[TunnelItemData]> tunnels: [
-        { id: "1", name: "MySQL 远程库映射", tunnel-type: "Local", local-port: 33066, remote-target: "127.0.0.1:3306", is-running: true },
-        { id: "2", name: "Redis 缓存映射", tunnel-type: "Local", local-port: 63799, remote-target: "127.0.0.1:6379", is-running: true },
-        { id: "3", name: "SOCKS5 动态代理", tunnel-type: "Dynamic", local-port: 10808, remote-target: "Dynamic", is-running: false },
-    ];
+    in property <[TunnelItemData]> tunnels: [];
+
 
     callback toggle-tunnel(string /* id */);
 

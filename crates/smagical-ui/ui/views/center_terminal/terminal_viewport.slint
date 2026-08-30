@@ -1,23 +1,175 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { StatusDot } from "../../components/status-dot.slint";
 import { TabItem } from "../../components/tab-item.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { TabData } from "tab_bar.slint";
+import { TerminalFindBar } from "terminal_find_bar.slint";
+import { TerminalContextMenu } from "terminal_context_menu.slint";
 
-/// 终端屏幕与多分屏仿真视口 (Terminal Viewport)
+/// 单个动态终端窗格数据模型 (支持无限嵌套任意多分屏)
+export struct TerminalPaneData {
+    /// 窗格唯一标识 ID (如: "tab-1-pane-1")
+    pane-id: string,
+    /// 窗格顶部标题文本
+    title: string,
+    /// 相对终端中央视口左上角像素 X 坐标
+    x: length,
+    /// 相对终端中央视口左上角像素 Y 坐标
+    y: length,
+    /// 窗格像素宽度
+    width: length,
+    /// 窗格像素高度
+    height: length,
+    /// 窗格像素位图帧流
+    image: image,
+    /// 是否获得当前焦点
+    is-active: bool,
+}
+
+/// 窗格间可拖拽分割条数据模型
+export struct TerminalSplitterData {
+    /// 分割条唯一标识 ID (对应二叉树分支节点 ID)
+    splitter-id: string,
+    /// 是否为垂直分割条 (true 为左右垂直拖拽条, false 为上下水平拖拽条)
+    is-vertical: bool,
+    /// 像素 X 坐标
+    x: length,
+    /// 像素 Y 坐标
+    y: length,
+    /// 像素宽度
+    width: length,
+    /// 像素高度
+    height: length,
+}
+
+/// 终端屏幕与多会话光栅化像素视口 (Terminal Viewport)
+///
+/// 承载终端位图光栅化渲染、键盘事件捕获转发、鼠标交互、多会话 Tab 调度、查找浮层与右键菜单。
 export component TerminalViewport inherits Rectangle {
+    /// 当前是否存在处于连接状态的活跃终端会话
     in property <bool> has-active-session: false;
+    /// 当前激活会话的展示名称 (如: "node-1 #1")
     in property <string> session-name: "";
+    /// 当前激活会话的连接地址 (如: "192.168.1.101:22" 或 "Local (pwsh.exe)")
     in property <string> host-address: "";
+    /// 当前主机的 ICMP 延迟毫秒数 (本地 Shell 为 0)
     in property <int> ping-ms: 0;
+    /// 是否开启多终端分屏模式
     in-out property <bool> is-split: false;
+    /// 分屏排布方向 ("vertical" 左右垂直分屏 | "horizontal" 上下水平分屏)
+    in-out property <string> split-orientation: "vertical";
+    /// 分屏窗格尺寸比例 (0.15 ~ 0.85, 默认 0.5)
+    in-out property <float> split-ratio: 0.5;
+    /// 当前获得键盘焦点的窗格索引 (0: 主窗格, 1: 副窗格)
+    in-out property <int> active-pane-index: 0;
+    /// 当前激活聚焦的窗格唯一 ID
+    in-out property <string> active-pane-id: "";
 
+    /// 活跃 Tab 会话列表数据模型
     in property <[TabData]> tabs: [];
+    /// 当前被选中的 Tab 会话 ID
     in-out property <string> active-tab-id: "";
+    /// 顶部 Tab 栏鼠标滚轮水平滑动像素偏移量
     in-out property <length> tab-scroll-offset: 0px;
 
+    /// 主窗格实时光栅化位图帧流
+    in property <image> terminal-screen-image;
+    /// 副窗格 1 实时光栅化位图帧流 (分屏模式有效)
+    in property <image> terminal-split-image;
+    /// 副窗格 2 实时光栅化位图帧流 (3/4 分屏有效)
+    in property <image> terminal-split2-image;
+    /// 副窗格 3 实时光栅化位图帧流 (4 分屏有效)
+    in property <image> terminal-split3-image;
+    /// 分屏窗格总数量
+    in-out property <int> split-count: 1;
+    /// 动态多窗格列表数据模型 (无限嵌套分屏)
+    in property <[TerminalPaneData]> terminal-panes: [];
+    /// 动态分割条列表数据模型
+    in property <[TerminalSplitterData]> terminal-splitters: [];
+    /// 分割条拖拽持久状态 (保存在 root 组件上，绝不受模型更新重置影响)
+    in-out property <bool> is-dragging-splitter: false;
+    in-out property <string> dragging-splitter-id: "";
+    in-out property <bool> dragging-is-vertical: false;
+    in-out property <length> drag-start-mouse: 0px;
+
+    /// 副窗格 1 展示名称
+
+
+
+    in property <string> split-session-name: "";
+    /// 副窗格 2 展示名称
+    in property <string> split2-session-name: "";
+    /// 副窗格 3 展示名称
+    in property <string> split3-session-name: "";
+
+    /// 终端内浮动查找栏状态与匹配计数
+    in-out property <bool> is-find-open: false;
+    in-out property <string> find-query: "";
+    in property <int> find-current-match: 0;
+    in property <int> find-total-matches: 0;
+
+    /// 终端右键快捷菜单状态与浮动坐标
+    in-out property <bool> is-context-menu-open: false;
+    in-out property <length> context-menu-x: 0px;
+    in-out property <length> context-menu-y: 0px;
+    in-out property <bool> has-selection: false;
+    /// 终端历史回滚总行数 (用于驱动滚动条与状态展示)
+    in property <int> history-size: 0;
+    /// 当前相对底部的向上回滚行偏移量 (0 表示在最底部最新行)
+    in property <int> scroll-offset: 0;
+
+    /// 壁纸展示模式 ("none" | "global" | "terminal")
+    in-out property <string> wallpaper-mode: "none";
+    /// 终端专属壁纸位图
+    in-out property <image> terminal-wallpaper-image;
+    /// 终端专属壁纸不透明度 (0.0 ~ 1.0)
+    in-out property <float> terminal-wallpaper-opacity: 0.20;
+
+    /// 终端实际物理像素渲染画布宽高
+    out property <float> canvas-width: root.width / 1px;
+    out property <float> canvas-height: Math.max(10px, root.height - 36px) / 1px;
+
+
+    /// 终端动态网格尺寸 (自适应计算字符列数与行数，同步回 Rust 后台 PTY)
+    out property <int> terminal-cols: Math.max(10, Math.floor((root.width - 36px) / 8.5px));
+    out property <int> terminal-rows: Math.max(5, Math.floor((root.height - 52px) / 18px));
+
+
+    /// 鼠标划选高亮状态
+    in-out property <int> sel-start-col: -1;
+    in-out property <int> sel-start-row: -1;
+    in-out property <int> sel-end-col: -1;
+    in-out property <int> sel-end-row: -1;
+    in-out property <bool> is-selecting: false;
+
+    /// Tab 栏调度交互回调
     callback select-tab(string /* id */);
     callback close-tab(string /* id */);
     callback new-tab();
+
+    /// 终端底层输入流与交互事件回调
+    callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
+    callback terminal-scroll(length /* delta */);
+    callback terminal-selection-changed(int /* sc */, int /* sr */, int /* ec */, int /* er */, bool /* has_sel */);
+    callback copy-text();
+    callback paste-text();
+    callback clear-screen();
+    callback split-terminal(string /* "horizontal" | "vertical" */);
+    callback close-split();
+    callback close-pane-by-index(int /* index */);
+    callback close-pane-by-id(string /* pane_id */);
+    callback select-pane(int /* index */);
+    callback select-pane-by-id(string /* pane_id */);
+    callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
+    callback search-terminal(string /* query */, bool /* match_case */);
+    callback terminal-resize(int /* cols */, int /* rows */);
+
+
+
+
+
+
+
 
     background: AppTheme.window-background;
 
@@ -25,7 +177,7 @@ export component TerminalViewport inherits Rectangle {
         padding: 0px;
         spacing: 0px;
 
-        // 1. 恒常驻留 36px 终端 Tab 会话栏 (即使无会话也稳定显示，杜绝界面抖动)
+        // 1. 恒常驻留 36px 终端 Tab 会话栏 (集成快捷功能按钮组)
         Rectangle {
             height: 36px;
             background: AppTheme.panel-background;
@@ -144,17 +296,283 @@ export component TerminalViewport inherits Rectangle {
                             }
                         }
                     }
+
                 }
             }
         }
 
-        // 2. 下方内容区域 (有会话显示终端字符界面，无会话显示欢迎引导仪表盘)
-        if root.has-active-session: Rectangle {
+        // 2. 终端主体区域
+        if root.has-active-session: terminal-canvas := Rectangle {
             background: AppTheme.window-background;
             vertical-stretch: 1;
+            clip: true;
 
-            VerticalLayout {
-                padding: 14px;
+            // 2.1 键盘按键与焦点捕捉层 (捕获字符与修饰键并统一转发至 Rust 后端状态机)
+            terminal-focus := FocusScope {
+                key-pressed(event) => {
+                    // 全局快捷键: 查找浮层 (Ctrl+F)
+                    if event.modifiers.control && (event.text == "f" || event.text == "F") {
+                        root.is-find-open = !root.is-find-open;
+                        return accept;
+                    }
+                    // 全局快捷键: 复制 (Ctrl+Shift+C)
+                    if event.modifiers.control && event.modifiers.shift && (event.text == "c" || event.text == "C") {
+                        root.copy-text();
+                        return accept;
+                    }
+                    // 全局快捷键: 粘贴 (Ctrl+Shift+V)
+                    if event.modifiers.control && event.modifiers.shift && (event.text == "v" || event.text == "V") {
+                        root.paste-text();
+                        return accept;
+                    }
+                    // 全局快捷键: 垂直分屏 (Ctrl+Shift+D)
+                    if event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D") {
+                        root.split-terminal("vertical");
+                        return accept;
+                    }
+                    // 全局快捷键: 水平分屏 (Ctrl+Shift+E)
+                    if event.modifiers.control && event.modifiers.shift && (event.text == "e" || event.text == "E") {
+                        root.split-terminal("horizontal");
+                        return accept;
+                    }
+                    // 全局快捷键: 清屏 (Ctrl+L)
+                    if event.modifiers.control && (event.text == "l" || event.text == "L") {
+                        root.clear-screen();
+                        return accept;
+                    }
+
+                    // 统一转发按键文本与修饰键状态至 Rust 后端进行 ANSI 序列编码
+                    if event.text != "" {
+                        root.terminal-key-input(event.text, event.modifiers.control, event.modifiers.shift, event.modifiers.alt);
+                        return accept;
+                    }
+                    reject
+                }
+            }
+
+
+
+            // 2.1 终端专属背景壁纸层 (当模式为 terminal 且壁纸有效时展示)
+            if root.wallpaper-mode == "terminal" && root.terminal-wallpaper-image.width > 0: Image {
+                source: root.terminal-wallpaper-image;
+                width: 100%;
+                height: 100%;
+                image-fit: cover;
+                opacity: root.terminal-wallpaper-opacity;
+            }
+
+            // 2.2 鼠标划选、滚动与右键菜单捕获
+            TouchArea {
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.down {
+                        if event.button == PointerEventButton.right {
+                            root.context-menu-x = self.mouse-x;
+                            root.context-menu-y = self.mouse-y;
+                            root.is-context-menu-open = true;
+                        } else if event.button == PointerEventButton.left {
+                            terminal-focus.focus();
+                            root.is-context-menu-open = false;
+                            let start-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
+                            let start-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
+                            root.sel-start-col = start-c;
+                            root.sel-start-row = start-r;
+                            root.sel-end-col = start-c;
+                            root.sel-end-row = start-r;
+                            root.is-selecting = true;
+                            root.has-selection = false;
+                            root.terminal-selection-changed(start-c, start-r, start-c, start-r, false);
+                        }
+                    } else if event.kind == PointerEventKind.up {
+                        if event.button == PointerEventButton.left && root.is-selecting {
+                            root.is-selecting = false;
+                            if root.sel-start-col != root.sel-end-col || root.sel-start-row != root.sel-end-row {
+                                root.has-selection = true;
+                                root.terminal-selection-changed(root.sel-start-col, root.sel-start-row, root.sel-end-col, root.sel-end-row, true);
+                            } else {
+                                root.has-selection = false;
+                                root.terminal-selection-changed(-1, -1, -1, -1, false);
+                            }
+                        }
+                    }
+                }
+                moved => {
+                    if root.is-selecting && self.pressed {
+                        let cur-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
+                        let cur-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
+                        root.sel-end-col = cur-c;
+                        root.sel-end-row = cur-r;
+                        if cur-c != root.sel-start-col || cur-r != root.sel-start-row {
+                            root.has-selection = true;
+                            root.terminal-selection-changed(root.sel-start-col, root.sel-start-row, cur-c, cur-r, true);
+                        }
+                    }
+                }
+                scroll-event(event) => {
+                    root.terminal-scroll(event.delta-y);
+                    accept
+                }
+                mouse-cursor: text;
+            }
+
+
+            // 2.3 单屏终端位图渲染主视口
+            if !root.is-split && root.terminal-screen-image.width > 0: Image {
+                source: root.terminal-screen-image;
+                width: 100%;
+                height: 100%;
+                image-fit: fill;
+                horizontal-alignment: left;
+                vertical-alignment: top;
+            }
+
+            // 2.4 任意层级嵌套多分屏模式视口 (数据驱动二叉树拓扑)
+            if root.is-split: Rectangle {
+                width: 100%;
+                height: 100%;
+
+                // 2.4.1 动态渲染全部叶子终端窗格
+                for pane in root.terminal-panes: Rectangle {
+                    x: pane.x;
+                    y: pane.y;
+                    width: pane.width;
+                    height: pane.height;
+                    border-width: pane.is-active ? 1.5px : 1px;
+                    border-color: pane.is-active ? AppTheme.accent : AppTheme.border;
+                    clip: true;
+
+                    VerticalLayout {
+                        padding: 0px;
+                        spacing: 0px;
+
+                        // 窗格顶部标题栏
+                        Rectangle {
+                            height: 22px;
+                            background: pane.is-active ? AppTheme.accent.transparentize(85%) : AppTheme.panel-background;
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 4px;
+                                spacing: 4px;
+
+                                Text {
+                                    text: pane.title;
+                                    font-size: 11px;
+                                    color: pane.is-active ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                }
+
+                                if root.terminal-panes.length > 1: Rectangle {
+                                    width: 16px;
+                                    height: 16px;
+                                    border-radius: 3px;
+                                    background: close-pane-touch.has-hover ? AppTheme.hover-background : Colors.transparent;
+
+                                    Text {
+                                        text: "×";
+                                        font-size: 12px;
+                                        color: close-pane-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+
+                                    close-pane-touch := TouchArea {
+                                        clicked => { root.close-pane-by-id(pane.pane-id); }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 窗格终端位图
+                        if pane.image.width > 0: Image {
+                            source: pane.image;
+                            width: 100%;
+                            vertical-stretch: 1;
+                            image-fit: fill;
+                            horizontal-alignment: left;
+                            vertical-alignment: top;
+                        }
+                    }
+
+                    TouchArea {
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.down {
+                                root.active-pane-id = pane.pane-id;
+                                root.select-pane-by-id(pane.pane-id);
+                                terminal-focus.focus();
+                                if event.button == PointerEventButton.right {
+                                    root.context-menu-x = pane.x + self.mouse-x;
+                                    root.context-menu-y = pane.y + self.mouse-y;
+                                    root.is-context-menu-open = true;
+                                } else {
+                                    root.is-context-menu-open = false;
+                                }
+                            }
+                        }
+                        scroll-event(event) => {
+                            root.terminal-scroll(event.delta-y);
+                            accept
+                        }
+                        mouse-cursor: text;
+                    }
+                }
+
+                // 2.4.2 动态渲染全部超窄拖拽分割条 (视觉 2px，触控感应热区 6px)
+                for splitter in root.terminal-splitters: Rectangle {
+                    x: splitter.x;
+                    y: splitter.y;
+                    width: splitter.width;
+                    height: splitter.height;
+                    background: split-bar-touch.has-hover || split-bar-touch.pressed ? AppTheme.accent : AppTheme.border;
+                    animate background { duration: 120ms; }
+
+                    split-bar-touch := TouchArea {
+                        x: splitter.is-vertical ? -3px : 0px;
+                        y: splitter.is-vertical ? 0px : -3px;
+                        width: splitter.is-vertical ? parent.width + 6px : parent.width;
+                        height: splitter.is-vertical ? parent.height : parent.height + 6px;
+                        mouse-cursor: splitter.is-vertical ? col-resize : row-resize;
+                        property <length> press-x: 0px;
+                        property <length> press-y: 0px;
+
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.down {
+                                self.press-x = self.mouse-x;
+                                self.press-y = self.mouse-y;
+                            }
+                        }
+
+                        moved => {
+                            if self.pressed {
+                                let dx = (self.mouse-x - self.press-x) / 1px;
+                                let dy = (self.mouse-y - self.press-y) / 1px;
+                                let delta = splitter.is-vertical ? dx : dy;
+                                let total = splitter.is-vertical ? root.canvas-width : root.canvas-height;
+                                if Math.abs(delta) >= 1.0 && total > 50.0 {
+                                    root.adjust-splitter(splitter.splitter-id, delta / total);
+                                }
+                            }
+                        }
+                    }
+
+
+
+                }
+            }
+
+
+
+
+
+
+
+            // 2.5 终端初始化 / 欢迎占位显示 (当尚无图像流或连接建立中时)
+            if !root.is-split && root.terminal-screen-image.width == 0: VerticalLayout {
+                padding-left: 14px;
+                padding-right: 14px;
+                padding-top: 14px;
+                padding-bottom: 20px;
                 spacing: 5px;
                 alignment: start;
 
@@ -188,23 +606,6 @@ export component TerminalViewport inherits Rectangle {
 
                 Rectangle { height: 6px; }
 
-                Text {
-                    text: "root@" + root.session-name + ":~# uname -a";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    font-weight: 600;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "Linux " + root.session-name + " 5.15.0-88-generic #98-Ubuntu SMP Mon Aug 24 10:15:20 UTC 2026 x86_64 GNU/Linux";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.success;
-                }
-
-                Rectangle { height: 6px; }
-
                 HorizontalLayout {
                     spacing: 0px;
 
@@ -223,9 +624,62 @@ export component TerminalViewport inherits Rectangle {
                     }
                 }
             }
+
+
+            // 2.5 浮动文本搜索栏 (Ctrl+F)
+            if root.is-find-open: TerminalFindBar {
+                x: parent.width - self.width - 16px;
+                y: 10px;
+                is-open: root.is-find-open;
+                search-query <=> root.find-query;
+                current-match: root.find-current-match;
+                total-matches: root.find-total-matches;
+                close => { root.is-find-open = false; }
+                find-next => { root.search-terminal(root.find-query, false); }
+                find-prev => { root.search-terminal(root.find-query, false); }
+                search-changed(q) => { root.search-terminal(q, false); }
+            }
+
+            // 2.6 右键上下文快捷菜单
+            if root.is-context-menu-open: TerminalContextMenu {
+                is-open: root.is-context-menu-open;
+                menu-x: root.context-menu-x;
+                menu-y: root.context-menu-y;
+                has-selection: root.has-selection;
+                copy-text => { root.copy-text(); }
+                paste-text => { root.paste-text(); }
+                select-all => { }
+                clear-screen => { root.clear-screen(); }
+                split-right => { root.split-terminal("vertical"); }
+                split-down => { root.split-terminal("horizontal"); }
+                close-menu => { root.is-context-menu-open = false; }
+            }
+
+            // 2.7 终端右侧微型历史滚动条 (当存在回滚历史时展示)
+            if root.history-size > 0: Rectangle {
+
+                x: parent.width - 8px;
+                y: 6px;
+                width: 5px;
+                height: parent.height - 12px;
+                border-radius: 2.5px;
+                background: AppTheme.border.transparentize(70%);
+
+                // 滚动滑块
+                Rectangle {
+                    y: Math.max(0px, Math.min(parent.height - 32px, (parent.height - 32px) * (1.0 - (root.scroll-offset / Math.max(1, root.history-size)))));
+                    width: 5px;
+                    height: Math.max(24px, parent.height * (root.terminal-rows / (root.history-size + root.terminal-rows)));
+                    border-radius: 2.5px;
+                    background: root.scroll-offset > 0 ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(50%);
+                    animate background { duration: 120ms; }
+                }
+            }
         }
 
-        // 空状态 / 欢迎仪表盘 (当无会话时)
+
+
+        // 3. 空状态 / 欢迎仪表盘 (当无会话时)
         if !root.has-active-session: Rectangle {
             background: AppTheme.window-background;
             vertical-stretch: 1;

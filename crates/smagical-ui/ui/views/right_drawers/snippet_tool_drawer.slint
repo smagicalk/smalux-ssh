@@ -13,14 +13,8 @@ export component SnippetToolDrawer inherits DrawerContainer {
     title: @tr("快捷命令库");
     collapse-icon: "▶";
 
-    in property <[QuickCmdData]> quick-cmds: [
-        { title: "查看容器", command: "docker ps" },
-        { title: "磁盘分析", command: "df -h" },
-        { title: "服务状态", command: "systemctl status nginx" },
-        { title: "跟踪系统日志", command: "tail -f /var/log/syslog" },
-        { title: "内存与Swap", command: "free -h" },
-        { title: "端口监听", command: "netstat -tulnp" },
-    ];
+    in property <[QuickCmdData]> quick-cmds: [];
+
 
     callback send-to-terminal(string /* command */);
 

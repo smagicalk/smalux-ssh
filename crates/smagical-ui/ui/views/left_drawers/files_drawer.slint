@@ -14,12 +14,8 @@ export component FilesDrawer inherits DrawerContainer {
     title: @tr("文件管理");
     collapse-icon: "◀";
 
-    in property <[BookmarkItemData]> bookmarks: [
-        { id: "1", path: "/var/log/nginx", description: "Nginx 访问与错误日志" },
-        { id: "2", path: "/etc/docker/daemon.json", description: "Docker 守护进程配置" },
-        { id: "3", path: "/opt/applications/prod", description: "后端应用发布目录" },
-        { id: "4", path: "/home/ubuntu/.ssh", description: "SSH 密钥与配置目录" },
-    ];
+    in property <[BookmarkItemData]> bookmarks: [];
+
 
     callback open-path(string /* path */);
 

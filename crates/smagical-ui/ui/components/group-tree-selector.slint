@@ -28,16 +28,9 @@ export struct GroupOptionData {
 /// 4. 内置 Flickable 滚动容器与自隐藏悬浮 3px 超薄滚动条；
 /// 5. 统一矢量图标配色，自适应深浅色主题。
 export component GroupTreeSelector inherits Rectangle {
-    /// 树状展示的分组选项数据模型数组
-    in property <[GroupOptionData]> options: [
-        { id: "root", name: "根目录 (顶级分组)", level: 0, parent-id: "", has-children: true, is-expanded: true },
-        { id: "grp-prod", name: "生产集群 (Production)", level: 1, parent-id: "root", has-children: true, is-expanded: true },
-        { id: "grp-k8s", name: "Kubernetes 集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
-        { id: "grp-db", name: "核心数据库集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
-        { id: "grp-edge", name: "边缘网关与缓存", level: 1, parent-id: "root", has-children: false, is-expanded: false },
-        { id: "grp-ai", name: "AI 算力集群 (GPU)", level: 1, parent-id: "root", has-children: false, is-expanded: false },
-        { id: "grp-dr", name: "容灾与测试环境", level: 1, parent-id: "root", has-children: false, is-expanded: false },
-    ];
+    /// 树状展示的分组选项数据模型数组 (由 Rust 存储层提供唯一真相源)
+    in property <[GroupOptionData]> options: [];
+
     /// 当前选中的目标分组 ID，支持与外部组件双向数据绑定 (<=>)
     in-out property <string> selected-id: "root";
 

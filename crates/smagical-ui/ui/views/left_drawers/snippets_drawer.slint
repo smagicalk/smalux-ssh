@@ -15,13 +15,8 @@ export component SnippetsDrawer inherits DrawerContainer {
     title: @tr("指令片段");
     collapse-icon: "◀";
 
-    in property <[SnippetItemData]> snippets: [
-        { id: "1", title: "查看容器状态", command: "docker ps --format 'table {{.Names}}  {{.Status}}  {{.Ports}}'", category: "Docker" },
-        { id: "2", title: "清理悬空镜像", command: "docker image prune -a --force", category: "Docker" },
-        { id: "3", title: "系统空间与内存", command: "df -h && free -m && uptime", category: "System" },
-        { id: "4", title: "重载 Nginx 配置", command: "nginx -t && systemctl reload nginx", category: "Nginx" },
-        { id: "5", title: "实时日志跟踪", command: "journalctl -u nginx -f -n 100", category: "System" },
-    ];
+    in property <[SnippetItemData]> snippets: [];
+
 
     callback execute-snippet(string /* command */);
 

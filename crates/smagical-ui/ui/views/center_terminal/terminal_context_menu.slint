@@ -1,0 +1,295 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 终端右键快捷操作上下文菜单 (Terminal Context Menu)
+///
+/// 提供快速复制选中内容、粘贴系统剪贴板、全选终端字符、清空终端视口及向右/向下分屏等快捷功能。
+export component TerminalContextMenu inherits Rectangle {
+    /// 菜单是否处于打开状态
+    in property <bool> is-open: false;
+    /// 菜单浮动 X 坐标 (相对于视口左上角)
+    in property <length> menu-x: 0px;
+    /// 菜单浮动 Y 坐标 (相对于视口左上角)
+    in property <length> menu-y: 0px;
+    /// 当前终端视口是否存在有效字符选区 (若无选区则“复制”按钮置灰不可点击)
+    in property <bool> has-selection: false;
+
+    /// 复制选中内容到系统剪贴板回调
+    callback copy-text();
+    /// 从系统剪贴板粘贴到终端 PTY 输入流回调
+    callback paste-text();
+    /// 选中终端视口全部字符回调
+    callback select-all();
+    /// 清除终端屏幕缓冲区内容回调
+    callback clear-screen();
+    /// 向右水平垂直分割当前终端会话回调
+    callback split-right();
+    /// 向下垂直水平分割当前终端会话回调
+    callback split-down();
+    /// 关闭右键快捷菜单回调
+    callback close-menu();
+
+
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    // 点击外部关闭遮罩
+    TouchArea {
+        clicked => { root.close-menu(); }
+    }
+
+    // 菜单本体
+    Rectangle {
+        x: Math.min(parent.width - self.width - 8px, root.menu-x);
+        y: Math.min(parent.height - self.height - 8px, root.menu-y);
+        width: 180px;
+        height: 196px;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #00000050;
+        drop-shadow-offset-y: 4px;
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+
+            // 1. 复制 (Copy)
+            Rectangle {
+                height: 26px;
+                border-radius: 3px;
+                background: copy-touch.has-hover ? AppTheme.hover-background : transparent;
+                opacity: root.has-selection ? 1.0 : 0.5;
+
+                copy-touch := TouchArea {
+                    clicked => {
+                        if root.has-selection {
+                            root.copy-text();
+                            root.close-menu();
+                        }
+                    }
+                    mouse-cursor: root.has-selection ? pointer : default;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("复制");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Ctrl+Shift+C";
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 2. 粘贴 (Paste)
+            Rectangle {
+                height: 26px;
+                border-radius: 3px;
+                background: paste-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                paste-touch := TouchArea {
+                    clicked => {
+                        root.paste-text();
+                        root.close-menu();
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("粘贴");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Ctrl+Shift+V";
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 3. 全选 (Select All)
+            Rectangle {
+                height: 26px;
+                border-radius: 3px;
+                background: select-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                select-touch := TouchArea {
+                    clicked => {
+                        root.select-all();
+                        root.close-menu();
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("全选");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Ctrl+Shift+A";
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 分割线
+            HorizontalLayout {
+                padding-left: 4px;
+                padding-right: 4px;
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+            }
+
+
+            // 4. 清屏 (Clear Screen)
+            Rectangle {
+                height: 26px;
+                border-radius: 3px;
+                background: clear-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                clear-touch := TouchArea {
+                    clicked => {
+                        root.clear-screen();
+                        root.close-menu();
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("清屏");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Ctrl+L";
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 分割线
+            HorizontalLayout {
+                padding-left: 4px;
+                padding-right: 4px;
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+            }
+
+
+            // 5. 左右分屏 (Split Right)
+            Rectangle {
+                height: 26px;
+                border-radius: 3px;
+                background: split-r-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                split-r-touch := TouchArea {
+                    clicked => {
+                        root.split-right();
+                        root.close-menu();
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("向右分屏");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Ctrl+Shift+D";
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 6. 上下分屏 (Split Down)
+            Rectangle {
+                height: 26px;
+                border-radius: 3px;
+                background: split-d-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                split-d-touch := TouchArea {
+                    clicked => {
+                        root.split-down();
+                        root.close-menu();
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    alignment: space-between;
+
+                    Text {
+                        text: @tr("向下分屏");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: "Ctrl+Shift+E";
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}

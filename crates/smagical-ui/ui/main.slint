@@ -6,6 +6,8 @@ export { HostItemData, HostTreeNode } from "views/left_drawers/hosts_drawer.slin
 export { GroupOptionData } from "components/create-group-modal.slint";
 export { LogEntryData } from "components/debug-modal.slint";
 export { LocalShellItemData } from "components/new-session-modal.slint";
+export { TerminalPaneData, TerminalSplitterData } from "views/center_terminal/terminal_viewport.slint";
+
 
 // 基础组件
 import {
@@ -62,8 +64,11 @@ import {
 import { TabBar, TabData } from "views/center_terminal/tab_bar.slint";
 import {
     TerminalViewport,
+    TerminalPaneData,
+    TerminalSplitterData,
 } from "views/center_terminal/terminal_viewport.slint";
 import { StatusBar } from "views/center_terminal/status_bar.slint";
+
 
 // 右侧视图
 import {
@@ -82,6 +87,7 @@ import { NotesToolDrawer } from "views/right_drawers/notes_tool_drawer.slint";
 import { AiToolDrawer } from "views/right_drawers/ai_tool_drawer.slint";
 import { RightToolBar } from "views/right_tool_bar.slint";
 
+/// smalux-ssh 桌面客户端主窗口根组件
 export component AppWindow inherits Window {
     title: @tr("smalux - 现代 Rust SSH 终端工作台");
     preferred-width: 1280px;
@@ -89,120 +95,280 @@ export component AppWindow inherits Window {
     min-width: 960px;
     min-height: 600px;
     background: AppTheme.window-background;
-    no-frame: true; // 隐藏系统原生边框
+    no-frame: true; // 隐藏系统原生边框，采用自绘制无边框标题栏
 
-    // 状态属性
+    // -------------------------------------------------------------------------
+    // 侧边栏与弹窗视口状态属性
+    // -------------------------------------------------------------------------
+    /// 左侧活动栏当前激活的 Tab 标识 ("hosts", "history", "files", "credentials", "snippets", "tunnels", "backup", "settings")
     in-out property <string> active-left-tab: "hosts";
+    /// 左侧功能抽屉是否处于展开状态
     in-out property <bool> is-left-drawer-open: true;
+    /// 右侧辅助工具栏当前激活的工具标识 ("monitor", "snippet", "sftp", "notes", "ai")
     in-out property <string> active-right-tool: "monitor";
-    in-out property <bool> is-right-drawer-open: true;
+    /// 右侧辅助工具抽屉是否处于展开状态 (默认关闭，点击右侧工具栏图标时展开)
+    in-out property <bool> is-right-drawer-open: false;
+
+    /// Ctrl+K 命令调色板是否处于打开状态
     in-out property <bool> is-command-palette-open: false;
+    /// F12 开发者调试诊断控制台模态弹窗是否打开
     in-out property <bool> is-debug-modal-open: false;
+    /// 多终端群发广播模式是否开启
     in-out property <bool> is-broadcast-mode: false;
+    /// 主窗口当前是否处于系统最大化状态
     in-out property <bool> is-window-maximized: false;
+    /// 当前是否处于深色模式
     in-out property <bool> is-dark-mode: true;
+    /// 当前生效的配色主题展示名称 (如: "Darcula", "GitHub Light")
     in-out property <string> current-theme-name: "Darcula";
+
+    // -------------------------------------------------------------------------
+    // 终端多会话状态属性
+    // -------------------------------------------------------------------------
+    /// 当前聚焦激活的会话 Tab 标识 ID (如 "sess-1")
     in-out property <string> active-session-tab: "";
+    /// 当前是否存在已连接的活跃终端会话
     in-out property <bool> has-active-session: false;
+    /// 当前激活会话的展示标题
     in-out property <string> active-session-name: "";
+    /// 当前激活会话的目标主机地址 (如 "192.168.1.101:22")
     in-out property <string> active-host-address: "";
+    /// 当前激活会话的网络延迟 (ms)
     in-out property <int> active-host-ping-ms: 0;
+    /// 当前激活会话的在线状态 ("online", "warning", "offline")
     in-out property <string> active-host-status: "online";
+    /// 顶部 Tab 栏所有会话标签列表数据
     in-out property <[TabData]> tabs: [];
-    in-out property <[HostTreeNode]> tree-nodes: [
-        { id: "grp-prod", name: "生产集群 (Production)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 5 },
-        { id: "grp-k8s", name: "Kubernetes 集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "warning", ping-ms: 0, item-count: 2 },
-        { id: "2", name: "k8s-control-plane", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.1", port: 6443, status: "warning", ping-ms: 68, item-count: 0 },
-        { id: "host-k8s-w1", name: "k8s-worker-node-01", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.11", port: 22, status: "online", ping-ms: 24, item-count: 0 },
-        { id: "grp-db", name: "核心数据库集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
-        { id: "3", name: "db-cluster-primary", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.50", port: 5432, status: "online", ping-ms: 18, item-count: 0 },
-        { id: "host-db-s1", name: "db-cluster-standby", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.51", port: 5432, status: "online", ping-ms: 20, item-count: 0 },
-        { id: "1", name: "prod-server-01", is-group: false, parent-id: "grp-prod", level: 1, is-expanded: false, address: "192.168.1.100", port: 22, status: "online", ping-ms: 21, item-count: 0 },
-        { id: "grp-edge", name: "边缘网关与缓存", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
-        { id: "5", name: "auth-gateway-edge", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "47.98.12.33", port: 443, status: "online", ping-ms: 35, item-count: 0 },
-        { id: "4", name: "redis-cache-shard-0", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "10.0.2.10", port: 6379, status: "online", ping-ms: 12, item-count: 0 },
-        { id: "grp-ai", name: "AI 算力集群 (GPU)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 1 },
-        { id: "6", name: "ai-inference-gpu", is-group: false, parent-id: "grp-ai", level: 1, is-expanded: false, address: "10.0.8.200", port: 22, status: "online", ping-ms: 14, item-count: 0 },
-        { id: "grp-dr", name: "容灾与测试环境", is-group: true, parent-id: "", level: 0, is-expanded: false, address: "", port: 0, status: "offline", ping-ms: 0, item-count: 2 },
-    ];
-    in-out property <[HostItemData]> hosts: [
-        { id: "1", name: "prod-server-01", address: "192.168.1.100", port: 22, group: "生产集群", status: "online", ping-ms: 21 },
-        { id: "2", name: "k8s-control-plane", address: "10.0.0.1", port: 6443, group: "K8s集群", status: "warning", ping-ms: 68 },
-        { id: "3", name: "db-cluster-primary", address: "10.0.1.50", port: 5432, group: "数据库", status: "online", ping-ms: 18 },
-        { id: "4", name: "redis-cache-shard-0", address: "10.0.2.10", port: 6379, group: "缓存集群", status: "online", ping-ms: 12 },
-        { id: "5", name: "auth-gateway-edge", address: "47.98.12.33", port: 443, group: "边缘网关", status: "online", ping-ms: 35 },
-        { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping-ms: 14 },
-        { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping-ms: 0 },
-    ];
+
+    // -------------------------------------------------------------------------
+    // 主机与分组资产数据模型
+    // -------------------------------------------------------------------------
+    /// 左侧主机抽屉树形视图可见节点列表
+    in-out property <[HostTreeNode]> tree-nodes: [];
+    /// 左侧主机抽屉卡片视图可见主机列表
+    in-out property <[HostItemData]> hosts: [];
     /// 主机管理视图模式 ("tree" 树形模式 | "card" 列表卡片模式)
     in-out property <string> hosts-view-mode: "tree";
-    /// 当前树形内容最宽尺寸（动态驱动左右平滑滚动）
+    /// 当前树形内容最宽尺寸（动态驱动左右平滑横向滚动）
     in-out property <length> tree-content-width: 240px;
+    /// 新建分组模态对话框是否显示
     in-out property <bool> is-create-group-open: false;
+    /// 新建分组默认选中的父级 ID
     in-out property <string> create-group-default-parent: "root";
-    in-out property <[GroupOptionData]> group-options: [
-        { id: "root", name: "根目录 (顶级分组)", level: 0, parent-id: "" },
-        { id: "grp-prod", name: "生产集群 (Production)", level: 1, parent-id: "root" },
-        { id: "grp-k8s", name: "Kubernetes 集群", level: 2, parent-id: "grp-prod" },
-        { id: "grp-db", name: "核心数据库集群", level: 2, parent-id: "grp-prod" },
-        { id: "grp-edge", name: "边缘网关与缓存", level: 1, parent-id: "root" },
-        { id: "grp-ai", name: "AI 算力集群 (GPU)", level: 1, parent-id: "root" },
-        { id: "grp-dr", name: "容灾与测试环境", level: 1, parent-id: "root" },
-    ];
+    /// 新建分组/主机弹窗中“上级分组选择器”下拉树形数据模型
+    in-out property <[GroupOptionData]> group-options: [];
+
+    /// 左侧抽屉自适应宽度 (支持鼠标拖拽调节)
     in-out property <length> left-drawer-width: 240px;
+    /// 右侧抽屉自适应宽度 (支持鼠标拖拽调节)
     in-out property <length> right-drawer-width: 240px;
-    /// 开发者调试实时事件日志列表
+    /// 开发者调试控制台实时事件日志列表
     in-out property <[LogEntryData]> debug-logs: [];
 
     /// 快速新建终端会话弹窗状态与数据
     in-out property <bool> is-new-session-modal-open: false;
+    /// 快速启动器本地 Shell 环境探测列表
     in-out property <[LocalShellItemData]> launcher-local-items: [];
+    /// 快速启动器远程主机资产列表
     in-out property <[HostItemData]> launcher-host-items: root.hosts;
 
-    /// 树节点拖拽交互状态
+    // -------------------------------------------------------------------------
+    // 拖拽调序交互状态机
+    // -------------------------------------------------------------------------
+    /// 是否正在进行鼠标拖拽操作
     in-out property <bool> is-dragging: false;
+    /// 被拖拽源节点 ID
     in-out property <string> drag-source-id: "";
+    /// 被拖拽源节点显示名称
     in-out property <string> drag-source-name: "";
+    /// 被拖拽源节点是否为文件夹分组
     in-out property <bool> drag-source-is-group: false;
+    /// 当前悬停命中的目标放置节点 ID
     in-out property <string> drop-target-id: "";
+    /// 当前悬停命中的目标放置节点名称
     in-out property <string> drop-target-name: "";
+    /// 当前悬停命中的目标放置节点下标
     in-out property <int> drop-target-index: -1;
-    in-out property <string> drop-position: "inside"; // "before" | "inside" | "after" | "root" | ""
+    /// 放置落点模式 ("before" 前插 | "inside" 移入分组 | "after" 后插 | "root" 顶级 | "none" 无效)
+    in-out property <string> drop-position: "inside";
+    /// 当前拖拽目标落点是否合法
     in-out property <bool> drop-target-valid: true;
+    /// 鼠标当前全局拖拽 X 坐标
     in-out property <length> drag-x: 0px;
+    /// 鼠标当前全局拖拽 Y 坐标
     in-out property <length> drag-y: 0px;
 
-    // 各种业务回调
+    /// 终端主窗格像素位图帧流 (由 Rust 终端引擎光栅化渲染后推送)
+    in-out property <image> terminal-screen-image;
+    /// 终端副窗格像素位图帧流 (分屏模式有效)
+    in-out property <image> terminal-split-image;
+    /// 终端第 3 窗格像素位图帧流 (三分屏/四分屏有效)
+    in-out property <image> terminal-split2-image;
+    /// 终端第 4 窗格像素位图帧流 (四分屏有效)
+    in-out property <image> terminal-split3-image;
+    /// 是否开启多终端分屏模式
+    in-out property <bool> is-split: false;
+    /// 分屏窗格总数量 (1: 单屏, 2: 双分屏, 3: 三分屏, 4: 四分屏)
+    in-out property <int> split-count: 1;
+    /// 分屏排布方向 ("vertical" 垂直左右 | "horizontal" 水平上下)
+    in-out property <string> split-orientation: "vertical";
+    /// 分屏窗格尺寸比例
+    in-out property <float> split-ratio: 0.5;
+    /// 当前获得键盘焦点的窗格索引 (0: 主窗格, 1: 副窗格 1, 2: 副窗格 2, 3: 副窗格 3)
+    in-out property <int> active-pane-index: 0;
+    /// 副窗格展示标题
+    in-out property <string> split-session-name: "";
+    /// 第 3 窗格展示标题
+    in-out property <string> split2-session-name: "";
+    /// 第 4 窗格展示标题
+    in-out property <string> split3-session-name: "";
+    /// 动态多窗格列表模型 (无限嵌套分屏)
+
+    in-out property <[TerminalPaneData]> terminal-panes: [];
+    /// 动态分割条列表模型
+    in-out property <[TerminalSplitterData]> terminal-splitters: [];
+    /// 当前获得键盘焦点的窗格 ID
+    in-out property <string> active-pane-id: "";
+    /// 终端实际物理像素渲染画布宽高
+    out property <float> terminal-canvas-width: viewport.canvas-width;
+    out property <float> terminal-canvas-height: viewport.canvas-height;
+    /// 终端动态网格列数 (由中央视口根据实际像素宽度自适应换算)
+    out property <int> terminal-cols: viewport.terminal-cols;
+    /// 终端动态网格行数 (由中央视口根据实际像素高度自适应换算)
+    out property <int> terminal-rows: viewport.terminal-rows;
+
+    /// 当前终端历史回滚总行数
+    in-out property <int> terminal-history-size: 0;
+
+    /// 当前相对底部的向上回滚行偏移量
+    in-out property <int> terminal-scroll-offset: 0;
+
+
+    /// 壁纸展示模式 ("none" 无壁纸 | "global" 全局磨砂壁纸 | "terminal" 仅终端视口壁纸)
+    in-out property <string> wallpaper-mode: "none";
+    /// 全局磨砂背景壁纸位图
+    in-out property <image> global-wallpaper-image;
+    /// 全局背景壁纸不透明度 (0.0 ~ 1.0)
+    in-out property <float> global-wallpaper-opacity: 0.15;
+    /// 终端专属背景壁纸位图
+    in-out property <image> terminal-wallpaper-image;
+    /// 终端专属背景壁纸不透明度 (0.0 ~ 1.0)
+    in-out property <float> terminal-wallpaper-opacity: 0.20;
+    /// 终端字体名称 (如 "JetBrains Mono" / "Consolas")
+    in-out property <string> terminal-font-family: "JetBrains Mono";
+    /// 终端字体字号 (默认 14.0 px)
+    in-out property <float> terminal-font-size: 14.0;
+
+
+    // -------------------------------------------------------------------------
+    // 窗口与业务路由回调
+    // -------------------------------------------------------------------------
+    /// 动态设置终端字体与字号
+    callback set-terminal-font(string /* font_name_or_path */, float /* font_size */);
+    /// 动态设置终端色彩主题
+    callback set-terminal-theme(string /* theme_id */);
+    /// 动态设置壁纸背景
+    callback set-wallpaper(string /* mode: "none"|"global"|"terminal" */, string /* image_path */, float /* opacity */);
+    /// 呼出全局命令面板回调
     callback trigger-command-palette();
+    /// 切换配色主题回调
     callback switch-theme(string /* theme_id */);
+    /// 切换深色/浅色外观模式回调
     callback toggle-color-mode();
+
+    /// 树形视图分组折叠/展开回调
     callback toggle-tree-group(string /* group-id */);
+    /// 拖拽释放节点移动与调序回调
     callback move-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
+    /// 拖拽悬停动态命中计算回调
     callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
+    /// 侧边栏主机资产实时搜索过滤回调
     callback filter-hosts(string /* query */);
+    /// 快速启动器弹窗实时搜索过滤回调
     callback filter-launcher(string /* query */);
-    callback create-group(string /* parent_id */, string /* name */);
+    /// 快速启动器上级分组动态折叠展开回调
     callback toggle-group-option(string /* id */);
+    /// 确认新建分组回调
+    callback create-group(string /* parent_id */, string /* name */);
+    /// 双击主机或本地 Shell 发起终端连接回调
     callback open-host(string /* id */);
+    /// 激活选中的终端会话 Tab 回调
     callback select-tab(string /* id */);
+    /// 关闭指定终端会话 Tab 回调
     callback close-tab(string /* id */);
+    /// 点击加号呼出新建终端会话弹窗回调
     callback new-tab();
+    /// 向当前终端发送指令片段回调
     callback send-snippet(string /* cmd */);
+    /// 原生窗口最小化回调
     callback minimize-window();
+    /// 原生窗口最大化/还原回调
     callback maximize-window();
+    /// 原生窗口退出应用回调
     callback close-window();
 
-    // 开发者调试面板专用回调
+    // -------------------------------------------------------------------------
+    // 终端核心底层交互回调
+    // -------------------------------------------------------------------------
+    /// 终端键盘按键字符/转义序列输入回调
+    callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
+    /// 终端鼠标滚轮视口滚动回调
+    callback terminal-scroll(length /* delta */);
+    /// 终端鼠标划选选区变更回调
+    callback terminal-selection-changed(int /* start_col */, int /* start_row */, int /* end_col */, int /* end_row */, bool /* has_selection */);
+    /// 终端选区复制到剪贴板回调
+    callback terminal-copy();
+    /// 剪贴板文本粘贴到终端回调
+    callback terminal-paste();
+    /// 终端视口清屏回调
+    callback terminal-clear();
+
+    /// 终端多窗格分屏回调
+    callback split-terminal(string /* orientation */);
+    /// 关闭当前终端分屏窗格回调
+    callback close-split();
+    /// 按窗格下标关闭指定分屏窗格回调
+    callback close-pane-by-index(int /* index */);
+    /// 按窗格 ID 关闭指定分屏窗格回调
+    callback close-pane-by-id(string /* pane_id */);
+    /// 选择并聚焦指定分屏窗格回调
+    callback select-pane(int /* index */);
+    /// 按窗格 ID 选择并聚焦指定窗格回调
+    callback select-pane-by-id(string /* pane_id */);
+    /// 动态拖拽调节分割条比例回调
+    callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
+    /// 终端缓冲区文本检索回调
+    callback search-terminal(string /* query */, bool /* match_case */);
+    /// 终端动态几何网格尺寸变更回调
+    callback terminal-resize(int /* cols */, int /* rows */);
+
+
+
+
+    // -------------------------------------------------------------------------
+    // 开发者 F12 调试控制台专用回调
+    // -------------------------------------------------------------------------
+    /// 批量生成主机测试数据
     callback debug-batch-generate(string /* prefix */, string /* count_str */, string /* ip_prefix */, string /* start_ip_str */, string /* port_str */, string /* group */, string /* status_mode */, bool /* overwrite */);
+    /// 批量更新主机状态模拟
     callback debug-batch-update-status(string /* status_mode */);
+    /// 批量修改主机端口
     callback debug-batch-update-port(string /* new_port_str */);
+    /// 注入标准场景测试预设
     callback debug-inject-preset(string /* preset_id */);
+    /// 快捷添加单台主机
     callback debug-quick-add-host(string /* name */, string /* ip */, string /* port_str */, string /* group */);
+    /// 快捷添加嵌套分组
     callback debug-quick-add-group(string /* name */, string /* parent_id */);
+    /// 清空全量内存与存储层数据
     callback debug-clear-data();
+    /// 恢复系统默认精简数据集
     callback debug-reset-default-data();
+    /// 清空诊断日志
     callback debug-clear-logs();
+    /// 模拟触发测试诊断日志
     callback debug-emit-test-log(string /* level */);
+
 
     // 全局快捷键拦截 (支持 F12 或 Ctrl+Shift+D 随时呼出调试弹窗)
     forward-focus: main-focus;
@@ -241,9 +407,19 @@ export component AppWindow inherits Window {
         background: AppTheme.window-background;
         clip: true;
 
+        // 全局磨砂壁纸层 (当 wallpaper-mode == "global" 且图像有效时展示)
+        if root.wallpaper-mode == "global" && root.global-wallpaper-image.width > 0: Image {
+            source: root.global-wallpaper-image;
+            width: 100%;
+            height: 100%;
+            image-fit: cover;
+            opacity: root.global-wallpaper-opacity;
+        }
+
         VerticalLayout {
             padding: 0px;
             spacing: 0px;
+
 
             // 1. 顶层全宽控制栏 (TabBar + 纯净系统窗口控制)
             TabBar {
@@ -386,8 +562,9 @@ export component AppWindow inherits Window {
                 }
 
                 // 2.3 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
-                TerminalViewport {
+                viewport := TerminalViewport {
                     horizontal-stretch: 1;
+
                     has-active-session: root.has-active-session;
                     tabs: root.tabs;
                     active-tab-id: root.active-session-tab;
@@ -397,7 +574,49 @@ export component AppWindow inherits Window {
                     session-name: root.active-session-name;
                     host-address: root.active-host-address;
                     ping-ms: root.active-host-ping-ms;
+                    terminal-screen-image: root.terminal-screen-image;
+                    terminal-split-image: root.terminal-split-image;
+                    terminal-split2-image: root.terminal-split2-image;
+                    terminal-split3-image: root.terminal-split3-image;
+                    is-split <=> root.is-split;
+                    split-count <=> root.split-count;
+                    split-orientation <=> root.split-orientation;
+                    split-ratio <=> root.split-ratio;
+                    active-pane-index <=> root.active-pane-index;
+                    active-pane-id <=> root.active-pane-id;
+                    terminal-panes: root.terminal-panes;
+                    terminal-splitters: root.terminal-splitters;
+                    split-session-name: root.split-session-name;
+                    split2-session-name: root.split2-session-name;
+                    split3-session-name: root.split3-session-name;
+                    history-size: root.terminal-history-size;
+                    scroll-offset: root.terminal-scroll-offset;
+                    wallpaper-mode: root.wallpaper-mode;
+                    terminal-wallpaper-image: root.terminal-wallpaper-image;
+                    terminal-wallpaper-opacity: root.terminal-wallpaper-opacity;
+                    terminal-key-input(text, is_ctrl, is_shift, is_alt) => { root.terminal-key-input(text, is_ctrl, is_shift, is_alt); }
+
+
+                    terminal-scroll(delta) => { root.terminal-scroll(delta); }
+                    terminal-selection-changed(sc, sr, ec, er, has_sel) => { root.terminal-selection-changed(sc, sr, ec, er, has_sel); }
+                    copy-text => { root.terminal-copy(); }
+                    paste-text => { root.terminal-paste(); }
+
+                    clear-screen => { root.terminal-clear(); }
+                    split-terminal(orient) => { root.split-terminal(orient); }
+                    close-split => { root.close-split(); }
+                    close-pane-by-index(idx) => { root.close-pane-by-index(idx); }
+                    close-pane-by-id(id) => { root.close-pane-by-id(id); }
+                    select-pane(idx) => { root.select-pane(idx); }
+                    select-pane-by-id(id) => { root.select-pane-by-id(id); }
+                    adjust-splitter(id, delta) => { root.adjust-splitter(id, delta); }
+                    search-terminal(q, c) => { root.search-terminal(q, c); }
+                    terminal-resize(cols, rows) => { root.terminal-resize(cols, rows); }
                 }
+
+
+
+
 
                 // 2.3.1 右侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
                 if root.is-right-drawer-open: Rectangle {

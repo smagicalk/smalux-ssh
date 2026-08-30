@@ -14,14 +14,8 @@ export struct PaletteItemData {
 /// 全局浮动指令面板 (Command Palette / Ctrl+K)
 export component CommandPalette inherits Rectangle {
     in property <bool> is-open: false;
-    in property <[PaletteItemData]> items: [
-        { id: "1", category: "host", icon-text: "🖥️", title: "prod-server-01", subtitle: "192.168.1.100:22 (生产环境)" },
-        { id: "2", category: "host", icon-text: "🖥️", title: "k8s-master-node", subtitle: "10.0.0.12:22 (集群控制面)" },
-        { id: "3", category: "command", icon-text: "⚡", title: "docker ps --format", subtitle: "查看运行中的容器列表" },
-        { id: "4", category: "command", icon-text: "⚡", title: "df -h && free -m", subtitle: "检查系统磁盘与内存占用" },
-        { id: "5", category: "theme", icon-text: "🎨", title: "切换主题: Darcula", subtitle: "经典深色暗调主题" },
-        { id: "6", category: "theme", icon-text: "🎨", title: "切换主题: Monokai", subtitle: "高对比色彩斑斓代码配色" },
-    ];
+    in property <[PaletteItemData]> items: [];
+
 
     callback close();
     callback item-selected(string /* id */);

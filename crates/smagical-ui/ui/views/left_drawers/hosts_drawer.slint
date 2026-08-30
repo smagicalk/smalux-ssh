@@ -2,7 +2,9 @@ import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
 import { SearchInput } from "../../components/search-input.slint";
 import { StatusDot } from "../../components/status-dot.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { ScrollView } from "std-widgets.slint";
+
 
 /// 主机项数据结构 (Host Item Data)
 ///
@@ -66,43 +68,12 @@ export component HostsDrawer inherits DrawerContainer {
     /// 当前树形内容的最大呈现宽度（根据节点长名称动态扩展，驱动自适应横向滚动）
     in-out property <length> tree-content-width: 240px;
 
-    /// 树形层级嵌套数据源 (支持任意层级嵌套与动态展开收缩)
-    in-out property <[HostTreeNode]> tree-nodes: [
-        // 顶级分组 1: 生产集群 (含二级子分组与直属主机)
-        { id: "grp-prod", name: "生产集群 (Production)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 5 },
-        { id: "grp-k8s", name: "Kubernetes 集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "warning", ping-ms: 0, item-count: 2 },
-        { id: "2", name: "k8s-control-plane", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.1", port: 6443, status: "warning", ping-ms: 68, item-count: 0 },
-        { id: "host-k8s-w1", name: "k8s-worker-node-01", is-group: false, parent-id: "grp-k8s", level: 2, is-expanded: false, address: "10.0.0.11", port: 22, status: "online", ping-ms: 24, item-count: 0 },
-        { id: "grp-db", name: "核心数据库集群", is-group: true, parent-id: "grp-prod", level: 1, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
-        { id: "3", name: "db-cluster-primary", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.50", port: 5432, status: "online", ping-ms: 18, item-count: 0 },
-        { id: "host-db-s1", name: "db-cluster-standby", is-group: false, parent-id: "grp-db", level: 2, is-expanded: false, address: "10.0.1.51", port: 5432, status: "online", ping-ms: 20, item-count: 0 },
-        { id: "1", name: "prod-server-01", is-group: false, parent-id: "grp-prod", level: 1, is-expanded: false, address: "192.168.1.100", port: 22, status: "online", ping-ms: 21, item-count: 0 },
-        
-        // 顶级分组 2: 边缘与微服务
-        { id: "grp-edge", name: "边缘网关与缓存", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 2 },
-        { id: "5", name: "auth-gateway-edge", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "47.98.12.33", port: 443, status: "online", ping-ms: 35, item-count: 0 },
-        { id: "4", name: "redis-cache-shard-0", is-group: false, parent-id: "grp-edge", level: 1, is-expanded: false, address: "10.0.2.10", port: 6379, status: "online", ping-ms: 12, item-count: 0 },
+    /// 树形层级嵌套数据源 (由 Rust 存储层提供唯一真相源)
+    in-out property <[HostTreeNode]> tree-nodes: [];
 
-        // 顶级分组 3: AI 推理集群
-        { id: "grp-ai", name: "AI 算力集群 (GPU)", is-group: true, parent-id: "", level: 0, is-expanded: true, address: "", port: 0, status: "online", ping-ms: 0, item-count: 1 },
-        { id: "6", name: "ai-inference-gpu", is-group: false, parent-id: "grp-ai", level: 1, is-expanded: false, address: "10.0.8.200", port: 22, status: "online", ping-ms: 14, item-count: 0 },
+    /// 卡片模式扁平列表数据源 (由 Rust 存储层提供唯一真相源)
+    in property <[HostItemData]> hosts: [];
 
-        // 顶级分组 4: 容灾备份与测试
-        { id: "grp-dr", name: "容灾与测试环境", is-group: true, parent-id: "", level: 0, is-expanded: false, address: "", port: 0, status: "offline", ping-ms: 0, item-count: 2 },
-        { id: "7", name: "backup-node-dr", is-group: false, parent-id: "grp-dr", level: 1, is-expanded: false, address: "192.168.100.250", port: 22, status: "offline", ping-ms: 0, item-count: 0 },
-        { id: "host-staging", name: "staging-api-test", is-group: false, parent-id: "grp-dr", level: 1, is-expanded: false, address: "10.0.12.88", port: 22, status: "offline", ping-ms: 0, item-count: 0 },
-    ];
-
-    /// 卡片模式扁平列表数据源
-    in property <[HostItemData]> hosts: [
-        { id: "1", name: "prod-server-01", address: "192.168.1.100", port: 22, group: "生产集群", status: "online", ping-ms: 21 },
-        { id: "2", name: "k8s-control-plane", address: "10.0.0.1", port: 6443, group: "K8s集群", status: "warning", ping-ms: 68 },
-        { id: "3", name: "db-cluster-primary", address: "10.0.1.50", port: 5432, group: "数据库", status: "online", ping-ms: 18 },
-        { id: "4", name: "redis-cache-shard-0", address: "10.0.2.10", port: 6379, group: "缓存集群", status: "online", ping-ms: 12 },
-        { id: "5", name: "auth-gateway-edge", address: "47.98.12.33", port: 443, group: "边缘网关", status: "online", ping-ms: 35 },
-        { id: "6", name: "ai-inference-gpu", address: "10.0.8.200", port: 22, group: "AI算力", status: "online", ping-ms: 14 },
-        { id: "7", name: "backup-node-dr", address: "192.168.100.250", port: 22, group: "容灾备份", status: "offline", ping-ms: 0 },
-    ];
 
     /// 单击选中主机事件回调
     callback host-selected(string /* id */);
@@ -267,61 +238,28 @@ export component HostsDrawer inherits DrawerContainer {
                 spacing: 4px;
                 alignment: end;
 
-                // 新建分组
-                Rectangle {
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 3px;
-                    background: add-grp-touch.has-hover ? AppTheme.hover-background : transparent;
-
-                    Image {
-                        source: @image-url("../../assets/icons/folder-plus.svg");
-                        width: 13px;
-                        height: 13px;
-                        image-fit: contain;
-                        colorize: add-grp-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                    }
-
-                    add-grp-touch := TouchArea {
-                        clicked => { root.create-new-group(); }
-                        mouse-cursor: pointer;
-                    }
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/folder-plus.svg");
+                    clicked => { root.create-new-group(); }
                 }
 
-                // 新建主机
-                Rectangle {
-                    width: 22px;
-                    height: 22px;
-                    border-radius: 3px;
-                    background: add-host-touch.has-hover ? AppTheme.hover-background : transparent;
-
-                    Image {
-                        source: @image-url("../../assets/icons/plus.svg");
-                        width: 13px;
-                        height: 13px;
-                        image-fit: contain;
-                        colorize: add-host-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
-                    }
-
-                    add-host-touch := TouchArea {
-                        clicked => { root.create-new-host(); }
-                        mouse-cursor: pointer;
-                    }
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/plus.svg");
+                    clicked => { root.create-new-host(); }
                 }
             }
+
         }
 
         // 2.5 拖拽时的顶级根目录放置区 (仅在树形模式呈现，列表模式无物理分组概念无需显示)
         if root.is-dragging && root.view-mode == "tree": Rectangle {
             height: 28px;
             border-radius: 4px;
-            background: (root.drop-target-id == "root" || root.drop-target-id == "") ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
+            background: root.drop-target-id == "root" ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
             border-width: 1.5px;
-            border-color: (root.drop-target-id == "root" || root.drop-target-id == "") ? AppTheme.accent : AppTheme.border;
+            border-color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.border;
+            animate background { duration: 120ms; }
+            animate border-color { duration: 120ms; }
 
             HorizontalLayout {
                 padding-left: 10px;
@@ -336,7 +274,7 @@ export component HostsDrawer inherits DrawerContainer {
                         width: 13px;
                         height: 13px;
                         image-fit: contain;
-                        colorize: AppTheme.accent;
+                        colorize: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.secondary-foreground;
                     }
                 }
 
@@ -346,7 +284,7 @@ export component HostsDrawer inherits DrawerContainer {
                         text: @tr("移至根目录 (未分组)");
                         font-size: 11px;
                         font-weight: 600;
-                        color: (root.drop-target-id == "root" || root.drop-target-id == "") ? AppTheme.accent : AppTheme.foreground;
+                        color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.foreground;
                         vertical-alignment: center;
                     }
                 }
@@ -397,8 +335,12 @@ export component HostsDrawer inherits DrawerContainer {
                                     root.drop-target-index = -1;
                                 }
                                 if event.kind == PointerEventKind.up {
-                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" && (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
-                                        root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
+                                        if root.drop-target-id == "root" {
+                                            root.move-node(root.drag-source-id, "root", "root");
+                                        } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
+                                            root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                        }
                                     }
                                     root.is-dragging = false;
                                     root.drag-source-id = "";
@@ -429,10 +371,16 @@ export component HostsDrawer inherits DrawerContainer {
                                         root.drag-y = total_y;
 
                                         let screen_y = total_y + scroll-area.viewport-y;
-                                        if screen_y < 0px {
+                                        if screen_y < 16px {
+                                            root.drop-target-index = -1;
+                                            root.drop-target-id = "root";
+                                            root.drop-position = "root";
+                                            root.drop-target-valid = true;
                                             root.request-drag-hover(root.drag-source-id, -1, 0.0);
                                         } else {
                                             let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
+                                            root.drop-target-index = target_idx;
+                                            root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
                                             root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
                                         }
                                     }
@@ -456,23 +404,19 @@ export component HostsDrawer inherits DrawerContainer {
                             mouse-cursor: root.is-dragging ? copy : pointer;
                         }
 
-                        // 核心：唯一下线指示条 (Bottom Insertion Line: 文件夹下线入分组，主机下线排后面)
-                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid: Rectangle {
-                            x: 4px + (node.is-group ? (node.level + 1) : node.level) * 14px;
+                        // 核心：唯一下线指示条 (Bottom Insertion Line: 从图标起始至名称后方，无起始圆点)
+                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid && root.drop-target-id != "root": Rectangle {
+                            x: 6px + node.level * 14px;
                             y: parent.height - 2px;
-                            width: parent.width - 8px - (node.is-group ? (node.level + 1) : node.level) * 14px;
+                            width: Math.min(125px, parent.width - 16px - node.level * 14px);
                             height: 2px;
                             background: AppTheme.accent;
-
-                            Rectangle {
-                                x: 0px;
-                                y: -2px;
-                                width: 6px;
-                                height: 6px;
-                                border-radius: 3px;
-                                background: AppTheme.accent;
-                            }
+                            border-radius: 1px;
+                            z: 20;
                         }
+
+
+
 
                         HorizontalLayout {
                             // 层级缩进 (level * 14px)
@@ -646,7 +590,10 @@ export component HostsDrawer inherits DrawerContainer {
                                         root.drag-y = total_y;
 
                                         let target_idx = Math.max(0, Math.min(root.hosts.length - 1, Math.floor((total_y + 24px) / 56px)));
+                                        root.drop-target-index = target_idx;
+                                        root.drop-target-valid = (target_idx != idx || root.hosts[target_idx].id != host.id);
                                         root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+
                                     }
                                 }
                             }
@@ -758,26 +705,18 @@ export component HostsDrawer inherits DrawerContainer {
                             }
                         }
 
-                        // 核心：唯一下线指示条 (Bottom Insertion Line: 拖拽到该卡片下方放置)
+                        // 核心：唯一下线指示条 (Bottom Insertion Line: 居中贯穿卡片底部，两端留出 8px 边距，无起始圆点)
                         if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid: Rectangle {
-                            x: 0px;
+                            x: 8px;
                             y: parent.height - 2px;
-                            width: parent.width;
-                            height: 2.5px;
+                            width: parent.width - 16px;
+                            height: 2px;
                             background: AppTheme.accent;
                             border-radius: 1px;
                             z: 20;
-
-                            // 左端高亮吸附小圆点
-                            Rectangle {
-                                x: 0px;
-                                y: -2px;
-                                width: 6.5px;
-                                height: 6.5px;
-                                border-radius: 3.25px;
-                                background: AppTheme.accent;
-                            }
                         }
+
+
                     }
                 }
             }

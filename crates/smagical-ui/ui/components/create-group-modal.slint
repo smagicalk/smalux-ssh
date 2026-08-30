@@ -1,29 +1,16 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { GroupTreeSelector, GroupOptionData } from "group-tree-selector.slint";
+import { AppButton } from "base/app-button.slint";
 
 export { GroupTreeSelector, GroupOptionData }
 
 /// 新建主机分组弹窗组件 (Create Group Modal)
-///
-/// 用于在主机资产管理中创建新分组的模态对话框。
-/// 核心特性：
-/// 1. 主弹窗轻量紧凑 (440x260px)，聚焦名称输入与确认创建；
-/// 2. 上级分组支持点击打开专属树形选择弹窗 (420x380px)，层级浏览更清晰宽敞；
-/// 3. 定制化深色无白底输入框，左侧固定图标，右侧绝对锚定清空按钮；
-/// 4. 底部取消与确认创建按钮（支持 Enter 快捷键快速提交）。
 export component CreateGroupModal inherits Rectangle {
     /// 弹窗显隐控制开关 (true: 显示弹窗, false: 隐藏弹窗)
     in property <bool> is-open: false;
-    /// 上级分组树形选项数据列表
-    in property <[GroupOptionData]> group-options: [
-        { id: "root", name: "根目录 (顶级分组)", level: 0, parent-id: "", has-children: true, is-expanded: true },
-        { id: "grp-prod", name: "生产集群 (Production)", level: 1, parent-id: "root", has-children: true, is-expanded: true },
-        { id: "grp-k8s", name: "Kubernetes 集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
-        { id: "grp-db", name: "核心数据库集群", level: 2, parent-id: "grp-prod", has-children: false, is-expanded: false },
-        { id: "grp-edge", name: "边缘网关与缓存", level: 1, parent-id: "root", has-children: false, is-expanded: false },
-        { id: "grp-ai", name: "AI 算力集群 (GPU)", level: 1, parent-id: "root", has-children: false, is-expanded: false },
-        { id: "grp-dr", name: "容灾与测试环境", level: 1, parent-id: "root", has-children: false, is-expanded: false },
-    ];
+    /// 上级分组树形选项数据列表 (由 Rust 存储层提供唯一真相源)
+    in property <[GroupOptionData]> group-options: [];
+
     /// 默认预选的上级分组 ID (默认为 "root" 顶级根目录)
     in property <string> default-parent-id: "root";
     /// 当前选中的目标父级分组 ID
@@ -376,84 +363,35 @@ export component CreateGroupModal inherits Rectangle {
                     height: 32px;
 
                     // 取消按钮
-                    Rectangle {
-                        width: 76px;
-                        height: 32px;
-                        border-radius: AppTheme.radius-medium;
-                        background: cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: cancel-touch.has-hover ? AppTheme.border.darker(10%) : AppTheme.border;
-
-                        animate background { duration: 120ms; }
-                        animate border-color { duration: 120ms; }
-
-                        cancel-touch := TouchArea {
-                            clicked => {
-                                root.group-name = "";
-                                root.is-picker-open = false;
-                                root.close();
-                            }
-                            mouse-cursor: pointer;
-                        }
-
-                        Text {
-                            text: @tr("取消");
-                            font-size: 12px;
-                            font-weight: 500;
-                            color: AppTheme.foreground;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        clicked => {
+                            root.group-name = "";
+                            root.is-picker-open = false;
+                            root.close();
                         }
                     }
 
                     // 确认创建按钮
-                    Rectangle {
-                        width: 96px;
-                        height: 32px;
-                        border-radius: AppTheme.radius-medium;
-                        background: root.group-name != "" ? (confirm-touch.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent) : AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: root.group-name != "" ? AppTheme.accent : AppTheme.border;
-
-                        animate background { duration: 120ms; }
-                        animate border-color { duration: 120ms; }
-
-                        confirm-touch := TouchArea {
-                            clicked => {
-                                if root.group-name != "" {
-                                    root.confirm(root.selected-parent-id, root.group-name);
-                                    root.group-name = "";
-                                    root.close();
-                                }
-                            }
-                            mouse-cursor: root.group-name != "" ? pointer : default;
-                        }
-
-                        HorizontalLayout {
-                            alignment: center;
-                            spacing: 5px;
-
-                            if root.group-name != "": Image {
-                                source: @image-url("../assets/icons/plus.svg");
-                                width: 11px;
-                                height: 11px;
-                                image-fit: contain;
-                                colorize: #ffffff;
-                                y: (parent.height - self.height) / 2;
-                            }
-
-                            Text {
-                                text: @tr("确认创建");
-                                font-size: 12px;
-                                font-weight: 600;
-                                color: root.group-name != "" ? #ffffff : AppTheme.disabled-foreground;
-                                vertical-alignment: center;
+                    AppButton {
+                        text: @tr("确认创建");
+                        icon: @image-url("../assets/icons/plus.svg");
+                        has-icon: root.group-name != "";
+                        variant: root.group-name != "" ? "primary" : "secondary";
+                        enabled: root.group-name != "";
+                        clicked => {
+                            if root.group-name != "" {
+                                root.confirm(root.selected-parent-id, root.group-name);
+                                root.group-name = "";
+                                root.close();
                             }
                         }
                     }
                 }
             }
         }
+
 
         // =========================================================================
         // 2. 选择上级分组 二级树形弹窗 (420x380px，支持完整树形折叠展开与即时确认)

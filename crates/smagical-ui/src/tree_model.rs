@@ -54,7 +54,17 @@ impl From<DebugRawNode> for RawTreeNode {
 
 /// 解析路径（如 "集群/k8s" 或 "亚太/中国区/杭州"）并在树中逐级确保嵌套分组节点存在。
 ///
-/// 返回 (叶子分组 ID, 叶子分组深度层级, 叶子分组展示名称)
+/// 若路径中某个中间分组不存在，则会自动创建并在内存树中追加对应的分组节点。
+///
+/// # 参数
+/// - `tree`: 内存原始节点列表的可变借用
+/// - `path`: 以正斜杠或反斜杠分隔的分组层级路径
+///
+/// # 返回值
+/// `(leaf_id, leaf_level, leaf_display_name)`
+/// - `leaf_id`: 最终叶子分组节点的唯一标识 ID
+/// - `leaf_level`: 最终叶子分组在树中的深度（顶级为 0）
+/// - `leaf_display_name`: 最终叶子分组的显示名称
 pub(crate) fn ensure_raw_group_hierarchy(tree: &mut Vec<RawTreeNode>, path: &str) -> (String, i32, String) {
     let clean_path = path.replace('\\', "/");
     let segments: Vec<&str> = clean_path
@@ -110,17 +120,28 @@ pub(crate) fn ensure_raw_group_hierarchy(tree: &mut Vec<RawTreeNode>, path: &str
 
 /// 移动与调序树形节点（主机或分组）。
 ///
-/// 支持四种落点模式：
-/// - `"inside"`: 移入目标分组内部作为其子节点
-/// - `"before"`: 插在目标节点上方（成为目标节点的同级前序节点）
-/// - `"after"`: 插在目标节点下方（成为目标节点的同级后序节点）
-/// - `"root"`: 移至顶级根目录
+/// 严格保证树形拓扑一致性，自动阻止自身移入自身或将父分组移入其子孙节点的环路行为。
+/// 若移动的是分组节点，会自动递归迁移其下属整棵子树并自动重算所有子节点的深度 `level` 与各分组的 `item_count`。
+///
+/// # 参数
+/// - `tree`: 内存原始节点列表的可变借用
+/// - `source_id`: 待移动源节点 ID
+/// - `target_id`: 目标节点 ID (若为 "root" 或空字符串则移动至顶级)
+/// - `drop_position`: 落点模式：
+///   - `"inside"`: 移入目标分组内部作为其直属子节点
+///   - `"before"`: 插在目标节点上方（成为同级前序节点）
+///   - `"after"`: 插在目标节点下方（成为同级后序节点）
+///   - `"root"`: 移至顶级根目录
+///
+/// # 返回值
+/// `Ok((source_name, target_name))` 成功返回源名称与目标名称；`Err(err_msg)` 失败返回防呆拒绝原因。
 pub(crate) fn move_and_reorder_raw_node(
     tree: &mut Vec<RawTreeNode>,
     source_id: &str,
     target_id: &str,
     drop_position: &str,
 ) -> Result<(String, String), String> {
+
     let source_idx = tree
         .iter()
         .position(|n| n.id == source_id)
@@ -264,7 +285,18 @@ pub(crate) fn move_and_reorder_raw_node(
     Ok((source_name, target_name))
 }
 
-/// 对树形结构节点进行标准化排序 (文件夹始终置顶，主机在下方，深度优先)。
+/// 对树形结构节点进行标准化深度优先排序。
+///
+/// 排序规则：
+/// 1. 深度优先递归遍历 (DFS)
+/// 2. 同级节点中，文件夹分组 (`is_group = true`) 始终置顶排列在具体主机前面
+/// 3. 同类型节点按名称不区分大小写升序排列 (`name.to_lowercase()`)
+///
+/// # 参数
+/// - `tree`: 乱序的原始节点切片
+///
+/// # 返回值
+/// 排序后的线性树形节点向量
 pub(crate) fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
     let mut result = Vec::with_capacity(tree.len());
 
@@ -285,6 +317,7 @@ pub(crate) fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
 
     collect_children("", tree, &mut result);
 
+    // 容错处理：将无有效父节点的游离孤立节点追加至末尾
     for node in tree {
         if !result.iter().any(|r| r.id == node.id) {
             result.push(node.clone());
@@ -295,6 +328,14 @@ pub(crate) fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
 }
 
 /// 从底层存储门面 (AppStorage) 构建 UI 层专用的全量原始树形节点列表。
+///
+/// 递归从根节点开始装载所有分组与主机记录，自动计算直属子项总数 (含直属子分组 + 直属主机)。
+///
+/// # 参数
+/// - `storage`: 底层存储门面特征对象引用
+///
+/// # 返回值
+/// 构建并完成 DFS 排序的 `Vec<RawTreeNode>` 原始树节点全量集合
 pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTreeNode> {
     let groups = storage.groups().list_all().unwrap_or_default();
     let hosts = storage.hosts().list_all().unwrap_or_default();
@@ -370,7 +411,16 @@ pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTr
     sort_tree_hierarchy(&result)
 }
 
-/// 构建新建分组弹窗中的上级分组树形选项数据模型。
+/// 构建新建分组/主机弹窗中的“上级分组选择器”树形扁平数据模型。
+///
+/// 仅提取所有分组节点并根据选择器当前的展开集合 (`expanded`) 计算其可见性与展开箭头状态。
+///
+/// # 参数
+/// - `tree`: 原始全量节点列表
+/// - `expanded`: 弹窗选择器中当前处于展开状态的分组 ID 集合
+///
+/// # 返回值
+/// 提供给 Slint 前端下拉树形选择框渲染的 `Vec<GroupOptionData>`
 pub(crate) fn build_group_options(tree: &[RawTreeNode], expanded: &HashSet<String>) -> Vec<GroupOptionData> {
     let mut options = Vec::new();
 
@@ -426,7 +476,16 @@ pub(crate) fn build_group_options(tree: &[RawTreeNode], expanded: &HashSet<Strin
     options
 }
 
-/// 构建主界面当前可见的树形视图节点。
+/// 构建左侧抽屉树形视图中当前实际可见的树形节点列表。
+///
+/// 遵循祖先链折叠可见性规则：只有当一个节点的所有祖先分组均处于 `expanded` 集合中时，该节点才输出至前端渲染。
+///
+/// # 参数
+/// - `tree`: 原始全量节点列表
+/// - `expanded`: 侧边栏当前处于展开状态的分组 ID 集合
+///
+/// # 返回值
+/// 前端树形列表所绑定的 `Vec<HostTreeNode>`
 pub(crate) fn build_visible_tree_nodes(tree: &[RawTreeNode], expanded: &HashSet<String>) -> Vec<HostTreeNode> {
     let mut visible = Vec::new();
     for node in tree {
@@ -464,7 +523,19 @@ pub(crate) fn build_visible_tree_nodes(tree: &[RawTreeNode], expanded: &HashSet<
     visible
 }
 
-/// 根据搜索关键字构建匹配的树形结构节点。
+/// 根据搜索关键字构建匹配的高亮树形结构节点。
+///
+/// 搜索匹配算法：
+/// 1. 匹配节点自身名称或 IP 地址
+/// 2. 若某个分组匹配，则其所有子孙节点全部展开显示
+/// 3. 若某个子节点匹配，则自动向上递归回溯保留其所有祖先节点并强制置为展开状态
+///
+/// # 参数
+/// - `tree`: 原始全量节点列表
+/// - `query`: 用户搜索关键词
+///
+/// # 返回值
+/// 匹配搜索条件的完整上下文树形节点列表
 pub(crate) fn build_search_tree_nodes(tree: &[RawTreeNode], query: &str) -> Vec<HostTreeNode> {
     let q = query.to_lowercase();
     let mut matching_or_needed_ids = HashSet::new();
@@ -514,7 +585,15 @@ pub(crate) fn build_search_tree_nodes(tree: &[RawTreeNode], query: &str) -> Vec<
     result
 }
 
-/// 计算可见树形节点列表所需的最大呈现宽度 (像素)。
+/// 计算可见树形节点列表所需的最大呈现宽度 (单位: 逻辑像素 px)。
+///
+/// 综合考虑节点缩进层级 `level * 14px`、图标宽度、文本长度及右侧状态标签宽度，用于横向滚动条自适应撑开。
+///
+/// # 参数
+/// - `nodes`: 当前可见的树形节点列表
+///
+/// # 返回值
+/// 推荐的视口内容总宽度 (最小保底 240.0 px)
 pub(crate) fn calculate_max_tree_width(nodes: &[HostTreeNode]) -> f32 {
     let mut max_w: f32 = 240.0;
     for node in nodes {
@@ -523,3 +602,151 @@ pub(crate) fn calculate_max_tree_width(nodes: &[HostTreeNode]) -> f32 {
     }
     max_w
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn create_test_tree() -> Vec<RawTreeNode> {
+        vec![
+            RawTreeNode {
+                id: "grp-a".into(),
+                name: "分组A".into(),
+                is_group: true,
+                parent_id: "".into(),
+                level: 0,
+                address: "".into(),
+                port: 0,
+                status: "online".into(),
+                ping_ms: 0,
+                item_count: 2,
+            },
+            RawTreeNode {
+                id: "grp-a-sub".into(),
+                name: "子分组A1".into(),
+                is_group: true,
+                parent_id: "grp-a".into(),
+                level: 1,
+                address: "".into(),
+                port: 0,
+                status: "online".into(),
+                ping_ms: 0,
+                item_count: 1,
+            },
+            RawTreeNode {
+                id: "host-1".into(),
+                name: "host-01".into(),
+                is_group: false,
+                parent_id: "grp-a-sub".into(),
+                level: 2,
+                address: "10.0.0.1".into(),
+                port: 22,
+                status: "online".into(),
+                ping_ms: 10,
+                item_count: 0,
+            },
+            RawTreeNode {
+                id: "grp-b".into(),
+                name: "分组B".into(),
+                is_group: true,
+                parent_id: "".into(),
+                level: 0,
+                address: "".into(),
+                port: 0,
+                status: "online".into(),
+                ping_ms: 0,
+                item_count: 0,
+            },
+            RawTreeNode {
+                id: "host-root".into(),
+                name: "host-root-node".into(),
+                is_group: false,
+                parent_id: "".into(),
+                level: 0,
+                address: "10.0.0.99".into(),
+                port: 22,
+                status: "online".into(),
+                ping_ms: 5,
+                item_count: 0,
+            },
+        ]
+    }
+
+    #[test]
+    fn test_move_host_inside_group() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "host-1", "grp-b", "inside");
+        assert!(res.is_ok());
+        let (src_name, target_name) = res.unwrap();
+        assert_eq!(src_name, "host-01");
+        assert_eq!(target_name, "分组B");
+
+        let host = tree.iter().find(|n| n.id == "host-1").unwrap();
+        assert_eq!(host.parent_id, "grp-b");
+        assert_eq!(host.level, 1);
+    }
+
+    #[test]
+    fn test_reorder_before() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "grp-b", "grp-a", "before");
+        assert!(res.is_ok());
+
+        assert_eq!(tree[0].id, "grp-b");
+        assert_eq!(tree[1].id, "grp-a");
+    }
+
+    #[test]
+    fn test_reorder_after() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "host-root", "grp-a", "after");
+        assert!(res.is_ok());
+
+        let host_pos = tree.iter().position(|n| n.id == "host-root").unwrap();
+        let host1_pos = tree.iter().position(|n| n.id == "host-1").unwrap();
+        assert!(host_pos > host1_pos);
+    }
+
+    #[test]
+    fn test_move_host_to_root() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "host-1", "root", "root");
+        assert!(res.is_ok());
+
+        let host = tree.iter().find(|n| n.id == "host-1").unwrap();
+        assert_eq!(host.parent_id, "");
+        assert_eq!(host.level, 0);
+    }
+
+    #[test]
+    fn test_move_group_with_children() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "grp-a-sub", "grp-b", "inside");
+        assert!(res.is_ok());
+
+        let sub = tree.iter().find(|n| n.id == "grp-a-sub").unwrap();
+        assert_eq!(sub.parent_id, "grp-b");
+        assert_eq!(sub.level, 1);
+
+        let host = tree.iter().find(|n| n.id == "host-1").unwrap();
+        assert_eq!(host.parent_id, "grp-a-sub");
+        assert_eq!(host.level, 2);
+    }
+
+    #[test]
+    fn test_prevent_cycle_moving_parent_to_child() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "grp-a", "grp-a-sub", "inside");
+        assert!(res.is_err());
+        assert!(res.unwrap_err().contains("循环引用"));
+    }
+
+    #[test]
+    fn test_cannot_move_inside_self() {
+        let mut tree = create_test_tree();
+        let res = move_and_reorder_raw_node(&mut tree, "grp-a", "grp-a", "inside");
+        assert!(res.is_err());
+    }
+}
+

@@ -1,0 +1,63 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 统一通用交互按钮 (App Button)
+export component AppButton inherits Rectangle {
+    in property <string> text: "";
+    in property <image> icon: @image-url("");
+    in property <bool> has-icon: false;
+    in property <length> icon-size: 11px;
+    /// 按钮变体类型: "primary" | "secondary" | "outline" | "ghost" | "danger"
+    in property <string> variant: "secondary";
+    in property <bool> enabled: true;
+    in property <length> font-size: 11px;
+
+    callback clicked();
+
+    height: 30px;
+    border-radius: AppTheme.radius-medium;
+    border-width: (root.variant == "outline" || root.variant == "secondary") ? 1px : 0px;
+    border-color: (root.variant == "outline" || root.variant == "secondary") ? AppTheme.border : transparent;
+
+    background: !root.enabled ? AppTheme.control-background.transparentize(50%) :
+        root.variant == "primary" ? (btn-touch.pressed ? AppTheme.accent.darker(15%) : btn-touch.has-hover ? AppTheme.accent.darker(8%) : AppTheme.accent) :
+        root.variant == "danger" ? (btn-touch.pressed ? AppTheme.danger.darker(15%) : btn-touch.has-hover ? AppTheme.danger.darker(8%) : AppTheme.danger) :
+        root.variant == "outline" ? (btn-touch.pressed ? AppTheme.hover-background.darker(10%) : btn-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background) :
+        root.variant == "ghost" ? (btn-touch.pressed ? AppTheme.hover-background.darker(10%) : btn-touch.has-hover ? AppTheme.hover-background : transparent) :
+        (btn-touch.pressed ? AppTheme.hover-background.darker(10%) : btn-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+
+
+    animate background { duration: 120ms; }
+
+    btn-touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        mouse-cursor: root.enabled ? pointer : default;
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 6px;
+        padding-left: 8px;
+        padding-right: 8px;
+
+        if root.has-icon: Image {
+            source: root.icon;
+            width: root.icon-size;
+            height: root.icon-size;
+            image-fit: contain;
+            colorize: (root.variant == "primary" || root.variant == "danger") ? #ffffff :
+                btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+            y: (parent.height - self.height) / 2;
+        }
+
+        if root.text != "": Text {
+            text: root.text;
+            font-size: root.font-size;
+            font-weight: (root.variant == "primary" || root.variant == "danger") ? 600 : 500;
+            color: !root.enabled ? AppTheme.disabled-foreground :
+                (root.variant == "primary" || root.variant == "danger") ? #ffffff :
+                btn-touch.has-hover ? AppTheme.foreground : AppTheme.foreground;
+            vertical-alignment: center;
+        }
+    }
+}

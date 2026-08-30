@@ -1,0 +1,165 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "../base/app-button.slint";
+import { AppFormInput } from "../base/app-form-input.slint";
+import { AppCard } from "../base/app-card.slint";
+
+export component DebugCrudTab inherits HorizontalLayout {
+    in-out property <string> quick-host-name: "";
+    in-out property <string> quick-host-ip: "192.168.1.50";
+    in-out property <string> quick-host-port: "22";
+    in-out property <string> quick-host-group: "生产集群/核心库";
+    in-out property <string> quick-group-name: "";
+    in-out property <string> current-theme-name: "Darcula";
+    in-out property <bool> is-dark-mode: true;
+
+    callback quick-add-host(string, string, string, string);
+    callback quick-add-group(string, string);
+    callback switch-theme(string);
+    callback toggle-color-mode();
+    callback clear-all-data();
+    callback reset-default-data();
+
+    spacing: 14px;
+    width: 100%;
+    height: 100%;
+
+    // 1. 快速新增单台主机
+    AppCard {
+        horizontal-stretch: 1;
+        height: 100%;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            alignment: start;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                height: 20px;
+
+                Image {
+                    source: @image-url("../../assets/icons/server.svg");
+                    width: 14px;
+                    height: 14px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: @tr("快速添加单台主机");
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            AppFormInput {
+                label: @tr("主机名称:");
+                icon: @image-url("../../assets/icons/server.svg");
+                has-icon: true;
+                text <=> root.quick-host-name;
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+
+                AppFormInput {
+                    horizontal-stretch: 3;
+                    label: @tr("IP 地址:");
+                    icon: @image-url("../../assets/icons/terminal.svg");
+                    has-icon: true;
+                    text <=> root.quick-host-ip;
+                }
+
+                AppFormInput {
+                    horizontal-stretch: 2;
+                    label: @tr("端口:");
+                    text <=> root.quick-host-port;
+                }
+            }
+
+            AppFormInput {
+                label: @tr("归属分组路径 (支持 / 嵌套):");
+                icon: @image-url("../../assets/icons/folder.svg");
+                has-icon: true;
+                text <=> root.quick-host-group;
+            }
+
+            AppButton {
+                text: @tr("确认添加主机");
+                icon: @image-url("../../assets/icons/plus.svg");
+                has-icon: true;
+                variant: "primary";
+                clicked => {
+                    if root.quick-host-name != "" {
+                        root.quick-add-host(
+                            root.quick-host-name,
+                            root.quick-host-ip,
+                            root.quick-host-port,
+                            root.quick-host-group
+                        );
+                        root.quick-host-name = "";
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. 快速新增分组
+    AppCard {
+        horizontal-stretch: 1;
+        height: 100%;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            alignment: start;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                height: 20px;
+
+                Image {
+                    source: @image-url("../../assets/icons/folder-plus.svg");
+                    width: 14px;
+                    height: 14px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: @tr("快速添加新分组");
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            AppFormInput {
+                label: @tr("分组路径 (支持 / 嵌套，如 生产/k8s):");
+                icon: @image-url("../../assets/icons/folder.svg");
+                has-icon: true;
+                text <=> root.quick-group-name;
+            }
+
+            AppButton {
+                text: @tr("确认添加分组");
+                icon: @image-url("../../assets/icons/folder-plus.svg");
+                has-icon: true;
+                variant: "primary";
+                clicked => {
+                    if root.quick-group-name != "" {
+                        root.quick-add-group(root.quick-group-name, "");
+                        root.quick-group-name = "";
+                    }
+                }
+            }
+        }
+    }
+}

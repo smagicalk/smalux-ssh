@@ -14,13 +14,9 @@ export component SftpToolDrawer inherits DrawerContainer {
     title: @tr("SFTP 文件传输");
     collapse-icon: "▶";
 
-    in property <string> current-dir: "/var/log/nginx";
-    in property <[SftpFileItemData]> files: [
-        { name: "..", is-dir: true, size-str: "<DIR>" },
-        { name: "access.log", is-dir: false, size-str: "14.2 MB" },
-        { name: "error.log", is-dir: false, size-str: "128 KB" },
-        { name: "access.log.1.gz", is-dir: false, size-str: "2.4 MB" },
-    ];
+    in property <string> current-dir: "/";
+    in property <[SftpFileItemData]> files: [];
+
 
     callback upload-file();
     callback download-file(string /* filename */);

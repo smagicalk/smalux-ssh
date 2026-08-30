@@ -1,0 +1,41 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 紧凑型独立图标按钮 (App Icon Button)
+export component AppIconButton inherits Rectangle {
+    in property <image> icon: @image-url("");
+    in property <length> icon-size: 13px;
+    in property <color> icon-color: AppTheme.secondary-foreground;
+    in property <color> hover-icon-color: AppTheme.accent;
+    in property <bool> has-border: false;
+    in property <bool> enabled: true;
+
+    callback clicked();
+
+    width: 22px;
+    height: 22px;
+    border-radius: 3px;
+    background: !root.enabled ? transparent :
+        touch.pressed ? AppTheme.hover-background.darker(10%) :
+        touch.has-hover ? AppTheme.hover-background : transparent;
+    border-width: root.has-border ? 1px : 0px;
+    border-color: root.has-border ? AppTheme.border : transparent;
+
+    animate background { duration: 120ms; }
+
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+        mouse-cursor: root.enabled ? pointer : default;
+    }
+
+    Image {
+        source: root.icon;
+        width: root.icon-size;
+        height: root.icon-size;
+        image-fit: contain;
+        colorize: !root.enabled ? AppTheme.disabled-foreground :
+            touch.has-hover ? root.hover-icon-color : root.icon-color;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+    }
+}

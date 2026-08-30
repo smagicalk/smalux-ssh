@@ -1,0 +1,240 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+export component DebugPresetTab inherits Rectangle {
+    callback inject-preset(string);
+
+    width: 100%;
+    height: 100%;
+
+    Flickable {
+        width: 100%;
+        height: 100%;
+        viewport-height: 360px;
+
+        VerticalLayout {
+            padding: 2px;
+            spacing: 8px;
+            alignment: start;
+
+            // 预设 1
+            Rectangle {
+                height: 60px;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../../assets/icons/server.svg");
+                            width: 16px;
+                            height: 16px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Text { text: @tr("1. 企业生产全集群预设 (35+ 主机)"); font-size: 12px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: @tr("包含生产 Web、K8s 编排、PG/Redis 核心库、大数据与 AI 算力中心"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        background: p1-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                        p1-t := TouchArea { clicked => { root.inject-preset("rich_clusters"); } mouse-cursor: pointer; }
+                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+
+            // 预设 2
+            Rectangle {
+                height: 60px;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../../assets/icons/server.svg");
+                            width: 16px;
+                            height: 16px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Text { text: @tr("2. 极简精简数据预设 (3 台主机)"); font-size: 12px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: @tr("验证小数据量下的空状态呈现、滚动条隐藏及轻量加载表现"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        background: p2-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                        p2-t := TouchArea { clicked => { root.inject-preset("minimal"); } mouse-cursor: pointer; }
+                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+
+            // 预设 3
+            Rectangle {
+                height: 60px;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../../assets/icons/server.svg");
+                            width: 16px;
+                            height: 16px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Text { text: @tr("3. 超长命名极限测试 (50+ 字符)"); font-size: 12px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: @tr("包含超长主机与微服务集群名称，验证平滑横向滚动与动态视口宽度自适应"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        background: p3-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                        p3-t := TouchArea { clicked => { root.inject-preset("long_names"); } mouse-cursor: pointer; }
+                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+
+            // 预设 4
+            Rectangle {
+                height: 60px;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../../assets/icons/tree.svg");
+                            width: 16px;
+                            height: 16px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Text { text: @tr("4. 极深层级嵌套树 (5 级结构)"); font-size: 12px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: @tr("全球基础设施 -> 亚太 -> 杭州可用区 -> 机架 POD -> 刀片计算阵列"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        background: p4-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                        p4-t := TouchArea { clicked => { root.inject-preset("deep_nested"); } mouse-cursor: pointer; }
+                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+
+            // 预设 5
+            Rectangle {
+                height: 60px;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../../assets/icons/activity.svg");
+                            width: 16px;
+                            height: 16px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            Text { text: @tr("5. 全告警与离线故障集 (Troubleshooting)"); font-size: 12px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: @tr("包含丢包路由、高延迟网关、断电主机及磁盘故障节点"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        background: p5-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                        p5-t := TouchArea { clicked => { root.inject-preset("faults"); } mouse-cursor: pointer; }
+                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+}

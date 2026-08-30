@@ -1,0 +1,359 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "../base/app-button.slint";
+import { AppFormInput } from "../base/app-form-input.slint";
+import { AppCard } from "../base/app-card.slint";
+
+export component DebugBatchTab inherits HorizontalLayout {
+    in-out property <string> batch-prefix: "k8s-node-";
+    in-out property <string> batch-count-str: "15";
+    in-out property <string> batch-start-ip-str: "10";
+    in-out property <string> batch-ip-prefix: "192.168.1.";
+    in-out property <string> batch-port-str: "22";
+    in-out property <string> batch-group: "集群/k8s";
+    in-out property <string> batch-status-mode: "random";
+    in-out property <string> batch-new-port-str: "2222";
+
+    callback batch-generate(string, string, string, string, string, string, string, bool);
+    callback batch-update-status(string);
+    callback batch-update-port(string);
+    callback reset-default-data();
+    callback clear-all-data();
+
+    spacing: 14px;
+    width: 100%;
+    height: 100%;
+
+    // 1.1 左半区：批量主机生成器
+    AppCard {
+        horizontal-stretch: 1;
+        height: 100%;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+            alignment: start;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                height: 20px;
+
+                Image {
+                    source: @image-url("../../assets/icons/zap.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: @tr("批量主机生成");
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            // 主机名前缀 + 生成数量
+            HorizontalLayout {
+                spacing: 8px;
+
+                AppFormInput {
+                    horizontal-stretch: 3;
+                    label: @tr("名称前缀:");
+                    text <=> root.batch-prefix;
+                }
+
+                AppFormInput {
+                    horizontal-stretch: 2;
+                    label: @tr("数量 (台):");
+                    text <=> root.batch-count-str;
+                }
+            }
+
+            // 快捷数量胶囊 (10 / 20 / 50 / 100)
+            HorizontalLayout {
+                spacing: 6px;
+                height: 22px;
+
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: q10.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    q10 := TouchArea { clicked => { root.batch-count-str = "10"; } mouse-cursor: pointer; }
+                    Text { text: "10 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: q20.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    q20 := TouchArea { clicked => { root.batch-count-str = "20"; } mouse-cursor: pointer; }
+                    Text { text: "20 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: q50.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    q50 := TouchArea { clicked => { root.batch-count-str = "50"; } mouse-cursor: pointer; }
+                    Text { text: "50 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+                Rectangle {
+                    horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                    background: q100.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: AppTheme.border;
+                    q100 := TouchArea { clicked => { root.batch-count-str = "100"; } mouse-cursor: pointer; }
+                    Text { text: "100 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                }
+            }
+
+            // IP 前缀 + 起始段
+            HorizontalLayout {
+                spacing: 8px;
+
+                AppFormInput {
+                    horizontal-stretch: 3;
+                    label: @tr("IP 前缀网段:");
+                    text <=> root.batch-ip-prefix;
+                }
+
+                AppFormInput {
+                    horizontal-stretch: 2;
+                    label: @tr("起始 IP 末位:");
+                    text <=> root.batch-start-ip-str;
+                }
+            }
+
+            // 目标归属分组 + 端口
+            HorizontalLayout {
+                spacing: 8px;
+
+                AppFormInput {
+                    horizontal-stretch: 3;
+                    label: @tr("归属分组路径 (支持 / 嵌套):");
+                    text <=> root.batch-group;
+                }
+
+                AppFormInput {
+                    horizontal-stretch: 2;
+                    label: @tr("SSH 端口:");
+                    text <=> root.batch-port-str;
+                }
+            }
+
+            // 状态模式选择
+            VerticalLayout {
+                spacing: 2px;
+                alignment: start;
+                Text { text: @tr("状态分配策略:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    height: 26px;
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: root.batch-status-mode == "random" ? AppTheme.accent : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-rand := TouchArea { clicked => { root.batch-status-mode = "random"; } mouse-cursor: pointer; }
+                        Text { text: @tr("混合随机"); font-size: 10px; color: root.batch-status-mode == "random" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: root.batch-status-mode == "online" ? AppTheme.accent : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-on := TouchArea { clicked => { root.batch-status-mode = "online"; } mouse-cursor: pointer; }
+                        Text { text: @tr("全部在线"); font-size: 10px; color: root.batch-status-mode == "online" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: root.batch-status-mode == "warning" ? AppTheme.accent : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-warn := TouchArea { clicked => { root.batch-status-mode = "warning"; } mouse-cursor: pointer; }
+                        Text { text: @tr("全部告警"); font-size: 10px; color: root.batch-status-mode == "warning" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: root.batch-status-mode == "offline" ? AppTheme.accent : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-off := TouchArea { clicked => { root.batch-status-mode = "offline"; } mouse-cursor: pointer; }
+                        Text { text: @tr("全部离线"); font-size: 10px; color: root.batch-status-mode == "offline" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+
+            // 按钮栏：生成并追加 / 覆盖生成
+            HorizontalLayout {
+                spacing: 8px;
+
+                AppButton {
+                    horizontal-stretch: 1;
+                    text: @tr("批量追加生成");
+                    icon: @image-url("../../assets/icons/plus.svg");
+                    has-icon: true;
+                    variant: "primary";
+                    clicked => {
+                        root.batch-generate(
+                            root.batch-prefix,
+                            root.batch-count-str,
+                            root.batch-ip-prefix,
+                            root.batch-start-ip-str,
+                            root.batch-port-str,
+                            root.batch-group,
+                            root.batch-status-mode,
+                            false
+                        );
+                    }
+                }
+
+                AppButton {
+                    horizontal-stretch: 1;
+                    text: @tr("覆盖并生成");
+                    icon: @image-url("../../assets/icons/zap.svg");
+                    has-icon: true;
+                    variant: "secondary";
+                    clicked => {
+                        root.batch-generate(
+                            root.batch-prefix,
+                            root.batch-count-str,
+                            root.batch-ip-prefix,
+                            root.batch-start-ip-str,
+                            root.batch-port-str,
+                            root.batch-group,
+                            root.batch-status-mode,
+                            true
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    // 1.2 右半区：批量修改与状态治理 (Batch Modifier)
+    AppCard {
+        horizontal-stretch: 1;
+        height: 100%;
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 10px;
+            alignment: start;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                height: 20px;
+
+                Image {
+                    source: @image-url("../../assets/icons/settings.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                Text {
+                    text: @tr("批量修改与数据治理");
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            // 1. 批量状态统一变更
+            VerticalLayout {
+                spacing: 3px;
+                alignment: start;
+                Text { text: @tr("批量修改全量主机在线状态:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                HorizontalLayout {
+                    spacing: 6px;
+                    height: 28px;
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: m-on.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        m-on := TouchArea { clicked => { root.batch-update-status("all_online"); } mouse-cursor: pointer; }
+                        Text { text: @tr("全部在线"); font-size: 10px; font-weight: 500; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: m-warn.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        m-warn := TouchArea { clicked => { root.batch-update-status("all_warning"); } mouse-cursor: pointer; }
+                        Text { text: @tr("全部告警"); font-size: 10px; font-weight: 500; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: m-off.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        m-off := TouchArea { clicked => { root.batch-update-status("all_offline"); } mouse-cursor: pointer; }
+                        Text { text: @tr("全部离线"); font-size: 10px; font-weight: 500; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: m-rand.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        m-rand := TouchArea { clicked => { root.batch-update-status("random"); } mouse-cursor: pointer; }
+                        Text { text: @tr("随机波动"); font-size: 10px; font-weight: 500; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+
+            // 2. 批量修改 SSH 端口
+            VerticalLayout {
+                spacing: 3px;
+                alignment: start;
+                Text { text: @tr("批量重置全量主机端口:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    AppFormInput {
+                        horizontal-stretch: 2;
+                        text <=> root.batch-new-port-str;
+                    }
+
+                    AppButton {
+                        horizontal-stretch: 3;
+                        text: @tr("批量更新所有端口");
+                        variant: "primary";
+                        clicked => {
+                            root.batch-update-port(root.batch-new-port-str);
+                        }
+                    }
+                }
+            }
+
+            // 3. 全局重置与数据清空
+            VerticalLayout {
+                spacing: 4px;
+                alignment: start;
+                Text { text: @tr("重置与清空:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    AppButton {
+                        horizontal-stretch: 1;
+                        text: @tr("恢复初始 (3台)");
+                        icon: @image-url("../../assets/icons/sparkles.svg");
+                        has-icon: true;
+                        variant: "secondary";
+                        clicked => { root.reset-default-data(); }
+                    }
+
+                    AppButton {
+                        horizontal-stretch: 1;
+                        text: @tr("清空全量数据");
+                        icon: @image-url("../../assets/icons/window-close.svg");
+                        has-icon: true;
+                        variant: "secondary";
+                        clicked => { root.clear-all-data(); }
+                    }
+                }
+            }
+        }
+    }
+}

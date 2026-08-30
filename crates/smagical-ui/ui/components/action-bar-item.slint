@@ -17,17 +17,8 @@ export component ActionBarItem inherits Rectangle {
 
     animate background { duration: 120ms; }
 
-    // 激活指示条 (左侧垂直居中)
-    if is-active: Rectangle {
-        x: 0px;
-        y: (parent.height - self.height) / 2;
-        width: 3px;
-        height: 18px;
-        border-radius: 1.5px;
-        background: AppTheme.accent;
-    }
-
     touch := TouchArea {
+
         clicked => { root.clicked(); }
         mouse-cursor: pointer;
     }
