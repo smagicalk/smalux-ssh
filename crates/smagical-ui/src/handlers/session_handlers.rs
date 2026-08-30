@@ -1,6 +1,6 @@
 //! 终端多会话管理、Tab 页签操作与快速启动器检索回调绑定。
 //!
-//! 负责响应前端终端 Tab 切换/关闭、新建会话中心搜索、终端按键输入、滚轮滚动与剪贴板等交互事件。
+//! 负责响应前端终端 Tab 切换/关闭、分屏多窗格多 Tab 调度、新建会话中心搜索、终端按键输入、滚轮滚动与剪贴板等交互事件。
 
 use std::rc::Rc;
 use slint::ComponentHandle;
@@ -8,14 +8,12 @@ use slint::ComponentHandle;
 use crate::debug_ui::sync_ui_debug_logs;
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::handlers::AppContext;
-use crate::session::sync_active_session_ui;
+use crate::session::{sync_active_session_ui, PaneGroup, TerminalSessionInfo};
 use crate::terminal::{encode_key_event, SplitNode, SplitOrientation, TerminalInstance};
-
-
 
 /// 注册终端会话与启动器相关交互回调。
 ///
-/// 将前端所有终端事件总线（包含多会话 Tab 调度、快速新建弹窗、按键转发、剪贴板交互等）与底层运行时打通。
+/// 将前端所有终端事件总线（包含多会话 Tab 调度、分屏多 Tab 迁移、快速新建弹窗、按键转发、剪贴板交互等）与底层运行时打通。
 ///
 /// # 参数
 /// - `window`: Slint 主窗口句柄引用
@@ -24,78 +22,189 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 1. 关闭会话 Tab 回调
     // -------------------------------------------------------------------------
-    // 当用户点击某个 Tab 上的关闭按钮 (x) 或通过快捷键/右键菜单关闭会话时触发。
-    // 算法逻辑：从活跃会话列表中移除目标会话，若关闭的是当前激活 Tab，则智能激活其前一个或后一个邻近 Tab。
+    // 当用户点击某个 Tab 上的关闭按钮 (x) 时触发。
+    // 算法逻辑：在所有分屏窗格组中查找到包含目标会话的窗格，将其从该窗格的 Tab 序列中移除。
+    // 若该窗格被清空，则自动销毁该窗格并在多分屏二叉树中执行合并。
     let window_weak = window.as_weak();
-    let active_sessions_close = Rc::clone(&ctx.active_sessions);
+    let pane_groups_close = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_close = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_close = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close = Rc::clone(&ctx.active_terminals);
     window.on_close_tab(move |sess_id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
-            let mut sessions = active_sessions_close.borrow_mut();
-            let cur_active = w.get_active_session_tab().to_string();
+            let mut groups = pane_groups_close.borrow_mut();
+            let mut active_pid = active_pane_id_close.borrow_mut();
+            let mut split_tree = global_split_tree_close.borrow_mut();
 
-            let mut next_active = cur_active.clone();
-            if let Some(idx) = sessions.iter().position(|s| s.session_id == id_str) {
-                if cur_active == id_str {
-                    if idx > 0 {
-                        next_active = sessions[idx - 1].session_id.clone();
-                    } else if idx + 1 < sessions.len() {
-                        next_active = sessions[idx + 1].session_id.clone();
-                    } else {
-                        next_active = "".to_string();
-                    }
-                }
-                sessions.remove(idx);
-            }
-
-            // 终止并清理底层 PTY 主会话与分屏会话实例
-            let mut terminals = active_terminals_close.borrow_mut();
-            if let Some(mut instance) = terminals.remove(&id_str) {
+            // 杀灭底层 PTY 进程并释放 Alacritty 实例
+            if let Some(mut instance) = active_terminals_close.borrow_mut().remove(&id_str) {
                 let _ = instance.pty.kill();
             }
-            let split_key = format!("{}-split", id_str);
-            if let Some(mut split_instance) = terminals.remove(&split_key) {
-                let _ = split_instance.pty.kill();
+
+            let mut target_group_idx = None;
+            for (idx, g) in groups.iter_mut().enumerate() {
+                if let Some(pos) = g.tabs.iter().position(|t| t.session_id == id_str) {
+                    g.tabs.remove(pos);
+                    target_group_idx = Some(idx);
+                    if g.active_tab_id == id_str && !g.tabs.is_empty() {
+                        let next_pos = if pos > 0 { pos - 1 } else { 0 };
+                        g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
+                    }
+                    break;
+                }
             }
 
-            // 同步最新的 Tab 列表与激活会话状态到 UI 视口
-            sync_active_session_ui(&w, &sessions, &next_active);
+            if let Some(idx) = target_group_idx
+                && groups[idx].tabs.is_empty()
+            {
+                let closed_pid = groups[idx].pane_id.clone();
+                groups.remove(idx);
+
+                if let Some(tree) = split_tree.as_mut() {
+                    tree.close_pane(&closed_pid);
+                    if tree.leaf_count() <= 1 {
+                        *split_tree = None;
+                    }
+                }
+
+                if !groups.is_empty() {
+                    *active_pid = groups[0].pane_id.clone();
+                } else {
+                    *active_pid = String::new();
+                }
+            }
+
+            let is_split = split_tree.is_some();
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
             sync_ui_debug_logs(&w);
         }
     });
 
+    // -------------------------------------------------------------------------
+    // 1.1 关闭指定窗格内的指定 Tab 回调
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let pane_groups_close_pane_tab = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_close_pane_tab = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_close_pane_tab = Rc::clone(&ctx.global_split_tree);
+    let active_terminals_close_pane_tab = Rc::clone(&ctx.active_terminals);
+    window.on_close_pane_tab(move |pane_id, tab_id| {
+        if let Some(w) = window_weak.upgrade() {
+            let p_id = pane_id.to_string();
+            let t_id = tab_id.to_string();
+            let mut groups = pane_groups_close_pane_tab.borrow_mut();
+            let mut active_pid = active_pane_id_close_pane_tab.borrow_mut();
+            let mut split_tree = global_split_tree_close_pane_tab.borrow_mut();
 
+            if let Some(mut instance) = active_terminals_close_pane_tab.borrow_mut().remove(&t_id) {
+                let _ = instance.pty.kill();
+            }
+
+            let mut remove_group_idx = None;
+            if let Some(idx) = groups.iter().position(|g| g.pane_id == p_id) {
+                let g = &mut groups[idx];
+                if let Some(pos) = g.tabs.iter().position(|t| t.session_id == t_id) {
+                    g.tabs.remove(pos);
+                    if g.active_tab_id == t_id && !g.tabs.is_empty() {
+                        let next_pos = if pos > 0 { pos - 1 } else { 0 };
+                        g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
+                    }
+                }
+                if g.tabs.is_empty() {
+                    remove_group_idx = Some(idx);
+                }
+            }
+
+
+            if let Some(idx) = remove_group_idx {
+                let closed_pid = groups[idx].pane_id.clone();
+                groups.remove(idx);
+
+                if let Some(tree) = split_tree.as_mut() {
+                    tree.close_pane(&closed_pid);
+                    if tree.leaf_count() <= 1 {
+                        *split_tree = None;
+                    }
+                }
+
+                if !groups.is_empty() {
+                    *active_pid = groups[0].pane_id.clone();
+                } else {
+                    *active_pid = String::new();
+                }
+            }
+
+            let is_split = split_tree.is_some();
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
+            sync_ui_debug_logs(&w);
+        }
+    });
 
     // -------------------------------------------------------------------------
     // 2. 切换激活 Tab 会话回调
     // -------------------------------------------------------------------------
-    // 当用户在顶部 Tab 栏点击某个会话标签时触发，将视口切换为该会话的连接信息与位图流。
     let window_weak = window.as_weak();
-    let active_sessions_select = Rc::clone(&ctx.active_sessions);
+    let pane_groups_select = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_select = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_select = Rc::clone(&ctx.global_split_tree);
     window.on_select_tab(move |sess_id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
-            let sessions = active_sessions_select.borrow();
-            sync_active_session_ui(&w, &sessions, &id_str);
+            let mut groups = pane_groups_select.borrow_mut();
+            let mut active_pid = active_pane_id_select.borrow_mut();
+            let is_split = global_split_tree_select.borrow().is_some();
+
+            for g in groups.iter_mut() {
+                if g.tabs.iter().any(|t| t.session_id == id_str) {
+                    g.active_tab_id = id_str.clone();
+                    *active_pid = g.pane_id.clone();
+                    break;
+                }
+            }
+
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::debug!(target: "smagical_ui::session", "切换至终端会话: {}", id_str);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 2.1 切换指定分屏窗格内的激活 Tab 会话回调
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let pane_groups_select_pane_tab = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_select_pane_tab = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_select_pane_tab = Rc::clone(&ctx.global_split_tree);
+    window.on_select_pane_tab(move |pane_id, tab_id| {
+        if let Some(w) = window_weak.upgrade() {
+            let p_id = pane_id.to_string();
+            let t_id = tab_id.to_string();
+            let mut groups = pane_groups_select_pane_tab.borrow_mut();
+            let mut active_pid = active_pane_id_select_pane_tab.borrow_mut();
+            let is_split = global_split_tree_select_pane_tab.borrow().is_some();
+
+            if let Some(g) = groups.iter_mut().find(|g| g.pane_id == p_id) {
+                g.active_tab_id = t_id.clone();
+                *active_pid = p_id.clone();
+            }
+
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            tracing::debug!(target: "smagical_ui::session", "窗格 [{}] 切换至 Tab: {}", p_id, t_id);
         }
     });
 
     // -------------------------------------------------------------------------
     // 3. 呼出新建终端会话弹窗回调
     // -------------------------------------------------------------------------
-    // 点击 Tab 栏右侧加号 (+) 按钮时触发，重置搜索输入框并装载当前缓存的本地 Shell 列表与全部主机资产。
     let window_weak = window.as_weak();
     let master_tree_reset = Rc::clone(&ctx.master_tree);
     let cached_shells_new_tab = Rc::clone(&ctx.cached_shells);
     window.on_new_tab(move || {
         if let Some(w) = window_weak.upgrade() {
-            // 恢复本地终端完整列表 (来自启动时缓存，避免文件系统探测开销)
             w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from((*cached_shells_new_tab).clone()))));
 
-            // 从当前内存全量树中提取所有主机节点
             let tree = master_tree_reset.borrow();
             let all_hosts: Vec<HostItemData> = tree
                 .iter()
@@ -120,7 +229,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 4. 快速新建会话中心实时关键词搜索过滤回调
     // -------------------------------------------------------------------------
-    // 在新建会话弹窗输入框中键入关键词时触发，实时对本地 Shell 环境与远程主机进行多字段模糊匹配。
     let window_weak = window.as_weak();
     let master_tree_launcher = Rc::clone(&ctx.master_tree);
     let cached_shells_launcher = Rc::clone(&ctx.cached_shells);
@@ -128,7 +236,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_lowercase();
 
-            // 过滤本地 Shell 项 (匹配标题、副标题、类型标签、常见别名)
             let filtered_locals: Vec<LocalShellItemData> = if q.is_empty() {
                 (*cached_shells_launcher).clone()
             } else {
@@ -152,7 +259,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             };
             w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_locals))));
 
-            // 过滤远程主机项 (匹配主机名称、IP/域名、所属分组)
             let tree = master_tree_launcher.borrow();
             let filtered_hosts: Vec<HostItemData> = tree
                 .iter()
@@ -183,110 +289,91 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // -------------------------------------------------------------------------
     // 5. 快捷指令片段发送回调
     // -------------------------------------------------------------------------
-    // 从右侧工具栏快捷指令库中点击某条指令时触发，直接将命令文本写入当前活跃终端。
     let window_weak = window.as_weak();
+    let pane_groups_snippet = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_snippet = Rc::clone(&ctx.active_pane_id);
     let active_terminals_snippet = Rc::clone(&ctx.active_terminals);
     window.on_send_snippet(move |cmd| {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
+            let active_pid = active_pane_id_snippet.borrow().clone();
+            let groups = pane_groups_snippet.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                let mut terminals = active_terminals_snippet.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    let cmd_str = format!("{}\n", cmd);
+                    let _ = instance.send_input(&cmd_str);
+                }
+                tracing::info!(target: "smagical_ui::cmd", "向终端发送指令片段: {}", cmd);
+                sync_ui_debug_logs(&w);
             }
-            let mut terminals = active_terminals_snippet.borrow_mut();
-            if let Some(instance) = terminals.get_mut(&active) {
-                let cmd_str = format!("{}\n", cmd);
-                let _ = instance.send_input(&cmd_str);
-            }
-            tracing::info!(target: "smagical_ui::cmd", "向终端发送指令片段: {}", cmd);
-            sync_ui_debug_logs(&w);
         }
     });
 
     // -------------------------------------------------------------------------
     // 6. 终端按键输入捕获回调
     // -------------------------------------------------------------------------
-    // 接收来自前端 FocusScope 捕获的键盘输入字符或转义序列，转发至当前激活窗格的 PTY/SSH 输入流。
     let window_weak = window.as_weak();
+    let pane_groups_input = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_input = Rc::clone(&ctx.active_pane_id);
     let active_terminals_input = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_input = Rc::clone(&ctx.active_pane_ids);
     window.on_terminal_key_input(move |text, is_ctrl, is_shift, is_alt| {
-        if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
-            let target_id = if w.get_is_split() {
-                active_pane_ids_input
-                    .borrow()
-                    .get(&active)
-                    .cloned()
-                    .unwrap_or_else(|| active.clone())
-            } else {
-                active.clone()
-            };
+        if let Some(_w) = window_weak.upgrade() {
+            let active_pid = active_pane_id_input.borrow().clone();
+            let groups = pane_groups_input.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                let mut terminals = active_terminals_input.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    if is_shift && (text == "\u{0012}" || text == "PageUp") {
+                        instance.scroll_page_up();
+                        return;
+                    }
+                    if is_shift && (text == "\u{0013}" || text == "PageDown") {
+                        instance.scroll_page_down();
+                        return;
+                    }
 
-            let mut terminals = active_terminals_input.borrow_mut();
-            if let Some(instance) = terminals.get_mut(&target_id) {
-                // 快捷键: Shift+PageUp 向上翻页 / Shift+PageDown 向下翻页
-                if is_shift && (text == "\u{0012}" || text == "PageUp") {
-                    instance.scroll_page_up();
-                    return;
+                    instance.scroll_to_bottom();
+                    let bytes = encode_key_event(text.as_str(), is_ctrl, is_shift, is_alt);
+                    let _ = instance.send_bytes(&bytes);
                 }
-                if is_shift && (text == "\u{0013}" || text == "PageDown") {
-                    instance.scroll_page_down();
-                    return;
-                }
-
-                // 正常敲击键盘输入时，自动跳回当前最新底端
-                instance.scroll_to_bottom();
-
-                let bytes = encode_key_event(text.as_str(), is_ctrl, is_shift, is_alt);
-                let _ = instance.send_bytes(&bytes);
             }
-            tracing::debug!(target: "smagical_ui::terminal", "终端 [{}] 接收按键: text={:?}, ctrl={}, shift={}, alt={}", target_id, text, is_ctrl, is_shift, is_alt);
         }
     });
 
     // -------------------------------------------------------------------------
     // 7. 终端滚轮视口滚动回调
     // -------------------------------------------------------------------------
-    // 鼠标在终端主视口滑动滚轮时触发，通知终端缓冲区向上或向下翻滚历史行。
     let window_weak = window.as_weak();
+    let pane_groups_scroll = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_scroll = Rc::clone(&ctx.active_pane_id);
     let active_terminals_scroll = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_scroll = Rc::clone(&ctx.active_pane_ids);
     let scroll_accum = Rc::new(std::cell::Cell::new(0.0f32));
     window.on_terminal_scroll(move |delta| {
-        if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
-            let target_id = if w.get_is_split() {
-                active_pane_ids_scroll
-                    .borrow()
-                    .get(&active)
-                    .cloned()
-                    .unwrap_or_else(|| active.clone())
-            } else {
-                active.clone()
-            };
+        if let Some(_w) = window_weak.upgrade() {
+            let active_pid = active_pane_id_scroll.borrow().clone();
+            let groups = pane_groups_scroll.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                let current = scroll_accum.get() + delta;
+                let line_step = 40.0f32;
+                let lines = (current / line_step) as i32;
 
-            // 使用平滑累加器按标准滚轮刻度 (40px/行，1 个标准刻度 120px 恰好对应 3 行) 平滑消费
-            let current = scroll_accum.get() + delta;
-            let line_step = 40.0f32;
-            let lines = (current / line_step) as i32;
-
-            if lines != 0 {
-                scroll_accum.set(current - (lines as f32) * line_step);
-                let mut terminals = active_terminals_scroll.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&target_id) {
-                    instance.scroll_delta(lines);
+                if lines != 0 {
+                    scroll_accum.set(current - (lines as f32) * line_step);
+                    let mut terminals = active_terminals_scroll.borrow_mut();
+                    if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                        instance.scroll_delta(lines);
+                    }
+                } else {
+                    scroll_accum.set(current);
                 }
-            } else {
-                scroll_accum.set(current);
             }
         }
     });
@@ -294,69 +381,53 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 8. 终端选区复制到剪贴板回调
     // -------------------------------------------------------------------------
-    // 响应快捷键 Ctrl+Shift+C 或右键菜单“复制”操作，提取当前选区纯文本并写入系统剪贴板。
     let window_weak = window.as_weak();
+    let pane_groups_copy = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_copy = Rc::clone(&ctx.active_pane_id);
     let active_terminals_copy = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_copy = Rc::clone(&ctx.active_pane_ids);
     window.on_terminal_copy(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
-            let target_id = if w.get_is_split() {
-                active_pane_ids_copy
-                    .borrow()
-                    .get(&active)
-                    .cloned()
-                    .unwrap_or_else(|| active.clone())
-            } else {
-                active.clone()
-            };
-
-            let mut terminals = active_terminals_copy.borrow_mut();
-            if let Some(instance) = terminals.get_mut(&target_id) {
-                let text = instance.parser.copy_selection_text();
-                if !text.is_empty()
-                    && let Ok(mut clipboard) = arboard::Clipboard::new()
-                {
-                    let _ = clipboard.set_text(text);
+            let active_pid = active_pane_id_copy.borrow().clone();
+            let groups = pane_groups_copy.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                let mut terminals = active_terminals_copy.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    let text = instance.parser.copy_selection_text();
+                    if !text.is_empty()
+                        && let Ok(mut clipboard) = arboard::Clipboard::new()
+                    {
+                        let _ = clipboard.set_text(text);
+                    }
                 }
+                tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 选区复制", active_sess.session_id);
+                sync_ui_debug_logs(&w);
             }
-            tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 选区文本复制到系统剪贴板", target_id);
-            sync_ui_debug_logs(&w);
         }
     });
 
     // -------------------------------------------------------------------------
     // 8.1 终端鼠标拖拽划选选区变更回调
     // -------------------------------------------------------------------------
-    // 响应鼠标在终端视口上的拖拽选区事件，实时更新高亮坐标并在下一次重绘时着色。
     let window_weak = window.as_weak();
+    let pane_groups_sel = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_sel = Rc::clone(&ctx.active_pane_id);
     let active_terminals_sel = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_sel = Rc::clone(&ctx.active_pane_ids);
     window.on_terminal_selection_changed(move |sc, sr, ec, er, has_sel| {
-        if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
-            let target_id = if w.get_is_split() {
-                active_pane_ids_sel
-                    .borrow()
-                    .get(&active)
-                    .cloned()
-                    .unwrap_or_else(|| active.clone())
-            } else {
-                active.clone()
-            };
-
-            let mut terminals = active_terminals_sel.borrow_mut();
-            if let Some(instance) = terminals.get_mut(&target_id) {
-                if has_sel && sc >= 0 && sr >= 0 && ec >= 0 && er >= 0 {
-                    instance.parser.set_selection((sc as usize, sr as usize), (ec as usize, er as usize));
-                } else {
-                    instance.parser.clear_selection();
+        if let Some(_w) = window_weak.upgrade() {
+            let active_pid = active_pane_id_sel.borrow().clone();
+            let groups = pane_groups_sel.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                let mut terminals = active_terminals_sel.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    if has_sel && sc >= 0 && sr >= 0 && ec >= 0 && er >= 0 {
+                        instance.parser.set_selection((sc as usize, sr as usize), (ec as usize, er as usize));
+                    } else {
+                        instance.parser.clear_selection();
+                    }
                 }
             }
         }
@@ -365,81 +436,72 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 9. 剪贴板文本粘贴到终端回调
     // -------------------------------------------------------------------------
-    // 响应快捷键 Ctrl+Shift+V 或右键菜单“粘贴”操作，读取系统剪贴板并写入当前激活窗格 PTY。
     let window_weak = window.as_weak();
+    let pane_groups_paste = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_paste = Rc::clone(&ctx.active_pane_id);
     let active_terminals_paste = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_paste = Rc::clone(&ctx.active_pane_ids);
     window.on_terminal_paste(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
-            let target_id = if w.get_is_split() {
-                active_pane_ids_paste
-                    .borrow()
-                    .get(&active)
-                    .cloned()
-                    .unwrap_or_else(|| active.clone())
-            } else {
-                active.clone()
-            };
-
-            if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
-                let mut terminals = active_terminals_paste.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&target_id) {
-                    let _ = instance.send_input(&text);
+            let active_pid = active_pane_id_paste.borrow().clone();
+            let groups = pane_groups_paste.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+                    let mut terminals = active_terminals_paste.borrow_mut();
+                    if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                        let _ = instance.send_input(&text);
+                    }
                 }
+                tracing::info!(target: "smagical_ui::terminal", "执行剪贴板粘贴到终端 [{}]", active_sess.session_id);
+                sync_ui_debug_logs(&w);
             }
-            tracing::info!(target: "smagical_ui::terminal", "执行剪贴板粘贴到终端 [{}]", target_id);
-            sync_ui_debug_logs(&w);
         }
     });
 
     // -------------------------------------------------------------------------
     // 10. 终端清屏回调
     // -------------------------------------------------------------------------
-    // 响应快捷键 Ctrl+L 或右键菜单“清屏”操作，向当前激活窗格 PTY 发送清屏控制码 (`\x1b[2J\x1b[H`)。
     let window_weak = window.as_weak();
+    let pane_groups_clear = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_clear = Rc::clone(&ctx.active_pane_id);
     let active_terminals_clear = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_clear = Rc::clone(&ctx.active_pane_ids);
     window.on_terminal_clear(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
+            let active_pid = active_pane_id_clear.borrow().clone();
+            let groups = pane_groups_clear.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
+                let mut terminals = active_terminals_clear.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    let _ = instance.clear();
+                }
+                tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 清屏", active_sess.session_id);
+                sync_ui_debug_logs(&w);
             }
-            let target_id = if w.get_is_split() {
-                active_pane_ids_clear
-                    .borrow()
-                    .get(&active)
-                    .cloned()
-                    .unwrap_or_else(|| active.clone())
-            } else {
-                active.clone()
-            };
-
-            let mut terminals = active_terminals_clear.borrow_mut();
-            if let Some(instance) = terminals.get_mut(&target_id) {
-                let _ = instance.clear();
-            }
-            tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 清屏", target_id);
-            sync_ui_debug_logs(&w);
         }
     });
 
+
     // -------------------------------------------------------------------------
-    // 11. 终端多窗格分屏回调 (支持无限层级任意嵌套分屏)
+    // 11. 终端多窗格分屏回调 (Editor Group 优雅切分模型)
     // -------------------------------------------------------------------------
+    // 当在分屏窗格中点击分屏按钮时：
+    // - 若当前窗格存在多个 Tab，将当前激活的 Tab 迁移到新分屏窗格；
+    // - 若当前窗格仅有 1 个 Tab，则为新分屏窗格创建独立的 Shell 会话。
     let window_weak = window.as_weak();
+    let pane_groups_split = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_split = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_split = Rc::clone(&ctx.global_split_tree);
     let active_terminals_split = Rc::clone(&ctx.active_terminals);
-    let session_split_trees_split = Rc::clone(&ctx.session_split_trees);
-    let active_pane_ids_split = Rc::clone(&ctx.active_pane_ids);
-    let next_pane_counter = Rc::new(std::cell::Cell::new(2usize));
+    let next_pane_num_split = Rc::clone(&ctx.next_pane_num);
+    let next_session_num_split = Rc::clone(&ctx.next_session_num);
     window.on_split_terminal(move |orient| {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
+            let mut groups = pane_groups_split.borrow_mut();
+            let mut active_pid = active_pane_id_split.borrow_mut();
+            if groups.is_empty() {
                 return;
             }
 
@@ -448,167 +510,196 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 _ => SplitOrientation::Vertical,
             };
 
-            let mut trees = session_split_trees_split.borrow_mut();
-            let tree = trees.entry(active.clone()).or_insert_with(|| {
-                SplitNode::new_single(active.clone(), format!("{} (Pane 1)", w.get_active_session_name()))
-            });
+            let target_idx = groups.iter().position(|g| g.pane_id == *active_pid).unwrap_or(0);
+            let target_pane_id = groups[target_idx].pane_id.clone();
 
-            let current_target = active_pane_ids_split
-                .borrow()
-                .get(&active)
-                .cloned()
-                .unwrap_or_else(|| active.clone());
+            let mut pane_counter = next_pane_num_split.borrow_mut();
+            let new_pane_id = format!("pane-{}", *pane_counter);
+            *pane_counter += 1;
 
-            let pane_num = next_pane_counter.get();
-            next_pane_counter.set(pane_num + 1);
-            let new_pane_id = format!("{}-pane-{}", active, pane_num);
-            let new_pane_title = format!("{} (Pane {})", w.get_active_session_name(), pane_num);
+            if groups[target_idx].tabs.len() > 1 {
+                // 场景 A: 存在多个 Tab，将当前激活 Tab 移入新窗格
+                let active_tab_id = groups[target_idx].active_tab_id.clone();
+                let tab_pos = groups[target_idx].tabs.iter().position(|t| t.session_id == active_tab_id).unwrap_or(0);
+                let moved_session = groups[target_idx].tabs.remove(tab_pos);
 
-            if tree.split_pane(&current_target, new_pane_id.clone(), new_pane_title.clone(), split_dir) {
-                let mut terminals = active_terminals_split.borrow_mut();
-                if let std::collections::hash_map::Entry::Vacant(e) = terminals.entry(new_pane_id.clone())
-                    && let Ok(instance) = TerminalInstance::spawn_local(
-                        new_pane_id.clone(),
-                        "local-powershell",
-                        new_pane_title,
-                        80,
-                        24,
-                    )
-                {
-                    e.insert(instance);
+                let remaining_act_pos = if tab_pos > 0 { tab_pos - 1 } else { 0 };
+                groups[target_idx].active_tab_id = groups[target_idx].tabs[remaining_act_pos.min(groups[target_idx].tabs.len() - 1)].session_id.clone();
+
+                let new_group = PaneGroup::new_single(new_pane_id.clone(), moved_session);
+                groups.push(new_group);
+            } else {
+                // 场景 B: 仅有 1 个 Tab，为新窗格生成一个全新终端会话
+                let mut sess_num = next_session_num_split.borrow_mut();
+                let sess_id = format!("sess-{}", *sess_num);
+                *sess_num += 1;
+
+                let session_name = format!("Terminal #{}", *sess_num);
+                if let Ok(instance) = TerminalInstance::spawn_local(sess_id.clone(), "local-powershell", session_name.clone(), 80, 24) {
+                    active_terminals_split.borrow_mut().insert(sess_id.clone(), instance);
                 }
 
-                active_pane_ids_split.borrow_mut().insert(active.clone(), new_pane_id.clone());
-                w.set_is_split(true);
-                w.set_split_count(tree.leaf_count() as i32);
-                w.set_active_pane_id(new_pane_id.clone().into());
+                let info = TerminalSessionInfo {
+                    session_id: sess_id.clone(),
+                    host_id: "local-powershell".to_string(),
+                    host_name: "PowerShell".to_string(),
+                    host_address: "127.0.0.1".to_string(),
+                    host_status: "online".to_string(),
+                    ping_ms: 0,
+                    display_title: session_name,
+                };
 
-                tracing::info!(target: "smagical_ui::terminal", "在窗格 [{}] 上成功嵌套分屏 -> 新窗格 [{}] (总窗格数: {})", current_target, new_pane_id, tree.leaf_count());
-                sync_ui_debug_logs(&w);
+                let new_group = PaneGroup::new_single(new_pane_id.clone(), info);
+                groups.push(new_group);
             }
+
+            // 更新全局二叉树拓扑
+            let mut split_tree = global_split_tree_split.borrow_mut();
+            if split_tree.is_none() {
+                let mut tree = SplitNode::new_single(target_pane_id.clone(), "Pane 1".to_string());
+                tree.split_pane(&target_pane_id, new_pane_id.clone(), "Pane 2".to_string(), split_dir);
+                *split_tree = Some(tree);
+            } else if let Some(tree) = split_tree.as_mut() {
+                tree.split_pane(&target_pane_id, new_pane_id.clone(), format!("Pane {}", *pane_counter), split_dir);
+            }
+
+            *active_pid = new_pane_id.clone();
+            sync_active_session_ui(&w, &groups, &new_pane_id, true);
+
+            tracing::info!(target: "smagical_ui::session", "成功在窗格 [{}] 上切分新分屏窗格 [{}] (总窗格数: {})", target_pane_id, new_pane_id, groups.len());
+            sync_ui_debug_logs(&w);
         }
     });
 
     // -------------------------------------------------------------------------
-    // 12. 按窗格 ID 关闭指定分屏窗格回调 (支持递归拓扑节点合并)
+    // 12. 按窗格 ID 关闭指定分屏窗格回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
+    let pane_groups_close_id = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_close_id = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_close_id = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_id = Rc::clone(&ctx.active_terminals);
-    let session_split_trees_close_id = Rc::clone(&ctx.session_split_trees);
-    let active_pane_ids_close_id = Rc::clone(&ctx.active_pane_ids);
     window.on_close_pane_by_id(move |target_pane_id| {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
+            let pid = target_pane_id.to_string();
+            let mut groups = pane_groups_close_id.borrow_mut();
+            let mut active_pid = active_pane_id_close_id.borrow_mut();
+            let mut split_tree = global_split_tree_close_id.borrow_mut();
 
-            let mut trees = session_split_trees_close_id.borrow_mut();
-            if let Some(tree) = trees.get_mut(&active) {
+            if let Some(idx) = groups.iter().position(|g| g.pane_id == pid) {
+                let closed_group = groups.remove(idx);
                 let mut terminals = active_terminals_close_id.borrow_mut();
-                if let Some(mut instance) = terminals.remove(target_pane_id.as_str()) {
-                    let _ = instance.pty.kill();
+                for t in closed_group.tabs {
+                    if let Some(mut inst) = terminals.remove(&t.session_id) {
+                        let _ = inst.pty.kill();
+                    }
                 }
-
-                tree.close_pane(target_pane_id.as_str());
-                let remaining_count = tree.leaf_count();
-
-                if remaining_count <= 1 {
-                    trees.remove(&active);
-                    w.set_is_split(false);
-                    w.set_split_count(1);
-                    active_pane_ids_close_id.borrow_mut().insert(active.clone(), active.clone());
-                    w.set_active_pane_id(active.clone().into());
-                } else {
-                    let all_remaining = tree.all_pane_ids();
-                    let next_active = all_remaining.into_iter().next().unwrap_or_else(|| active.clone());
-                    active_pane_ids_close_id.borrow_mut().insert(active.clone(), next_active.clone());
-                    w.set_split_count(remaining_count as i32);
-                    w.set_active_pane_id(next_active.into());
-                }
-
-                tracing::info!(target: "smagical_ui::terminal", "关闭指定窗格 [{}] (剩余窗格数: {})", target_pane_id, remaining_count);
-                sync_ui_debug_logs(&w);
             }
+
+            if let Some(tree) = split_tree.as_mut() {
+                tree.close_pane(&pid);
+                if tree.leaf_count() <= 1 {
+                    *split_tree = None;
+                }
+            }
+
+            if !groups.is_empty() {
+                *active_pid = groups[0].pane_id.clone();
+            } else {
+                *active_pid = String::new();
+            }
+
+            let is_split = split_tree.is_some();
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            tracing::info!(target: "smagical_ui::session", "已关闭窗格: {}", pid);
+            sync_ui_debug_logs(&w);
         }
     });
 
     // -------------------------------------------------------------------------
-    // 12.1 按窗格索引关闭分屏窗格回调 (向后兼容)
+    // 12.1 按窗格下标关闭分屏窗格回调 (向后兼容)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let session_split_trees_close_idx = Rc::clone(&ctx.session_split_trees);
+    let pane_groups_close_idx = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_close_idx = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_close_idx = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_idx = Rc::clone(&ctx.active_terminals);
-    let active_pane_ids_close_idx = Rc::clone(&ctx.active_pane_ids);
     window.on_close_pane_by_index(move |idx| {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if active.is_empty() {
-                return;
-            }
+            let mut groups = pane_groups_close_idx.borrow_mut();
+            let mut active_pid = active_pane_id_close_idx.borrow_mut();
+            let mut split_tree = global_split_tree_close_idx.borrow_mut();
 
-            let mut trees = session_split_trees_close_idx.borrow_mut();
-            if let Some(tree) = trees.get_mut(&active) {
-                let pane_ids = tree.all_pane_ids();
-                if let Some(target_pane_id) = pane_ids.get(idx as usize) {
-                    let target_id = target_pane_id.clone();
-                    let mut terminals = active_terminals_close_idx.borrow_mut();
-                    if let Some(mut instance) = terminals.remove(&target_id) {
-                        let _ = instance.pty.kill();
-                    }
-
-                    tree.close_pane(&target_id);
-                    let remaining_count = tree.leaf_count();
-
-                    if remaining_count <= 1 {
-                        trees.remove(&active);
-                        w.set_is_split(false);
-                        w.set_split_count(1);
-                        active_pane_ids_close_idx.borrow_mut().insert(active.clone(), active.clone());
-                        w.set_active_pane_id(active.clone().into());
-                    } else {
-                        let all_remaining = tree.all_pane_ids();
-                        let next_active = all_remaining.into_iter().next().unwrap_or_else(|| active.clone());
-                        active_pane_ids_close_idx.borrow_mut().insert(active.clone(), next_active.clone());
-                        w.set_split_count(remaining_count as i32);
-                        w.set_active_pane_id(next_active.into());
+            let u_idx = idx as usize;
+            if u_idx < groups.len() {
+                let closed_group = groups.remove(u_idx);
+                let pid = closed_group.pane_id.clone();
+                let mut terminals = active_terminals_close_idx.borrow_mut();
+                for t in closed_group.tabs {
+                    if let Some(mut inst) = terminals.remove(&t.session_id) {
+                        let _ = inst.pty.kill();
                     }
                 }
+
+                if let Some(tree) = split_tree.as_mut() {
+                    tree.close_pane(&pid);
+                    if tree.leaf_count() <= 1 {
+                        *split_tree = None;
+                    }
+                }
+
+                if !groups.is_empty() {
+                    *active_pid = groups[0].pane_id.clone();
+                } else {
+                    *active_pid = String::new();
+                }
+
+                let is_split = split_tree.is_some();
+                sync_active_session_ui(&w, &groups, &active_pid, is_split);
             }
         }
     });
 
     // -------------------------------------------------------------------------
-    // 12.2 关闭当前终端全部嵌套分屏模式
+    // 12.2 关闭当前终端全部嵌套分屏模式 (合并为单屏)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let active_terminals_close_split = Rc::clone(&ctx.active_terminals);
-    let session_split_trees_close_split = Rc::clone(&ctx.session_split_trees);
-    let active_pane_ids_close_split = Rc::clone(&ctx.active_pane_ids);
+    let pane_groups_close_split = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_close_split = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_close_split = Rc::clone(&ctx.global_split_tree);
     window.on_close_split(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            w.set_is_split(false);
-            w.set_split_count(1);
-            w.set_active_pane_index(0);
-            w.set_active_pane_id(active.clone().into());
-            active_pane_ids_close_split.borrow_mut().insert(active.clone(), active.clone());
+            let mut groups = pane_groups_close_split.borrow_mut();
+            let mut active_pid = active_pane_id_close_split.borrow_mut();
+            *global_split_tree_close_split.borrow_mut() = None;
 
-            if !active.is_empty() {
-                let mut trees = session_split_trees_close_split.borrow_mut();
-                if let Some(tree) = trees.remove(&active) {
-                    let pane_ids = tree.all_pane_ids();
-                    let mut terminals = active_terminals_close_split.borrow_mut();
-                    for pid in pane_ids {
-                        if pid != active
-                            && let Some(mut instance) = terminals.remove(&pid)
-                        {
-                            let _ = instance.pty.kill();
+            if groups.len() > 1 {
+                let first_pid = groups[0].pane_id.clone();
+                // 将所有后续分屏窗格的 tabs 合并入第一窗格
+                let mut all_tabs = Vec::new();
+                for (i, g) in groups.drain(..).enumerate() {
+                    if i == 0 {
+                        all_tabs = g.tabs;
+                    } else {
+                        for t in g.tabs {
+                            all_tabs.push(t);
                         }
                     }
                 }
+                if let Some(first_tab) = all_tabs.first() {
+                    let act_id = first_tab.session_id.clone();
+                    groups.push(PaneGroup {
+                        pane_id: first_pid.clone(),
+                        tabs: all_tabs,
+                        active_tab_id: act_id,
+                    });
+                    *active_pid = first_pid;
+                }
             }
-            tracing::info!(target: "smagical_ui::terminal", "终端 [{}] 全部退出分屏模式", active);
+
+
+            sync_active_session_ui(&w, &groups, &active_pid, false);
+            tracing::info!(target: "smagical_ui::session", "退出分屏模式并合并所有 Tab");
             sync_ui_debug_logs(&w);
         }
     });
@@ -617,14 +708,16 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 13. 选择并聚焦指定分屏窗格回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let active_pane_ids_sel_id = Rc::clone(&ctx.active_pane_ids);
+    let pane_groups_sel_id = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_sel_id = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_sel_id = Rc::clone(&ctx.global_split_tree);
     window.on_select_pane_by_id(move |pane_id| {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if !active.is_empty() {
-                active_pane_ids_sel_id.borrow_mut().insert(active, pane_id.to_string());
-                w.set_active_pane_id(pane_id);
-            }
+            let pid = pane_id.to_string();
+            let groups = pane_groups_sel_id.borrow();
+            let is_split = global_split_tree_sel_id.borrow().is_some();
+            *active_pane_id_sel_id.borrow_mut() = pid.clone();
+            sync_active_session_ui(&w, &groups, &pid, is_split);
         }
     });
 
@@ -636,28 +729,42 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 13.1 动态拖拽调节分割条比例回调
+    // 13.1 切换单窗格临时最大化 (Zoom) 与还原回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let session_split_trees_adjust = Rc::clone(&ctx.session_split_trees);
-    window.on_adjust_splitter(move |splitter_id, delta_ratio| {
+    let zoomed_pane_id_toggle = Rc::clone(&ctx.zoomed_pane_id);
+    window.on_toggle_pane_zoom(move |pane_id| {
         if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if !active.is_empty() {
-                let mut trees = session_split_trees_adjust.borrow_mut();
-                if let Some(tree) = trees.get_mut(&active) {
-                    let res = tree.adjust_splitter(splitter_id.as_str(), delta_ratio);
-                    tracing::info!(target: "smagical_ui::terminal", "调整分割条 [{}] delta={:.4} -> 结果: {}", splitter_id, delta_ratio, res);
-                }
+            let target_id = pane_id.to_string();
+            let mut zoomed = zoomed_pane_id_toggle.borrow_mut();
+            if zoomed.as_deref() == Some(target_id.as_str()) {
+                *zoomed = None;
+                tracing::info!(target: "smagical_ui::terminal", "还原窗格 [{}] 至多分屏布局", target_id);
+            } else {
+                *zoomed = Some(target_id.clone());
+                tracing::info!(target: "smagical_ui::terminal", "单窗格 [{}] 临时最大化 (Zoom)", target_id);
+            }
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 13.2 动态拖拽调节分割条比例回调
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let global_split_tree_adjust = Rc::clone(&ctx.global_split_tree);
+    window.on_adjust_splitter(move |splitter_id, delta_ratio| {
+        if let Some(_w) = window_weak.upgrade() {
+            let mut tree_guard = global_split_tree_adjust.borrow_mut();
+            if let Some(tree) = tree_guard.as_mut() {
+                let _res = tree.adjust_splitter(splitter_id.as_str(), delta_ratio);
             }
         }
     });
 
-
     // -------------------------------------------------------------------------
     // 14. 终端内文本查找回调
     // -------------------------------------------------------------------------
-    // 响应快捷键 Ctrl+F 浮层中输入的关键词，在终端历史回滚缓冲区中检索匹配项。
     let window_weak = window.as_weak();
     window.on_search_terminal(move |query, match_case| {
         if let Some(w) = window_weak.upgrade() {
@@ -669,21 +776,27 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 15. 终端动态几何网格尺寸调节回调 (Resize)
     // -------------------------------------------------------------------------
-    // 当前端窗口或抽屉宽度拉伸导致终端视口变化时，自适应重置行列数并下发至 PTY。
     let window_weak = window.as_weak();
+    let pane_groups_resize = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_resize = Rc::clone(&ctx.active_pane_id);
     let active_terminals_resize = Rc::clone(&ctx.active_terminals);
     window.on_terminal_resize(move |cols, rows| {
-        if let Some(w) = window_weak.upgrade() {
-            let active = w.get_active_session_tab().to_string();
-            if !active.is_empty() {
+        if let Some(_w) = window_weak.upgrade() {
+            let active_pid = active_pane_id_resize.borrow().clone();
+            let groups = pane_groups_resize.borrow();
+            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+                && let Some(active_sess) = g.get_active_session()
+            {
                 let mut terminals = active_terminals_resize.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active) {
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
                     let _ = instance.resize(cols as u16, rows as u16);
                 }
             }
         }
+
     });
 }
+
 
 
 

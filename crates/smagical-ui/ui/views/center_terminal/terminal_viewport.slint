@@ -5,6 +5,7 @@ import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { TabData } from "tab_bar.slint";
 import { TerminalFindBar } from "terminal_find_bar.slint";
 import { TerminalContextMenu } from "terminal_context_menu.slint";
+import { TerminalPaneView } from "terminal_pane_view.slint";
 
 /// 单个动态终端窗格数据模型 (支持无限嵌套任意多分屏)
 export struct TerminalPaneData {
@@ -24,7 +25,21 @@ export struct TerminalPaneData {
     image: image,
     /// 是否获得当前焦点
     is-active: bool,
+    /// 窗格在当前分屏组内的序号 (1-indexed)
+    pane-index: int,
+    /// 当前分屏组内的窗格总数
+    total-panes: int,
+    /// 窗格当前是否处于临时最大化 (Zoom) 状态
+    is-zoomed: bool,
+    /// 窗格在线状态 ("online" | "warning" | "offline")
+    status: string,
+    /// 该窗格所属的 Tab 列表
+    tabs: [TabData],
+    /// 该窗格当前激活的 Tab ID
+    active-tab-id: string,
 }
+
+
 
 /// 窗格间可拖拽分割条数据模型
 export struct TerminalSplitterData {
@@ -127,13 +142,11 @@ export component TerminalViewport inherits Rectangle {
 
     /// 终端实际物理像素渲染画布宽高
     out property <float> canvas-width: root.width / 1px;
-    out property <float> canvas-height: Math.max(10px, root.height - 36px) / 1px;
-
+    out property <float> canvas-height: Math.max(10px, root.height) / 1px;
 
     /// 终端动态网格尺寸 (自适应计算字符列数与行数，同步回 Rust 后台 PTY)
     out property <int> terminal-cols: Math.max(10, Math.floor((root.width - 36px) / 8.5px));
-    out property <int> terminal-rows: Math.max(5, Math.floor((root.height - 52px) / 18px));
-
+    out property <int> terminal-rows: Math.max(5, Math.floor((root.height - 36px) / 18px));
 
     /// 鼠标划选高亮状态
     in-out property <int> sel-start-col: -1;
@@ -146,6 +159,9 @@ export component TerminalViewport inherits Rectangle {
     callback select-tab(string /* id */);
     callback close-tab(string /* id */);
     callback new-tab();
+    callback select-pane-tab(string /* pane_id */, string /* tab_id */);
+    callback close-pane-tab(string /* pane_id */, string /* tab_id */);
+
 
     /// 终端底层输入流与交互事件回调
     callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
@@ -160,16 +176,11 @@ export component TerminalViewport inherits Rectangle {
     callback close-pane-by-id(string /* pane_id */);
     callback select-pane(int /* index */);
     callback select-pane-by-id(string /* pane_id */);
+    callback toggle-pane-zoom(string /* pane_id */);
     callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
+
     callback search-terminal(string /* query */, bool /* match_case */);
     callback terminal-resize(int /* cols */, int /* rows */);
-
-
-
-
-
-
-
 
     background: AppTheme.window-background;
 
@@ -177,12 +188,11 @@ export component TerminalViewport inherits Rectangle {
         padding: 0px;
         spacing: 0px;
 
-        // 1. 恒常驻留 36px 终端 Tab 会话栏 (集成快捷功能按钮组)
-        Rectangle {
+        // 1. 空状态默认 Tab 栏 (当无会话时展示标准 36px 栏，最右侧固定 + 按钮)
+        if !root.has-active-session: Rectangle {
             height: 36px;
             background: AppTheme.panel-background;
 
-            // 操作条底部分割线
             Rectangle {
                 y: parent.height - 1px;
                 height: 1px;
@@ -190,118 +200,41 @@ export component TerminalViewport inherits Rectangle {
                 background: AppTheme.border;
             }
 
-            VerticalLayout {
-                alignment: center;
-                height: 100%;
+            HorizontalLayout {
                 padding-left: 6px;
                 padding-right: 6px;
+                alignment: end;
 
-                HorizontalLayout {
-                    spacing: 6px;
+                VerticalLayout {
+                    alignment: center;
 
-                    // 1.1 Tab 会话卡片可滑动视口
-                    VerticalLayout {
-                        alignment: center;
-                        horizontal-stretch: 1;
+                    Rectangle {
+                        width: 26px;
+                        height: 26px;
+                        border-radius: 4px;
+                        background: empty-new-tab-touch.has-hover ? AppTheme.hover-background : Colors.transparent;
 
-                        tab-scroll-box := Rectangle {
-                            horizontal-stretch: 1;
-                            height: 28px;
-                            clip: true;
-                            property <length> total-tab-width: root.tabs.length * 144px + 10px;
-                            property <length> min-scroll: Math.min(0px, self.width - total-tab-width);
-                            property <length> effective-offset: Math.min(0px, Math.max(min-scroll, root.tab-scroll-offset));
+                        Text {
+                            text: "+";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: empty-new-tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
 
-                            // 鼠标滚轮横向滑动
-                            TouchArea {
-                                scroll-event(event) => {
-                                    root.tab-scroll-offset = Math.min(0px, Math.max(tab-scroll-box.min-scroll, tab-scroll-box.effective-offset + event.delta-y + event.delta-x));
-                                    accept
-                                }
-                            }
-
-                            // 无活跃会话时的微光提示
-                            if root.tabs.length == 0: HorizontalLayout {
-                                alignment: start;
-                                height: 100%;
-                                VerticalLayout {
-                                    alignment: center;
-                                    Text {
-                                        text: @tr("无活跃终端会话 - 点击右侧 + 或在左侧双击主机发起连接");
-                                        font-size: 11px;
-                                        color: AppTheme.secondary-foreground.transparentize(40%);
-                                        vertical-alignment: center;
-                                    }
-                                }
-                            }
-
-                            // 有会话时平铺 Tabs
-                            if root.tabs.length > 0: HorizontalLayout {
-                                x: tab-scroll-box.effective-offset;
-                                y: 0px;
-                                width: Math.max(parent.width, tab-scroll-box.total-tab-width);
-                                height: parent.height;
-                                spacing: 4px;
-                                alignment: start;
-
-                                animate x { duration: 150ms; easing: ease-out; }
-
-                                for tab in root.tabs: TabItem {
-                                    title: tab.title;
-                                    status: tab.status;
-                                    is-active: tab.id == root.active-tab-id;
-                                    select => {
-                                        root.active-tab-id = tab.id;
-                                        root.select-tab(tab.id);
-                                    }
-                                    close => { root.close-tab(tab.id); }
-                                }
-                            }
+                        empty-new-tab-touch := TouchArea {
+                            clicked => { root.new-tab(); }
+                            mouse-cursor: pointer;
                         }
                     }
-
-                    // 1.2 右侧终端创建新会话加号按钮 (+)
-                    VerticalLayout {
-                        alignment: center;
-
-                        Rectangle {
-                            width: 26px;
-                            height: 26px;
-                            border-radius: 4px;
-                            background: new-tab-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background;
-                            border-width: 1px;
-                            border-color: new-tab-touch.has-hover ? AppTheme.border : AppTheme.border.transparentize(30%);
-
-                            animate background { duration: 180ms; easing: ease-out; }
-                            animate border-color { duration: 180ms; easing: ease-out; }
-
-                            Text {
-                                text: "+";
-                                font-size: 16px;
-                                font-weight: 700;
-                                color: new-tab-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                                x: (parent.width - self.width) / 2;
-                                y: (parent.height - self.height) / 2;
-
-                                animate color { duration: 180ms; easing: ease-out; }
-                            }
-
-                            new-tab-touch := TouchArea {
-                                clicked => {
-                                    root.new-tab();
-                                }
-                                mouse-cursor: pointer;
-                            }
-                        }
-                    }
-
                 }
             }
         }
 
-        // 2. 终端主体区域
+        // 2. 终端主体区域 (当存在活跃会话时)
         if root.has-active-session: terminal-canvas := Rectangle {
             background: AppTheme.window-background;
             vertical-stretch: 1;
@@ -349,8 +282,6 @@ export component TerminalViewport inherits Rectangle {
                     reject
                 }
             }
-
-
 
             // 2.1 终端专属背景壁纸层 (当模式为 terminal 且壁纸有效时展示)
             if root.wallpaper-mode == "terminal" && root.terminal-wallpaper-image.width > 0: Image {
@@ -414,15 +345,36 @@ export component TerminalViewport inherits Rectangle {
                 mouse-cursor: text;
             }
 
-
             // 2.3 单屏终端位图渲染主视口
-            if !root.is-split && root.terminal-screen-image.width > 0: Image {
-                source: root.terminal-screen-image;
-                width: 100%;
-                height: 100%;
-                image-fit: fill;
-                horizontal-alignment: left;
-                vertical-alignment: top;
+            if !root.is-split: TerminalPaneView {
+                pane-id: root.active-tab-id;
+                title: root.session-name;
+                image: root.terminal-screen-image;
+                is-active: true;
+                status: "online";
+                pane-index: 1;
+                total-panes: 1;
+                tabs: root.tabs;
+                active-tab-id: root.active-tab-id;
+
+                select-tab(id) => {
+                    root.active-tab-id = id;
+                    root.select-tab(id);
+                }
+                close-tab(id) => {
+                    root.close-tab(id);
+                }
+                new-tab => { root.new-tab(); }
+                select => { terminal-focus.focus(); }
+                scroll(delta) => { root.terminal-scroll(delta); }
+                selection-changed(sc, sr, ec, er, has-sel) => {
+                    root.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                }
+                context-menu(mx, my) => {
+                    root.context-menu-x = mx;
+                    root.context-menu-y = my;
+                    root.is-context-menu-open = true;
+                }
             }
 
             // 2.4 任意层级嵌套多分屏模式视口 (数据驱动二叉树拓扑)
@@ -430,95 +382,71 @@ export component TerminalViewport inherits Rectangle {
                 width: 100%;
                 height: 100%;
 
-                // 2.4.1 动态渲染全部叶子终端窗格
-                for pane in root.terminal-panes: Rectangle {
+                // 2.4.1 动态渲染全部叶子终端独立窗格组件
+                for pane in root.terminal-panes: TerminalPaneView {
                     x: pane.x;
                     y: pane.y;
                     width: pane.width;
                     height: pane.height;
-                    border-width: pane.is-active ? 1.5px : 1px;
-                    border-color: pane.is-active ? AppTheme.accent : AppTheme.border;
-                    clip: true;
+                    pane-id: pane.pane-id;
+                    title: pane.title;
+                    image: pane.image;
+                    is-active: pane.is-active;
+                    is-zoomed: pane.is-zoomed;
+                    status: pane.status;
+                    pane-index: pane.pane-index;
+                    total-panes: pane.total-panes;
+                    tabs: pane.tabs;
+                    active-tab-id: pane.active-tab-id;
 
-                    VerticalLayout {
-                        padding: 0px;
-                        spacing: 0px;
-
-                        // 窗格顶部标题栏
-                        Rectangle {
-                            height: 22px;
-                            background: pane.is-active ? AppTheme.accent.transparentize(85%) : AppTheme.panel-background;
-                            HorizontalLayout {
-                                padding-left: 8px;
-                                padding-right: 4px;
-                                spacing: 4px;
-
-                                Text {
-                                    text: pane.title;
-                                    font-size: 11px;
-                                    color: pane.is-active ? AppTheme.accent : AppTheme.secondary-foreground;
-                                    vertical-alignment: center;
-                                    horizontal-stretch: 1;
-                                    overflow: elide;
-                                }
-
-                                if root.terminal-panes.length > 1: Rectangle {
-                                    width: 16px;
-                                    height: 16px;
-                                    border-radius: 3px;
-                                    background: close-pane-touch.has-hover ? AppTheme.hover-background : Colors.transparent;
-
-                                    Text {
-                                        text: "×";
-                                        font-size: 12px;
-                                        color: close-pane-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
-                                        horizontal-alignment: center;
-                                        vertical-alignment: center;
-                                    }
-
-                                    close-pane-touch := TouchArea {
-                                        clicked => { root.close-pane-by-id(pane.pane-id); }
-                                        mouse-cursor: pointer;
-                                    }
-                                }
-                            }
-                        }
-
-                        // 窗格终端位图
-                        if pane.image.width > 0: Image {
-                            source: pane.image;
-                            width: 100%;
-                            vertical-stretch: 1;
-                            image-fit: fill;
-                            horizontal-alignment: left;
-                            vertical-alignment: top;
-                        }
+                    select-tab(tab-id) => {
+                        root.active-pane-id = pane.pane-id;
+                        root.select-pane-tab(pane.pane-id, tab-id);
+                        terminal-focus.focus();
+                    }
+                    close-tab(tab-id) => {
+                        root.close-pane-tab(pane.pane-id, tab-id);
+                    }
+                    select => {
+                        root.active-pane-id = pane.pane-id;
+                        root.select-pane-by-id(pane.pane-id);
+                        terminal-focus.focus();
+                        root.is-context-menu-open = false;
+                    }
+                    new-tab => {
+                        root.active-pane-id = pane.pane-id;
+                        root.new-tab();
+                    }
+                    split-right => {
+                        root.active-pane-id = pane.pane-id;
+                        root.select-pane-by-id(pane.pane-id);
+                        root.split-terminal("vertical");
+                    }
+                    split-down => {
+                        root.active-pane-id = pane.pane-id;
+                        root.select-pane-by-id(pane.pane-id);
+                        root.split-terminal("horizontal");
+                    }
+                    toggle-zoom => {
+                        root.toggle-pane-zoom(pane.pane-id);
+                    }
+                    close => {
+                        root.close-pane-by-id(pane.pane-id);
+                    }
+                    scroll(delta) => {
+                        root.terminal-scroll(delta);
                     }
 
-                    TouchArea {
-                        pointer-event(event) => {
-                            if event.kind == PointerEventKind.down {
-                                root.active-pane-id = pane.pane-id;
-                                root.select-pane-by-id(pane.pane-id);
-                                terminal-focus.focus();
-                                if event.button == PointerEventButton.right {
-                                    root.context-menu-x = pane.x + self.mouse-x;
-                                    root.context-menu-y = pane.y + self.mouse-y;
-                                    root.is-context-menu-open = true;
-                                } else {
-                                    root.is-context-menu-open = false;
-                                }
-                            }
-                        }
-                        scroll-event(event) => {
-                            root.terminal-scroll(event.delta-y);
-                            accept
-                        }
-                        mouse-cursor: text;
+                    context-menu(mx, my) => {
+                        root.active-pane-id = pane.pane-id;
+                        root.select-pane-by-id(pane.pane-id);
+                        root.context-menu-x = pane.x + mx;
+                        root.context-menu-y = pane.y + my;
+                        root.is-context-menu-open = true;
                     }
                 }
 
-                // 2.4.2 动态渲染全部超窄拖拽分割条 (视觉 2px，触控感应热区 6px)
+                // 2.4.2 动态渲染全部超窄拖拽分割条 (视觉 2px，触控感应热区 8px)
                 for splitter in root.terminal-splitters: Rectangle {
                     x: splitter.x;
                     y: splitter.y;
@@ -555,76 +483,8 @@ export component TerminalViewport inherits Rectangle {
                             }
                         }
                     }
-
-
-
                 }
             }
-
-
-
-
-
-
-
-            // 2.5 终端初始化 / 欢迎占位显示 (当尚无图像流或连接建立中时)
-            if !root.is-split && root.terminal-screen-image.width == 0: VerticalLayout {
-                padding-left: 14px;
-                padding-right: 14px;
-                padding-top: 14px;
-                padding-bottom: 20px;
-                spacing: 5px;
-                alignment: start;
-
-                Text {
-                    text: "Linux " + root.session-name + " 5.15.0-88-generic #98-Ubuntu SMP x86_64";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.secondary-foreground;
-                }
-
-                Text {
-                    text: "Connected to " + root.session-name + " (" + root.host-address + ") | Latency: " + root.ping-ms + "ms";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.accent;
-                }
-
-                Text {
-                    text: "Welcome to Smalux SSH Remote Terminal Environment";
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                }
-
-                Text {
-                    text: "Last login: " + @tr("Just now from Smalux-SSH Client");
-                    font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                    font-size: 12px;
-                    color: AppTheme.disabled-foreground;
-                }
-
-                Rectangle { height: 6px; }
-
-                HorizontalLayout {
-                    spacing: 0px;
-
-                    Text {
-                        text: "root@" + root.session-name + ":~# ";
-                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
-                        font-size: 12px;
-                        font-weight: 700;
-                        color: AppTheme.accent;
-                    }
-
-                    Rectangle {
-                        width: 8px;
-                        height: 14px;
-                        background: AppTheme.foreground;
-                    }
-                }
-            }
-
 
             // 2.5 浮动文本搜索栏 (Ctrl+F)
             if root.is-find-open: TerminalFindBar {
@@ -657,7 +517,6 @@ export component TerminalViewport inherits Rectangle {
 
             // 2.7 终端右侧微型历史滚动条 (当存在回滚历史时展示)
             if root.history-size > 0: Rectangle {
-
                 x: parent.width - 8px;
                 y: 6px;
                 width: 5px;
@@ -676,8 +535,6 @@ export component TerminalViewport inherits Rectangle {
                 }
             }
         }
-
-
 
         // 3. 空状态 / 欢迎仪表盘 (当无会话时)
         if !root.has-active-session: Rectangle {
@@ -705,4 +562,5 @@ export component TerminalViewport inherits Rectangle {
             }
         }
     }
+
 }

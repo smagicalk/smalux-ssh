@@ -493,22 +493,24 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 7. 打开主机终端会话回调
     // -------------------------------------------------------------------------
+    // 8. 双击主机 / 本地 Shell 发起终端连接回调
+    // -------------------------------------------------------------------------
     // 双击树形或卡片列表中的某个主机（或选择本地 Shell）时触发，分配会话 ID 并激活新 Tab。
     let window_weak = window.as_weak();
     let master_tree_open = Rc::clone(&ctx.master_tree);
-    let active_sessions_open = Rc::clone(&ctx.active_sessions);
+    let pane_groups_open = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_open = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_open = Rc::clone(&ctx.global_split_tree);
     let active_terminals_open = Rc::clone(&ctx.active_terminals);
     let next_session_num_open = Rc::clone(&ctx.next_session_num);
+    let next_pane_num_open = Rc::clone(&ctx.next_pane_num);
     let cached_shells_open = Rc::clone(&ctx.cached_shells);
     window.on_open_host(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
 
-            // 支持启动本地终端环境 (使用缓存的 Shell 列表，避免重复扫描文件系统)
-            if h_id.starts_with("local-") {
-                let mut sessions = active_sessions_open.borrow_mut();
+            let (sess_id, info) = if h_id.starts_with("local-") {
                 let mut num = next_session_num_open.borrow_mut();
-
                 let sess_id = format!("sess-{}", *num);
                 *num += 1;
 
@@ -519,10 +521,12 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     ("Local Terminal".to_string(), "127.0.0.1".to_string())
                 };
 
-                let session_name = format!("{} #{}", base_name, sessions.len() + 1);
-                let ping = 0;
+                let mut total_sess_count = 0;
+                for g in pane_groups_open.borrow().iter() {
+                    total_sess_count += g.tabs.len();
+                }
+                let session_name = format!("{} #{}", base_name, total_sess_count + 1);
 
-                // 启动底层 PTY 进程并建立 Alacritty 状态机
                 if let Ok(instance) = TerminalInstance::spawn_local(sess_id.clone(), &h_id, session_name.clone(), 120, 32) {
                     active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
                 }
@@ -531,34 +535,28 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     session_id: sess_id.clone(),
                     host_id: h_id.clone(),
                     host_name: base_name.clone(),
-                    host_address: addr.clone(),
+                    host_address: addr,
                     host_status: "online".to_string(),
-                    ping_ms: ping,
-                    display_title: session_name.clone(),
+                    ping_ms: 0,
+                    display_title: session_name,
                 };
-                sessions.push(info);
+                (sess_id, info)
+            } else {
+                let tree = master_tree_open.borrow();
+                let Some(host_node) = tree.iter().find(|n| n.id == h_id && !n.is_group) else {
+                    return;
+                };
 
-                sync_active_session_ui(&w, &sessions, &sess_id);
-
-                tracing::info!(target: "smagical_ui::session", "成功启动本地终端环境: [{}] (Session ID: {})", base_name, sess_id);
-                sync_ui_debug_logs(&w);
-                return;
-            }
-
-            // 远程主机连接模式
-            let tree = master_tree_open.borrow();
-            if let Some(host_node) = tree.iter().find(|n| n.id == h_id && !n.is_group) {
-                let mut sessions = active_sessions_open.borrow_mut();
                 let mut num = next_session_num_open.borrow_mut();
-
                 let sess_id = format!("sess-{}", *num);
                 *num += 1;
 
-                let session_name = format!("{} #{}", host_node.name, sessions.len() + 1);
-                let addr = host_node.address.clone();
-                let ping = host_node.ping_ms;
+                let mut total_sess_count = 0;
+                for g in pane_groups_open.borrow().iter() {
+                    total_sess_count += g.tabs.len();
+                }
+                let session_name = format!("{} #{}", host_node.name, total_sess_count + 1);
 
-                // 启动真实远程 SSH 终端交互连接（若系统无 ssh 命令则安全降级为本地默认 Shell）
                 let instance_res = TerminalInstance::spawn_ssh(
                     sess_id.clone(),
                     session_name.clone(),
@@ -582,25 +580,49 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
                 }
 
-
                 let info = TerminalSessionInfo {
                     session_id: sess_id.clone(),
                     host_id: host_node.id.clone(),
                     host_name: host_node.name.clone(),
-                    host_address: addr.clone(),
+                    host_address: host_node.address.clone(),
                     host_status: host_node.status.clone(),
-                    ping_ms: ping,
-                    display_title: session_name.clone(),
+                    ping_ms: host_node.ping_ms,
+                    display_title: session_name,
                 };
-                sessions.push(info);
+                (sess_id, info)
+            };
 
-                sync_active_session_ui(&w, &sessions, &sess_id);
+            let mut groups = pane_groups_open.borrow_mut();
+            let mut active_pid = active_pane_id_open.borrow_mut();
+            let is_split = global_split_tree_open.borrow().is_some();
 
-                tracing::info!(target: "smagical_ui::session", "成功打开远程主机终端会话: [{}] -> {}:{} (Session ID: {})", host_node.name, host_node.address, host_node.port, sess_id);
-                sync_ui_debug_logs(&w);
+            if groups.is_empty() {
+                let mut p_num = next_pane_num_open.borrow_mut();
+                let pid = format!("pane-{}", *p_num);
+                *p_num += 1;
+                groups.push(crate::session::PaneGroup::new_single(pid.clone(), info));
+                *active_pid = pid;
+            } else {
+                let target_idx = groups.iter().position(|g| g.pane_id == *active_pid).unwrap_or(0);
+                let target_group = &mut groups[target_idx];
+                let insert_idx = if let Some(pos) = target_group.tabs.iter().position(|s| s.session_id == target_group.active_tab_id) {
+                    pos + 1
+                } else {
+                    target_group.tabs.len()
+                };
+                target_group.tabs.insert(insert_idx, info);
+                target_group.active_tab_id = sess_id;
+                *active_pid = target_group.pane_id.clone();
             }
+
+
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            tracing::info!(target: "smagical_ui::session", "成功打开终端会话 (Pane ID: {})", *active_pid);
+            sync_ui_debug_logs(&w);
         }
     });
+
+
 }
 
 

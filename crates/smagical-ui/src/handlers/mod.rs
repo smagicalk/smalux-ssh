@@ -15,9 +15,9 @@ use smagical_core::theme::ThemeService;
 use smagical_core::CoreState;
 
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
-use crate::session::TerminalSessionInfo;
 use crate::terminal::TerminalInstance;
 use crate::tree_model::RawTreeNode;
+
 
 
 /// 应用全局共享上下文句柄集合。
@@ -37,10 +37,9 @@ pub(crate) struct AppContext {
     pub selector_expanded_groups: Rc<RefCell<HashSet<String>>>,
     /// 侧边栏主机搜索栏当前输入的过滤关键词 (Search Query)
     pub search_query: Rc<RefCell<String>>,
-    /// 当前运行时已打开并管理的终端会话 UI 描述列表 (Active Terminal Sessions UI metadata)
-    pub active_sessions: Rc<RefCell<Vec<TerminalSessionInfo>>>,
     /// 运行中的终端底层会话实例表 (Session ID -> TerminalInstance)
     pub active_terminals: Rc<RefCell<HashMap<String, TerminalInstance>>>,
+
     /// 新增终端会话的自增序号计数器 (Next Session Sequence ID)
     pub next_session_num: Rc<RefCell<usize>>,
     /// 启动时探测到的本地可用 Shell 环境列表只读缓存 (Cached Local Shells)
@@ -49,14 +48,19 @@ pub(crate) struct AppContext {
     pub themes: Rc<ThemeService>,
     /// 终端像素帧光栅化渲染器实例 (Terminal Renderer)
     pub terminal_renderer: Rc<RefCell<Option<crate::terminal::TerminalRenderer>>>,
-    /// 会话 Tab 的多分屏拓扑树管理映射 (Tab Session ID -> SplitNode)
-    #[allow(dead_code)]
-    pub session_split_trees: Rc<RefCell<HashMap<String, crate::terminal::SplitNode>>>,
-    /// 会话 Tab 当前激活聚焦的叶子窗格 ID 映射 (Tab Session ID -> Active Pane ID)
-    #[allow(dead_code)]
-    pub active_pane_ids: Rc<RefCell<HashMap<String, String>>>,
+    /// 活跃分屏窗格组列表 (每个窗格拥有独立的 Tab 序列与激活状态)
+    pub pane_groups: Rc<RefCell<Vec<crate::session::PaneGroup>>>,
+    /// 全局多分屏二叉树拓扑结构 (None 表示当前处于单屏模式)
+    pub global_split_tree: Rc<RefCell<Option<crate::terminal::SplitNode>>>,
+    /// 当前获得焦点激活的窗格 ID (如 "pane-1")
+    pub active_pane_id: Rc<RefCell<String>>,
+    /// 当前处于临时独占全屏 (Zoom) 状态的窗格 ID
+    pub zoomed_pane_id: Rc<RefCell<Option<String>>>,
+    /// 新增分屏窗格的自增序号计数器
+    pub next_pane_num: Rc<RefCell<usize>>,
 
 }
+
 
 
 

@@ -298,8 +298,13 @@ export component AppWindow inherits Window {
     callback close-tab(string /* id */);
     /// 点击加号呼出新建终端会话弹窗回调
     callback new-tab();
+    /// 选择指定分屏窗格内的指定 Tab 回调
+    callback select-pane-tab(string /* pane_id */, string /* tab_id */);
+    /// 关闭指定分屏窗格内的指定 Tab 回调
+    callback close-pane-tab(string /* pane_id */, string /* tab_id */);
     /// 向当前终端发送指令片段回调
     callback send-snippet(string /* cmd */);
+
     /// 原生窗口最小化回调
     callback minimize-window();
     /// 原生窗口最大化/还原回调
@@ -335,8 +340,11 @@ export component AppWindow inherits Window {
     callback select-pane(int /* index */);
     /// 按窗格 ID 选择并聚焦指定窗格回调
     callback select-pane-by-id(string /* pane_id */);
+    /// 切换单窗格临时最大化 (Zoom) 与还原回调
+    callback toggle-pane-zoom(string /* pane_id */);
     /// 动态拖拽调节分割条比例回调
     callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
+
     /// 终端缓冲区文本检索回调
     callback search-terminal(string /* query */, bool /* match_case */);
     /// 终端动态几何网格尺寸变更回调
@@ -494,6 +502,8 @@ export component AppWindow inherits Window {
                         open-local-shell(type) => { root.open-host("local-" + type); }
                     }
 
+
+
                     if root.active-left-tab == "history": HistoryDrawer {
                         collapse => { root.is-left-drawer-open = false; }
                         reconnect(id) => { root.open-host(id); }
@@ -570,7 +580,10 @@ export component AppWindow inherits Window {
                     active-tab-id: root.active-session-tab;
                     select-tab(id) => { root.select-tab(id); }
                     close-tab(id) => { root.close-tab(id); }
+                    select-pane-tab(pane_id, tab_id) => { root.select-pane-tab(pane_id, tab_id); }
+                    close-pane-tab(pane_id, tab_id) => { root.close-pane-tab(pane_id, tab_id); }
                     new-tab => { root.is-new-session-modal-open = true; }
+
                     session-name: root.active-session-name;
                     host-address: root.active-host-address;
                     ping-ms: root.active-host-ping-ms;
@@ -609,7 +622,9 @@ export component AppWindow inherits Window {
                     close-pane-by-id(id) => { root.close-pane-by-id(id); }
                     select-pane(idx) => { root.select-pane(idx); }
                     select-pane-by-id(id) => { root.select-pane-by-id(id); }
+                    toggle-pane-zoom(id) => { root.toggle-pane-zoom(id); }
                     adjust-splitter(id, delta) => { root.adjust-splitter(id, delta); }
+
                     search-terminal(q, c) => { root.search-terminal(q, c); }
                     terminal-resize(cols, rows) => { root.terminal-resize(cols, rows); }
                 }

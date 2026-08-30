@@ -1,0 +1,238 @@
+// =============================================================================
+// 文件名称: terminal_pane_view.slint
+// 模块功能: 单个终端分屏窗格独立视口组件 (Terminal Pane View)
+// 核心设计: 将 Tab 标签页直接下沉并内聚到每个分屏窗格自身顶部 (集成 TabItem 卡片、+ 按钮、Zoom 与分屏操作)
+// =============================================================================
+
+import { AppTheme } from "../../themes/app-theme.slint";
+import { TabItem } from "../../components/tab-item.slint";
+import { TabData } from "tab_bar.slint";
+
+/// 单个终端分屏窗格独立视口组件
+///
+/// 具备原装一致的 TabItem 标签页列表（支持多开与长标题...省略）、固定在最右侧的新建加号 (+)、位图渲染与鼠标交互路由。
+export component TerminalPaneView inherits Rectangle {
+    // -------------------------------------------------------------------------
+    // 1. 基础属性定义
+    // -------------------------------------------------------------------------
+    /// 窗格唯一标识 ID (如 "sess-1-pane-1")
+    in property <string> pane-id: "";
+    /// 窗格标题文本 (单卡片模式时使用)
+    in property <string> title: "";
+    /// 窗格位图渲染流
+    in property <image> image;
+    /// 窗格当前是否处于键盘鼠标激活焦点状态
+    in property <bool> is-active: false;
+    /// 窗格当前是否处于临时独占全屏 (Zoomed) 状态
+    in property <bool> is-zoomed: false;
+    /// 窗格所在主机的在线状态 ("online" | "warning" | "offline")
+    in property <string> status: "online";
+    /// 窗格在分屏组内的序号 (1-indexed, 如 1, 2, 3)
+    in property <int> pane-index: 1;
+    /// 当前分屏组内的窗格总数
+    in property <int> total-panes: 1;
+
+    /// 会话 Tab 列表数据 (单屏模式或窗格多标签模式)
+    in property <[TabData]> tabs: [];
+    /// 当前激活的 Tab 会话 ID
+    in-out property <string> active-tab-id: "";
+    /// Tab 栏横向滚轮滚动偏移量
+    in-out property <length> tab-scroll-offset: 0px;
+
+    // -------------------------------------------------------------------------
+    // 2. 交互回调接口
+    // -------------------------------------------------------------------------
+    /// 点击选中当前窗格回调
+    callback select();
+    /// 选择指定 Tab 会话回调
+    callback select-tab(string /* id */);
+    /// 关闭指定 Tab 会话回调
+    callback close-tab(string /* id */);
+    /// 点击新建会话 + 回调
+    callback new-tab();
+    /// 向右水平切分当前窗格回调
+    callback split-right();
+    /// 向下垂直切分当前窗格回调
+    callback split-down();
+    /// 切换单窗格临时最大化 (Zoom) 与还原回调
+    callback toggle-zoom();
+    /// 关闭当前窗格/会话回调
+    callback close();
+    /// 鼠标滚轮滚动回调
+    callback scroll(length /* delta-y */);
+    /// 鼠标划选区域变更回调
+    callback selection-changed(int /* sc */, int /* sr */, int /* ec */, int /* er */, bool /* has_sel */);
+    /// 呼出右键快捷菜单回调
+    callback context-menu(length /* global-x */, length /* global-y */);
+
+    // -------------------------------------------------------------------------
+    // 3. 视觉容器与边框样式
+    // -------------------------------------------------------------------------
+    background: AppTheme.window-background;
+    border-width: root.is-active && root.total-panes > 1 ? 1.5px : (root.total-panes > 1 ? 1px : 0px);
+    border-color: root.is-active ? AppTheme.accent : AppTheme.border;
+    clip: true;
+
+    animate border-color { duration: 150ms; easing: ease-out; }
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // ---------------------------------------------------------------------
+        // 4. 窗格专属 Tab 页签栏 (高度 36px，左侧 Tab 序列，最右侧固定 + 按钮)
+        // ---------------------------------------------------------------------
+        header-bar := Rectangle {
+            height: 36px;
+            background: AppTheme.panel-background;
+
+            // 标题栏底部 1px 细分割线
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+
+            // 标题栏空白区域交互捕获 (单击激活，双击触发 Zoom 全屏/还原)
+            header-touch := TouchArea {
+                clicked => { root.select(); }
+                double-clicked => {
+                    if root.total-panes > 1 {
+                        root.toggle-zoom();
+                    }
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                height: 100%;
+                padding-left: 6px;
+                padding-right: 6px;
+
+                HorizontalLayout {
+                    spacing: 6px;
+
+                    // 4.1 Tab 会话卡片可滑动列表视口 (支持长名称 ... 省略与横向滑动)
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+
+                        tab-scroll-box := Rectangle {
+                            horizontal-stretch: 1;
+                            height: 28px;
+                            clip: true;
+                            property <length> total-tab-width: (root.tabs.length > 0 ? root.tabs.length : 1) * 148px + 10px;
+                            property <length> min-scroll: Math.min(0px, self.width - total-tab-width);
+                            property <length> effective-offset: Math.min(0px, Math.max(min-scroll, root.tab-scroll-offset));
+
+                            // 鼠标滚轮横向滑动
+                            TouchArea {
+                                scroll-event(event) => {
+                                    root.tab-scroll-offset = Math.min(0px, Math.max(tab-scroll-box.min-scroll, tab-scroll-box.effective-offset + event.delta-y + event.delta-x));
+                                    accept
+                                }
+                            }
+
+                            // 4.1.1 多 Tab 列表渲染
+                            HorizontalLayout {
+                                x: tab-scroll-box.effective-offset;
+                                y: 0px;
+                                width: Math.max(parent.width, tab-scroll-box.total-tab-width);
+                                height: parent.height;
+                                spacing: 4px;
+                                alignment: start;
+
+                                animate x { duration: 150ms; easing: ease-out; }
+
+                                for tab in root.tabs: TabItem {
+                                    title: tab.title;
+                                    status: tab.status;
+                                    is-active: tab.id == root.active-tab-id;
+                                    select => {
+                                        root.active-tab-id = tab.id;
+                                        root.select-tab(tab.id);
+                                    }
+                                    close => {
+                                        root.close-tab(tab.id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+
+                    // 4.2 固定在最右侧的 + 新建终端会话加号按钮 (无其他多余图标)
+                    VerticalLayout {
+                        alignment: center;
+
+                        Rectangle {
+                            width: 26px;
+                            height: 26px;
+                            border-radius: 4px;
+                            background: new-tab-touch.has-hover ? AppTheme.hover-background : Colors.transparent;
+
+                            Text {
+                                text: "+";
+                                font-size: 16px;
+                                font-weight: 600;
+                                color: new-tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            new-tab-touch := TouchArea {
+                                clicked => { root.new-tab(); }
+                                mouse-cursor: pointer;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+
+
+        // ---------------------------------------------------------------------
+        // 5. 终端位图渲染主视口
+        // ---------------------------------------------------------------------
+        Rectangle {
+            vertical-stretch: 1;
+            background: Colors.transparent;
+            clip: true;
+
+            // 5.1 实时光栅化位图
+            if root.image.width > 0: Image {
+                source: root.image;
+                width: 100%;
+                height: 100%;
+                image-fit: fill;
+                horizontal-alignment: left;
+                vertical-alignment: top;
+            }
+
+            // 5.2 鼠标手势、聚焦切换与右键菜单拦截层
+            pane-body-touch := TouchArea {
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.down {
+                        root.select();
+                        if event.button == PointerEventButton.right {
+                            root.context-menu(self.mouse-x, self.mouse-y);
+                        }
+                    }
+                }
+
+                scroll-event(event) => {
+                    root.scroll(event.delta-y);
+                    accept
+                }
+
+                mouse-cursor: text;
+            }
+        }
+    }
+}
+
+

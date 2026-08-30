@@ -327,23 +327,60 @@ impl SplitNode {
     }
 
     /// 递归计算全部分割树中叶子窗格与分割条的精确像素几何布局。
+    /// 递归查找指定窗格 ID 的标题文本。
+    pub fn find_pane_title(&self, target_id: &str) -> Option<String> {
+        match self {
+            SplitNode::Leaf { pane_id, title } => {
+                if pane_id == target_id {
+                    Some(title.clone())
+                } else {
+                    None
+                }
+            }
+            SplitNode::Branch { first, second, .. } => {
+                first.find_pane_title(target_id).or_else(|| second.find_pane_title(target_id))
+            }
+        }
+    }
+
+    /// 推导当前二叉分屏树在指定像素视口中的几何布局。
     ///
     /// # 参数
     /// - `width`: 终端主视口像素总宽度
     /// - `height`: 终端主视口像素总高度
-    /// - `splitter_thickness`: 分割条厚度 (像素, 建议 4.0 ~ 6.0)
+    /// - `splitter_thickness`: 分割条厚度 (像素, 建议 2.0 ~ 6.0)
+    /// - `zoomed_pane_id`: 若指定窗格处于临时最大化 (Zoom) 状态，则该窗格独占 100% 视口，分割线集合为空
     pub fn compute_pixel_layout(
         &self,
         width: f32,
         height: f32,
         splitter_thickness: f32,
+        zoomed_pane_id: Option<&str>,
     ) -> (Vec<PanePixelLayout>, Vec<SplitterPixelLayout>) {
+        if let Some(target_id) = zoomed_pane_id
+            && let Some(leaf_title) = self.find_pane_title(target_id)
+        {
+            return (
+                vec![PanePixelLayout {
+                    pane_id: target_id.to_string(),
+                    title: leaf_title,
+                    x: 0.0,
+                    y: 0.0,
+                    width: width.max(20.0),
+                    height: height.max(20.0),
+                }],
+                Vec::new(),
+            );
+        }
+
+
         let mut panes = Vec::new();
         let mut splitters = Vec::new();
         let initial_rect = PixelRect { x: 0.0, y: 0.0, w: width, h: height };
         self.compute_pixel_recursive(initial_rect, splitter_thickness, &mut panes, &mut splitters);
         (panes, splitters)
     }
+
 
     fn compute_pixel_recursive(
         &self,
@@ -541,11 +578,20 @@ mod tests {
         tree.split_pane("p4", "p5".into(), "Pane 5".into(), SplitOrientation::Horizontal);
 
         assert_eq!(tree.leaf_count(), 5);
-        let (panes, splitters) = tree.compute_pixel_layout(1000.0, 800.0, 6.0);
+        let (panes, splitters) = tree.compute_pixel_layout(1000.0, 800.0, 6.0, None);
         assert_eq!(panes.len(), 5);
         assert_eq!(splitters.len(), 4);
 
+        // 验证单窗格 Zoom 临时全屏
+        let (zoomed_panes, zoomed_splitters) = tree.compute_pixel_layout(1000.0, 800.0, 6.0, Some("p3"));
+        assert_eq!(zoomed_panes.len(), 1);
+        assert_eq!(zoomed_panes[0].pane_id, "p3");
+        assert_eq!(zoomed_panes[0].width, 1000.0);
+        assert_eq!(zoomed_panes[0].height, 800.0);
+        assert_eq!(zoomed_splitters.len(), 0);
+
         // 验证所有窗格均有正向尺寸
+
         for p in &panes {
             assert!(p.width > 20.0);
             assert!(p.height > 20.0);

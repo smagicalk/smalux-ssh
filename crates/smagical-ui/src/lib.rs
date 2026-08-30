@@ -169,12 +169,14 @@ pub fn run() -> Result<(), slint::PlatformError> {
         initial_cards,
     ))));
 
-    let active_sessions = Rc::new(RefCell::new(Vec::new()));
     let next_session_num = Rc::new(RefCell::new(1));
     let active_terminals = Rc::new(RefCell::new(std::collections::HashMap::new()));
     let terminal_renderer = Rc::new(RefCell::new(terminal::TerminalRenderer::new(14.0).ok()));
-    let session_split_trees = Rc::new(RefCell::new(std::collections::HashMap::new()));
-    let active_pane_ids = Rc::new(RefCell::new(std::collections::HashMap::new()));
+    let pane_groups = Rc::new(RefCell::new(Vec::new()));
+    let global_split_tree = Rc::new(RefCell::new(None));
+    let active_pane_id = Rc::new(RefCell::new(String::new()));
+    let zoomed_pane_id = Rc::new(RefCell::new(None));
+    let next_pane_num = Rc::new(RefCell::new(1));
 
     // 构造全局应用上下文
     let ctx = AppContext {
@@ -184,14 +186,17 @@ pub fn run() -> Result<(), slint::PlatformError> {
         expanded_groups,
         selector_expanded_groups,
         search_query,
-        active_sessions,
         active_terminals: Rc::clone(&active_terminals),
         next_session_num,
         cached_shells,
         themes,
         terminal_renderer: Rc::clone(&terminal_renderer),
-        session_split_trees: Rc::clone(&session_split_trees),
-        active_pane_ids: Rc::clone(&active_pane_ids),
+
+        pane_groups: Rc::clone(&pane_groups),
+        global_split_tree: Rc::clone(&global_split_tree),
+        active_pane_id: Rc::clone(&active_pane_id),
+        zoomed_pane_id: Rc::clone(&zoomed_pane_id),
+        next_pane_num: Rc::clone(&next_pane_num),
     };
 
 
@@ -212,8 +217,10 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let window_weak = window.as_weak();
     let active_terminals_timer = Rc::clone(&active_terminals);
     let terminal_renderer_timer = Rc::clone(&terminal_renderer);
-    let session_split_trees_timer = Rc::clone(&session_split_trees);
-    let active_pane_ids_timer = Rc::clone(&active_pane_ids);
+    let pane_groups_timer = Rc::clone(&pane_groups);
+    let global_split_tree_timer = Rc::clone(&global_split_tree);
+    let active_pane_id_timer = Rc::clone(&active_pane_id);
+    let zoomed_pane_id_timer = Rc::clone(&zoomed_pane_id);
     let mut last_rendered_session = String::new();
     let mut primary_buffer: Option<slint::SharedPixelBuffer<slint::Rgba8Pixel>> = None;
     let mut pane_pixel_buffers: std::collections::HashMap<String, slint::SharedPixelBuffer<slint::Rgba8Pixel>> = std::collections::HashMap::new();
@@ -224,80 +231,84 @@ pub fn run() -> Result<(), slint::PlatformError> {
         std::time::Duration::from_millis(8),
         move || {
             if let Some(w) = window_weak.upgrade() {
-
-                let active_id = w.get_active_session_tab().to_string();
-                if active_id.is_empty() {
+                let groups = pane_groups_timer.borrow();
+                if groups.is_empty() {
                     return;
                 }
 
-                let is_split = w.get_is_split();
-                let ui_cols = w.get_terminal_cols() as u16;
-                let ui_rows = w.get_terminal_rows() as u16;
-
+                let is_split = global_split_tree_timer.borrow().is_some();
                 let mut terminals = active_terminals_timer.borrow_mut();
+                let mut renderer_opt = terminal_renderer_timer.borrow_mut();
 
                 if !is_split {
                     // 1. 单屏模式：泵送并渲染主视口
-                    if let Some(instance) = terminals.get_mut(&active_id) {
-                        if ui_cols >= 10 && ui_rows >= 5 && (instance.size.cols != ui_cols || instance.size.rows != ui_rows) {
-                            let _ = instance.resize(ui_cols, ui_rows);
-                        }
+                    let main_group = &groups[0];
+                    if let Some(active_sess) = main_group.get_active_session() {
+                        let active_id = active_sess.session_id.clone();
+                        let ui_cols = w.get_terminal_cols() as u16;
+                        let ui_rows = w.get_terminal_rows() as u16;
 
-                        let has_new_output = instance.poll_output();
-                        let switched_session = active_id != last_rendered_session;
-                        if has_new_output || switched_session || instance.parser.take_dirty() {
-                            let mut renderer_opt = terminal_renderer_timer.borrow_mut();
+                        if let Some(instance) = terminals.get_mut(&active_id) {
+                            if instance.size.cols != ui_cols || instance.size.rows != ui_rows {
+                                let _ = instance.resize(ui_cols, ui_rows);
+                            }
+
+                            let has_new_output = instance.poll_output();
+                            let is_dirty = instance.parser.take_dirty();
+
                             if let Some(renderer) = renderer_opt.as_mut() {
                                 let (cw, ch) = renderer.cell_size();
-                                let (cols, rows) = (instance.size.cols as u32, instance.size.rows as u32);
-                                let img_w = (cols * cw + renderer.padding_x * 2).max(100);
-                                let img_h = (rows * ch + renderer.padding_y * 2).max(100);
+                                let img_w = (ui_cols as u32 * cw + renderer.padding_x * 2).max(100);
+                                let img_h = (ui_rows as u32 * ch + renderer.padding_y * 2).max(60);
 
                                 let mut buf = match primary_buffer.take() {
                                     Some(b) if b.width() == img_w && b.height() == img_h => b,
                                     _ => slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(img_w, img_h),
                                 };
 
-                                renderer.render_to_buffer(instance.parser.term(), instance.parser.selection(), &mut buf);
-                                let image = slint::Image::from_rgba8(buf.clone());
-                                w.set_terminal_screen_image(image);
-                                primary_buffer = Some(buf);
+                                if has_new_output || is_dirty || last_rendered_session != active_id {
+                                    renderer.render_to_buffer(instance.parser.term(), instance.parser.selection(), &mut buf);
+                                    let image = slint::Image::from_rgba8(buf.clone());
+                                    w.set_terminal_screen_image(image);
+                                    primary_buffer = Some(buf);
+                                    last_rendered_session = active_id;
+                                } else {
+                                    primary_buffer = Some(buf);
+                                }
                             }
-                        }
 
-                        let (hist_size, scroll_off) = instance.scroll_info();
-                        w.set_terminal_history_size(hist_size as i32);
-                        w.set_terminal_scroll_offset(scroll_off as i32);
+                            let (hist_size, scroll_off) = instance.scroll_info();
+                            w.set_terminal_history_size(hist_size as i32);
+                            w.set_terminal_scroll_offset(scroll_off as i32);
+                        }
                     }
                 } else {
                     // 2. 任意层级嵌套二叉多分屏模式：数据驱动推导几何并渲染全量活跃叶子窗格
-                    let trees = session_split_trees_timer.borrow();
-                    if let Some(tree) = trees.get(&active_id) {
+                    let trees_guard = global_split_tree_timer.borrow();
+                    if let Some(tree) = trees_guard.as_ref() {
                         let vp_w = w.get_terminal_canvas_width().max(200.0);
                         let vp_h = w.get_terminal_canvas_height().max(100.0);
-                        let (panes_layout, splitters_layout) = tree.compute_pixel_layout(vp_w, vp_h, 2.0);
+                        let current_zoom = zoomed_pane_id_timer.borrow().clone();
+                        let (panes_layout, splitters_layout) = tree.compute_pixel_layout(vp_w, vp_h, 2.0, current_zoom.as_deref());
 
+                        let active_pid = active_pane_id_timer.borrow().clone();
+                        let total_panes_len = panes_layout.len();
+                        let mut panes_data = Vec::with_capacity(total_panes_len);
 
-                        let active_pane_id = active_pane_ids_timer
-
-                            .borrow()
-                            .get(&active_id)
-                            .cloned()
-                            .unwrap_or_else(|| active_id.clone());
-
-                        let mut panes_data = Vec::with_capacity(panes_layout.len());
-                        let mut renderer_opt = terminal_renderer_timer.borrow_mut();
-
-                        for pl in &panes_layout {
+                        for (idx, pl) in panes_layout.iter().enumerate() {
                             let mut pane_image = slint::Image::default();
+                            let group_opt = groups.iter().find(|g| g.pane_id == pl.pane_id);
+                            let active_sess_opt = group_opt.and_then(|g| g.get_active_session());
 
-                            if let Some(instance) = terminals.get_mut(&pl.pane_id)
+                            if let Some(active_sess) = active_sess_opt
+                                && let Some(instance) = terminals.get_mut(&active_sess.session_id)
                                 && let Some(renderer) = renderer_opt.as_mut()
                             {
                                 let (cw, ch) = renderer.cell_size();
-                                let title_bar_h = 22.0f32;
+                                let title_bar_h = 36.0f32;
                                 let content_w = (pl.width - (renderer.padding_x * 2) as f32).max(40.0);
                                 let content_h = (pl.height - title_bar_h - (renderer.padding_y * 2) as f32).max(20.0);
+
                                 let target_cols = ((content_w / cw as f32) as u16).max(10);
                                 let target_rows = ((content_h / ch as f32) as u16).max(3);
 
@@ -328,16 +339,30 @@ pub fn run() -> Result<(), slint::PlatformError> {
                                 pane_pixel_buffers.insert(pl.pane_id.clone(), buf);
                             }
 
+                            let (title, status, pane_tabs, active_tab_id) = if let Some(group) = group_opt {
+                                let act_id = group.active_tab_id.clone();
+                                let act_title = group.get_active_session().map(|s| s.display_title.clone()).unwrap_or_else(|| pl.title.clone());
+                                let act_status = group.get_active_session().map(|s| s.host_status.clone()).unwrap_or_else(|| "online".to_string());
+                                (act_title, act_status, group.to_tab_data_list(), act_id)
+                            } else {
+                                (pl.title.clone(), "online".to_string(), Vec::new(), String::new())
+                            };
 
                             panes_data.push(TerminalPaneData {
                                 pane_id: pl.pane_id.clone().into(),
-                                title: pl.title.clone().into(),
+                                title: title.into(),
                                 x: pl.x,
                                 y: pl.y,
                                 width: pl.width,
                                 height: pl.height,
                                 image: pane_image,
-                                is_active: pl.pane_id == active_pane_id,
+                                is_active: pl.pane_id == active_pid,
+                                pane_index: (idx + 1) as i32,
+                                total_panes: total_panes_len as i32,
+                                is_zoomed: current_zoom.as_deref() == Some(&pl.pane_id),
+                                status: status.into(),
+                                tabs: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(pane_tabs))),
+                                active_tab_id: active_tab_id.into(),
                             });
                         }
 
@@ -357,13 +382,10 @@ pub fn run() -> Result<(), slint::PlatformError> {
                         update_model_in_place(&splitters_model_timer, splitters_data);
                     }
                 }
-
-
-
-                last_rendered_session = active_id;
             }
         },
     );
+
 
 
 
