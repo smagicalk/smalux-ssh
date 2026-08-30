@@ -9,8 +9,15 @@ pub mod state;
 pub mod storage;
 pub mod theme;
 
-pub use domain::{group::GroupRecord, host::HostRecord, host::HostStatus};
+pub use domain::{
+    group::GroupRecord,
+    history::{HistoryRecord, SessionSnapshotConfig},
+    host::{HostRecord, HostStatus},
+};
+
 pub use state::core_state::CoreState;
 pub use storage::{
-    AppStorage, GroupRepository, HostRepository, MockStorage, StorageError, StorageResult,
+    AppStorage, GroupRepository, HistoryRepository, HostRepository, MockStorage, StorageError,
+    StorageResult,
 };
+

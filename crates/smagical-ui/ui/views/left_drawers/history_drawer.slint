@@ -2,141 +2,525 @@ import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
 import { ScrollView } from "std-widgets.slint";
 
-/// 历史会话项数据结构
+/// 历史会话单项数据结构
 export struct HistoryItemData {
     id: string,
-    host-name: string,
+    host-id: string,
+    title: string,
     address: string,
-    time-ago: string,
-    duration: string,
+    username: string,
+    session-type: string,       // "ssh" | "local"
+    time-text: string,          // "10m 前", "18:32", "昨天"
+    duration-text: string,      // "42m", "1h 15m", "2s"
+    exit-status: string,        // "active", "success", "timeout", "auth_failed", "error"
+    error-msg: string,
+    is-pinned: bool,
+    connect-count: int,
+    subtitle: string,           // "root@192.168.1.100:22 · 持续 42m" 或 "累计连接 18 次 · 最近: 10m 前"
 }
 
-/// 历史会话抽屉 (History Drawer)
+/// 历史会话分组数据结构 (时间线分组或置顶分组)
+export struct HistoryGroupData {
+    group-id: string,           // "pinned", "today", "yesterday", "earlier", "all_hosts"
+    group-name: string,         // "置顶常用", "今天 (Today)", "昨天 (Yesterday)", "更早 (Earlier)", "全部主机"
+    item-count: int,
+    is-collapsed: bool,
+    items: [HistoryItemData],
+}
+
+/// 历史会话抽屉组件 (History Drawer)
 export component HistoryDrawer inherits DrawerContainer {
-    title: @tr("历史会话");
+    title: @tr("连接历史");
     collapse-icon: "◀";
 
-    in property <[HistoryItemData]> history-items: [];
+    in property <[HistoryGroupData]> history-groups: [];
+    in property <int> total-count: 0;
+    in-out property <string> view-mode: "timeline"; // "timeline" | "hosts"
+    in-out property <string> search-query: "";
 
     callback reconnect(string /* id */);
+    callback reconnect-split(string /* id */);
+    callback delete-item(string /* id */);
     callback clear-all();
+    callback toggle-pin(string /* id */);
+    callback toggle-group(string /* group-id */);
+    callback search-changed(string /* query */);
+    callback change-view-mode(string /* mode */);
 
     VerticalLayout {
         padding: 8px;
         spacing: 8px;
 
-        // 头部操作提示
+        // 1. 顶部操作栏（数量徽标 + 清空全部按钮）
         HorizontalLayout {
             padding-left: 4px;
             padding-right: 4px;
+            alignment: center;
 
             Text {
-                text: @tr("最近连接记录");
+                text: root.total-count > 0 ? "共 " + root.total-count + " 条记录" : @tr("暂无连接记录");
                 font-size: 11px;
                 color: AppTheme.secondary-foreground;
-                horizontal-alignment: left;
+                vertical-alignment: center;
+                horizontal-stretch: 1;
             }
 
-            Rectangle {
-                width: 50px;
-                height: 20px;
+            if root.total-count > 0: Rectangle {
+                width: 58px;
+                height: 22px;
                 border-radius: AppTheme.radius-small;
                 background: clear-touch.has-hover ? AppTheme.hover-background : transparent;
-
-                Text {
-                    text: @tr("清空");
-                    font-size: 10px;
-                    color: AppTheme.disabled-foreground;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
 
                 clear-touch := TouchArea {
                     clicked => { root.clear-all(); }
                     mouse-cursor: pointer;
                 }
+
+                HorizontalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+                    spacing: 4px;
+                    alignment: center;
+
+                    Image {
+                        source: @image-url("../../assets/icons/trash.svg");
+                        width: 11px;
+                        height: 11px;
+                        image-fit: contain;
+                        colorize: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    }
+
+                    Text {
+                        text: @tr("清空");
+                        font-size: 10px;
+                        color: clear-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
             }
         }
 
-        // 历史列表
-        ScrollView {
-            VerticalLayout {
-                spacing: 4px;
+        // 2. 搜索过滤栏
+        Rectangle {
+            height: 28px;
+            background: AppTheme.control-background;
+            border-radius: AppTheme.radius-small;
+            border-width: 1px;
+            border-color: search-input.has-focus ? AppTheme.accent : AppTheme.border;
 
-                for item in root.history-items: Rectangle {
-                    height: 54px;
-                    border-radius: AppTheme.radius-medium;
-                    background: item-touch.has-hover ? AppTheme.hover-background : transparent;
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                spacing: 6px;
+                alignment: center;
 
-                    item-touch := TouchArea {
-                        clicked => { root.reconnect(item.id); }
+                Image {
+                    source: @image-url("../../assets/icons/search.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: AppTheme.disabled-foreground;
+                }
+
+                search-input := TextInput {
+                    text <=> root.search-query;
+                    font-size: 11px;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                    single-line: true;
+                    edited => { root.search-changed(self.text); }
+                }
+
+                if root.search-query != "": Rectangle {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 8px;
+                    background: clear-search-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    Text {
+                        text: "×";
+                        font-size: 12px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    clear-search-touch := TouchArea {
+                        clicked => {
+                            root.search-query = "";
+                            root.search-changed("");
+                        }
+                        mouse-cursor: pointer;
+                    }
+                }
+            }
+        }
+
+        // 3. 视图切换胶囊 (时间流 / 按主机)
+        Rectangle {
+            height: 24px;
+            background: AppTheme.surface-background;
+            border-radius: AppTheme.radius-small;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding: 1px;
+                spacing: 2px;
+
+                // 时间流模式按钮
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: AppTheme.radius-small;
+                    background: root.view-mode == "timeline" ? AppTheme.hover-background : (timeline-touch.has-hover ? AppTheme.surface-background : transparent);
+
+                    timeline-touch := TouchArea {
+                        clicked => {
+                            root.view-mode = "timeline";
+                            root.change-view-mode("timeline");
+                        }
                         mouse-cursor: pointer;
                     }
 
                     HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        spacing: 8px;
                         alignment: center;
+                        spacing: 4px;
 
-                        Text {
-                            text: "◷";
-                            font-size: 14px;
-                            color: AppTheme.secondary-foreground;
-                            vertical-alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/clock.svg");
+                            width: 11px;
+                            height: 11px;
+                            image-fit: contain;
+                            colorize: root.view-mode == "timeline" ? AppTheme.foreground : AppTheme.secondary-foreground;
                         }
 
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 2px;
-
-                            Text {
-                                text: item.host-name;
-                                font-size: 12px;
-                                font-weight: 600;
-                                color: AppTheme.foreground;
-                            }
-
-                            HorizontalLayout {
-                                spacing: 8px;
-
-                                Text {
-                                text: item.address;
-                                font-size: 10px;
-                                color: AppTheme.secondary-foreground;
-                            }
-
-                            Text {
-                                text: item.time-ago;
-                                font-size: 10px;
-                                color: AppTheme.disabled-foreground;
-                            }
+                        Text {
+                            text: @tr("时间流");
+                            font-size: 10px;
+                            font-weight: root.view-mode == "timeline" ? 600 : 400;
+                            color: root.view-mode == "timeline" ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            vertical-alignment: center;
                         }
                     }
+                }
 
-                    // 重连按钮
-                    Rectangle {
-                        width: 24px;
-                        height: 24px;
-                        border-radius: AppTheme.radius-small;
-                        background: recon-touch.has-hover ? AppTheme.accent : AppTheme.control-background;
+                // 按主机聚合按钮
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: AppTheme.radius-small;
+                    background: root.view-mode == "hosts" ? AppTheme.hover-background : (hosts-touch.has-hover ? AppTheme.surface-background : transparent);
 
-                        Text {
-                            text: "▶";
-                            font-size: 10px;
-                            color: recon-touch.has-hover ? #ffffff : AppTheme.secondary-foreground;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                    hosts-touch := TouchArea {
+                        clicked => {
+                            root.view-mode = "hosts";
+                            root.change-view-mode("hosts");
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        alignment: center;
+                        spacing: 4px;
+
+                        Image {
+                            source: @image-url("../../assets/icons/server.svg");
+                            width: 11px;
+                            height: 11px;
+                            image-fit: contain;
+                            colorize: root.view-mode == "hosts" ? AppTheme.foreground : AppTheme.secondary-foreground;
                         }
 
-                        recon-touch := TouchArea {
-                            clicked => { root.reconnect(item.id); }
-                            mouse-cursor: pointer;
+                        Text {
+                            text: @tr("按主机");
+                            font-size: 10px;
+                            font-weight: root.view-mode == "hosts" ? 600 : 400;
+                            color: root.view-mode == "hosts" ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            vertical-alignment: center;
                         }
                     }
                 }
             }
         }
+
+        // 4. 历史列表展示区 (单列垂直流)
+        if root.total-count > 0: ScrollView {
+            VerticalLayout {
+                spacing: 6px;
+                padding-bottom: 8px;
+
+                for group in root.history-groups: VerticalLayout {
+                    spacing: 3px;
+
+                    // 分组折叠标题栏 (若只有单个分组且无名称则不显示)
+                    if group.group-name != "": Rectangle {
+                        height: 22px;
+                        border-radius: AppTheme.radius-small;
+                        background: group-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        group-touch := TouchArea {
+                            clicked => { root.toggle-group(group.group-id); }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 4px;
+                            padding-right: 4px;
+                            spacing: 6px;
+                            alignment: center;
+
+                            Image {
+                                source: group.is-collapsed ? @image-url("../../assets/icons/chevron-right.svg") : @image-url("../../assets/icons/chevron-down.svg");
+                                width: 11px;
+                                height: 11px;
+                                image-fit: contain;
+                                colorize: AppTheme.secondary-foreground;
+                            }
+
+                            Text {
+                                text: group.group-name;
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                            }
+
+                            Text {
+                                text: "(" + group.item-count + ")";
+                                font-size: 9px;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 分组展开状态下的卡片列表
+                    if !group.is-collapsed: VerticalLayout {
+                        spacing: 3px;
+
+                        for item in group.items: Rectangle {
+                            height: 52px;
+                            border-radius: AppTheme.radius-medium;
+                            background: card-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+                            border-width: 1px;
+                            border-color: item.is-pinned ? AppTheme.accent : (card-touch.has-hover ? AppTheme.border : transparent);
+
+                            card-touch := TouchArea {
+                                double-clicked => { root.reconnect(item.id); }
+                                mouse-cursor: pointer;
+                            }
+
+                            // 靠左垂直居中图标 + 状态指示点
+                            Rectangle {
+                                x: 8px;
+                                y: (parent.height - 20px) / 2;
+                                width: 20px;
+                                height: 20px;
+
+                                Image {
+                                    x: 0px;
+                                    y: 0px;
+                                    width: 16px;
+                                    height: 16px;
+                                    source: @image-url("../../assets/icons/server.svg");
+                                    image-fit: contain;
+                                    colorize: card-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                }
+
+
+                                // 状态微标指示点 (6x6 位于右下角)
+                                Rectangle {
+                                    x: 12px;
+                                    y: 12px;
+                                    width: 6px;
+                                    height: 6px;
+                                    border-radius: 3px;
+                                    background: item.exit-status == "active" ? #22c55e : (item.exit-status == "timeout" || item.exit-status == "error" ? #ef4444 : (item.exit-status == "auth_failed" ? #f59e0b : #64748b));
+                                    border-width: 1px;
+                                    border-color: AppTheme.surface-background;
+                                }
+                            }
+
+                            // 中部两行文本信息
+                            VerticalLayout {
+                                x: 34px;
+                                y: (parent.height - self.height) / 2;
+                                width: parent.width - 34px - (card-touch.has-hover ? 64px : 48px);
+                                spacing: 2px;
+
+                                // 第一行：标题名称
+                                Text {
+                                    text: item.title;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: card-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    overflow: elide;
+                                }
+
+                                // 第二行：副标题描述 (user@ip · 时长 · 状态)
+                                Text {
+                                    text: item.subtitle;
+                                    font-size: 9px;
+                                    color: AppTheme.disabled-foreground;
+                                    overflow: elide;
+                                }
+                            }
+
+                            // 默认常驻右侧相对时间
+                            if !card-touch.has-hover: Text {
+                                x: parent.width - self.width - 8px;
+                                y: 8px;
+                                text: item.time-text;
+                                font-size: 9px;
+                                color: AppTheme.disabled-foreground;
+                            }
+
+                            // 常驻置顶星标 (若是置顶状态且未悬浮)
+                            if item.is-pinned && !card-touch.has-hover: Image {
+                                x: parent.width - 16px - 8px;
+                                y: parent.height - 16px - 6px;
+                                width: 12px;
+                                height: 12px;
+                                source: @image-url("../../assets/icons/star-filled.svg");
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+
+                            // 悬浮滑出快捷操作条 ([▶ 重连] [◧ 分屏] [⭐️ 置顶] [🗑 删除])
+                            if card-touch.has-hover: HorizontalLayout {
+                                x: parent.width - self.width - 6px;
+                                y: (parent.height - self.height) / 2;
+                                spacing: 2px;
+
+                                // 重连按钮
+                                Rectangle {
+                                    width: 18px;
+                                    height: 18px;
+                                    border-radius: 3px;
+                                    background: recon-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                    recon-btn-touch := TouchArea {
+                                        clicked => { root.reconnect(item.id); }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 11px;
+                                        height: 11px;
+                                        source: @image-url("../../assets/icons/play.svg");
+                                        image-fit: contain;
+                                        colorize: recon-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                // 分屏打开按钮
+                                Rectangle {
+                                    width: 18px;
+                                    height: 18px;
+                                    border-radius: 3px;
+                                    background: split-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                    split-btn-touch := TouchArea {
+                                        clicked => { root.reconnect-split(item.id); }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 11px;
+                                        height: 11px;
+                                        source: @image-url("../../assets/icons/split-v.svg");
+                                        image-fit: contain;
+                                        colorize: split-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                // 置顶切换按钮
+                                Rectangle {
+                                    width: 18px;
+                                    height: 18px;
+                                    border-radius: 3px;
+                                    background: pin-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                    pin-btn-touch := TouchArea {
+                                        clicked => { root.toggle-pin(item.id); }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 11px;
+                                        height: 11px;
+                                        source: item.is-pinned ? @image-url("../../assets/icons/star-filled.svg") : @image-url("../../assets/icons/star.svg");
+                                        image-fit: contain;
+                                        colorize: item.is-pinned ? AppTheme.accent : (pin-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                    }
+                                }
+
+                                // 删除按钮
+                                Rectangle {
+                                    width: 18px;
+                                    height: 18px;
+                                    border-radius: 3px;
+                                    background: del-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                    del-btn-touch := TouchArea {
+                                        clicked => { root.delete-item(item.id); }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 11px;
+                                        height: 11px;
+                                        source: @image-url("../../assets/icons/trash.svg");
+                                        image-fit: contain;
+                                        colorize: del-btn-touch.has-hover ? #ef4444 : AppTheme.secondary-foreground;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 5. 空状态展示
+        if root.total-count == 0: VerticalLayout {
+            alignment: center;
+            spacing: 8px;
+            vertical-stretch: 1;
+
+            Image {
+                source: @image-url("../../assets/icons/clock.svg");
+                width: 32px;
+                height: 32px;
+                image-fit: contain;
+                colorize: AppTheme.disabled-foreground;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: root.search-query != "" ? @tr("未找到匹配的历史记录") : @tr("暂无连接历史");
+                font-size: 11px;
+                font-weight: 600;
+                color: AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+            }
+
+            Text {
+                text: root.search-query != "" ? @tr("请尝试其他搜索关键词") : @tr("在「主机」页面双击主机发起远程连接后将自动记录");
+                font-size: 10px;
+                color: AppTheme.disabled-foreground;
+                horizontal-alignment: center;
+            }
+
+        }
     }
 }
-}
+

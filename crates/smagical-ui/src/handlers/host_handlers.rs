@@ -505,7 +505,9 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let next_session_num_open = Rc::clone(&ctx.next_session_num);
     let next_pane_num_open = Rc::clone(&ctx.next_pane_num);
     let cached_shells_open = Rc::clone(&ctx.cached_shells);
+    let ctx_open = ctx.clone();
     window.on_open_host(move |host_id| {
+
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
 
@@ -592,6 +594,37 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 (sess_id, info)
             };
 
+            // 自动同步沉淀会话历史记录 (包括远程 SSH 主机与本地 Shell 终端)
+            let now_sec = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1725019200);
+
+            let hist_rec = if h_id.starts_with("local-") {
+                let shell_type = h_id.strip_prefix("local-").unwrap_or(&h_id);
+                smagical_core::HistoryRecord::new_local(
+                    format!("hist-{}", sess_id),
+                    Some(h_id.clone()),
+                    shell_type.to_string(),
+                    info.host_name.clone(),
+                    now_sec,
+                )
+            } else {
+                smagical_core::HistoryRecord::new_ssh(
+                    format!("hist-{}", sess_id),
+                    Some(h_id.clone()),
+                    info.host_name.clone(),
+                    format!("{}:{}", info.host_address, 22),
+                    22,
+                    "root".to_string(),
+                    now_sec,
+                )
+            };
+            let _ = ctx_open.core_state.storage().history().save(&hist_rec);
+            crate::handlers::history_handlers::sync_ui_history(&w, &ctx_open);
+
+
+
             let mut groups = pane_groups_open.borrow_mut();
             let mut active_pid = active_pane_id_open.borrow_mut();
             let is_split = global_split_tree_open.borrow().is_some();
@@ -615,14 +648,13 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 *active_pid = target_group.pane_id.clone();
             }
 
-
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "成功打开终端会话 (Pane ID: {})", *active_pid);
             sync_ui_debug_logs(&w);
         }
     });
-
-
 }
+
+
 
 

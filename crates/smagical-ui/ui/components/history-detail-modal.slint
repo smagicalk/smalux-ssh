@@ -1,0 +1,482 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppButton } from "base/app-button.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 会话历史详情与终端屏幕快照弹窗 (History Session Detail & Snapshot Modal)
+export component HistoryDetailModal inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <string> history-id: "";
+    in property <string> session-title: "";
+    in property <string> session-address: "";
+    in property <string> session-user: "";
+    in property <string> session-type: "ssh";
+    in property <string> connected-time: "";
+    in property <string> disconnected-time: "";
+    in property <string> duration-text: "";
+    in property <string> exit-status: "success";
+    in property <string> error-msg: "";
+    in property <string> snapshot-content: "";
+    in property <int> snapshot-lines: 0;
+    in-out property <bool> copy-success: false;
+
+    callback close();
+    callback reconnect(string /* history_id */);
+    callback copy-log(string /* content */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088;
+
+        TouchArea {
+            // 拦截遮罩区域背景点击穿透
+        }
+
+        // =====================================================================
+        // 主弹窗主体 (660px x 520px 居中)
+        // =====================================================================
+        Rectangle {
+            width: 660px;
+            height: 520px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
+
+                // -------------------------------------------------------------
+                // 1. 顶部 Header 标题栏
+                // -------------------------------------------------------------
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 28px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        Rectangle {
+                            width: 20px;
+                            height: 100%;
+
+                            Image {
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                                source: @image-url("../assets/icons/file-text.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: @tr("会话历史详情与终端快照");
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+
+                        // 状态微标指示
+                        Rectangle {
+                            height: 20px;
+                            border-radius: 4px;
+                            background: root.exit-status == "active" ? #22c55e22 : (root.exit-status == "timeout" || root.exit-status == "error" ? #ef444422 : (root.exit-status == "auth_failed" ? #f59e0b22 : #64748b22));
+                            y: (parent.height - self.height) / 2;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 4px;
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 6px;
+                                    height: 6px;
+                                    border-radius: 3px;
+                                    background: root.exit-status == "active" ? #22c55e : (root.exit-status == "timeout" || root.exit-status == "error" ? #ef4444 : (root.exit-status == "auth_failed" ? #f59e0b : #64748b));
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                Text {
+                                    text: root.exit-status == "active" ? @tr("活跃中") : (root.exit-status == "timeout" ? @tr("连接超时") : (root.exit-status == "auth_failed" ? @tr("认证失败") : (root.exit-status == "error" ? @tr("异常中断") : @tr("正常退出"))));
+                                    font-size: 10px;
+                                    font-weight: 600;
+                                    color: root.exit-status == "active" ? #22c55e : (root.exit-status == "timeout" || root.exit-status == "error" ? #ef4444 : (root.exit-status == "auth_failed" ? #f59e0b : AppTheme.secondary-foreground));
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // 右上角关闭按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        close-touch := TouchArea {
+                            clicked => { root.close(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        Text {
+                            text: "×";
+                            font-size: 16px;
+                            color: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // 2. 会话核心参数卡片 (3 列元数据网格)
+                // -------------------------------------------------------------
+                Rectangle {
+                    height: 56px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    HorizontalLayout {
+                        padding-left: 12px;
+                        padding-right: 12px;
+                        spacing: 12px;
+
+                        // 目标主机 (支持鼠标划选与复制)
+                        VerticalLayout {
+                            horizontal-stretch: 1.2;
+                            alignment: center;
+                            spacing: 2px;
+
+                            Text {
+                                text: @tr("目标主机与身份");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                            }
+
+                            TextInput {
+                                text: root.session-title + " (" + root.session-user + "@" + root.session-address + ")";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: AppTheme.foreground;
+                                read-only: true;
+                                single-line: true;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+                            }
+                        }
+
+                        // 分割线
+                        Rectangle {
+                            width: 1px;
+                            height: 28px;
+                            background: AppTheme.border;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        // 连接生命周期 (支持鼠标划选与复制)
+                        VerticalLayout {
+                            horizontal-stretch: 1.4;
+                            alignment: center;
+                            spacing: 2px;
+
+                            Text {
+                                text: @tr("连接与断开时间");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                            }
+
+                            TextInput {
+                                text: root.connected-time + " ~ " + (root.disconnected-time != "" ? root.disconnected-time : @tr("进行中"));
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                read-only: true;
+                                single-line: true;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+                            }
+                        }
+
+                        // 分割线
+                        Rectangle {
+                            width: 1px;
+                            height: 28px;
+                            background: AppTheme.border;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        // 持续时长
+                        VerticalLayout {
+                            horizontal-stretch: 0.8;
+                            alignment: center;
+                            spacing: 2px;
+
+                            Text {
+                                text: @tr("统计时长");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                            }
+
+                            TextInput {
+                                text: root.duration-text != "" ? root.duration-text : "-";
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: AppTheme.accent;
+                                read-only: true;
+                                single-line: true;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // 3. 终端屏幕输出快照区域 (带复制按键与滚动代码视口)
+                // -------------------------------------------------------------
+                VerticalLayout {
+                    vertical-stretch: 1;
+                    spacing: 6px;
+
+                    // 快照视口顶部小标题与操作
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 24px;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+
+                            Text {
+                                text: @tr("终端输出快照");
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: root.snapshot-lines > 0 ? "（共 " + root.snapshot-lines + " 行输出，支持鼠标划选复制）" : @tr("（无屏幕记录）");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        // [📋 复制快照日志] 按钮
+                        if root.snapshot-content != "": Rectangle {
+                            height: 24px;
+                            border-radius: AppTheme.radius-small;
+                            background: copy-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+
+                            copy-touch := TouchArea {
+                                clicked => {
+                                    root.copy-log(root.snapshot-content);
+                                    root.copy-success = true;
+                                }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                spacing: 4px;
+                                alignment: center;
+
+                                Rectangle {
+                                    width: 12px;
+                                    height: 100%;
+
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        source: root.copy-success ? @image-url("../assets/icons/clipboard.svg") : @image-url("../assets/icons/copy.svg");
+                                        width: 11px;
+                                        height: 11px;
+                                        image-fit: contain;
+                                        colorize: root.copy-success ? #22c55e : (copy-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                    }
+                                }
+
+                                Text {
+                                    text: root.copy-success ? @tr("已复制 ✓") : @tr("复制快照");
+                                    font-size: 10px;
+                                    font-weight: 600;
+                                    color: root.copy-success ? #22c55e : (copy-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // 快照纯文本滚动展示视口 (主题深度融合终端容器，支持鼠标直接划选与快捷键复制)
+                    Rectangle {
+                        vertical-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.window-background; // 与应用窗口底色 100% 保持一致
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        clip: true;
+
+                        snap-flick := Flickable {
+                            visible: root.snapshot-content != "";
+                            interactive: false; // 禁用拖拽滚屏，使鼠标拖拽完全用于文本划选高亮与复制
+                            width: 100%;
+                            height: 100%;
+                            viewport-width: Math.max(self.width, 720px);
+                            viewport-height: Math.max(self.height, root.snapshot-lines * 17px + 24px);
+
+                            // 可直接鼠标划选高亮、自由复制的只读终端文本框
+                            TextInput {
+                                x: 12px;
+                                y: 10px;
+                                width: snap-flick.viewport-width - 24px;
+                                height: snap-flick.viewport-height - 20px;
+                                text: root.snapshot-content;
+                                read-only: true;
+                                single-line: false;
+                                wrap: no-wrap;
+                                font-family: "Consolas";
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+                            }
+                        }
+
+
+
+                        // 极简主题竖向滚动条滑块 (半透明细条，悬停亮起，与主窗口配色浑然一体)
+                        if root.snapshot-content != "" && snap-flick.viewport-height > snap-flick.height: Rectangle {
+                            x: parent.width - self.width - 3px;
+                            y: (-snap-flick.viewport-y / snap-flick.viewport-height) * parent.height;
+                            width: 5px;
+                            height: Math.max(24px, (snap-flick.height / snap-flick.viewport-height) * parent.height);
+                            border-radius: 2.5px;
+                            background: vscroll-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(65%);
+
+                            vscroll-touch := TouchArea {
+                                // 鼠标悬停高亮反馈
+                            }
+                        }
+
+                        // 极简主题横向滚动条滑块 (宽文本时出现)
+                        if root.snapshot-content != "" && snap-flick.viewport-width > snap-flick.width: Rectangle {
+                            x: (-snap-flick.viewport-x / snap-flick.viewport-width) * parent.width;
+                            y: parent.height - self.height - 3px;
+                            height: 5px;
+                            width: Math.max(24px, (snap-flick.width / snap-flick.viewport-width) * parent.width);
+                            border-radius: 2.5px;
+                            background: hscroll-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(65%);
+
+                            hscroll-touch := TouchArea {
+                                // 鼠标悬停高亮反馈
+                            }
+                        }
+
+                        if root.snapshot-content == "": VerticalLayout {
+                            alignment: center;
+                            spacing: 8px;
+
+                            Text {
+                                text: @tr("暂无终端屏幕输出快照");
+                                font-size: 12px;
+                                color: AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                            }
+
+                            Text {
+                                text: @tr("该会话在建立快照机制前断开，或会话执行过程中未产生屏幕文本输出");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+
+                }
+
+                // -------------------------------------------------------------
+                // 4. 底部操作按钮栏
+                // -------------------------------------------------------------
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    // 左侧错误提示 (采用原生矢量图标，彻底避免系统 Emoji 字体缺失或裁剪变形)
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+
+                        if root.error-msg != "": HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+
+                            VerticalLayout {
+                                alignment: center;
+
+                                Image {
+                                    source: @image-url("../assets/icons/window-close.svg");
+                                    width: 13px;
+                                    height: 13px;
+                                    image-fit: contain;
+                                    colorize: #ef4444;
+                                }
+                            }
+
+                            TextInput {
+                                text: root.error-msg;
+                                font-size: 11px;
+                                color: #ef4444;
+                                read-only: true;
+                                single-line: true;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+                            }
+                        }
+                    }
+
+
+
+                    // 右侧动作按钮组 (关闭与发起连接宽度严格统一为 90px)
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: end;
+
+                        AppButton {
+                            width: 90px;
+                            text: @tr("关闭");
+                            variant: "secondary";
+                            clicked => { root.close(); }
+                        }
+
+                        AppButton {
+                            width: 90px;
+                            text: @tr("发起连接");
+                            has-icon: true;
+                            icon: @image-url("../assets/icons/play.svg");
+                            variant: "primary";
+                            clicked => {
+                                root.close();
+                                root.reconnect(root.history-id);
+                            }
+                        }
+                    }
+
+                }
+            }
+        }
+    }
+}

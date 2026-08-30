@@ -178,6 +178,10 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let zoomed_pane_id = Rc::new(RefCell::new(None));
     let next_pane_num = Rc::new(RefCell::new(1));
 
+    let collapsed_history_groups = Rc::new(RefCell::new(HashSet::new()));
+    let history_view_mode = Rc::new(RefCell::new("timeline".to_string()));
+    let history_search_query = Rc::new(RefCell::new(String::new()));
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state,
@@ -197,11 +201,18 @@ pub fn run() -> Result<(), slint::PlatformError> {
         active_pane_id: Rc::clone(&active_pane_id),
         zoomed_pane_id: Rc::clone(&zoomed_pane_id),
         next_pane_num: Rc::clone(&next_pane_num),
+
+        collapsed_history_groups,
+        history_view_mode,
+        history_search_query,
     };
 
+    // 初始同步历史会话抽屉数据
+    handlers::history_handlers::sync_ui_history(&window, &ctx);
 
     // 统一挂载所有区域的回调事件处理器
     register_all_handlers(&window, &ctx);
+
 
     // 持久化多窗格与分割条数据模型引用（保持 ModelRc 实例单一持久，避免 Slint 重建 UI 组件导致拖拽焦点丢失）
     let panes_model = Rc::new(slint::VecModel::<TerminalPaneData>::default());

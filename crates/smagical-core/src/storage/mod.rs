@@ -5,7 +5,7 @@
 /// 基于纯内存与预设种子的 Mock 存储实现。
 pub mod mock_storage;
 
-use crate::domain::{group::GroupRecord, host::HostRecord};
+use crate::domain::{group::GroupRecord, history::HistoryRecord, host::HostRecord};
 
 /// 存储操作统一结果类型
 pub type StorageResult<T> = Result<T, StorageError>;
@@ -69,6 +69,40 @@ pub trait GroupRepository: Send + Sync {
     fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()>;
 }
 
+/// 历史会话仓储接口契约
+pub trait HistoryRepository: Send + Sync {
+    /// 获取全部历史会话记录（按连接时间倒序排列）
+    fn list_all(&self) -> StorageResult<Vec<HistoryRecord>>;
+
+    /// 根据唯一 ID 查询单条历史记录
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<HistoryRecord>>;
+
+    /// 保存或更新历史记录
+    fn save(&self, record: &HistoryRecord) -> StorageResult<()>;
+
+    /// 批量保存历史记录
+    fn save_batch(&self, records: &[HistoryRecord]) -> StorageResult<()>;
+
+    /// 删除指定历史记录
+    fn delete(&self, id: &str) -> StorageResult<bool>;
+
+    /// 清空全部历史记录 (keep_pinned: 是否保留置顶项)
+    fn clear_all(&self, keep_pinned: bool) -> StorageResult<()>;
+
+    /// 切换或设置指定历史记录的置顶标星状态
+    fn toggle_pin(&self, id: &str) -> StorageResult<bool>;
+
+    /// 保存指定历史会话的终端屏幕输出快照 (按 max_lines 限制最新行数，0 为不限)
+    fn save_snapshot(&self, history_id: &str, content: &str, max_lines: usize) -> StorageResult<()>;
+
+    /// 读取指定历史会话的终端屏幕快照完整文本
+    fn get_snapshot(&self, history_id: &str) -> StorageResult<Option<String>>;
+
+    /// 删除指定历史会话的终端屏幕快照
+    fn delete_snapshot(&self, history_id: &str) -> StorageResult<bool>;
+}
+
+
 /// 聚合存储服务门面契约
 pub trait AppStorage: Send + Sync {
     /// 主机仓储句柄
@@ -76,6 +110,9 @@ pub trait AppStorage: Send + Sync {
 
     /// 分组仓储句柄
     fn groups(&self) -> &dyn GroupRepository;
+
+    /// 历史会话仓储句柄
+    fn history(&self) -> &dyn HistoryRepository;
 
     /// 强制从物理介质重新加载数据
     fn reload(&self) -> StorageResult<()>;
@@ -85,3 +122,4 @@ pub trait AppStorage: Send + Sync {
 }
 
 pub use mock_storage::MockStorage;
+

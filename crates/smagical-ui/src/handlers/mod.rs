@@ -3,6 +3,7 @@
 //! 将 Slint UI 各区域的回调绑定按功能域拆分为独立的处理器模块。
 
 pub(crate) mod debug_handlers;
+pub(crate) mod history_handlers;
 pub(crate) mod host_handlers;
 pub(crate) mod session_handlers;
 pub(crate) mod window_handlers;
@@ -17,8 +18,6 @@ use smagical_core::CoreState;
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::terminal::TerminalInstance;
 use crate::tree_model::RawTreeNode;
-
-
 
 /// 应用全局共享上下文句柄集合。
 ///
@@ -59,16 +58,17 @@ pub(crate) struct AppContext {
     /// 新增分屏窗格的自增序号计数器
     pub next_pane_num: Rc<RefCell<usize>>,
 
+    /// 历史抽屉已折叠的分组 ID 集合 (Collapsed History Groups)
+    pub collapsed_history_groups: Rc<RefCell<HashSet<String>>>,
+    /// 历史抽屉当前视图模式 ("timeline" 时间流 | "hosts" 按主机聚合)
+    pub history_view_mode: Rc<RefCell<String>>,
+    /// 历史抽屉搜索关键词
+    pub history_search_query: Rc<RefCell<String>>,
 }
-
-
-
-
-
 
 /// 统一注册挂载所有 Slint UI 回调处理器。
 ///
-/// 依次将窗口控制、终端会话管理、主机分组管理与开发者调试控制台的回调绑定到 AppWindow 实例。
+/// 依次将窗口控制、终端会话管理、主机分组管理、历史会话与开发者调试控制台的回调绑定到 AppWindow 实例。
 ///
 /// # 参数
 /// - `window`: Slint 生成的主窗口组件引用句柄
@@ -80,7 +80,10 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     session_handlers::register_session_handlers(window, ctx);
     // 3. 挂载主机与分组资产回调 (分组折叠/展开、拖拽调序移动、搜索过滤、双击打开终端等)
     host_handlers::register_host_handlers(window, ctx);
-    // 4. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
+    // 4. 挂载历史会话抽屉交互回调 (重连、分屏重连、置顶、删除、清空、搜索与模式切换)
+    history_handlers::register_history_handlers(window, ctx);
+    // 5. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
     debug_handlers::register_debug_handlers(window, ctx);
 }
+
 

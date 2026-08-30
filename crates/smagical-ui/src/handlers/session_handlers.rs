@@ -30,15 +30,22 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_close = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close = Rc::clone(&ctx.active_terminals);
+    let ctx_close = ctx.clone();
     window.on_close_tab(move |sess_id| {
+
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
             let mut groups = pane_groups_close.borrow_mut();
             let mut active_pid = active_pane_id_close.borrow_mut();
             let mut split_tree = global_split_tree_close.borrow_mut();
 
-            // 杀灭底层 PTY 进程并释放 Alacritty 实例
+            // 捕获终端屏幕快照并杀灭底层 PTY 进程与 Alacritty 实例
+            let mut snapshot_opt = None;
             if let Some(mut instance) = active_terminals_close.borrow_mut().remove(&id_str) {
+                let snap = instance.snapshot_text(500);
+                if !snap.trim().is_empty() {
+                    snapshot_opt = Some((snap.lines().count() as u32, snap));
+                }
                 let _ = instance.pty.kill();
             }
 
@@ -79,6 +86,21 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
             sync_ui_debug_logs(&w);
+
+            let now_sec = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1725019200);
+            let hist_id = format!("hist-{}", id_str);
+            if let Ok(Some(mut hist)) = ctx_close.core_state.storage().history().get_by_id(&hist_id) {
+                hist.mark_closed(now_sec);
+                if let Some((lines_count, snap_text)) = snapshot_opt {
+                    hist.record_snapshot(lines_count);
+                    let _ = ctx_close.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
+                }
+                let _ = ctx_close.core_state.storage().history().save(&hist);
+                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close);
+            }
         }
     });
 
@@ -90,6 +112,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_close_pane_tab = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close_pane_tab = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_pane_tab = Rc::clone(&ctx.active_terminals);
+    let ctx_close_pane = ctx.clone();
     window.on_close_pane_tab(move |pane_id, tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let p_id = pane_id.to_string();
@@ -98,7 +121,13 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let mut active_pid = active_pane_id_close_pane_tab.borrow_mut();
             let mut split_tree = global_split_tree_close_pane_tab.borrow_mut();
 
+            // 捕获终端屏幕快照并杀灭底层 PTY 进程与 Alacritty 实例
+            let mut snapshot_opt = None;
             if let Some(mut instance) = active_terminals_close_pane_tab.borrow_mut().remove(&t_id) {
+                let snap = instance.snapshot_text(500);
+                if !snap.trim().is_empty() {
+                    snapshot_opt = Some((snap.lines().count() as u32, snap));
+                }
                 let _ = instance.pty.kill();
             }
 
@@ -116,7 +145,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     remove_group_idx = Some(idx);
                 }
             }
-
 
             if let Some(idx) = remove_group_idx {
                 let closed_pid = groups[idx].pane_id.clone();
@@ -140,8 +168,25 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
             sync_ui_debug_logs(&w);
+
+            let now_sec = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs())
+                .unwrap_or(1725019200);
+            let hist_id = format!("hist-{}", t_id);
+            if let Ok(Some(mut hist)) = ctx_close_pane.core_state.storage().history().get_by_id(&hist_id) {
+                hist.mark_closed(now_sec);
+                if let Some((lines_count, snap_text)) = snapshot_opt {
+                    hist.record_snapshot(lines_count);
+                    let _ = ctx_close_pane.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
+                }
+                let _ = ctx_close_pane.core_state.storage().history().save(&hist);
+                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane);
+            }
         }
     });
+
+
 
     // -------------------------------------------------------------------------
     // 2. 切换激活 Tab 会话回调

@@ -254,6 +254,53 @@ impl TerminalParser {
 
         lines.join("\r\n")
     }
+
+    /// 提取终端当前屏幕以及回滚缓冲区的纯文本快照 (最多保留最新的 max_lines 行，0 为不限)
+    pub fn extract_all_text(&self, max_lines: usize) -> String {
+        let content = self.term.renderable_content();
+        let cols = self.term.columns();
+
+        let mut line_chars: std::collections::BTreeMap<i32, Vec<(usize, char)>> = std::collections::BTreeMap::new();
+
+        for cell in content.display_iter {
+            let col = cell.point.column.0;
+            let line_i32 = cell.point.line.0;
+            if col < cols {
+                line_chars.entry(line_i32).or_default().push((col, cell.c));
+            }
+        }
+
+        let mut lines = Vec::new();
+        for (_, mut chars) in line_chars {
+            chars.sort_by_key(|(c, _)| *c);
+            let mut line_str = String::new();
+            for (_, ch) in chars {
+                if ch != '\0' {
+                    line_str.push(ch);
+                } else {
+                    line_str.push(' ');
+                }
+            }
+            let trimmed = line_str.trim_end();
+            lines.push(trimmed.to_string());
+        }
+
+        // 去除尾部多余空行
+        while let Some(last) = lines.last() {
+            if last.is_empty() {
+                lines.pop();
+            } else {
+                break;
+            }
+        }
+
+        if max_lines > 0 && lines.len() > max_lines {
+            lines[lines.len() - max_lines..].join("\r\n")
+        } else {
+            lines.join("\r\n")
+        }
+    }
 }
+
 
 

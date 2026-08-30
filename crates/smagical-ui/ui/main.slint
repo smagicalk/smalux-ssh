@@ -26,6 +26,8 @@ import {
     NewSessionModal,
     LocalShellItemData,
 } from "components/new-session-modal.slint";
+import { HistoryDetailModal } from "components/history-detail-modal.slint";
+
 
 // 左侧视图
 import { LeftActivityBar } from "views/left_activity_bar.slint";
@@ -35,9 +37,12 @@ import {
     HostTreeNode,
 } from "views/left_drawers/hosts_drawer.slint";
 import {
-    HistoryDrawer,
+    HistoryCenterView,
     HistoryItemData,
-} from "views/left_drawers/history_drawer.slint";
+    HistoryGroupData,
+} from "views/history_center_view.slint";
+
+
 import {
     FilesDrawer,
     BookmarkItemData,
@@ -171,6 +176,43 @@ export component AppWindow inherits Window {
     in-out property <[LocalShellItemData]> launcher-local-items: [];
     /// 快速启动器远程主机资产列表
     in-out property <[HostItemData]> launcher-host-items: root.hosts;
+    /// 主工作区展示视图 ("terminal" 终端视口 | "history" 历史连接中心)
+    in-out property <string> main-view: "terminal";
+
+
+    // -------------------------------------------------------------------------
+    // 历史会话数据模型与状态
+    // -------------------------------------------------------------------------
+
+    /// 历史抽屉分组数据模型
+    in-out property <[HistoryGroupData]> history-groups: [];
+    /// 历史记录总条数
+    in-out property <int> history-total-count: 0;
+    /// 历史抽屉视图模式 ("timeline" 时间流 | "hosts" 按主机聚合)
+    in-out property <string> history-view-mode: "timeline";
+    /// 历史抽屉搜索过滤关键词
+    in-out property <string> history-search-query: "";
+
+    // -------------------------------------------------------------------------
+    // 历史会话详情与快照弹窗状态
+    // -------------------------------------------------------------------------
+    /// 会话详情与快照弹窗显隐开关
+    in-out property <bool> is-history-detail-open: false;
+    /// 会话详情弹窗数据
+    in-out property <string> history-detail-id: "";
+    in-out property <string> history-detail-title: "";
+    in-out property <string> history-detail-address: "";
+    in-out property <string> history-detail-user: "";
+    in-out property <string> history-detail-type: "ssh";
+    in-out property <string> history-detail-connected-time: "";
+    in-out property <string> history-detail-disconnected-time: "";
+    in-out property <string> history-detail-duration: "";
+    in-out property <string> history-detail-exit-status: "success";
+    in-out property <string> history-detail-error-msg: "";
+    in-out property <string> history-detail-snapshot: "";
+    in-out property <int> history-detail-snapshot-lines: 0;
+
+
 
     // -------------------------------------------------------------------------
     // 拖拽调序交互状态机
@@ -350,12 +392,35 @@ export component AppWindow inherits Window {
     /// 终端动态几何网格尺寸变更回调
     callback terminal-resize(int /* cols */, int /* rows */);
 
-
+    // -------------------------------------------------------------------------
+    // 历史会话抽屉交互回调
+    // -------------------------------------------------------------------------
+    /// 重连指定历史会话 (在当前焦点窗格中打开)
+    callback reconnect-history(string /* id */);
+    /// 重连指定历史会话 (向右分屏打开)
+    callback reconnect-history-split(string /* id */);
+    /// 删除单条历史记录
+    callback delete-history-item(string /* id */);
+    /// 清空全部历史记录
+    callback clear-history();
+    /// 切换单条历史记录置顶标星状态
+    callback toggle-pin-history(string /* id */);
+    /// 切换历史时间分组折叠展开状态
+    callback toggle-history-group(string /* group_id */);
+    /// 历史记录搜索关键词过滤回调
+    callback filter-history(string /* query */);
+    /// 切换历史抽屉视图模式回调 ("timeline" | "hosts")
+    callback switch-history-view-mode(string /* mode */);
+    /// 呼出会话详情与终端快照弹窗回调
+    callback show-history-detail(string /* id */);
+    /// 复制快照日志到剪贴板回调
+    callback copy-history-log(string /* content */);
 
 
     // -------------------------------------------------------------------------
     // 开发者 F12 调试控制台专用回调
     // -------------------------------------------------------------------------
+
     /// 批量生成主机测试数据
     callback debug-batch-generate(string /* prefix */, string /* count_str */, string /* ip_prefix */, string /* start_ip_str */, string /* port_str */, string /* group */, string /* status_mode */, bool /* overwrite */);
     /// 批量更新主机状态模拟
@@ -376,6 +441,9 @@ export component AppWindow inherits Window {
     callback debug-clear-logs();
     /// 模拟触发测试诊断日志
     callback debug-emit-test-log(string /* level */);
+    /// 侧边栏/主视图活动页签切换
+    callback activity-tab-switched(string /* tab_id */);
+
 
 
     // 全局快捷键拦截 (支持 F12 或 Ctrl+Shift+D 随时呼出调试弹窗)
@@ -435,9 +503,15 @@ export component AppWindow inherits Window {
                 is-dark-mode: root.is-dark-mode;
                 active-tab-id: root.active-session-tab;
                 tabs: root.tabs;
-                select-tab(id) => { root.select-tab(id); }
+                select-tab(id) => {
+                    root.main-view = "terminal";
+                    root.select-tab(id);
+                }
                 close-tab(id) => { root.close-tab(id); }
-                new-tab => { root.new-tab(); }
+                new-tab => {
+                    root.main-view = "terminal";
+                    root.new-tab();
+                }
                 minimize-window => { root.minimize-window(); }
                 maximize-window => {
                     root.maximize-window();
@@ -457,16 +531,27 @@ export component AppWindow inherits Window {
                     is-dark-mode: root.is-dark-mode;
                     toggle-color-mode => { root.toggle-color-mode(); }
                     tab-clicked(id) => {
+                        root.activity-tab-switched(id);
                         if id == "debug" {
                             // 点击调试图标直接唤起全局独立浮动弹窗
                             root.is-debug-modal-open = !root.is-debug-modal-open;
-                        } else if root.active-left-tab == id && root.is-left-drawer-open {
+                        } else if id == "history" {
+                            // 切换至独立全屏历史中心大页面 (无终端视口干扰)
+                            root.active-left-tab = "history";
+                            root.main-view = "history";
                             root.is-left-drawer-open = false;
                         } else {
-                            root.active-left-tab = id;
-                            root.is-left-drawer-open = true;
+                            // 资产与设置抽屉：切回终端工作区 + 展开对应抽屉
+                            root.main-view = "terminal";
+                            if root.active-left-tab == id && root.is-left-drawer-open {
+                                root.is-left-drawer-open = false;
+                            } else {
+                                root.active-left-tab = id;
+                                root.is-left-drawer-open = true;
+                            }
                         }
                     }
+
                 }
 
                 // 2.2 左侧可伸缩二级抽屉
@@ -503,11 +588,6 @@ export component AppWindow inherits Window {
                     }
 
 
-
-                    if root.active-left-tab == "history": HistoryDrawer {
-                        collapse => { root.is-left-drawer-open = false; }
-                        reconnect(id) => { root.open-host(id); }
-                    }
 
                     if root.active-left-tab == "files": FilesDrawer {
                         collapse => { root.is-left-drawer-open = false; }
@@ -571,13 +651,50 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 2.3 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
-                viewport := TerminalViewport {
+                // 2.3.1 全屏历史中心页面 (当 main-view == "history" 时全屏展开，彻底隐藏终端与多栏)
+                if root.main-view == "history": HistoryCenterView {
                     horizontal-stretch: 1;
+                    history-groups: root.history-groups;
+                    total-count: root.history-total-count;
+                    has-active-terminal: root.has-active-session;
+                    search-query <=> root.history-search-query;
+
+                    reconnect(id) => {
+                        root.main-view = "terminal";
+                        root.active-left-tab = "hosts";
+                        root.is-left-drawer-open = true;
+                        root.reconnect-history(id);
+                    }
+                    show-detail(id) => { root.show-history-detail(id); }
+                    delete-item(id) => { root.delete-history-item(id); }
+
+                    clear-all => { root.clear-history(); }
+                    toggle-pin(id) => { root.toggle-pin-history(id); }
+                    toggle-group(id) => { root.toggle-history-group(id); }
+                    search-changed(q) => { root.filter-history(q); }
+                    switch-to-terminal => {
+                        root.main-view = "terminal";
+                        root.active-left-tab = "hosts";
+                        root.is-left-drawer-open = true;
+                    }
+
+                }
+
+
+
+                // 2.3.2 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
+                viewport := TerminalViewport {
+                    visible: root.main-view == "terminal";
+                    horizontal-stretch: root.main-view == "terminal" ? 1 : 0;
+                    min-width: 0px;
+                    max-width: root.main-view == "terminal" ? 100000px : 0px;
 
                     has-active-session: root.has-active-session;
+
                     tabs: root.tabs;
                     active-tab-id: root.active-session-tab;
+
+
                     select-tab(id) => { root.select-tab(id); }
                     close-tab(id) => { root.close-tab(id); }
                     select-pane-tab(pane_id, tab_id) => { root.select-pane-tab(pane_id, tab_id); }
@@ -633,8 +750,8 @@ export component AppWindow inherits Window {
 
 
 
-                // 2.3.1 右侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
-                if root.is-right-drawer-open: Rectangle {
+                // 2.3.1 右侧可拖拽调宽分割条 (仅在终端工作区展开右侧抽屉时展示)
+                if root.is-right-drawer-open && root.main-view == "terminal": Rectangle {
                     width: 5px;
                     background: right-split-touch.has-hover || right-split-touch.pressed ? AppTheme.accent : AppTheme.panel-background;
                     animate background { duration: 120ms; }
@@ -668,8 +785,8 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 2.4 右侧可伸缩工具抽屉
-                if root.is-right-drawer-open: Rectangle {
+                // 2.4 右侧可伸缩工具抽屉 (仅在终端工作区展开时展示)
+                if root.is-right-drawer-open && root.main-view == "terminal": Rectangle {
                     width: root.right-drawer-width;
                     clip: true;
 
@@ -696,8 +813,8 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 2.5 最右侧 48px 工具图标栏
-                RightToolBar {
+                // 2.5 最右侧 48px 工具图标栏 (仅在终端工作区展示)
+                if root.main-view == "terminal": RightToolBar {
                     active-tool: root.active-right-tool;
                     tool-clicked(id) => {
                         if root.active-right-tool == id && root.is-right-drawer-open {
@@ -708,6 +825,7 @@ export component AppWindow inherits Window {
                         }
                     }
                 }
+
             }
 
             // 3. 底层全宽状态栏
@@ -792,4 +910,32 @@ export component AppWindow inherits Window {
             root.open-host(id);
         }
     }
+
+    // 会话历史详情与终端屏幕快照弹窗
+    HistoryDetailModal {
+        is-open: root.is-history-detail-open;
+        history-id: root.history-detail-id;
+        session-title: root.history-detail-title;
+        session-address: root.history-detail-address;
+        session-user: root.history-detail-user;
+        session-type: root.history-detail-type;
+        connected-time: root.history-detail-connected-time;
+        disconnected-time: root.history-detail-disconnected-time;
+        duration-text: root.history-detail-duration;
+        exit-status: root.history-detail-exit-status;
+        error-msg: root.history-detail-error-msg;
+        snapshot-content: root.history-detail-snapshot;
+        snapshot-lines: root.history-detail-snapshot-lines;
+        close => { root.is-history-detail-open = false; }
+        reconnect(id) => {
+            root.is-history-detail-open = false;
+            root.main-view = "terminal";
+            root.active-left-tab = "hosts";
+            root.is-left-drawer-open = true;
+            root.reconnect-history(id);
+        }
+
+        copy-log(text) => { root.copy-history-log(text); }
+    }
 }
+

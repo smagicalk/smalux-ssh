@@ -196,5 +196,11 @@ impl TerminalInstance {
     pub fn scroll_info(&self) -> (usize, usize) {
         self.parser.scroll_info()
     }
+
+    /// 提取会话终端屏幕与回滚历史的纯文本快照 (最多保留 max_lines 行，0 为不限)
+    pub fn snapshot_text(&self, max_lines: usize) -> String {
+        self.parser.extract_all_text(max_lines)
+    }
 }
+
 
