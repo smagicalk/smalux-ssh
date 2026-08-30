@@ -5,7 +5,9 @@ import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { TabData } from "tab_bar.slint";
 import { TerminalFindBar } from "terminal_find_bar.slint";
 import { TerminalContextMenu } from "terminal_context_menu.slint";
+import { TabContextMenu } from "tab_context_menu.slint";
 import { TerminalPaneView } from "terminal_pane_view.slint";
+
 
 /// 单个动态终端窗格数据模型 (支持无限嵌套任意多分屏)
 export struct TerminalPaneData {
@@ -156,6 +158,14 @@ export component TerminalViewport inherits Rectangle {
     in-out property <bool> is-selecting: false;
     property <bool> context-menu-can-split: false;
 
+    /// Tab 专属右键快捷菜单状态
+    in-out property <bool> is-tab-context-menu-open: false;
+    in-out property <length> tab-context-menu-x: 0px;
+    in-out property <length> tab-context-menu-y: 0px;
+    in-out property <string> tab-context-menu-tab-id: "";
+    in-out property <string> tab-context-menu-pane-id: "";
+    property <bool> tab-context-menu-can-split: false;
+    property <bool> tab-context-menu-can-close-others: false;
 
     /// Tab 栏调度交互回调
     callback select-tab(string /* id */);
@@ -163,6 +173,9 @@ export component TerminalViewport inherits Rectangle {
     callback new-tab();
     callback select-pane-tab(string /* pane_id */, string /* tab_id */);
     callback close-pane-tab(string /* pane_id */, string /* tab_id */);
+    callback copy-tab-ip(string /* tab_id */);
+    callback close-other-tabs(string /* pane_id */, string /* tab_id */);
+
 
 
     /// 终端底层输入流与交互事件回调
@@ -317,23 +330,53 @@ export component TerminalViewport inherits Rectangle {
                     root.active-tab-id = id;
                     root.select-tab(id);
                     terminal-focus.focus();
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
                 }
                 close-tab(id) => {
                     root.close-tab(id);
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
                 }
-                new-tab => { root.new-tab(); }
-                select => { terminal-focus.focus(); }
-                scroll(delta) => { root.terminal-scroll(delta); }
+                new-tab => {
+                    root.new-tab();
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                select => {
+                    terminal-focus.focus();
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                scroll(delta) => {
+                    root.terminal-scroll(delta);
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
                 selection-changed(sc, sr, ec, er, has-sel) => {
                     root.has-selection = has-sel;
                     root.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
                 }
                 context-menu(mx, my) => {
                     root.context-menu-x = mx;
                     root.context-menu-y = 36px + my;
                     root.context-menu-can-split = root.tabs.length > 1;
                     root.is-context-menu-open = true;
+                    root.is-tab-context-menu-open = false;
                 }
+                tab-context-menu(tab_id, mx, my) => {
+                    root.tab-context-menu-tab-id = tab_id;
+                    root.tab-context-menu-pane-id = root.active-pane-id;
+                    root.tab-context-menu-x = mx;
+                    root.tab-context-menu-y = my;
+                    root.tab-context-menu-can-split = root.tabs.length > 1;
+                    root.tab-context-menu-can-close-others = root.tabs.length > 1;
+                    root.is-tab-context-menu-open = true;
+                    root.is-context-menu-open = false;
+                }
+
             }
 
             // 2.4 任意层级嵌套多分屏模式视口 (数据驱动二叉树拓扑)
@@ -362,25 +405,34 @@ export component TerminalViewport inherits Rectangle {
                         root.active-pane-id = pane.pane-id;
                         root.select-pane-tab(pane.pane-id, tab-id);
                         terminal-focus.focus();
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     close-tab(tab-id) => {
                         root.close-pane-tab(pane.pane-id, tab-id);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     select => {
                         root.active-pane-id = pane.pane-id;
                         root.select-pane-by-id(pane.pane-id);
                         terminal-focus.focus();
                         root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     new-tab => {
                         root.active-pane-id = pane.pane-id;
                         root.new-tab();
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     split-right => {
                         if pane.tabs.length > 1 {
                             root.active-pane-id = pane.pane-id;
                             root.select-pane-by-id(pane.pane-id);
                             root.split-terminal("vertical");
+                            root.is-context-menu-open = false;
+                            root.is-tab-context-menu-open = false;
                         }
                     }
                     split-down => {
@@ -388,22 +440,33 @@ export component TerminalViewport inherits Rectangle {
                             root.active-pane-id = pane.pane-id;
                             root.select-pane-by-id(pane.pane-id);
                             root.split-terminal("horizontal");
+                            root.is-context-menu-open = false;
+                            root.is-tab-context-menu-open = false;
                         }
                     }
                     toggle-zoom => {
                         root.toggle-pane-zoom(pane.pane-id);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     close => {
                         root.close-pane-by-id(pane.pane-id);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     scroll(delta) => {
                         root.terminal-scroll(delta);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
                     selection-changed(sc, sr, ec, er, has-sel) => {
                         root.active-pane-id = pane.pane-id;
                         root.has-selection = has-sel;
                         root.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
                     }
+
 
                     context-menu(mx, my) => {
                         root.active-pane-id = pane.pane-id;
@@ -412,7 +475,21 @@ export component TerminalViewport inherits Rectangle {
                         root.context-menu-y = pane.y + 36px + my;
                         root.context-menu-can-split = pane.tabs.length > 1;
                         root.is-context-menu-open = true;
+                        root.is-tab-context-menu-open = false;
                     }
+                    tab-context-menu(tab_id, mx, my) => {
+                        root.active-pane-id = pane.pane-id;
+                        root.select-pane-by-id(pane.pane-id);
+                        root.tab-context-menu-tab-id = tab_id;
+                        root.tab-context-menu-pane-id = pane.pane-id;
+                        root.tab-context-menu-x = pane.x + mx;
+                        root.tab-context-menu-y = pane.y + my;
+                        root.tab-context-menu-can-split = pane.tabs.length > 1;
+                        root.tab-context-menu-can-close-others = pane.tabs.length > 1;
+                        root.is-tab-context-menu-open = true;
+                        root.is-context-menu-open = false;
+                    }
+
                 }
 
 
@@ -472,6 +549,8 @@ export component TerminalViewport inherits Rectangle {
 
             // 2.6 右键上下文快捷菜单
             if root.is-context-menu-open: TerminalContextMenu {
+                x: Math.max(2px, Math.min(parent.width - self.width - 4px, root.context-menu-x));
+                y: Math.max(2px, Math.min(parent.height - self.height - 4px, root.context-menu-y));
                 is-open: root.is-context-menu-open;
                 menu-x: root.context-menu-x;
                 menu-y: root.context-menu-y;
@@ -485,6 +564,51 @@ export component TerminalViewport inherits Rectangle {
                 split-down => { root.split-terminal("horizontal"); }
                 close-menu => { root.is-context-menu-open = false; }
             }
+
+            // 2.6.2 Tab 标签专属右键快捷菜单
+            if root.is-tab-context-menu-open: TabContextMenu {
+                x: Math.max(2px, Math.min(parent.width - self.width - 4px, root.tab-context-menu-x));
+                y: Math.max(2px, Math.min(parent.height - self.height - 4px, root.tab-context-menu-y));
+                is-open: root.is-tab-context-menu-open;
+                menu-x: root.tab-context-menu-x;
+                menu-y: root.tab-context-menu-y;
+                can-split: root.tab-context-menu-can-split;
+
+                can-close-others: root.tab-context-menu-can-close-others;
+                copy-ip => { root.copy-tab-ip(root.tab-context-menu-tab-id); }
+                split-right => {
+                    if root.tab-context-menu-can-split {
+                        if root.is-split {
+                            root.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                        } else {
+                            root.select-tab(root.tab-context-menu-tab-id);
+                        }
+                        root.split-terminal("vertical");
+                    }
+                }
+                split-down => {
+                    if root.tab-context-menu-can-split {
+                        if root.is-split {
+                            root.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                        } else {
+                            root.select-tab(root.tab-context-menu-tab-id);
+                        }
+                        root.split-terminal("horizontal");
+                    }
+                }
+                close-tab => {
+                    if root.is-split {
+                        root.close-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                    } else {
+                        root.close-tab(root.tab-context-menu-tab-id);
+                    }
+                }
+                close-others => {
+                    root.close-other-tabs(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                }
+                close-menu => { root.is-tab-context-menu-open = false; }
+            }
+
 
 
             // 2.7 终端右侧微型历史滚动条 (当存在回滚历史时展示)

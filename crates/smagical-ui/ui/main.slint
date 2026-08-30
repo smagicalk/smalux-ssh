@@ -344,7 +344,12 @@ export component AppWindow inherits Window {
     callback select-pane-tab(string /* pane_id */, string /* tab_id */);
     /// 关闭指定分屏窗格内的指定 Tab 回调
     callback close-pane-tab(string /* pane_id */, string /* tab_id */);
+    /// 复制指定 Tab 会话所对应主机的 IP / 连接地址回调
+    callback copy-tab-ip(string /* tab_id */);
+    /// 关闭指定分屏窗格内除目标 Tab 以外的其他会话回调
+    callback close-other-tabs(string /* pane_id */, string /* tab_id */);
     /// 向当前终端发送指令片段回调
+
     callback send-snippet(string /* cmd */);
 
     /// 原生窗口最小化回调
@@ -699,7 +704,10 @@ export component AppWindow inherits Window {
                     close-tab(id) => { root.close-tab(id); }
                     select-pane-tab(pane_id, tab_id) => { root.select-pane-tab(pane_id, tab_id); }
                     close-pane-tab(pane_id, tab_id) => { root.close-pane-tab(pane_id, tab_id); }
+                    copy-tab-ip(tab_id) => { root.copy-tab-ip(tab_id); }
+                    close-other-tabs(pane_id, tab_id) => { root.close-other-tabs(pane_id, tab_id); }
                     new-tab => { root.is-new-session-modal-open = true; }
+
 
                     session-name: root.active-session-name;
                     host-address: root.active-host-address;

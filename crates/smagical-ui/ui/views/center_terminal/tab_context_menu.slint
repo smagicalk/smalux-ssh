@@ -1,0 +1,274 @@
+// =============================================================================
+// 文件名称: tab_context_menu.slint
+// 模块功能: 终端 Tab 标签页专属右键快捷操作上下文菜单 (Tab Context Menu)
+// 核心设计: 提供复制会话 IP/连接地址、向右/向下分屏、关闭当前会话与关闭其他会话等操作
+// =============================================================================
+
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 终端 Tab 标签页右键快捷上下文菜单
+export component TabContextMenu inherits Rectangle {
+    /// 菜单是否处于打开状态
+    in property <bool> is-open: false;
+    /// 菜单浮动 X 坐标 (相对于视口左上角)
+    in property <length> menu-x: 0px;
+    /// 菜单浮动 Y 坐标 (相对于视口左上角)
+    in property <length> menu-y: 0px;
+    /// 当前窗格是否支持分屏 (仅当拥有 > 1 个 Tab 时支持分屏)
+    in property <bool> can-split: true;
+    /// 是否支持关闭其他会话 (仅当拥有 > 1 个 Tab 时支持)
+    in property <bool> can-close-others: true;
+
+    /// 复制当前 Tab 主机 IP / 连接地址回调
+    callback copy-ip();
+    /// 向右切分当前 Tab 窗格回调
+    callback split-right();
+    /// 向下切分当前 Tab 窗格回调
+    callback split-down();
+    /// 关闭当前选中的 Tab 回调
+    callback close-tab();
+    /// 关闭除当前 Tab 以外的其他会话回调
+    callback close-others();
+    /// 关闭右键菜单遮罩回调
+    callback close-menu();
+
+    x: root.menu-x;
+    y: root.menu-y;
+    width: 168px;
+    height: 146px;
+
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.surface-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    drop-shadow-blur: 10px;
+    drop-shadow-color: #00000060;
+    drop-shadow-offset-y: 3px;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 2px;
+
+        // 1. 复制 IP (Copy IP)
+        Rectangle {
+            height: 24px;
+            border-radius: 3px;
+            background: copy-ip-touch.has-hover ? AppTheme.hover-background : transparent;
+
+            copy-ip-touch := TouchArea {
+                clicked => {
+                    root.copy-ip();
+                    root.close-menu();
+                }
+                mouse-cursor: pointer;
+            }
+
+            Image {
+                x: 7px;
+                y: (parent.height - self.height) / 2;
+                width: 13px;
+                height: 13px;
+                source: @image-url("../../assets/icons/copy.svg");
+                image-fit: contain;
+                colorize: copy-ip-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+            }
+
+            Text {
+                x: 27px;
+                y: (parent.height - self.height) / 2;
+                text: @tr("复制 IP");
+                font-size: 11px;
+                font-weight: 500;
+                color: copy-ip-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 分割线
+        HorizontalLayout {
+            padding-left: 4px;
+            padding-right: 4px;
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border;
+            }
+        }
+
+        // 2. 向右分屏 (Split Right)
+        Rectangle {
+            height: 24px;
+            border-radius: 3px;
+            background: (root.can-split && split-r-touch.has-hover) ? AppTheme.hover-background : transparent;
+            opacity: root.can-split ? 1.0 : 0.4;
+
+            split-r-touch := TouchArea {
+                clicked => {
+                    if root.can-split {
+                        root.split-right();
+                        root.close-menu();
+                    }
+                }
+                mouse-cursor: root.can-split ? pointer : default;
+            }
+
+            Image {
+                x: 7px;
+                y: (parent.height - self.height) / 2;
+                width: 13px;
+                height: 13px;
+                source: @image-url("../../assets/icons/split-v.svg");
+                image-fit: contain;
+                colorize: (root.can-split && split-r-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
+            }
+
+            Text {
+                x: 27px;
+                y: (parent.height - self.height) / 2;
+                text: @tr("向右分屏");
+                font-size: 11px;
+                font-weight: 500;
+                color: (root.can-split && split-r-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: parent.width - self.width - 7px;
+                y: (parent.height - self.height) / 2;
+                text: "Ctrl+Shift+D";
+                font-size: 9px;
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 3. 向下分屏 (Split Down)
+        Rectangle {
+            height: 24px;
+            border-radius: 3px;
+            background: (root.can-split && split-d-touch.has-hover) ? AppTheme.hover-background : transparent;
+            opacity: root.can-split ? 1.0 : 0.4;
+
+            split-d-touch := TouchArea {
+                clicked => {
+                    if root.can-split {
+                        root.split-down();
+                        root.close-menu();
+                    }
+                }
+                mouse-cursor: root.can-split ? pointer : default;
+            }
+
+            Image {
+                x: 7px;
+                y: (parent.height - self.height) / 2;
+                width: 13px;
+                height: 13px;
+                source: @image-url("../../assets/icons/split-h.svg");
+                image-fit: contain;
+                colorize: (root.can-split && split-d-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
+            }
+
+            Text {
+                x: 27px;
+                y: (parent.height - self.height) / 2;
+                text: @tr("向下分屏");
+                font-size: 11px;
+                font-weight: 500;
+                color: (root.can-split && split-d-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+
+            Text {
+                x: parent.width - self.width - 7px;
+                y: (parent.height - self.height) / 2;
+                text: "Ctrl+Shift+E";
+                font-size: 9px;
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 分割线
+        HorizontalLayout {
+            padding-left: 4px;
+            padding-right: 4px;
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border;
+            }
+        }
+
+        // 4. 关闭当前会话 (Close Tab)
+        Rectangle {
+            height: 24px;
+            border-radius: 3px;
+            background: close-tab-touch.has-hover ? #e7484822 : transparent;
+
+            close-tab-touch := TouchArea {
+                clicked => {
+                    root.close-tab();
+                    root.close-menu();
+                }
+                mouse-cursor: pointer;
+            }
+
+            Image {
+                x: 7px;
+                y: (parent.height - self.height) / 2;
+                width: 13px;
+                height: 13px;
+                source: @image-url("../../assets/icons/window-close.svg");
+                image-fit: contain;
+                colorize: close-tab-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+            }
+
+            Text {
+                x: 27px;
+                y: (parent.height - self.height) / 2;
+                text: @tr("关闭");
+                font-size: 11px;
+                font-weight: 500;
+                color: close-tab-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 5. 关闭其他会话 (Close Other Tabs)
+        Rectangle {
+            height: 24px;
+            border-radius: 3px;
+            background: (root.can-close-others && close-others-touch.has-hover) ? AppTheme.hover-background : transparent;
+            opacity: root.can-close-others ? 1.0 : 0.4;
+
+            close-others-touch := TouchArea {
+                clicked => {
+                    if root.can-close-others {
+                        root.close-others();
+                        root.close-menu();
+                    }
+                }
+                mouse-cursor: root.can-close-others ? pointer : default;
+            }
+
+            Image {
+                x: 7px;
+                y: (parent.height - self.height) / 2;
+                width: 13px;
+                height: 13px;
+                source: @image-url("../../assets/icons/trash.svg");
+                image-fit: contain;
+                colorize: (root.can-close-others && close-others-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
+            }
+
+            Text {
+                x: 27px;
+                y: (parent.height - self.height) / 2;
+                text: @tr("关闭其他会话");
+                font-size: 11px;
+                font-weight: 500;
+                color: (root.can-close-others && close-others-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

@@ -9,6 +9,7 @@ export component TabItem inherits Rectangle {
 
     callback select();
     callback close();
+    callback context-menu(length /* x */, length /* y */);
 
     // 舒适易读宽度：确保会话名称、终端图标与关闭按钮完整展现，紧凑无多余冗余空间
     min-width: is-active ? 150px : 140px;
@@ -41,8 +42,14 @@ export component TabItem inherits Rectangle {
 
                 main-touch := TouchArea {
                     clicked => { root.select(); }
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                            root.context-menu(self.mouse-x, self.mouse-y);
+                        }
+                    }
                     mouse-cursor: pointer;
                 }
+
 
                 HorizontalLayout {
                     spacing: 6px;

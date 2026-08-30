@@ -192,6 +192,112 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
+    // -------------------------------------------------------------------------
+    // 1.2 复制指定 Tab 会话对应的主机 IP / 连接地址
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let pane_groups_copy_ip = Rc::clone(&ctx.pane_groups);
+    window.on_copy_tab_ip(move |tab_id| {
+        if let Some(w) = window_weak.upgrade() {
+            let t_id = tab_id.to_string();
+            let groups = pane_groups_copy_ip.borrow();
+            let mut found_ip = None;
+            let mut host_name = String::new();
+
+            for g in groups.iter() {
+                if let Some(s) = g.tabs.iter().find(|t| t.session_id == t_id) {
+                    // 如果地址中包含端口 (如 192.168.1.1:22)，则优先提取纯 IP，纯本地 Shell 保留 127.0.0.1
+                    let raw_addr = &s.host_address;
+                    let clean_ip = if raw_addr.starts_with("Local") || raw_addr.is_empty() {
+                        "127.0.0.1".to_string()
+                    } else if let Some((ip_part, _)) = raw_addr.split_once(':') {
+                        ip_part.to_string()
+                    } else {
+                        raw_addr.clone()
+                    };
+                    found_ip = Some(clean_ip);
+                    host_name = s.host_name.clone();
+                    break;
+                }
+            }
+
+            if let Some(ip) = found_ip
+                && let Ok(mut cb) = arboard::Clipboard::new()
+            {
+                let _ = cb.set_text(ip.clone());
+                tracing::info!(target: "smagical_ui::session", "已将会话 [{}] 对应主机 [{}] 的 IP [{}] 复制到剪贴板", t_id, host_name, ip);
+                sync_ui_debug_logs(&w);
+            }
+        }
+    });
+
+
+    // -------------------------------------------------------------------------
+    // 1.3 关闭指定窗格内除目标 Tab 以外的其他会话 (Close Other Tabs)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let pane_groups_close_others = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_close_others = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_close_others = Rc::clone(&ctx.global_split_tree);
+    let active_terminals_close_others = Rc::clone(&ctx.active_terminals);
+    let ctx_close_others = ctx.clone();
+    window.on_close_other_tabs(move |pane_id, tab_id| {
+        if let Some(w) = window_weak.upgrade() {
+            let p_id = pane_id.to_string();
+            let t_id = tab_id.to_string();
+            let mut groups = pane_groups_close_others.borrow_mut();
+            let active_pid = active_pane_id_close_others.borrow();
+            let split_tree = global_split_tree_close_others.borrow();
+
+            let target_group_idx = groups.iter().position(|g| g.pane_id == p_id)
+                .or_else(|| groups.iter().position(|g| g.tabs.iter().any(|t| t.session_id == t_id)));
+
+            if let Some(idx) = target_group_idx {
+                let g = &mut groups[idx];
+                let mut removed_tabs = Vec::new();
+                g.tabs.retain(|t| {
+                    if t.session_id == t_id {
+                        true
+                    } else {
+                        removed_tabs.push(t.session_id.clone());
+                        false
+                    }
+                });
+                g.active_tab_id = t_id.clone();
+
+                // 批量清理被移除会话的底层进程与历史记录
+                let now_sec = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .map(|d| d.as_secs())
+                    .unwrap_or(1725019200);
+
+                let mut terminals = active_terminals_close_others.borrow_mut();
+                for rem_id in removed_tabs {
+                    if let Some(mut inst) = terminals.remove(&rem_id) {
+                        let snap = inst.snapshot_text(500);
+                        let _ = inst.pty.kill();
+                        let hist_id = format!("hist-{}", rem_id);
+                        if let Ok(Some(mut hist)) = ctx_close_others.core_state.storage().history().get_by_id(&hist_id) {
+                            hist.mark_closed(now_sec);
+                            if !snap.trim().is_empty() {
+                                hist.record_snapshot(snap.lines().count() as u32);
+                                let _ = ctx_close_others.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
+                            }
+                            let _ = ctx_close_others.core_state.storage().history().save(&hist);
+                        }
+                    }
+                }
+                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_others);
+            }
+
+            let is_split = split_tree.is_some();
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭其他会话，保留: {}", p_id, t_id);
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+
 
 
     // -------------------------------------------------------------------------

@@ -71,6 +71,8 @@ export component TerminalPaneView inherits Rectangle {
     callback selection-changed(int /* sc */, int /* sr */, int /* ec */, int /* er */, bool /* has_sel */);
     /// 呼出右键快捷菜单回调
     callback context-menu(length /* global-x */, length /* global-y */);
+    /// 呼出 Tab 标签页专属右键菜单回调
+    callback tab-context-menu(string /* tab_id */, length /* local-x */, length /* local-y */);
 
     // -------------------------------------------------------------------------
     // 3. 视觉容器与边框样式
@@ -163,10 +165,17 @@ export component TerminalPaneView inherits Rectangle {
                                     close => {
                                         root.close-tab(tab.id);
                                     }
+                                    context-menu(mx, my) => {
+                                        root.tab-context-menu(tab.id, 6px + tab-scroll-box.effective-offset + self.x + mx, 4px + self.y + my);
+                                    }
+
+
+
                                 }
                             }
                         }
                     }
+
 
 
                     // 4.2 固定在最右侧的 + 新建终端会话加号按钮 (始终固定在最右侧)
