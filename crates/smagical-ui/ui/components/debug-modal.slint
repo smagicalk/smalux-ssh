@@ -384,7 +384,12 @@ export component DebugModal inherits Rectangle {
                         total-nodes-count: root.total-nodes-count;
                         visible-nodes-count: root.visible-nodes-count;
                         host-cards-count: root.host-cards-count;
+                        current-theme-name: root.current-theme-name;
+                        is-dark-mode: root.is-dark-mode;
+                        switch-theme(id) => { root.switch-theme(id); }
+                        toggle-color-mode => { root.toggle-color-mode(); }
                     }
+
                 }
             }
         }

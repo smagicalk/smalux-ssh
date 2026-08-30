@@ -28,31 +28,49 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_switch_theme(move |theme_id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = theme_id.as_str();
-            let _ = apply_theme_by_id(&w, &themes_clone, id_str);
-            let name = if id_str.contains("darcula") {
+            let normalized_id = match id_str {
+                "builtin.ui.onedark" | "onedark" => "builtin.ui.one-dark",
+                "builtin.ui.solarized" | "solarized" => "builtin.ui.solarized-dark",
+                "darcula" => "builtin.ui.darcula",
+                "monokai" => "builtin.ui.monokai",
+                "nord" => "builtin.ui.nord",
+                "github-light" => "builtin.ui.github-light",
+                "github-dark" => "builtin.ui.github-dark",
+                "system" => "builtin.ui.system",
+                other => other,
+            };
+
+            let name = if normalized_id.contains("darcula") {
                 "Darcula"
-            } else if id_str.contains("monokai") {
+            } else if normalized_id.contains("monokai") {
                 "Monokai"
-            } else if id_str.contains("onedark") || id_str.contains("one-dark") {
+            } else if normalized_id.contains("one-dark") || normalized_id.contains("onedark") {
                 "One Dark"
-            } else if id_str.contains("solarized-light") {
+            } else if normalized_id.contains("solarized-light") {
                 "Solarized Light"
-            } else if id_str.contains("solarized") {
+            } else if normalized_id.contains("solarized") {
                 "Solarized"
-            } else if id_str.contains("github-light") || id_str.contains("light") {
+            } else if normalized_id.contains("nord") {
+                "Nord"
+            } else if normalized_id.contains("github-light") || normalized_id.contains("light") {
                 "GitHub Light"
-            } else if id_str.contains("github-dark") {
+            } else if normalized_id.contains("github-dark") {
                 "GitHub Dark"
             } else {
                 "System"
             };
-            w.set_current_theme_name(name.into());
 
-            // 依据主题标识自动同步深浅色布尔标志位
-            let is_light = id_str.contains("light") || id_str.contains("dawn") || id_str.contains("latte");
-            w.set_is_dark_mode(!is_light);
-
-            tracing::info!(target: "smagical_ui::theme", "切换应用配色主题: {} ({})", name, id_str);
+            match apply_theme_by_id(&w, &themes_clone, normalized_id) {
+                Ok(()) => {
+                    w.set_current_theme_name(name.into());
+                    let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
+                    w.set_is_dark_mode(!is_light);
+                    tracing::info!(target: "smagical_ui::theme", "切换应用配色主题: {} ({})", name, normalized_id);
+                }
+                Err(err) => {
+                    tracing::error!(target: "smagical_ui::theme", "切换应用主题失败 [{}]: {:?}", normalized_id, err);
+                }
+            }
             sync_ui_debug_logs(&w);
         }
     });
@@ -67,20 +85,22 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let is_dark = w.get_is_dark_mode();
             let next_dark = !is_dark;
-            w.set_is_dark_mode(next_dark);
 
             if next_dark {
                 let _ = apply_theme_by_id(&w, &themes_clone, "builtin.ui.darcula");
                 w.set_current_theme_name("Darcula".into());
+                w.set_is_dark_mode(true);
             } else {
                 let _ = apply_theme_by_id(&w, &themes_clone, "builtin.ui.github-light");
                 w.set_current_theme_name("GitHub Light".into());
+                w.set_is_dark_mode(false);
             }
 
             tracing::info!(target: "smagical_ui::theme", "{}", if next_dark { "切换至深色模式 (Darcula)" } else { "切换至浅色模式 (GitHub Light)" });
             sync_ui_debug_logs(&w);
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 3. 窗口控制: 关闭应用

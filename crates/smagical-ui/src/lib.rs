@@ -236,8 +236,10 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let mut primary_buffer: Option<slint::SharedPixelBuffer<slint::Rgba8Pixel>> = None;
     let mut pane_pixel_buffers: std::collections::HashMap<String, slint::SharedPixelBuffer<slint::Rgba8Pixel>> = std::collections::HashMap::new();
     let mut pane_rendered_images: std::collections::HashMap<String, slint::Image> = std::collections::HashMap::new();
+    let mut pane_tab_models: std::collections::HashMap<String, (Vec<TabData>, slint::ModelRc<TabData>)> = std::collections::HashMap::new();
 
     render_timer.start(
+
         slint::TimerMode::Repeated,
         std::time::Duration::from_millis(8),
         move || {
@@ -359,6 +361,15 @@ pub fn run() -> Result<(), slint::PlatformError> {
                                 (pl.title.clone(), "online".to_string(), Vec::new(), String::new())
                             };
 
+                            let pane_tabs_rc = match pane_tab_models.get_mut(&pl.pane_id) {
+                                Some((cached_tabs, cached_rc)) if *cached_tabs == pane_tabs => cached_rc.clone(),
+                                _ => {
+                                    let rc = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(pane_tabs.clone())));
+                                    pane_tab_models.insert(pl.pane_id.clone(), (pane_tabs, rc.clone()));
+                                    rc
+                                }
+                            };
+
                             panes_data.push(TerminalPaneData {
                                 pane_id: pl.pane_id.clone().into(),
                                 title: title.into(),
@@ -372,10 +383,11 @@ pub fn run() -> Result<(), slint::PlatformError> {
                                 total_panes: total_panes_len as i32,
                                 is_zoomed: current_zoom.as_deref() == Some(&pl.pane_id),
                                 status: status.into(),
-                                tabs: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(pane_tabs))),
+                                tabs: pane_tabs_rc,
                                 active_tab_id: active_tab_id.into(),
                             });
                         }
+
 
                         update_model_in_place(&panes_model_timer, panes_data);
 

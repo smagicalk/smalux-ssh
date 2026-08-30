@@ -12,8 +12,11 @@ export component TerminalContextMenu inherits Rectangle {
     in property <length> menu-y: 0px;
     /// 当前终端视口是否存在有效字符选区 (若无选区则“复制”按钮置灰不可点击)
     in property <bool> has-selection: false;
+    /// 当前窗格是否支持分屏 (仅当当前窗格或视口拥有 > 1 个 Tab 时支持分屏)
+    in property <bool> can-split: true;
 
     /// 复制选中内容到系统剪贴板回调
+
     callback copy-text();
     /// 从系统剪贴板粘贴到终端 PTY 输入流回调
     callback paste-text();
@@ -258,14 +261,17 @@ export component TerminalContextMenu inherits Rectangle {
             Rectangle {
                 height: 26px;
                 border-radius: 3px;
-                background: split-r-touch.has-hover ? AppTheme.hover-background : transparent;
+                background: (root.can-split && split-r-touch.has-hover) ? AppTheme.hover-background : transparent;
+                opacity: root.can-split ? 1.0 : 0.4;
 
                 split-r-touch := TouchArea {
                     clicked => {
-                        root.split-right();
-                        root.close-menu();
+                        if root.can-split {
+                            root.split-right();
+                            root.close-menu();
+                        }
                     }
-                    mouse-cursor: pointer;
+                    mouse-cursor: root.can-split ? pointer : default;
                 }
 
                 Image {
@@ -275,7 +281,7 @@ export component TerminalContextMenu inherits Rectangle {
                     height: 14px;
                     source: @image-url("../../assets/icons/split-v.svg");
                     image-fit: contain;
-                    colorize: split-r-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    colorize: (root.can-split && split-r-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
                 }
 
                 Text {
@@ -283,7 +289,7 @@ export component TerminalContextMenu inherits Rectangle {
                     y: (parent.height - self.height) / 2;
                     text: @tr("向右分屏");
                     font-size: 11px;
-                    color: split-r-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    color: (root.can-split && split-r-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
                     vertical-alignment: center;
                 }
 
@@ -301,14 +307,17 @@ export component TerminalContextMenu inherits Rectangle {
             Rectangle {
                 height: 26px;
                 border-radius: 3px;
-                background: split-d-touch.has-hover ? AppTheme.hover-background : transparent;
+                background: (root.can-split && split-d-touch.has-hover) ? AppTheme.hover-background : transparent;
+                opacity: root.can-split ? 1.0 : 0.4;
 
                 split-d-touch := TouchArea {
                     clicked => {
-                        root.split-down();
-                        root.close-menu();
+                        if root.can-split {
+                            root.split-down();
+                            root.close-menu();
+                        }
                     }
-                    mouse-cursor: pointer;
+                    mouse-cursor: root.can-split ? pointer : default;
                 }
 
                 Image {
@@ -318,7 +327,7 @@ export component TerminalContextMenu inherits Rectangle {
                     height: 14px;
                     source: @image-url("../../assets/icons/split-h.svg");
                     image-fit: contain;
-                    colorize: split-d-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    colorize: (root.can-split && split-d-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
                 }
 
                 Text {
@@ -326,7 +335,7 @@ export component TerminalContextMenu inherits Rectangle {
                     y: (parent.height - self.height) / 2;
                     text: @tr("向下分屏");
                     font-size: 11px;
-                    color: split-d-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    color: (root.can-split && split-d-touch.has-hover) ? AppTheme.foreground : AppTheme.secondary-foreground;
                     vertical-alignment: center;
                 }
 
@@ -339,6 +348,7 @@ export component TerminalContextMenu inherits Rectangle {
                     vertical-alignment: center;
                 }
             }
+
         }
 
     }

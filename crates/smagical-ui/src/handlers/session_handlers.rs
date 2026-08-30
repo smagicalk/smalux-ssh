@@ -8,8 +8,9 @@ use slint::ComponentHandle;
 use crate::debug_ui::sync_ui_debug_logs;
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::handlers::AppContext;
-use crate::session::{sync_active_session_ui, PaneGroup, TerminalSessionInfo};
-use crate::terminal::{encode_key_event, SplitNode, SplitOrientation, TerminalInstance};
+use crate::session::{sync_active_session_ui, PaneGroup};
+use crate::terminal::{encode_key_event, SplitNode, SplitOrientation};
+
 
 /// 注册终端会话与启动器相关交互回调。
 ///
@@ -131,8 +132,12 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = instance.pty.kill();
             }
 
+            // 1. 定位目标窗格组（优先按 pane_id 匹配，兜底按包含该 tab_id 的窗格组匹配）
+            let target_group_idx = groups.iter().position(|g| g.pane_id == p_id)
+                .or_else(|| groups.iter().position(|g| g.tabs.iter().any(|t| t.session_id == t_id)));
+
             let mut remove_group_idx = None;
-            if let Some(idx) = groups.iter().position(|g| g.pane_id == p_id) {
+            if let Some(idx) = target_group_idx {
                 let g = &mut groups[idx];
                 if let Some(pos) = g.tabs.iter().position(|t| t.session_id == t_id) {
                     g.tabs.remove(pos);
@@ -163,6 +168,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     *active_pid = String::new();
                 }
             }
+
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
@@ -532,16 +538,14 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 11. 终端多窗格分屏回调 (Editor Group 优雅切分模型)
     // -------------------------------------------------------------------------
-    // 当在分屏窗格中点击分屏按钮时：
-    // - 若当前窗格存在多个 Tab，将当前激活的 Tab 迁移到新分屏窗格；
-    // - 若当前窗格仅有 1 个 Tab，则为新分屏窗格创建独立的 Shell 会话。
+    // 当在分屏窗格中触发分屏时：
+    // - 仅当当前窗格存在至少 2 个 Tab 时支持分屏，将当前激活的 Tab 迁移到新分屏窗格；
+    // - 若当前窗格仅有 1 个 Tab，则不支持分屏（无多余 Tab 可分过去）。
     let window_weak = window.as_weak();
     let pane_groups_split = Rc::clone(&ctx.pane_groups);
     let active_pane_id_split = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_split = Rc::clone(&ctx.global_split_tree);
-    let active_terminals_split = Rc::clone(&ctx.active_terminals);
     let next_pane_num_split = Rc::clone(&ctx.next_pane_num);
-    let next_session_num_split = Rc::clone(&ctx.next_session_num);
     window.on_split_terminal(move |orient| {
         if let Some(w) = window_weak.upgrade() {
             let mut groups = pane_groups_split.borrow_mut();
@@ -550,53 +554,33 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 return;
             }
 
+            let target_idx = groups.iter().position(|g| g.pane_id == *active_pid).unwrap_or(0);
+            if groups[target_idx].tabs.len() <= 1 {
+                tracing::warn!(target: "smagical_ui::session", "当前窗格仅有 1 个会话 Tab，无法分屏至新窗格 (分屏需要从当前窗格迁移 Tab，至少需要 2 个 Tab)");
+                sync_ui_debug_logs(&w);
+                return;
+            }
+
             let split_dir = match orient.as_str() {
                 "horizontal" => SplitOrientation::Horizontal,
                 _ => SplitOrientation::Vertical,
             };
 
-            let target_idx = groups.iter().position(|g| g.pane_id == *active_pid).unwrap_or(0);
             let target_pane_id = groups[target_idx].pane_id.clone();
-
             let mut pane_counter = next_pane_num_split.borrow_mut();
             let new_pane_id = format!("pane-{}", *pane_counter);
             *pane_counter += 1;
 
-            if groups[target_idx].tabs.len() > 1 {
-                // 场景 A: 存在多个 Tab，将当前激活 Tab 移入新窗格
-                let active_tab_id = groups[target_idx].active_tab_id.clone();
-                let tab_pos = groups[target_idx].tabs.iter().position(|t| t.session_id == active_tab_id).unwrap_or(0);
-                let moved_session = groups[target_idx].tabs.remove(tab_pos);
+            // 将当前激活 Tab 移入新窗格
+            let active_tab_id = groups[target_idx].active_tab_id.clone();
+            let tab_pos = groups[target_idx].tabs.iter().position(|t| t.session_id == active_tab_id).unwrap_or(0);
+            let moved_session = groups[target_idx].tabs.remove(tab_pos);
 
-                let remaining_act_pos = if tab_pos > 0 { tab_pos - 1 } else { 0 };
-                groups[target_idx].active_tab_id = groups[target_idx].tabs[remaining_act_pos.min(groups[target_idx].tabs.len() - 1)].session_id.clone();
+            let remaining_act_pos = if tab_pos > 0 { tab_pos - 1 } else { 0 };
+            groups[target_idx].active_tab_id = groups[target_idx].tabs[remaining_act_pos.min(groups[target_idx].tabs.len() - 1)].session_id.clone();
 
-                let new_group = PaneGroup::new_single(new_pane_id.clone(), moved_session);
-                groups.push(new_group);
-            } else {
-                // 场景 B: 仅有 1 个 Tab，为新窗格生成一个全新终端会话
-                let mut sess_num = next_session_num_split.borrow_mut();
-                let sess_id = format!("sess-{}", *sess_num);
-                *sess_num += 1;
-
-                let session_name = format!("Terminal #{}", *sess_num);
-                if let Ok(instance) = TerminalInstance::spawn_local(sess_id.clone(), "local-powershell", session_name.clone(), 80, 24) {
-                    active_terminals_split.borrow_mut().insert(sess_id.clone(), instance);
-                }
-
-                let info = TerminalSessionInfo {
-                    session_id: sess_id.clone(),
-                    host_id: "local-powershell".to_string(),
-                    host_name: "PowerShell".to_string(),
-                    host_address: "127.0.0.1".to_string(),
-                    host_status: "online".to_string(),
-                    ping_ms: 0,
-                    display_title: session_name,
-                };
-
-                let new_group = PaneGroup::new_single(new_pane_id.clone(), info);
-                groups.push(new_group);
-            }
+            let new_group = PaneGroup::new_single(new_pane_id.clone(), moved_session);
+            groups.push(new_group);
 
             // 更新全局二叉树拓扑
             let mut split_tree = global_split_tree_split.borrow_mut();
@@ -616,6 +600,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
+
     // -------------------------------------------------------------------------
     // 12. 按窗格 ID 关闭指定分屏窗格回调
     // -------------------------------------------------------------------------
@@ -624,6 +609,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_close_id = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close_id = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_id = Rc::clone(&ctx.active_terminals);
+    let ctx_close_pane_id = ctx.clone();
     window.on_close_pane_by_id(move |target_pane_id| {
         if let Some(w) = window_weak.upgrade() {
             let pid = target_pane_id.to_string();
@@ -636,9 +622,24 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 let mut terminals = active_terminals_close_id.borrow_mut();
                 for t in closed_group.tabs {
                     if let Some(mut inst) = terminals.remove(&t.session_id) {
+                        let snap = inst.snapshot_text(500);
                         let _ = inst.pty.kill();
+                        let now_sec = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .map(|d| d.as_secs())
+                            .unwrap_or(1725019200);
+                        let hist_id = format!("hist-{}", t.session_id);
+                        if let Ok(Some(mut hist)) = ctx_close_pane_id.core_state.storage().history().get_by_id(&hist_id) {
+                            hist.mark_closed(now_sec);
+                            if !snap.trim().is_empty() {
+                                hist.record_snapshot(snap.lines().count() as u32);
+                                let _ = ctx_close_pane_id.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
+                            }
+                            let _ = ctx_close_pane_id.core_state.storage().history().save(&hist);
+                        }
                     }
                 }
+                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane_id);
             }
 
             if let Some(tree) = split_tree.as_mut() {
@@ -660,6 +661,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_ui_debug_logs(&w);
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 12.1 按窗格下标关闭分屏窗格回调 (向后兼容)

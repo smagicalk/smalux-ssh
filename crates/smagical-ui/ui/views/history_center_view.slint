@@ -256,7 +256,7 @@ export component HistoryCenterView inherits Rectangle {
         }
 
         // ---------------------------------------------------------------------
-        // 2. 列表内容区 (单列宽卡片流排版，100% 占满横向视口)
+        // 2. 列表内容区 (单列宽卡片流排版，右侧预留安全间距隔离滚动条)
         // ---------------------------------------------------------------------
         if root.total-count > 0: ScrollView {
             width: 100%;
@@ -265,7 +265,9 @@ export component HistoryCenterView inherits Rectangle {
             VerticalLayout {
                 width: 100%;
                 spacing: 14px;
+                padding-right: 18px;
                 padding-bottom: 24px;
+
 
                 for group in root.history-groups: VerticalLayout {
                     width: 100%;

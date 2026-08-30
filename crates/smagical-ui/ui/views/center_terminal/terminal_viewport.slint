@@ -154,6 +154,8 @@ export component TerminalViewport inherits Rectangle {
     in-out property <int> sel-end-col: -1;
     in-out property <int> sel-end-row: -1;
     in-out property <bool> is-selecting: false;
+    property <bool> context-menu-can-split: false;
+
 
     /// Tab 栏调度交互回调
     callback select-tab(string /* id */);
@@ -260,16 +262,21 @@ export component TerminalViewport inherits Rectangle {
                         root.paste-text();
                         return accept;
                     }
-                    // 全局快捷键: 垂直分屏 (Ctrl+Shift+D)
+                    // 全局快捷键: 垂直分屏 (Ctrl+Shift+D) (仅当当前存在多个 Tab 时可用)
                     if event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D") {
-                        root.split-terminal("vertical");
+                        if root.tabs.length > 1 {
+                            root.split-terminal("vertical");
+                        }
                         return accept;
                     }
-                    // 全局快捷键: 水平分屏 (Ctrl+Shift+E)
+                    // 全局快捷键: 水平分屏 (Ctrl+Shift+E) (仅当当前存在多个 Tab 时可用)
                     if event.modifiers.control && event.modifiers.shift && (event.text == "e" || event.text == "E") {
-                        root.split-terminal("horizontal");
+                        if root.tabs.length > 1 {
+                            root.split-terminal("horizontal");
+                        }
                         return accept;
                     }
+
                     // 全局快捷键: 清屏 (Ctrl+L)
                     if event.modifiers.control && (event.text == "l" || event.text == "L") {
                         root.clear-screen();
@@ -324,6 +331,7 @@ export component TerminalViewport inherits Rectangle {
                 context-menu(mx, my) => {
                     root.context-menu-x = mx;
                     root.context-menu-y = 36px + my;
+                    root.context-menu-can-split = root.tabs.length > 1;
                     root.is-context-menu-open = true;
                 }
             }
@@ -369,14 +377,18 @@ export component TerminalViewport inherits Rectangle {
                         root.new-tab();
                     }
                     split-right => {
-                        root.active-pane-id = pane.pane-id;
-                        root.select-pane-by-id(pane.pane-id);
-                        root.split-terminal("vertical");
+                        if pane.tabs.length > 1 {
+                            root.active-pane-id = pane.pane-id;
+                            root.select-pane-by-id(pane.pane-id);
+                            root.split-terminal("vertical");
+                        }
                     }
                     split-down => {
-                        root.active-pane-id = pane.pane-id;
-                        root.select-pane-by-id(pane.pane-id);
-                        root.split-terminal("horizontal");
+                        if pane.tabs.length > 1 {
+                            root.active-pane-id = pane.pane-id;
+                            root.select-pane-by-id(pane.pane-id);
+                            root.split-terminal("horizontal");
+                        }
                     }
                     toggle-zoom => {
                         root.toggle-pane-zoom(pane.pane-id);
@@ -398,6 +410,7 @@ export component TerminalViewport inherits Rectangle {
                         root.select-pane-by-id(pane.pane-id);
                         root.context-menu-x = pane.x + mx;
                         root.context-menu-y = pane.y + 36px + my;
+                        root.context-menu-can-split = pane.tabs.length > 1;
                         root.is-context-menu-open = true;
                     }
                 }
@@ -463,6 +476,7 @@ export component TerminalViewport inherits Rectangle {
                 menu-x: root.context-menu-x;
                 menu-y: root.context-menu-y;
                 has-selection: root.has-selection;
+                can-split: root.context-menu-can-split;
                 copy-text => { root.copy-text(); }
                 paste-text => { root.paste-text(); }
                 select-all => { }
@@ -471,6 +485,7 @@ export component TerminalViewport inherits Rectangle {
                 split-down => { root.split-terminal("horizontal"); }
                 close-menu => { root.is-context-menu-open = false; }
             }
+
 
             // 2.7 终端右侧微型历史滚动条 (当存在回滚历史时展示)
             if root.history-size > 0: Rectangle {

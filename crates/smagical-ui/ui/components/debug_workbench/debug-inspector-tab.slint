@@ -114,40 +114,41 @@ export component DebugInspectorTab inherits VerticalLayout {
 
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
-                    background: th1.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-                    border-width: 1px; border-color: AppTheme.border;
+                    background: root.current-theme-name == "Darcula" ? AppTheme.accent : th1.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: root.current-theme-name == "Darcula" ? AppTheme.accent : AppTheme.border;
                     th1 := TouchArea { clicked => { root.switch-theme("builtin.ui.darcula"); } mouse-cursor: pointer; }
-                    Text { text: "Darcula"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "Darcula"; font-size: 11px; font-weight: root.current-theme-name == "Darcula" ? 700 : 400; color: root.current-theme-name == "Darcula" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
-                    background: th2.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-                    border-width: 1px; border-color: AppTheme.border;
+                    background: root.current-theme-name == "Monokai" ? AppTheme.accent : th2.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: root.current-theme-name == "Monokai" ? AppTheme.accent : AppTheme.border;
                     th2 := TouchArea { clicked => { root.switch-theme("builtin.ui.monokai"); } mouse-cursor: pointer; }
-                    Text { text: "Monokai"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "Monokai"; font-size: 11px; font-weight: root.current-theme-name == "Monokai" ? 700 : 400; color: root.current-theme-name == "Monokai" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
-                    background: th3.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-                    border-width: 1px; border-color: AppTheme.border;
-                    th3 := TouchArea { clicked => { root.switch-theme("builtin.ui.onedark"); } mouse-cursor: pointer; }
-                    Text { text: "One Dark"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    background: root.current-theme-name == "One Dark" ? AppTheme.accent : th3.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: root.current-theme-name == "One Dark" ? AppTheme.accent : AppTheme.border;
+                    th3 := TouchArea { clicked => { root.switch-theme("builtin.ui.one-dark"); } mouse-cursor: pointer; }
+                    Text { text: "One Dark"; font-size: 11px; font-weight: root.current-theme-name == "One Dark" ? 700 : 400; color: root.current-theme-name == "One Dark" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
-                    background: th4.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-                    border-width: 1px; border-color: AppTheme.border;
+                    background: root.current-theme-name == "Solarized" ? AppTheme.accent : th4.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: root.current-theme-name == "Solarized" ? AppTheme.accent : AppTheme.border;
                     th4 := TouchArea { clicked => { root.switch-theme("builtin.ui.solarized-dark"); } mouse-cursor: pointer; }
-                    Text { text: "Solarized"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "Solarized"; font-size: 11px; font-weight: root.current-theme-name == "Solarized" ? 700 : 400; color: root.current-theme-name == "Solarized" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
-                    background: th5.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-                    border-width: 1px; border-color: AppTheme.border;
+                    background: root.current-theme-name == "GitHub Light" ? AppTheme.accent : th5.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px; border-color: root.current-theme-name == "GitHub Light" ? AppTheme.accent : AppTheme.border;
                     th5 := TouchArea { clicked => { root.switch-theme("builtin.ui.github-light"); } mouse-cursor: pointer; }
-                    Text { text: "GitHub Light"; font-size: 11px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "GitHub Light"; font-size: 11px; font-weight: root.current-theme-name == "GitHub Light" ? 700 : 400; color: root.current-theme-name == "GitHub Light" ? #ffffff : AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
             }
+
         }
     }
 }
