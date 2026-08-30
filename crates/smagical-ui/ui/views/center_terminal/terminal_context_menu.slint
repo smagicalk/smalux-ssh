@@ -42,8 +42,8 @@ export component TerminalContextMenu inherits Rectangle {
     Rectangle {
         x: Math.min(parent.width - self.width - 8px, root.menu-x);
         y: Math.min(parent.height - self.height - 8px, root.menu-y);
-        width: 180px;
-        height: 196px;
+        width: 200px;
+        height: 208px;
         border-radius: AppTheme.radius-medium;
         background: AppTheme.surface-background;
         border-width: 1px;
@@ -53,7 +53,7 @@ export component TerminalContextMenu inherits Rectangle {
         drop-shadow-offset-y: 4px;
 
         VerticalLayout {
-            padding: 4px;
+            padding: 5px;
             spacing: 2px;
 
             // 1. 复制 (Copy)
@@ -76,13 +76,22 @@ export component TerminalContextMenu inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
-                    alignment: space-between;
+                    spacing: 8px;
+
+                    Text {
+                        text: "⎘";
+                        font-size: 13px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                        width: 18px;
+                    }
 
                     Text {
                         text: @tr("复制");
                         font-size: 11px;
                         color: AppTheme.foreground;
                         vertical-alignment: center;
+                        horizontal-stretch: 1;
                     }
 
                     Text {
@@ -111,13 +120,22 @@ export component TerminalContextMenu inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
-                    alignment: space-between;
+                    spacing: 8px;
+
+                    Text {
+                        text: "📋";
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                        width: 18px;
+                    }
 
                     Text {
                         text: @tr("粘贴");
                         font-size: 11px;
                         color: AppTheme.foreground;
                         vertical-alignment: center;
+                        horizontal-stretch: 1;
                     }
 
                     Text {
@@ -146,13 +164,22 @@ export component TerminalContextMenu inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
-                    alignment: space-between;
+                    spacing: 8px;
+
+                    Text {
+                        text: "▣";
+                        font-size: 12px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                        width: 18px;
+                    }
 
                     Text {
                         text: @tr("全选");
                         font-size: 11px;
                         color: AppTheme.foreground;
                         vertical-alignment: center;
+                        horizontal-stretch: 1;
                     }
 
                     Text {
@@ -174,7 +201,6 @@ export component TerminalContextMenu inherits Rectangle {
                 }
             }
 
-
             // 4. 清屏 (Clear Screen)
             Rectangle {
                 height: 26px;
@@ -192,13 +218,23 @@ export component TerminalContextMenu inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
-                    alignment: space-between;
+                    spacing: 8px;
+
+                    Text {
+                        text: "⟲";
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                        width: 18px;
+                    }
 
                     Text {
                         text: @tr("清屏");
                         font-size: 11px;
                         color: AppTheme.foreground;
                         vertical-alignment: center;
+                        horizontal-stretch: 1;
                     }
 
                     Text {
@@ -220,7 +256,6 @@ export component TerminalContextMenu inherits Rectangle {
                 }
             }
 
-
             // 5. 左右分屏 (Split Right)
             Rectangle {
                 height: 26px;
@@ -238,13 +273,24 @@ export component TerminalContextMenu inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
-                    alignment: space-between;
+                    spacing: 8px;
+
+                    Text {
+                        text: "[ | ]";
+                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
+                        font-size: 10px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                        vertical-alignment: center;
+                        width: 22px;
+                    }
 
                     Text {
                         text: @tr("向右分屏");
                         font-size: 11px;
                         color: AppTheme.foreground;
                         vertical-alignment: center;
+                        horizontal-stretch: 1;
                     }
 
                     Text {
@@ -273,13 +319,24 @@ export component TerminalContextMenu inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 8px;
                     padding-right: 8px;
-                    alignment: space-between;
+                    spacing: 8px;
+
+                    Text {
+                        text: "[ — ]";
+                        font-family: "JetBrains Mono, Fira Code, Consolas, monospace";
+                        font-size: 10px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                        vertical-alignment: center;
+                        width: 22px;
+                    }
 
                     Text {
                         text: @tr("向下分屏");
                         font-size: 11px;
                         color: AppTheme.foreground;
                         vertical-alignment: center;
+                        horizontal-stretch: 1;
                     }
 
                     Text {
@@ -292,4 +349,5 @@ export component TerminalContextMenu inherits Rectangle {
             }
         }
     }
+
 }

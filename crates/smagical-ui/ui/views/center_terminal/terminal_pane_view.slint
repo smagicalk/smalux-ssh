@@ -38,6 +38,13 @@ export component TerminalPaneView inherits Rectangle {
     in-out property <string> active-tab-id: "";
     /// Tab 栏横向滚轮滚动偏移量
     in-out property <length> tab-scroll-offset: 0px;
+    /// 划选状态记录
+    in-out property <int> sel-start-col: -1;
+    in-out property <int> sel-start-row: -1;
+    in-out property <int> sel-end-col: -1;
+    in-out property <int> sel-end-row: -1;
+    in-out property <bool> is-selecting: false;
+
 
     // -------------------------------------------------------------------------
     // 2. 交互回调接口
@@ -213,13 +220,43 @@ export component TerminalPaneView inherits Rectangle {
                 vertical-alignment: top;
             }
 
-            // 5.2 鼠标手势、聚焦切换与右键菜单拦截层
+            // 5.2 鼠标手势、划选高亮、聚焦切换与右键菜单拦截层
             pane-body-touch := TouchArea {
                 pointer-event(event) => {
                     if event.kind == PointerEventKind.down {
                         root.select();
                         if event.button == PointerEventButton.right {
                             root.context-menu(self.mouse-x, self.mouse-y);
+                        } else if event.button == PointerEventButton.left {
+                            let start-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
+                            let start-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
+                            root.sel-start-col = start-c;
+                            root.sel-start-row = start-r;
+                            root.sel-end-col = start-c;
+                            root.sel-end-row = start-r;
+                            root.is-selecting = true;
+                            root.selection-changed(start-c, start-r, start-c, start-r, false);
+                        }
+                    } else if event.kind == PointerEventKind.up {
+                        if event.button == PointerEventButton.left && root.is-selecting {
+                            root.is-selecting = false;
+                            if root.sel-start-col != root.sel-end-col || root.sel-start-row != root.sel-end-row {
+                                root.selection-changed(root.sel-start-col, root.sel-start-row, root.sel-end-col, root.sel-end-row, true);
+                            } else {
+                                root.selection-changed(-1, -1, -1, -1, false);
+                            }
+                        }
+                    }
+                }
+
+                moved => {
+                    if root.is-selecting && self.pressed {
+                        let cur-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
+                        let cur-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
+                        root.sel-end-col = cur-c;
+                        root.sel-end-row = cur-r;
+                        if cur-c != root.sel-start-col || cur-r != root.sel-start-row {
+                            root.selection-changed(root.sel-start-col, root.sel-start-row, cur-c, cur-r, true);
                         }
                     }
                 }
@@ -231,6 +268,7 @@ export component TerminalPaneView inherits Rectangle {
 
                 mouse-cursor: text;
             }
+
         }
     }
 }

@@ -240,6 +240,8 @@ export component TerminalViewport inherits Rectangle {
             vertical-stretch: 1;
             clip: true;
 
+
+
             // 2.1 键盘按键与焦点捕捉层 (捕获字符与修饰键并统一转发至 Rust 后端状态机)
             terminal-focus := FocusScope {
                 key-pressed(event) => {
@@ -248,13 +250,13 @@ export component TerminalViewport inherits Rectangle {
                         root.is-find-open = !root.is-find-open;
                         return accept;
                     }
-                    // 全局快捷键: 复制 (Ctrl+Shift+C)
-                    if event.modifiers.control && event.modifiers.shift && (event.text == "c" || event.text == "C") {
+                    // 全局快捷键: 复制 (Ctrl+Shift+C 或有选区时的 Ctrl+C)
+                    if event.modifiers.control && ((event.modifiers.shift && (event.text == "c" || event.text == "C")) || (root.has-selection && (event.text == "c" || event.text == "C" || event.text == "\u{0003}"))) {
                         root.copy-text();
                         return accept;
                     }
-                    // 全局快捷键: 粘贴 (Ctrl+Shift+V)
-                    if event.modifiers.control && event.modifiers.shift && (event.text == "v" || event.text == "V") {
+                    // 全局快捷键: 粘贴 (Ctrl+Shift+V 或 Ctrl+V)
+                    if event.modifiers.control && ((event.modifiers.shift && (event.text == "v" || event.text == "V")) || event.text == "\u{0016}") {
                         root.paste-text();
                         return accept;
                     }
@@ -292,59 +294,6 @@ export component TerminalViewport inherits Rectangle {
                 opacity: root.terminal-wallpaper-opacity;
             }
 
-            // 2.2 鼠标划选、滚动与右键菜单捕获
-            TouchArea {
-                pointer-event(event) => {
-                    if event.kind == PointerEventKind.down {
-                        if event.button == PointerEventButton.right {
-                            root.context-menu-x = self.mouse-x;
-                            root.context-menu-y = self.mouse-y;
-                            root.is-context-menu-open = true;
-                        } else if event.button == PointerEventButton.left {
-                            terminal-focus.focus();
-                            root.is-context-menu-open = false;
-                            let start-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
-                            let start-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
-                            root.sel-start-col = start-c;
-                            root.sel-start-row = start-r;
-                            root.sel-end-col = start-c;
-                            root.sel-end-row = start-r;
-                            root.is-selecting = true;
-                            root.has-selection = false;
-                            root.terminal-selection-changed(start-c, start-r, start-c, start-r, false);
-                        }
-                    } else if event.kind == PointerEventKind.up {
-                        if event.button == PointerEventButton.left && root.is-selecting {
-                            root.is-selecting = false;
-                            if root.sel-start-col != root.sel-end-col || root.sel-start-row != root.sel-end-row {
-                                root.has-selection = true;
-                                root.terminal-selection-changed(root.sel-start-col, root.sel-start-row, root.sel-end-col, root.sel-end-row, true);
-                            } else {
-                                root.has-selection = false;
-                                root.terminal-selection-changed(-1, -1, -1, -1, false);
-                            }
-                        }
-                    }
-                }
-                moved => {
-                    if root.is-selecting && self.pressed {
-                        let cur-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
-                        let cur-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
-                        root.sel-end-col = cur-c;
-                        root.sel-end-row = cur-r;
-                        if cur-c != root.sel-start-col || cur-r != root.sel-start-row {
-                            root.has-selection = true;
-                            root.terminal-selection-changed(root.sel-start-col, root.sel-start-row, cur-c, cur-r, true);
-                        }
-                    }
-                }
-                scroll-event(event) => {
-                    root.terminal-scroll(event.delta-y);
-                    accept
-                }
-                mouse-cursor: text;
-            }
-
             // 2.3 单屏终端位图渲染主视口
             if !root.is-split: TerminalPaneView {
                 pane-id: root.active-tab-id;
@@ -360,6 +309,7 @@ export component TerminalViewport inherits Rectangle {
                 select-tab(id) => {
                     root.active-tab-id = id;
                     root.select-tab(id);
+                    terminal-focus.focus();
                 }
                 close-tab(id) => {
                     root.close-tab(id);
@@ -368,11 +318,12 @@ export component TerminalViewport inherits Rectangle {
                 select => { terminal-focus.focus(); }
                 scroll(delta) => { root.terminal-scroll(delta); }
                 selection-changed(sc, sr, ec, er, has-sel) => {
+                    root.has-selection = has-sel;
                     root.terminal-selection-changed(sc, sr, ec, er, has-sel);
                 }
                 context-menu(mx, my) => {
                     root.context-menu-x = mx;
-                    root.context-menu-y = my;
+                    root.context-menu-y = 36px + my;
                     root.is-context-menu-open = true;
                 }
             }
@@ -436,15 +387,21 @@ export component TerminalViewport inherits Rectangle {
                     scroll(delta) => {
                         root.terminal-scroll(delta);
                     }
+                    selection-changed(sc, sr, ec, er, has-sel) => {
+                        root.active-pane-id = pane.pane-id;
+                        root.has-selection = has-sel;
+                        root.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                    }
 
                     context-menu(mx, my) => {
                         root.active-pane-id = pane.pane-id;
                         root.select-pane-by-id(pane.pane-id);
                         root.context-menu-x = pane.x + mx;
-                        root.context-menu-y = pane.y + my;
+                        root.context-menu-y = pane.y + 36px + my;
                         root.is-context-menu-open = true;
                     }
                 }
+
 
                 // 2.4.2 动态渲染全部超窄拖拽分割条 (视觉 2px，触控感应热区 8px)
                 for splitter in root.terminal-splitters: Rectangle {
