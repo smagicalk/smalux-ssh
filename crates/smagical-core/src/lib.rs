@@ -5,6 +5,7 @@
 #![deny(missing_docs)]
 
 pub mod domain;
+pub mod hook;
 pub mod state;
 pub mod storage;
 pub mod theme;
@@ -15,9 +16,16 @@ pub use domain::{
     host::{HostRecord, HostStatus},
 };
 
+pub use hook::{
+    CommandInteractionFrame, CommandSource, DangerousCommandGuard, FallbackStrategy, FrameStatus,
+    FunctionalHook, HookDecision, HookEngine, HostMetadata, SessionAuditLogger, SessionContext,
+    TerminalError, TerminalHook,
+};
+
 pub use state::core_state::CoreState;
 pub use storage::{
     AppStorage, GroupRepository, HistoryRepository, HostRepository, MockStorage, StorageError,
     StorageResult,
 };
+
 
