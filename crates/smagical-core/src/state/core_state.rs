@@ -1,16 +1,21 @@
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use crate::app_hook::{AppGlobalHookEngine, AutoConfigBackupHook};
+use crate::domain::{ActivityBarRegistry, NavigationRequest, NavigationRouter};
 use crate::hook::HookEngine;
 use crate::storage::{AppStorage, MockStorage};
 
 /// 无界面依赖的核心状态引擎 (Core State Engine)
 ///
-/// 内部封装聚合存储门面 (`Arc<dyn AppStorage>`)、终端 Hook 调度中心 (`Arc<HookEngine>`) 以及应用级全局 Hook 引擎 (`Arc<AppGlobalHookEngine>`)。
+/// 内部封装聚合存储门面 (`Arc<dyn AppStorage>`)、终端 Hook 调度中心 (`Arc<HookEngine>`)、
+/// 应用级全局 Hook 引擎 (`Arc<AppGlobalHookEngine>`)、侧边栏动态注册中心 (`Arc<ActivityBarRegistry>`)
+/// 以及全局统一导航路由中枢 (`Arc<RwLock<NavigationRouter>>`)。
 #[derive(Clone)]
 pub struct CoreState {
     storage: Arc<dyn AppStorage>,
     hooks: Arc<HookEngine>,
     app_hooks: Arc<AppGlobalHookEngine>,
+    activity_bar: Arc<ActivityBarRegistry>,
+    navigation: Arc<RwLock<NavigationRouter>>,
 }
 
 impl CoreState {
@@ -26,7 +31,16 @@ impl CoreState {
         let app_engine = AppGlobalHookEngine::new();
         app_engine.register(Arc::new(AutoConfigBackupHook::new()));
 
-        Self::with_all(storage, Arc::new(engine), Arc::new(app_engine))
+        let activity_bar = Arc::new(ActivityBarRegistry::new_with_defaults());
+        let navigation = Arc::new(RwLock::new(NavigationRouter::default()));
+
+        Self {
+            storage,
+            hooks: Arc::new(engine),
+            app_hooks: Arc::new(app_engine),
+            activity_bar,
+            navigation,
+        }
     }
 
     /// 使用任意存储后端创建 CoreState (自动挂载内置 Hook 插件)
@@ -39,26 +53,15 @@ impl CoreState {
         let app_engine = AppGlobalHookEngine::new();
         app_engine.register(Arc::new(AutoConfigBackupHook::new()));
 
-        Self::with_all(storage, Arc::new(engine), Arc::new(app_engine))
-    }
+        let activity_bar = Arc::new(ActivityBarRegistry::new_with_defaults());
+        let navigation = Arc::new(RwLock::new(NavigationRouter::default()));
 
-    /// 使用指定存储后端与自定义 HookEngine 创建 CoreState
-    pub fn with_hooks(storage: Arc<dyn AppStorage>, hooks: Arc<HookEngine>) -> Self {
-        let app_engine = AppGlobalHookEngine::new();
-        app_engine.register(Arc::new(AutoConfigBackupHook::new()));
-        Self::with_all(storage, hooks, Arc::new(app_engine))
-    }
-
-    /// 使用完整自定义组件创建 CoreState
-    pub fn with_all(
-        storage: Arc<dyn AppStorage>,
-        hooks: Arc<HookEngine>,
-        app_hooks: Arc<AppGlobalHookEngine>,
-    ) -> Self {
         Self {
             storage,
-            hooks,
-            app_hooks,
+            hooks: Arc::new(engine),
+            app_hooks: Arc::new(app_engine),
+            activity_bar,
+            navigation,
         }
     }
 
@@ -76,7 +79,41 @@ impl CoreState {
     pub fn app_hooks(&self) -> &Arc<AppGlobalHookEngine> {
         &self.app_hooks
     }
+
+    /// 获取侧边栏动态注册中心引用
+    pub fn activity_bar(&self) -> &Arc<ActivityBarRegistry> {
+        &self.activity_bar
+    }
+
+    /// 获取导航路由器引用
+    pub fn navigation(&self) -> &Arc<RwLock<NavigationRouter>> {
+        &self.navigation
+    }
+
+    /// 统一发起页面跳转导航，并自动触发生命周期 Hook
+    pub fn navigate_to(&self, request: NavigationRequest) {
+        let (prev, curr) = {
+            let mut nav = self.navigation.write().unwrap();
+            nav.navigate_to(request)
+        };
+
+        // 1. 若有上一个激活的模块，触发其失活生命周期
+        if let Some(p) = prev {
+            self.app_hooks.dispatch_module_deactivated(&p.target_tab);
+        }
+
+        // 2. 广播全局导航请求
+        self.app_hooks.dispatch_navigation_requested(&curr);
+
+        // 3. 触发目标模块激活生命周期
+        self.app_hooks.dispatch_module_activated(
+            &curr.target_tab,
+            curr.sub_section.as_deref(),
+            &curr.params,
+        );
+    }
 }
+
 
 
 

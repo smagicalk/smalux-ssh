@@ -462,13 +462,16 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
 
     // 11. 活动栏视图切换导航日志与全局 Hook 广播
     let core_state_nav = ctx.core_state.clone();
+    let window_weak = window.as_weak();
     window.on_activity_tab_switched(move |tab_id| {
         core_state_nav.app_hooks().dispatch_left_menu_clicked(&tab_id, "");
         tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
+        if let Some(w) = window_weak.upgrade().filter(|w| tab_id == "debug" || w.get_is_debug_modal_open()) {
+            crate::debug_ui::sync_ui_debug_logs(&w);
+        }
     });
-
-
-
 }
+
+
 
 

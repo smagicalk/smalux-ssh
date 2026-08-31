@@ -1,0 +1,385 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "../base/app-button.slint";
+import { AppFormInput } from "../base/app-form-input.slint";
+import { AppCard } from "../base/app-card.slint";
+
+/// 主机管理与主页资产专属调试面板 (Hosts & Assets Debug Tab)
+export component DebugHostsTab inherits VerticalLayout {
+    // 资产树探针指标
+    in property <int> total-nodes-count: 0;
+    in property <int> visible-nodes-count: 0;
+    in property <int> host-cards-count: 0;
+    in property <length> tree-viewport-width: 240px;
+
+    // 批量生成表单属性
+    in-out property <string> batch-prefix: "k8s-node-";
+    in-out property <string> batch-count-str: "15";
+    in-out property <string> batch-start-ip-str: "10";
+    in-out property <string> batch-ip-prefix: "192.168.1.";
+    in-out property <string> batch-port-str: "22";
+    in-out property <string> batch-group: "集群/k8s";
+    in-out property <string> batch-status-mode: "random";
+    in-out property <bool> batch-overwrite: false;
+    in-out property <string> batch-new-port-str: "2222";
+
+    // 快速增删表单属性
+    in-out property <string> quick-host-name: "";
+    in-out property <string> quick-host-ip: "192.168.1.50";
+    in-out property <string> quick-host-port: "22";
+    in-out property <string> quick-host-group: "生产集群/核心库";
+    in-out property <string> quick-group-name: "";
+
+    // 回调事件
+    callback batch-generate(string, string, string, string, string, string, string, bool);
+    callback batch-update-status(string);
+    callback batch-update-port(string);
+    callback inject-preset(string);
+    callback quick-add-host(string, string, string, string);
+    callback quick-add-group(string, string);
+    callback reset-default-data();
+    callback clear-all-data();
+
+    spacing: 10px;
+    width: 100%;
+    height: 100%;
+    alignment: start;
+
+    // 1. 顶部指标胶囊与全局数据重置栏 (完美垂直居中)
+    Rectangle {
+        height: 52px;
+        width: 100%;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        HorizontalLayout {
+            height: 100%;
+            padding-left: 14px;
+            padding-right: 14px;
+            alignment: space-between;
+
+            // 指标探针 (垂直居中)
+            HorizontalLayout {
+                spacing: 16px;
+                alignment: start;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    Text { text: @tr("全量主机数"); font-size: 9px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + root.host-cards-count; font-size: 14px; font-weight: 700; color: AppTheme.foreground; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    Text { text: @tr("展开可见节点"); font-size: 9px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + root.visible-nodes-count; font-size: 14px; font-weight: 700; color: AppTheme.accent; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    Text { text: @tr("全量总节点"); font-size: 9px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + root.total-nodes-count; font-size: 14px; font-weight: 700; color: AppTheme.foreground; }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 1px;
+                    Text { text: @tr("树视口测算宽"); font-size: 9px; color: AppTheme.secondary-foreground; }
+                    Text { text: "" + (root.tree-viewport-width / 1px) + "px"; font-size: 14px; font-weight: 700; color: AppTheme.foreground; }
+                }
+            }
+
+            // 全局重置/清空操作 (垂直居中)
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+
+                VerticalLayout {
+                    alignment: center;
+                    AppButton {
+                        text: @tr("恢复默认预设");
+                        icon: @image-url("../../assets/icons/sparkles.svg");
+                        has-icon: true;
+                        variant: "secondary";
+                        clicked => { root.reset-default-data(); }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    AppButton {
+                        text: @tr("清空全量数据");
+                        icon: @image-url("../../assets/icons/trash.svg");
+                        has-icon: true;
+                        variant: "danger";
+                        clicked => { root.clear-all-data(); }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. 主体左右双栏卡片
+    HorizontalLayout {
+        spacing: 10px;
+        vertical-stretch: 1;
+        width: 100%;
+
+        // 2.1 左栏：批量生成与场景预设
+        AppCard {
+            horizontal-stretch: 1;
+            height: 100%;
+
+            VerticalLayout {
+                padding: 10px;
+                spacing: 6px;
+                alignment: start;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    height: 18px;
+
+                    Image {
+                        source: @image-url("../../assets/icons/zap.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("批量主机生成与场景注入");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+
+                    AppFormInput {
+                        horizontal-stretch: 3;
+                        label: @tr("名称前缀:");
+                        placeholder: "如 k8s-node-";
+                        text <=> root.batch-prefix;
+                    }
+
+                    AppFormInput {
+                        horizontal-stretch: 2;
+                        label: @tr("生成数量:");
+                        placeholder: "15";
+                        text <=> root.batch-count-str;
+                    }
+                }
+
+                // 快捷数量
+                HorizontalLayout {
+                    spacing: 4px;
+                    height: 20px;
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: q10.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        q10 := TouchArea { clicked => { root.batch-count-str = "10"; } mouse-cursor: pointer; }
+                        Text { text: "10 台"; font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: q50.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        q50 := TouchArea { clicked => { root.batch-count-str = "50"; } mouse-cursor: pointer; }
+                        Text { text: "50 台"; font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: q100.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        q100 := TouchArea { clicked => { root.batch-count-str = "100"; } mouse-cursor: pointer; }
+                        Text { text: "100 台"; font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+
+                AppFormInput {
+                    label: @tr("归属分组路径:");
+                    placeholder: "集群/k8s";
+                    text <=> root.batch-group;
+                }
+
+                AppButton {
+                    text: @tr("立即批量生成主机");
+                    icon: @image-url("../../assets/icons/zap.svg");
+                    has-icon: true;
+                    variant: "primary";
+                    clicked => {
+                        root.batch-generate(
+                            root.batch-prefix,
+                            root.batch-count-str,
+                            root.batch-ip-prefix,
+                            root.batch-start-ip-str,
+                            root.batch-port-str,
+                            root.batch-group,
+                            root.batch-status-mode,
+                            root.batch-overwrite,
+                        );
+                    }
+                }
+
+                // 场景预设注入快捷项
+                Text { text: @tr("一键场景预设:"); font-size: 10px; font-weight: 600; color: AppTheme.secondary-foreground; }
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    height: 24px;
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: ps1.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        ps1 := TouchArea { clicked => { root.inject-preset("rich_clusters"); } mouse-cursor: pointer; }
+                        Text { text: @tr("35+ 企业全集群"); font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: ps2.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        ps2 := TouchArea { clicked => { root.inject-preset("deep_tree"); } mouse-cursor: pointer; }
+                        Text { text: @tr("6 层深嵌套树"); font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+
+        // 2.2 右栏：单项增删 & 状态/端口批量修改
+        AppCard {
+            horizontal-stretch: 1;
+            height: 100%;
+
+            VerticalLayout {
+                padding: 10px;
+                spacing: 6px;
+                alignment: start;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    height: 18px;
+
+                    Image {
+                        source: @image-url("../../assets/icons/server.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("单项增删改与状态治理");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+
+                    AppFormInput {
+                        horizontal-stretch: 3;
+                        label: @tr("主机名:");
+                        placeholder: "如 web-prod-01";
+                        text <=> root.quick-host-name;
+                    }
+
+                    AppFormInput {
+                        horizontal-stretch: 2;
+                        label: @tr("端口:");
+                        placeholder: "22";
+                        text <=> root.quick-host-port;
+                    }
+                }
+
+                AppFormInput {
+                    label: @tr("IP 地址:");
+                    placeholder: "192.168.1.50";
+                    text <=> root.quick-host-ip;
+                }
+
+                AppFormInput {
+                    label: @tr("归属分组路径:");
+                    placeholder: "生产集群/核心库";
+                    text <=> root.quick-host-group;
+                }
+
+                AppButton {
+                    text: @tr("快速添加单台主机");
+                    icon: @image-url("../../assets/icons/plus.svg");
+                    has-icon: true;
+                    variant: "secondary";
+                    clicked => {
+                        if root.quick-host-name != "" {
+                            root.quick-add-host(
+                                root.quick-host-name,
+                                root.quick-host-ip,
+                                root.quick-host-port,
+                                root.quick-host-group,
+                            );
+                            root.quick-host-name = "";
+                        }
+                    }
+                }
+
+                // 批量状态更新
+                Text { text: @tr("全量状态一键批量变更:"); font-size: 10px; font-weight: 600; color: AppTheme.secondary-foreground; }
+
+                HorizontalLayout {
+                    spacing: 4px;
+                    height: 22px;
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: st-on.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-on := TouchArea { clicked => { root.batch-update-status("all_online"); } mouse-cursor: pointer; }
+                        Text { text: @tr("全在线"); font-size: 9px; color: #4ade80; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: st-warn.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-warn := TouchArea { clicked => { root.batch-update-status("all_warning"); } mouse-cursor: pointer; }
+                        Text { text: @tr("全告警"); font-size: 9px; color: #fbbf24; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: st-off.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-off := TouchArea { clicked => { root.batch-update-status("all_offline"); } mouse-cursor: pointer; }
+                        Text { text: @tr("全离线"); font-size: 9px; color: #f87171; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+
+                    Rectangle {
+                        horizontal-stretch: 1; border-radius: AppTheme.radius-small;
+                        background: st-rnd.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px; border-color: AppTheme.border;
+                        st-rnd := TouchArea { clicked => { root.batch-update-status("random"); } mouse-cursor: pointer; }
+                        Text { text: @tr("随机分布"); font-size: 9px; color: AppTheme.accent; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+}

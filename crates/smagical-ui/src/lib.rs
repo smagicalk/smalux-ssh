@@ -29,7 +29,8 @@ pub mod terminal;
 /// 快速新建终端启动器后台异步预热 Hook 模块。
 pub(crate) mod launcher_prewarm;
 
-
+/// 侧边栏动态注册与 UI 同步服务。
+pub(crate) mod activity_bar_service;
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -52,9 +53,10 @@ mod generated {
 }
 
 pub use generated::{
-    AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData, HostTreeNode,
-    LocalShellItemData, LogEntryData, TabData, TerminalPaneData, TerminalSplitterData,
+    ActivityBarItemData, AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData,
+    HostTreeNode, LocalShellItemData, LogEntryData, TabData, TerminalPaneData, TerminalSplitterData,
 };
+
 
 
 /// 创建并运行桌面应用主窗口。
@@ -103,6 +105,14 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 初始化 CoreState 核心状态引擎 (基于 MockStorage 预设种子存储)
     let core_state = Rc::new(CoreState::new_mock());
+
+    // 同步 Debug 开启状态与侧边栏动态注册菜单项到 Slint 界面
+    let is_dbg = smagical_debug::is_debug_enabled();
+    window.set_is_debug_enabled(is_dbg);
+    core_state.activity_bar().set_visible("debug", is_dbg);
+    activity_bar_service::sync_activity_bar_ui(&window, &core_state);
+
+
 
     // 注册本地终端异步预热与文件系统后台探测 Hook (0ms 阻塞主线程)
     core_state.app_hooks().register(std::sync::Arc::new(local_shells::LocalShellDiscoveryHook::new(

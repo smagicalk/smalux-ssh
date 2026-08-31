@@ -17,10 +17,13 @@ pub use app_hook::{
 };
 
 pub use domain::{
+    activity_bar::{ActivityBarItem, ActivityBarRegistry},
     group::GroupRecord,
     history::{HistoryRecord, SessionSnapshotConfig},
     host::{HostRecord, HostStatus},
+    navigation::{NavigationRequest, NavigationRouter},
 };
+
 
 pub use hook::{
     CommandInteractionFrame, CommandSource, DangerousCommandGuard, FallbackStrategy, FrameStatus,

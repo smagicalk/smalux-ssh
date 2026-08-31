@@ -652,7 +652,24 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
         }
     });
+
+    // -------------------------------------------------------------------------
+    // 13. 开发者调试控制台实时日志流自动同步定时器 (500ms 刷新)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let log_timer = Box::leak(Box::new(slint::Timer::default()));
+    log_timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(500),
+        move || {
+            if let Some(w) = window_weak.upgrade().filter(|w| w.get_is_debug_modal_open() && smagical_debug::is_debug_enabled()) {
+                sync_ui_debug_logs(&w);
+            }
+        },
+    );
+
 }
+
 
 
 

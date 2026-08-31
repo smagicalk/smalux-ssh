@@ -1,26 +1,46 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { ActionBarItem } from "../components/action-bar-item.slint";
 
-/// 最左侧 48px 活动图标栏组件 (Left Activity Bar)
-///
-/// 模拟 VS Code 经典活动栏设计，提供顶级业务模块导航与系统设置入口。
-/// 核心特性：
-/// 1. 业务图标区：主机管理 -> 文件管理 -> 凭据保管 -> 指令片段 -> 网络隧道 -> 历史会话；
-/// 2. 底部系统区：数据备份与导入、偏好设置、深色/浅色一键切换；
-/// 3. 原生 SVG 矢量渲染与精准高亮指示条。
+/// 动态侧边栏菜单项数据结构
+export struct ActivityBarItemData {
+    id: string,
+    icon-name: string,
+    tooltip: string,
+    badge-count: int,
+    shortcut: string,
+}
+
+/// 最左侧 48px 动态活动图标栏组件 (Dynamic Left Activity Bar)
 export component LeftActivityBar inherits Rectangle {
-    /// 当前选中的激活 Tab 模块 ID (例如: "hosts", "files", "credentials", "snippets", "tunnels", "history", "backup", "settings")
+    /// 当前选中的激活 Tab 模块 ID (例如: "hosts", "keys", "history", "snippets", "settings", "debug")
     in property <string> active-tab: "hosts";
+    /// 顶部主功能动态菜单项列表
+    in property <[ActivityBarItemData]> top-items: [];
+    /// 底部系统/设置动态菜单项列表
+    in property <[ActivityBarItemData]> bottom-items: [];
     /// 当前是否处于深色模式 (用于更新底部日/夜间切换图标)
     in-out property <bool> is-dark-mode: true;
-    /// 开发者调试控制台是否开启 (若关闭则隐藏左侧栏调试图标)
-    in property <bool> is-debug-enabled: true;
-
 
     /// 当用户点击任意顶级 Tab 图标时触发的回调事件，参数为 tab_id 字符串
     callback tab-clicked(string /* tab_id */);
     /// 当用户点击底部深浅色切换图标时触发的回调事件
     callback toggle-color-mode();
+
+    // 纯函数：映射图标标识至编译期静态内联 SVG 资产
+    pure function resolve-icon(name: string) -> image {
+        if name == "server" { return @image-url("../assets/icons/server.svg"); }
+        if name == "key" { return @image-url("../assets/icons/key.svg"); }
+        if name == "clock" { return @image-url("../assets/icons/clock.svg"); }
+        if name == "terminal" { return @image-url("../assets/icons/terminal.svg"); }
+        if name == "folder" { return @image-url("../assets/icons/folder.svg"); }
+        if name == "tunnel" { return @image-url("../assets/icons/tunnel.svg"); }
+        if name == "archive" { return @image-url("../assets/icons/archive.svg"); }
+        if name == "settings" { return @image-url("../assets/icons/settings.svg"); }
+        if name == "bug" { return @image-url("../assets/icons/bug.svg"); }
+        if name == "zap" { return @image-url("../assets/icons/zap.svg"); }
+        if name == "sparkles" { return @image-url("../assets/icons/sparkles.svg"); }
+        return @image-url("../assets/icons/server.svg");
+    }
 
     width: 48px;
     background: AppTheme.panel-background;
@@ -41,91 +61,32 @@ export component LeftActivityBar inherits Rectangle {
         spacing: 6px;
         alignment: space-between;
 
-        // 上半区 (业务资产)
+        // 上半区 (动态数据驱动渲染主功能项)
         VerticalLayout {
             spacing: 6px;
             alignment: center;
 
-            // 1. 主机资产
-            ActionBarItem {
-                icon: @image-url("../assets/icons/server.svg");
-                tooltip: @tr("主机管理");
-                is-active: root.active-tab == "hosts";
-                clicked => { root.tab-clicked("hosts"); }
-            }
-
-            // 2. 文件管理
-            ActionBarItem {
-                icon: @image-url("../assets/icons/folder.svg");
-                tooltip: @tr("文件管理");
-                is-active: root.active-tab == "files";
-                clicked => { root.tab-clicked("files"); }
-            }
-
-            // 3. 凭据保管
-            ActionBarItem {
-                icon: @image-url("../assets/icons/key.svg");
-                tooltip: @tr("凭据保管");
-                is-active: root.active-tab == "credentials";
-                clicked => { root.tab-clicked("credentials"); }
-            }
-
-            // 4. 指令片段
-            ActionBarItem {
-                icon: @image-url("../assets/icons/terminal.svg");
-                tooltip: @tr("指令片段");
-                is-active: root.active-tab == "snippets";
-                clicked => { root.tab-clicked("snippets"); }
-            }
-
-            // 5. 网络隧道
-            ActionBarItem {
-                icon: @image-url("../assets/icons/tunnel.svg");
-                tooltip: @tr("网络隧道");
-                is-active: root.active-tab == "tunnels";
-                clicked => { root.tab-clicked("tunnels"); }
-            }
-
-            // 6. 历史会话 (移动至网络隧道下方)
-            ActionBarItem {
-                icon: @image-url("../assets/icons/clock.svg");
-                tooltip: @tr("历史会话");
-                is-active: root.active-tab == "history";
-                clicked => { root.tab-clicked("history"); }
+            for item in root.top-items: ActionBarItem {
+                icon: root.resolve-icon(item.icon-name);
+                tooltip: item.tooltip;
+                is-active: root.active-tab == item.id;
+                clicked => { root.tab-clicked(item.id); }
             }
         }
 
-        // 下半区 (系统维护与外观，VS Code 经典左下角设计)
+        // 下半区 (动态数据驱动渲染系统设置项 + 外观切换)
         VerticalLayout {
             spacing: 6px;
             alignment: center;
 
-            // 7. 数据备份
-            ActionBarItem {
-                icon: @image-url("../assets/icons/archive.svg");
-                tooltip: @tr("数据备份与导入");
-                is-active: root.active-tab == "backup";
-                clicked => { root.tab-clicked("backup"); }
+            for item in root.bottom-items: ActionBarItem {
+                icon: root.resolve-icon(item.icon-name);
+                tooltip: item.tooltip;
+                is-active: root.active-tab == item.id;
+                clicked => { root.tab-clicked(item.id); }
             }
 
-            // 8. 开发者调试控制面板 (受全局 is-debug-enabled 开关控制)
-            if root.is-debug-enabled: ActionBarItem {
-                icon: @image-url("../assets/icons/bug.svg");
-                tooltip: @tr("开发者调试控制台");
-                is-active: root.active-tab == "debug";
-                clicked => { root.tab-clicked("debug"); }
-            }
-
-
-            // 9. 偏好设置
-            ActionBarItem {
-                icon: @image-url("../assets/icons/settings.svg");
-                tooltip: @tr("偏好设置");
-                is-active: root.active-tab == "settings";
-                clicked => { root.tab-clicked("settings"); }
-            }
-
-            // 9. 深色 / 浅色主题切换
+            // 固有深浅色外观切换开关
             ActionBarItem {
                 icon: root.is-dark-mode ? @image-url("../assets/icons/moon.svg") : @image-url("../assets/icons/sun.svg");
                 tooltip: root.is-dark-mode ? @tr("切换至浅色模式") : @tr("切换至深色模式");

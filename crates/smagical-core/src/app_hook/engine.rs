@@ -4,10 +4,12 @@ use std::panic::{self, AssertUnwindSafe};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
+use crate::domain::NavigationRequest;
 use crate::hook::HookDecision;
 use super::builtin::FunctionalGlobalHook;
 use super::traits::AppGlobalHook;
 use super::types::{AppBootContext, AppExitContext, ConfigChangeEvent, WindowState};
+
 
 /// 动态监听订阅句柄 (用于热拔除/取消注册)。
 pub struct ListenerHandle {
@@ -155,6 +157,49 @@ impl AppGlobalHookEngine {
         }
     }
 
+    /// 广播页面跳转导航请求 (`on_navigation_requested`)。
+    pub fn dispatch_navigation_requested(&self, req: &NavigationRequest) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let req_cloned = req.clone();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_navigation_requested(&req_cloned);
+            }));
+        }
+    }
+
+    /// 广播模块激活挂载事件 (`on_module_activated`)。
+    pub fn dispatch_module_activated(
+        &self,
+        tab_id: &str,
+        sub_section: Option<&str>,
+        params: &std::collections::HashMap<String, String>,
+    ) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let t_id = tab_id.to_string();
+            let sub_sec = sub_section.map(|s| s.to_string());
+            let p = params.clone();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_module_activated(&t_id, sub_sec.as_deref(), &p);
+            }));
+        }
+    }
+
+    /// 广播模块失活休眠事件 (`on_module_deactivated`)。
+    pub fn dispatch_module_deactivated(&self, tab_id: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let t_id = tab_id.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_module_deactivated(&t_id);
+            }));
+        }
+    }
+
     /// 广播左侧活动栏菜单点击事件 (`on_left_menu_clicked`)。
     pub fn dispatch_left_menu_clicked(&self, menu_id: &str, old_menu_id: &str) {
         let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
@@ -167,6 +212,7 @@ impl AppGlobalHookEngine {
             }));
         }
     }
+
 
     /// 广播主工作区视图流转事件 (`on_main_view_switched`)。
     pub fn dispatch_main_view_switched(&self, current_view: &str, previous_view: &str) {

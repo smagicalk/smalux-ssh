@@ -123,8 +123,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_debug = ctx.core_state.clone();
     window.on_toggle_debug_enabled(move |enabled| {
         smagical_debug::set_debug_enabled(enabled);
+        core_state_debug.activity_bar().set_visible("debug", enabled);
         if let Some(w) = window_weak.upgrade() {
             w.set_is_debug_enabled(enabled);
+            crate::activity_bar_service::sync_activity_bar_ui(&w, &core_state_debug);
             if !enabled {
                 w.set_is_debug_modal_open(false);
                 w.set_debug_logs(slint::ModelRc::default());
@@ -143,6 +145,22 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             tracing::info!(target: "smagical_ui::settings", "开发者调试控制台已{}", if enabled { "开启" } else { "关闭" });
         }
     });
+
+    // -------------------------------------------------------------------------
+    // 2.2 全局统一路由跳转导航回调 (Navigation Router)
+    // -------------------------------------------------------------------------
+    let core_state_nav = ctx.core_state.clone();
+    window.on_navigate_to(move |target_tab, section| {
+        let t_str = target_tab.as_str();
+        let s_str = section.as_str();
+        let mut req = smagical_core::NavigationRequest::target(t_str);
+        if !s_str.is_empty() {
+            req = req.with_section(s_str);
+        }
+        core_state_nav.navigate_to(req);
+        tracing::info!(target: "smagical_ui::navigation", "路由中枢成功处理跳转请求: [{}] (section: {:?})", t_str, if s_str.is_empty() { None } else { Some(s_str) });
+    });
+
 
     // -------------------------------------------------------------------------
     // 3. 窗口控制: 关闭应用 (带安全守护与退出归档 Hook)

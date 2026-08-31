@@ -1,14 +1,11 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppIconButton } from "base/app-icon-button.slint";
-import { DebugBatchTab } from "debug_workbench/debug-batch-tab.slint";
-import { DebugPresetTab } from "debug_workbench/debug-preset-tab.slint";
-import { DebugCrudTab } from "debug_workbench/debug-crud-tab.slint";
+import { DebugHostsTab } from "debug_workbench/debug-hosts-tab.slint";
+import { DebugSettingsTab } from "debug_workbench/debug-settings-tab.slint";
 import { DebugLogsTab, LogEntryData } from "debug_workbench/debug-logs-tab.slint";
-import { DebugInspectorTab } from "debug_workbench/debug-inspector-tab.slint";
 import { DebugRenderingTab } from "debug_workbench/debug-rendering-tab.slint";
 
 export { LogEntryData }
-
 
 /// 开发者全功能独立调试与批量数据生成模态弹窗 (Debug Modal)
 export component DebugModal inherits Rectangle {
@@ -30,8 +27,8 @@ export component DebugModal inherits Rectangle {
     /// 是否为深色模式
     in property <bool> is-dark-mode: true;
 
-    // 当前激活的子面板: "batch" | "presets" | "crud" | "logs" | "inspector"
-    property <string> active-subtab: "batch";
+    // 当前激活的子面板 (按页面与核心领域分类): "hosts" | "settings" | "logs" | "rendering"
+    property <string> active-subtab: "hosts";
 
     // --- 回调事件 ---
     callback close();
@@ -65,7 +62,6 @@ export component DebugModal inherits Rectangle {
     callback run-benchmark();
     /// 切换图形渲染管线
     callback switch-pipeline(string);
-
     /// 保存管线配置 (下次生效)
     callback save-pipeline();
     /// 保存管线并立即重启
@@ -74,10 +70,7 @@ export component DebugModal inherits Rectangle {
     /// 当前激活的管线 ID
     in property <string> active-pipeline: "winit-skia";
 
-
-
     if is-open: Rectangle {
-
         width: 100%;
         height: 100%;
         background: #00000088; // 半透明暗色背景遮罩
@@ -124,7 +117,7 @@ export component DebugModal inherits Rectangle {
                         }
 
                         Text {
-                            text: @tr("开发者调试与数据控制台");
+                            text: @tr("开发者调试工作台 (Workbench)");
                             font-size: 13px;
                             font-weight: 700;
                             color: AppTheme.foreground;
@@ -147,7 +140,7 @@ export component DebugModal inherits Rectangle {
                                 alignment: center;
 
                                 Text {
-                                    text: @tr("主机数: ") + root.host-cards-count + @tr(" | 节点: ") + root.visible-nodes-count;
+                                    text: @tr("主机数: ") + root.host-cards-count + @tr(" | 可见节点: ") + root.visible-nodes-count;
                                     font-size: 10px;
                                     font-weight: 500;
                                     color: AppTheme.secondary-foreground;
@@ -164,23 +157,22 @@ export component DebugModal inherits Rectangle {
                     }
                 }
 
-
-                // 2. 顶部子标签切换导航栏
+                // 2. 顶部子标签切换导航栏 (按页面与核心功能清晰分类)
                 HorizontalLayout {
-                    spacing: 6px;
+                    spacing: 8px;
                     height: 32px;
 
-                    // 选项 1: 批量生成与修改
+                    // 页面 1: 主机管理调试 (包含批量生成、预设注入、快捷增删、状态治理与树形指标)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
                         border-radius: AppTheme.radius-medium;
-                        background: root.active-subtab == "batch" ? AppTheme.accent : (b-tab1.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        background: root.active-subtab == "hosts" ? AppTheme.accent : (b-tab1.has-hover ? AppTheme.hover-background : AppTheme.control-background);
                         border-width: 1px;
-                        border-color: root.active-subtab == "batch" ? AppTheme.accent : AppTheme.border;
+                        border-color: root.active-subtab == "hosts" ? AppTheme.accent : AppTheme.border;
 
                         b-tab1 := TouchArea {
-                            clicked => { root.active-subtab = "batch"; }
+                            clicked => { root.active-subtab = "hosts"; }
                             mouse-cursor: pointer;
                         }
 
@@ -189,35 +181,35 @@ export component DebugModal inherits Rectangle {
                             spacing: 6px;
 
                             Image {
-                                source: @image-url("../assets/icons/zap.svg");
+                                source: @image-url("../assets/icons/server.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "batch" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "hosts" ? #ffffff : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
                             Text {
-                                text: @tr("批量生成/修改");
+                                text: @tr("主机资产调试");
                                 font-size: 11px;
-                                font-weight: root.active-subtab == "batch" ? 600 : 500;
-                                color: root.active-subtab == "batch" ? #ffffff : AppTheme.foreground;
+                                font-weight: root.active-subtab == "hosts" ? 600 : 500;
+                                color: root.active-subtab == "hosts" ? #ffffff : AppTheme.foreground;
                                 vertical-alignment: center;
                             }
                         }
                     }
 
-                    // 选项 2: 场景预设
+                    // 页面 2: 设置与偏好调试 (包含主题配色测试、深浅色翻转与设计令牌)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
                         border-radius: AppTheme.radius-medium;
-                        background: root.active-subtab == "presets" ? AppTheme.accent : (b-tab2.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        background: root.active-subtab == "settings" ? AppTheme.accent : (b-tab2.has-hover ? AppTheme.hover-background : AppTheme.control-background);
                         border-width: 1px;
-                        border-color: root.active-subtab == "presets" ? AppTheme.accent : AppTheme.border;
+                        border-color: root.active-subtab == "settings" ? AppTheme.accent : AppTheme.border;
 
                         b-tab2 := TouchArea {
-                            clicked => { root.active-subtab = "presets"; }
+                            clicked => { root.active-subtab = "settings"; }
                             mouse-cursor: pointer;
                         }
 
@@ -226,71 +218,34 @@ export component DebugModal inherits Rectangle {
                             spacing: 6px;
 
                             Image {
-                                source: @image-url("../assets/icons/sparkles.svg");
+                                source: @image-url("../assets/icons/settings.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "presets" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "settings" ? #ffffff : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
                             Text {
-                                text: @tr("场景预设");
+                                text: @tr("设置外观调试");
                                 font-size: 11px;
-                                font-weight: root.active-subtab == "presets" ? 600 : 500;
-                                color: root.active-subtab == "presets" ? #ffffff : AppTheme.foreground;
+                                font-weight: root.active-subtab == "settings" ? 600 : 500;
+                                color: root.active-subtab == "settings" ? #ffffff : AppTheme.foreground;
                                 vertical-alignment: center;
                             }
                         }
                     }
 
-                    // 选项 3: 单项 CRUD
+                    // 页面 3: 实时日志流 (包含日志等级过滤、清空与测试触发)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
                         border-radius: AppTheme.radius-medium;
-                        background: root.active-subtab == "crud" ? AppTheme.accent : (b-tab3.has-hover ? AppTheme.hover-background : AppTheme.control-background);
-                        border-width: 1px;
-                        border-color: root.active-subtab == "crud" ? AppTheme.accent : AppTheme.border;
-
-                        b-tab3 := TouchArea {
-                            clicked => { root.active-subtab = "crud"; }
-                            mouse-cursor: pointer;
-                        }
-
-                        HorizontalLayout {
-                            alignment: center;
-                            spacing: 6px;
-
-                            Image {
-                                source: @image-url("../assets/icons/plus.svg");
-                                width: 12px;
-                                height: 12px;
-                                image-fit: contain;
-                                colorize: root.active-subtab == "crud" ? #ffffff : AppTheme.secondary-foreground;
-                                y: (parent.height - self.height) / 2;
-                            }
-
-                            Text {
-                                text: @tr("单项增删改");
-                                font-size: 11px;
-                                font-weight: root.active-subtab == "crud" ? 600 : 500;
-                                color: root.active-subtab == "crud" ? #ffffff : AppTheme.foreground;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    // 选项 4: 实时日志流
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        height: 30px;
-                        border-radius: AppTheme.radius-medium;
-                        background: root.active-subtab == "logs" ? AppTheme.accent : (b-tab4.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        background: root.active-subtab == "logs" ? AppTheme.accent : (b-tab3.has-hover ? AppTheme.hover-background : AppTheme.control-background);
                         border-width: 1px;
                         border-color: root.active-subtab == "logs" ? AppTheme.accent : AppTheme.border;
 
-                        b-tab4 := TouchArea {
+                        b-tab3 := TouchArea {
                             clicked => { root.active-subtab = "logs"; }
                             mouse-cursor: pointer;
                         }
@@ -318,53 +273,16 @@ export component DebugModal inherits Rectangle {
                         }
                     }
 
-                    // 选项 5: 运行时探针
+                    // 页面 4: 渲染管线矩阵 (纯 Skia 4 大管线、安全重启与 120Hz 基准压测)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
                         border-radius: AppTheme.radius-medium;
-                        background: root.active-subtab == "inspector" ? AppTheme.accent : (b-tab5.has-hover ? AppTheme.hover-background : AppTheme.control-background);
-                        border-width: 1px;
-                        border-color: root.active-subtab == "inspector" ? AppTheme.accent : AppTheme.border;
-
-                        b-tab5 := TouchArea {
-                            clicked => { root.active-subtab = "inspector"; }
-                            mouse-cursor: pointer;
-                        }
-
-                        HorizontalLayout {
-                            alignment: center;
-                            spacing: 6px;
-
-                            Image {
-                                source: @image-url("../assets/icons/activity.svg");
-                                width: 12px;
-                                height: 12px;
-                                image-fit: contain;
-                                colorize: root.active-subtab == "inspector" ? #ffffff : AppTheme.secondary-foreground;
-                                y: (parent.height - self.height) / 2;
-                            }
-
-                            Text {
-                                text: @tr("运行时探针");
-                                font-size: 11px;
-                                font-weight: root.active-subtab == "inspector" ? 600 : 500;
-                                color: root.active-subtab == "inspector" ? #ffffff : AppTheme.foreground;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
-
-                    // 选项 6: 渲染相关
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        height: 30px;
-                        border-radius: AppTheme.radius-medium;
-                        background: root.active-subtab == "rendering" ? AppTheme.accent : (b-tab6.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        background: root.active-subtab == "rendering" ? AppTheme.accent : (b-tab4.has-hover ? AppTheme.hover-background : AppTheme.control-background);
                         border-width: 1px;
                         border-color: root.active-subtab == "rendering" ? AppTheme.accent : AppTheme.border;
 
-                        b-tab6 := TouchArea {
+                        b-tab4 := TouchArea {
                             clicked => { root.active-subtab = "rendering"; }
                             mouse-cursor: pointer;
                         }
@@ -383,7 +301,7 @@ export component DebugModal inherits Rectangle {
                             }
 
                             Text {
-                                text: @tr("渲染相关");
+                                text: @tr("图形渲染管线");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "rendering" ? 600 : 500;
                                 color: root.active-subtab == "rendering" ? #ffffff : AppTheme.foreground;
@@ -399,51 +317,43 @@ export component DebugModal inherits Rectangle {
                     background: AppTheme.border;
                 }
 
-                // 3. 内容主体区 (动态切换渲染 6 个子组件)
+                // 3. 内容主体区 (动态切换渲染 4 大专属模块)
                 Rectangle {
                     height: 440px;
                     width: 100%;
 
-                    if root.active-subtab == "batch": DebugBatchTab {
+                    // 1. 主机资产调试 (融合批量、单项、预设、状态与指标)
+                    if root.active-subtab == "hosts": DebugHostsTab {
+                        total-nodes-count: root.total-nodes-count;
+                        visible-nodes-count: root.visible-nodes-count;
+                        host-cards-count: root.host-cards-count;
+                        tree-viewport-width: root.tree-viewport-width;
                         batch-generate(p, cnt, ip_p, s_ip, port, grp, st, ovr) => { root.batch-generate(p, cnt, ip_p, s_ip, port, grp, st, ovr); }
                         batch-update-status(st) => { root.batch-update-status(st); }
                         batch-update-port(p) => { root.batch-update-port(p); }
-                        reset-default-data => { root.reset-default-data(); }
-                        clear-all-data => { root.clear-all-data(); }
-                    }
-
-                    if root.active-subtab == "presets": DebugPresetTab {
                         inject-preset(id) => { root.inject-preset(id); }
-                    }
-
-                    if root.active-subtab == "crud": DebugCrudTab {
-                        current-theme-name: root.current-theme-name;
-                        is-dark-mode: root.is-dark-mode;
                         quick-add-host(n, ip, p, g) => { root.quick-add-host(n, ip, p, g); }
                         quick-add-group(n, p) => { root.quick-add-group(n, p); }
-                        switch-theme(id) => { root.switch-theme(id); }
-                        toggle-color-mode => { root.toggle-color-mode(); }
-                        clear-all-data => { root.clear-all-data(); }
                         reset-default-data => { root.reset-default-data(); }
+                        clear-all-data => { root.clear-all-data(); }
                     }
 
+                    // 2. 设置偏好调试 (主题快切、深浅色模式与设计令牌)
+                    if root.active-subtab == "settings": DebugSettingsTab {
+                        current-theme-name: root.current-theme-name;
+                        is-dark-mode: root.is-dark-mode;
+                        switch-theme(id) => { root.switch-theme(id); }
+                        toggle-color-mode => { root.toggle-color-mode(); }
+                    }
+
+                    // 3. 实时日志流
                     if root.active-subtab == "logs": DebugLogsTab {
                         logs: root.logs;
                         clear-logs => { root.clear-logs(); }
                         emit-test-log(lvl) => { root.emit-test-log(lvl); }
                     }
 
-                    if root.active-subtab == "inspector": DebugInspectorTab {
-                        tree-viewport-width: root.tree-viewport-width;
-                        total-nodes-count: root.total-nodes-count;
-                        visible-nodes-count: root.visible-nodes-count;
-                        host-cards-count: root.host-cards-count;
-                        current-theme-name: root.current-theme-name;
-                        is-dark-mode: root.is-dark-mode;
-                        switch-theme(id) => { root.switch-theme(id); }
-                        toggle-color-mode => { root.toggle-color-mode(); }
-                    }
-
+                    // 4. 图形渲染管线
                     if root.active-subtab == "rendering": DebugRenderingTab {
                         current-active-pipeline: root.active-pipeline;
                         switch-pipeline(id) => { root.switch-pipeline(id); }
@@ -452,10 +362,7 @@ export component DebugModal inherits Rectangle {
                         force-repaint => { root.force-repaint(); }
                         run-benchmark => { root.run-benchmark(); }
                     }
-
-
                 }
-
             }
         }
     }

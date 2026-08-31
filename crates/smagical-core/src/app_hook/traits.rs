@@ -1,7 +1,7 @@
-//! 全局应用级 Hook 核心 Trait 接口定义。
-
+use crate::domain::NavigationRequest;
 use crate::hook::HookDecision;
 use super::types::{AppBootContext, AppExitContext, ConfigChangeEvent, WindowState};
+
 
 /// 全局应用生命周期、主框架交互路由与配置变更 Hook 接口。
 ///
@@ -39,11 +39,26 @@ pub trait AppGlobalHook: Send + Sync {
     // 2. 主框架导航与交互路由 (Shell Navigation)
     // =========================================================================
 
+    /// 【页面跳转导航请求】：响应全局路由跳转意图。
+    fn on_navigation_requested(&self, _req: &NavigationRequest) {}
+
+    /// 【模块激活挂载】：目标页面/抽屉被激活切入时调用。
+    fn on_module_activated(
+        &self,
+        _tab_id: &str,
+        _sub_section: Option<&str>,
+        _params: &std::collections::HashMap<String, String>,
+    ) {}
+
+    /// 【模块失活休眠】：页面/抽屉被切出或隐藏时调用 (用于暂停轮询、释放临时内存)。
+    fn on_module_deactivated(&self, _tab_id: &str) {}
+
     /// 【左侧活动栏菜单点击】：用户点击左侧图标切换抽屉面板。
     ///
     /// - `menu_id`: 目标菜单标识 (如 "hosts", "history", "files", "credentials", "settings")
     /// - `old_menu_id`: 切换前的菜单标识
     fn on_left_menu_clicked(&self, _menu_id: &str, _old_menu_id: &str) {}
+
 
     /// 【主工作区视图切换】：在中央核心工作区之间流转。
     ///

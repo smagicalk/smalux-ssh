@@ -3,6 +3,7 @@ import { AppTheme } from "../../themes/app-theme.slint";
 /// 标准表单输入控件 (App Form Input)
 export component AppFormInput inherits VerticalLayout {
     in property <string> label: "";
+    in property <string> placeholder: "";
     in property <image> icon: @image-url("");
     in property <bool> has-icon: false;
     in property <length> input-height: 28px;
@@ -19,6 +20,7 @@ export component AppFormInput inherits VerticalLayout {
         text: root.label;
         font-size: 10px;
         color: AppTheme.secondary-foreground;
+        horizontal-alignment: left;
     }
 
     Rectangle {
@@ -31,31 +33,57 @@ export component AppFormInput inherits VerticalLayout {
 
         animate border-color { duration: 120ms; }
 
+        // 点击输入框背景任意空白区域直接聚焦
+        TouchArea {
+            clicked => { input.focus(); }
+        }
+
+
         HorizontalLayout {
             padding-left: 8px;
             padding-right: 8px;
             spacing: 6px;
-            alignment: center;
 
-            if root.has-icon: Image {
-                source: root.icon;
-                width: 12px;
-                height: 12px;
-                image-fit: contain;
-                colorize: input.has-focus ? AppTheme.accent : AppTheme.secondary-foreground;
-                vertical-alignment: center;
+            if root.has-icon: VerticalLayout {
+                alignment: center;
+                width: 14px;
+                Image {
+                    source: root.icon;
+                    width: 12px;
+                    height: 12px;
+                    image-fit: contain;
+                    colorize: input.has-focus ? AppTheme.accent : AppTheme.secondary-foreground;
+                }
             }
 
-            input := TextInput {
-                font-size: 11px;
-                color: AppTheme.foreground;
-                vertical-alignment: center;
+            Rectangle {
                 horizontal-stretch: 1;
-                enabled: root.enabled;
-                edited => { root.edited(self.text); }
-                accepted => { root.accepted(self.text); }
-            }
+                clip: true;
 
+                if input.text == "" && root.placeholder != "" && !input.has-focus: Text {
+                    text: root.placeholder;
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground.transparentize(40%);
+                    vertical-alignment: center;
+                    horizontal-alignment: left;
+                    x: 0px;
+                    width: 100%;
+                    height: 100%;
+                }
+
+                input := TextInput {
+                    x: 0px;
+                    width: 100%;
+                    height: 100%;
+                    font-size: 11px;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                    horizontal-alignment: left;
+                    enabled: root.enabled;
+                    edited => { root.edited(self.text); }
+                    accepted => { root.accepted(self.text); }
+                }
+            }
         }
     }
 }

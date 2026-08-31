@@ -30,7 +30,9 @@ import { HistoryDetailModal } from "components/history-detail-modal.slint";
 
 
 // 左侧视图
-import { LeftActivityBar } from "views/left_activity_bar.slint";
+import { LeftActivityBar, ActivityBarItemData } from "views/left_activity_bar.slint";
+export { ActivityBarItemData }
+
 import {
     HostsDrawer,
     HostItemData,
@@ -120,7 +122,12 @@ export component AppWindow inherits Window {
     in-out property <bool> is-debug-modal-open: false;
     /// 全局开发者调试功能开关 (默认开启 true，关闭则隐藏侧边栏图标并停止日志收集)
     in-out property <bool> is-debug-enabled: true;
+    /// 动态左侧活动栏主功能菜单项列表
+    in-out property <[ActivityBarItemData]> top-activity-items: [];
+    /// 动态左侧活动栏底部系统菜单项列表
+    in-out property <[ActivityBarItemData]> bottom-activity-items: [];
     /// 多终端群发广播模式是否开启
+
 
     in-out property <bool> is-broadcast-mode: false;
     /// 主窗口当前是否处于系统最大化状态
@@ -466,8 +473,11 @@ export component AppWindow inherits Window {
     /// 开发者调试功能开关切换回调
     callback toggle-debug-enabled(bool /* enabled */);
 
+    /// 全局统一路由跳转请求回调
+    callback navigate-to(string /* target_tab */, string /* section */);
     /// 侧边栏/主视图活动页签切换
     callback activity-tab-switched(string /* tab_id */);
+
 
 
 
@@ -553,11 +563,12 @@ export component AppWindow inherits Window {
                 padding: 0px;
                 spacing: 0px;
 
-                // 2.1 最左侧 48px 图标栏 (集成左下角外观切换)
+                // 2.1 最左侧 48px 动态数据驱动活动图标栏
                 LeftActivityBar {
                     active-tab: root.active-left-tab;
+                    top-items: root.top-activity-items;
+                    bottom-items: root.bottom-activity-items;
                     is-dark-mode: root.is-dark-mode;
-                    is-debug-enabled: root.is-debug-enabled;
                     toggle-color-mode => { root.toggle-color-mode(); }
                     tab-clicked(id) => {
                         root.activity-tab-switched(id);
@@ -569,6 +580,7 @@ export component AppWindow inherits Window {
                             root.active-left-tab = "history";
                             root.main-view = "history";
                             root.is-left-drawer-open = false;
+                            root.navigate-to("history", "");
                         } else {
                             // 资产与设置抽屉：切回终端工作区 + 展开对应抽屉
                             root.main-view = "terminal";
@@ -578,10 +590,11 @@ export component AppWindow inherits Window {
                                 root.active-left-tab = id;
                                 root.is-left-drawer-open = true;
                             }
+                            root.navigate-to(id, "");
                         }
                     }
-
                 }
+
 
                 // 2.2 左侧可伸缩二级抽屉
                 if root.is-left-drawer-open: Rectangle {
