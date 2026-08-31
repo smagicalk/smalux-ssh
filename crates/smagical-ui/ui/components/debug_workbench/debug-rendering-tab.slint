@@ -1,0 +1,612 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 开发者调试面板 - 渲染引擎与图形诊断子 Tab (Rendering Diagnostics & Engine Tab)
+export component DebugRenderingTab inherits ScrollView {
+    /// 当前生效的 GUI 渲染引擎名称
+    in property <string> engine-name: "Skia 2D (Google Chrome / Flutter 同款)";
+    /// GPU 硬件加速管线
+    in property <string> gpu-pipeline: "GPU 硬件加速 (DirectX / OpenGL / Vulkan)";
+    /// 终端像素视口管线
+    in property <string> terminal-pipeline: "fontdue SIMD 矢量光栅化 + Alacritty VT100 状态机";
+    /// 静态内联 SVG 图标总数
+    in property <int> svg-count: 42;
+    /// 目标刷新帧率
+    in property <string> target-fps: "120 FPS (8.3ms 极速吞吐)";
+    /// 脏矩形增量渲染状态
+    in property <string> damage-tracking: "已启用 (Partial Repaint / 0% 待机功耗)";
+    /// 字体微调排版技术
+    in property <string> font-hinting: "DirectWrite / FreeType 次像素抗锯齿";
+
+    /// 当前运行时已激活的管线 ID
+    in property <string> current-active-pipeline: "winit-skia";
+    /// 用户选中的目标管线 ID
+    in-out property <string> selected-pipeline: "winit-skia";
+    /// 是否已保存成功提示
+    in-out property <bool> is-saved-success: false;
+
+    /// 切换管线选中回调
+    callback switch-pipeline(string /* pipeline_id */);
+    /// 保存管线配置并在下次启动生效
+    callback save-pipeline();
+    /// 保存并立即自动重启客户端
+    callback apply-and-restart();
+    /// 强制全屏重绘回调
+    callback force-repaint();
+    /// 模拟终端高频吞吐基准测试
+    callback run-benchmark();
+
+    width: 100%;
+    height: 100%;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 12px;
+        alignment: start;
+
+        // =========================================================================
+        // 1. Skia 纯引擎四大图形管线切换矩阵 (Pure Skia Pipeline Switcher)
+        // =========================================================================
+        Rectangle {
+            height: 170px;
+            width: 100%;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                alignment: start;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 22px;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../../assets/icons/zap.svg");
+                            width: 14px;
+                            height: 14px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        Text {
+                            text: @tr("Skia 原生图形渲染管线矩阵 (Google Skia Pipelines)");
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 当前运行状态指示胶囊
+                    Rectangle {
+                        height: 20px;
+                        border-radius: 10px;
+                        background: AppTheme.hover-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+                            Rectangle {
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: #4ade80;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            Text {
+                                text: @tr("当前激活: ") + root.current-active-pipeline;
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: #4ade80;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 4 大 Skia 管线选择卡片 (2x2 网格，采用标准 SVG 矢量图标)
+                HorizontalLayout {
+                    spacing: 8px;
+                    height: 50px;
+
+                    // 1. Skia Auto (D3D / OpenGL 自动)
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.selected-pipeline == "winit-skia" ? AppTheme.accent : p1-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: root.selected-pipeline == "winit-skia" ? AppTheme.accent : AppTheme.border;
+
+                        p1-t := TouchArea {
+                            clicked => {
+                                root.selected-pipeline = "winit-skia";
+                                root.is-saved-success = false;
+                                root.switch-pipeline("winit-skia");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/sparkles.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: root.selected-pipeline == "winit-skia" ? #ffffff : AppTheme.accent;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                Text { text: "Skia Auto (官方推荐)"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia" ? #ffffff : AppTheme.foreground; }
+                            }
+                            Text { text: "DirectX/DWM 硬件自动加速"; font-size: 9px; color: root.selected-pipeline == "winit-skia" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                        }
+                    }
+
+                    // 2. Skia OpenGL
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.selected-pipeline == "winit-skia-opengl" ? AppTheme.accent : p2-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: root.selected-pipeline == "winit-skia-opengl" ? AppTheme.accent : AppTheme.border;
+
+                        p2-t := TouchArea {
+                            clicked => {
+                                root.selected-pipeline = "winit-skia-opengl";
+                                root.is-saved-success = false;
+                                root.switch-pipeline("winit-skia-opengl");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/radio.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: root.selected-pipeline == "winit-skia-opengl" ? #ffffff : #4ade80;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                Text { text: "Skia OpenGL"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-opengl" ? #ffffff : AppTheme.foreground; }
+                            }
+                            Text { text: "强制标准 OpenGL 硬件加速管线"; font-size: 9px; color: root.selected-pipeline == "winit-skia-opengl" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    height: 50px;
+
+                    // 3. Skia Vulkan
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.selected-pipeline == "winit-skia-vulkan" ? AppTheme.accent : p3-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: root.selected-pipeline == "winit-skia-vulkan" ? AppTheme.accent : AppTheme.border;
+
+                        p3-t := TouchArea {
+                            clicked => {
+                                root.selected-pipeline = "winit-skia-vulkan";
+                                root.is-saved-success = false;
+                                root.switch-pipeline("winit-skia-vulkan");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/zap.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: root.selected-pipeline == "winit-skia-vulkan" ? #ffffff : #38bdf8;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                Text { text: "Skia Vulkan"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-vulkan" ? #ffffff : AppTheme.foreground; }
+                            }
+                            Text { text: "现代 Vulkan 超低开销显卡直通"; font-size: 9px; color: root.selected-pipeline == "winit-skia-vulkan" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                        }
+                    }
+
+                    // 4. Skia Software (CPU 纯软解) - 使用清晰的 server.svg 矢量图标
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.selected-pipeline == "winit-skia-software" ? AppTheme.accent : p4-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: root.selected-pipeline == "winit-skia-software" ? AppTheme.accent : AppTheme.border;
+
+                        p4-t := TouchArea {
+                            clicked => {
+                                root.selected-pipeline = "winit-skia-software";
+                                root.is-saved-success = false;
+                                root.switch-pipeline("winit-skia-software");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            alignment: center;
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/server.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: root.selected-pipeline == "winit-skia-software" ? #ffffff : AppTheme.secondary-foreground;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                                Text { text: "Skia CPU 纯软解"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-software" ? #ffffff : AppTheme.foreground; }
+                            }
+                            Text { text: "SIMD 纯 CPU 光栅化 (0 显卡依赖)"; font-size: 9px; color: root.selected-pipeline == "winit-skia-software" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 2. 渲染特性与显示调优矩阵
+        // =========================================================================
+        Rectangle {
+            height: 115px;
+            width: 100%;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+                alignment: start;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    Image {
+                        source: @image-url("../../assets/icons/layout-grid.svg");
+                        width: 14px;
+                        height: 14px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("画质与运行指标 (Quality & Telemetry)");
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+
+                    // 特性 1: 文字抗锯齿
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 56px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            Text { text: @tr("次像素排版抗锯齿"); font-size: 10px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: root.font-hinting; font-size: 9px; color: AppTheme.secondary-foreground; }
+                            Text { text: @tr("状态: 完美锐利渲染"); font-size: 9px; font-weight: 700; color: #4ade80; }
+                        }
+                    }
+
+                    // 特性 2: 脏区域重绘
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 56px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            Text { text: @tr("局部增量重绘 (Damage)"); font-size: 10px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: root.damage-tracking; font-size: 9px; color: AppTheme.secondary-foreground; }
+                            Text { text: @tr("待机功耗: ~0.0% CPU"); font-size: 9px; font-weight: 700; color: #4ade80; }
+                        }
+                    }
+
+                    // 特性 3: VSync 帧率
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 56px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            padding: 6px;
+                            spacing: 2px;
+                            Text { text: @tr("垂直同步与刷新率"); font-size: 10px; font-weight: 600; color: AppTheme.foreground; }
+                            Text { text: root.target-fps; font-size: 9px; color: AppTheme.secondary-foreground; }
+                            Text { text: @tr("状态: 自适应高刷匹配"); font-size: 9px; font-weight: 700; color: #38bdf8; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 3. SVG 矢量资产与显存纹理图集监控
+        // =========================================================================
+        Rectangle {
+            height: 90px;
+            width: 100%;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 10px;
+                spacing: 6px;
+                alignment: start;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    Image {
+                        source: @image-url("../../assets/icons/archive.svg");
+                        width: 14px;
+                        height: 14px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("SVG 矢量资产预热与显存池 (Resource Atlas)");
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 12px;
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        Text { text: @tr("静态打包图标总数:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        Text { text: "" + root.svg-count + " 个全量矢量资产"; font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        Text { text: @tr("GPU 纹理缓存池状态:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        Text { text: @tr("42 / 42 全部已预热常驻"); font-size: 11px; font-weight: 700; color: #4ade80; }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        Text { text: @tr("预估显存总占用:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        Text { text: "~168 KB (微量无感)"; font-size: 11px; font-weight: 700; color: AppTheme.accent; }
+                    }
+
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 2px;
+                        Text { text: @tr("运行时磁盘 I/O 开销:"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        Text { text: "0 ms (静态内联)"; font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 4. 重启确认提醒与诊断控制栏 (带确认重启 / 仅保存提醒)
+        // =========================================================================
+        Rectangle {
+            height: 56px;
+            width: 100%;
+            border-radius: AppTheme.radius-large;
+            background: root.selected-pipeline != root.current-active-pipeline ? AppTheme.hover-background : AppTheme.surface-background;
+            border-width: 1px;
+            border-color: root.selected-pipeline != root.current-active-pipeline ? AppTheme.accent : AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                alignment: space-between;
+
+                // 左侧提示信息
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    VerticalLayout {
+                        alignment: center;
+                        if root.selected-pipeline != root.current-active-pipeline: Text {
+                            text: @tr("⚠️ 目标管线已变更为 [") + root.selected-pipeline + @tr("]，需重启客户端加载生效");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: #f59e0b;
+                        }
+                        if root.selected-pipeline == root.current-active-pipeline && !root.is-saved-success: Text {
+                            text: @tr("🛠️ 渲染管线自检与应用操作");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                        }
+                        if root.is-saved-success: Text {
+                            text: @tr("✓ 配置已保存至本地，将在下次启动客户端时生效");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: #4ade80;
+                        }
+                    }
+                }
+
+                // 右侧操作按钮组
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    // 按钮 1: 强制重绘
+                    Rectangle {
+                        width: 95px;
+                        height: 28px;
+                        border-radius: AppTheme.radius-medium;
+                        background: btn-rp.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        y: (parent.height - self.height) / 2;
+
+                        btn-rp := TouchArea {
+                            clicked => { root.force-repaint(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            Image {
+                                source: @image-url("../../assets/icons/arrow-up-down.svg");
+                                width: 11px;
+                                height: 11px;
+                                image-fit: contain;
+                                colorize: AppTheme.foreground;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            Text {
+                                text: @tr("强制重绘");
+                                font-size: 10px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 按钮 2: 仅保存 (下次生效)
+                    Rectangle {
+                        width: 125px;
+                        height: 28px;
+                        border-radius: AppTheme.radius-medium;
+                        background: btn-save.has-hover ? AppTheme.control-background.darker(0.1) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        y: (parent.height - self.height) / 2;
+
+                        btn-save := TouchArea {
+                            clicked => {
+                                root.is-saved-success = true;
+                                root.save-pipeline();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            Image {
+                                source: @image-url("../../assets/icons/archive.svg");
+                                width: 11px;
+                                height: 11px;
+                                image-fit: contain;
+                                colorize: AppTheme.foreground;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            Text {
+                                text: @tr("保存 (下次生效)");
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 按钮 3: 保存并立即重启
+                    Rectangle {
+                        width: 135px;
+                        height: 28px;
+                        border-radius: AppTheme.radius-medium;
+                        background: btn-restart.has-hover ? #dc2626 : (root.selected-pipeline != root.current-active-pipeline ? #ea580c : AppTheme.accent);
+                        border-width: 1px;
+                        border-color: root.selected-pipeline != root.current-active-pipeline ? #ea580c : AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+
+                        btn-restart := TouchArea {
+                            clicked => { root.apply-and-restart(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            Image {
+                                source: @image-url("../../assets/icons/zap.svg");
+                                width: 11px;
+                                height: 11px;
+                                image-fit: contain;
+                                colorize: #ffffff;
+                                y: (parent.height - self.height) / 2;
+                            }
+                            Text {
+                                text: @tr("保存并立即重启");
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

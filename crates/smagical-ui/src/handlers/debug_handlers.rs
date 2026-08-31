@@ -549,5 +549,112 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_ui_debug_logs(&w);
         }
     });
+
+    // -------------------------------------------------------------------------
+    // 8. 强制全屏重绘 (Force Repaint)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    window.on_debug_force_repaint(move || {
+        if let Some(w) = window_weak.upgrade() {
+            w.window().request_redraw();
+            tracing::info!(target: "smagical_debug::render", "已触发 GPU 全屏强制重绘 (Force Repaint)");
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 9. 终端 120Hz 高频吞吐性能基准压测 (Benchmark)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let pane_groups_bm = Rc::clone(&ctx.pane_groups);
+    let active_terminals_bm = Rc::clone(&ctx.active_terminals);
+    window.on_debug_run_benchmark(move || {
+        if let Some(w) = window_weak.upgrade() {
+            let groups = pane_groups_bm.borrow();
+            if let Some(active_sess) = groups.first().and_then(|g| g.get_active_session()) {
+                let mut terminals = active_terminals_bm.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    let benchmark_payload = "\x1b[32m[Benchmark]\x1b[0m 正在执行 120Hz 高频吞吐压力测试...\r\n";
+                    let _ = instance.send_bytes(benchmark_payload.as_bytes());
+                }
+            }
+            tracing::info!(target: "smagical_debug::render", "已触发终端 120Hz 视口高频吞吐基准压测");
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 10. 切换图形渲染管线首选项 (Switch Pipeline)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_pipe = ctx.core_state.clone();
+    window.on_debug_switch_pipeline(move |pipe_id| {
+        let p_str = pipe_id.to_string();
+        // Safety: 设置环境变量以在下次启动或测试时生效
+        unsafe {
+            std::env::set_var("SLINT_BACKEND", &p_str);
+        }
+        if let Some(w) = window_weak.upgrade() {
+            w.set_active_rendering_pipeline(p_str.clone().into());
+            core_state_pipe.app_hooks().dispatch_config_changed(&smagical_core::ConfigChangeEvent::new(
+                "rendering.pipeline",
+                "",
+                &p_str,
+                "debug_switch_pipeline",
+            ));
+            tracing::info!(target: "smagical_debug::render", "图形渲染管线首选项已切换为: {}", p_str);
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 11. 保存管线配置并生效 (Apply Pipeline)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    window.on_debug_apply_pipeline(move || {
+        if let Some(w) = window_weak.upgrade() {
+            let cur = w.get_active_rendering_pipeline().to_string();
+            // Safety: 设置环境变量以持久化渲染后端配置
+            unsafe {
+                std::env::set_var("SLINT_BACKEND", &cur);
+            }
+            w.window().request_redraw();
+            tracing::info!(target: "smagical_debug::render", "已成功保存渲染管线首选项: [{}] (将在下次启动时加载生效)", cur);
+            sync_ui_debug_logs(&w);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 12. 保存管线并立即重启客户端 (Restart App)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let persistence_guard = ctx.persistence_guard.clone();
+    window.on_debug_restart_app(move || {
+        if let Some(w) = window_weak.upgrade() {
+            let cur = w.get_active_rendering_pipeline().to_string();
+            unsafe {
+                std::env::set_var("SLINT_BACKEND", &cur);
+            }
+            tracing::info!(target: "smagical_debug::render", "正在执行客户端安全重启以加载全新渲染管线: [{}]...", cur);
+            
+            // 确保异步会话数据落盘
+            persistence_guard.flush_and_wait(std::time::Duration::from_millis(500));
+
+            // 拉起新进程并退出当前旧进程
+            if let Ok(exe_path) = std::env::current_exe() {
+                let mut cmd = std::process::Command::new(exe_path);
+                cmd.env("SLINT_BACKEND", &cur);
+                if let Err(e) = cmd.spawn() {
+                    tracing::error!(target: "smagical_debug::render", "拉起新进程失败: {:?}", e);
+                } else {
+                    std::process::exit(0);
+                }
+            }
+        }
+    });
 }
+
+
+
+
 

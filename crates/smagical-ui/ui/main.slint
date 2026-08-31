@@ -129,6 +129,9 @@ export component AppWindow inherits Window {
     in-out property <bool> is-dark-mode: true;
     /// 当前生效的配色主题展示名称 (如: "Darcula", "GitHub Light")
     in-out property <string> current-theme-name: "Darcula";
+    /// 当前生效的底层图形渲染管线 (如: "winit-skia", "winit-skia-opengl", "winit-skia-vulkan", "winit-femtovg")
+    in-out property <string> active-rendering-pipeline: "winit-skia";
+
 
     // -------------------------------------------------------------------------
     // 终端多会话状态属性
@@ -449,10 +452,24 @@ export component AppWindow inherits Window {
     callback debug-clear-logs();
     /// 模拟触发测试诊断日志
     callback debug-emit-test-log(string /* level */);
+    /// 强制全屏重绘测试
+
+    callback debug-force-repaint();
+    /// 终端 120Hz 高频吞吐基准压测
+    callback debug-run-benchmark();
+    /// 切换图形渲染管线首选项
+    callback debug-switch-pipeline(string /* pipeline_id */);
+    /// 保存管线配置 (下次生效)
+    callback debug-apply-pipeline();
+    /// 保存管线并立即重启客户端
+    callback debug-restart-app();
     /// 开发者调试功能开关切换回调
     callback toggle-debug-enabled(bool /* enabled */);
+
     /// 侧边栏/主视图活动页签切换
     callback activity-tab-switched(string /* tab_id */);
+
+
 
 
 
@@ -914,7 +931,16 @@ export component AppWindow inherits Window {
         emit-test-log(level) => { root.debug-emit-test-log(level); }
         switch-theme(id) => { root.switch-theme(id); }
         toggle-color-mode => { root.toggle-color-mode(); }
+        active-pipeline: root.active-rendering-pipeline;
+        switch-pipeline(id) => { root.debug-switch-pipeline(id); }
+        save-pipeline => { root.debug-apply-pipeline(); }
+        restart-app => { root.debug-restart-app(); }
+        force-repaint => { root.debug-force-repaint(); }
+        run-benchmark => { root.debug-run-benchmark(); }
     }
+
+
+
 
     // 快速新建终端会话居中卡片弹窗
     NewSessionModal {

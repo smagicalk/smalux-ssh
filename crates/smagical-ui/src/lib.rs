@@ -93,8 +93,13 @@ pub fn run() -> Result<(), slint::PlatformError> {
     window.set_current_theme_name("Darcula".into());
     window.set_is_dark_mode(true);
 
+    // 初始化图形渲染管线标识
+    let initial_pipeline = std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "winit-skia".to_string());
+    window.set_active_rendering_pipeline(initial_pipeline.into());
+
     // 同步初始化 Debug 日志缓冲区至 Slint 界面
     sync_ui_debug_logs(&window);
+
 
     // 初始化 CoreState 核心状态引擎 (基于 MockStorage 预设种子存储)
     let core_state = Rc::new(CoreState::new_mock());

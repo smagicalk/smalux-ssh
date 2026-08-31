@@ -5,10 +5,10 @@ import { DebugPresetTab } from "debug_workbench/debug-preset-tab.slint";
 import { DebugCrudTab } from "debug_workbench/debug-crud-tab.slint";
 import { DebugLogsTab, LogEntryData } from "debug_workbench/debug-logs-tab.slint";
 import { DebugInspectorTab } from "debug_workbench/debug-inspector-tab.slint";
-
-
+import { DebugRenderingTab } from "debug_workbench/debug-rendering-tab.slint";
 
 export { LogEntryData }
+
 
 /// 开发者全功能独立调试与批量数据生成模态弹窗 (Debug Modal)
 export component DebugModal inherits Rectangle {
@@ -59,8 +59,25 @@ export component DebugModal inherits Rectangle {
     callback switch-theme(string);
     /// 切换深浅色
     callback toggle-color-mode();
+    /// 强制全屏重绘
+    callback force-repaint();
+    /// 终端 120Hz 吞吐基准压测
+    callback run-benchmark();
+    /// 切换图形渲染管线
+    callback switch-pipeline(string);
+
+    /// 保存管线配置 (下次生效)
+    callback save-pipeline();
+    /// 保存管线并立即重启
+    callback restart-app();
+
+    /// 当前激活的管线 ID
+    in property <string> active-pipeline: "winit-skia";
+
+
 
     if is-open: Rectangle {
+
         width: 100%;
         height: 100%;
         background: #00000088; // 半透明暗色背景遮罩
@@ -337,6 +354,43 @@ export component DebugModal inherits Rectangle {
                             }
                         }
                     }
+
+                    // 选项 6: 渲染相关
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 30px;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.active-subtab == "rendering" ? AppTheme.accent : (b-tab6.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        border-width: 1px;
+                        border-color: root.active-subtab == "rendering" ? AppTheme.accent : AppTheme.border;
+
+                        b-tab6 := TouchArea {
+                            clicked => { root.active-subtab = "rendering"; }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+
+                            Image {
+                                source: @image-url("../assets/icons/sparkles.svg");
+                                width: 12px;
+                                height: 12px;
+                                image-fit: contain;
+                                colorize: root.active-subtab == "rendering" ? #ffffff : AppTheme.secondary-foreground;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            Text {
+                                text: @tr("渲染相关");
+                                font-size: 11px;
+                                font-weight: root.active-subtab == "rendering" ? 600 : 500;
+                                color: root.active-subtab == "rendering" ? #ffffff : AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
                 }
 
                 // 分割线
@@ -345,7 +399,7 @@ export component DebugModal inherits Rectangle {
                     background: AppTheme.border;
                 }
 
-                // 3. 内容主体区 (动态切换渲染 5 个子组件)
+                // 3. 内容主体区 (动态切换渲染 6 个子组件)
                 Rectangle {
                     height: 440px;
                     width: 100%;
@@ -390,7 +444,18 @@ export component DebugModal inherits Rectangle {
                         toggle-color-mode => { root.toggle-color-mode(); }
                     }
 
+                    if root.active-subtab == "rendering": DebugRenderingTab {
+                        current-active-pipeline: root.active-pipeline;
+                        switch-pipeline(id) => { root.switch-pipeline(id); }
+                        save-pipeline => { root.save-pipeline(); }
+                        apply-and-restart => { root.restart-app(); }
+                        force-repaint => { root.force-repaint(); }
+                        run-benchmark => { root.run-benchmark(); }
+                    }
+
+
                 }
+
             }
         }
     }
