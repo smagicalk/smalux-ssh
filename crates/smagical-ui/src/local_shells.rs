@@ -314,6 +314,11 @@ fn parse_unix_shell_info(path: &str, is_default: bool) -> (String, String, Strin
     (title_display, sub, tag, id)
 }
 
+/// 快速预设默认本地 Shell 列表 (0 磁盘 I/O，首帧 0ms 瞬间展示)
+pub fn fast_default_shells() -> Vec<LocalShellItemData> {
+    fallback_shells()
+}
+
 fn fallback_shells() -> Vec<LocalShellItemData> {
     #[cfg(windows)]
     {
@@ -351,3 +356,62 @@ fn fallback_shells() -> Vec<LocalShellItemData> {
         ]
     }
 }
+
+/// 本地终端异步预热与全量环境后台探测 Hook (实现 `AppGlobalHook`)
+pub struct LocalShellDiscoveryHook {
+    cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
+    window_weak: slint::Weak<crate::generated::AppWindow>,
+}
+
+impl LocalShellDiscoveryHook {
+    /// 创建一个新的本地终端探测 Hook
+    pub fn new(
+        cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
+        window_weak: slint::Weak<crate::generated::AppWindow>,
+    ) -> Self {
+        Self {
+            cached_shells,
+            window_weak,
+        }
+    }
+}
+
+impl smagical_core::AppGlobalHook for LocalShellDiscoveryHook {
+    fn name(&self) -> &'static str {
+        "local_shell_discovery_hook"
+    }
+
+    fn priority(&self) -> i32 {
+        50
+    }
+
+    /// 应用引导启动时：在后台工作线程中异步探测所有本地终端，0 毫秒阻塞主 UI 线程
+    fn on_app_boot(&self, _ctx: &smagical_core::AppBootContext) {
+        let cached_shells = std::sync::Arc::clone(&self.cached_shells);
+        let window_weak = self.window_weak.clone();
+
+        std::thread::Builder::new()
+            .name("local-shell-detector".into())
+            .spawn(move || {
+                tracing::info!(target: "smagical_ui::local_shells", "开始在后台异步探测本地 Shell 终端环境...");
+                let detected = detect_local_shells();
+                tracing::info!(target: "smagical_ui::local_shells", "后台探测完成，发现 {} 个可用本地终端环境", detected.len());
+
+                // 1. 更新内存共享缓存
+                if let Ok(mut write_guard) = cached_shells.write() {
+                    *write_guard = detected.clone();
+                }
+
+                // 2. 异步回推到 UI 事件循环，就地更新 Slint 启动器数据模型
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(
+                            slint::VecModel::from(detected),
+                        )));
+                    }
+                });
+            })
+            .ok();
+    }
+}
+

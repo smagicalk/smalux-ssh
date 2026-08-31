@@ -5,9 +5,9 @@ use slint::ComponentHandle;
 use smagical_core::HistoryRecord;
 
 
-use crate::debug_ui::sync_ui_debug_logs;
 use crate::generated::{AppWindow, HistoryGroupData, HistoryItemData};
 use crate::handlers::AppContext;
+
 
 /// 将 Unix 秒时间戳格式化为本地可读的具体日期时间字符串 (格式: "YYYY-MM-DD HH:MM:SS")
 pub(crate) fn format_datetime(timestamp: u64) -> String {
@@ -112,31 +112,34 @@ fn map_history_item(r: &HistoryRecord, _now: u64, is_aggregated: bool) -> Histor
 }
 
 
-/// 同步更新 Slint 历史抽屉数据与视图
-pub(crate) fn sync_ui_history(window: &AppWindow, ctx: &AppContext) {
+/// 独立更新 Slint 历史抽屉数据与视图 (线程安全入参)
+pub(crate) fn sync_ui_history_from_state(
+    window: &AppWindow,
+    storage: &dyn smagical_core::AppStorage,
+    search_q: &str,
+    view_mode: &str,
+    collapsed_set: &std::collections::HashSet<String>,
+) {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
         .unwrap_or(1725019200);
 
-    let all_records = ctx.core_state.storage().history().list_all().unwrap_or_default();
+    let all_records = storage.history().list_all().unwrap_or_default();
     let total_count = all_records.len() as i32;
-
-    let search_q = ctx.history_search_query.borrow().to_lowercase();
-    let view_mode = ctx.history_view_mode.borrow().clone();
-    let collapsed_set = ctx.collapsed_history_groups.borrow();
+    let search_q_lower = search_q.to_lowercase();
 
     // 过滤逻辑
-    let filtered_records: Vec<HistoryRecord> = if search_q.is_empty() {
+    let filtered_records: Vec<HistoryRecord> = if search_q_lower.is_empty() {
         all_records
     } else {
         all_records
             .into_iter()
             .filter(|r| {
-                r.title.to_lowercase().contains(&search_q)
-                    || r.address.to_lowercase().contains(&search_q)
-                    || r.username.to_lowercase().contains(&search_q)
-                    || r.session_type.to_lowercase().contains(&search_q)
+                r.title.to_lowercase().contains(&search_q_lower)
+                    || r.address.to_lowercase().contains(&search_q_lower)
+                    || r.username.to_lowercase().contains(&search_q_lower)
+                    || r.session_type.to_lowercase().contains(&search_q_lower)
             })
             .collect()
     };
@@ -203,7 +206,6 @@ pub(crate) fn sync_ui_history(window: &AppWindow, ctx: &AppContext) {
             } else {
                 let diff = now.saturating_sub(r.connected_at);
                 if diff < 86400 {
-
                     today_items.push(item);
                 } else if diff < 172800 {
                     yesterday_items.push(item);
@@ -258,6 +260,21 @@ pub(crate) fn sync_ui_history(window: &AppWindow, ctx: &AppContext) {
     window.set_history_groups(slint::ModelRc::from(Rc::new(slint::VecModel::from(groups))));
 }
 
+/// 同步更新 Slint 历史抽屉数据与视图
+pub(crate) fn sync_ui_history(window: &AppWindow, ctx: &AppContext) {
+    let search_q = ctx.history_search_query.borrow().clone();
+    let view_mode = ctx.history_view_mode.borrow().clone();
+    let collapsed_set = ctx.collapsed_history_groups.borrow().clone();
+    sync_ui_history_from_state(
+        window,
+        ctx.core_state.storage().as_ref(),
+        &search_q,
+        &view_mode,
+        &collapsed_set,
+    );
+}
+
+
 /// 注册历史会话抽屉交互回调
 pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 1. 重连历史会话 (在当前焦点窗格中打开)
@@ -279,7 +296,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = ctx_recon.core_state.storage().history().save(&h);
 
                 tracing::info!(target: "smagical_ui::history", "历史会话触发重连: {} ({})", h.title, target_id);
-                sync_ui_debug_logs(&w);
                 sync_ui_history(&w, &ctx_recon);
 
                 // 发起连接
@@ -310,7 +326,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = ctx_recon_split.core_state.storage().history().save(&h);
 
                 tracing::info!(target: "smagical_ui::history", "历史会话分屏重连: {} ({})", h.title, target_id);
-                sync_ui_debug_logs(&w);
                 sync_ui_history(&w, &ctx_recon_split);
 
                 // 在新分屏中打开
@@ -319,7 +334,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
-
     // 3. 删除单条历史记录
     let window_weak = window.as_weak();
     let ctx_del = ctx.clone();
@@ -327,7 +341,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_del.core_state.storage().history().delete(&hist_id);
             tracing::info!(target: "smagical_ui::history", "删除历史会话记录: {}", hist_id);
-            sync_ui_debug_logs(&w);
             sync_ui_history(&w, &ctx_del);
         }
     });
@@ -339,7 +352,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_clr.core_state.storage().history().clear_all(true);
             tracing::info!(target: "smagical_ui::history", "清空历史记录 (保留置顶项)");
-            sync_ui_debug_logs(&w);
             sync_ui_history(&w, &ctx_clr);
         }
     });
@@ -351,10 +363,10 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let is_pinned = ctx_pin.core_state.storage().history().toggle_pin(&hist_id).unwrap_or_default();
             tracing::info!(target: "smagical_ui::history", "切换历史会话置顶状态: {} -> {}", hist_id, if is_pinned { "⭐️ 已置顶" } else { "取消置顶" });
-            sync_ui_debug_logs(&w);
             sync_ui_history(&w, &ctx_pin);
         }
     });
+
 
     // 6. 切换时间分组折叠展开
     let window_weak = window.as_weak();
@@ -372,7 +384,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             };
             drop(set);
             tracing::debug!(target: "smagical_ui::history", "切换历史时间分组折叠: {} ({})", gid, if is_collapsed { "已折叠" } else { "已展开" });
-            sync_ui_debug_logs(&w);
             sync_ui_history(&w, &ctx_grp);
         }
     });
@@ -386,7 +397,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_search.history_search_query.borrow_mut() = q.clone();
             if !q.is_empty() {
                 tracing::debug!(target: "smagical_ui::history", "历史记录搜索过滤: \"{}\"", q);
-                sync_ui_debug_logs(&w);
             }
             sync_ui_history(&w, &ctx_search);
         }
@@ -399,7 +409,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             *ctx_mode.history_view_mode.borrow_mut() = mode.to_string();
             tracing::debug!(target: "smagical_ui::history", "切换历史视图模式: {}", mode);
-            sync_ui_debug_logs(&w);
             sync_ui_history(&w, &ctx_mode);
         }
     });
@@ -438,32 +447,28 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             w.set_is_history_detail_open(true);
 
             tracing::info!(target: "smagical_ui::history", "查看历史会话详情与快照: {} (用户: {}, 地址: {}, 快照: {} 行)", hist.title, hist.username, hist.address, snapshot_lines);
-            sync_ui_debug_logs(&w);
         }
     });
 
     // 10. 复制历史终端快照日志到剪贴板
-    let window_weak = window.as_weak();
     window.on_copy_history_log(move |content| {
         let chars = content.chars().count();
         let lines = content.lines().count();
         if let Ok(mut cb) = arboard::Clipboard::new() {
             let _ = cb.set_text(content.to_string());
             tracing::info!(target: "smagical_ui::history", "终端输出快照已复制到系统剪贴板 (共 {} 行, {} 字符)", lines, chars);
-            if let Some(w) = window_weak.upgrade() {
-                sync_ui_debug_logs(&w);
-            }
         }
     });
 
-    // 11. 活动栏视图切换导航日志
-    let window_weak = window.as_weak();
+    // 11. 活动栏视图切换导航日志与全局 Hook 广播
+    let core_state_nav = ctx.core_state.clone();
     window.on_activity_tab_switched(move |tab_id| {
-        if let Some(w) = window_weak.upgrade() {
-            tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
-            sync_ui_debug_logs(&w);
-        }
+        core_state_nav.app_hooks().dispatch_left_menu_clicked(&tab_id, "");
+        tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
     });
+
+
+
 }
 
 

@@ -137,4 +137,48 @@ pub(crate) fn sync_active_session_ui(
     }
 }
 
+/// 会话退出异步持久化守护与应用退出等待守卫。
+#[derive(Clone, Default)]
+pub(crate) struct SessionPersistenceGuard {
+    pending_handles: std::sync::Arc<std::sync::Mutex<Vec<std::thread::JoinHandle<()>>>>,
+}
+
+impl SessionPersistenceGuard {
+    /// 派发一个异步后台会话历史与快照持久化任务
+    pub(crate) fn spawn<F>(&self, task: F)
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        if let Ok(handle) = std::thread::Builder::new()
+            .name("session-history-flusher".into())
+            .spawn(task)
+            && let Ok(mut list) = self.pending_handles.lock()
+        {
+            list.retain(|h| !h.is_finished());
+            list.push(handle);
+        }
+
+    }
+
+    /// 应用即将退出时：阻塞等待所有未完成的后台持久化落盘任务（带最大超时保护）
+    pub(crate) fn flush_and_wait(&self, timeout: std::time::Duration) {
+        let start = std::time::Instant::now();
+        let handles = if let Ok(mut list) = self.pending_handles.lock() {
+            std::mem::take(&mut *list)
+        } else {
+            Vec::new()
+        };
+
+        for h in handles {
+            let elapsed = start.elapsed();
+            if elapsed >= timeout {
+                tracing::warn!(target: "smagical_ui::session", "会话后台持久化等待超时");
+                break;
+            }
+            let _ = h.join();
+        }
+    }
+}
+
+
 

@@ -12,7 +12,13 @@ use crate::generated::{AppWindow, LogEntryData};
 /// # 参数
 /// - `w`: Slint 主窗口句柄引用
 pub(crate) fn sync_ui_debug_logs(w: &AppWindow) {
+    if !smagical_debug::is_debug_enabled() {
+        w.set_debug_logs(slint::ModelRc::default());
+        return;
+    }
+
     if let Ok(buf) = smagical_debug::get_global_log_buffer().lock() {
+
         let entries = buf.get_all();
         let slint_entries: Vec<LogEntryData> = entries
             .into_iter()

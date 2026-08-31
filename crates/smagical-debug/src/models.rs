@@ -38,8 +38,9 @@ impl DebugLogLevel {
 }
 
 /// 开发者实时事件日志条目 (Log Entry)
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct DebugLogEntry {
+
     /// 时间戳 (格式: "HH:mm:ss")
     pub timestamp: String,
     /// 日志等级 ("INFO", "DEBUG", "WARN", "ERROR")

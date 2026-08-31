@@ -18,8 +18,13 @@ export component SettingsDrawer inherits DrawerContainer {
 
 
     in property <string> current-theme-id: "builtin.ui.darcula";
+    /// 开发者调试控制台开关
+    in-out property <bool> is-debug-enabled: true;
 
     callback switch-theme(string /* theme_id */);
+    /// 切换开发者调试开关回调
+    callback toggle-debug-enabled(bool /* enabled */);
+
 
     VerticalLayout {
         padding: 10px;
@@ -113,5 +118,69 @@ export component SettingsDrawer inherits DrawerContainer {
                 }
             }
         }
+
+        // 开发者控制台开关卡片
+        Rectangle {
+            height: 56px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                alignment: space-between;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+
+                    Text {
+                        text: @tr("🛠️ 开发者调试控制台");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                    }
+
+                    Text {
+                        text: @tr("在左侧栏显示调试入口并开启诊断抓取");
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                }
+
+                // 精致滑动开关 (Toggle Switch)
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 36px;
+                        height: 20px;
+                        border-radius: 10px;
+                        background: root.is-debug-enabled ? AppTheme.accent : AppTheme.border;
+                        animate background { duration: 150ms; }
+
+                        Rectangle {
+                            x: root.is-debug-enabled ? parent.width - self.width - 2px : 2px;
+                            y: 2px;
+                            width: 16px;
+                            height: 16px;
+                            border-radius: 8px;
+                            background: white;
+                            animate x { duration: 150ms; }
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.is-debug-enabled = !root.is-debug-enabled;
+                                root.toggle-debug-enabled(root.is-debug-enabled);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
     }
 }
+

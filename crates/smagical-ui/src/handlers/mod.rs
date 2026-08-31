@@ -41,8 +41,9 @@ pub(crate) struct AppContext {
 
     /// 新增终端会话的自增序号计数器 (Next Session Sequence ID)
     pub next_session_num: Rc<RefCell<usize>>,
-    /// 启动时探测到的本地可用 Shell 环境列表只读缓存 (Cached Local Shells)
-    pub cached_shells: Rc<Vec<LocalShellItemData>>,
+    /// 启动时预热与后台探测到的本地可用 Shell 环境列表缓存 (Cached Local Shells)
+    pub cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
+
     /// 全局配色主题管理器服务 (Theme Service)
     pub themes: Rc<ThemeService>,
     /// 终端像素帧光栅化渲染器实例 (Terminal Renderer)
@@ -64,7 +65,10 @@ pub(crate) struct AppContext {
     pub history_view_mode: Rc<RefCell<String>>,
     /// 历史抽屉搜索关键词
     pub history_search_query: Rc<RefCell<String>>,
+    /// 会话后台异步持久化与退出等待守卫 (Session Persistence Guard)
+    pub persistence_guard: std::sync::Arc<crate::session::SessionPersistenceGuard>,
 }
+
 
 /// 统一注册挂载所有 Slint UI 回调处理器。
 ///

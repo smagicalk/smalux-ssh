@@ -26,6 +26,10 @@ pub(crate) mod handlers;
 /// 终端引擎核心层 (PTY 进程托管与 VT100 状态机)。
 pub mod terminal;
 
+/// 快速新建终端启动器后台异步预热 Hook 模块。
+pub(crate) mod launcher_prewarm;
+
+
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -67,10 +71,10 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     let window = AppWindow::new()?;
 
-    // 启动时一次性探测本地 Shell 环境并缓存 (避免每次搜索都重新扫描文件系统)
-    let cached_shells = Rc::new(local_shells::detect_local_shells());
+    // 启动时使用 0 磁盘 I/O 预设快速 Shell 列表初始化 UI，首帧 0ms 瞬间渲染
+    let cached_shells = std::sync::Arc::new(std::sync::RwLock::new(local_shells::fast_default_shells()));
     window.set_launcher_local_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-        (*cached_shells).clone(),
+        cached_shells.read().unwrap().clone(),
     ))));
 
     // 初始化核心主题服务
@@ -94,6 +98,26 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 初始化 CoreState 核心状态引擎 (基于 MockStorage 预设种子存储)
     let core_state = Rc::new(CoreState::new_mock());
+
+    // 注册本地终端异步预热与文件系统后台探测 Hook (0ms 阻塞主线程)
+    core_state.app_hooks().register(std::sync::Arc::new(local_shells::LocalShellDiscoveryHook::new(
+        std::sync::Arc::clone(&cached_shells),
+        window.as_weak(),
+    )));
+
+    // 注册启动器资产数据后台异步预热 Hook
+    core_state.app_hooks().register(std::sync::Arc::new(launcher_prewarm::LauncherPrewarmHook::new(
+        core_state.storage().clone(),
+        window.as_weak(),
+    )));
+
+
+
+    // 触发全局应用启动 Hook 引导生命周期 (自动驱动后台线程探测本地终端)
+    let boot_ctx = smagical_core::AppBootContext::new(std::env::args().collect());
+    core_state.app_hooks().dispatch_app_boot(&boot_ctx);
+
+
 
     // 从存储层读取初始主控树形结构与分组生成器
     let initial_tree = build_raw_tree_from_storage(core_state.storage().as_ref());
@@ -166,8 +190,12 @@ pub fn run() -> Result<(), slint::PlatformError> {
         .collect();
     let master_cards = Rc::new(RefCell::new(initial_cards.clone()));
     window.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(
+        initial_cards.clone(),
+    ))));
+    window.set_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(
         initial_cards,
     ))));
+
 
     let next_session_num = Rc::new(RefCell::new(1));
     let active_terminals = Rc::new(RefCell::new(std::collections::HashMap::new()));
@@ -184,8 +212,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 构造全局应用上下文
     let ctx = AppContext {
-        core_state,
+        core_state: Rc::clone(&core_state),
         master_tree,
+
         master_cards,
         expanded_groups,
         selector_expanded_groups,
@@ -205,7 +234,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
         collapsed_history_groups,
         history_view_mode,
         history_search_query,
+        persistence_guard: std::sync::Arc::new(crate::session::SessionPersistenceGuard::default()),
     };
+
 
     // 初始同步历史会话抽屉数据
     handlers::history_handlers::sync_ui_history(&window, &ctx);
@@ -412,8 +443,12 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
 
 
+    // 触发全局应用界面首帧就绪 Hook 生命周期
+    core_state.app_hooks().dispatch_app_ready();
+
     window.run()?;
     Ok(())
+
 }
 
 /// 智能就地更新 Slint 动态数据模型（仅在行数据发生变化时更新行，杜绝全量 reset 导致 UI 组件重构与鼠标拖拽焦点丢失）。

@@ -1,4 +1,4 @@
-//! 主机与分组资产管理、树形/列表视图拖拽移动、快速打开终端等交互回调绑定。
+﻿//! 主机与分组资产管理、树形/列表视图拖拽移动、快速打开终端等交互回调绑定。
 //!
 //! 包含多级分组嵌套维护、无环拓扑防呆校验、平滑调序与动态视口宽度计算。
 
@@ -6,7 +6,6 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 use smagical_core::GroupRecord;
 
-use crate::debug_ui::sync_ui_debug_logs;
 use crate::generated::{AppWindow, HostItemData};
 use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, TerminalSessionInfo};
@@ -81,7 +80,6 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let gname = tree.iter().find(|n| n.id == id_str).map(|n| n.name.as_str()).unwrap_or(id_str.as_str());
             tracing::debug!(target: "smagical_ui::tree", "{}分组: {} (已同步存储层)", if is_expanding { "展开" } else { "折叠" }, gname);
-            sync_ui_debug_logs(&w);
         }
     });
 
@@ -141,7 +139,6 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
-                    sync_ui_debug_logs(&w);
                 }
                 return;
             }
@@ -221,11 +218,9 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已同步存储层)", src_name, pos_str, target_name);
-                    sync_ui_debug_logs(&w);
                 }
                 Err(err_msg) => {
                     tracing::warn!(target: "smagical_ui::hosts", "移动节点被阻止: {}", err_msg);
-                    sync_ui_debug_logs(&w);
                 }
             }
         }
@@ -438,7 +433,6 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_ui::tree", "创建新分组: {} (上级: {}, 已同步存储层)", g_name, if p_id.is_empty() { "根目录" } else { &p_id });
-            sync_ui_debug_logs(&w);
         }
     });
 
@@ -485,7 +479,6 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             if !q.is_empty() {
                 tracing::debug!(target: "smagical_ui::search", "过滤主机资产: '{}'", q);
-                sync_ui_debug_logs(&w);
             }
         }
     });
@@ -504,7 +497,8 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_open = Rc::clone(&ctx.active_terminals);
     let next_session_num_open = Rc::clone(&ctx.next_session_num);
     let next_pane_num_open = Rc::clone(&ctx.next_pane_num);
-    let cached_shells_open = Rc::clone(&ctx.cached_shells);
+    let cached_shells_open = std::sync::Arc::clone(&ctx.cached_shells);
+
     let ctx_open = ctx.clone();
     window.on_open_host(move |host_id| {
 
@@ -516,8 +510,9 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 let sess_id = format!("sess-{}", *num);
                 *num += 1;
 
-                let all_shells = &*cached_shells_open;
+                let all_shells = cached_shells_open.read().unwrap();
                 let (base_name, addr) = if let Some(sh) = all_shells.iter().find(|s| s.id == h_id.as_str()) {
+
                     (sh.title.to_string(), format!("Local ({})", sh.subtitle))
                 } else {
                     ("Local Terminal".to_string(), "127.0.0.1".to_string())
@@ -627,7 +622,6 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "成功打开终端会话 (Pane ID: {})", *active_pid);
-            sync_ui_debug_logs(&w);
         }
     });
 }

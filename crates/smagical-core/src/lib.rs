@@ -4,11 +4,17 @@
 
 #![deny(missing_docs)]
 
+pub mod app_hook;
 pub mod domain;
 pub mod hook;
 pub mod state;
 pub mod storage;
 pub mod theme;
+
+pub use app_hook::{
+    AppBootContext, AppExitContext, AppGlobalHook, AppGlobalHookEngine, AutoConfigBackupHook,
+    ConfigChangeEvent, FunctionalGlobalHook, ListenerHandle, WindowState,
+};
 
 pub use domain::{
     group::GroupRecord,
@@ -21,6 +27,7 @@ pub use hook::{
     FunctionalHook, HistoryTrackingHook, HookDecision, HookEngine, HostMetadata, SessionAuditLogger,
     SessionContext, TerminalError, TerminalHook,
 };
+
 
 
 pub use state::core_state::CoreState;

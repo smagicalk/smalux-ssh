@@ -5,7 +5,6 @@
 use std::rc::Rc;
 use slint::ComponentHandle;
 
-use crate::debug_ui::sync_ui_debug_logs;
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, PaneGroup};
@@ -86,26 +85,45 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
-            sync_ui_debug_logs(&w);
 
             let session_ctx = smagical_core::SessionContext::new(
                 id_str.clone(),
                 active_pid.clone(),
                 smagical_core::HostMetadata::local_shell(&id_str),
             );
-            if let Some((lines_count, snap_text)) = snapshot_opt {
-                let hist_id = format!("hist-{}", id_str);
-                let _ = ctx_close.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
-                if let Ok(Some(mut h)) = ctx_close.core_state.storage().history().get_by_id(&hist_id) {
-                    h.record_snapshot(lines_count);
-                    let _ = ctx_close.core_state.storage().history().save(&h);
+            let storage_async = ctx_close.core_state.storage().clone();
+            let hooks_async = ctx_close.core_state.hooks().clone();
+            let window_weak_async = window_weak.clone();
+            let search_q = ctx_close.history_search_query.borrow().clone();
+            let view_mode = ctx_close.history_view_mode.borrow().clone();
+            let collapsed = ctx_close.collapsed_history_groups.borrow().clone();
+
+            ctx_close.persistence_guard.spawn(move || {
+                if let Some((lines_count, snap_text)) = snapshot_opt {
+                    let hist_id = format!("hist-{}", id_str);
+                    let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500);
+                    if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id) {
+                        h.record_snapshot(lines_count);
+                        let _ = storage_async.history().save(&h);
+                    }
                 }
-            }
-            // 触发 Hook 引擎 post_close 生命周期 (自动由 HistoryTrackingHook 标记关闭并更新状态)
-            ctx_close.core_state.hooks().dispatch_post_close(&session_ctx);
-            crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close);
+                // 触发 Hook 引擎 post_close 生命周期 (自动由 HistoryTrackingHook 标记关闭并更新状态)
+                hooks_async.dispatch_post_close(&session_ctx);
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w_ui) = window_weak_async.upgrade() {
+                        crate::handlers::history_handlers::sync_ui_history_from_state(
+                            &w_ui,
+                            storage_async.as_ref(),
+                            &search_q,
+                            &view_mode,
+                            &collapsed,
+                        );
+                    }
+                });
+            });
         }
     });
+
 
 
     // -------------------------------------------------------------------------
@@ -118,6 +136,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_close_pane_tab = Rc::clone(&ctx.active_terminals);
     let ctx_close_pane = ctx.clone();
     window.on_close_pane_tab(move |pane_id, tab_id| {
+
         if let Some(w) = window_weak.upgrade() {
             let p_id = pane_id.to_string();
             let t_id = tab_id.to_string();
@@ -135,26 +154,24 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = instance.pty.kill();
             }
 
-            // 1. 定位目标窗格组（优先按 pane_id 匹配，兜底按包含该 tab_id 的窗格组匹配）
-            let target_group_idx = groups.iter().position(|g| g.pane_id == p_id)
-                .or_else(|| groups.iter().position(|g| g.tabs.iter().any(|t| t.session_id == t_id)));
-
-            let mut remove_group_idx = None;
-            if let Some(idx) = target_group_idx {
-                let g = &mut groups[idx];
-                if let Some(pos) = g.tabs.iter().position(|t| t.session_id == t_id) {
-                    g.tabs.remove(pos);
-                    if g.active_tab_id == t_id && !g.tabs.is_empty() {
-                        let next_pos = if pos > 0 { pos - 1 } else { 0 };
-                        g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
+            let mut target_group_idx = None;
+            for (idx, g) in groups.iter_mut().enumerate() {
+                if g.pane_id == p_id {
+                    if let Some(pos) = g.tabs.iter().position(|t| t.session_id == t_id) {
+                        g.tabs.remove(pos);
+                        target_group_idx = Some(idx);
+                        if g.active_tab_id == t_id && !g.tabs.is_empty() {
+                            let next_pos = if pos > 0 { pos - 1 } else { 0 };
+                            g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
+                        }
                     }
-                }
-                if g.tabs.is_empty() {
-                    remove_group_idx = Some(idx);
+                    break;
                 }
             }
 
-            if let Some(idx) = remove_group_idx {
+            if let Some(idx) = target_group_idx
+                && groups[idx].tabs.is_empty()
+            {
                 let closed_pid = groups[idx].pane_id.clone();
                 groups.remove(idx);
 
@@ -176,66 +193,83 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
-            sync_ui_debug_logs(&w);
 
             let session_ctx = smagical_core::SessionContext::new(
                 t_id.clone(),
                 p_id.clone(),
                 smagical_core::HostMetadata::local_shell(&t_id),
             );
-            if let Some((lines_count, snap_text)) = snapshot_opt {
-                let hist_id = format!("hist-{}", t_id);
-                let _ = ctx_close_pane.core_state.storage().history().save_snapshot(&hist_id, &snap_text, 500);
-                if let Ok(Some(mut h)) = ctx_close_pane.core_state.storage().history().get_by_id(&hist_id) {
-                    h.record_snapshot(lines_count);
-                    let _ = ctx_close_pane.core_state.storage().history().save(&h);
+            let storage_async = ctx_close_pane.core_state.storage().clone();
+            let hooks_async = ctx_close_pane.core_state.hooks().clone();
+            let window_weak_async = window_weak.clone();
+            let search_q = ctx_close_pane.history_search_query.borrow().clone();
+            let view_mode = ctx_close_pane.history_view_mode.borrow().clone();
+            let collapsed = ctx_close_pane.collapsed_history_groups.borrow().clone();
+
+            ctx_close_pane.persistence_guard.spawn(move || {
+                if let Some((lines_count, snap_text)) = snapshot_opt {
+                    let hist_id = format!("hist-{}", t_id);
+                    let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500);
+                    if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id) {
+                        h.record_snapshot(lines_count);
+                        let _ = storage_async.history().save(&h);
+                    }
                 }
-            }
-            // 触发 Hook 引擎 post_close 生命周期
-            ctx_close_pane.core_state.hooks().dispatch_post_close(&session_ctx);
-            crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane);
+                // 触发 Hook 引擎 post_close 生命周期
+                hooks_async.dispatch_post_close(&session_ctx);
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w_ui) = window_weak_async.upgrade() {
+                        crate::handlers::history_handlers::sync_ui_history_from_state(
+                            &w_ui,
+                            storage_async.as_ref(),
+                            &search_q,
+                            &view_mode,
+                            &collapsed,
+                        );
+                    }
+                });
+            });
         }
     });
+
+
 
 
     // -------------------------------------------------------------------------
     // 1.2 复制指定 Tab 会话对应的主机 IP / 连接地址
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_copy_ip = Rc::clone(&ctx.pane_groups);
     window.on_copy_tab_ip(move |tab_id| {
-        if let Some(w) = window_weak.upgrade() {
-            let t_id = tab_id.to_string();
-            let groups = pane_groups_copy_ip.borrow();
-            let mut found_ip = None;
-            let mut host_name = String::new();
+        let t_id = tab_id.to_string();
+        let groups = pane_groups_copy_ip.borrow();
+        let mut found_ip = None;
+        let mut host_name = String::new();
 
-            for g in groups.iter() {
-                if let Some(s) = g.tabs.iter().find(|t| t.session_id == t_id) {
-                    // 如果地址中包含端口 (如 192.168.1.1:22)，则优先提取纯 IP，纯本地 Shell 保留 127.0.0.1
-                    let raw_addr = &s.host_address;
-                    let clean_ip = if raw_addr.starts_with("Local") || raw_addr.is_empty() {
-                        "127.0.0.1".to_string()
-                    } else if let Some((ip_part, _)) = raw_addr.split_once(':') {
-                        ip_part.to_string()
-                    } else {
-                        raw_addr.clone()
-                    };
-                    found_ip = Some(clean_ip);
-                    host_name = s.host_name.clone();
-                    break;
-                }
-            }
-
-            if let Some(ip) = found_ip
-                && let Ok(mut cb) = arboard::Clipboard::new()
-            {
-                let _ = cb.set_text(ip.clone());
-                tracing::info!(target: "smagical_ui::session", "已将会话 [{}] 对应主机 [{}] 的 IP [{}] 复制到剪贴板", t_id, host_name, ip);
-                sync_ui_debug_logs(&w);
+        for g in groups.iter() {
+            if let Some(s) = g.tabs.iter().find(|t| t.session_id == t_id) {
+                // 如果地址中包含端口 (如 192.168.1.1:22)，则优先提取纯 IP，纯本地 Shell 保留 127.0.0.1
+                let raw_addr = &s.host_address;
+                let clean_ip = if raw_addr.starts_with("Local") || raw_addr.is_empty() {
+                    "127.0.0.1".to_string()
+                } else if let Some((ip_part, _)) = raw_addr.split_once(':') {
+                    ip_part.to_string()
+                } else {
+                    raw_addr.clone()
+                };
+                found_ip = Some(clean_ip);
+                host_name = s.host_name.clone();
+                break;
             }
         }
+
+        if let Some(ip) = found_ip
+            && let Ok(mut cb) = arboard::Clipboard::new()
+        {
+            let _ = cb.set_text(ip.clone());
+            tracing::info!(target: "smagical_ui::session", "已将会话 [{}] 对应主机 [{}] 的 IP [{}] 复制到剪贴板", t_id, host_name, ip);
+        }
     });
+
 
 
     // -------------------------------------------------------------------------
@@ -271,36 +305,66 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 });
                 g.active_tab_id = t_id.clone();
 
-                // 批量清理被移除会话的底层进程并触发 Hook post_close 记录历史
+                // 批量清理被移除会话的底层进程并准备快照数据
                 let mut terminals = active_terminals_close_others.borrow_mut();
+                let mut persist_items = Vec::new();
                 for rem_id in removed_tabs {
                     if let Some(mut inst) = terminals.remove(&rem_id) {
                         let snap = inst.snapshot_text(500);
                         let _ = inst.pty.kill();
-                        let hist_id = format!("hist-{}", rem_id);
-                        if !snap.trim().is_empty() {
-                            let _ = ctx_close_others.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
-                            if let Ok(Some(mut hist)) = ctx_close_others.core_state.storage().history().get_by_id(&hist_id) {
-                                hist.record_snapshot(snap.lines().count() as u32);
-                                let _ = ctx_close_others.core_state.storage().history().save(&hist);
-                            }
-                        }
+                        let snap_opt = if !snap.trim().is_empty() {
+                            Some((snap.lines().count() as u32, snap))
+                        } else {
+                            None
+                        };
                         let session_ctx = smagical_core::SessionContext::new(
                             rem_id.clone(),
                             p_id.clone(),
                             smagical_core::HostMetadata::local_shell(&rem_id),
                         );
-                        ctx_close_others.core_state.hooks().dispatch_post_close(&session_ctx);
+                        persist_items.push((rem_id, snap_opt, session_ctx));
                     }
                 }
-                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_others);
+                drop(terminals);
 
+                let storage_async = ctx_close_others.core_state.storage().clone();
+                let hooks_async = ctx_close_others.core_state.hooks().clone();
+                let window_weak_async = window_weak.clone();
+                let search_q = ctx_close_others.history_search_query.borrow().clone();
+                let view_mode = ctx_close_others.history_view_mode.borrow().clone();
+                let collapsed = ctx_close_others.collapsed_history_groups.borrow().clone();
+
+                ctx_close_others.persistence_guard.spawn(move || {
+                    for (rem_id, snap_opt, session_ctx) in persist_items {
+                        if let Some((lines_count, snap)) = snap_opt {
+                            let hist_id = format!("hist-{}", rem_id);
+                            let _ = storage_async.history().save_snapshot(&hist_id, &snap, 500);
+                            if let Ok(Some(mut hist)) = storage_async.history().get_by_id(&hist_id) {
+                                hist.record_snapshot(lines_count);
+                                let _ = storage_async.history().save(&hist);
+                            }
+                        }
+                        hooks_async.dispatch_post_close(&session_ctx);
+                    }
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w_ui) = window_weak_async.upgrade() {
+                            crate::handlers::history_handlers::sync_ui_history_from_state(
+                                &w_ui,
+                                storage_async.as_ref(),
+                                &search_q,
+                                &view_mode,
+                                &collapsed,
+                            );
+                        }
+                    });
+                });
             }
+
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭其他会话，保留: {}", p_id, t_id);
-            sync_ui_debug_logs(&w);
+
         }
     });
 
@@ -363,47 +427,28 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 3. 呼出新建终端会话弹窗回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let master_tree_reset = Rc::clone(&ctx.master_tree);
-    let cached_shells_new_tab = Rc::clone(&ctx.cached_shells);
     window.on_new_tab(move || {
-        if let Some(w) = window_weak.upgrade() {
-            w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from((*cached_shells_new_tab).clone()))));
-
-            let tree = master_tree_reset.borrow();
-            let all_hosts: Vec<HostItemData> = tree
-                .iter()
-                .filter(|n| !n.is_group)
-                .map(|n| HostItemData {
-                    id: n.id.clone().into(),
-                    name: n.name.clone().into(),
-                    address: n.address.clone().into(),
-                    port: n.port,
-                    group: "".into(),
-                    status: n.status.clone().into(),
-                    ping_ms: n.ping_ms,
-                })
-                .collect();
-            w.set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_hosts))));
-
+        if let Some(_w) = window_weak.upgrade() {
             tracing::info!(target: "smagical_ui::session", "呼出快速新建会话中心");
-            sync_ui_debug_logs(&w);
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 4. 快速新建会话中心实时关键词搜索过滤回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let master_tree_launcher = Rc::clone(&ctx.master_tree);
-    let cached_shells_launcher = Rc::clone(&ctx.cached_shells);
+    let cached_shells_launcher = std::sync::Arc::clone(&ctx.cached_shells);
     window.on_filter_launcher(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_lowercase();
+            let all_cached = cached_shells_launcher.read().unwrap();
 
             let filtered_locals: Vec<LocalShellItemData> = if q.is_empty() {
-                (*cached_shells_launcher).clone()
+                all_cached.clone()
             } else {
-                cached_shells_launcher
+                all_cached
                     .iter()
                     .filter(|s| {
                         let t = s.title.to_lowercase();
@@ -447,65 +492,59 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     ping_ms: n.ping_ms,
                 })
                 .collect();
-
             w.set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_hosts))));
         }
     });
 
+
+
     // -------------------------------------------------------------------------
     // 5. 快捷指令片段发送回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_snippet = Rc::clone(&ctx.pane_groups);
     let active_pane_id_snippet = Rc::clone(&ctx.active_pane_id);
     let active_terminals_snippet = Rc::clone(&ctx.active_terminals);
     window.on_send_snippet(move |cmd| {
-        if let Some(w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_snippet.borrow().clone();
-            let groups = pane_groups_snippet.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let mut terminals = active_terminals_snippet.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                    let cmd_str = format!("{}\n", cmd);
-                    let _ = instance.send_input(&cmd_str);
-                }
-                tracing::info!(target: "smagical_ui::cmd", "向终端发送指令片段: {}", cmd);
-                sync_ui_debug_logs(&w);
+        let active_pid = active_pane_id_snippet.borrow().clone();
+        let groups = pane_groups_snippet.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_snippet.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let cmd_str = format!("{}\n", cmd);
+                let _ = instance.send_input(&cmd_str);
             }
+            tracing::info!(target: "smagical_ui::cmd", "向终端发送指令片段: {}", cmd);
         }
     });
 
     // -------------------------------------------------------------------------
     // 6. 终端按键输入捕获回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_input = Rc::clone(&ctx.pane_groups);
     let active_pane_id_input = Rc::clone(&ctx.active_pane_id);
     let active_terminals_input = Rc::clone(&ctx.active_terminals);
     window.on_terminal_key_input(move |text, is_ctrl, is_shift, is_alt| {
-        if let Some(_w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_input.borrow().clone();
-            let groups = pane_groups_input.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let mut terminals = active_terminals_input.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                    if is_shift && (text == "\u{0012}" || text == "PageUp") {
-                        instance.scroll_page_up();
-                        return;
-                    }
-                    if is_shift && (text == "\u{0013}" || text == "PageDown") {
-                        instance.scroll_page_down();
-                        return;
-                    }
-
-                    instance.scroll_to_bottom();
-                    let bytes = encode_key_event(text.as_str(), is_ctrl, is_shift, is_alt);
-                    let _ = instance.send_bytes(&bytes);
+        let active_pid = active_pane_id_input.borrow().clone();
+        let groups = pane_groups_input.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_input.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                if is_shift && (text == "\u{0012}" || text == "PageUp") {
+                    instance.scroll_page_up();
+                    return;
                 }
+                if is_shift && (text == "\u{0013}" || text == "PageDown") {
+                    instance.scroll_page_down();
+                    return;
+                }
+
+                instance.scroll_to_bottom();
+                let bytes = encode_key_event(text.as_str(), is_ctrl, is_shift, is_alt);
+                let _ = instance.send_bytes(&bytes);
             }
         }
     });
@@ -513,31 +552,28 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 7. 终端滚轮视口滚动回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_scroll = Rc::clone(&ctx.pane_groups);
     let active_pane_id_scroll = Rc::clone(&ctx.active_pane_id);
     let active_terminals_scroll = Rc::clone(&ctx.active_terminals);
     let scroll_accum = Rc::new(std::cell::Cell::new(0.0f32));
     window.on_terminal_scroll(move |delta| {
-        if let Some(_w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_scroll.borrow().clone();
-            let groups = pane_groups_scroll.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let current = scroll_accum.get() + delta;
-                let line_step = 40.0f32;
-                let lines = (current / line_step) as i32;
+        let active_pid = active_pane_id_scroll.borrow().clone();
+        let groups = pane_groups_scroll.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let current = scroll_accum.get() + delta;
+            let line_step = 40.0f32;
+            let lines = (current / line_step) as i32;
 
-                if lines != 0 {
-                    scroll_accum.set(current - (lines as f32) * line_step);
-                    let mut terminals = active_terminals_scroll.borrow_mut();
-                    if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                        instance.scroll_delta(lines);
-                    }
-                } else {
-                    scroll_accum.set(current);
+            if lines != 0 {
+                scroll_accum.set(current - (lines as f32) * line_step);
+                let mut terminals = active_terminals_scroll.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    instance.scroll_delta(lines);
                 }
+            } else {
+                scroll_accum.set(current);
             }
         }
     });
@@ -545,53 +581,46 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 8. 终端选区复制到剪贴板回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_copy = Rc::clone(&ctx.pane_groups);
     let active_pane_id_copy = Rc::clone(&ctx.active_pane_id);
     let active_terminals_copy = Rc::clone(&ctx.active_terminals);
     window.on_terminal_copy(move || {
-        if let Some(w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_copy.borrow().clone();
-            let groups = pane_groups_copy.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let mut terminals = active_terminals_copy.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                    let text = instance.parser.copy_selection_text();
-                    if !text.is_empty()
-                        && let Ok(mut clipboard) = arboard::Clipboard::new()
-                    {
-                        let _ = clipboard.set_text(text);
-                    }
+        let active_pid = active_pane_id_copy.borrow().clone();
+        let groups = pane_groups_copy.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_copy.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let text = instance.parser.copy_selection_text();
+                if !text.is_empty()
+                    && let Ok(mut clipboard) = arboard::Clipboard::new()
+                {
+                    let _ = clipboard.set_text(text);
                 }
-                tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 选区复制", active_sess.session_id);
-                sync_ui_debug_logs(&w);
             }
+            tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 选区复制", active_sess.session_id);
         }
     });
 
     // -------------------------------------------------------------------------
     // 8.1 终端鼠标拖拽划选选区变更回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_sel = Rc::clone(&ctx.pane_groups);
     let active_pane_id_sel = Rc::clone(&ctx.active_pane_id);
     let active_terminals_sel = Rc::clone(&ctx.active_terminals);
     window.on_terminal_selection_changed(move |sc, sr, ec, er, has_sel| {
-        if let Some(_w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_sel.borrow().clone();
-            let groups = pane_groups_sel.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let mut terminals = active_terminals_sel.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                    if has_sel && sc >= 0 && sr >= 0 && ec >= 0 && er >= 0 {
-                        instance.parser.set_selection((sc as usize, sr as usize), (ec as usize, er as usize));
-                    } else {
-                        instance.parser.clear_selection();
-                    }
+        let active_pid = active_pane_id_sel.borrow().clone();
+        let groups = pane_groups_sel.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_sel.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                if has_sel && sc >= 0 && sr >= 0 && ec >= 0 && er >= 0 {
+                    instance.parser.set_selection((sc as usize, sr as usize), (ec as usize, er as usize));
+                } else {
+                    instance.parser.clear_selection();
                 }
             }
         }
@@ -600,52 +629,45 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 9. 剪贴板文本粘贴到终端回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_paste = Rc::clone(&ctx.pane_groups);
     let active_pane_id_paste = Rc::clone(&ctx.active_pane_id);
     let active_terminals_paste = Rc::clone(&ctx.active_terminals);
     window.on_terminal_paste(move || {
-        if let Some(w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_paste.borrow().clone();
-            let groups = pane_groups_paste.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
-                    let mut terminals = active_terminals_paste.borrow_mut();
-                    if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                        let _ = instance.send_input(&text);
-                    }
+        let active_pid = active_pane_id_paste.borrow().clone();
+        let groups = pane_groups_paste.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+                let mut terminals = active_terminals_paste.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    let _ = instance.send_input(&text);
                 }
-                tracing::info!(target: "smagical_ui::terminal", "执行剪贴板粘贴到终端 [{}]", active_sess.session_id);
-                sync_ui_debug_logs(&w);
             }
+            tracing::info!(target: "smagical_ui::terminal", "执行剪贴板粘贴到终端 [{}]", active_sess.session_id);
         }
     });
 
     // -------------------------------------------------------------------------
     // 10. 终端清屏回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_clear = Rc::clone(&ctx.pane_groups);
     let active_pane_id_clear = Rc::clone(&ctx.active_pane_id);
     let active_terminals_clear = Rc::clone(&ctx.active_terminals);
     window.on_terminal_clear(move || {
-        if let Some(w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_clear.borrow().clone();
-            let groups = pane_groups_clear.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let mut terminals = active_terminals_clear.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                    let _ = instance.clear();
-                }
-                tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 清屏", active_sess.session_id);
-                sync_ui_debug_logs(&w);
+        let active_pid = active_pane_id_clear.borrow().clone();
+        let groups = pane_groups_clear.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_clear.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let _ = instance.clear();
             }
+            tracing::info!(target: "smagical_ui::terminal", "执行终端 [{}] 清屏", active_sess.session_id);
         }
     });
+
 
 
     // -------------------------------------------------------------------------
@@ -670,7 +692,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let target_idx = groups.iter().position(|g| g.pane_id == *active_pid).unwrap_or(0);
             if groups[target_idx].tabs.len() <= 1 {
                 tracing::warn!(target: "smagical_ui::session", "当前窗格仅有 1 个会话 Tab，无法分屏至新窗格 (分屏需要从当前窗格迁移 Tab，至少需要 2 个 Tab)");
-                sync_ui_debug_logs(&w);
                 return;
             }
 
@@ -709,7 +730,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_active_session_ui(&w, &groups, &new_pane_id, true);
 
             tracing::info!(target: "smagical_ui::session", "成功在窗格 [{}] 上切分新分屏窗格 [{}] (总窗格数: {})", target_pane_id, new_pane_id, groups.len());
-            sync_ui_debug_logs(&w);
         }
     });
 
@@ -769,7 +789,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已关闭窗格: {}", pid);
-            sync_ui_debug_logs(&w);
         }
     });
 
@@ -858,7 +877,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             sync_active_session_ui(&w, &groups, &active_pid, false);
             tracing::info!(target: "smagical_ui::session", "退出分屏模式并合并所有 Tab");
-            sync_ui_debug_logs(&w);
         }
     });
 
@@ -889,71 +907,57 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 13.1 切换单窗格临时最大化 (Zoom) 与还原回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let zoomed_pane_id_toggle = Rc::clone(&ctx.zoomed_pane_id);
     window.on_toggle_pane_zoom(move |pane_id| {
-        if let Some(w) = window_weak.upgrade() {
-            let target_id = pane_id.to_string();
-            let mut zoomed = zoomed_pane_id_toggle.borrow_mut();
-            if zoomed.as_deref() == Some(target_id.as_str()) {
-                *zoomed = None;
-                tracing::info!(target: "smagical_ui::terminal", "还原窗格 [{}] 至多分屏布局", target_id);
-            } else {
-                *zoomed = Some(target_id.clone());
-                tracing::info!(target: "smagical_ui::terminal", "单窗格 [{}] 临时最大化 (Zoom)", target_id);
-            }
-            sync_ui_debug_logs(&w);
+        let target_id = pane_id.to_string();
+        let mut zoomed = zoomed_pane_id_toggle.borrow_mut();
+        if zoomed.as_deref() == Some(target_id.as_str()) {
+            *zoomed = None;
+            tracing::info!(target: "smagical_ui::terminal", "还原窗格 [{}] 至多分屏布局", target_id);
+        } else {
+            *zoomed = Some(target_id.clone());
+            tracing::info!(target: "smagical_ui::terminal", "单窗格 [{}] 临时最大化 (Zoom)", target_id);
         }
     });
 
     // -------------------------------------------------------------------------
     // 13.2 动态拖拽调节分割条比例回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let global_split_tree_adjust = Rc::clone(&ctx.global_split_tree);
     window.on_adjust_splitter(move |splitter_id, delta_ratio| {
-        if let Some(_w) = window_weak.upgrade() {
-            let mut tree_guard = global_split_tree_adjust.borrow_mut();
-            if let Some(tree) = tree_guard.as_mut() {
-                let _res = tree.adjust_splitter(splitter_id.as_str(), delta_ratio);
-            }
+        let mut tree_guard = global_split_tree_adjust.borrow_mut();
+        if let Some(tree) = tree_guard.as_mut() {
+            let _res = tree.adjust_splitter(splitter_id.as_str(), delta_ratio);
         }
     });
 
     // -------------------------------------------------------------------------
     // 14. 终端内文本查找回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     window.on_search_terminal(move |query, match_case| {
-        if let Some(w) = window_weak.upgrade() {
-            tracing::info!(target: "smagical_ui::terminal", "终端查找文本: {:?} (大小写敏感: {})", query, match_case);
-            sync_ui_debug_logs(&w);
-        }
+        tracing::info!(target: "smagical_ui::terminal", "终端查找文本: {:?} (大小写敏感: {})", query, match_case);
     });
 
     // -------------------------------------------------------------------------
     // 15. 终端动态几何网格尺寸调节回调 (Resize)
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let pane_groups_resize = Rc::clone(&ctx.pane_groups);
     let active_pane_id_resize = Rc::clone(&ctx.active_pane_id);
     let active_terminals_resize = Rc::clone(&ctx.active_terminals);
     window.on_terminal_resize(move |cols, rows| {
-        if let Some(_w) = window_weak.upgrade() {
-            let active_pid = active_pane_id_resize.borrow().clone();
-            let groups = pane_groups_resize.borrow();
-            if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-                && let Some(active_sess) = g.get_active_session()
-            {
-                let mut terminals = active_terminals_resize.borrow_mut();
-                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
-                    let _ = instance.resize(cols as u16, rows as u16);
-                }
+        let active_pid = active_pane_id_resize.borrow().clone();
+        let groups = pane_groups_resize.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_resize.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let _ = instance.resize(cols as u16, rows as u16);
             }
         }
-
     });
 }
+
 
 
 

@@ -20,9 +20,10 @@ pub use logger::{get_current_timestamp, DebugLogBuffer};
 pub use models::{DebugHostCard, DebugLogEntry, DebugLogLevel, DebugRawNode};
 pub use presets::{get_preset_by_id, PresetKind};
 pub use tracing_layer::{
-    clean_expired_logs, get_default_log_dir, get_global_log_buffer, init_tracing, TracingGuard,
-    UiLogLayer,
+    clean_expired_logs, get_default_log_dir, get_global_log_buffer, init_tracing,
+    is_debug_enabled, set_debug_enabled, TracingGuard, UiLogLayer,
 };
+
 
 /// 开发者调试核心服务门面 (Debug Service Facade)
 #[derive(Clone, Debug, Default)]

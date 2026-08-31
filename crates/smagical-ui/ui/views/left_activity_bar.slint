@@ -13,6 +13,9 @@ export component LeftActivityBar inherits Rectangle {
     in property <string> active-tab: "hosts";
     /// 当前是否处于深色模式 (用于更新底部日/夜间切换图标)
     in-out property <bool> is-dark-mode: true;
+    /// 开发者调试控制台是否开启 (若关闭则隐藏左侧栏调试图标)
+    in property <bool> is-debug-enabled: true;
+
 
     /// 当用户点击任意顶级 Tab 图标时触发的回调事件，参数为 tab_id 字符串
     callback tab-clicked(string /* tab_id */);
@@ -105,13 +108,14 @@ export component LeftActivityBar inherits Rectangle {
                 clicked => { root.tab-clicked("backup"); }
             }
 
-            // 8. 开发者调试控制面板
-            ActionBarItem {
+            // 8. 开发者调试控制面板 (受全局 is-debug-enabled 开关控制)
+            if root.is-debug-enabled: ActionBarItem {
                 icon: @image-url("../assets/icons/bug.svg");
                 tooltip: @tr("开发者调试控制台");
                 is-active: root.active-tab == "debug";
                 clicked => { root.tab-clicked("debug"); }
             }
+
 
             // 9. 偏好设置
             ActionBarItem {

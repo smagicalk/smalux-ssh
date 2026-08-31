@@ -118,7 +118,10 @@ export component AppWindow inherits Window {
     in-out property <bool> is-command-palette-open: false;
     /// F12 开发者调试诊断控制台模态弹窗是否打开
     in-out property <bool> is-debug-modal-open: false;
+    /// 全局开发者调试功能开关 (默认开启 true，关闭则隐藏侧边栏图标并停止日志收集)
+    in-out property <bool> is-debug-enabled: true;
     /// 多终端群发广播模式是否开启
+
     in-out property <bool> is-broadcast-mode: false;
     /// 主窗口当前是否处于系统最大化状态
     in-out property <bool> is-window-maximized: false;
@@ -446,6 +449,8 @@ export component AppWindow inherits Window {
     callback debug-clear-logs();
     /// 模拟触发测试诊断日志
     callback debug-emit-test-log(string /* level */);
+    /// 开发者调试功能开关切换回调
+    callback toggle-debug-enabled(bool /* enabled */);
     /// 侧边栏/主视图活动页签切换
     callback activity-tab-switched(string /* tab_id */);
 
@@ -458,10 +463,11 @@ export component AppWindow inherits Window {
             if event.modifiers.control && (event.text == "k" || event.text == "K" || event.text == "p" || event.text == "P") {
                 root.is-command-palette-open = !root.is-command-palette-open;
                 accept
-            } else if event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D")) {
+            } else if (event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D"))) && root.is-debug-enabled {
                 root.is-debug-modal-open = !root.is-debug-modal-open;
                 accept
             } else if event.text == Key.Escape {
+
                 if root.is-command-palette-open {
                     root.is-command-palette-open = false;
                     accept
@@ -534,6 +540,7 @@ export component AppWindow inherits Window {
                 LeftActivityBar {
                     active-tab: root.active-left-tab;
                     is-dark-mode: root.is-dark-mode;
+                    is-debug-enabled: root.is-debug-enabled;
                     toggle-color-mode => { root.toggle-color-mode(); }
                     tab-clicked(id) => {
                         root.activity-tab-switched(id);
@@ -616,10 +623,13 @@ export component AppWindow inherits Window {
                     }
 
                     if root.active-left-tab == "settings": SettingsDrawer {
+                        is-debug-enabled <=> root.is-debug-enabled;
                         collapse => { root.is-left-drawer-open = false; }
                         switch-theme(id) => { root.switch-theme(id); }
+                        toggle-debug-enabled(enabled) => { root.toggle-debug-enabled(enabled); }
                     }
                 }
+
 
                 // 2.2.1 左侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
                 if root.is-left-drawer-open: Rectangle {

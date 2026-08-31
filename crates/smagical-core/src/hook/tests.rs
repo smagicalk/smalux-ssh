@@ -186,13 +186,21 @@ fn test_output_chunks_and_metrics_accumulation() {
 #[test]
 fn test_dynamic_unregister() {
     let engine = HookEngine::new();
-    engine.register(Arc::new(SessionAuditLogger::new()));
+    let _id1 = engine.register(Arc::new(SessionAuditLogger::new()));
+    let id2 = engine.register(Arc::new(DangerousCommandGuard::new()));
+
+    assert_eq!(engine.len(), 2);
+
+    // 根据名称注销
+    engine.unregister("session_audit_logger");
     assert_eq!(engine.len(), 1);
 
-    engine.unregister("session_audit_logger");
+    // 根据唯一 ID 注销
+    engine.unregister_by_id(id2);
     assert_eq!(engine.len(), 0);
     assert!(engine.is_empty());
 }
+
 
 #[test]
 fn test_history_tracking_hook_lifecycle() {
