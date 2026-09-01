@@ -103,24 +103,21 @@ export struct TransferItemData {
 
 ---
 
-## 🌐 5. 生命周期与 Hook 体系集成 (Hook Integration)
+## 🌐 5. 生命周期与事件体系集成 (Event Integration)
 
-双盘文件浏览器全面接入核心 `AppGlobalHookEngine`（详见 [07_hooks_and_lifecycle.md](file:///F:/code/rust/smalux-ssh/docs/ui/07_hooks_and_lifecycle.md)）：
+双盘文件浏览器全面接入核心 `EventDispatcher`（详见 [07_events_and_lifecycle.md](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md)）：
 
-1. **连接与会话 Hook**：
-   - `on_file_tab_opening(host_id, path)`：连接前责任链校验；
-   - `on_file_tab_opened(session_id, host_id, path)`：挂载后广播；
-   - `on_file_tab_focus_changed(session_id, is_remote, path)`：双栏焦点切换通知；
-   - `on_file_tab_closed(session_id)`：释放会话资源。
-2. **路径导航 Hook**：
-   - `on_file_tab_navigated(session_id, is_remote, from, to)`：记录路径跳转与审计。
-3. **安全守护与操作 Hook**：
-   - `on_file_operation_before("delete", ...)`：前置拦截高危删除操作（由内置 `DangerousFileGuardHook` 保护系统根目录）；
-   - `on_file_operation_completed(op, is_remote, path, success)`：操作审计日志。
-4. **传输管道 Hook**：
-   - `on_file_transfer_enqueued(task)`：任务入队前检查；
-   - `on_file_transfer_started(task_id)`：传输开始；
-   - `on_file_transfer_progress(task_id, ...)`：流式度量采集；
-   - `on_file_transfer_completed(task)`：传输成功完成；
-   - `on_file_transfer_failed(task, err)`：传输失败重试。
+1. **连接与会话事件**：
+   - `FileTabOpeningEvent`：打开前责任链校验与安全审查（支持 `.abort()`）；
+   - `FileTabOpenedEvent`：挂载后广播；
+   - `FileTabFocusChangedEvent`：双栏焦点切换通知；
+   - `FileTabClosedEvent`：释放会话资源。
+2. **路径导航事件**：
+   - `FileTabNavigatedEvent`：记录路径跳转与审计。
+3. **安全守护与操作事件**：
+   - `FileOperationBeforeEvent`：前置拦截高危删除操作（拦截保护系统根目录与核心系统文件）；
+   - `FileOperationCompletedEvent`：操作审计日志。
+4. **传输管道事件**：
+   - `FileTransferStartedEvent`：传输开始；
+   - 传输任务流式度量采集与全局 Toast 状态通知。
 

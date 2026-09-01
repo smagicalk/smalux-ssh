@@ -16,10 +16,13 @@ pub mod terminal_context;
 pub mod right_panel;
 /// 双盘文件浏览器与 SFTP 传输模型。
 pub mod file_item;
+/// SSH 凭据与密钥管理模型。
+pub mod credential;
 
 pub use group::GroupRecord;
 pub use history::{HistoryRecord, SessionSnapshotConfig};
 pub use host::{HostRecord, HostStatus};
+pub use credential::{CredentialRecord, CredentialType};
 pub use activity_bar::{ActivityBarItem, ActivityBarRegistry};
 pub use navigation::{NavigationRequest, NavigationRouter};
 pub use terminal_context::{ActiveTerminalSessionContext, TerminalAction};

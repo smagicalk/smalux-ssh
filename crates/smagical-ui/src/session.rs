@@ -24,35 +24,6 @@ pub(crate) struct TerminalSessionInfo {
 }
 
 impl TerminalSessionInfo {
-    /// 转换为统一的 Core HostMetadata 资产模型
-    pub(crate) fn to_host_metadata(&self) -> smagical_core::HostMetadata {
-        if self.host_id.starts_with("local-") {
-            smagical_core::HostMetadata::local_shell(&self.host_name)
-        } else {
-            let (addr, port) = if let Some((a, p)) = self.host_address.split_once(':') {
-                (a.to_string(), p.parse::<u16>().unwrap_or(22))
-            } else {
-                (self.host_address.clone(), 22)
-            };
-            smagical_core::HostMetadata::remote_ssh(
-                &self.host_id,
-                &self.host_name,
-                addr,
-                port,
-                "root",
-            )
-        }
-    }
-
-    /// 转换为会话运行时上下文 SessionContext
-    pub(crate) fn to_session_context(&self, pane_id: &str) -> smagical_core::SessionContext {
-        smagical_core::SessionContext::new(
-            self.session_id.clone(),
-            pane_id,
-            self.to_host_metadata(),
-        )
-    }
-
     /// 转换为 Core 层标准化活跃终端上下文快照
     pub(crate) fn to_active_terminal_context(&self) -> smagical_core::ActiveTerminalSessionContext {
         if self.host_id.starts_with("local-") {
@@ -164,7 +135,7 @@ pub(crate) fn sync_active_session_ui(
     }
 }
 
-/// 将当前聚焦的终端活跃上下文同步至 CoreState，并自动触发全局 `on_terminal_focus_changed` Hook 广播。
+/// 将当前聚焦的终端活跃上下文同步至 CoreState，并自动触发全局 `TerminalFocusChangedEvent` 广播。
 pub(crate) fn sync_active_session_to_core(
     pane_groups: &[PaneGroup],
     active_pane_id: &str,

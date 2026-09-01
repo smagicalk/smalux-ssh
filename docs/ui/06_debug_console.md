@@ -42,6 +42,9 @@ export struct LogEntryData {
 3. **实时 Tracing 日志流捕获**：
    - 捕获 `tracing` 产生的全部终端渲染、文件操作、路由跳转与状态变更事件；
    - 支持按日志级别过滤（All / Info / Warn / Error）与一键清空日志。
+4. **凭据安全调试工作台 (Credentials Debug Tab)**：
+   - 快速生成 5+ 项典型种子凭据（Ed25519 密钥、RSA 密钥、SSH Agent、口令密码）；
+   - 一键清空凭据保险库与生成指定规格仿真密钥对。
 
 ---
 
@@ -51,10 +54,11 @@ export struct LogEntryData {
 
 | Target 命名空间 | 分类与职责 | 级别与样例 |
 | :--- | :--- | :--- |
+| **`smalux::credential`** | **凭据安全管理与生成日志** | `INFO` `[事件总线:凭据保存] ID: [cred-1], 名称: '生产集群 Root 私钥'`<br>`INFO` `[事件总线:密钥生成] 规格: 'Ed25519', 生成公钥指纹: [SHA256:4a8b...]` |
+| **`smalux::security`** | **安全审计与高危拦截日志** | `WARN` `[安全审计:机密提取] 凭据 ID: [cred-1], 动作: 复制【PrivateKey】至系统剪贴板 (高危安全操作)`<br>`WARN` `[安全守护] 拦截高危文件删除尝试: /etc/passwd` |
 | **`smalux::file`** | **文件与 SFTP 领域操作日志** | `INFO` `[文件管理:会话建立] 会话 Tab: [rtab-1], 目标主机: [h-1]`<br>`INFO` `[文件传输:传输完成] 任务 ID: [task-1], 字节: 128MB` |
-| **`security::file_guard`** | **高危文件操作拦截告警** | `WARN` `高危文件操作拦截: 尝试删除受保护的系统级敏感路径 [/etc]` |
 | **`smagical_ui::files`** | **UI 交互与视图刷新日志** | `INFO` `进入本地目录: F:/code/rust`<br>`DEBUG` `传输任务折叠/展开: task_id=task-1, is_expanded=true` |
 | **`smalux::terminal`** | **终端建立与生命周期日志** | `INFO` `[终端会话:建立] 会话 ID: [term-1], 目标主机: Prod-Web` |
 | **`smalux::host`** | **主机资产变动日志** | `INFO` `[主机管理:新增] 主机 ID: [h-100], 名称: 'DB-Master'` |
 | **`smalux::history`** | **历史记录管理日志** | `WARN` `[历史记录:清空] 用户清空了非置顶历史会话记录` |
-| **`smalux::backup`** | **配置自动增量备份** | `INFO` `[自动备份 #1]: 检测到全局参数变更, 已触发增量备份快照` |
+| **`smalux::config`** | **全局配置变动通知** | `INFO` `[事件总线:配置变动] 键: 'ui.theme', 旧值: 'dark', 新值: 'nord'` |

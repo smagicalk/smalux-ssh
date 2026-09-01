@@ -5,7 +5,7 @@ use std::collections::HashMap;
 /// 页面跳转意图请求。
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct NavigationRequest {
-    /// 目标页面/抽屉标识 (如 "hosts", "keys", "history", "snippets", "settings", "debug")
+    /// 目标页面/抽屉标识 (如 "hosts", "credentials", "history", "snippets", "settings", "debug")
     pub target_tab: String,
     /// 可选的深层子路由/锚点定位 (如 "terminal_font", "appearance", "ssh_keys")
     pub sub_section: Option<String>,
@@ -150,30 +150,30 @@ mod tests {
         assert_eq!(prev, None);
         assert_eq!(curr.target_tab, "hosts");
 
-        // 2. 跳转到 keys (附带参数)
+        // 2. 跳转到 credentials (附带参数)
         let (prev, curr) = router.navigate_to(
-            NavigationRequest::target("keys")
+            NavigationRequest::target("credentials")
                 .with_section("ssh_keys")
                 .with_param("highlight_id", "key-01"),
         );
         assert_eq!(prev.unwrap().target_tab, "hosts");
-        assert_eq!(curr.target_tab, "keys");
+        assert_eq!(curr.target_tab, "credentials");
         assert_eq!(curr.sub_section.as_deref(), Some("ssh_keys"));
         assert_eq!(curr.params.get("highlight_id").map(|s| s.as_str()), Some("key-01"));
         assert!(router.can_go_back());
 
         // 3. 后退 (Back) 到 hosts
         let (to_deactivate, to_activate) = router.navigate_back().unwrap();
-        assert_eq!(to_deactivate.target_tab, "keys");
+        assert_eq!(to_deactivate.target_tab, "credentials");
         assert_eq!(to_activate.target_tab, "hosts");
         assert_eq!(router.current().unwrap().target_tab, "hosts");
         assert!(router.can_go_forward());
 
-        // 4. 前进 (Forward) 到 keys
+        // 4. 前进 (Forward) 到 credentials
         let (to_deactivate, to_activate) = router.navigate_forward().unwrap();
         assert_eq!(to_deactivate.target_tab, "hosts");
-        assert_eq!(to_activate.target_tab, "keys");
-        assert_eq!(router.current().unwrap().target_tab, "keys");
+        assert_eq!(to_activate.target_tab, "credentials");
+        assert_eq!(router.current().unwrap().target_tab, "credentials");
     }
 }
 

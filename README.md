@@ -31,7 +31,8 @@
 - 🕒 **[04. 历史会话中心 (04_history_center.md)](file:///F:/code/rust/smalux-ssh/docs/ui/04_history_center.md)**
 - 🧩 **[05. 全局通用组件库 (05_global_components.md)](file:///F:/code/rust/smalux-ssh/docs/ui/05_global_components.md)**
 - 🛠️ **[06. 开发者调试控制台 (06_debug_console.md)](file:///F:/code/rust/smalux-ssh/docs/ui/06_debug_console.md)**
-- 🌐 **[07. Hook 插件与生命周期协同 (07_hooks_and_lifecycle.md)](file:///F:/code/rust/smalux-ssh/docs/ui/07_hooks_and_lifecycle.md)**
+- 🌐 **[07. 泛型事件分发与生命周期协同 (07_events_and_lifecycle.md)](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md)**
+- 🔐 **[08. 凭据保险库与安全认证中心 (08_credentials_vault.md)](file:///F:/code/rust/smalux-ssh/docs/ui/08_credentials_vault.md)**
 
 ---
 

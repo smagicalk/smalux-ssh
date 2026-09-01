@@ -4,6 +4,7 @@
 
 use std::rc::Rc;
 use slint::ComponentHandle;
+use smagical_core::event::{TerminalSessionEvent, TerminalSplitChangedEvent};
 
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::handlers::AppContext;
@@ -85,18 +86,16 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_close.core_state);
-            ctx_close.core_state.app_hooks().dispatch_host_terminal_closed(&id_str, 0);
+            ctx_close.core_state.events().dispatch(&TerminalSessionEvent {
+                session_id: id_str.clone(),
+                host_id: "".into(),
+                action: "closed".into(),
+            });
             tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
 
 
 
-            let session_ctx = smagical_core::SessionContext::new(
-                id_str.clone(),
-                active_pid.clone(),
-                smagical_core::HostMetadata::local_shell(&id_str),
-            );
             let storage_async = ctx_close.core_state.storage().clone();
-            let hooks_async = ctx_close.core_state.hooks().clone();
             let window_weak_async = window_weak.clone();
             let search_q = ctx_close.history_search_query.borrow().clone();
             let view_mode = ctx_close.history_view_mode.borrow().clone();
@@ -111,8 +110,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                         let _ = storage_async.history().save(&h);
                     }
                 }
-                // 触发 Hook 引擎 post_close 生命周期 (自动由 HistoryTrackingHook 标记关闭并更新状态)
-                hooks_async.dispatch_post_close(&session_ctx);
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w_ui) = window_weak_async.upgrade() {
                         crate::handlers::history_handlers::sync_ui_history_from_state(
@@ -197,18 +194,16 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_close_pane.core_state);
-            ctx_close_pane.core_state.app_hooks().dispatch_host_terminal_closed(&t_id, 0);
+            ctx_close_pane.core_state.events().dispatch(&TerminalSessionEvent {
+                session_id: t_id.clone(),
+                host_id: "".into(),
+                action: "closed".into(),
+            });
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
 
 
 
-            let session_ctx = smagical_core::SessionContext::new(
-                t_id.clone(),
-                p_id.clone(),
-                smagical_core::HostMetadata::local_shell(&t_id),
-            );
             let storage_async = ctx_close_pane.core_state.storage().clone();
-            let hooks_async = ctx_close_pane.core_state.hooks().clone();
             let window_weak_async = window_weak.clone();
             let search_q = ctx_close_pane.history_search_query.borrow().clone();
             let view_mode = ctx_close_pane.history_view_mode.borrow().clone();
@@ -223,8 +218,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                         let _ = storage_async.history().save(&h);
                     }
                 }
-                // 触发 Hook 引擎 post_close 生命周期
-                hooks_async.dispatch_post_close(&session_ctx);
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w_ui) = window_weak_async.upgrade() {
                         crate::handlers::history_handlers::sync_ui_history_from_state(
@@ -325,25 +318,19 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                         } else {
                             None
                         };
-                        let session_ctx = smagical_core::SessionContext::new(
-                            rem_id.clone(),
-                            p_id.clone(),
-                            smagical_core::HostMetadata::local_shell(&rem_id),
-                        );
-                        persist_items.push((rem_id, snap_opt, session_ctx));
+                        persist_items.push((rem_id, snap_opt));
                     }
                 }
                 drop(terminals);
 
                 let storage_async = ctx_close_others.core_state.storage().clone();
-                let hooks_async = ctx_close_others.core_state.hooks().clone();
                 let window_weak_async = window_weak.clone();
                 let search_q = ctx_close_others.history_search_query.borrow().clone();
                 let view_mode = ctx_close_others.history_view_mode.borrow().clone();
                 let collapsed = ctx_close_others.collapsed_history_groups.borrow().clone();
 
                 ctx_close_others.persistence_guard.spawn(move || {
-                    for (rem_id, snap_opt, session_ctx) in persist_items {
+                    for (rem_id, snap_opt) in persist_items {
                         if let Some((lines_count, snap)) = snap_opt {
                             let hist_id = format!("hist-{}", rem_id);
                             let _ = storage_async.history().save_snapshot(&hist_id, &snap, 500);
@@ -352,7 +339,6 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                                 let _ = storage_async.history().save(&hist);
                             }
                         }
-                        hooks_async.dispatch_post_close(&session_ctx);
                     }
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(w_ui) = window_weak_async.upgrade() {
@@ -566,7 +552,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             crate::session::sync_active_session_to_core(&groups, &active_pid, &core_state_move_tab);
-            core_state_move_tab.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &to_pid, is_split);
+            core_state_move_tab.events().dispatch(&TerminalSplitChangedEvent {
+                group_count: groups.len(),
+                active_pane_id: to_pid.clone(),
+                is_split,
+            });
 
             tracing::info!(
                 target: "smagical_ui::session",
@@ -882,7 +872,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             *active_pid = new_pane_id.clone();
             sync_active_session_ui(&w, &groups, &new_pane_id, true);
-            core_state_split.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &new_pane_id, true);
+            core_state_split.events().dispatch(&TerminalSplitChangedEvent {
+                group_count: groups.len(),
+                active_pane_id: new_pane_id.clone(),
+                is_split: true,
+            });
 
             tracing::info!(target: "smagical_ui::session", "成功在窗格 [{}] 上切分新分屏窗格 [{}] (总窗格数: {})", target_pane_id, new_pane_id, groups.len());
         }
@@ -921,8 +915,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                                 let _ = ctx_close_pane_id.core_state.storage().history().save(&hist);
                             }
                         }
-                        let session_ctx = t.to_session_context(&pid);
-                        ctx_close_pane_id.core_state.hooks().dispatch_post_close(&session_ctx);
+                        ctx_close_pane_id.core_state.events().dispatch(&TerminalSessionEvent {
+                            session_id: t.session_id.clone(),
+                            host_id: "".into(),
+                            action: "closed".into(),
+                        });
                     }
                 }
                 crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane_id);
@@ -944,7 +941,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
-            ctx_close_pane_id.core_state.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &active_pid, is_split);
+            ctx_close_pane_id.core_state.events().dispatch(&TerminalSplitChangedEvent {
+                group_count: groups.len(),
+                active_pane_id: active_pid.clone(),
+                is_split,
+            });
             tracing::info!(target: "smagical_ui::session", "已关闭窗格: {}", pid);
 
         }
@@ -1034,7 +1035,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             sync_active_session_ui(&w, &groups, &active_pid, false);
-            core_state_close_split.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &active_pid, false);
+            core_state_close_split.events().dispatch(&TerminalSplitChangedEvent {
+                group_count: groups.len(),
+                active_pane_id: active_pid.clone(),
+                is_split: false,
+            });
             tracing::info!(target: "smagical_ui::session", "退出分屏模式并合并所有 Tab");
         }
     });

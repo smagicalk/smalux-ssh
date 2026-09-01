@@ -1,6 +1,7 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppIconButton } from "base/app-icon-button.slint";
 import { DebugHostsTab } from "debug_workbench/debug-hosts-tab.slint";
+import { DebugCredentialsTab } from "debug_workbench/debug-credentials-tab.slint";
 import { DebugSettingsTab } from "debug_workbench/debug-settings-tab.slint";
 import { DebugLogsTab, LogEntryData } from "debug_workbench/debug-logs-tab.slint";
 import { DebugRenderingTab } from "debug_workbench/debug-rendering-tab.slint";
@@ -20,6 +21,8 @@ export component DebugModal inherits Rectangle {
     in property <int> visible-nodes-count: 0;
     /// 卡片总数
     in property <int> host-cards-count: 0;
+    /// 凭据总数
+    in property <int> credential-count: 0;
     /// 树形视口计算宽度
     in property <length> tree-viewport-width: 240px;
     /// 当前主题名称
@@ -27,7 +30,7 @@ export component DebugModal inherits Rectangle {
     /// 是否为深色模式
     in property <bool> is-dark-mode: true;
 
-    // 当前激活的子面板 (按页面与核心领域分类): "hosts" | "settings" | "logs" | "rendering"
+    // 当前激活的子面板: "hosts" | "credentials" | "settings" | "logs" | "rendering"
     property <string> active-subtab: "hosts";
 
     // --- 回调事件 ---
@@ -48,6 +51,14 @@ export component DebugModal inherits Rectangle {
     callback clear-all-data();
     /// 恢复默认数据
     callback reset-default-data();
+    /// 批量生成凭据 (count_str, mode, overwrite)
+    callback debug-batch-generate-credentials(string, string, bool);
+    /// 快速新增凭据 (cred_type, name, data)
+    callback debug-quick-add-credential(string, string, string);
+    /// 恢复默认凭据
+    callback debug-reset-default-credentials();
+    /// 清空所有凭据
+    callback debug-clear-credentials();
     /// 清空日志
     callback clear-logs();
     /// 模拟测试日志
@@ -199,7 +210,44 @@ export component DebugModal inherits Rectangle {
                         }
                     }
 
-                    // 页面 2: 设置与偏好调试 (包含主题配色测试、深浅色翻转与设计令牌)
+                    // 页面 2: 凭据与密钥调试 (包含预设注入、快捷单项、批量造数与清空)
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 30px;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.active-subtab == "credentials" ? AppTheme.accent : (b-tab-cred.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        border-width: 1px;
+                        border-color: root.active-subtab == "credentials" ? AppTheme.accent : AppTheme.border;
+
+                        b-tab-cred := TouchArea {
+                            clicked => { root.active-subtab = "credentials"; }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+
+                            Image {
+                                source: @image-url("../assets/icons/key.svg");
+                                width: 12px;
+                                height: 12px;
+                                image-fit: contain;
+                                colorize: root.active-subtab == "credentials" ? #ffffff : AppTheme.secondary-foreground;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            Text {
+                                text: @tr("凭据密钥调试");
+                                font-size: 11px;
+                                font-weight: root.active-subtab == "credentials" ? 600 : 500;
+                                color: root.active-subtab == "credentials" ? #ffffff : AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 页面 3: 设置与偏好调试 (包含主题配色测试、深浅色翻转与设计令牌)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
@@ -236,7 +284,7 @@ export component DebugModal inherits Rectangle {
                         }
                     }
 
-                    // 页面 3: 实时日志流 (包含日志等级过滤、清空与测试触发)
+                    // 页面 4: 实时日志流 (包含日志等级过滤、清空与测试触发)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
@@ -273,7 +321,7 @@ export component DebugModal inherits Rectangle {
                         }
                     }
 
-                    // 页面 4: 渲染管线矩阵 (纯 Skia 4 大管线、安全重启与 120Hz 基准压测)
+                    // 页面 5: 渲染管线矩阵 (纯 Skia 4 大管线、安全重启与 120Hz 基准压测)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
@@ -317,7 +365,7 @@ export component DebugModal inherits Rectangle {
                     background: AppTheme.border;
                 }
 
-                // 3. 内容主体区 (动态切换渲染 4 大专属模块)
+                // 3. 内容主体区
                 Rectangle {
                     height: 440px;
                     width: 100%;
@@ -338,7 +386,16 @@ export component DebugModal inherits Rectangle {
                         clear-all-data => { root.clear-all-data(); }
                     }
 
-                    // 2. 设置偏好调试 (主题快切、深浅色模式与设计令牌)
+                    // 2. 凭据密钥调试
+                    if root.active-subtab == "credentials": DebugCredentialsTab {
+                        credential-count: root.credential-count;
+                        batch-generate-credentials(cnt, mode, ovr) => { root.debug-batch-generate-credentials(cnt, mode, ovr); }
+                        quick-add-credential(ctype, n, d) => { root.debug-quick-add-credential(ctype, n, d); }
+                        reset-default-credentials => { root.debug-reset-default-credentials(); }
+                        clear-all-credentials => { root.debug-clear-credentials(); }
+                    }
+
+                    // 3. 设置偏好调试 (主题快切、深浅色模式与设计令牌)
                     if root.active-subtab == "settings": DebugSettingsTab {
                         current-theme-name: root.current-theme-name;
                         is-dark-mode: root.is-dark-mode;
@@ -346,14 +403,14 @@ export component DebugModal inherits Rectangle {
                         toggle-color-mode => { root.toggle-color-mode(); }
                     }
 
-                    // 3. 实时日志流
+                    // 4. 实时日志流
                     if root.active-subtab == "logs": DebugLogsTab {
                         logs: root.logs;
                         clear-logs => { root.clear-logs(); }
                         emit-test-log(lvl) => { root.emit-test-log(lvl); }
                     }
 
-                    // 4. 图形渲染管线
+                    // 5. 图形渲染管线
                     if root.active-subtab == "rendering": DebugRenderingTab {
                         current-active-pipeline: root.active-pipeline;
                         switch-pipeline(id) => { root.switch-pipeline(id); }

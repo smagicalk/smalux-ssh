@@ -4,6 +4,9 @@
 
 use std::rc::Rc;
 use slint::ComponentHandle;
+use smagical_core::event::{
+    HostGroupToggledEvent, HostSearchFilteredEvent, HostTreeReorderedEvent, TerminalSessionEvent,
+};
 use smagical_core::GroupRecord;
 
 use crate::generated::{AppWindow, HostItemData};
@@ -67,7 +70,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             }
             // 同步至存储层
             let _ = core_state_toggle.storage().groups().set_expanded(&id_str, is_expanding);
-            core_state_toggle.app_hooks().dispatch_host_asset_group_toggled(&id_str, is_expanding);
+            core_state_toggle.events().dispatch(&HostGroupToggledEvent {
+                group_id: id_str.clone(),
+                is_expanded: is_expanding,
+            });
 
 
             let tree = master_tree_toggle.borrow();
@@ -141,7 +147,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
-                    core_state_move.app_hooks().dispatch_host_asset_tree_reordered(&src_str, &target_str, &pos_str);
+                    core_state_move.events().dispatch(&HostTreeReorderedEvent {
+                        source_id: src_str.clone(),
+                        target_id: target_str.clone(),
+                        position: pos_str.clone(),
+                    });
                 }
                 return;
 
@@ -222,7 +232,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已同步存储层)", src_name, pos_str, target_name);
-                    core_state_move.app_hooks().dispatch_host_asset_tree_reordered(&src_str, &target_str, &pos_str);
+                    core_state_move.events().dispatch(&HostTreeReorderedEvent {
+                        source_id: src_str.clone(),
+                        target_id: target_str.clone(),
+                        position: pos_str.clone(),
+                    });
                 }
 
                 Err(err_msg) => {
@@ -484,7 +498,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 .collect();
             w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(filtered_cards.clone()))));
 
-            core_state_filter.app_hooks().dispatch_host_asset_search_filtered(&q, filtered_cards.len());
+            core_state_filter.events().dispatch(&HostSearchFilteredEvent {
+                query: q.clone(),
+                match_count: filtered_cards.len(),
+            });
 
             if !q.is_empty() {
                 tracing::debug!(target: "smagical_ui::search", "过滤主机资产: '{}'", q);
@@ -599,10 +616,12 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 (sess_id, info)
             };
 
-            // 触发 Hook 引擎 post_open 全局生命周期 (自动由 HistoryTrackingHook 沉淀历史并触发审计)
-            let session_ctx = info.to_session_context("pane-active");
-            ctx_open.core_state.hooks().dispatch_post_open(&session_ctx);
-            ctx_open.core_state.app_hooks().dispatch_host_terminal_opened(&sess_id, &info.to_active_terminal_context());
+            // 广播终端会话已开启事件
+            ctx_open.core_state.events().dispatch(&TerminalSessionEvent {
+                session_id: sess_id.clone(),
+                host_id: info.host_id.clone(),
+                action: "opened".into(),
+            });
             crate::handlers::history_handlers::sync_ui_history(&w, &ctx_open);
 
 

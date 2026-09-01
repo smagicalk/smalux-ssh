@@ -5,8 +5,13 @@
 use std::path::PathBuf;
 use std::rc::Rc;
 use slint::ComponentHandle;
+use smagical_core::event::{
+    FileOperationBeforeEvent, FileOperationCompletedEvent, FileTabClosedEvent,
+    FileTabFocusChangedEvent, FileTabNavigatedEvent, FileTabOpenedEvent,
+    FileTabOpeningEvent, FileTransferStartedEvent,
+};
 use smagical_core::{
-    generate_mock_remote_directory, scan_local_directory, FileItemData, HookDecision,
+    generate_mock_remote_directory, scan_local_directory, FileItemData,
     LocalFileTabSession, RemoteFileTabSession, TransferDirection, TransferStatus, TransferTask,
 };
 
@@ -356,7 +361,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = try_refresh_local_path(&ctx_select_loc, &loc, false);
             }
 
-            ctx_select_loc.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), false, &loc);
+            ctx_select_loc.core_state.events().dispatch(&FileTabFocusChangedEvent {
+                tab_id: Some(tid.clone()),
+                is_remote: false,
+                current_path: loc.clone(),
+            });
             sync_file_explorer_ui(&w, &ctx_select_loc);
             tracing::info!(target: "smagical_ui::files", "切换至本地文件 Tab: {}", tid);
         }
@@ -394,7 +403,9 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             drop(tabs);
             drop(act_id);
 
-            ctx_close_loc.core_state.app_hooks().dispatch_file_tab_closed(&tid);
+            ctx_close_loc.core_state.events().dispatch(&FileTabClosedEvent {
+                tab_id: tid.clone(),
+            });
 
             if let Some(t) = next_tab {
                 refresh_local_path(&ctx_close_loc, &t.current_path);
@@ -425,7 +436,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_new_loc.active_local_tab_id.borrow_mut() = tab_id.clone();
             drop(tabs);
 
-            ctx_new_loc.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, "local", &home_dir);
+            ctx_new_loc.core_state.events().dispatch(&FileTabOpenedEvent {
+                tab_id: tab_id.clone(),
+                host_id: "local".into(),
+                path: home_dir.clone(),
+            });
             refresh_local_path(&ctx_new_loc, &home_dir);
             sync_file_explorer_ui(&w, &ctx_new_loc);
             tracing::info!(target: "smagical_ui::files", "新建本地文件 Tab: {}", tab_id);
@@ -454,7 +469,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = try_refresh_remote_path(&ctx_select_rem, &rem, false);
             }
 
-            ctx_select_rem.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), true, &rem);
+            ctx_select_rem.core_state.events().dispatch(&FileTabFocusChangedEvent {
+                tab_id: Some(tid.clone()),
+                is_remote: true,
+                current_path: rem.clone(),
+            });
             sync_file_explorer_ui(&w, &ctx_select_rem);
             tracing::info!(target: "smagical_ui::files", "切换至远程 SFTP Tab: {}", tid);
         }
@@ -486,7 +505,9 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             drop(tabs);
             drop(act_id);
 
-            ctx_close_rem.core_state.app_hooks().dispatch_file_tab_closed(&tid);
+            ctx_close_rem.core_state.events().dispatch(&FileTabClosedEvent {
+                tab_id: tid.clone(),
+            });
 
             if let Some(t) = next_tab {
                 refresh_remote_path(&ctx_close_rem, &t.current_path);
@@ -521,10 +542,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
 
-            // 责任链前置拦截校验
-            let decision = ctx_open_host.core_state.app_hooks().dispatch_file_tab_opening(&h_id, "/root");
-            if let HookDecision::Abort { reason } = decision {
-                ctx_open_host.notify_warning("连接已拦截", reason);
+            // 事件总线前置安全审查
+            let open_event = FileTabOpeningEvent::new(&h_id, "/root");
+            ctx_open_host.core_state.events().dispatch(&open_event);
+            if open_event.is_aborted() {
+                ctx_open_host.notify_warning("连接已拦截", open_event.abort_reason().unwrap_or_default());
                 return;
             }
 
@@ -537,7 +559,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 *ctx_open_host.active_remote_tab_id.borrow_mut() = tid.clone();
                 drop(tabs);
 
-                ctx_open_host.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), true, &rem);
+                ctx_open_host.core_state.events().dispatch(&FileTabFocusChangedEvent {
+                    tab_id: Some(tid.clone()),
+                    is_remote: true,
+                    current_path: rem.clone(),
+                });
                 refresh_remote_path(&ctx_open_host, &rem);
                 sync_file_explorer_ui(&w, &ctx_open_host);
                 tracing::info!(target: "smagical_ui::files", "激活已存在的右侧远程 Tab: {}", tid);
@@ -557,7 +583,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_open_host.active_remote_tab_id.borrow_mut() = tab_id.clone();
             drop(tabs);
 
-            ctx_open_host.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, &h_id, "/root");
+            ctx_open_host.core_state.events().dispatch(&FileTabOpenedEvent {
+                tab_id: tab_id.clone(),
+                host_id: h_id.clone(),
+                path: "/root".into(),
+            });
             refresh_remote_path(&ctx_open_host, "/root");
             sync_file_explorer_ui(&w, &ctx_open_host);
             tracing::info!(target: "smagical_ui::files", "双击主机创建右侧远程 SFTP Tab: {}", tab_id);
@@ -577,7 +607,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             match try_refresh_local_path(&ctx_nav_local, &p_str, true) {
                 Ok(_) => {
                     let act_id = ctx_nav_local.active_local_tab_id.borrow().clone();
-                    ctx_nav_local.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &old_p, &p_str);
+                    ctx_nav_local.core_state.events().dispatch(&FileTabNavigatedEvent {
+                        tab_id: act_id.clone(),
+                        is_remote: false,
+                        old_path: old_p.clone(),
+                        new_path: p_str.clone(),
+                    });
                     sync_file_explorer_ui(&w, &ctx_nav_local);
                     tracing::info!(target: "smagical_ui::files", "成功跳转本地路径: {}", p_str);
                 }
@@ -604,7 +639,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(prev) = prev_path {
                 let old_p = ctx_back_loc.local_current_path.borrow().clone();
                 let _ = try_refresh_local_path(&ctx_back_loc, &prev, false);
-                ctx_back_loc.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &old_p, &prev);
+                ctx_back_loc.core_state.events().dispatch(&FileTabNavigatedEvent {
+                    tab_id: act_id.clone(),
+                    is_remote: false,
+                    old_path: old_p.clone(),
+                    new_path: prev.clone(),
+                });
                 sync_file_explorer_ui(&w, &ctx_back_loc);
                 tracing::info!(target: "smagical_ui::files", "本地后退至路径: {}", prev);
             }
@@ -624,7 +664,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(next) = next_path {
                 let old_p = ctx_fwd_loc.local_current_path.borrow().clone();
                 let _ = try_refresh_local_path(&ctx_fwd_loc, &next, false);
-                ctx_fwd_loc.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &old_p, &next);
+                ctx_fwd_loc.core_state.events().dispatch(&FileTabNavigatedEvent {
+                    tab_id: act_id.clone(),
+                    is_remote: false,
+                    old_path: old_p.clone(),
+                    new_path: next.clone(),
+                });
                 sync_file_explorer_ui(&w, &ctx_fwd_loc);
                 tracing::info!(target: "smagical_ui::files", "本地前进至路径: {}", next);
             }
@@ -643,7 +688,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 if !parent_str.is_empty() {
                     let act_id = ctx_up_loc.active_local_tab_id.borrow().clone();
                     let _ = try_refresh_local_path(&ctx_up_loc, &parent_str, true);
-                    ctx_up_loc.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &current, &parent_str);
+                    ctx_up_loc.core_state.events().dispatch(&FileTabNavigatedEvent {
+                        tab_id: act_id.clone(),
+                        is_remote: false,
+                        old_path: current.clone(),
+                        new_path: parent_str.clone(),
+                    });
                     sync_file_explorer_ui(&w, &ctx_up_loc);
                     tracing::info!(target: "smagical_ui::files", "本地向上进入目录: {}", parent_str);
                 }
@@ -661,7 +711,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             match try_refresh_remote_path(&ctx_nav_remote, &p_str, true) {
                 Ok(_) => {
                     let act_id = ctx_nav_remote.active_remote_tab_id.borrow().clone();
-                    ctx_nav_remote.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &old_p, &p_str);
+                    ctx_nav_remote.core_state.events().dispatch(&FileTabNavigatedEvent {
+                        tab_id: act_id.clone(),
+                        is_remote: true,
+                        old_path: old_p.clone(),
+                        new_path: p_str.clone(),
+                    });
                     sync_file_explorer_ui(&w, &ctx_nav_remote);
                     tracing::info!(target: "smagical_ui::files", "成功跳转远程路径: {}", p_str);
                 }
@@ -688,7 +743,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(path) = target_path {
                 let old_p = ctx_back_rem.remote_current_path.borrow().clone();
                 let _ = try_refresh_remote_path(&ctx_back_rem, &path, false);
-                ctx_back_rem.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &old_p, &path);
+                ctx_back_rem.core_state.events().dispatch(&FileTabNavigatedEvent {
+                    tab_id: act_id.clone(),
+                    is_remote: true,
+                    old_path: old_p.clone(),
+                    new_path: path.clone(),
+                });
                 sync_file_explorer_ui(&w, &ctx_back_rem);
                 tracing::info!(target: "smagical_ui::files", "远程文件历史后退至: {}", path);
             }
@@ -708,7 +768,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(path) = target_path {
                 let old_p = ctx_fwd_rem.remote_current_path.borrow().clone();
                 let _ = try_refresh_remote_path(&ctx_fwd_rem, &path, false);
-                ctx_fwd_rem.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &old_p, &path);
+                ctx_fwd_rem.core_state.events().dispatch(&FileTabNavigatedEvent {
+                    tab_id: act_id.clone(),
+                    is_remote: true,
+                    old_path: old_p.clone(),
+                    new_path: path.clone(),
+                });
                 sync_file_explorer_ui(&w, &ctx_fwd_rem);
                 tracing::info!(target: "smagical_ui::files", "远程文件历史前进至: {}", path);
             }
@@ -733,14 +798,24 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     let parent_str = parent.to_string_lossy().to_string();
                     if !parent_str.is_empty() {
                         let _ = try_refresh_remote_path(&ctx_up_remote, &parent_str, true);
-                        ctx_up_remote.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &current, &parent_str);
+                        ctx_up_remote.core_state.events().dispatch(&FileTabNavigatedEvent {
+                            tab_id: act_id.clone(),
+                            is_remote: true,
+                            old_path: current.clone(),
+                            new_path: parent_str.clone(),
+                        });
                         sync_file_explorer_ui(&w, &ctx_up_remote);
                     }
                 }
             } else if let Some(pos) = current.rfind('/') {
                 let parent_str = if pos == 0 { "/" } else { &current[..pos] };
                 let _ = try_refresh_remote_path(&ctx_up_remote, parent_str, true);
-                ctx_up_remote.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &current, parent_str);
+                ctx_up_remote.core_state.events().dispatch(&FileTabNavigatedEvent {
+                    tab_id: act_id.clone(),
+                    is_remote: true,
+                    old_path: current.clone(),
+                    new_path: parent_str.to_string(),
+                });
                 sync_file_explorer_ui(&w, &ctx_up_remote);
             }
         }
@@ -1014,7 +1089,9 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     error_message: None,
                 };
 
-                ctx_start_trans.core_state.app_hooks().dispatch_file_transfer_started(&parent_task.id);
+                ctx_start_trans.core_state.events().dispatch(&FileTransferStartedEvent {
+                    task_id: parent_task.id.clone(),
+                });
                 tasks.push(parent_task);
                 tasks.push(child1);
                 tasks.push(child2);
@@ -1045,7 +1122,9 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     status: TransferStatus::Transferring,
                     error_message: None,
                 };
-                ctx_start_trans.core_state.app_hooks().dispatch_file_transfer_started(&single_task.id);
+                ctx_start_trans.core_state.events().dispatch(&FileTransferStartedEvent {
+                    task_id: single_task.id.clone(),
+                });
                 tasks.push(single_task);
                 tracing::info!(
                     target: "smagical_ui::files",
@@ -1220,7 +1299,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                             counter += 1;
                         }
                         let ok = std::fs::create_dir_all(&target).is_ok();
-                        ctx_file_act.core_state.app_hooks().dispatch_file_operation_completed("create_folder", false, &target.to_string_lossy(), ok);
+                        ctx_file_act.core_state.events().dispatch(&FileOperationCompletedEvent {
+                            action: "create_folder".into(),
+                            is_remote: false,
+                            path: target.to_string_lossy().to_string(),
+                            success: ok,
+                        });
                         let cur_p = ctx_file_act.local_current_path.borrow().clone();
                         refresh_local_path(&ctx_file_act, &cur_p);
                         sync_file_explorer_ui(&w, &ctx_file_act);
@@ -1236,17 +1320,23 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                             counter += 1;
                         }
                         let ok = std::fs::File::create(&target).is_ok();
-                        ctx_file_act.core_state.app_hooks().dispatch_file_operation_completed("create_file", false, &target.to_string_lossy(), ok);
+                        ctx_file_act.core_state.events().dispatch(&FileOperationCompletedEvent {
+                            action: "create_file".into(),
+                            is_remote: false,
+                            path: target.to_string_lossy().to_string(),
+                            success: ok,
+                        });
                         let cur_p = ctx_file_act.local_current_path.borrow().clone();
                         refresh_local_path(&ctx_file_act, &cur_p);
                         sync_file_explorer_ui(&w, &ctx_file_act);
                     }
                 }
                 "delete" => {
-                    // 1. 高危操作责任链前置拦截校验
-                    let decision = ctx_file_act.core_state.app_hooks().dispatch_file_operation_before("delete", is_remote, &p_str);
-                    if let HookDecision::Abort { reason } = decision {
-                        ctx_file_act.notify_warning("高危操作拦截", reason);
+                    // 1. 高危操作事件总线前置安全审查
+                    let del_event = FileOperationBeforeEvent::new("delete", is_remote, &p_str);
+                    ctx_file_act.core_state.events().dispatch(&del_event);
+                    if del_event.is_aborted() {
+                        ctx_file_act.notify_warning("高危操作拦截", del_event.abort_reason().unwrap_or_default());
                         return;
                     }
 
@@ -1256,7 +1346,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                         } else {
                             std::fs::remove_file(&p_str).is_ok()
                         };
-                        ctx_file_act.core_state.app_hooks().dispatch_file_operation_completed("delete", false, &p_str, ok);
+                        ctx_file_act.core_state.events().dispatch(&FileOperationCompletedEvent {
+                            action: "delete".into(),
+                            is_remote: false,
+                            path: p_str.clone(),
+                            success: ok,
+                        });
                         if ok {
                             ctx_file_act.notify_info("已删除", format!("已删除: {}", n_str));
                         }
@@ -1330,17 +1425,22 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 *ctx_open_fhost.active_remote_tab_id.borrow_mut() = tab_id.clone();
                 drop(tabs);
 
-                ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, "local", &home_path);
+                ctx_open_fhost.core_state.events().dispatch(&FileTabOpenedEvent {
+                    tab_id: tab_id.clone(),
+                    host_id: "local".into(),
+                    path: home_path.clone(),
+                });
                 refresh_remote_path(&ctx_open_fhost, &home_path);
                 sync_file_explorer_ui(&w, &ctx_open_fhost);
                 tracing::info!(target: "smagical_ui::files", "在右栏新建并打开本地文件目录 Tab: tab_id={}, path={}", tab_id, home_path);
                 return;
             }
 
-            // 责任链前置拦截校验
-            let decision = ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_opening(&hid, "/root");
-            if let HookDecision::Abort { reason } = decision {
-                ctx_open_fhost.notify_warning("连接已拦截", reason);
+            // 事件总线前置安全审查
+            let open_event = FileTabOpeningEvent::new(&hid, "/root");
+            ctx_open_fhost.core_state.events().dispatch(&open_event);
+            if open_event.is_aborted() {
+                ctx_open_fhost.notify_warning("连接已拦截", open_event.abort_reason().unwrap_or_default());
                 return;
             }
 
@@ -1353,7 +1453,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 *ctx_open_fhost.active_remote_tab_id.borrow_mut() = tid.clone();
                 drop(tabs);
 
-                ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), true, &rem);
+                ctx_open_fhost.core_state.events().dispatch(&FileTabFocusChangedEvent {
+                    tab_id: Some(tid.clone()),
+                    is_remote: true,
+                    current_path: rem.clone(),
+                });
                 refresh_remote_path(&ctx_open_fhost, &rem);
                 sync_file_explorer_ui(&w, &ctx_open_fhost);
                 tracing::info!(target: "smagical_ui::files", "文件弹窗切换至已有远程 SFTP Tab: {}", tid);
@@ -1385,7 +1489,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_open_fhost.active_remote_tab_id.borrow_mut() = tab_id.clone();
             drop(tabs);
 
-            ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, &hid, "/root");
+            ctx_open_fhost.core_state.events().dispatch(&FileTabOpenedEvent {
+                tab_id: tab_id.clone(),
+                host_id: hid.clone(),
+                path: "/root".into(),
+            });
             refresh_remote_path(&ctx_open_fhost, "/root");
             sync_file_explorer_ui(&w, &ctx_open_fhost);
             tracing::info!(target: "smagical_ui::files", "文件弹窗自动连接并创建远程 SFTP Tab: host_id={}, tab_id={}", hid, tab_id);

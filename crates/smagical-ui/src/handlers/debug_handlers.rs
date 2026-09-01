@@ -5,6 +5,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use slint::{ComponentHandle, Model};
+use smagical_core::event::ConfigChangedEvent;
 use smagical_debug::{
     generate_batch_hosts, get_preset_by_id, BatchGenerateConfig,
 };
@@ -364,6 +365,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 address: h_ip.clone(),
                 port: port as u16,
                 parent_group_id: if parent_id.is_empty() { None } else { Some(parent_id) },
+                credential_id: None,
                 status: smagical_core::HostStatus::Online,
                 ping_ms: 22,
                 sort_order: 0,
@@ -596,12 +598,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         }
         if let Some(w) = window_weak.upgrade() {
             w.set_active_rendering_pipeline(p_str.clone().into());
-            core_state_pipe.app_hooks().dispatch_config_changed(&smagical_core::ConfigChangeEvent::new(
-                "rendering.pipeline",
-                "",
-                &p_str,
-                "debug_switch_pipeline",
-            ));
+            core_state_pipe.events().dispatch(&ConfigChangedEvent {
+                key: "rendering.pipeline".into(),
+                old_val: "".into(),
+                new_val: p_str.clone(),
+                source: "debug_switch_pipeline".into(),
+            });
             tracing::info!(target: "smagical_debug::render", "图形渲染管线首选项已切换为: {}", p_str);
             sync_ui_debug_logs(&w);
         }
@@ -668,6 +670,310 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         },
     );
 
+    // -------------------------------------------------------------------------
+    // 14. 批量生成凭据测试数据
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_bg_cred = ctx.core_state.clone();
+    let notif_bg_cred = ctx.notifications.clone();
+    window.on_debug_batch_generate_credentials(move |count_str, mode_str, overwrite| {
+        if let Some(w) = window_weak.upgrade() {
+            let count = count_str.as_str().parse::<usize>().unwrap_or(10).max(1);
+            let mode = mode_str.to_string();
+
+            if overwrite {
+                if let Ok(existing) = core_state_bg_cred.storage().credentials().list_all() {
+                    for c in existing {
+                        let _ = core_state_bg_cred.storage().credentials().delete(&c.id);
+                    }
+                }
+            }
+
+            let mut batch_records = Vec::with_capacity(count);
+            for i in 1..=count {
+                let id = format!("cred-mock-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
+                let c_type = match mode.as_str() {
+                    "key" => smagical_core::CredentialType::Key,
+                    "password" => smagical_core::CredentialType::Password,
+                    "agent" => smagical_core::CredentialType::Agent,
+                    _ => match i % 3 {
+                        0 => smagical_core::CredentialType::Key,
+                        1 => smagical_core::CredentialType::Password,
+                        _ => smagical_core::CredentialType::Agent,
+                    },
+                };
+
+                let rec = match c_type {
+                    smagical_core::CredentialType::Key => smagical_core::CredentialRecord {
+                        id: id.clone(),
+                        name: format!("批量测试密钥 #{}", i),
+                        cred_type: smagical_core::CredentialType::Key,
+                        algorithm: if i % 2 == 0 { "Ed25519".to_string() } else { "RSA-4096".to_string() },
+                        username: Some(format!("user-{}", i)),
+                        secret_data: "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQAAAJCR2Y69kdmO\nvQAAAAtzc2gtZWQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6\nSQAAAEA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP\n4lXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQ=\n-----END OPENSSH PRIVATE KEY-----".to_string(),
+                        passphrase: if i % 2 == 0 { Some("••••••••".to_string()) } else { None },
+                        public_key: Some(format!("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI{} test-key-{}", i, i)),
+                        fingerprint: Some(format!("SHA256:mockFingerprint{:08x}", i)),
+                        bound_host_count: i % 5,
+                        created_at: "2026-09-01 12:00:00".to_string(),
+                        updated_at: "2026-09-01 12:00:00".to_string(),
+                        notes: format!("批量压测生成密钥 #{}", i),
+                    },
+                    smagical_core::CredentialType::Password => smagical_core::CredentialRecord {
+                        id: id.clone(),
+                        name: format!("批量测试密码 #{}", i),
+                        cred_type: smagical_core::CredentialType::Password,
+                        algorithm: "Password".to_string(),
+                        username: Some(format!("admin-{}", i)),
+                        secret_data: format!("MockPass#{}!Secure", i),
+                        passphrase: None,
+                        public_key: None,
+                        fingerprint: None,
+                        bound_host_count: i % 4,
+                        created_at: "2026-09-01 12:00:00".to_string(),
+                        updated_at: "2026-09-01 12:00:00".to_string(),
+                        notes: format!("批量压测生成密码 #{}", i),
+                    },
+                    smagical_core::CredentialType::Agent | smagical_core::CredentialType::Certificate => smagical_core::CredentialRecord {
+                        id: id.clone(),
+                        name: format!("测试 SSH Agent 管道 #{}", i),
+                        cred_type: smagical_core::CredentialType::Agent,
+                        algorithm: if i % 2 == 0 { "1Password".to_string() } else { "OpenSSH".to_string() },
+                        username: Some(format!("agent-user-{}", i)),
+                        secret_data: if i % 2 == 0 { r"\\.\pipe\1password-ssh-agent".to_string() } else { r"\\.\pipe\openssh-ssh-agent".to_string() },
+                        passphrase: None,
+                        public_key: Some(format!("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI{} agent-{}", i, i)),
+                        fingerprint: Some(format!("SHA256:agentFingerprint{:08x}", i)),
+                        bound_host_count: i % 3,
+                        created_at: "2026-09-01 12:00:00".to_string(),
+                        updated_at: "2026-09-01 12:00:00".to_string(),
+                        notes: format!("批量压测生成 Agent #{}", i),
+                    },
+                };
+                batch_records.push(rec);
+            }
+
+            let _ = core_state_bg_cred.storage().credentials().save_batch(&batch_records);
+            let cat = w.get_credential_filter_category().to_string();
+            let q = w.get_credential_search_query().to_string();
+            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_bg_cred, &cat, &q);
+            notif_bg_cred.success("批量凭据生成完成", &format!("成功注入 {} 条测试凭据数据", count));
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 15. 快捷添加单条测试凭据
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_qa_cred = ctx.core_state.clone();
+    let notif_qa_cred = ctx.notifications.clone();
+    window.on_debug_quick_add_credential(move |ctype, name, data| {
+        if let Some(w) = window_weak.upgrade() {
+            let id = format!("cred-quick-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
+            let c_name = name.to_string();
+            let c_data = data.to_string();
+            let cred_type = match ctype.as_str() {
+                "key" => smagical_core::CredentialType::Key,
+                "password" => smagical_core::CredentialType::Password,
+                "agent" => smagical_core::CredentialType::Agent,
+                _ => smagical_core::CredentialType::Key,
+            };
+
+            let rec = match cred_type {
+                smagical_core::CredentialType::Key => smagical_core::CredentialRecord {
+                    id: id.clone(),
+                    name: c_name.clone(),
+                    cred_type: smagical_core::CredentialType::Key,
+                    algorithm: if c_data.contains("RSA") { "RSA-4096".to_string() } else { "Ed25519".to_string() },
+                    username: Some("root".to_string()),
+                    secret_data: if c_data.is_empty() {
+                        "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQAAAJCR2Y69kdmO\nvQAAAAtzc2gtZWQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6\nSQAAAEA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP\n4lXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQ=\n-----END OPENSSH PRIVATE KEY-----".to_string()
+                    } else {
+                        c_data
+                    },
+                    passphrase: None,
+                    public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMfyDbS9fsr2nUF83bA/iVeplszjEaAD1Anq0vuvWfpJ root@test".to_string()),
+                    fingerprint: Some("SHA256:k9x8Ym+3pLq1G7vX2nR8uM4aP9tL3wQ2bN6pG8oP4qM".to_string()),
+                    bound_host_count: 1,
+                    created_at: "2026-09-01 12:00:00".to_string(),
+                    updated_at: "2026-09-01 12:00:00".to_string(),
+                    notes: "快捷添加的测试密钥凭据".to_string(),
+                },
+                smagical_core::CredentialType::Password => smagical_core::CredentialRecord {
+                    id: id.clone(),
+                    name: c_name.clone(),
+                    cred_type: smagical_core::CredentialType::Password,
+                    algorithm: "Password".to_string(),
+                    username: Some("root".to_string()),
+                    secret_data: if c_data.is_empty() { "SmaluxSecure#2026!P@ss".to_string() } else { c_data },
+                    passphrase: None,
+                    public_key: None,
+                    fingerprint: None,
+                    bound_host_count: 1,
+                    created_at: "2026-09-01 12:00:00".to_string(),
+                    updated_at: "2026-09-01 12:00:00".to_string(),
+                    notes: "快捷添加的测试密码凭据".to_string(),
+                },
+                smagical_core::CredentialType::Agent | smagical_core::CredentialType::Certificate => smagical_core::CredentialRecord {
+                    id: id.clone(),
+                    name: c_name.clone(),
+                    cred_type: smagical_core::CredentialType::Agent,
+                    algorithm: "Agent".to_string(),
+                    username: Some("agent".to_string()),
+                    secret_data: if c_data.is_empty() { r"\\.\pipe\openssh-ssh-agent".to_string() } else { c_data },
+                    passphrase: None,
+                    public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q agent".to_string()),
+                    fingerprint: Some("SHA256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d".to_string()),
+                    bound_host_count: 1,
+                    created_at: "2026-09-01 12:00:00".to_string(),
+                    updated_at: "2026-09-01 12:00:00".to_string(),
+                    notes: "快捷添加的测试 Agent 管道凭据".to_string(),
+                },
+            };
+
+            let _ = core_state_qa_cred.storage().credentials().save(&rec);
+            let cat = w.get_credential_filter_category().to_string();
+            let q = w.get_credential_search_query().to_string();
+            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_qa_cred, &cat, &q);
+            notif_qa_cred.success("凭据添加成功", &format!("已成功注入: {}", c_name));
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 16. 恢复默认凭据预设
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_rst_cred = ctx.core_state.clone();
+    let notif_rst_cred = ctx.notifications.clone();
+    window.on_debug_reset_default_credentials(move || {
+        if let Some(w) = window_weak.upgrade() {
+            if let Ok(existing) = core_state_rst_cred.storage().credentials().list_all() {
+                for c in existing {
+                    let _ = core_state_rst_cred.storage().credentials().delete(&c.id);
+                }
+            }
+
+            let default_creds = vec![
+                smagical_core::CredentialRecord {
+                    id: "cred-prod-ed25519".to_string(),
+                    name: "生产集群 Ed25519 密钥".to_string(),
+                    cred_type: smagical_core::CredentialType::Key,
+                    algorithm: "Ed25519".to_string(),
+                    username: Some("root".to_string()),
+                    secret_data: "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQAAAJCR2Y69kdmO\nvQAAAAtzc2gtZWQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6\nSQAAAEA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP\n4lXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQ=\n-----END OPENSSH PRIVATE KEY-----".to_string(),
+                    passphrase: Some("••••••••".to_string()),
+                    public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMfyDbS9fsr2nUF83bA/iVeplszjEaAD1Anq0vuvWfpJ root@smalux-k8s-prod".to_string()),
+                    fingerprint: Some("SHA256:k9x8Ym+3pLq1G7vX2nR8uM4aP9tL3wQ2bN6pG8oP4qM".to_string()),
+                    bound_host_count: 5,
+                    created_at: "2026-08-15 10:20:00".to_string(),
+                    updated_at: "2026-09-01 09:15:00".to_string(),
+                    notes: "Kubernetes 核心控制面与网关认证主密钥".to_string(),
+                },
+                smagical_core::CredentialRecord {
+                    id: "cred-bastion-pwd".to_string(),
+                    name: "堡垒跳板机 Root 管理密码".to_string(),
+                    cred_type: smagical_core::CredentialType::Password,
+                    algorithm: "Password".to_string(),
+                    username: Some("root".to_string()),
+                    secret_data: "SmaluxSecure#2026!P@ss".to_string(),
+                    passphrase: None,
+                    public_key: None,
+                    fingerprint: None,
+                    bound_host_count: 2,
+                    created_at: "2026-08-18 14:30:00".to_string(),
+                    updated_at: "2026-08-30 18:00:00".to_string(),
+                    notes: "边缘网关与跳板机应急控制台特权密码".to_string(),
+                },
+                smagical_core::CredentialRecord {
+                    id: "cred-1pwd-agent".to_string(),
+                    name: "1Password SSH Agent".to_string(),
+                    cred_type: smagical_core::CredentialType::Agent,
+                    algorithm: "1Password".to_string(),
+                    username: Some("developer".to_string()),
+                    secret_data: r"\\.\pipe\1password-ssh-agent".to_string(),
+                    passphrase: None,
+                    public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q 1password-agent".to_string()),
+                    fingerprint: Some("SHA256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d".to_string()),
+                    bound_host_count: 3,
+                    created_at: "2026-08-20 16:45:00".to_string(),
+                    updated_at: "2026-09-01 11:30:00".to_string(),
+                    notes: "硬件安全保管箱，受 Windows Hello 生物识别保护".to_string(),
+                },
+                smagical_core::CredentialRecord {
+                    id: "cred-dev-rsa".to_string(),
+                    name: "CI/CD 流水线 RSA 密钥".to_string(),
+                    cred_type: smagical_core::CredentialType::Key,
+                    algorithm: "RSA-4096".to_string(),
+                    username: Some("gitlab-runner".to_string()),
+                    secret_data: "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0k6K9X7L9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQ2Y69kd\nvQMwAAAAtzc2gtcnNhAAAAAwEAAQAAAgEAv7b4a2p8zXqN3vP9xK2m4rL9nO1pQ8tL\n3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQ\nA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4l\nXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQFAgcICQoLDA0O\nDxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0\nBBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3Bx\ncnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6Ch\noqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR\n0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/wID\n-----END RSA PRIVATE KEY-----".to_string(),
+                    passphrase: None,
+                    public_key: Some("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDv7b4a2p8zXqN3vP9xK2m4rL9nO1pQ8tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQ gitlab@runner".to_string()),
+                    fingerprint: Some("SHA256:9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f".to_string()),
+                    bound_host_count: 1,
+                    created_at: "2026-08-25 09:00:00".to_string(),
+                    updated_at: "2026-08-25 09:00:00".to_string(),
+                    notes: "GitLab Runner 持续部署构建机专有免密凭据".to_string(),
+                },
+                smagical_core::CredentialRecord {
+                    id: "cred-openssh-agent".to_string(),
+                    name: "Windows OpenSSH Agent".to_string(),
+                    cred_type: smagical_core::CredentialType::Agent,
+                    algorithm: "OpenSSH".to_string(),
+                    username: Some("ssh-agent".to_string()),
+                    secret_data: r"\\.\pipe\openssh-ssh-agent".to_string(),
+                    passphrase: None,
+                    public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q openssh-agent".to_string()),
+                    fingerprint: Some("SHA256:8f4e2c9a1b3d5e7f0a2c4e6b8d0f1a3c".to_string()),
+                    bound_host_count: 4,
+                    created_at: "2026-08-22 11:00:00".to_string(),
+                    updated_at: "2026-08-22 11:00:00".to_string(),
+                    notes: "Windows 内置 OpenSSH Authentication Agent 命名管道".to_string(),
+                },
+                smagical_core::CredentialRecord {
+                    id: "cred-bitwarden-agent".to_string(),
+                    name: "Bitwarden SSH Agent".to_string(),
+                    cred_type: smagical_core::CredentialType::Agent,
+                    algorithm: "Bitwarden".to_string(),
+                    username: Some("vault".to_string()),
+                    secret_data: r"\\.\pipe\bitwarden-ssh-agent".to_string(),
+                    passphrase: None,
+                    public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q bitwarden-agent".to_string()),
+                    fingerprint: Some("SHA256:3d5e7f9a1c2b4d6e8f0a1b3c5d7e9f1a".to_string()),
+                    bound_host_count: 2,
+                    created_at: "2026-08-28 15:20:00".to_string(),
+                    updated_at: "2026-08-28 15:20:00".to_string(),
+                    notes: "Bitwarden / Vaultwarden 桌面端安全托管 SSH Agent".to_string(),
+                },
+            ];
+
+            let _ = core_state_rst_cred.storage().credentials().save_batch(&default_creds);
+            let cat = w.get_credential_filter_category().to_string();
+            let q = w.get_credential_search_query().to_string();
+            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_rst_cred, &cat, &q);
+            notif_rst_cred.success("预设恢复完成", "已重新载入 6 项精选预设凭据");
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 17. 清空所有凭据
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_clr_cred = ctx.core_state.clone();
+    let notif_clr_cred = ctx.notifications.clone();
+    window.on_debug_clear_credentials(move || {
+        if let Some(w) = window_weak.upgrade() {
+            if let Ok(existing) = core_state_clr_cred.storage().credentials().list_all() {
+                for c in existing {
+                    let _ = core_state_clr_cred.storage().credentials().delete(&c.id);
+                }
+            }
+
+            let cat = w.get_credential_filter_category().to_string();
+            let q = w.get_credential_search_query().to_string();
+            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_clr_cred, &cat, &q);
+            notif_clr_cred.info("凭据已清空", "所有凭据数据已从存储层完全清除");
+        }
+    });
 }
 
 

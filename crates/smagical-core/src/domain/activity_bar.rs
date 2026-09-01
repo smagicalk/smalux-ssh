@@ -5,7 +5,7 @@ use std::sync::RwLock;
 /// 侧边栏菜单项配置与状态模型。
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ActivityBarItem {
-    /// 唯一标识 (如 "hosts", "keys", "history", "snippets", "settings", "debug")
+    /// 唯一标识 (如 "hosts", "credentials", "history", "snippets", "settings", "debug")
     pub id: String,
     /// 矢量图标名称 (如 "server", "key", "clock", "terminal", "settings", "bug")
     pub icon_name: String,
@@ -98,10 +98,10 @@ impl ActivityBarRegistry {
     /// 创建预置默认核心菜单项的注册管理器。
     pub fn new_with_defaults() -> Self {
         let registry = Self::new();
-        // 顶部核心业务功能 (严格按序: 主机 -> SFTP文件 -> 密钥 -> 代码片段 -> 隧道代理 -> 历史会话)
+        // 顶部核心业务功能 (严格按序: 主机 -> SFTP文件 -> 凭据保管 -> 代码片段 -> 隧道代理 -> 历史会话)
         registry.register(ActivityBarItem::top("hosts", "server", "主机资产管理", 10).with_shortcut("Ctrl+1"));
         registry.register(ActivityBarItem::top("files", "folder", "SFTP 文件管理", 20).with_shortcut("Ctrl+2"));
-        registry.register(ActivityBarItem::top("keys", "key", "SSH 密钥保险箱", 30).with_shortcut("Ctrl+3"));
+        registry.register(ActivityBarItem::top("credentials", "key", "凭据保管箱", 30).with_shortcut("Ctrl+3"));
         registry.register(ActivityBarItem::top("snippets", "terminal", "常用脚本与代码段", 40).with_shortcut("Ctrl+4"));
         registry.register(ActivityBarItem::top("tunnels", "tunnel", "网络隧道代理", 50).with_shortcut("Ctrl+5"));
         registry.register(ActivityBarItem::top("history", "clock", "历史会话与审计", 60).with_shortcut("Ctrl+6"));
@@ -211,7 +211,7 @@ mod tests {
         assert_eq!(tops.len(), 6);
         assert_eq!(tops[0].id, "hosts");
         assert_eq!(tops[1].id, "files");
-        assert_eq!(tops[2].id, "keys");
+        assert_eq!(tops[2].id, "credentials");
         assert_eq!(tops[3].id, "snippets");
         assert_eq!(tops[4].id, "tunnels");
         assert_eq!(tops[5].id, "history");
@@ -228,7 +228,7 @@ mod tests {
         registry.register(ActivityBarItem::top("ai_assistant", "sparkles", "AI 终端助手", 25));
         let tops_updated = registry.list_top_items();
         assert_eq!(tops_updated.len(), 7);
-        assert_eq!(tops_updated[2].id, "ai_assistant"); // order 25 插入在 files (20) 和 keys (30) 之间
+        assert_eq!(tops_updated[2].id, "ai_assistant"); // order 25 插入在 files (20) 和 credentials (30) 之间
     }
 
 }

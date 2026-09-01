@@ -8,6 +8,7 @@ export { LogEntryData } from "components/debug-modal.slint";
 export { LocalShellItemData } from "components/new-session-modal.slint";
 export { TerminalPaneData, TerminalSplitterData } from "views/center_terminal/terminal_viewport.slint";
 export { FileItemData, FileTabData, TransferItemData } from "views/file_explorer_view.slint";
+export { CredentialItemData } from "views/left_drawers/credentials_drawer.slint";
 export { ToastItemData } from "components/toast.slint";
 
 
@@ -32,6 +33,7 @@ import { HistoryDetailModal } from "components/history-detail-modal.slint";
 import { MessageDialog } from "components/message-dialog.slint";
 import { FileHostModal } from "components/file-host-modal.slint";
 import { ToastContainer, ToastItemData } from "components/toast.slint";
+import { CredentialsCenterView } from "views/credentials_view.slint";
 
 
 
@@ -267,7 +269,33 @@ export component AppWindow inherits Window {
     in-out property <string> history-detail-snapshot: "";
     in-out property <int> history-detail-snapshot-lines: 0;
 
+    // -------------------------------------------------------------------------
+    // 凭据保管与密钥管理状态 (Master-Detail 全屏视图)
+    // -------------------------------------------------------------------------
+    /// 全量凭据资产列表
+    in property <[CredentialItemData]> credentials: [];
+    /// 凭据分类过滤 ("all" | "key" | "password" | "agent")
+    in-out property <string> credential-filter-category: "all";
+    /// 凭据搜索过滤词
+    in-out property <string> credential-search-query: "";
+    /// 当前选中凭据 ID
+    in-out property <string> active-credential-id: "";
 
+    /// 右侧详情与编辑表单状态
+    in-out property <bool> is-credential-create-mode: false;
+    in-out property <bool> is-credential-editing: false;
+    in-out property <string> credential-form-id: "";
+    in-out property <string> credential-form-name: "";
+    in-out property <string> credential-form-type: "key";
+    in-out property <string> credential-form-algorithm: "Ed25519";
+    in-out property <string> credential-form-username: "root";
+    in-out property <string> credential-form-secret-data: "";
+    in-out property <string> credential-form-passphrase: "";
+    in-out property <string> credential-form-public-key: "";
+    in-out property <string> credential-form-fingerprint: "";
+    in-out property <string> credential-form-notes: "";
+    in-out property <int> credential-form-bound-host-count: 0;
+    in-out property <string> credential-form-updated-at: "";
 
     // -------------------------------------------------------------------------
     // 拖拽调序交互状态机
@@ -478,6 +506,33 @@ export component AppWindow inherits Window {
     /// 复制快照日志到剪贴板回调
     callback copy-history-log(string /* content */);
 
+    // -------------------------------------------------------------------------
+    // 凭据保管全屏中心交互回调
+    // -------------------------------------------------------------------------
+    /// 选中指定凭据
+    callback select-credential(string /* id */);
+    /// 开启新建凭据模式
+    callback open-create-credential-modal();
+    /// 取消新建凭据模式
+    callback cancel-create-credential();
+    /// 开启编辑当前凭据模式
+    callback start-edit-credential();
+    /// 取消编辑当前凭据模式
+    callback cancel-edit-credential();
+    /// 保存凭据记录 (新增或修改)
+    callback save-credential(string /* id */, string /* name */, string /* cred_type */, string /* algorithm */, string /* username */, string /* secret_data */, string /* passphrase */, string /* public_key */, string /* fingerprint */, string /* notes */);
+    /// 删除指定凭据
+    callback delete-credential(string /* id */);
+    /// 复制凭据核心机密 (公钥或密码)
+    callback copy-credential-secret(string /* id */);
+    /// 复制任意自定义文本至剪贴板
+    callback copy-custom-text(string /* text */, string /* title */, string /* msg */);
+    /// 一键生成 SSH 密钥对
+    callback generate-credential-key(string /* algorithm */);
+    /// 一键生成随机强密码
+    callback generate-credential-password();
+    /// 凭据分类与搜索过滤
+    callback filter-credentials(string /* category */, string /* query */);
 
     // -------------------------------------------------------------------------
     // 开发者 F12 调试控制台专用回调
@@ -499,6 +554,14 @@ export component AppWindow inherits Window {
     callback debug-clear-data();
     /// 恢复系统默认精简数据集
     callback debug-reset-default-data();
+    /// 批量生成凭据测试数据
+    callback debug-batch-generate-credentials(string /* count_str */, string /* mode */, bool /* overwrite */);
+    /// 快捷添加单条测试凭据
+    callback debug-quick-add-credential(string /* cred_type */, string /* name */, string /* data */);
+    /// 恢复默认精选凭据预设
+    callback debug-reset-default-credentials();
+    /// 清空所有凭据数据
+    callback debug-clear-credentials();
     /// 清空诊断日志
     callback debug-clear-logs();
     /// 模拟触发测试诊断日志
@@ -730,6 +793,12 @@ export component AppWindow inherits Window {
                             root.main-view = "history";
                             root.is-left-drawer-open = false;
                             root.navigate-to("history", "");
+                        } else if id == "credentials" {
+                            // 切换至独立全屏凭据中心大页面 (左侧列表 + 右侧详情编辑，无右侧工具栏)
+                            root.active-left-tab = "credentials";
+                            root.main-view = "credentials";
+                            root.is-left-drawer-open = false;
+                            root.navigate-to("credentials", "");
                         } else if id == "files" {
                             // 切换至文件管理页面：左侧展示主机树抽屉，中央展示双盘文件管理器
                             root.active-left-tab = "files";
@@ -791,24 +860,46 @@ export component AppWindow inherits Window {
                     }
 
                     if root.active-left-tab == "credentials": CredentialsDrawer {
+                        width: 100%;
+                        height: 100%;
                         collapse => { root.is-left-drawer-open = false; }
+                        credentials: root.credentials;
+                        filter-category <=> root.credential-filter-category;
+                        search-query <=> root.credential-search-query;
+                        active-cred-id <=> root.active-credential-id;
+
+                        select-cred(id) => { root.select-credential(id); }
+                        open-create-modal => { root.open-create-credential-modal(); }
+                        edit-cred(id) => { root.select-credential(id); }
+                        delete-cred(id) => { root.delete-credential(id); }
+                        copy-secret(id) => { root.copy-credential-secret(id); }
+                        search-changed(q) => { root.filter-credentials(root.credential-filter-category, q); }
+                        filter-category-changed(cat) => { root.filter-credentials(cat, root.credential-search-query); }
                     }
 
 
                     if root.active-left-tab == "snippets": SnippetsDrawer {
+                        width: 100%;
+                        height: 100%;
                         collapse => { root.is-left-drawer-open = false; }
                         execute-snippet(cmd) => { root.send-snippet(cmd); }
                     }
 
                     if root.active-left-tab == "tunnels": TunnelsDrawer {
+                        width: 100%;
+                        height: 100%;
                         collapse => { root.is-left-drawer-open = false; }
                     }
 
                     if root.active-left-tab == "backup": BackupDrawer {
+                        width: 100%;
+                        height: 100%;
                         collapse => { root.is-left-drawer-open = false; }
                     }
 
                     if root.active-left-tab == "settings": SettingsDrawer {
+                        width: 100%;
+                        height: 100%;
                         is-debug-enabled <=> root.is-debug-enabled;
                         collapse => { root.is-left-drawer-open = false; }
                         switch-theme(id) => { root.switch-theme(id); }
@@ -881,9 +972,54 @@ export component AppWindow inherits Window {
 
                 }
 
+                // 2.3.2 全屏凭据管理中心 (当 main-view == "credentials" 时展开，左侧列表 + 右侧详情编辑，隐藏终端与右侧工具栏)
+                if root.main-view == "credentials": CredentialsCenterView {
+                    horizontal-stretch: 1;
+                    credentials: root.credentials;
+                    filter-category <=> root.credential-filter-category;
+                    search-query <=> root.credential-search-query;
+                    active-cred-id <=> root.active-credential-id;
+
+                    is-create-mode <=> root.is-credential-create-mode;
+                    is-editing <=> root.is-credential-editing;
+                    form-id <=> root.credential-form-id;
+                    form-name <=> root.credential-form-name;
+                    form-type <=> root.credential-form-type;
+                    form-algorithm <=> root.credential-form-algorithm;
+                    form-username <=> root.credential-form-username;
+                    form-secret-data <=> root.credential-form-secret-data;
+                    form-passphrase <=> root.credential-form-passphrase;
+                    form-public-key <=> root.credential-form-public-key;
+                    form-fingerprint <=> root.credential-form-fingerprint;
+                    form-notes <=> root.credential-form-notes;
+                    form-bound-host-count <=> root.credential-form-bound-host-count;
+                    form-updated-at <=> root.credential-form-updated-at;
+
+                    select-cred(id) => { root.select-credential(id); }
+                    start-create => { root.open-create-credential-modal(); }
+                    cancel-create => { root.cancel-create-credential(); }
+                    start-edit => { root.start-edit-credential(); }
+                    cancel-edit => { root.cancel-edit-credential(); }
+                    save-cred(id, name, cred_type, algo, user, secret, pass, pub, fp, notes) => {
+                        root.save-credential(id, name, cred_type, algo, user, secret, pass, pub, fp, notes);
+                    }
+                    delete-cred(id) => { root.delete-credential(id); }
+                    copy-secret(id) => { root.copy-credential-secret(id); }
+                    copy-text(text, title, msg) => { root.copy-custom-text(text, title, msg); }
+                    generate-key(algo) => { root.generate-credential-key(algo); }
+                    generate-password => { root.generate-credential-password(); }
+                    search-changed(q) => { root.filter-credentials(root.credential-filter-category, q); }
+                    filter-category-changed(cat) => { root.filter-credentials(cat, root.credential-search-query); }
+                    back-to-terminal => {
+                        root.main-view = "terminal";
+                        root.active-left-tab = "hosts";
+                        root.is-left-drawer-open = true;
+                    }
+                }
 
 
-                // 2.3.2 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
+
+                // 2.3.3 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
                 viewport := TerminalViewport {
                     visible: root.main-view == "terminal";
                     horizontal-stretch: root.main-view == "terminal" ? 1 : 0;
@@ -1144,6 +1280,7 @@ export component AppWindow inherits Window {
         total-nodes-count: root.tree-nodes.length;
         visible-nodes-count: root.tree-nodes.length;
         host-cards-count: root.hosts.length;
+        credential-count: root.credentials.length;
         tree-viewport-width: root.tree-content-width;
         current-theme-name: root.current-theme-name;
         is-dark-mode: root.is-dark-mode;
@@ -1163,6 +1300,10 @@ export component AppWindow inherits Window {
         quick-add-group(name, parent-id) => { root.debug-quick-add-group(name, parent-id); }
         clear-all-data => { root.debug-clear-data(); }
         reset-default-data => { root.debug-reset-default-data(); }
+        debug-batch-generate-credentials(cnt, mode, ovr) => { root.debug-batch-generate-credentials(cnt, mode, ovr); }
+        debug-quick-add-credential(ctype, n, d) => { root.debug-quick-add-credential(ctype, n, d); }
+        debug-reset-default-credentials => { root.debug-reset-default-credentials(); }
+        debug-clear-credentials => { root.debug-clear-credentials(); }
         clear-logs => { root.debug-clear-logs(); }
         emit-test-log(level) => { root.debug-emit-test-log(level); }
         switch-theme(id) => { root.switch-theme(id); }

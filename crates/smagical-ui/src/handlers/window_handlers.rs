@@ -4,6 +4,10 @@
 
 use std::rc::Rc;
 use slint::ComponentHandle;
+use smagical_core::event::{
+    AppBeforeExitEvent, AppExitEvent, ConfigChangedEvent, ThemeChangedEvent,
+    ThemeModeToggledEvent, WindowStateChangedEvent,
+};
 use theme::apply_theme_by_id;
 
 use crate::generated::AppWindow;
@@ -67,13 +71,16 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_current_theme_name(name.into());
                     let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
                     w.set_is_dark_mode(!is_light);
-                    core_state_theme.app_hooks().dispatch_theme_changed(normalized_id, !is_light);
-                    core_state_theme.app_hooks().dispatch_config_changed(&smagical_core::ConfigChangeEvent::new(
-                        "appearance.theme",
-                        "",
-                        normalized_id,
-                        "switch_theme",
-                    ));
+                    core_state_theme.events().dispatch(&ThemeChangedEvent {
+                        theme_id: normalized_id.to_string(),
+                        is_dark: !is_light,
+                    });
+                    core_state_theme.events().dispatch(&ConfigChangedEvent {
+                        key: "appearance.theme".into(),
+                        old_val: "".into(),
+                        new_val: normalized_id.to_string(),
+                        source: "switch_theme".into(),
+                    });
                     tracing::info!(target: "smagical_ui::theme", "切换应用配色主题: {} ({})", name, normalized_id);
 
                 }
@@ -106,13 +113,15 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 w.set_is_dark_mode(false);
             }
 
-            core_state_color_mode.app_hooks().dispatch_theme_mode_toggled(next_dark);
-            core_state_color_mode.app_hooks().dispatch_config_changed(&smagical_core::ConfigChangeEvent::new(
-                "appearance.color_mode",
-                if is_dark { "dark" } else { "light" },
-                if next_dark { "dark" } else { "light" },
-                "toggle_color_mode",
-            ));
+            core_state_color_mode.events().dispatch(&ThemeModeToggledEvent {
+                is_dark: next_dark,
+            });
+            core_state_color_mode.events().dispatch(&ConfigChangedEvent {
+                key: "appearance.color_mode".into(),
+                old_val: if is_dark { "dark" } else { "light" }.into(),
+                new_val: if next_dark { "dark" } else { "light" }.into(),
+                source: "toggle_color_mode".into(),
+            });
 
             tracing::info!(target: "smagical_ui::theme", "{}", if next_dark { "切换至深色模式 (Darcula)" } else { "切换至浅色模式 (GitHub Light)" });
         }
@@ -138,12 +147,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 crate::debug_ui::sync_ui_debug_logs(&w);
             }
-            core_state_debug.app_hooks().dispatch_config_changed(&smagical_core::ConfigChangeEvent::new(
-                "developer.debug_enabled",
-                if enabled { "false" } else { "true" },
-                if enabled { "true" } else { "false" },
-                "toggle_debug_enabled",
-            ));
+            core_state_debug.events().dispatch(&ConfigChangedEvent {
+                key: "developer.debug_enabled".into(),
+                old_val: if enabled { "false" } else { "true" }.into(),
+                new_val: if enabled { "true" } else { "false" }.into(),
+                source: "toggle_debug_enabled".into(),
+            });
             tracing::info!(target: "smagical_ui::settings", "开发者调试控制台已{}", if enabled { "开启" } else { "关闭" });
         }
     });
@@ -165,24 +174,27 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
 
 
     // -------------------------------------------------------------------------
-    // 3. 窗口控制: 关闭应用 (带安全守护与退出归档 Hook)
-
+    // 3. 窗口控制: 关闭应用 (带安全守护与退出归档)
     // -------------------------------------------------------------------------
-    // 点击右上角红色关闭按钮时，触发 before_exit 询问与 exit 终态归档，安全退出客户端进程。
+    // 点击右上角红色关闭按钮时，安全退出客户端进程。
     let core_state_close = ctx.core_state.clone();
     let pane_groups_close = Rc::clone(&ctx.pane_groups);
     let persistence_guard_close = std::sync::Arc::clone(&ctx.persistence_guard);
     window.on_close_window(move || {
-        let active_count = pane_groups_close.borrow().iter().map(|g| g.tabs.len()).sum();
-        let exit_ctx = smagical_core::AppExitContext::normal(active_count);
-        let decision = core_state_close.app_hooks().dispatch_app_before_exit(&exit_ctx);
-        if matches!(decision, smagical_core::HookDecision::Abort { .. }) {
-            tracing::warn!(target: "smagical_ui::window", "应用退出流程被安全守护插件拦截");
+        let active_count: usize = pane_groups_close.borrow().iter().map(|g| g.tabs.len()).sum();
+        let before_exit_event = AppBeforeExitEvent::new(active_count);
+        core_state_close.events().dispatch(&before_exit_event);
+        if before_exit_event.is_aborted() {
+            tracing::warn!(
+                target: "smagical_ui::window",
+                "应用退出流程被安全守护拦截: {:?}",
+                before_exit_event.abort_reason()
+            );
             return;
         }
         // 等待所有后台会话历史持久化写盘完成，杜绝数据丢失
         persistence_guard_close.flush_and_wait(std::time::Duration::from_millis(1000));
-        core_state_close.app_hooks().dispatch_app_exit(&exit_ctx);
+        core_state_close.events().dispatch(&AppExitEvent { exit_code: 0 });
         std::process::exit(0);
     });
 
@@ -195,7 +207,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_min = ctx.core_state.clone();
     window.on_minimize_window(move || {
         if let Some(w) = window_weak.upgrade() {
-            core_state_min.app_hooks().dispatch_shell_window_state_changed(smagical_core::WindowState::Minimized);
+            core_state_min.events().dispatch(&WindowStateChangedEvent {
+                state: "minimized".into(),
+            });
             w.window().set_minimized(true);
         }
     });
@@ -209,15 +223,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_maximize_window(move || {
         if let Some(w) = window_weak.upgrade() {
             let is_max = w.get_is_window_maximized();
-            core_state_max.app_hooks().dispatch_shell_window_state_changed(if !is_max {
-                smagical_core::WindowState::Maximized
-            } else {
-                smagical_core::WindowState::Normal
+            core_state_max.events().dispatch(&WindowStateChangedEvent {
+                state: if !is_max { "maximized".into() } else { "restored".into() },
             });
             w.set_is_window_maximized(!is_max);
             w.window().set_maximized(!is_max);
         }
-
     });
 
     // -------------------------------------------------------------------------

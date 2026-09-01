@@ -2,8 +2,11 @@
 
 use std::rc::Rc;
 use slint::ComponentHandle;
+use smagical_core::event::{
+    HistoryClearedEvent, HistoryItemDeletedEvent, HistoryPinToggledEvent,
+    HistoryReconnectRequestedEvent, NavigationTabClickedEvent,
+};
 use smagical_core::HistoryRecord;
-
 
 use crate::generated::{AppWindow, HistoryGroupData, HistoryItemData};
 use crate::handlers::AppContext;
@@ -296,7 +299,9 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = ctx_recon.core_state.storage().history().save(&h);
 
                 tracing::info!(target: "smagical_ui::history", "历史会话触发重连: {} ({})", h.title, target_id);
-                ctx_recon.core_state.app_hooks().dispatch_history_reconnect_requested(&hist_id);
+                ctx_recon.core_state.events().dispatch(&HistoryReconnectRequestedEvent {
+                    history_id: hist_id.to_string(),
+                });
                 sync_ui_history(&w, &ctx_recon);
 
                 // 发起连接
@@ -327,7 +332,9 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = ctx_recon_split.core_state.storage().history().save(&h);
 
                 tracing::info!(target: "smagical_ui::history", "历史会话分屏重连: {} ({})", h.title, target_id);
-                ctx_recon_split.core_state.app_hooks().dispatch_history_reconnect_requested(&hist_id);
+                ctx_recon_split.core_state.events().dispatch(&HistoryReconnectRequestedEvent {
+                    history_id: hist_id.to_string(),
+                });
                 sync_ui_history(&w, &ctx_recon_split);
 
                 // 在新分屏中打开
@@ -342,7 +349,9 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_delete_history_item(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_del.core_state.storage().history().delete(&hist_id);
-            ctx_del.core_state.app_hooks().dispatch_history_item_deleted(&hist_id);
+            ctx_del.core_state.events().dispatch(&HistoryItemDeletedEvent {
+                history_id: hist_id.to_string(),
+            });
             tracing::info!(target: "smagical_ui::history", "删除历史会话记录: {}", hist_id);
             sync_ui_history(&w, &ctx_del);
         }
@@ -354,7 +363,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_clear_history(move || {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_clr.core_state.storage().history().clear_all(true);
-            ctx_clr.core_state.app_hooks().dispatch_history_cleared();
+            ctx_clr.core_state.events().dispatch(&HistoryClearedEvent);
             tracing::info!(target: "smagical_ui::history", "清空历史记录 (保留置顶项)");
             sync_ui_history(&w, &ctx_clr);
         }
@@ -366,7 +375,10 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_toggle_pin_history(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let is_pinned = ctx_pin.core_state.storage().history().toggle_pin(&hist_id).unwrap_or_default();
-            ctx_pin.core_state.app_hooks().dispatch_history_pin_toggled(&hist_id, is_pinned);
+            ctx_pin.core_state.events().dispatch(&HistoryPinToggledEvent {
+                history_id: hist_id.to_string(),
+                is_pinned,
+            });
             tracing::info!(target: "smagical_ui::history", "切换历史会话置顶状态: {} -> {}", hist_id, if is_pinned { "⭐️ 已置顶" } else { "取消置顶" });
             sync_ui_history(&w, &ctx_pin);
         }
@@ -466,11 +478,14 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
-    // 11. 活动栏视图切换导航日志与全局 Hook 广播
+    // 11. 活动栏视图切换导航日志与事件广播
     let core_state_nav = ctx.core_state.clone();
     let window_weak = window.as_weak();
     window.on_activity_tab_switched(move |tab_id| {
-        core_state_nav.app_hooks().dispatch_shell_left_menu_clicked(&tab_id, "");
+        core_state_nav.events().dispatch(&NavigationTabClickedEvent {
+            tab_id: tab_id.to_string(),
+            query: "".into(),
+        });
         tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
 
         if let Some(w) = window_weak.upgrade().filter(|w| tab_id == "debug" || w.get_is_debug_modal_open()) {

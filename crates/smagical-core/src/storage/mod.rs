@@ -35,6 +35,9 @@ pub trait HostRepository: Send + Sync {
     /// 根据唯一 ID 查询单条主机记录
     fn get_by_id(&self, id: &str) -> StorageResult<Option<HostRecord>>;
 
+    /// 根据关联凭据 ID 查询所有引用该凭据的主机
+    fn list_by_credential(&self, credential_id: &str) -> StorageResult<Vec<HostRecord>>;
+
     /// 保存或更新主机记录
     fn save(&self, host: &HostRecord) -> StorageResult<()>;
 
@@ -102,6 +105,32 @@ pub trait HistoryRepository: Send + Sync {
     fn delete_snapshot(&self, history_id: &str) -> StorageResult<bool>;
 }
 
+/// 凭据与密钥资产仓储接口契约
+pub trait CredentialRepository: Send + Sync {
+    /// 获取全部凭据记录
+    fn list_all(&self) -> StorageResult<Vec<crate::domain::credential::CredentialRecord>>;
+
+    /// 按分类查询 (Key / Password / Agent / Certificate)
+    fn list_by_type(&self, cred_type: crate::domain::credential::CredentialType) -> StorageResult<Vec<crate::domain::credential::CredentialRecord>>;
+
+    /// 根据唯一 ID 查询单条凭据记录
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<crate::domain::credential::CredentialRecord>>;
+
+    /// 模糊搜索凭据 (按名称、用户名、公钥指纹、备注)
+    fn search(&self, query: &str) -> StorageResult<Vec<crate::domain::credential::CredentialRecord>>;
+
+    /// 获取引用/绑定了该凭据的主机 ID 列表
+    fn get_bound_hosts(&self, id: &str) -> StorageResult<Vec<String>>;
+
+    /// 保存或更新凭据记录
+    fn save(&self, record: &crate::domain::credential::CredentialRecord) -> StorageResult<()>;
+
+    /// 批量保存凭据记录
+    fn save_batch(&self, records: &[crate::domain::credential::CredentialRecord]) -> StorageResult<()>;
+
+    /// 删除指定凭据记录
+    fn delete(&self, id: &str) -> StorageResult<bool>;
+}
 
 /// 聚合存储服务门面契约
 pub trait AppStorage: Send + Sync {
@@ -113,6 +142,9 @@ pub trait AppStorage: Send + Sync {
 
     /// 历史会话仓储句柄
     fn history(&self) -> &dyn HistoryRepository;
+
+    /// 凭据仓储句柄
+    fn credentials(&self) -> &dyn CredentialRepository;
 
     /// 强制从物理介质重新加载数据
     fn reload(&self) -> StorageResult<()>;

@@ -26,7 +26,7 @@ pub(crate) mod handlers;
 /// 终端引擎核心层 (PTY 进程托管与 VT100 状态机)。
 pub mod terminal;
 
-/// 快速新建终端启动器后台异步预热 Hook 模块。
+/// 快速新建终端启动器后台异步预热服务模块。
 pub(crate) mod launcher_prewarm;
 
 /// 侧边栏动态注册与 UI 同步服务。
@@ -122,23 +122,21 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
 
 
-    // 注册本地终端异步预热与文件系统后台探测 Hook (0ms 阻塞主线程)
-    core_state.app_hooks().register(std::sync::Arc::new(local_shells::LocalShellDiscoveryHook::new(
+    // 启动本地终端异步探测服务 (0ms 阻塞主线程)
+    local_shells::start_local_shell_discovery(
         std::sync::Arc::clone(&cached_shells),
         window.as_weak(),
-    )));
+    );
 
-    // 注册启动器资产数据后台异步预热 Hook
-    core_state.app_hooks().register(std::sync::Arc::new(launcher_prewarm::LauncherPrewarmHook::new(
+    // 注册启动器资产数据后台异步预热服务
+    let prewarm_service = std::sync::Arc::new(launcher_prewarm::LauncherPrewarmService::new(
         core_state.storage().clone(),
         window.as_weak(),
-    )));
+    ));
+    prewarm_service.register(core_state.event_manager());
 
-
-
-    // 触发全局应用启动 Hook 引导生命周期 (自动驱动后台线程探测本地终端)
-    let boot_ctx = smagical_core::AppBootContext::new(std::env::args().collect());
-    core_state.app_hooks().dispatch_app_boot(&boot_ctx);
+    // 触发全局应用启动事件
+    core_state.events().dispatch(&smagical_core::AppBootEvent);
 
 
 
@@ -504,8 +502,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
 
 
-    // 触发全局应用界面首帧就绪 Hook 生命周期
-    core_state.app_hooks().dispatch_app_ready();
+    // 触发全局应用界面首帧就绪事件
+    core_state.events().dispatch(&smagical_core::AppReadyEvent);
 
     window.run()?;
     Ok(())

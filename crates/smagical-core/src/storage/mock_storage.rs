@@ -1,11 +1,13 @@
 use std::sync::{Arc, RwLock};
 use crate::domain::{
+    credential::{CredentialRecord, CredentialType},
     group::GroupRecord,
     history::HistoryRecord,
     host::{HostRecord, HostStatus},
 };
 use super::{
-    AppStorage, GroupRepository, HistoryRepository, HostRepository, StorageError, StorageResult,
+    AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
+    StorageError, StorageResult,
 };
 
 
@@ -30,6 +32,11 @@ impl MockHostRepository {
             hosts: Arc::new(RwLock::new(hosts)),
         }
     }
+
+    /// 获取底层并发锁句柄 (供仓储间引用计算)
+    pub fn hosts_raw(&self) -> Arc<RwLock<Vec<HostRecord>>> {
+        self.hosts.clone()
+    }
 }
 
 impl HostRepository for MockHostRepository {
@@ -41,6 +48,11 @@ impl HostRepository for MockHostRepository {
     fn get_by_id(&self, id: &str) -> StorageResult<Option<HostRecord>> {
         let read_guard = self.hosts.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().find(|h| h.id == id).cloned())
+    }
+
+    fn list_by_credential(&self, credential_id: &str) -> StorageResult<Vec<HostRecord>> {
+        let read_guard = self.hosts.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(read_guard.iter().filter(|h| h.credential_id.as_deref() == Some(credential_id)).cloned().collect())
     }
 
     fn save(&self, host: &HostRecord) -> StorageResult<()> {
@@ -393,6 +405,139 @@ impl HistoryRepository for MockHistoryRepository {
     }
 }
 
+/// 线程安全的内存凭据仓储实现
+#[derive(Debug, Default, Clone)]
+pub struct MockCredentialRepository {
+    credentials: Arc<RwLock<Vec<CredentialRecord>>>,
+    hosts: Option<Arc<RwLock<Vec<HostRecord>>>>,
+}
+
+impl MockCredentialRepository {
+    /// 创建空的内存凭据仓储
+    pub fn new() -> Self {
+        Self {
+            credentials: Arc::new(RwLock::new(Vec::new())),
+            hosts: None,
+        }
+    }
+
+    /// 使用指定凭据列表创建内存仓储
+    pub fn with_credentials(credentials: Vec<CredentialRecord>) -> Self {
+        Self {
+            credentials: Arc::new(RwLock::new(credentials)),
+            hosts: None,
+        }
+    }
+
+    /// 关联主机引用创建内存仓储
+    pub fn with_hosts(hosts: Arc<RwLock<Vec<HostRecord>>>) -> Self {
+        Self {
+            credentials: Arc::new(RwLock::new(Vec::new())),
+            hosts: Some(hosts),
+        }
+    }
+
+    /// 使用指定凭据列表并关联主机引用创建内存仓储
+    pub fn with_credentials_and_hosts(credentials: Vec<CredentialRecord>, hosts: Arc<RwLock<Vec<HostRecord>>>) -> Self {
+        Self {
+            credentials: Arc::new(RwLock::new(credentials)),
+            hosts: Some(hosts),
+        }
+    }
+}
+
+impl CredentialRepository for MockCredentialRepository {
+    fn list_all(&self) -> StorageResult<Vec<CredentialRecord>> {
+        let read_guard = self.credentials.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        let hosts_guard = self.hosts.as_ref().and_then(|h| h.read().ok());
+        let list = read_guard.iter().map(|c| {
+            let mut cred = c.clone();
+            if let Some(ref h_list) = hosts_guard {
+                cred.bound_host_count = h_list.iter().filter(|h| h.credential_id.as_deref() == Some(&cred.id)).count();
+            }
+            cred
+        }).collect();
+        Ok(list)
+    }
+
+    fn list_by_type(&self, cred_type: CredentialType) -> StorageResult<Vec<CredentialRecord>> {
+        let all = self.list_all()?;
+        Ok(all.into_iter().filter(|c| c.cred_type == cred_type).collect())
+    }
+
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<CredentialRecord>> {
+        let read_guard = self.credentials.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(c) = read_guard.iter().find(|c| c.id == id) {
+            let mut cred = c.clone();
+            if let Some(ref hosts_lock) = self.hosts {
+                if let Ok(h_list) = hosts_lock.read() {
+                    cred.bound_host_count = h_list.iter().filter(|h| h.credential_id.as_deref() == Some(&cred.id)).count();
+                }
+            }
+            Ok(Some(cred))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn search(&self, query: &str) -> StorageResult<Vec<CredentialRecord>> {
+        let all = self.list_all()?;
+        if query.trim().is_empty() {
+            return Ok(all);
+        }
+        let q = query.to_lowercase();
+        Ok(all.into_iter().filter(|c| {
+            c.name.to_lowercase().contains(&q)
+                || c.algorithm.to_lowercase().contains(&q)
+                || c.username.as_ref().map_or(false, |u| u.to_lowercase().contains(&q))
+                || c.fingerprint.as_ref().map_or(false, |f| f.to_lowercase().contains(&q))
+                || c.notes.to_lowercase().contains(&q)
+        }).collect())
+    }
+
+    fn get_bound_hosts(&self, id: &str) -> StorageResult<Vec<String>> {
+        if let Some(ref hosts_lock) = self.hosts {
+            let h_list = hosts_lock.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+            Ok(h_list.iter().filter(|h| h.credential_id.as_deref() == Some(id)).map(|h| h.id.clone()).collect())
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn save(&self, record: &CredentialRecord) -> StorageResult<()> {
+        let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = write_guard.iter().position(|c| c.id == record.id) {
+            write_guard[pos] = record.clone();
+        } else {
+            write_guard.push(record.clone());
+        }
+        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存凭据: {} ({})", record.name, record.algorithm);
+        Ok(())
+    }
+
+    fn save_batch(&self, records: &[CredentialRecord]) -> StorageResult<()> {
+        let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        for rec in records {
+            if let Some(pos) = write_guard.iter().position(|c| c.id == rec.id) {
+                write_guard[pos] = rec.clone();
+            } else {
+                write_guard.push(rec.clone());
+            }
+        }
+        Ok(())
+    }
+
+    fn delete(&self, id: &str) -> StorageResult<bool> {
+        let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = write_guard.iter().position(|c| c.id == id) {
+            write_guard.remove(pos);
+            tracing::debug!(target: "smagical_core::storage", "MockStorage 删除凭据: ID={}", id);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+}
 
 /// 聚合内存存储实现 (MockStorage)
 #[derive(Debug, Clone)]
@@ -400,6 +545,7 @@ pub struct MockStorage {
     hosts_repo: MockHostRepository,
     groups_repo: MockGroupRepository,
     history_repo: MockHistoryRepository,
+    credentials_repo: MockCredentialRepository,
 }
 
 impl Default for MockStorage {
@@ -411,10 +557,13 @@ impl Default for MockStorage {
 impl MockStorage {
     /// 创建空的 MockStorage
     pub fn new() -> Self {
+        let hosts_repo = MockHostRepository::new();
+        let credentials_repo = MockCredentialRepository::with_hosts(hosts_repo.hosts_raw());
         Self {
-            hosts_repo: MockHostRepository::new(),
+            hosts_repo,
             groups_repo: MockGroupRepository::new(),
             history_repo: MockHistoryRepository::new(),
+            credentials_repo,
         }
     }
 
@@ -478,6 +627,7 @@ impl MockStorage {
                 address: "192.168.1.100".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-prod".to_string()),
+                credential_id: Some("cred-prod-ed25519".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 21,
                 sort_order: 0,
@@ -489,6 +639,7 @@ impl MockStorage {
                 address: "10.0.0.1".to_string(),
                 port: 6443,
                 parent_group_id: Some("grp-k8s".to_string()),
+                credential_id: Some("cred-prod-ed25519".to_string()),
                 status: HostStatus::Warning,
                 ping_ms: 68,
                 sort_order: 1,
@@ -500,6 +651,7 @@ impl MockStorage {
                 address: "10.0.0.11".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-k8s".to_string()),
+                credential_id: Some("cred-prod-ed25519".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 24,
                 sort_order: 2,
@@ -511,6 +663,7 @@ impl MockStorage {
                 address: "10.0.1.50".to_string(),
                 port: 5432,
                 parent_group_id: Some("grp-db".to_string()),
+                credential_id: Some("cred-bastion-pwd".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 18,
                 sort_order: 3,
@@ -522,6 +675,7 @@ impl MockStorage {
                 address: "10.0.1.51".to_string(),
                 port: 5432,
                 parent_group_id: Some("grp-db".to_string()),
+                credential_id: Some("cred-bastion-pwd".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 20,
                 sort_order: 4,
@@ -533,6 +687,7 @@ impl MockStorage {
                 address: "10.0.2.10".to_string(),
                 port: 6379,
                 parent_group_id: Some("grp-edge".to_string()),
+                credential_id: Some("cred-1pwd-agent".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 12,
                 sort_order: 5,
@@ -544,6 +699,7 @@ impl MockStorage {
                 address: "47.98.12.33".to_string(),
                 port: 443,
                 parent_group_id: Some("grp-edge".to_string()),
+                credential_id: Some("cred-1pwd-agent".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 35,
                 sort_order: 6,
@@ -555,6 +711,7 @@ impl MockStorage {
                 address: "10.0.8.200".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-ai".to_string()),
+                credential_id: Some("cred-dev-rsa".to_string()),
                 status: HostStatus::Online,
                 ping_ms: 14,
                 sort_order: 7,
@@ -566,6 +723,7 @@ impl MockStorage {
                 address: "192.168.100.250".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-dr".to_string()),
+                credential_id: Some("cred-openssh-agent".to_string()),
                 status: HostStatus::Offline,
                 ping_ms: 0,
                 sort_order: 8,
@@ -577,6 +735,7 @@ impl MockStorage {
                 address: "10.0.12.88".to_string(),
                 port: 22,
                 parent_group_id: Some("grp-dr".to_string()),
+                credential_id: Some("cred-bitwarden-agent".to_string()),
                 status: HostStatus::Offline,
                 ping_ms: 0,
                 sort_order: 9,
@@ -901,19 +1060,116 @@ backup@backup-nas-storage:~$ exit
 logout"#.to_string(),
         );
 
+        let credentials = vec![
+            CredentialRecord {
+                id: "cred-prod-ed25519".to_string(),
+                name: "生产集群 Ed25519 密钥".to_string(),
+                cred_type: CredentialType::Key,
+                algorithm: "Ed25519".to_string(),
+                username: Some("root".to_string()),
+                secret_data: "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW\nQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQAAAJCR2Y69kdmO\nvQAAAAtzc2gtZWQyNTUxOQAAACDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6\nSQAAAEA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP\n4lXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQ=\n-----END OPENSSH PRIVATE KEY-----".to_string(),
+                passphrase: Some("••••••••".to_string()),
+                public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIMfyDbS9fsr2nUF83bA/iVeplszjEaAD1Anq0vuvWfpJ root@smalux-k8s-prod".to_string()),
+                fingerprint: Some("SHA256:k9x8Ym+3pLq1G7vX2nR8uM4aP9tL3wQ2bN6pG8oP4qM".to_string()),
+                bound_host_count: 5,
+                created_at: "2026-08-15 10:20:00".to_string(),
+                updated_at: "2026-09-01 09:15:00".to_string(),
+                notes: "Kubernetes 核心控制面与网关认证主密钥".to_string(),
+            },
+            CredentialRecord {
+                id: "cred-bastion-pwd".to_string(),
+                name: "堡垒跳板机 Root 管理密码".to_string(),
+                cred_type: CredentialType::Password,
+                algorithm: "Password".to_string(),
+                username: Some("root".to_string()),
+                secret_data: "SmaluxSecure#2026!P@ss".to_string(),
+                passphrase: None,
+                public_key: None,
+                fingerprint: None,
+                bound_host_count: 2,
+                created_at: "2026-08-18 14:30:00".to_string(),
+                updated_at: "2026-08-30 18:00:00".to_string(),
+                notes: "边缘网关与跳板机应急控制台特权密码".to_string(),
+            },
+            CredentialRecord {
+                id: "cred-1pwd-agent".to_string(),
+                name: "1Password SSH Agent".to_string(),
+                cred_type: CredentialType::Agent,
+                algorithm: "1Password".to_string(),
+                username: Some("developer".to_string()),
+                secret_data: r"\\.\pipe\1password-ssh-agent".to_string(),
+                passphrase: None,
+                public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q 1password-agent".to_string()),
+                fingerprint: Some("SHA256:1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d".to_string()),
+                bound_host_count: 3,
+                created_at: "2026-08-20 16:45:00".to_string(),
+                updated_at: "2026-09-01 11:30:00".to_string(),
+                notes: "硬件安全保管箱，受 Windows Hello 生物识别保护".to_string(),
+            },
+            CredentialRecord {
+                id: "cred-dev-rsa".to_string(),
+                name: "CI/CD 流水线 RSA 密钥".to_string(),
+                cred_type: CredentialType::Key,
+                algorithm: "RSA-4096".to_string(),
+                username: Some("gitlab-runner".to_string()),
+                secret_data: "-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA0k6K9X7L9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQ2Y69kd\nvQMwAAAAtzc2gtcnNhAAAAAwEAAQAAAgEAv7b4a2p8zXqN3vP9xK2m4rL9nO1pQ8tL\n3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQ\nA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4l\nXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQFAgcICQoLDA0O\nDxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0\nBBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3Bx\ncnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6Ch\noqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR\n0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/wID\n-----END RSA PRIVATE KEY-----".to_string(),
+                passphrase: None,
+                public_key: Some("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDv7b4a2p8zXqN3vP9xK2m4rL9nO1pQ8tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQA6WjG4m2JpL5kZ8yQ3uP9tL3wR2bN6pG8oP4qM7lX2nDH8g20vX7K9p1BfN2wP4lXqZbM4xGgA9QJ6tL7r1n6SQAAAA1zbWFsdXgtc3NoLWtleQECAwQ gitlab@runner".to_string()),
+                fingerprint: Some("SHA256:9c8b7a6f5e4d3c2b1a0f9e8d7c6b5a4f".to_string()),
+                bound_host_count: 1,
+                created_at: "2026-08-25 09:00:00".to_string(),
+                updated_at: "2026-08-25 09:00:00".to_string(),
+                notes: "GitLab Runner 持续部署构建机专有免密凭据".to_string(),
+            },
+            CredentialRecord {
+                id: "cred-openssh-agent".to_string(),
+                name: "Windows OpenSSH Agent".to_string(),
+                cred_type: CredentialType::Agent,
+                algorithm: "OpenSSH".to_string(),
+                username: Some("ssh-agent".to_string()),
+                secret_data: r"\\.\pipe\openssh-ssh-agent".to_string(),
+                passphrase: None,
+                public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q openssh-agent".to_string()),
+                fingerprint: Some("SHA256:8f4e2c9a1b3d5e7f0a2c4e6b8d0f1a3c".to_string()),
+                bound_host_count: 4,
+                created_at: "2026-08-22 11:00:00".to_string(),
+                updated_at: "2026-08-22 11:00:00".to_string(),
+                notes: "Windows 内置 OpenSSH Authentication Agent 命名管道".to_string(),
+            },
+            CredentialRecord {
+                id: "cred-bitwarden-agent".to_string(),
+                name: "Bitwarden SSH Agent".to_string(),
+                cred_type: CredentialType::Agent,
+                algorithm: "Bitwarden".to_string(),
+                username: Some("vault".to_string()),
+                secret_data: r"\\.\pipe\bitwarden-ssh-agent".to_string(),
+                passphrase: None,
+                public_key: Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIPq8Xm7kL9vN2wA4bF6jZ8qM3uP9tL3wR2bN6pG8oP4q bitwarden-agent".to_string()),
+                fingerprint: Some("SHA256:3d5e7f9a1c2b4d6e8f0a1b3c5d7e9f1a".to_string()),
+                bound_host_count: 2,
+                created_at: "2026-08-28 15:20:00".to_string(),
+                updated_at: "2026-08-28 15:20:00".to_string(),
+                notes: "Bitwarden / Vaultwarden 桌面端安全托管 SSH Agent".to_string(),
+            },
+        ];
+
         tracing::info!(
             target: "smagical_core::storage",
-            "初始化 MockStorage 预设种子引擎完成: 已注入 {} 个层级分组, {} 台主机资产, {} 条历史会话记录 (含 {} 份屏幕快照)",
+            "初始化 MockStorage 预设种子引擎完成: 已注入 {} 个层级分组, {} 台主机资产, {} 条历史会话记录 (含 {} 份屏幕快照), {} 条凭据记录",
             groups.len(),
             hosts.len(),
             history.len(),
-            snapshots.len()
+            snapshots.len(),
+            credentials.len()
         );
 
+        let hosts_repo = MockHostRepository::with_hosts(hosts);
+        let credentials_repo = MockCredentialRepository::with_credentials_and_hosts(credentials, hosts_repo.hosts_raw());
         Self {
-            hosts_repo: MockHostRepository::with_hosts(hosts),
+            hosts_repo,
             groups_repo: MockGroupRepository::with_groups(groups),
             history_repo: MockHistoryRepository::with_history_and_snapshots(history, snapshots),
+            credentials_repo,
         }
     }
 }
@@ -930,6 +1186,10 @@ impl AppStorage for MockStorage {
 
     fn history(&self) -> &dyn HistoryRepository {
         &self.history_repo
+    }
+
+    fn credentials(&self) -> &dyn CredentialRepository {
+        &self.credentials_repo
     }
 
     fn reload(&self) -> StorageResult<()> {
@@ -1105,6 +1365,70 @@ mod tests {
         assert_eq!(list[0].session_type, "local");
         assert_eq!(list[0].host_id.as_deref(), Some("local-powershell"));
         assert_eq!(list[0].address, "Local (PowerShell 7)");
+    }
+
+    #[test]
+    fn test_mock_storage_credential_crud() {
+        let storage = MockStorage::new_seeded();
+        let list = storage.credentials().list_all().unwrap();
+        assert_eq!(list.len(), 6);
+
+        // 新增凭据
+        let new_cred = CredentialRecord::new_key(
+            "cred-test-key",
+            "测试 Ed25519 凭据",
+            "Ed25519",
+            "test_private_key",
+            None,
+            Some("ssh-ed25519 AAAAC... test@test".to_string()),
+            Some("SHA256:11223344".to_string()),
+            "单元测试专供",
+        );
+        storage.credentials().save(&new_cred).unwrap();
+        assert_eq!(storage.credentials().list_all().unwrap().len(), 7);
+
+        // 查询单条
+        let fetched = storage.credentials().get_by_id("cred-test-key").unwrap().unwrap();
+        assert_eq!(fetched.name, "测试 Ed25519 凭据");
+        assert_eq!(fetched.cred_type, CredentialType::Key);
+        assert_eq!(fetched.fingerprint.as_deref(), Some("SHA256:11223344"));
+
+        // 更新单条
+        let mut updated = fetched;
+        updated.name = "已重命名测试凭据".to_string();
+        storage.credentials().save(&updated).unwrap();
+        assert_eq!(storage.credentials().get_by_id("cred-test-key").unwrap().unwrap().name, "已重命名测试凭据");
+
+        // 删除单条
+        let deleted = storage.credentials().delete("cred-test-key").unwrap();
+        assert!(deleted);
+        assert_eq!(storage.credentials().list_all().unwrap().len(), 6);
+
+        // 验证凭据与主机相互引用与查询
+        // 1. 根据凭据查关联主机
+        let prod_hosts = storage.hosts().list_by_credential("cred-prod-ed25519").unwrap();
+        assert_eq!(prod_hosts.len(), 3);
+        assert_eq!(prod_hosts[0].id, "1");
+
+        // 2. 根据凭据查关联主机 ID
+        let bound_ids = storage.credentials().get_bound_hosts("cred-prod-ed25519").unwrap();
+        assert_eq!(bound_ids.len(), 3);
+        assert!(bound_ids.contains(&"1".to_string()));
+        assert!(bound_ids.contains(&"2".to_string()));
+        assert!(bound_ids.contains(&"host-k8s-w1".to_string()));
+
+        // 3. 动态引用计数验证
+        let cred_prod = storage.credentials().get_by_id("cred-prod-ed25519").unwrap().unwrap();
+        assert_eq!(cred_prod.bound_host_count, 3);
+
+        // 4. 按类型分类查询
+        let agent_creds = storage.credentials().list_by_type(CredentialType::Agent).unwrap();
+        assert_eq!(agent_creds.len(), 3);
+
+        // 5. 模糊搜索
+        let search_results = storage.credentials().search("1Password").unwrap();
+        assert_eq!(search_results.len(), 1);
+        assert_eq!(search_results[0].id, "cred-1pwd-agent");
     }
 }
 

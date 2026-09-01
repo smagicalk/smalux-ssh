@@ -1,22 +1,23 @@
-//! 快速新建会话中心与启动器后台异步预热 Hook。
+//! 快速新建会话中心与启动器后台异步预热服务。
 //!
-//! 在应用启动就绪 (on_app_ready)、左侧主机资产抽屉切换 (on_left_menu_clicked) 以及资产数据变更时，
+//! 在应用启动就绪 (AppReadyEvent)、左侧主机资产抽屉切换 (NavigationTabClickedEvent) 以及资产数据变更 (HostAssetChangedEvent/ConfigChangedEvent) 时，
 //! 在后台独立工作线程中异步将存储层的主机与分组数据转换为 Slint 展示模型并推送至 UI，
 //! 彻底消除点击 + 号新建终端会话弹窗时的任何主 UI 线程同步计算与掉帧卡顿。
 
 use std::sync::{Arc, RwLock};
-use smagical_core::{AppGlobalHook, AppStorage, ConfigChangeEvent};
+use smagical_core::event::{AppReadyEvent, ConfigChangedEvent, EventManager, HostAssetChangedEvent, NavigationTabClickedEvent};
+use smagical_core::AppStorage;
 use crate::generated::{AppWindow, HostItemData};
 
-/// 快速新建终端启动器后台异步预热 Hook
-pub struct LauncherPrewarmHook {
+/// 快速新建终端启动器后台异步预热服务
+pub struct LauncherPrewarmService {
     storage: Arc<dyn AppStorage>,
     window_weak: slint::Weak<AppWindow>,
     is_prewarming: Arc<RwLock<bool>>,
 }
 
-impl LauncherPrewarmHook {
-    /// 创建一个新的启动器异步预热 Hook 实例
+impl LauncherPrewarmService {
+    /// 创建一个新的启动器异步预热服务实例
     pub fn new(
         storage: Arc<dyn AppStorage>,
         window_weak: slint::Weak<AppWindow>,
@@ -46,7 +47,7 @@ impl LauncherPrewarmHook {
             .name("launcher-prewarmer".into())
             .spawn(move || {
                 tracing::debug!(target: "smagical_ui::launcher", "开始在后台工作线程异步预热启动器主机数据...");
-                
+
                 let all_hosts = storage.hosts().list_all().unwrap_or_default();
                 let all_groups = storage.groups().list_all().unwrap_or_default();
 
@@ -86,34 +87,36 @@ impl LauncherPrewarmHook {
             })
             .ok();
     }
-}
 
-impl AppGlobalHook for LauncherPrewarmHook {
-    fn name(&self) -> &'static str {
-        "launcher_prewarm_hook"
-    }
+    /// 绑定启动器预热至全局事件分发系统
+    pub fn register(self: Arc<Self>, events: &EventManager) {
+        let s1 = Arc::clone(&self);
+        let g1 = events.global().listen(move |_: &AppReadyEvent| {
+            s1.trigger_async_prewarm();
+        });
+        g1.detach();
 
-    fn priority(&self) -> i32 {
-        40
-    }
+        let s2 = Arc::clone(&self);
+        let g2 = events.global().listen(move |e: &NavigationTabClickedEvent| {
+            if e.tab_id == "hosts" || e.tab_id.is_empty() {
+                s2.trigger_async_prewarm();
+            }
+        });
+        g2.detach();
 
-    /// 应用首帧就绪时：在后台空闲期自动启动初次预热
-    fn on_app_ready(&self) {
-        self.trigger_async_prewarm();
-    }
+        let s3 = Arc::clone(&self);
+        let g3 = events.global().listen(move |_: &HostAssetChangedEvent| {
+            s3.trigger_async_prewarm();
+        });
+        g3.detach();
 
-    /// 用户在左侧活动栏切换抽屉时：若进入或切换主机资产页面，静默同步预热
-    fn on_shell_left_menu_clicked(&self, menu_id: &str, _old_menu_id: &str) {
-        if menu_id == "hosts" || menu_id.is_empty() {
-            self.trigger_async_prewarm();
-        }
-    }
-
-    /// 全局配置或资产变动时：静默更新预热模型
-    fn on_config_changed(&self, event: &ConfigChangeEvent) {
-        if event.affects("hosts") || event.affects("storage") {
-            self.trigger_async_prewarm();
-        }
+        let s4 = Arc::clone(&self);
+        let g4 = events.global().listen(move |e: &ConfigChangedEvent| {
+            if e.key.starts_with("hosts") || e.key.starts_with("storage") {
+                s4.trigger_async_prewarm();
+            }
+        });
+        g4.detach();
     }
 }
 

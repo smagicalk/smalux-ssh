@@ -65,6 +65,8 @@ pub struct HostRecord {
     pub port: u16,
     /// 所属分组的唯一标识符 (None 表示未分组)。
     pub parent_group_id: Option<String>,
+    /// 关联的认证凭据唯一标识符 (None 表示使用全局默认或无凭据)。
+    pub credential_id: Option<String>,
     /// 主机在线健康状态。
     pub status: HostStatus,
     /// 网络延迟测速结果 (单位: 毫秒)。
@@ -89,13 +91,13 @@ impl HostRecord {
             address: address.into(),
             port,
             parent_group_id: None,
+            credential_id: None,
             status: HostStatus::Online,
             ping_ms: 0,
             sort_order: 0,
             notes: String::new(),
         }
     }
-
 
     /// 指定所属分组创建主机记录。
     pub fn with_group(
@@ -108,6 +110,12 @@ impl HostRecord {
         let mut host = Self::new(id, name, address, port);
         host.parent_group_id = Some(group_id.into());
         host
+    }
+
+    /// 指定关联凭据 ID 创建或配置主机记录。
+    pub fn with_credential(mut self, credential_id: impl Into<String>) -> Self {
+        self.credential_id = Some(credential_id.into());
+        self
     }
 }
 

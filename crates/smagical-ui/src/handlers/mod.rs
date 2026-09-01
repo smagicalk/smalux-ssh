@@ -2,6 +2,7 @@
 //!
 //! 将 Slint UI 各区域的回调绑定按功能域拆分为独立的处理器模块。
 
+pub(crate) mod credential_handlers;
 pub(crate) mod debug_handlers;
 pub(crate) mod file_handlers;
 pub(crate) mod history_handlers;
@@ -139,7 +140,9 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     history_handlers::register_history_handlers(window, ctx);
     // 5. 挂载双盘文件管理与 SFTP 传输交互回调 (Tab 切换/关闭、路径导航、刷新、上传/下载)
     file_handlers::register_file_handlers(window, ctx);
-    // 6. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
+    // 6. 挂载凭据保管与密钥管理交互回调 (筛选、CRUD、一键生成密钥/强密码、安全复制)
+    credential_handlers::register_credential_handlers(window, ctx);
+    // 7. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
     debug_handlers::register_debug_handlers(window, ctx);
 }
 

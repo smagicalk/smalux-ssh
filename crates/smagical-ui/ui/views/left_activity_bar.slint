@@ -12,7 +12,7 @@ export struct ActivityBarItemData {
 
 /// 最左侧 48px 动态活动图标栏组件 (Dynamic Left Activity Bar)
 export component LeftActivityBar inherits Rectangle {
-    /// 当前选中的激活 Tab 模块 ID (例如: "hosts", "keys", "history", "snippets", "settings", "debug")
+    /// 当前选中的激活 Tab 模块 ID (例如: "hosts", "credentials", "history", "snippets", "settings", "debug")
     in property <string> active-tab: "hosts";
     /// 顶部主功能动态菜单项列表
     in property <[ActivityBarItemData]> top-items: [];

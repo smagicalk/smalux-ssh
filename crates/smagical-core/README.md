@@ -18,7 +18,7 @@ crates/smagical-core/
     │   ├── file_item.rs        # FileItemData, LocalFileTabSession, RemoteFileTabSession, TransferTask
     │   ├── right_panel.rs      # 右侧工具面板注册实体
     │   └── terminal_context.rs # 终端上下文模型
-    ├── app_hook/               # 全局应用生命周期 Hook 拦截与事件分发引擎
+    ├── event/                  # 强类型泛型事件分发总线与集中管理器 (EventDispatcher / EventManager)
     ├── storage/                # 数据存储与持久化抽象层
     │   ├── mod.rs              # AppStorage, HostRepository, GroupRepository Trait 定义与 StorageError
     │   └── mock_storage.rs     # 线程安全并发内存存储实现 (MockStorage) 与种子预设引擎

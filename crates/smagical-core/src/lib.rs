@@ -4,16 +4,26 @@
 
 #![deny(missing_docs)]
 
-pub mod app_hook;
 pub mod domain;
-pub mod hook;
+pub mod event;
 pub mod state;
 pub mod storage;
 pub mod theme;
 
-pub use app_hook::{
-    AppBootContext, AppExitContext, AppGlobalHook, AppGlobalHookEngine, AutoConfigBackupHook,
-    ConfigChangeEvent, FunctionalGlobalHook, ListenerHandle, WindowState,
+pub use event::{
+    AppBeforeExitEvent, AppBootEvent, AppEvent, AppExitEvent, AppReadyEvent, ConfigChangedEvent,
+    CredentialCopyType, CredentialDeletedEvent, CredentialSavedEvent, CredentialSecretCopiedEvent,
+    CredentialSelectedEvent, EventDispatcher, EventManager, FileOperationBeforeEvent,
+    FileOperationCompletedEvent, FileTabClosedEvent, FileTabFocusChangedEvent,
+    FileTabNavigatedEvent, FileTabOpenedEvent, FileTabOpeningEvent, FileTransferStartedEvent,
+    HistoryClearedEvent, HistoryItemDeletedEvent, HistoryPinToggledEvent,
+    HistoryReconnectRequestedEvent, HostAssetChangedEvent, HostGroupToggledEvent,
+    HostSearchFilteredEvent, HostTreeReorderedEvent, KeyGeneratedEvent, ListenerGuard,
+    ModuleActivatedEvent, ModuleDeactivatedEvent, NavigationRequestedEvent,
+    NavigationTabClickedEvent, PasswordGeneratedEvent, RightPanelRegisteredEvent,
+    RightPanelSwitchedEvent, RightPanelUnregisteredEvent, TerminalActionRequestedEvent,
+    TerminalFocusChangedEvent, TerminalSessionEvent, TerminalSplitChangedEvent, ThemeChangedEvent,
+    ThemeModeToggledEvent, WindowStateChangedEvent,
 };
 
 pub use domain::{
@@ -24,6 +34,7 @@ pub use domain::{
         TransferStatus, TransferTask,
     },
 
+    credential::{CredentialRecord, CredentialType},
     group::GroupRecord,
     history::{HistoryRecord, SessionSnapshotConfig},
     host::{HostRecord, HostStatus},
@@ -32,21 +43,10 @@ pub use domain::{
     terminal_context::{ActiveTerminalSessionContext, TerminalAction},
 };
 
-
-
-
-pub use hook::{
-    CommandInteractionFrame, CommandSource, DangerousCommandGuard, FallbackStrategy, FrameStatus,
-    FunctionalHook, HistoryTrackingHook, HookDecision, HookEngine, HostMetadata, SessionAuditLogger,
-    SessionContext, TerminalError, TerminalHook,
-};
-
-
-
 pub use state::core_state::CoreState;
 pub use storage::{
-    AppStorage, GroupRepository, HistoryRepository, HostRepository, MockStorage, StorageError,
-    StorageResult,
+    AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
+    MockStorage, StorageError, StorageResult,
 };
 
 

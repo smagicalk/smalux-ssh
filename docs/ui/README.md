@@ -14,7 +14,8 @@
 | **04** | **历史会话中心** | [04_history_center.md](file:///F:/code/rust/smalux-ssh/docs/ui/04_history_center.md) | 侧边栏历史抽屉与全屏独立历史中心、按时间/主机/模式聚合、会话置顶与重连 |
 | **05** | **全局通用组件库** | [05_global_components.md](file:///F:/code/rust/smalux-ssh/docs/ui/05_global_components.md) | 全局气泡通知 (Toast)、右键上下文菜单 (ContextMenu)、主机选择列表 (HostPickerList)、模态弹窗体系 |
 | **06** | **开发者调试控制台** | [06_debug_console.md](file:///F:/code/rust/smalux-ssh/docs/ui/06_debug_console.md) | 资产批量造数、健康状态快速更新、预设写入与 Tracing 实时日志流同步 |
-| **07** | **Hook 插件与生命周期** | [07_hooks_and_lifecycle.md](file:///F:/code/rust/smalux-ssh/docs/ui/07_hooks_and_lifecycle.md) | 全局应用级 Hook (三栏协同、全域路由) 与终端流式 Hook (高危命令拦截、Panic 隔离) |
+| **07** | **事件分发与生命周期** | [07_events_and_lifecycle.md](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md) | 泛型事件分发总线 (`EventDispatcher`)、多作用域管理器 (`EventManager`) 与生命周期守卫 |
+| **08** | **凭据保管库与安全认证** | [08_credentials_vault.md](file:///F:/code/rust/smalux-ssh/docs/ui/08_credentials_vault.md) | SSH 密钥/口令安全保管、多算法密钥生成器、随机密码生成器与机密提取审计 |
 
 ---
 
@@ -73,6 +74,6 @@ z: 1     ───► 中央主工作区 (TerminalViewport, FileExplorerView)
                                ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                领域模型与核心状态 (smagical-core)             │
-│    (CoreState, Storage, AppHooks, TerminalSessionInfo)      │
+│    (CoreState, Storage, EventManager, TerminalSessionInfo)   │
 └─────────────────────────────────────────────────────────────┘
 ```
