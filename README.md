@@ -20,6 +20,21 @@
 
 ---
 
+## 📚 详细设计与 UI 模块文档
+
+项目在 `docs/ui/` 目录下提供了完整的页面级架构设计与数据契约文档：
+
+- 📖 **[UI 架构与设计规范总览 (docs/ui/README.md)](file:///F:/code/rust/smalux-ssh/docs/ui/README.md)**
+- 💻 **[01. 终端多窗格与会话工作区 (01_terminal_workspace.md)](file:///F:/code/rust/smalux-ssh/docs/ui/01_terminal_workspace.md)**
+- 📂 **[02. 双盘文件浏览器与 SFTP (02_file_explorer.md)](file:///F:/code/rust/smalux-ssh/docs/ui/02_file_explorer.md)**
+- 🌲 **[03. 主机资产管理抽屉 (03_hosts_drawer.md)](file:///F:/code/rust/smalux-ssh/docs/ui/03_hosts_drawer.md)**
+- 🕒 **[04. 历史会话中心 (04_history_center.md)](file:///F:/code/rust/smalux-ssh/docs/ui/04_history_center.md)**
+- 🧩 **[05. 全局通用组件库 (05_global_components.md)](file:///F:/code/rust/smalux-ssh/docs/ui/05_global_components.md)**
+- 🛠️ **[06. 开发者调试控制台 (06_debug_console.md)](file:///F:/code/rust/smalux-ssh/docs/ui/06_debug_console.md)**
+- 🌐 **[07. Hook 插件与生命周期协同 (07_hooks_and_lifecycle.md)](file:///F:/code/rust/smalux-ssh/docs/ui/07_hooks_and_lifecycle.md)**
+
+---
+
 ## 🏗️ 架构与 Workspace 模块分层
 
 仓库采用 Rust Cargo Workspace 多 crate 分层解耦架构：
@@ -125,6 +140,43 @@ flowchart TD
    - 深度联动 `smagical-core` 现有的 15+ 套终端配色预设（Darcula, Nord, Monokai 等），支持 1677 万真彩色平滑渲染。
 5. **工业级选区与 Text Reflow**：
    - 窗口缩放文字智能折行重排；原生支持双击选词、三击选行、方块选区与 URL 超链接跳转。
+
+---
+
+## 📂 双盘文件管理与 SFTP 传输架构 (Dual-Pane File Explorer & SFTP)
+
+`smagicalssh` 集成了对标专业 FTP/SFTP 客户端的双盘文件管理与传输工作台：
+
+```text
++----------------------------------------------------------------------------------------------------+
+| Local Tabs: [本地 (C:\Users\dev)] [D:\Projects] [+]  |  Remote Tabs: [Prod-Web-01 (/var/www)] [DB] [+]  |
++------------------------------------------------------+---------------------------------------------+
+|  [<-] [->] [^]  路径: C:\Users\dev\workspace         |  [<-] [->] [^]  路径: /var/www/html/dist    |
++------------------------------------------------------+---------------------------------------------+
+|  📄 Cargo.toml          1.8 KB   2026-08-31 18:30    |  📁 assets/                  -   2026-08-31 |
+|  📁 src/                     -   2026-08-31 18:30    |  📄 index.html          4.2 KB   2026-08-31 |
+|  📄 build.rs            820 B    2026-08-31 18:30    |  📄 app.js             128.5 KB  2026-08-31 |
++------------------------------------------------------+---------------------------------------------+
+| 🚀 传输队列 (1 传输中, 2 已完成)                                            [清空已完成] [展开/折叠] |
+| ├── ⬆️ 上传: dist/ ➔ /var/www/html/dist/ (4 项)                   [======>    ] 65% (12.4 MB/s)     |
+| └── ⬇️ 下载: nginx.conf ➔ C:\Users\dev\nginx.conf (8.2 KB)        [===========] 100% (完成)          |
++----------------------------------------------------------------------------------------------------+
+```
+
+### 核心特性与架构机制
+
+1. **左右独立双栏 Tab 调度**：
+   - 左栏本地磁盘与右栏远程 SFTP 拥有独立的 Tab 栈、双向历史导航（后退/前进/上级目录）与即时路径输入框；
+   - 采用轻量化单项同步（`sync_local_tabs_only` / `sync_remote_tabs_only`），微秒级极速响应。
+2. **同栏 Tab 丝滑拖拽调序**：
+   - **绝对居中跟随**：浮动虚影中心牢牢吸附鼠标指针，消除跳动与延迟；
+   - **双态安全边界**：同栏拖拽呈现高亮移动徽章；拖出 Tab 栏或跨栏即时切入 **`🚫 禁止` 置灰状态**，松开鼠标安全复位。
+3. **跨栏文件拖拽与传输任务树**：
+   - 支持从本地向右侧远程拖拽上传、从远程向左侧本地拖拽下载；
+   - 支持单文件与多层级嵌套文件夹任务树（`TransferTask`），默认折叠汇总显示进度与传输速率。
+4. **统一现代化右键上下文菜单**：
+   - 全工程统一定义 `ContextMenuContainer` 与 `ContextMenuItem`（文件、传输、终端视口、终端 Tab 4 大菜单）；
+   - 支持智能视口避让翻转、100% 实体高对比度分割线与即时响应。
 
 ---
 

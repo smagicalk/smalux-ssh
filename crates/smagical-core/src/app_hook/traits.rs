@@ -227,6 +227,52 @@ pub trait AppGlobalHook: Send + Sync {
 
     /// 【预设主题切换】：应用特定主题预设。
     fn on_theme_changed(&self, _theme_id: &str, _is_dark: bool) {}
+
+    // =========================================================================
+    // 10. 双盘文件浏览器与 SFTP 传输域 (File Explorer & Transfer - file_)
+    // =========================================================================
+
+    /// 【文件会话打开前拦截（责任链）】：打开 SFTP 会话前触发，可校验权限或准备跳板代理。
+    fn on_file_tab_opening(&self, _host_id: &str, _initial_path: &str) -> HookDecision {
+        HookDecision::Continue
+    }
+
+    /// 【文件会话建立就绪】：SFTP 或本地文件 Tab 成功建立并挂载。
+    fn on_file_tab_opened(&self, _session_id: &str, _host_id: &str, _initial_path: &str) {}
+
+    /// 【文件会话活跃聚焦变更】：双栏 Tab 切换或选栏时广播当前活动路径（供右侧工具栏伴生感知）。
+    fn on_file_tab_focus_changed(&self, _session_id: Option<&str>, _is_remote: bool, _current_path: &str) {}
+
+    /// 【文件目录导航跳转】：路径导航跳转后触发（前进、后退、向上、回车直达）。
+    fn on_file_tab_navigated(&self, _session_id: &str, _is_remote: bool, _from_path: &str, _to_path: &str) {}
+
+    /// 【文件会话关闭】：文件会话 Tab 被关闭。
+    fn on_file_tab_closed(&self, _session_id: &str) {}
+
+    /// 【文件高危操作前置拦截（责任链）】：在删除/覆写/修改权限前触发，用于敏感路径阻断。
+    fn on_file_operation_before(&self, _op_type: &str, _is_remote: bool, _path: &str) -> HookDecision {
+        HookDecision::Continue
+    }
+
+    /// 【文件/目录操作完成】：创建、删除、重命名、修改权限完成。
+    fn on_file_operation_completed(&self, _op_type: &str, _is_remote: bool, _path: &str, _success: bool) {}
+
+    /// 【传输任务入队前校验（责任链）】：传输任务创建与入队前校验（如文件大小配额、敏感后缀过滤）。
+    fn on_file_transfer_enqueued(&self, _task: &crate::domain::TransferTask) -> HookDecision {
+        HookDecision::Continue
+    }
+
+    /// 【传输任务开始执行】：传输任务开始。
+    fn on_file_transfer_started(&self, _task_id: &str) {}
+
+    /// 【传输进度与速率更新】：传输进度与速率更新（用于度量监控与底部抽屉统计）。
+    fn on_file_transfer_progress(&self, _task_id: &str, _transferred: u64, _total: u64, _speed_bps: u64) {}
+
+    /// 【传输任务完成】：传输任务完成（统一触发 Toast 成功通知与对侧目录增量刷新）。
+    fn on_file_transfer_completed(&self, _task: &crate::domain::TransferTask) {}
+
+    /// 【传输任务失败】：传输任务失败（统一触发 Toast 错误通知与重试标记）。
+    fn on_file_transfer_failed(&self, _task: &crate::domain::TransferTask, _error_message: &str) {}
 }
 
 

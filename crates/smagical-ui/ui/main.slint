@@ -8,6 +8,7 @@ export { LogEntryData } from "components/debug-modal.slint";
 export { LocalShellItemData } from "components/new-session-modal.slint";
 export { TerminalPaneData, TerminalSplitterData } from "views/center_terminal/terminal_viewport.slint";
 export { FileItemData, FileTabData, TransferItemData } from "views/file_explorer_view.slint";
+export { ToastItemData } from "components/toast.slint";
 
 
 // 基础组件
@@ -30,6 +31,7 @@ import {
 import { HistoryDetailModal } from "components/history-detail-modal.slint";
 import { MessageDialog } from "components/message-dialog.slint";
 import { FileHostModal } from "components/file-host-modal.slint";
+import { ToastContainer, ToastItemData } from "components/toast.slint";
 
 
 
@@ -579,6 +581,16 @@ export component AppWindow inherits Window {
     callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
     /// 复制文本到系统剪贴板
     callback copy-to-clipboard(string /* text */);
+    /// 文件夹 Tab 拖拽调整顺序回调 (仅在同栏内生效)
+    callback reorder-local-tab(int /* from_index */, int /* to_index */);
+    callback reorder-remote-tab(int /* from_index */, int /* to_index */);
+
+    // -------------------------------------------------------------------------
+    // 全局气泡通知 (Toast) 状态与回调
+    // -------------------------------------------------------------------------
+    in property <[ToastItemData]> active-toasts: [];
+    in property <string> toast-position: "top-right";
+    callback close-toast(string /* id */);
 
     // -------------------------------------------------------------------------
     // 统一错误与消息提示弹窗状态
@@ -991,6 +1003,8 @@ export component AppWindow inherits Window {
                     transfer-action(act, tid) => { root.transfer-action(act, tid); }
                     file-action(act, rem, p, name, is_dir) => { root.file-action(act, rem, p, name, is_dir); }
                     copy-to-clipboard(text) => { root.copy-to-clipboard(text); }
+                    reorder-local-tab(from, to) => { root.reorder-local-tab(from, to); }
+                    reorder-remote-tab(from, to) => { root.reorder-remote-tab(from, to); }
                     is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
                 }
 
@@ -1226,7 +1240,16 @@ export component AppWindow inherits Window {
             root.open-file-host(id);
         }
     }
+
+    // 全局气泡通知浮层 (z: 1000 最高层级)
+    ToastContainer {
+        z: 1000;
+        toasts: root.active-toasts;
+        position: root.toast-position;
+        close-toast(id) => { root.close-toast(id); }
+    }
 }
+
 
 
 

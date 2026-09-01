@@ -6,8 +6,8 @@ use std::path::PathBuf;
 use std::rc::Rc;
 use slint::ComponentHandle;
 use smagical_core::{
-    generate_mock_remote_directory, scan_local_directory, FileItemData, LocalFileTabSession,
-    RemoteFileTabSession, TransferDirection, TransferStatus, TransferTask,
+    generate_mock_remote_directory, scan_local_directory, FileItemData, HookDecision,
+    LocalFileTabSession, RemoteFileTabSession, TransferDirection, TransferStatus, TransferTask,
 };
 
 use crate::generated::{
@@ -87,9 +87,8 @@ pub(crate) fn map_file_item_to_ui(item: &FileItemData) -> SlintFileItemData {
 }
 
 
-/// 同步当前激活文件会话的双盘数据到 Slint UI
-pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
-    // 1. 同步左侧本地 Tab 列表
+/// 仅同步左侧本地 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
+pub(crate) fn sync_local_tabs_only(window: &AppWindow, ctx: &AppContext) {
     let local_tabs = ctx.local_tabs.borrow();
     let active_local_id = ctx.active_local_tab_id.borrow().clone();
     let ui_local_tabs: Vec<SlintFileTabData> = local_tabs
@@ -105,8 +104,10 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
         .collect();
     window.set_local_tabs(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_local_tabs))));
     window.set_active_local_tab_id(active_local_id.into());
+}
 
-    // 2. 同步右侧远程 Tab 列表
+/// 仅同步右侧远程 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
+pub(crate) fn sync_remote_tabs_only(window: &AppWindow, ctx: &AppContext) {
     let remote_tabs = ctx.remote_tabs.borrow();
     let active_remote_id = ctx.active_remote_tab_id.borrow().clone();
     let ui_remote_tabs: Vec<SlintFileTabData> = remote_tabs
@@ -122,6 +123,15 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
         .collect();
     window.set_remote_tabs(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_remote_tabs))));
     window.set_active_remote_tab_id(active_remote_id.into());
+}
+
+/// 同步当前激活文件会话的双盘数据到 Slint UI
+pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
+    // 1. 同步左侧本地 Tab 列表
+    sync_local_tabs_only(window, ctx);
+
+    // 2. 同步右侧远程 Tab 列表
+    sync_remote_tabs_only(window, ctx);
 
     // 3. 同步当前路径
     let local_path = ctx.local_current_path.borrow().clone();
@@ -336,13 +346,17 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_select_loc.active_local_tab_id.borrow_mut() = tid.clone();
 
             let tabs = ctx_select_loc.local_tabs.borrow();
-            if let Some(tab) = tabs.iter().find(|t| t.tab_id == tid) {
-                let loc = tab.current_path.clone();
-                drop(tabs);
+            let loc = if let Some(tab) = tabs.iter().find(|t| t.tab_id == tid) {
+                tab.current_path.clone()
+            } else {
+                String::new()
+            };
+            drop(tabs);
+            if !loc.is_empty() {
                 let _ = try_refresh_local_path(&ctx_select_loc, &loc, false);
             }
 
-
+            ctx_select_loc.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), false, &loc);
             sync_file_explorer_ui(&w, &ctx_select_loc);
             tracing::info!(target: "smagical_ui::files", "切换至本地文件 Tab: {}", tid);
         }
@@ -380,6 +394,8 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             drop(tabs);
             drop(act_id);
 
+            ctx_close_loc.core_state.app_hooks().dispatch_file_tab_closed(&tid);
+
             if let Some(t) = next_tab {
                 refresh_local_path(&ctx_close_loc, &t.current_path);
             }
@@ -409,6 +425,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_new_loc.active_local_tab_id.borrow_mut() = tab_id.clone();
             drop(tabs);
 
+            ctx_new_loc.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, "local", &home_dir);
             refresh_local_path(&ctx_new_loc, &home_dir);
             sync_file_explorer_ui(&w, &ctx_new_loc);
             tracing::info!(target: "smagical_ui::files", "新建本地文件 Tab: {}", tab_id);
@@ -427,13 +444,17 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_select_rem.active_remote_tab_id.borrow_mut() = tid.clone();
 
             let tabs = ctx_select_rem.remote_tabs.borrow();
-            if let Some(tab) = tabs.iter().find(|t| t.tab_id == tid) {
-                let rem = tab.current_path.clone();
-                drop(tabs);
+            let rem = if let Some(tab) = tabs.iter().find(|t| t.tab_id == tid) {
+                tab.current_path.clone()
+            } else {
+                String::new()
+            };
+            drop(tabs);
+            if !rem.is_empty() {
                 let _ = try_refresh_remote_path(&ctx_select_rem, &rem, false);
             }
 
-
+            ctx_select_rem.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), true, &rem);
             sync_file_explorer_ui(&w, &ctx_select_rem);
             tracing::info!(target: "smagical_ui::files", "切换至远程 SFTP Tab: {}", tid);
         }
@@ -465,6 +486,8 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             drop(tabs);
             drop(act_id);
 
+            ctx_close_rem.core_state.app_hooks().dispatch_file_tab_closed(&tid);
+
             if let Some(t) = next_tab {
                 refresh_remote_path(&ctx_close_rem, &t.current_path);
             } else {
@@ -491,13 +514,20 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
 
     // -------------------------------------------------------------------------
     // 3. 从左侧主机栏双击主机：只会创建到右侧远程 Tab 栏
-
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let ctx_open_host = ctx.clone();
     window.on_open_host_files(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
+
+            // 责任链前置拦截校验
+            let decision = ctx_open_host.core_state.app_hooks().dispatch_file_tab_opening(&h_id, "/root");
+            if let HookDecision::Abort { reason } = decision {
+                ctx_open_host.notify_warning("连接已拦截", reason);
+                return;
+            }
+
             let mut tabs = ctx_open_host.remote_tabs.borrow_mut();
 
             // 如果该主机已有打开的远程 Tab，则直接激活它
@@ -507,6 +537,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 *ctx_open_host.active_remote_tab_id.borrow_mut() = tid.clone();
                 drop(tabs);
 
+                ctx_open_host.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), true, &rem);
                 refresh_remote_path(&ctx_open_host, &rem);
                 sync_file_explorer_ui(&w, &ctx_open_host);
                 tracing::info!(target: "smagical_ui::files", "激活已存在的右侧远程 Tab: {}", tid);
@@ -526,6 +557,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_open_host.active_remote_tab_id.borrow_mut() = tab_id.clone();
             drop(tabs);
 
+            ctx_open_host.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, &h_id, "/root");
             refresh_remote_path(&ctx_open_host, "/root");
             sync_file_explorer_ui(&w, &ctx_open_host);
             tracing::info!(target: "smagical_ui::files", "双击主机创建右侧远程 SFTP Tab: {}", tab_id);
@@ -535,22 +567,22 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 4. 路径导航与目录文件交互
     // -------------------------------------------------------------------------
-    // 4.1 本地路径导航 (支持回车直达与不存在弹窗提示)
+    // 4.1 本地路径导航 (支持回车直达与不存在气泡通知提示)
     let window_weak = window.as_weak();
     let ctx_nav_local = ctx.clone();
     window.on_navigate_local_path(move |path| {
         if let Some(w) = window_weak.upgrade() {
             let p_str = path.to_string();
+            let old_p = ctx_nav_local.local_current_path.borrow().clone();
             match try_refresh_local_path(&ctx_nav_local, &p_str, true) {
                 Ok(_) => {
+                    let act_id = ctx_nav_local.active_local_tab_id.borrow().clone();
+                    ctx_nav_local.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &old_p, &p_str);
                     sync_file_explorer_ui(&w, &ctx_nav_local);
                     tracing::info!(target: "smagical_ui::files", "成功跳转本地路径: {}", p_str);
                 }
                 Err(err) => {
-                    w.set_dialog_title("路径不存在".into());
-                    w.set_dialog_message(err.into());
-                    w.set_dialog_type("error".into());
-                    w.set_is_dialog_open(true);
+                    ctx_nav_local.notify_error("路径不存在", err.clone());
                     let current_valid = ctx_nav_local.local_current_path.borrow().clone();
                     w.set_local_current_path(current_valid.into());
                     tracing::warn!(target: "smagical_ui::files", "本地路径跳转失败: {}", p_str);
@@ -565,14 +597,16 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_navigate_local_back(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_back_loc.active_local_tab_id.borrow().clone();
-            let target_path = {
+            let prev_path = {
                 let mut tabs = ctx_back_loc.local_tabs.borrow_mut();
                 tabs.iter_mut().find(|t| t.tab_id == act_id).and_then(|t| t.go_back())
             };
-            if let Some(path) = target_path {
-                let _ = try_refresh_local_path(&ctx_back_loc, &path, false);
+            if let Some(prev) = prev_path {
+                let old_p = ctx_back_loc.local_current_path.borrow().clone();
+                let _ = try_refresh_local_path(&ctx_back_loc, &prev, false);
+                ctx_back_loc.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &old_p, &prev);
                 sync_file_explorer_ui(&w, &ctx_back_loc);
-                tracing::info!(target: "smagical_ui::files", "本地文件历史后退至: {}", path);
+                tracing::info!(target: "smagical_ui::files", "本地后退至路径: {}", prev);
             }
         }
     });
@@ -583,51 +617,56 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_navigate_local_forward(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_fwd_loc.active_local_tab_id.borrow().clone();
-            let target_path = {
+            let next_path = {
                 let mut tabs = ctx_fwd_loc.local_tabs.borrow_mut();
                 tabs.iter_mut().find(|t| t.tab_id == act_id).and_then(|t| t.go_forward())
             };
-            if let Some(path) = target_path {
-                let _ = try_refresh_local_path(&ctx_fwd_loc, &path, false);
+            if let Some(next) = next_path {
+                let old_p = ctx_fwd_loc.local_current_path.borrow().clone();
+                let _ = try_refresh_local_path(&ctx_fwd_loc, &next, false);
+                ctx_fwd_loc.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &old_p, &next);
                 sync_file_explorer_ui(&w, &ctx_fwd_loc);
-                tracing::info!(target: "smagical_ui::files", "本地文件历史前进至: {}", path);
+                tracing::info!(target: "smagical_ui::files", "本地前进至路径: {}", next);
             }
         }
     });
 
-    // 4.4 本地上级目录导航
+    // 4.4 本地返回上一级
     let window_weak = window.as_weak();
-    let ctx_up_local = ctx.clone();
+    let ctx_up_loc = ctx.clone();
     window.on_navigate_local_up(move || {
         if let Some(w) = window_weak.upgrade() {
-            let current = ctx_up_local.local_current_path.borrow().clone();
-            let p = std::path::Path::new(&current);
+            let current = ctx_up_loc.local_current_path.borrow().clone();
+            let p = std::path::PathBuf::from(&current);
             if let Some(parent) = p.parent() {
                 let parent_str = parent.to_string_lossy().to_string();
                 if !parent_str.is_empty() {
-                    refresh_local_path(&ctx_up_local, &parent_str);
-                    sync_file_explorer_ui(&w, &ctx_up_local);
+                    let act_id = ctx_up_loc.active_local_tab_id.borrow().clone();
+                    let _ = try_refresh_local_path(&ctx_up_loc, &parent_str, true);
+                    ctx_up_loc.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, false, &current, &parent_str);
+                    sync_file_explorer_ui(&w, &ctx_up_loc);
+                    tracing::info!(target: "smagical_ui::files", "本地向上进入目录: {}", parent_str);
                 }
             }
         }
     });
 
-    // 4.5 远程路径导航 (支持回车直达与格式/路径弹窗校验)
+    // 4.5 远程路径导航 (支持回车直达与格式/路径气泡通知校验)
     let window_weak = window.as_weak();
     let ctx_nav_remote = ctx.clone();
     window.on_navigate_remote_path(move |path| {
         if let Some(w) = window_weak.upgrade() {
             let p_str = path.to_string();
+            let old_p = ctx_nav_remote.remote_current_path.borrow().clone();
             match try_refresh_remote_path(&ctx_nav_remote, &p_str, true) {
                 Ok(_) => {
+                    let act_id = ctx_nav_remote.active_remote_tab_id.borrow().clone();
+                    ctx_nav_remote.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &old_p, &p_str);
                     sync_file_explorer_ui(&w, &ctx_nav_remote);
                     tracing::info!(target: "smagical_ui::files", "成功跳转远程路径: {}", p_str);
                 }
                 Err(err) => {
-                    w.set_dialog_title("路径不存在".into());
-                    w.set_dialog_message(err.into());
-                    w.set_dialog_type("error".into());
-                    w.set_is_dialog_open(true);
+                    ctx_nav_remote.notify_error("路径不存在", err.clone());
                     let current_valid = ctx_nav_remote.remote_current_path.borrow().clone();
                     w.set_remote_current_path(current_valid.into());
                     tracing::warn!(target: "smagical_ui::files", "远程路径跳转失败: {}", p_str);
@@ -647,7 +686,9 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 tabs.iter_mut().find(|t| t.tab_id == act_id).and_then(|t| t.go_back())
             };
             if let Some(path) = target_path {
+                let old_p = ctx_back_rem.remote_current_path.borrow().clone();
                 let _ = try_refresh_remote_path(&ctx_back_rem, &path, false);
+                ctx_back_rem.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &old_p, &path);
                 sync_file_explorer_ui(&w, &ctx_back_rem);
                 tracing::info!(target: "smagical_ui::files", "远程文件历史后退至: {}", path);
             }
@@ -665,7 +706,9 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 tabs.iter_mut().find(|t| t.tab_id == act_id).and_then(|t| t.go_forward())
             };
             if let Some(path) = target_path {
+                let old_p = ctx_fwd_rem.remote_current_path.borrow().clone();
                 let _ = try_refresh_remote_path(&ctx_fwd_rem, &path, false);
+                ctx_fwd_rem.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &old_p, &path);
                 sync_file_explorer_ui(&w, &ctx_fwd_rem);
                 tracing::info!(target: "smagical_ui::files", "远程文件历史前进至: {}", path);
             }
@@ -689,13 +732,15 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 if let Some(parent) = p.parent() {
                     let parent_str = parent.to_string_lossy().to_string();
                     if !parent_str.is_empty() {
-                        refresh_remote_path(&ctx_up_remote, &parent_str);
+                        let _ = try_refresh_remote_path(&ctx_up_remote, &parent_str, true);
+                        ctx_up_remote.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &current, &parent_str);
                         sync_file_explorer_ui(&w, &ctx_up_remote);
                     }
                 }
             } else if let Some(pos) = current.rfind('/') {
                 let parent_str = if pos == 0 { "/" } else { &current[..pos] };
-                refresh_remote_path(&ctx_up_remote, parent_str);
+                let _ = try_refresh_remote_path(&ctx_up_remote, parent_str, true);
+                ctx_up_remote.core_state.app_hooks().dispatch_file_tab_navigated(&act_id, true, &current, parent_str);
                 sync_file_explorer_ui(&w, &ctx_up_remote);
             }
         }
@@ -969,6 +1014,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     error_message: None,
                 };
 
+                ctx_start_trans.core_state.app_hooks().dispatch_file_transfer_started(&parent_task.id);
                 tasks.push(parent_task);
                 tasks.push(child1);
                 tasks.push(child2);
@@ -999,6 +1045,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     status: TransferStatus::Transferring,
                     error_message: None,
                 };
+                ctx_start_trans.core_state.app_hooks().dispatch_file_transfer_started(&single_task.id);
                 tasks.push(single_task);
                 tracing::info!(
                     target: "smagical_ui::files",
@@ -1006,7 +1053,6 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     dir, src_str, target_combined
                 );
             }
-
 
             drop(tasks);
             sync_file_explorer_ui(&w, &ctx_start_trans);
@@ -1020,11 +1066,15 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak.upgrade() {
             let tid = task_id.to_string();
             let mut tasks = ctx_toggle_trans.transfer_tasks.borrow_mut();
-            if let Some(folder) = tasks.iter_mut().find(|t| t.id == tid && t.is_dir) {
+            let is_expanded = if let Some(folder) = tasks.iter_mut().find(|t| t.id == tid && t.is_dir) {
                 folder.is_expanded = !folder.is_expanded;
-            }
+                folder.is_expanded
+            } else {
+                false
+            };
             drop(tasks);
             sync_file_explorer_ui(&w, &ctx_toggle_trans);
+            tracing::debug!(target: "smagical_ui::files", "传输任务折叠/展开: task_id={}, is_expanded={}", tid, is_expanded);
         }
     });
 
@@ -1169,7 +1219,8 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                             target = parent.join(format!("新建文件夹 ({})", counter));
                             counter += 1;
                         }
-                        let _ = std::fs::create_dir_all(&target);
+                        let ok = std::fs::create_dir_all(&target).is_ok();
+                        ctx_file_act.core_state.app_hooks().dispatch_file_operation_completed("create_folder", false, &target.to_string_lossy(), ok);
                         let cur_p = ctx_file_act.local_current_path.borrow().clone();
                         refresh_local_path(&ctx_file_act, &cur_p);
                         sync_file_explorer_ui(&w, &ctx_file_act);
@@ -1184,18 +1235,30 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                             target = parent.join(format!("新建文本文档 ({}).txt", counter));
                             counter += 1;
                         }
-                        let _ = std::fs::File::create(&target);
+                        let ok = std::fs::File::create(&target).is_ok();
+                        ctx_file_act.core_state.app_hooks().dispatch_file_operation_completed("create_file", false, &target.to_string_lossy(), ok);
                         let cur_p = ctx_file_act.local_current_path.borrow().clone();
                         refresh_local_path(&ctx_file_act, &cur_p);
                         sync_file_explorer_ui(&w, &ctx_file_act);
                     }
                 }
                 "delete" => {
+                    // 1. 高危操作责任链前置拦截校验
+                    let decision = ctx_file_act.core_state.app_hooks().dispatch_file_operation_before("delete", is_remote, &p_str);
+                    if let HookDecision::Abort { reason } = decision {
+                        ctx_file_act.notify_warning("高危操作拦截", reason);
+                        return;
+                    }
+
                     if !is_remote {
-                        if is_dir {
-                            let _ = std::fs::remove_dir_all(&p_str);
+                        let ok = if is_dir {
+                            std::fs::remove_dir_all(&p_str).is_ok()
                         } else {
-                            let _ = std::fs::remove_file(&p_str);
+                            std::fs::remove_file(&p_str).is_ok()
+                        };
+                        ctx_file_act.core_state.app_hooks().dispatch_file_operation_completed("delete", false, &p_str, ok);
+                        if ok {
+                            ctx_file_act.notify_info("已删除", format!("已删除: {}", n_str));
                         }
                         let cur_p = ctx_file_act.local_current_path.borrow().clone();
                         refresh_local_path(&ctx_file_act, &cur_p);
@@ -1247,13 +1310,13 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_open_file_host(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
             let hid = host_id.to_string();
-            let mut tabs = ctx_open_fhost.remote_tabs.borrow_mut();
 
             // 若在右栏打开本地文件系统
             if hid == "local" {
                 let home_path = directories::BaseDirs::new()
                     .map(|p| p.home_dir().to_string_lossy().to_string())
                     .unwrap_or_else(|| "/".to_string());
+                let mut tabs = ctx_open_fhost.remote_tabs.borrow_mut();
                 let new_idx = tabs.len() + 1;
                 let tab_id = format!("rtab-{}", new_idx);
                 let session = RemoteFileTabSession::new(
@@ -1267,11 +1330,21 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 *ctx_open_fhost.active_remote_tab_id.borrow_mut() = tab_id.clone();
                 drop(tabs);
 
+                ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, "local", &home_path);
                 refresh_remote_path(&ctx_open_fhost, &home_path);
                 sync_file_explorer_ui(&w, &ctx_open_fhost);
                 tracing::info!(target: "smagical_ui::files", "在右栏新建并打开本地文件目录 Tab: tab_id={}, path={}", tab_id, home_path);
                 return;
             }
+
+            // 责任链前置拦截校验
+            let decision = ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_opening(&hid, "/root");
+            if let HookDecision::Abort { reason } = decision {
+                ctx_open_fhost.notify_warning("连接已拦截", reason);
+                return;
+            }
+
+            let mut tabs = ctx_open_fhost.remote_tabs.borrow_mut();
 
             // 若已有打开的该主机 Tab，则直接切换过去
             if let Some(existing) = tabs.iter().find(|t| t.host_id == hid) {
@@ -1280,6 +1353,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 *ctx_open_fhost.active_remote_tab_id.borrow_mut() = tid.clone();
                 drop(tabs);
 
+                ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_focus_changed(Some(&tid), true, &rem);
                 refresh_remote_path(&ctx_open_fhost, &rem);
                 sync_file_explorer_ui(&w, &ctx_open_fhost);
                 tracing::info!(target: "smagical_ui::files", "文件弹窗切换至已有远程 SFTP Tab: {}", tid);
@@ -1311,11 +1385,58 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             *ctx_open_fhost.active_remote_tab_id.borrow_mut() = tab_id.clone();
             drop(tabs);
 
+            ctx_open_fhost.core_state.app_hooks().dispatch_file_tab_opened(&tab_id, &hid, "/root");
             refresh_remote_path(&ctx_open_fhost, "/root");
             sync_file_explorer_ui(&w, &ctx_open_fhost);
             tracing::info!(target: "smagical_ui::files", "文件弹窗自动连接并创建远程 SFTP Tab: host_id={}, tab_id={}", hid, tab_id);
         }
     });
 
+    // -------------------------------------------------------------------------
+    // 16. 本地 Tab 拖拽调整顺序 (仅在同栏内生效)
+    // -------------------------------------------------------------------------
+    let ctx_reorder_loc = ctx.clone();
+    let window_weak = window.as_weak();
+    window.on_reorder_local_tab(move |from_idx: i32, to_idx: i32| {
+        if from_idx == to_idx || from_idx < 0 || to_idx < 0 {
+            return;
+        }
+        let from = from_idx as usize;
+        let to = to_idx as usize;
+        let mut tabs = ctx_reorder_loc.local_tabs.borrow_mut();
+        if from < tabs.len() && to < tabs.len() {
+            let item = tabs.remove(from);
+            tabs.insert(to, item);
+            tracing::info!(target: "smagical_ui::files", "本地 Tab 拖拽重排: {} -> {}", from, to);
+        }
+        drop(tabs);
+        if let Some(w) = window_weak.upgrade() {
+            sync_local_tabs_only(&w, &ctx_reorder_loc);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 17. 远程 Tab 拖拽调整顺序 (仅在同栏内生效)
+    // -------------------------------------------------------------------------
+    let ctx_reorder_rem = ctx.clone();
+    let window_weak = window.as_weak();
+    window.on_reorder_remote_tab(move |from_idx: i32, to_idx: i32| {
+        if from_idx == to_idx || from_idx < 0 || to_idx < 0 {
+            return;
+        }
+        let from = from_idx as usize;
+        let to = to_idx as usize;
+        let mut tabs = ctx_reorder_rem.remote_tabs.borrow_mut();
+        if from < tabs.len() && to < tabs.len() {
+            let item = tabs.remove(from);
+            tabs.insert(to, item);
+            tracing::info!(target: "smagical_ui::files", "远程 Tab 拖拽重排: {} -> {}", from, to);
+        }
+        drop(tabs);
+        if let Some(w) = window_weak.upgrade() {
+            sync_remote_tabs_only(&w, &ctx_reorder_rem);
+        }
+    });
 }
+
 

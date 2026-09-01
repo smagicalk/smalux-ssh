@@ -164,6 +164,109 @@ impl AppGlobalHook for HostAuditLogHook {
             "[历史审计:清空] 用户清空了非置顶历史会话记录"
         );
     }
+
+    // =========================================================================
+    // 文件管理与 SFTP 传输审计 (audit::file)
+    // =========================================================================
+
+    fn on_file_tab_opening(&self, host_id: &str, initial_path: &str) -> HookDecision {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:请求连接] 目标主机: [{}], 初始路径: '{}'",
+            host_id, initial_path
+        );
+        HookDecision::Continue
+    }
+
+    fn on_file_tab_opened(&self, session_id: &str, host_id: &str, initial_path: &str) {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:会话建立] 会话 Tab: [{}], 目标主机: [{}], 挂载路径: '{}'",
+            session_id, host_id, initial_path
+        );
+    }
+
+    fn on_file_tab_focus_changed(&self, session_id: Option<&str>, is_remote: bool, current_path: &str) {
+        tracing::debug!(
+            target: "audit::file",
+            "[文件审计:焦点切换] 激活会话: {:?}, 是否远程: {}, 当前路径: '{}'",
+            session_id, is_remote, current_path
+        );
+    }
+
+    fn on_file_tab_navigated(&self, session_id: &str, is_remote: bool, from_path: &str, to_path: &str) {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:路径跳转] 会话 Tab: [{}], 远程: {}, 路径变动: '{}' -> '{}'",
+            session_id, is_remote, from_path, to_path
+        );
+    }
+
+    fn on_file_tab_closed(&self, session_id: &str) {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:会话关闭] 会话 Tab: [{}] 已释放",
+            session_id
+        );
+    }
+
+    fn on_file_operation_before(&self, op_type: &str, is_remote: bool, path: &str) -> HookDecision {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:操作准备] 动作: [{}], 远程: {}, 目标路径: '{}'",
+            op_type, is_remote, path
+        );
+        HookDecision::Continue
+    }
+
+    fn on_file_operation_completed(&self, op_type: &str, is_remote: bool, path: &str, success: bool) {
+        if success {
+            tracing::info!(
+                target: "audit::file",
+                "[文件审计:操作完成] 动作: [{}], 远程: {}, 路径: '{}', 结果: 成功",
+                op_type, is_remote, path
+            );
+        } else {
+            tracing::warn!(
+                target: "audit::file",
+                "[文件审计:操作失败] 动作: [{}], 远程: {}, 路径: '{}', 结果: 失败",
+                op_type, is_remote, path
+            );
+        }
+    }
+
+    fn on_file_transfer_enqueued(&self, task: &crate::domain::TransferTask) -> HookDecision {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:传输排队] 任务 ID: [{}], 文件: '{}', 方向: {:?}, 总大小: {} 字节",
+            task.id, task.filename, task.direction, task.total_bytes
+        );
+        HookDecision::Continue
+    }
+
+    fn on_file_transfer_started(&self, task_id: &str) {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:传输开始] 任务 ID: [{}]",
+            task_id
+        );
+    }
+
+    fn on_file_transfer_completed(&self, task: &crate::domain::TransferTask) {
+        tracing::info!(
+            target: "audit::file",
+            "[文件审计:传输成功] 任务 ID: [{}], 文件: '{}', 传输总字节: {}",
+            task.id, task.filename, task.total_bytes
+        );
+    }
+
+    fn on_file_transfer_failed(&self, task: &crate::domain::TransferTask, error_message: &str) {
+        tracing::error!(
+            target: "audit::file",
+            "[文件审计:传输失败] 任务 ID: [{}], 文件: '{}', 错误详情: {}",
+            task.id, task.filename, error_message
+        );
+    }
 }
 
 
@@ -249,7 +352,6 @@ impl AppGlobalHook for FunctionalGlobalHook {
     }
 
     fn on_app_before_exit(&self, ctx: &AppExitContext) -> HookDecision {
-
         if let Some(ref f) = self.on_before_exit_fn {
             f(ctx)
         } else {
@@ -257,3 +359,57 @@ impl AppGlobalHook for FunctionalGlobalHook {
         }
     }
 }
+
+/// 文件高危操作安全守护插件。
+///
+/// 严格拦截针对系统根目录、关键系统文件夹（如 `/`, `/etc`, `/bin`, `C:\Windows` 等）的删除与覆写破坏性指令。
+pub struct DangerousFileGuardHook;
+
+impl Default for DangerousFileGuardHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl DangerousFileGuardHook {
+    /// 创建一个新的高危文件操作守护插件实例。
+    pub fn new() -> Self {
+        Self
+    }
+
+    /// 检查指定路径是否为受保护的敏感/根目录
+    pub fn is_protected_path(path: &str) -> bool {
+        let clean = path.trim().replace('\\', "/").to_lowercase();
+        let trimmed = clean.trim_end_matches('/');
+
+        matches!(
+            trimmed,
+            "" | "/" | "." | ".." | "c:" | "d:" | "e:" | "/etc" | "/bin" | "/sbin" | "/usr" | "/lib" | "/boot" | "/sys" | "/proc" | "/dev" | "c:/windows" | "c:/windows/system32" | "c:/program files" | "c:/program files (x86)"
+        )
+    }
+}
+
+impl AppGlobalHook for DangerousFileGuardHook {
+    fn name(&self) -> &'static str {
+        "builtin_dangerous_file_guard"
+    }
+
+    fn priority(&self) -> i32 {
+        100 // 最高优先级，最先执行安全拦截
+    }
+
+    fn on_file_operation_before(&self, op_type: &str, _is_remote: bool, path: &str) -> HookDecision {
+        if op_type == "delete" && Self::is_protected_path(path) {
+            tracing::warn!(
+                target: "security::file_guard",
+                "高危文件操作拦截: 尝试删除受保护的系统级敏感路径 [{}]",
+                path
+            );
+            return HookDecision::Abort {
+                reason: format!("安全守护拦截：严禁删除系统保护路径 [{}]", path),
+            };
+        }
+        HookDecision::Continue
+    }
+}
+

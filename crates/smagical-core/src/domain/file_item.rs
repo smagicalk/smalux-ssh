@@ -741,6 +741,36 @@ mod tests {
         assert_eq!(session.go_back(), Some("/root".to_string()));
         assert_eq!(session.go_forward(), Some("/var/log".to_string()));
     }
+
+    #[test]
+    fn test_tab_reordering_within_same_pane() {
+        let mut tabs = vec![
+            LocalFileTabSession::new("ltab-1", "Tab 1", "D:/dir1"),
+            LocalFileTabSession::new("ltab-2", "Tab 2", "D:/dir2"),
+            LocalFileTabSession::new("ltab-3", "Tab 3", "D:/dir3"),
+        ];
+
+        // 模拟拖拽从 index 0 移到 index 2: [Tab 1, Tab 2, Tab 3] -> [Tab 2, Tab 3, Tab 1]
+        let from = 0;
+        let to = 2;
+        let item = tabs.remove(from);
+        tabs.insert(to, item);
+
+        assert_eq!(tabs[0].tab_id, "ltab-2");
+        assert_eq!(tabs[1].tab_id, "ltab-3");
+        assert_eq!(tabs[2].tab_id, "ltab-1");
+
+        // 模拟拖拽从 index 2 移到 index 1: [Tab 2, Tab 3, Tab 1] -> [Tab 2, Tab 1, Tab 3]
+        let from = 2;
+        let to = 1;
+        let item = tabs.remove(from);
+        tabs.insert(to, item);
+
+        assert_eq!(tabs[0].tab_id, "ltab-2");
+        assert_eq!(tabs[1].tab_id, "ltab-1");
+        assert_eq!(tabs[2].tab_id, "ltab-3");
+    }
 }
+
 
 

@@ -866,4 +866,173 @@ impl AppGlobalHookEngine {
             }));
         }
     }
+
+    // =========================================================================
+    // 10. 双盘文件浏览器与 SFTP 传输域 (File Explorer & Transfer - file_)
+    // =========================================================================
+
+    /// 广播文件会话打开前拦截 (`on_file_tab_opening`)。
+    pub fn dispatch_file_tab_opening(&self, host_id: &str, initial_path: &str) -> HookDecision {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hid = host_id.to_string();
+            let p = initial_path.to_string();
+            let hook_cloned = Arc::clone(&hook);
+            let res = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_tab_opening(&hid, &p)
+            }));
+            if let Ok(HookDecision::Abort { reason }) = res {
+                return HookDecision::Abort { reason };
+            }
+        }
+        HookDecision::Continue
+    }
+
+    /// 广播文件会话建立就绪 (`on_file_tab_opened`)。
+    pub fn dispatch_file_tab_opened(&self, session_id: &str, host_id: &str, initial_path: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let sid = session_id.to_string();
+            let hid = host_id.to_string();
+            let p = initial_path.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_tab_opened(&sid, &hid, &p);
+            }));
+        }
+    }
+
+    /// 广播文件会话活跃聚焦变更 (`on_file_tab_focus_changed`)。
+    pub fn dispatch_file_tab_focus_changed(&self, session_id: Option<&str>, is_remote: bool, current_path: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let sid = session_id.map(|s| s.to_string());
+            let cp = current_path.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_tab_focus_changed(sid.as_deref(), is_remote, &cp);
+            }));
+        }
+    }
+
+    /// 广播文件目录导航跳转 (`on_file_tab_navigated`)。
+    pub fn dispatch_file_tab_navigated(&self, session_id: &str, is_remote: bool, from_path: &str, to_path: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let sid = session_id.to_string();
+            let fp = from_path.to_string();
+            let tp = to_path.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_tab_navigated(&sid, is_remote, &fp, &tp);
+            }));
+        }
+    }
+
+    /// 广播文件会话关闭 (`on_file_tab_closed`)。
+    pub fn dispatch_file_tab_closed(&self, session_id: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let sid = session_id.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_tab_closed(&sid);
+            }));
+        }
+    }
+
+    /// 广播文件高危操作前置拦截 (`on_file_operation_before`)。
+    pub fn dispatch_file_operation_before(&self, op_type: &str, is_remote: bool, path: &str) -> HookDecision {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let ot = op_type.to_string();
+            let p = path.to_string();
+            let hook_cloned = Arc::clone(&hook);
+            let res = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_operation_before(&ot, is_remote, &p)
+            }));
+            if let Ok(HookDecision::Abort { reason }) = res {
+                return HookDecision::Abort { reason };
+            }
+        }
+        HookDecision::Continue
+    }
+
+    /// 广播文件/目录操作完成 (`on_file_operation_completed`)。
+    pub fn dispatch_file_operation_completed(&self, op_type: &str, is_remote: bool, path: &str, success: bool) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let ot = op_type.to_string();
+            let p = path.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_operation_completed(&ot, is_remote, &p, success);
+            }));
+        }
+    }
+
+    /// 广播传输任务入队前校验 (`on_file_transfer_enqueued`)。
+    pub fn dispatch_file_transfer_enqueued(&self, task: &crate::domain::TransferTask) -> HookDecision {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let t = task.clone();
+            let hook_cloned = Arc::clone(&hook);
+            let res = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_transfer_enqueued(&t)
+            }));
+            if let Ok(HookDecision::Abort { reason }) = res {
+                return HookDecision::Abort { reason };
+            }
+        }
+        HookDecision::Continue
+    }
+
+    /// 广播传输任务开始执行 (`on_file_transfer_started`)。
+    pub fn dispatch_file_transfer_started(&self, task_id: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let tid = task_id.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_transfer_started(&tid);
+            }));
+        }
+    }
+
+    /// 广播传输进度与速率更新 (`on_file_transfer_progress`)。
+    pub fn dispatch_file_transfer_progress(&self, task_id: &str, transferred: u64, total: u64, speed_bps: u64) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let tid = task_id.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_transfer_progress(&tid, transferred, total, speed_bps);
+            }));
+        }
+    }
+
+    /// 广播传输任务完成 (`on_file_transfer_completed`)。
+    pub fn dispatch_file_transfer_completed(&self, task: &crate::domain::TransferTask) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let t = task.clone();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_transfer_completed(&t);
+            }));
+        }
+    }
+
+    /// 广播传输任务失败 (`on_file_transfer_failed`)。
+    pub fn dispatch_file_transfer_failed(&self, task: &crate::domain::TransferTask, error_message: &str) {
+        let entries = { self.hooks.read().unwrap().iter().map(|e| Arc::clone(&e.hook)).collect::<Vec<_>>() };
+        for hook in entries {
+            let hook_cloned = Arc::clone(&hook);
+            let t = task.clone();
+            let err = error_message.to_string();
+            let _ = panic::catch_unwind(AssertUnwindSafe(move || {
+                hook_cloned.on_file_transfer_failed(&t, &err);
+            }));
+        }
+    }
 }

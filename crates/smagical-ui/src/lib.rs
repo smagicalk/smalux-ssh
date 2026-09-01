@@ -33,6 +33,8 @@ pub(crate) mod launcher_prewarm;
 pub(crate) mod activity_bar_service;
 /// 右侧辅助抽屉动态注册与 UI 同步服务。
 pub(crate) mod right_panel_service;
+/// 全局气泡通知服务。
+pub mod notification_service;
 
 
 use std::cell::RefCell;
@@ -58,6 +60,7 @@ mod generated {
 pub use generated::{
     ActivityBarItemData, AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData,
     HostTreeNode, LocalShellItemData, LogEntryData, TabData, TerminalPaneData, TerminalSplitterData,
+    ToastItemData,
 };
 
 
@@ -251,6 +254,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let local_file_nodes = Rc::new(RefCell::new(initial_local_files));
     let remote_file_nodes = Rc::new(RefCell::new(Vec::new()));
     let transfer_tasks = Rc::new(RefCell::new(Vec::<smagical_core::TransferTask>::new()));
+    let notifications = notification_service::NotificationManager::new(window.as_weak());
 
     // 构造全局应用上下文
     let ctx = AppContext {
@@ -287,6 +291,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
         local_file_nodes: Rc::clone(&local_file_nodes),
         remote_file_nodes: Rc::clone(&remote_file_nodes),
         transfer_tasks: Rc::clone(&transfer_tasks),
+        notifications,
     };
 
 

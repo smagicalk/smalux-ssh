@@ -88,10 +88,32 @@ pub(crate) struct AppContext {
     pub remote_file_nodes: Rc<RefCell<Vec<FileItemData>>>,
     /// 文件传输任务队列缓存
     pub transfer_tasks: Rc<RefCell<Vec<smagical_core::TransferTask>>>,
+    /// 全局气泡通知服务管理器
+    pub notifications: crate::notification_service::NotificationManager,
 }
 
+#[allow(dead_code)]
+impl AppContext {
+    /// 弹出成功通知气泡
+    pub fn notify_success(&self, title: impl Into<String>, message: impl Into<String>) {
+        self.notifications.success(title, message);
+    }
 
+    /// 弹出信息通知气泡
+    pub fn notify_info(&self, title: impl Into<String>, message: impl Into<String>) {
+        self.notifications.info(title, message);
+    }
 
+    /// 弹出警告通知气泡
+    pub fn notify_warning(&self, title: impl Into<String>, message: impl Into<String>) {
+        self.notifications.warning(title, message);
+    }
+
+    /// 弹出错误通知气泡
+    pub fn notify_error(&self, title: impl Into<String>, message: impl Into<String>) {
+        self.notifications.error(title, message);
+    }
+}
 
 /// 统一注册挂载所有 Slint UI 回调处理器。
 ///
@@ -101,6 +123,12 @@ pub(crate) struct AppContext {
 /// - `window`: Slint 生成的主窗口组件引用句柄
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
+    // 0. 挂载全局气泡通知关闭回调
+    let notif_mgr = ctx.notifications.clone();
+    window.on_close_toast(move |id| {
+        notif_mgr.close(&id);
+    });
+
     // 1. 挂载窗口级基础回调 (主题切换、深浅色模式、系统窗口三键操作)
     window_handlers::register_window_handlers(window, ctx);
     // 2. 挂载终端多会话与启动器回调 (Tab 切换/关闭、新建会话、键盘输入、滚轮滑动、剪贴板等)

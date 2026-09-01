@@ -1,0 +1,172 @@
+import { AppTheme } from "../themes/app-theme.slint";
+
+/// 气泡通知数据契约模型
+export struct ToastItemData {
+    /// 唯一标识 ID
+    id: string,
+    /// 提示标题
+    title: string,
+    /// 提示详情正文
+    message: string,
+    /// 语义级别 ("info" | "success" | "warning" | "error")
+    level: string,
+    /// 弹出方位 ("top-right" | "top-center" | "bottom-right")
+    position: string,
+    /// 自动消隐倒计时毫秒数 (0 为不自动关闭)
+    duration-ms: int,
+    /// 是否展示右上角关闭按钮
+    closable: bool,
+}
+
+/// 单个气泡通知卡片组件
+export component ToastCard inherits Rectangle {
+    /// 气泡数据项
+    in property <ToastItemData> data;
+    /// 手动关闭事件回调
+    callback close(string /* id */);
+
+    width: 340px;
+    border-radius: 8px;
+    background: AppTheme.surface-background;
+    border-width: 1px;
+    border-color: data.level == "error" ? #ef444466 : (
+        data.level == "success" ? #10b98166 : (
+            data.level == "warning" ? #f59e0b66 : #3b82f666
+        )
+    );
+    drop-shadow-blur: 16px;
+    drop-shadow-color: #00000088;
+    drop-shadow-offset-y: 4px;
+    clip: true;
+
+    // 左侧主题状态指示条
+    Rectangle {
+        x: 0px;
+        y: 0px;
+        width: 4px;
+        height: 100%;
+        background: data.level == "error" ? #ef4444 : (
+            data.level == "success" ? #10b981 : (
+                data.level == "warning" ? #f59e0b : #3b82f6
+            )
+        );
+    }
+
+    // 气泡主内容区 (右侧留出 32px 给右上角绝对定位的关闭按钮)
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 32px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        spacing: 10px;
+        alignment: start;
+
+        // 图标指示徽章 (SVG 矢量图标)
+        VerticalLayout {
+            alignment: start;
+            Rectangle {
+                width: 24px;
+                height: 24px;
+                border-radius: 12px;
+                background: data.level == "error" ? #ef444422 : (
+                    data.level == "success" ? #10b98122 : (
+                        data.level == "warning" ? #f59e0b22 : #3b82f622
+                    )
+                );
+
+                Image {
+                    source: data.level == "error" ? @image-url("../assets/icons/x-circle.svg") : (
+                        data.level == "success" ? @image-url("../assets/icons/check-circle.svg") : (
+                            data.level == "warning" ? @image-url("../assets/icons/alert-triangle.svg") : @image-url("../assets/icons/info-circle.svg")
+                        )
+                    );
+                    width: 14px;
+                    height: 14px;
+                    image-fit: contain;
+                    colorize: data.level == "error" ? #ef4444 : (
+                        data.level == "success" ? #10b981 : (
+                            data.level == "warning" ? #f59e0b : #3b82f6
+                        )
+                    );
+                }
+            }
+        }
+
+        // 标题与正文文本
+        VerticalLayout {
+            spacing: 3px;
+            horizontal-stretch: 1;
+            alignment: center;
+
+            if data.title != "": Text {
+                text: data.title;
+                font-size: 13px;
+                font-weight: 700;
+                color: AppTheme.foreground;
+                overflow: elide;
+            }
+
+            if data.message != "": Text {
+                text: data.message;
+                font-size: 12px;
+                font-weight: 400;
+                color: AppTheme.secondary-foreground;
+                wrap: word-wrap;
+            }
+        }
+    }
+
+    // 绝对定位在右上角的关闭按钮 (保证在任何文本高度下均稳固在右上角)
+    if data.closable: Rectangle {
+        x: parent.width - 28px;
+        y: 8px;
+        width: 20px;
+        height: 20px;
+        border-radius: 4px;
+        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+        z: 10;
+
+        close-touch := TouchArea {
+            mouse-cursor: pointer;
+            clicked => {
+                root.close(data.id);
+            }
+        }
+
+        Image {
+            source: @image-url("../assets/icons/window-close.svg");
+            width: 9px;
+            height: 9px;
+            image-fit: contain;
+            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.disabled-foreground;
+        }
+    }
+}
+
+/// 全局气泡通知浮层容器 (顶层悬浮 z: 1000)
+export component ToastContainer inherits Rectangle {
+    /// 活跃气泡通知数据列表
+    in property <[ToastItemData]> toasts: [];
+    /// 默认弹出方位 ("top-right" | "top-center" | "bottom-right")
+    in property <string> position: "top-right";
+    /// 点击关闭气泡事件回调
+    callback close-toast(string /* id */);
+
+    background: transparent;
+
+    if root.toasts.length > 0: VerticalLayout {
+        x: root.position == "top-center" ? (parent.width - 340px) / 2 : (
+            root.position == "bottom-right" || root.position == "top-right" ? parent.width - 356px : 20px
+        );
+        y: root.position == "bottom-right" || root.position == "bottom-left" ? parent.height - self.preferred-height - 20px : 44px;
+        spacing: 8px;
+        alignment: start;
+
+        for toast[idx] in root.toasts: ToastCard {
+            data: toast;
+            close(id) => {
+                root.close-toast(id);
+            }
+        }
+    }
+}

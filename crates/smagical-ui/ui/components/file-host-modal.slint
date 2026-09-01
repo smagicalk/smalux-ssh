@@ -3,17 +3,24 @@ import { SearchInput } from "search-input.slint";
 import { HostItemData } from "../views/left_drawers/hosts_drawer.slint";
 import { AppIconButton } from "base/app-icon-button.slint";
 import { StatusDot } from "status-dot.slint";
+import { HostPickerList } from "host-picker-list.slint";
 
 /// 文件管理会话选择与快速连接弹窗 (File Host Modal)
 ///
 /// 专用于文件页面：本地统一为一个「本地文件目录」条目，远程展示全部主机资产，点击即自动连接 SFTP 会话。
 export component FileHostModal inherits Rectangle {
+    /// 弹窗显隐开关状态
     in property <bool> is-open: false;
+    /// 过滤后展示的远程主机列表
     in property <[HostItemData]> host-items: [];
 
+    /// 关闭弹窗事件回调
     callback close();
+    /// 选择指定远程主机事件回调
     callback host-selected(string /* host_id */);
+    /// 选择本机文件系统条目事件回调
     callback local-selected();
+    /// 搜索框输入过滤文本变更事件回调
     callback search-changed(string /* query */);
 
     if is-open: Rectangle {
@@ -211,126 +218,12 @@ export component FileHostModal inherits Rectangle {
                         }
 
                         // === Section 2: 远程主机资产 (SFTP 会话) ===
-                        if root.host-items.length > 0: VerticalLayout {
-                            spacing: 6px;
-
-                            Text {
-                                text: @tr("🌐 远程主机资产 (Remote SFTP Hosts)");
-                                font-size: 11px;
-                                font-weight: 600;
-                                color: AppTheme.secondary-foreground;
-                            }
-
-                            for host in root.host-items: Rectangle {
-                                height: 44px;
-                                border-radius: 6px;
-                                background: host-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
-                                border-width: 1px;
-                                border-color: host-touch.has-hover ? #10b981 : transparent;
-                                clip: true;
-
-                                animate background { duration: 120ms; }
-                                animate border-color { duration: 120ms; }
-
-                                HorizontalLayout {
-                                    padding: 0px;
-                                    spacing: 0px;
-
-                                    // 1. 图标靠左
-                                    Rectangle {
-                                        width: 44px;
-                                        height: 100%;
-                                        background: host-touch.has-hover ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
-
-                                        Image {
-                                            source: @image-url("../assets/icons/server.svg");
-                                            width: 16px;
-                                            height: 16px;
-                                            colorize: host-touch.has-hover ? #10b981 : AppTheme.secondary-foreground;
-                                            horizontal-alignment: center;
-                                            vertical-alignment: center;
-                                            x: (parent.width - self.width) / 2;
-                                            y: (parent.height - self.height) / 2;
-                                        }
-                                    }
-
-                                    // 2. 右侧信息展示区域
-                                    HorizontalLayout {
-                                        horizontal-stretch: 1;
-                                        padding-left: 12px;
-                                        padding-right: 12px;
-                                        spacing: 8px;
-
-                                        VerticalLayout {
-                                            alignment: center;
-                                            horizontal-stretch: 1;
-                                            spacing: 2px;
-
-                                            HorizontalLayout {
-                                                spacing: 6px;
-                                                alignment: start;
-
-                                                VerticalLayout {
-                                                    alignment: center;
-                                                    StatusDot {
-                                                        status: host.status;
-                                                        dot-size: 5px;
-                                                    }
-                                                }
-
-                                                Text {
-                                                    text: host.name;
-                                                    font-size: 12px;
-                                                    font-weight: 600;
-                                                    color: AppTheme.foreground;
-                                                    horizontal-alignment: left;
-                                                    vertical-alignment: center;
-                                                    overflow: elide;
-                                                }
-                                            }
-
-                                            Text {
-                                                text: host.address + (host.port > 0 ? (":" + host.port) : "");
-                                                font-size: 10px;
-                                                color: AppTheme.secondary-foreground;
-                                                horizontal-alignment: left;
-                                                vertical-alignment: center;
-                                                overflow: elide;
-                                            }
-                                        }
-
-                                        // 右侧所属分组标签
-                                        if host.group != "": VerticalLayout {
-                                            alignment: center;
-
-                                            Rectangle {
-                                                height: 20px;
-                                                border-radius: 3px;
-                                                background: AppTheme.control-background;
-
-                                                HorizontalLayout {
-                                                    padding-left: 6px;
-                                                    padding-right: 6px;
-                                                    alignment: center;
-
-                                                    Text {
-                                                        text: host.group;
-                                                        font-size: 10px;
-                                                        color: AppTheme.secondary-foreground;
-                                                        vertical-alignment: center;
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-
-                                host-touch := TouchArea {
-                                    mouse-cursor: pointer;
-                                    clicked => {
-                                        root.host-selected(host.id);
-                                    }
-                                }
+                        if root.host-items.length > 0: HostPickerList {
+                            hosts: root.host-items;
+                            section-title: @tr("🌐 远程主机资产 (Remote SFTP Hosts)");
+                            hover-accent-color: #10b981;
+                            host-selected(id) => {
+                                root.host-selected(id);
                             }
                         }
 

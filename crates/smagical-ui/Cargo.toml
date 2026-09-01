@@ -17,6 +17,7 @@ fontdue.workspace = true
 arboard.workspace = true
 vt100.workspace = true
 directories.workspace = true
+uuid.workspace = true
 smagical-core = { path = "../smagical-core" }
 smagical-debug = { path = "../smagical-debug" }
 

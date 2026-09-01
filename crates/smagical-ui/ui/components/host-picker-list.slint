@@ -1,0 +1,158 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { HostItemData } from "../views/left_drawers/hosts_drawer.slint";
+import { StatusDot } from "status-dot.slint";
+
+/// 单个主机资产选择卡片组件
+export component HostPickerCard inherits Rectangle {
+    /// 主机数据源
+    in property <HostItemData> host;
+    /// 鼠标悬浮高亮强调色
+    in property <color> hover-accent-color: AppTheme.accent;
+    /// 是否展示健康状态指示小圆点
+    in property <bool> show-status: true;
+    /// 单击选中当前主机事件回调
+    callback selected(string /* host_id */);
+
+    height: 44px;
+    border-radius: 6px;
+    background: host-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+    border-width: 1px;
+    border-color: host-touch.has-hover ? hover-accent-color : transparent;
+    clip: true;
+
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // 1. 图标靠左，占据整行高度
+        Rectangle {
+            width: 44px;
+            height: 100%;
+            background: host-touch.has-hover ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
+
+            Image {
+                source: @image-url("../assets/icons/server.svg");
+                width: 16px;
+                height: 16px;
+                colorize: host-touch.has-hover ? hover-accent-color : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+        }
+
+        // 2. 右侧信息展示区域
+        HorizontalLayout {
+            horizontal-stretch: 1;
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 8px;
+
+            // 中间文字描述 (严格靠左，垂直居中)
+            VerticalLayout {
+                alignment: center;
+                horizontal-stretch: 1;
+                spacing: 2px;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    if root.show-status && host.status != "": VerticalLayout {
+                        alignment: center;
+                        StatusDot {
+                            status: host.status;
+                            dot-size: 5px;
+                        }
+                    }
+
+                    Text {
+                        text: host.name;
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        horizontal-alignment: left;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                Text {
+                    text: host.address + (host.port > 0 ? (":" + host.port) : "");
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+            }
+
+            // 右侧所属分组标签 (垂直居中)
+            if host.group != "": VerticalLayout {
+                alignment: center;
+
+                Rectangle {
+                    height: 20px;
+                    border-radius: 3px;
+                    background: AppTheme.control-background;
+
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+                        alignment: center;
+
+                        Text {
+                            text: host.group;
+                            font-size: 10px;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    host-touch := TouchArea {
+        mouse-cursor: pointer;
+        clicked => {
+            root.selected(host.id);
+        }
+    }
+}
+
+/// 快速主机资产选择列表组件 (Host Picker List)
+export component HostPickerList inherits VerticalLayout {
+    /// 待展示的主机资产数据列表
+    in property <[HostItemData]> hosts: [];
+    /// 列表分组标题说明 (若为空字符串则不渲染标题)
+    in property <string> section-title: @tr("🌐 远程主机资产 (Remote Hosts)");
+    /// 鼠标悬停卡片高亮强调色 (例如终端模式为品牌蓝，文件模式为 SFTP 翡翠绿)
+    in property <color> hover-accent-color: AppTheme.accent;
+    /// 是否在卡片中显示健康状态指示小圆点
+    in property <bool> show-status: true;
+    /// 单击任意主机条目时触发的回调事件
+    callback host-selected(string /* host_id */);
+
+    spacing: 6px;
+
+    if root.section-title != "" && root.hosts.length > 0: Text {
+        text: root.section-title;
+        font-size: 11px;
+        font-weight: 600;
+        color: AppTheme.secondary-foreground;
+    }
+
+    for host in root.hosts: HostPickerCard {
+        host: host;
+        hover-accent-color: root.hover-accent-color;
+        show-status: root.show-status;
+        selected(id) => {
+            root.host-selected(id);
+        }
+    }
+}

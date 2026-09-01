@@ -37,6 +37,7 @@ impl CoreState {
         let app_engine = AppGlobalHookEngine::new();
         app_engine.register(Arc::new(AutoConfigBackupHook::new()));
         app_engine.register(Arc::new(crate::app_hook::HostAuditLogHook::new()));
+        app_engine.register(Arc::new(crate::app_hook::DangerousFileGuardHook::new()));
 
         let activity_bar = Arc::new(ActivityBarRegistry::new_with_defaults());
         let right_panels = Arc::new(RwLock::new(RightPanelRegistry::default()));
@@ -64,6 +65,7 @@ impl CoreState {
         let app_engine = AppGlobalHookEngine::new();
         app_engine.register(Arc::new(AutoConfigBackupHook::new()));
         app_engine.register(Arc::new(crate::app_hook::HostAuditLogHook::new()));
+        app_engine.register(Arc::new(crate::app_hook::DangerousFileGuardHook::new()));
 
 
         let activity_bar = Arc::new(ActivityBarRegistry::new_with_defaults());

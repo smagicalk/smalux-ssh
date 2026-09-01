@@ -14,7 +14,11 @@ crates/smagical-core/
     ├── domain/                 # 核心领域实体模型
     │   ├── mod.rs              # 领域模块导出
     │   ├── host.rs             # HostRecord 结构体与 HostStatus 状态枚举
-    │   └── group.rs            # GroupRecord 层级分组结构体
+    │   ├── group.rs            # GroupRecord 层级分组结构体
+    │   ├── file_item.rs        # FileItemData, LocalFileTabSession, RemoteFileTabSession, TransferTask
+    │   ├── right_panel.rs      # 右侧工具面板注册实体
+    │   └── terminal_context.rs # 终端上下文模型
+    ├── app_hook/               # 全局应用生命周期 Hook 拦截与事件分发引擎
     ├── storage/                # 数据存储与持久化抽象层
     │   ├── mod.rs              # AppStorage, HostRepository, GroupRepository Trait 定义与 StorageError
     │   └── mock_storage.rs     # 线程安全并发内存存储实现 (MockStorage) 与种子预设引擎
@@ -43,6 +47,14 @@ crates/smagical-core/
 - **`GroupRecord`**：层级分组实体。
   - 字段：`id`, `name`, `parent_id` (Option<String>), `level`, `is_expanded`, `sort_order`。
   - 提供 `GroupRecord::root(...)` 与 `GroupRecord::child(...)` 便捷构造器。
+- **`FileItemData`**：双盘文件浏览器统一节点模型。
+  - 字段：`id`, `name`, `path`, `is_dir`, `size`, `size_formatted`, `modified_at`, `modified_formatted`, `permissions`, `owner`, `group`, `is_symlink`, `is_hidden`, `is_expanded`, `level`, `item_count`。
+  - 提供 `new_file` 与 `new_dir` 构造工厂，内置人类可读大小与 ISO 格式时间格式化工具函数。
+- **`LocalFileTabSession` / `RemoteFileTabSession`**：双栏会话 Tab 模型与导航历史管理。
+  - 包含 `history: Vec<String>` 与 `history_index: usize` 双向历史记录栈，提供 `push_path`（自动清理前插栈分支）、`go_back`、`go_forward`、`can_go_back`、`can_go_forward`。
+- **`TransferTask`**：文件传输任务实体（支持单文件与多层级文件夹树形递归拆解）。
+  - 字段：`id`, `parent_id` (Option<String>), `session_id`, `filename`, `is_dir`, `is_expanded`, `level`, `item_count_text`, `source_path`, `target_path`, `direction` (`TransferDirection`), `total_bytes`, `transferred_bytes`, `speed_bytes_per_sec`, `status` (`TransferStatus`), `error_message`。
+  - 提供 `progress() -> f32` 进度计算与 `speed_formatted() -> String` 速度格式化。
 
 ### 2. 存储抽象层 (Storage Abstraction)
 
