@@ -436,6 +436,145 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
+    // -------------------------------------------------------------------------
+    // 2.2 终端 Tab 拖拽重排与跨分屏移动/自动合并回调
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let pane_groups_move_tab = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_move_tab = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_move_tab = Rc::clone(&ctx.global_split_tree);
+    let core_state_move_tab = ctx.core_state.clone();
+    window.on_move_terminal_tab(move |from_pane_id, from_index, drop_x, drop_y| {
+        if let Some(w) = window_weak.upgrade() {
+            let from_pid = from_pane_id.to_string();
+            let from_idx = from_index as usize;
+            let drop_x_px = drop_x;
+            let drop_y_px = drop_y;
+
+            let mut groups = pane_groups_move_tab.borrow_mut();
+            let mut active_pid = active_pane_id_move_tab.borrow_mut();
+            let mut split_tree = global_split_tree_move_tab.borrow_mut();
+
+            if groups.is_empty() {
+                return;
+            }
+
+            // 1. 定位源窗格
+            let src_idx_opt = groups.iter().position(|g| g.pane_id == from_pid || (from_pid.is_empty() && g.pane_id == *active_pid)).or_else(|| groups.iter().position(|g| !g.tabs.is_empty()));
+            let src_idx = match src_idx_opt {
+                Some(idx) => idx,
+                None => return,
+            };
+
+            if from_idx >= groups[src_idx].tabs.len() {
+                return;
+            }
+
+            let src_pane_id = groups[src_idx].pane_id.clone();
+
+            // 2. 根据分屏模式推导落点目标窗格与插入位置
+            let (to_pid, insert_pos) = if let Some(tree) = split_tree.as_ref() {
+                let vp_w = w.get_terminal_canvas_width().max(200.0);
+                let vp_h = w.get_terminal_canvas_height().max(100.0);
+                let (panes_layout, _) = tree.compute_pixel_layout(vp_w, vp_h, 2.0, None);
+
+                let target_layout = panes_layout.iter().find(|p| {
+                    drop_x_px >= p.x && drop_x_px <= p.x + p.width && drop_y_px >= p.y && drop_y_px <= p.y + p.height
+                });
+
+                if let Some(pl) = target_layout {
+                    let rel_x = (drop_x_px - (pl.x + 6.0)).max(0.0);
+                    let to_i = (rel_x / 152.0).round() as usize;
+                    (pl.pane_id.clone(), to_i)
+                } else {
+                    let rel_x = (drop_x_px - 6.0).max(0.0);
+                    let to_i = (rel_x / 152.0).round() as usize;
+                    (src_pane_id.clone(), to_i)
+                }
+            } else {
+                let rel_x = (drop_x_px - 6.0).max(0.0);
+                let to_i = (rel_x / 152.0).round() as usize;
+                (src_pane_id.clone(), to_i)
+            };
+
+            // 3. 判断是否在同窗格内重排
+            if to_pid == src_pane_id {
+                let tab = groups[src_idx].tabs.remove(from_idx);
+                let clamped_pos = insert_pos.min(groups[src_idx].tabs.len());
+                groups[src_idx].tabs.insert(clamped_pos, tab.clone());
+                groups[src_idx].active_tab_id = tab.session_id.clone();
+                *active_pid = src_pane_id.clone();
+
+                let is_split = split_tree.is_some();
+                sync_active_session_ui(&w, &groups, &active_pid, is_split);
+                crate::session::sync_active_session_to_core(&groups, &active_pid, &core_state_move_tab);
+                tracing::info!(
+                    target: "smagical_ui::session",
+                    "窗格 [{}] 内 Tab [{}] 重排完成: 索引 {} -> {}",
+                    src_pane_id, tab.session_id, from_idx, clamped_pos
+                );
+                return;
+            }
+
+            // 4. 跨分屏移动 (从 src_pane_id 移动到 to_pid)
+            let moved_tab = groups[src_idx].tabs.remove(from_idx);
+            let src_is_now_empty = groups[src_idx].tabs.is_empty();
+
+            if !src_is_now_empty
+                && groups[src_idx].active_tab_id == moved_tab.session_id
+            {
+                let next_pos = if from_idx > 0 { from_idx - 1 } else { 0 };
+                groups[src_idx].active_tab_id = groups[src_idx].tabs[next_pos.min(groups[src_idx].tabs.len() - 1)].session_id.clone();
+            }
+
+            let tgt_idx_opt = groups.iter().position(|g| g.pane_id == to_pid);
+            let tgt_idx = match tgt_idx_opt {
+                Some(idx) => idx,
+                None => {
+                    // 目标窗格不存在时插回源窗格并恢复
+                    let cur_len = groups[src_idx].tabs.len();
+                    groups[src_idx].tabs.insert(from_idx.min(cur_len), moved_tab);
+                    return;
+                }
+            };
+
+            let clamped_insert = insert_pos.min(groups[tgt_idx].tabs.len());
+            groups[tgt_idx].tabs.insert(clamped_insert, moved_tab.clone());
+            groups[tgt_idx].active_tab_id = moved_tab.session_id.clone();
+            *active_pid = to_pid.clone();
+
+            // 5. 核心：如果源窗格最后一个 Tab 迁出，自动关闭并合并原分屏窗格
+            if src_is_now_empty {
+                let empty_pos = groups.iter().position(|g| g.pane_id == src_pane_id);
+                if let Some(pos) = empty_pos {
+                    groups.remove(pos);
+                }
+
+                if let Some(tree) = split_tree.as_mut() {
+                    tree.close_pane(&src_pane_id);
+                    if tree.leaf_count() <= 1 {
+                        *split_tree = None;
+                    }
+                }
+                tracing::info!(
+                    target: "smagical_ui::session",
+                    "源分屏窗格 [{}] 所有 Tab 均已迁出，已自动关闭并合并原窗格",
+                    src_pane_id
+                );
+            }
+
+            let is_split = split_tree.is_some();
+            sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            crate::session::sync_active_session_to_core(&groups, &active_pid, &core_state_move_tab);
+            core_state_move_tab.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &to_pid, is_split);
+
+            tracing::info!(
+                target: "smagical_ui::session",
+                "跨分屏移动 Tab [{}] 成功: 从窗格 [{}] 迁移至窗格 [{}] (目标位置: {}, 剩余分屏数: {})",
+                moved_tab.session_id, src_pane_id, to_pid, clamped_insert, groups.len()
+            );
+        }
+    });
 
     // -------------------------------------------------------------------------
     // 3. 呼出新建终端会话弹窗回调

@@ -67,27 +67,31 @@ impl AppGlobalHook for AutoConfigBackupHook {
 }
 
 /// 主机资产全生命周期与终端会话操作审计日志插件。
+/// 系统操作与会话状态日志记录器。
 ///
 /// 实时监听主机资产变动 (`on_host_asset_*`)、终端会话生命周期 (`on_host_terminal_*`)、
-/// 历史会话操作 (`on_history_*`) 与配置变动，生成符合规范的结构化审计日志。
-pub struct HostAuditLogHook;
+/// 历史会话操作 (`on_history_*`) 与文件传输管理，生成统一规范的结构化调试与运行日志。
+pub struct SystemLoggerHook;
 
-impl Default for HostAuditLogHook {
+/// 兼容别名
+pub type HostAuditLogHook = SystemLoggerHook;
+
+impl Default for SystemLoggerHook {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl HostAuditLogHook {
-    /// 创建一个新的主机与会话审计日志插件实例。
+impl SystemLoggerHook {
+    /// 创建一个新的系统日志插件实例。
     pub fn new() -> Self {
         Self
     }
 }
 
-impl AppGlobalHook for HostAuditLogHook {
+impl AppGlobalHook for SystemLoggerHook {
     fn name(&self) -> &'static str {
-        "builtin_host_audit_logger"
+        "builtin_system_logger"
     }
 
     fn priority(&self) -> i32 {
@@ -96,39 +100,39 @@ impl AppGlobalHook for HostAuditLogHook {
 
     fn on_host_asset_created(&self, host: &crate::domain::HostRecord) {
         tracing::info!(
-            target: "audit::host",
-            "[资产审计:新增] 主机 ID: [{}], 名称: '{}', 地址: {}:{}",
+            target: "smalux::host",
+            "[主机管理:新增] 主机 ID: [{}], 名称: '{}', 地址: {}:{}",
             host.id, host.name, host.address, host.port
         );
     }
 
     fn on_host_asset_updated(&self, old_host: &crate::domain::HostRecord, new_host: &crate::domain::HostRecord) {
         tracing::warn!(
-            target: "audit::host",
-            "[资产审计:修改] 主机 ID: [{}], 名称: '{}' -> '{}', 地址: {}:{} -> {}:{}",
+            target: "smalux::host",
+            "[主机管理:修改] 主机 ID: [{}], 名称: '{}' -> '{}', 地址: {}:{} -> {}:{}",
             new_host.id, old_host.name, new_host.name, old_host.address, old_host.port, new_host.address, new_host.port
         );
     }
 
     fn on_host_asset_deleted(&self, host_id: &str) {
         tracing::warn!(
-            target: "audit::host",
-            "[资产审计:删除] 主机 ID: [{}]",
+            target: "smalux::host",
+            "[主机管理:删除] 主机 ID: [{}]",
             host_id
         );
     }
 
     fn on_host_asset_group_toggled(&self, group_id: &str, is_expanded: bool) {
         tracing::debug!(
-            target: "audit::host",
-            "[资产偏好] 分组 ID: [{}] 切换为: {}",
+            target: "smalux::host",
+            "[分组偏好] 分组 ID: [{}] 切换为: {}",
             group_id, if is_expanded { "展开" } else { "折叠" }
         );
     }
 
     fn on_host_asset_tree_reordered(&self, src_id: &str, target_id: &str, position: &str) {
         tracing::info!(
-            target: "audit::host",
+            target: "smalux::host",
             "[资产拓扑] 节点 [{}] 移动至 [{}] 模式: {}",
             src_id, target_id, position
         );
@@ -136,43 +140,43 @@ impl AppGlobalHook for HostAuditLogHook {
 
     fn on_host_terminal_opened(&self, session_id: &str, ctx: &crate::domain::ActiveTerminalSessionContext) {
         tracing::info!(
-            target: "audit::terminal",
-            "[会话审计:建立] 会话 ID: [{}], 目标主机: '{}' ({}:{}), 登录用户: '{}'",
+            target: "smalux::terminal",
+            "[终端会话:建立] 会话 ID: [{}], 目标主机: '{}' ({}:{}), 登录用户: '{}'",
             session_id, ctx.host_name, ctx.host_ip, ctx.port, ctx.username
         );
     }
 
     fn on_host_terminal_closed(&self, session_id: &str, duration_secs: u64) {
         tracing::info!(
-            target: "audit::terminal",
-            "[会话审计:关闭] 会话 ID: [{}], 在线持续时长: {} 秒",
+            target: "smalux::terminal",
+            "[终端会话:关闭] 会话 ID: [{}], 在线持续时长: {} 秒",
             session_id, duration_secs
         );
     }
 
     fn on_history_item_deleted(&self, history_id: &str) {
         tracing::info!(
-            target: "audit::history",
-            "[历史审计:删除] 历史记录 ID: [{}]",
+            target: "smalux::history",
+            "[历史记录:删除] 历史记录 ID: [{}]",
             history_id
         );
     }
 
     fn on_history_cleared(&self) {
         tracing::warn!(
-            target: "audit::history",
-            "[历史审计:清空] 用户清空了非置顶历史会话记录"
+            target: "smalux::history",
+            "[历史记录:清空] 用户清空了非置顶历史会话记录"
         );
     }
 
     // =========================================================================
-    // 文件管理与 SFTP 传输审计 (audit::file)
+    // 文件管理与 SFTP 传输日志 (smalux::file)
     // =========================================================================
 
     fn on_file_tab_opening(&self, host_id: &str, initial_path: &str) -> HookDecision {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:请求连接] 目标主机: [{}], 初始路径: '{}'",
+            target: "smalux::file",
+            "[文件管理:请求连接] 目标主机: [{}], 初始路径: '{}'",
             host_id, initial_path
         );
         HookDecision::Continue
@@ -180,40 +184,40 @@ impl AppGlobalHook for HostAuditLogHook {
 
     fn on_file_tab_opened(&self, session_id: &str, host_id: &str, initial_path: &str) {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:会话建立] 会话 Tab: [{}], 目标主机: [{}], 挂载路径: '{}'",
+            target: "smalux::file",
+            "[文件管理:会话建立] 会话 Tab: [{}], 目标主机: [{}], 挂载路径: '{}'",
             session_id, host_id, initial_path
         );
     }
 
     fn on_file_tab_focus_changed(&self, session_id: Option<&str>, is_remote: bool, current_path: &str) {
         tracing::debug!(
-            target: "audit::file",
-            "[文件审计:焦点切换] 激活会话: {:?}, 是否远程: {}, 当前路径: '{}'",
+            target: "smalux::file",
+            "[文件管理:焦点切换] 激活会话: {:?}, 是否远程: {}, 当前路径: '{}'",
             session_id, is_remote, current_path
         );
     }
 
     fn on_file_tab_navigated(&self, session_id: &str, is_remote: bool, from_path: &str, to_path: &str) {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:路径跳转] 会话 Tab: [{}], 远程: {}, 路径变动: '{}' -> '{}'",
+            target: "smalux::file",
+            "[文件管理:路径跳转] 会话 Tab: [{}], 远程: {}, 路径变动: '{}' -> '{}'",
             session_id, is_remote, from_path, to_path
         );
     }
 
     fn on_file_tab_closed(&self, session_id: &str) {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:会话关闭] 会话 Tab: [{}] 已释放",
+            target: "smalux::file",
+            "[文件管理:会话关闭] 会话 Tab: [{}] 已释放",
             session_id
         );
     }
 
     fn on_file_operation_before(&self, op_type: &str, is_remote: bool, path: &str) -> HookDecision {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:操作准备] 动作: [{}], 远程: {}, 目标路径: '{}'",
+            target: "smalux::file",
+            "[文件管理:操作准备] 动作: [{}], 远程: {}, 目标路径: '{}'",
             op_type, is_remote, path
         );
         HookDecision::Continue
@@ -222,14 +226,14 @@ impl AppGlobalHook for HostAuditLogHook {
     fn on_file_operation_completed(&self, op_type: &str, is_remote: bool, path: &str, success: bool) {
         if success {
             tracing::info!(
-                target: "audit::file",
-                "[文件审计:操作完成] 动作: [{}], 远程: {}, 路径: '{}', 结果: 成功",
+                target: "smalux::file",
+                "[文件管理:操作完成] 动作: [{}], 远程: {}, 路径: '{}', 结果: 成功",
                 op_type, is_remote, path
             );
         } else {
             tracing::warn!(
-                target: "audit::file",
-                "[文件审计:操作失败] 动作: [{}], 远程: {}, 路径: '{}', 结果: 失败",
+                target: "smalux::file",
+                "[文件管理:操作失败] 动作: [{}], 远程: {}, 路径: '{}', 结果: 失败",
                 op_type, is_remote, path
             );
         }
@@ -237,8 +241,8 @@ impl AppGlobalHook for HostAuditLogHook {
 
     fn on_file_transfer_enqueued(&self, task: &crate::domain::TransferTask) -> HookDecision {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:传输排队] 任务 ID: [{}], 文件: '{}', 方向: {:?}, 总大小: {} 字节",
+            target: "smalux::file",
+            "[文件传输:任务排队] 任务 ID: [{}], 文件: '{}', 方向: {:?}, 总大小: {} 字节",
             task.id, task.filename, task.direction, task.total_bytes
         );
         HookDecision::Continue
@@ -246,24 +250,24 @@ impl AppGlobalHook for HostAuditLogHook {
 
     fn on_file_transfer_started(&self, task_id: &str) {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:传输开始] 任务 ID: [{}]",
+            target: "smalux::file",
+            "[文件传输:开始传输] 任务 ID: [{}]",
             task_id
         );
     }
 
     fn on_file_transfer_completed(&self, task: &crate::domain::TransferTask) {
         tracing::info!(
-            target: "audit::file",
-            "[文件审计:传输成功] 任务 ID: [{}], 文件: '{}', 传输总字节: {}",
+            target: "smalux::file",
+            "[文件传输:传输完成] 任务 ID: [{}], 文件: '{}', 传输总字节: {}",
             task.id, task.filename, task.total_bytes
         );
     }
 
     fn on_file_transfer_failed(&self, task: &crate::domain::TransferTask, error_message: &str) {
         tracing::error!(
-            target: "audit::file",
-            "[文件审计:传输失败] 任务 ID: [{}], 文件: '{}', 错误详情: {}",
+            target: "smalux::file",
+            "[文件传输:传输失败] 任务 ID: [{}], 文件: '{}', 错误详情: {}",
             task.id, task.filename, error_message
         );
     }

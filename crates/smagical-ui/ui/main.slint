@@ -451,6 +451,8 @@ export component AppWindow inherits Window {
     callback search-terminal(string /* query */, bool /* match_case */);
     /// 终端动态几何网格尺寸变更回调
     callback terminal-resize(int /* cols */, int /* rows */);
+    /// 终端 Tab 拖拽移动与跨分屏移动回调
+    callback move-terminal-tab(string /* from_pane_id */, int /* from_index */, length /* drop_x */, length /* drop_y */);
 
     // -------------------------------------------------------------------------
     // 历史会话抽屉交互回调
@@ -946,6 +948,7 @@ export component AppWindow inherits Window {
 
                     search-terminal(q, c) => { root.search-terminal(q, c); }
                     terminal-resize(cols, rows) => { root.terminal-resize(cols, rows); }
+                    move-terminal-tab(from_pid, from_idx, drop_x, drop_y) => { root.move-terminal-tab(from_pid, from_idx, drop_x, drop_y); }
                 }
 
                 // 2.3.3 双盘文件管理与 SFTP 传输视图 (当 main-view == "files" 时展开)

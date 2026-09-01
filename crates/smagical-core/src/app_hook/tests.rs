@@ -408,14 +408,14 @@ fn test_file_domain_lifecycle_flow() {
 }
 
 #[test]
-fn test_host_audit_logger_file_domain_coverage() {
-    use super::builtin::HostAuditLogHook;
+fn test_system_logger_file_domain_coverage() {
+    use super::builtin::SystemLoggerHook;
     use crate::domain::{TransferDirection, TransferStatus, TransferTask};
 
     let engine = AppGlobalHookEngine::new();
-    engine.register(Arc::new(HostAuditLogHook::new()));
+    engine.register(Arc::new(SystemLoggerHook::new()));
 
-    // 验证所有 file 域 dispatch 方法在挂载 HostAuditLogHook 时均能正常执行且不发生 panic
+    // 验证所有 file 域 dispatch 方法在挂载 SystemLoggerHook 时均能正常执行且不发生 panic
     let _ = engine.dispatch_file_tab_opening("host-1", "/root");
     engine.dispatch_file_tab_opened("rtab-1", "host-1", "/root");
     engine.dispatch_file_tab_focus_changed(Some("rtab-1"), true, "/root");

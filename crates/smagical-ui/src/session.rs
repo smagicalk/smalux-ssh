@@ -232,5 +232,145 @@ impl SessionPersistenceGuard {
     }
 }
 
+#[cfg(test)]
+pub(crate) mod tests {
+    use super::*;
+    use crate::terminal::split_tree::{SplitNode, SplitOrientation};
+
+    fn make_test_session(id: &str, title: &str) -> TerminalSessionInfo {
+        TerminalSessionInfo {
+            session_id: id.to_string(),
+            host_id: format!("host-{}", id),
+            host_name: title.to_string(),
+            host_address: "127.0.0.1:22".to_string(),
+            host_status: "online".to_string(),
+            ping_ms: 10,
+            display_title: title.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_same_pane_tab_reorder() {
+        let s1 = make_test_session("s1", "Terminal 1");
+        let s2 = make_test_session("s2", "Terminal 2");
+        let s3 = make_test_session("s3", "Terminal 3");
+
+        let mut group = PaneGroup {
+            pane_id: "pane-1".to_string(),
+            tabs: vec![s1.clone(), s2.clone(), s3.clone()],
+            active_tab_id: "s1".to_string(),
+        };
+
+        // 将 s1 从 index 0 拖动到 index 2
+        let moved = group.tabs.remove(0);
+        let target_pos = 2usize.min(group.tabs.len());
+        group.tabs.insert(target_pos, moved.clone());
+        group.active_tab_id = moved.session_id.clone();
+
+        assert_eq!(group.tabs.len(), 3);
+        assert_eq!(group.tabs[0].session_id, "s2");
+        assert_eq!(group.tabs[1].session_id, "s3");
+        assert_eq!(group.tabs[2].session_id, "s1");
+        assert_eq!(group.active_tab_id, "s1");
+    }
+
+    #[test]
+    fn test_cross_pane_tab_move_with_remaining_tabs() {
+        let s1 = make_test_session("s1", "Terminal 1");
+        let s2 = make_test_session("s2", "Terminal 2");
+        let s3 = make_test_session("s3", "Terminal 3");
+
+        let mut groups = [
+            PaneGroup {
+                pane_id: "pane-1".to_string(),
+                tabs: vec![s1.clone(), s2.clone()],
+                active_tab_id: "s1".to_string(),
+            },
+            PaneGroup {
+                pane_id: "pane-2".to_string(),
+                tabs: vec![s3.clone()],
+                active_tab_id: "s3".to_string(),
+            },
+        ];
+
+        // 跨分屏将 s1 从 pane-1 移动到 pane-2
+        let moved = groups[0].tabs.remove(0);
+        assert!(!groups[0].tabs.is_empty());
+        // 更新源窗格激活 Tab 为剩余的 s2
+        groups[0].active_tab_id = groups[0].tabs[0].session_id.clone();
+
+        // 插入目标窗格 pane-2 的首位
+        groups[1].tabs.insert(0, moved.clone());
+        groups[1].active_tab_id = moved.session_id.clone();
+
+        assert_eq!(groups[0].tabs.len(), 1);
+        assert_eq!(groups[0].tabs[0].session_id, "s2");
+        assert_eq!(groups[0].active_tab_id, "s2");
+
+        assert_eq!(groups[1].tabs.len(), 2);
+        assert_eq!(groups[1].tabs[0].session_id, "s1");
+        assert_eq!(groups[1].tabs[1].session_id, "s3");
+        assert_eq!(groups[1].active_tab_id, "s1");
+    }
+
+    #[test]
+    fn test_cross_pane_tab_move_last_tab_closes_source_pane() {
+        let s1 = make_test_session("s1", "Terminal 1");
+        let s2 = make_test_session("s2", "Terminal 2");
+
+        let mut groups = vec![
+            PaneGroup {
+                pane_id: "pane-1".to_string(),
+                tabs: vec![s1.clone()],
+                active_tab_id: "s1".to_string(),
+            },
+            PaneGroup {
+                pane_id: "pane-2".to_string(),
+                tabs: vec![s2.clone()],
+                active_tab_id: "s2".to_string(),
+            },
+        ];
+
+        let mut split_tree = {
+            let mut tree = SplitNode::new_single("pane-1".to_string(), "Pane 1".to_string());
+            tree.split_pane("pane-1", "pane-2".to_string(), "Pane 2".to_string(), SplitOrientation::Vertical);
+            Some(tree)
+        };
+
+        assert_eq!(split_tree.as_ref().unwrap().leaf_count(), 2);
+
+        // 将 pane-1 的唯一一个 Tab s1 迁出到 pane-2
+        let moved = groups[0].tabs.remove(0);
+        let src_is_empty = groups[0].tabs.is_empty();
+        assert!(src_is_empty);
+
+        // 插入 pane-2
+        groups[1].tabs.push(moved.clone());
+        groups[1].active_tab_id = moved.session_id.clone();
+
+        // 移除空的 pane-1 窗格并关闭分屏
+        if src_is_empty {
+            groups.remove(0);
+            if let Some(tree) = split_tree.as_mut() {
+                let closed = tree.close_pane("pane-1");
+                assert!(closed);
+                if tree.leaf_count() <= 1 {
+                    split_tree = None;
+                }
+            }
+        }
+
+        // 验证：剩余窗格数为 1，分屏树已自动回缩为 None (退出分屏模式)，Tab 完整迁移至 pane-2
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].pane_id, "pane-2");
+        assert_eq!(groups[0].tabs.len(), 2);
+        assert_eq!(groups[0].tabs[0].session_id, "s2");
+        assert_eq!(groups[0].tabs[1].session_id, "s1");
+        assert_eq!(groups[0].active_tab_id, "s1");
+        assert!(split_tree.is_none(), "分屏二叉树应在只剩 1 个窗格时自动回缩并退出分屏模式");
+    }
+}
+
+
 
 

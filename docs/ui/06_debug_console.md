@@ -51,10 +51,10 @@ export struct LogEntryData {
 
 | Target 命名空间 | 分类与职责 | 级别与样例 |
 | :--- | :--- | :--- |
-| **`audit::file`** | **文件与 SFTP 领域审计日志** | `INFO` `[文件审计:会话建立] 会话 Tab: [rtab-1], 目标主机: [h-1]`<br>`INFO` `[文件审计:传输成功] 任务 ID: [task-1], 字节: 128MB` |
+| **`smalux::file`** | **文件与 SFTP 领域操作日志** | `INFO` `[文件管理:会话建立] 会话 Tab: [rtab-1], 目标主机: [h-1]`<br>`INFO` `[文件传输:传输完成] 任务 ID: [task-1], 字节: 128MB` |
 | **`security::file_guard`** | **高危文件操作拦截告警** | `WARN` `高危文件操作拦截: 尝试删除受保护的系统级敏感路径 [/etc]` |
-| **`smagical_ui::files`** | **UI 交互与物理操作追踪** | `INFO` `进入本地目录: F:/code/rust`<br>`DEBUG` `传输任务折叠/展开: task_id=task-1, is_expanded=true` |
-| **`audit::terminal`** | **终端建立与生命周期审计** | `INFO` `[会话审计:建立] 会话 ID: [term-1], 目标主机: Prod-Web` |
-| **`audit::host`** | **主机资产变动审计** | `INFO` `[资产审计:新增] 主机 ID: [h-100], 名称: 'DB-Master'` |
-| **`audit::history`** | **历史记录审计** | `WARN` `[历史审计:清空] 用户清空了非置顶历史会话记录` |
+| **`smagical_ui::files`** | **UI 交互与视图刷新日志** | `INFO` `进入本地目录: F:/code/rust`<br>`DEBUG` `传输任务折叠/展开: task_id=task-1, is_expanded=true` |
+| **`smalux::terminal`** | **终端建立与生命周期日志** | `INFO` `[终端会话:建立] 会话 ID: [term-1], 目标主机: Prod-Web` |
+| **`smalux::host`** | **主机资产变动日志** | `INFO` `[主机管理:新增] 主机 ID: [h-100], 名称: 'DB-Master'` |
+| **`smalux::history`** | **历史记录管理日志** | `WARN` `[历史记录:清空] 用户清空了非置顶历史会话记录` |
 | **`smalux::backup`** | **配置自动增量备份** | `INFO` `[自动备份 #1]: 检测到全局参数变更, 已触发增量备份快照` |

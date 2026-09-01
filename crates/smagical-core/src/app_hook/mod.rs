@@ -15,6 +15,7 @@ mod tests;
 
 pub use builtin::{
     AutoConfigBackupHook, DangerousFileGuardHook, FunctionalGlobalHook, HostAuditLogHook,
+    SystemLoggerHook,
 };
 pub use engine::{AppGlobalHookEngine, ListenerHandle};
 pub use traits::AppGlobalHook;

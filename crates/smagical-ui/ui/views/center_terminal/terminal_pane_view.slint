@@ -5,6 +5,7 @@
 // =============================================================================
 
 import { AppTheme } from "../../themes/app-theme.slint";
+import { StatusDot } from "../../components/status-dot.slint";
 import { TabItem } from "../../components/tab-item.slint";
 import { TabData } from "tab_bar.slint";
 
@@ -45,6 +46,10 @@ export component TerminalPaneView inherits Rectangle {
     in-out property <int> sel-end-row: -1;
     in-out property <bool> is-selecting: false;
 
+    // Tab 拖拽相关状态
+    in property <bool> is-dragging-tab: false;
+    in property <string> drag-tab-source-pane: "";
+    in property <int> drag-tab-from-index: -1;
 
     // -------------------------------------------------------------------------
     // 2. 交互回调接口
@@ -73,6 +78,9 @@ export component TerminalPaneView inherits Rectangle {
     callback context-menu(length /* global-x */, length /* global-y */);
     /// 呼出 Tab 标签页专属右键菜单回调
     callback tab-context-menu(string /* tab_id */, length /* local-x */, length /* local-y */);
+    /// Tab 拖拽移动与释放事件
+    callback tab-drag-moved(int /* from_idx */, string /* title */, string /* status */, length /* local_x */, length /* local_y */);
+    callback tab-drag-ended();
 
     // -------------------------------------------------------------------------
     // 3. 视觉容器与边框样式
@@ -131,7 +139,7 @@ export component TerminalPaneView inherits Rectangle {
                             horizontal-stretch: 1;
                             height: 28px;
                             clip: true;
-                            property <length> total-tab-width: (root.tabs.length > 0 ? root.tabs.length : 1) * 148px + 10px;
+                            property <length> total-tab-width: (root.tabs.length > 0 ? root.tabs.length : 1) * 152px + 10px;
                             property <length> min-scroll: Math.min(0px, self.width - total-tab-width);
                             property <length> effective-offset: Math.min(0px, Math.max(min-scroll, root.tab-scroll-offset));
 
@@ -143,7 +151,7 @@ export component TerminalPaneView inherits Rectangle {
                                 }
                             }
 
-                            // 4.1.1 多 Tab 列表渲染
+                            // 4.1.1 多 Tab 列表渲染 (支持拖拽重排与跨分屏拖拽)
                             HorizontalLayout {
                                 x: tab-scroll-box.effective-offset;
                                 y: 0px;
@@ -154,23 +162,140 @@ export component TerminalPaneView inherits Rectangle {
 
                                 animate x { duration: 150ms; easing: ease-out; }
 
-                                for tab in root.tabs: TabItem {
-                                    title: tab.title;
-                                    status: tab.status;
-                                    is-active: tab.id == root.active-tab-id;
-                                    select => {
-                                        root.active-tab-id = tab.id;
-                                        root.select-tab(tab.id);
-                                    }
-                                    close => {
-                                        root.close-tab(tab.id);
-                                    }
-                                    context-menu(mx, my) => {
-                                        root.tab-context-menu(tab.id, 6px + tab-scroll-box.effective-offset + self.x + mx, 4px + self.y + my);
+                                for tab[idx] in root.tabs: Rectangle {
+                                    min-width: tab.id == root.active-tab-id ? 150px : 140px;
+                                    max-width: 180px;
+                                    height: 28px;
+                                    border-radius: 4px;
+
+                                    opacity: (root.is-dragging-tab && root.drag-tab-source-pane == root.pane-id && root.drag-tab-from-index == idx) ? 0.35 : 1.0;
+                                    background: tab.id == root.active-tab-id ? AppTheme.surface-background : (tab-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background.transparentize(50%));
+                                    border-width: 1px;
+                                    border-color: tab.id == root.active-tab-id ? AppTheme.accent : (tab-touch.has-hover ? AppTheme.accent.transparentize(40%) : AppTheme.border);
+
+                                    animate background { duration: 180ms; easing: ease-out; }
+                                    animate border-color { duration: 180ms; easing: ease-out; }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        height: 100%;
+
+                                        HorizontalLayout {
+                                            padding-left: 8px;
+                                            padding-right: 6px;
+                                            spacing: 6px;
+
+                                            // 会话选择与拖拽触发主区域
+                                            main-touch-box := Rectangle {
+                                                horizontal-stretch: 1;
+                                                height: 100%;
+
+                                                tab-touch := TouchArea {
+                                                    mouse-cursor: pointer;
+                                                    clicked => {
+                                                        if !root.is-dragging-tab {
+                                                            root.active-tab-id = tab.id;
+                                                            root.select-tab(tab.id);
+                                                        }
+                                                    }
+                                                    pointer-event(event) => {
+                                                        if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                                                            root.tab-context-menu(tab.id, 6px + tab-scroll-box.effective-offset + (idx * 152px) + self.mouse-x, 4px + self.mouse-y);
+                                                        } else if event.kind == PointerEventKind.up {
+                                                            root.tab-drag-ended();
+                                                        }
+                                                    }
+                                                    moved => {
+                                                        if self.pressed && (self.mouse-x - self.pressed-x > 6px || self.mouse-x - self.pressed-x < -6px || self.mouse-y - self.pressed-y > 6px || self.mouse-y - self.pressed-y < -6px) {
+                                                            let cur_lx: length = 6px + tab-scroll-box.effective-offset + (idx * 152px) + self.mouse-x;
+                                                            let cur_ly: length = 4px + self.mouse-y;
+                                                            root.tab-drag-moved(idx, tab.title, tab.status, cur_lx, cur_ly);
+                                                        }
+                                                    }
+                                                }
+
+                                                HorizontalLayout {
+                                                    spacing: 6px;
+
+                                                    // 图标
+                                                    VerticalLayout {
+                                                        alignment: center;
+                                                        Image {
+                                                            source: @image-url("../../assets/icons/terminal.svg");
+                                                            width: 13px;
+                                                            height: 13px;
+                                                            image-fit: contain;
+                                                            colorize: tab.id == root.active-tab-id ? AppTheme.accent : (tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                                            animate colorize { duration: 180ms; easing: ease-out; }
+                                                        }
+                                                    }
+
+                                                    // 状态指示灯
+                                                    VerticalLayout {
+                                                        alignment: center;
+                                                        StatusDot {
+                                                            status: tab.status;
+                                                            dot-size: 5px;
+                                                        }
+                                                    }
+
+                                                    // 标题
+                                                    VerticalLayout {
+                                                        alignment: center;
+                                                        horizontal-stretch: 1;
+                                                        Text {
+                                                            text: tab.title;
+                                                            font-size: 11px;
+                                                            font-weight: tab.id == root.active-tab-id ? 700 : 500;
+                                                            color: tab.id == root.active-tab-id ? AppTheme.foreground : (tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                                            overflow: elide;
+                                                            horizontal-alignment: left;
+                                                            vertical-alignment: center;
+                                                            animate color { duration: 180ms; easing: ease-out; }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 关闭按钮
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Rectangle {
+                                                    width: 16px;
+                                                    height: 16px;
+                                                    border-radius: 3px;
+                                                    background: close-touch.has-hover ? #e7484833 : transparent;
+                                                    animate background { duration: 150ms; easing: ease-out; }
+
+                                                    Image {
+                                                        source: @image-url("../../assets/icons/window-close.svg");
+                                                        width: 8px;
+                                                        height: 8px;
+                                                        image-fit: contain;
+                                                        colorize: close-touch.has-hover ? AppTheme.danger : (tab.id == root.active-tab-id ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                                        x: (parent.width - self.width) / 2;
+                                                        y: (parent.height - self.height) / 2;
+                                                        animate colorize { duration: 150ms; easing: ease-out; }
+                                                    }
+
+                                                    close-touch := TouchArea {
+                                                        clicked => { root.close-tab(tab.id); }
+                                                        mouse-cursor: pointer;
+                                                    }
+                                                }
+                                            }
+                                        }
                                     }
 
-
-
+                                    // 激活状态底部品牌指示光条
+                                    if tab.id == root.active-tab-id: Rectangle {
+                                        y: parent.height - 2px;
+                                        height: 2px;
+                                        width: parent.width - 12px;
+                                        x: 6px;
+                                        border-radius: 1px;
+                                        background: AppTheme.accent;
+                                    }
                                 }
                             }
                         }

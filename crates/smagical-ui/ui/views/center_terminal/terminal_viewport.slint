@@ -167,6 +167,16 @@ export component TerminalViewport inherits Rectangle {
     property <bool> tab-context-menu-can-split: false;
     property <bool> tab-context-menu-can-close-others: false;
 
+    /// Tab 拖拽调度全局状态
+    in-out property <bool> is-dragging-tab: false;
+    in-out property <bool> is-tab-drop-valid: true;
+    in-out property <string> drag-tab-source-pane: "";
+    in-out property <int> drag-tab-from-index: -1;
+    in-out property <string> drag-tab-title: "";
+    in-out property <string> drag-tab-status: "online";
+    in-out property <length> drag-tab-x: 0px;
+    in-out property <length> drag-tab-y: 0px;
+
     /// Tab 栏调度交互回调
     callback select-tab(string /* id */);
     callback close-tab(string /* id */);
@@ -175,6 +185,7 @@ export component TerminalViewport inherits Rectangle {
     callback close-pane-tab(string /* pane_id */, string /* tab_id */);
     callback copy-tab-ip(string /* tab_id */);
     callback close-other-tabs(string /* pane_id */, string /* tab_id */);
+    callback move-terminal-tab(string /* from_pane_id */, int /* from_index */, length /* drop_x */, length /* drop_y */);
 
 
 
@@ -326,6 +337,30 @@ export component TerminalViewport inherits Rectangle {
                 tabs: root.tabs;
                 active-tab-id: root.active-tab-id;
 
+                is-dragging-tab: root.is-dragging-tab;
+                drag-tab-source-pane: root.drag-tab-source-pane;
+                drag-tab-from-index: root.drag-tab-from-index;
+
+                tab-drag-moved(from-idx, title, status, lx, ly) => {
+                    root.is-dragging-tab = true;
+                    root.drag-tab-source-pane = "";
+                    root.drag-tab-from-index = from-idx;
+                    root.drag-tab-title = title;
+                    root.drag-tab-status = status;
+                    root.drag-tab-x = lx;
+                    root.drag-tab-y = ly;
+                    root.is-tab-drop-valid = lx >= 0px && lx <= root.width && ly >= -15px && ly <= root.height;
+                }
+                tab-drag-ended => {
+                    if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-from-index >= 0 {
+                        root.move-terminal-tab("", root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
+                    }
+                    root.is-dragging-tab = false;
+                    root.is-tab-drop-valid = true;
+                    root.drag-tab-from-index = -1;
+                    root.drag-tab-source-pane = "";
+                }
+
                 select-tab(id) => {
                     root.active-tab-id = id;
                     root.select-tab(id);
@@ -400,6 +435,32 @@ export component TerminalViewport inherits Rectangle {
                     total-panes: pane.total-panes;
                     tabs: pane.tabs;
                     active-tab-id: pane.active-tab-id;
+
+                    is-dragging-tab: root.is-dragging-tab;
+                    drag-tab-source-pane: root.drag-tab-source-pane;
+                    drag-tab-from-index: root.drag-tab-from-index;
+
+                    tab-drag-moved(from-idx, title, status, lx, ly) => {
+                        root.is-dragging-tab = true;
+                        root.drag-tab-source-pane = pane.pane-id;
+                        root.drag-tab-from-index = from-idx;
+                        root.drag-tab-title = title;
+                        root.drag-tab-status = status;
+                        let gx = pane.x + lx;
+                        let gy = pane.y + ly;
+                        root.drag-tab-x = gx;
+                        root.drag-tab-y = gy;
+                        root.is-tab-drop-valid = gx >= 0px && gx <= root.width && gy >= -15px && gy <= root.height;
+                    }
+                    tab-drag-ended => {
+                        if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-from-index >= 0 {
+                            root.move-terminal-tab(root.drag-tab-source-pane, root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
+                        }
+                        root.is-dragging-tab = false;
+                        root.is-tab-drop-valid = true;
+                        root.drag-tab-from-index = -1;
+                        root.drag-tab-source-pane = "";
+                    }
 
                     select-tab(tab-id) => {
                         root.active-pane-id = pane.pane-id;
@@ -659,4 +720,56 @@ export component TerminalViewport inherits Rectangle {
         }
     }
 
+    // -------------------------------------------------------------------------
+    // 4. Tab 拖拽浮动虚影 (Floating Ghost Card - 尺寸与原装 Tab 卡片 140px x 28px 完全一致)
+    // -------------------------------------------------------------------------
+    if root.is-dragging-tab: Rectangle {
+        x: root.drag-tab-x - 70px;
+        y: root.drag-tab-y - 14px;
+        width: 140px;
+        height: 28px;
+        border-radius: 4px;
+        opacity: root.is-tab-drop-valid ? 0.90 : 0.45;
+        background: AppTheme.surface-background.transparentize(15%);
+        border-width: 1.5px;
+        border-color: root.is-tab-drop-valid ? #3b82f6 : AppTheme.danger;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: #000000.transparentize(40%);
+
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 6px;
+            alignment: center;
+
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("../../assets/icons/terminal.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: root.is-tab-drop-valid ? #3b82f6 : AppTheme.disabled-foreground;
+                }
+            }
+
+            if root.is-tab-drop-valid: VerticalLayout {
+                alignment: center;
+                StatusDot {
+                    status: root.drag-tab-status;
+                    dot-size: 5px;
+                }
+            }
+
+            Text {
+                text: root.drag-tab-title;
+                font-size: 11px;
+                font-weight: 700;
+                color: root.is-tab-drop-valid ? AppTheme.foreground : AppTheme.disabled-foreground;
+                overflow: elide;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+            }
+        }
+    }
 }
