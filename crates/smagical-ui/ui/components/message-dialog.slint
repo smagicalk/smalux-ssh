@@ -1,0 +1,131 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppButton } from "base/app-button.slint";
+
+/// 统一提示与错误弹窗组件 (Message / Error Dialog Modal)
+export component MessageDialog inherits Rectangle {
+    /// 弹窗显隐状态
+    in-out property <bool> is-open: false;
+    /// 弹窗标题
+    in property <string> title: "提示";
+    /// 提示详情文本
+    in property <string> message: "";
+    /// 弹窗类型: "error" (错误) | "warning" (告警) | "info" (信息)
+    in property <string> dialog-type: "error";
+
+    /// 关闭弹窗事件回调
+    callback close();
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088; // 半透明暗色遮罩
+
+        TouchArea {
+            // 拦截点击穿透
+        }
+
+        // 居中弹窗卡片 (380x190px)
+        Rectangle {
+            width: 380px;
+            height: 190px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: root.dialog-type == "error" ? AppTheme.danger.transparentize(50%) : AppTheme.border;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 12px;
+                alignment: space-between;
+
+                // 1. 标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/window-close.svg");
+                                width: 14px;
+                                height: 14px;
+                                image-fit: contain;
+                                colorize: root.dialog-type == "error" ? AppTheme.danger : AppTheme.warning;
+                            }
+                        }
+
+                        Text {
+                            text: root.title;
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 关闭 ✕ 按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        close-touch := TouchArea {
+                            clicked => {
+                                root.is-open = false;
+                                root.close();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 2. 详细说明信息
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: root.message;
+                        font-size: 12px;
+                        color: AppTheme.secondary-foreground;
+                        wrap: word-wrap;
+                        vertical-alignment: center;
+                        horizontal-alignment: left;
+                    }
+                }
+
+                // 3. 底部确定按钮
+                HorizontalLayout {
+                    alignment: end;
+                    height: 32px;
+
+                    AppButton {
+                        text: "确定";
+                        variant: "primary";
+                        clicked => {
+                            root.is-open = false;
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

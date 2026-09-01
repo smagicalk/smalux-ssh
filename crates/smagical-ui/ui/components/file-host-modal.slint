@@ -1,0 +1,369 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { SearchInput } from "search-input.slint";
+import { HostItemData } from "../views/left_drawers/hosts_drawer.slint";
+import { AppIconButton } from "base/app-icon-button.slint";
+import { StatusDot } from "status-dot.slint";
+
+/// 文件管理会话选择与快速连接弹窗 (File Host Modal)
+///
+/// 专用于文件页面：本地统一为一个「本地文件目录」条目，远程展示全部主机资产，点击即自动连接 SFTP 会话。
+export component FileHostModal inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[HostItemData]> host-items: [];
+
+    callback close();
+    callback host-selected(string /* host_id */);
+    callback local-selected();
+    callback search-changed(string /* query */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088; // 半透明暗色背景
+        z: 90;
+
+        // 点击遮罩外部空白区域关闭
+        TouchArea {
+            clicked => { root.close(); }
+        }
+
+        // 居中面板卡片
+        Rectangle {
+            width: 540px;
+            height: 480px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: 8px;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+
+            // 拦截卡片内部点击，避免误触发遮罩关闭
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 14px;
+                spacing: 10px;
+
+                // 1. 顶部标题栏与标准 SVG 关闭按钮
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: center;
+
+                        Image {
+                            source: @image-url("../assets/icons/folder.svg");
+                            width: 15px;
+                            height: 15px;
+                            colorize: AppTheme.accent;
+                        }
+
+                        Text {
+                            text: @tr("选择并打开文件会话");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    AppIconButton {
+                        icon: @image-url("../assets/icons/window-close.svg");
+                        clicked => { root.close(); }
+                    }
+                }
+
+                // 2. 搜索过滤输入框 (支持按主机名称 / IP / 分组过滤)
+                SearchInput {
+                    placeholder: @tr("搜索主机 (支持名称 / IP / 分组)...");
+                    changed(text) => { root.search-changed(text); }
+                }
+
+                // 3. 可滚动卡片列表区域
+                Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: list-content.preferred-height;
+
+                    list-content := VerticalLayout {
+                        spacing: 8px;
+                        padding-right: 4px;
+
+                        // === Section 1: 本地文件系统 (单一条目) ===
+                        VerticalLayout {
+                            spacing: 6px;
+
+                            Text {
+                                text: @tr("💻 本地文件系统 (Local Filesystem)");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                            }
+
+                            Rectangle {
+                                height: 44px;
+                                border-radius: 6px;
+                                background: loc-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+                                border-width: 1px;
+                                border-color: loc-touch.has-hover ? AppTheme.accent : transparent;
+                                clip: true;
+
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding: 0px;
+                                    spacing: 0px;
+
+                                    Rectangle {
+                                        width: 44px;
+                                        height: 100%;
+                                        background: loc-touch.has-hover ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
+
+                                        Image {
+                                            source: @image-url("../assets/icons/folder.svg");
+                                            width: 16px;
+                                            height: 16px;
+                                            colorize: loc-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        horizontal-stretch: 1;
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 8px;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 1;
+                                            spacing: 2px;
+
+                                            Text {
+                                                text: @tr("本地工作目录 (Local Disk)");
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                                color: AppTheme.foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+
+                                            Text {
+                                                text: @tr("浏览和管理本机磁盘文件目录");
+                                                font-size: 10px;
+                                                color: AppTheme.secondary-foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+
+                                            Rectangle {
+                                                height: 20px;
+                                                border-radius: 3px;
+                                                background: AppTheme.control-background;
+
+                                                HorizontalLayout {
+                                                    padding-left: 6px;
+                                                    padding-right: 6px;
+                                                    alignment: center;
+
+                                                    Text {
+                                                        text: "LOCAL";
+                                                        font-size: 10px;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                loc-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.local-selected();
+                                    }
+                                }
+                            }
+                        }
+
+                        // === 本地与主机的中间分割线 ===
+                        if root.host-items.length > 0: VerticalLayout {
+                            padding-top: 4px;
+                            padding-bottom: 4px;
+                            Rectangle {
+                                height: 1px;
+                                background: AppTheme.border.transparentize(30%);
+                            }
+                        }
+
+                        // === Section 2: 远程主机资产 (SFTP 会话) ===
+                        if root.host-items.length > 0: VerticalLayout {
+                            spacing: 6px;
+
+                            Text {
+                                text: @tr("🌐 远程主机资产 (Remote SFTP Hosts)");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                            }
+
+                            for host in root.host-items: Rectangle {
+                                height: 44px;
+                                border-radius: 6px;
+                                background: host-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background;
+                                border-width: 1px;
+                                border-color: host-touch.has-hover ? #10b981 : transparent;
+                                clip: true;
+
+                                animate background { duration: 120ms; }
+                                animate border-color { duration: 120ms; }
+
+                                HorizontalLayout {
+                                    padding: 0px;
+                                    spacing: 0px;
+
+                                    // 1. 图标靠左
+                                    Rectangle {
+                                        width: 44px;
+                                        height: 100%;
+                                        background: host-touch.has-hover ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
+
+                                        Image {
+                                            source: @image-url("../assets/icons/server.svg");
+                                            width: 16px;
+                                            height: 16px;
+                                            colorize: host-touch.has-hover ? #10b981 : AppTheme.secondary-foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                    }
+
+                                    // 2. 右侧信息展示区域
+                                    HorizontalLayout {
+                                        horizontal-stretch: 1;
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 8px;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            horizontal-stretch: 1;
+                                            spacing: 2px;
+
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                alignment: start;
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    StatusDot {
+                                                        status: host.status;
+                                                        dot-size: 5px;
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: host.name;
+                                                    font-size: 12px;
+                                                    font-weight: 600;
+                                                    color: AppTheme.foreground;
+                                                    horizontal-alignment: left;
+                                                    vertical-alignment: center;
+                                                    overflow: elide;
+                                                }
+                                            }
+
+                                            Text {
+                                                text: host.address + (host.port > 0 ? (":" + host.port) : "");
+                                                font-size: 10px;
+                                                color: AppTheme.secondary-foreground;
+                                                horizontal-alignment: left;
+                                                vertical-alignment: center;
+                                                overflow: elide;
+                                            }
+                                        }
+
+                                        // 右侧所属分组标签
+                                        if host.group != "": VerticalLayout {
+                                            alignment: center;
+
+                                            Rectangle {
+                                                height: 20px;
+                                                border-radius: 3px;
+                                                background: AppTheme.control-background;
+
+                                                HorizontalLayout {
+                                                    padding-left: 6px;
+                                                    padding-right: 6px;
+                                                    alignment: center;
+
+                                                    Text {
+                                                        text: host.group;
+                                                        font-size: 10px;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                host-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                    clicked => {
+                                        root.host-selected(host.id);
+                                    }
+                                }
+                            }
+                        }
+
+                        // 无搜索结果提示
+                        if root.host-items.length == 0: VerticalLayout {
+                            alignment: center;
+                            height: 100px;
+                            spacing: 8px;
+
+                            Text {
+                                text: @tr("未找到匹配的远程主机");
+                                font-size: 12px;
+                                color: AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 4. 底部快捷操作提示
+                Rectangle {
+                    height: 20px;
+                    Text {
+                        text: @tr("💡 提示：点击任意远程主机即可自动建立 SFTP 会话并打开文件管理");
+                        font-size: 10px;
+                        color: AppTheme.disabled-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+        }
+    }
+}

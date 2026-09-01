@@ -52,7 +52,34 @@ impl TerminalSessionInfo {
             self.to_host_metadata(),
         )
     }
+
+    /// 转换为 Core 层标准化活跃终端上下文快照
+    pub(crate) fn to_active_terminal_context(&self) -> smagical_core::ActiveTerminalSessionContext {
+        if self.host_id.starts_with("local-") {
+            smagical_core::ActiveTerminalSessionContext::local_shell(
+                &self.session_id,
+                &self.display_title,
+            )
+        } else {
+            let (addr, port) = if let Some((a, p)) = self.host_address.split_once(':') {
+                (a.to_string(), p.parse::<u16>().unwrap_or(22))
+            } else {
+                (self.host_address.clone(), 22)
+            };
+            smagical_core::ActiveTerminalSessionContext::ssh(
+                &self.session_id,
+                &self.host_id,
+                &self.host_name,
+                addr,
+                port,
+                "root",
+                "默认分组",
+                vec![],
+            )
+        }
+    }
 }
+
 
 /// 单个分屏窗格内的 Tab 会话组 (Editor Group 模型)
 
@@ -136,6 +163,31 @@ pub(crate) fn sync_active_session_ui(
         w.set_split_count(pane_groups.len() as i32);
     }
 }
+
+/// 将当前聚焦的终端活跃上下文同步至 CoreState，并自动触发全局 `on_terminal_focus_changed` Hook 广播。
+pub(crate) fn sync_active_session_to_core(
+    pane_groups: &[PaneGroup],
+    active_pane_id: &str,
+    core_state: &smagical_core::CoreState,
+) {
+    if pane_groups.is_empty() {
+        core_state.set_active_terminal(None);
+    } else {
+        let active_group = pane_groups
+            .iter()
+            .find(|g| g.pane_id == active_pane_id)
+            .or_else(|| pane_groups.first());
+
+        if let Some(g) = active_group
+            && let Some(active_sess) = g.get_active_session()
+        {
+            core_state.set_active_terminal(Some(active_sess.to_active_terminal_context()));
+        } else {
+            core_state.set_active_terminal(None);
+        }
+    }
+}
+
 
 /// 会话退出异步持久化守护与应用退出等待守卫。
 #[derive(Clone, Default)]

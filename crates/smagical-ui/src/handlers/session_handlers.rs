@@ -84,7 +84,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_close.core_state);
+            ctx_close.core_state.app_hooks().dispatch_host_terminal_closed(&id_str, 0);
             tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
+
+
 
             let session_ctx = smagical_core::SessionContext::new(
                 id_str.clone(),
@@ -192,7 +196,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_close_pane.core_state);
+            ctx_close_pane.core_state.app_hooks().dispatch_host_terminal_closed(&t_id, 0);
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
+
+
 
             let session_ctx = smagical_core::SessionContext::new(
                 t_id.clone(),
@@ -378,6 +386,8 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_select = Rc::clone(&ctx.pane_groups);
     let active_pane_id_select = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_select = Rc::clone(&ctx.global_split_tree);
+    let core_state_select = ctx.core_state.clone();
+
     window.on_select_tab(move |sess_id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
@@ -394,6 +404,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            crate::session::sync_active_session_to_core(&groups, &active_pid, &core_state_select);
             tracing::debug!(target: "smagical_ui::session", "切换至终端会话: {}", id_str);
         }
     });
@@ -405,6 +416,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_select_pane_tab = Rc::clone(&ctx.pane_groups);
     let active_pane_id_select_pane_tab = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_select_pane_tab = Rc::clone(&ctx.global_split_tree);
+    let core_state_select_pane_tab = ctx.core_state.clone();
     window.on_select_pane_tab(move |pane_id, tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let p_id = pane_id.to_string();
@@ -419,9 +431,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            crate::session::sync_active_session_to_core(&groups, &active_pid, &core_state_select_pane_tab);
             tracing::debug!(target: "smagical_ui::session", "窗格 [{}] 切换至 Tab: {}", p_id, t_id);
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 3. 呼出新建终端会话弹窗回调
@@ -681,6 +695,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_split = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_split = Rc::clone(&ctx.global_split_tree);
     let next_pane_num_split = Rc::clone(&ctx.next_pane_num);
+    let core_state_split = ctx.core_state.clone();
     window.on_split_terminal(move |orient| {
         if let Some(w) = window_weak.upgrade() {
             let mut groups = pane_groups_split.borrow_mut();
@@ -728,10 +743,12 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             *active_pid = new_pane_id.clone();
             sync_active_session_ui(&w, &groups, &new_pane_id, true);
+            core_state_split.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &new_pane_id, true);
 
             tracing::info!(target: "smagical_ui::session", "成功在窗格 [{}] 上切分新分屏窗格 [{}] (总窗格数: {})", target_pane_id, new_pane_id, groups.len());
         }
     });
+
 
 
     // -------------------------------------------------------------------------
@@ -788,7 +805,9 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            ctx_close_pane_id.core_state.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &active_pid, is_split);
             tracing::info!(target: "smagical_ui::session", "已关闭窗格: {}", pid);
+
         }
     });
 
@@ -844,6 +863,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_close_split = Rc::clone(&ctx.pane_groups);
     let active_pane_id_close_split = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close_split = Rc::clone(&ctx.global_split_tree);
+    let core_state_close_split = ctx.core_state.clone();
     window.on_close_split(move || {
         if let Some(w) = window_weak.upgrade() {
             let mut groups = pane_groups_close_split.borrow_mut();
@@ -874,11 +894,12 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-
             sync_active_session_ui(&w, &groups, &active_pid, false);
+            core_state_close_split.app_hooks().dispatch_host_terminal_split_changed(groups.len(), &active_pid, false);
             tracing::info!(target: "smagical_ui::session", "退出分屏模式并合并所有 Tab");
         }
     });
+
 
     // -------------------------------------------------------------------------
     // 13. 选择并聚焦指定分屏窗格回调

@@ -103,16 +103,17 @@ impl AppGlobalHook for LauncherPrewarmHook {
     }
 
     /// 用户在左侧活动栏切换抽屉时：若进入或切换主机资产页面，静默同步预热
-    fn on_left_menu_clicked(&self, menu_id: &str, _old_menu_id: &str) {
+    fn on_shell_left_menu_clicked(&self, menu_id: &str, _old_menu_id: &str) {
         if menu_id == "hosts" || menu_id.is_empty() {
             self.trigger_async_prewarm();
         }
     }
 
     /// 全局配置或资产变动时：静默更新预热模型
-    fn on_global_config_changed(&self, event: &ConfigChangeEvent) {
+    fn on_config_changed(&self, event: &ConfigChangeEvent) {
         if event.affects("hosts") || event.affects("storage") {
             self.trigger_async_prewarm();
         }
     }
 }
+

@@ -3,6 +3,7 @@
 //! 将 Slint UI 各区域的回调绑定按功能域拆分为独立的处理器模块。
 
 pub(crate) mod debug_handlers;
+pub(crate) mod file_handlers;
 pub(crate) mod history_handlers;
 pub(crate) mod host_handlers;
 pub(crate) mod session_handlers;
@@ -13,7 +14,8 @@ use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
 use smagical_core::theme::ThemeService;
-use smagical_core::CoreState;
+use smagical_core::{CoreState, FileItemData};
+
 
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::terminal::TerminalInstance;
@@ -67,12 +69,33 @@ pub(crate) struct AppContext {
     pub history_search_query: Rc<RefCell<String>>,
     /// 会话后台异步持久化与退出等待守卫 (Session Persistence Guard)
     pub persistence_guard: std::sync::Arc<crate::session::SessionPersistenceGuard>,
+
+    /// 本地文件浏览器会话 Tab 列表
+    pub local_tabs: Rc<RefCell<Vec<smagical_core::LocalFileTabSession>>>,
+    /// 当前激活的本地文件 Tab ID
+    pub active_local_tab_id: Rc<RefCell<String>>,
+    /// 远程 SFTP 文件传输 Tab 列表
+    pub remote_tabs: Rc<RefCell<Vec<smagical_core::RemoteFileTabSession>>>,
+    /// 当前激活的远程 SFTP Tab ID
+    pub active_remote_tab_id: Rc<RefCell<String>>,
+    /// 本地文件当前工作目录
+    pub local_current_path: Rc<RefCell<String>>,
+    /// 远程文件当前工作目录
+    pub remote_current_path: Rc<RefCell<String>>,
+    /// 本地文件列表缓存
+    pub local_file_nodes: Rc<RefCell<Vec<FileItemData>>>,
+    /// 远程文件列表缓存
+    pub remote_file_nodes: Rc<RefCell<Vec<FileItemData>>>,
+    /// 文件传输任务队列缓存
+    pub transfer_tasks: Rc<RefCell<Vec<smagical_core::TransferTask>>>,
 }
+
+
 
 
 /// 统一注册挂载所有 Slint UI 回调处理器。
 ///
-/// 依次将窗口控制、终端会话管理、主机分组管理、历史会话与开发者调试控制台的回调绑定到 AppWindow 实例。
+/// 依次将窗口控制、终端会话管理、主机分组管理、历史会话、双盘文件管理与开发者调试控制台的回调绑定到 AppWindow 实例。
 ///
 /// # 参数
 /// - `window`: Slint 生成的主窗口组件引用句柄
@@ -86,8 +109,11 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     host_handlers::register_host_handlers(window, ctx);
     // 4. 挂载历史会话抽屉交互回调 (重连、分屏重连、置顶、删除、清空、搜索与模式切换)
     history_handlers::register_history_handlers(window, ctx);
-    // 5. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
+    // 5. 挂载双盘文件管理与 SFTP 传输交互回调 (Tab 切换/关闭、路径导航、刷新、上传/下载)
+    file_handlers::register_file_handlers(window, ctx);
+    // 6. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
     debug_handlers::register_debug_handlers(window, ctx);
 }
+
 
 

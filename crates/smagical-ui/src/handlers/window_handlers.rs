@@ -67,6 +67,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_current_theme_name(name.into());
                     let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
                     w.set_is_dark_mode(!is_light);
+                    core_state_theme.app_hooks().dispatch_theme_changed(normalized_id, !is_light);
                     core_state_theme.app_hooks().dispatch_config_changed(&smagical_core::ConfigChangeEvent::new(
                         "appearance.theme",
                         "",
@@ -74,6 +75,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                         "switch_theme",
                     ));
                     tracing::info!(target: "smagical_ui::theme", "切换应用配色主题: {} ({})", name, normalized_id);
+
                 }
                 Err(err) => {
                     tracing::error!(target: "smagical_ui::theme", "切换应用主题失败 [{}]: {:?}", normalized_id, err);
@@ -193,7 +195,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_min = ctx.core_state.clone();
     window.on_minimize_window(move || {
         if let Some(w) = window_weak.upgrade() {
-            core_state_min.app_hooks().dispatch_window_state_changed(smagical_core::WindowState::Minimized);
+            core_state_min.app_hooks().dispatch_shell_window_state_changed(smagical_core::WindowState::Minimized);
             w.window().set_minimized(true);
         }
     });
@@ -207,7 +209,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_maximize_window(move || {
         if let Some(w) = window_weak.upgrade() {
             let is_max = w.get_is_window_maximized();
-            core_state_max.app_hooks().dispatch_window_state_changed(if !is_max {
+            core_state_max.app_hooks().dispatch_shell_window_state_changed(if !is_max {
                 smagical_core::WindowState::Maximized
             } else {
                 smagical_core::WindowState::Normal
@@ -215,6 +217,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             w.set_is_window_maximized(!is_max);
             w.window().set_maximized(!is_max);
         }
+
     });
 
     // -------------------------------------------------------------------------

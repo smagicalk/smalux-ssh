@@ -10,12 +10,28 @@ pub mod host;
 pub mod activity_bar;
 /// 统一页面导航与路由模型。
 pub mod navigation;
+/// 终端活跃会话上下文与指令交互模型。
+pub mod terminal_context;
+/// 右侧辅助抽屉栏动态注册模型。
+pub mod right_panel;
+/// 双盘文件浏览器与 SFTP 传输模型。
+pub mod file_item;
 
 pub use group::GroupRecord;
 pub use history::{HistoryRecord, SessionSnapshotConfig};
 pub use host::{HostRecord, HostStatus};
 pub use activity_bar::{ActivityBarItem, ActivityBarRegistry};
 pub use navigation::{NavigationRequest, NavigationRouter};
+pub use terminal_context::{ActiveTerminalSessionContext, TerminalAction};
+pub use right_panel::{RightPanelItem, RightPanelRegistry};
+pub use file_item::{
+    format_file_size, format_file_time, generate_mock_remote_directory, scan_local_directory,
+    FileItemData, FileTabSession, LocalFileTabSession, RemoteFileTabSession, TransferDirection,
+    TransferStatus, TransferTask,
+};
+
+
+
 
 
 

@@ -13,7 +13,8 @@ pub mod types;
 #[cfg(test)]
 mod tests;
 
-pub use builtin::{AutoConfigBackupHook, FunctionalGlobalHook};
+pub use builtin::{AutoConfigBackupHook, FunctionalGlobalHook, HostAuditLogHook};
 pub use engine::{AppGlobalHookEngine, ListenerHandle};
 pub use traits::AppGlobalHook;
 pub use types::{AppBootContext, AppExitContext, ConfigChangeEvent, WindowState};
+

@@ -1,4 +1,4 @@
-﻿//! 主机与分组资产管理、树形/列表视图拖拽移动、快速打开终端等交互回调绑定。
+//! 主机与分组资产管理、树形/列表视图拖拽移动、快速打开终端等交互回调绑定。
 //!
 //! 包含多级分组嵌套维护、无环拓扑防呆校验、平滑调序与动态视口宽度计算。
 
@@ -67,6 +67,8 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             }
             // 同步至存储层
             let _ = core_state_toggle.storage().groups().set_expanded(&id_str, is_expanding);
+            core_state_toggle.app_hooks().dispatch_host_asset_group_toggled(&id_str, is_expanding);
+
 
             let tree = master_tree_toggle.borrow();
             let q = search_query_toggle.borrow().clone();
@@ -139,8 +141,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
+                    core_state_move.app_hooks().dispatch_host_asset_tree_reordered(&src_str, &target_str, &pos_str);
                 }
                 return;
+
             }
 
             // 2. 树形层级模式 (Tree View Mode): 物理资产层级结构与文件夹迁移
@@ -218,7 +222,9 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已同步存储层)", src_name, pos_str, target_name);
+                    core_state_move.app_hooks().dispatch_host_asset_tree_reordered(&src_str, &target_str, &pos_str);
                 }
+
                 Err(err_msg) => {
                     tracing::warn!(target: "smagical_ui::hosts", "移动节点被阻止: {}", err_msg);
                 }
@@ -445,6 +451,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let master_cards_filter = Rc::clone(&ctx.master_cards);
     let expanded_clone = Rc::clone(&ctx.expanded_groups);
     let search_query_filter = Rc::clone(&ctx.search_query);
+    let core_state_filter = Rc::clone(&ctx.core_state);
     window.on_filter_hosts(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_lowercase();
@@ -475,12 +482,15 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 })
                 .cloned()
                 .collect();
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(filtered_cards))));
+            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(filtered_cards.clone()))));
+
+            core_state_filter.app_hooks().dispatch_host_asset_search_filtered(&q, filtered_cards.len());
 
             if !q.is_empty() {
                 tracing::debug!(target: "smagical_ui::search", "过滤主机资产: '{}'", q);
             }
         }
+
     });
 
     // -------------------------------------------------------------------------
@@ -592,7 +602,9 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             // 触发 Hook 引擎 post_open 全局生命周期 (自动由 HistoryTrackingHook 沉淀历史并触发审计)
             let session_ctx = info.to_session_context("pane-active");
             ctx_open.core_state.hooks().dispatch_post_open(&session_ctx);
+            ctx_open.core_state.app_hooks().dispatch_host_terminal_opened(&sess_id, &info.to_active_terminal_context());
             crate::handlers::history_handlers::sync_ui_history(&w, &ctx_open);
+
 
 
 
@@ -621,10 +633,13 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+            crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_open.core_state);
             tracing::info!(target: "smagical_ui::session", "成功打开终端会话 (Pane ID: {})", *active_pid);
         }
     });
 }
+
+
 
 
 

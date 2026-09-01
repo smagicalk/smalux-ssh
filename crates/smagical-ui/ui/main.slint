@@ -7,6 +7,7 @@ export { GroupOptionData } from "components/create-group-modal.slint";
 export { LogEntryData } from "components/debug-modal.slint";
 export { LocalShellItemData } from "components/new-session-modal.slint";
 export { TerminalPaneData, TerminalSplitterData } from "views/center_terminal/terminal_viewport.slint";
+export { FileItemData, FileTabData, TransferItemData } from "views/file_explorer_view.slint";
 
 
 // 基础组件
@@ -27,6 +28,10 @@ import {
     LocalShellItemData,
 } from "components/new-session-modal.slint";
 import { HistoryDetailModal } from "components/history-detail-modal.slint";
+import { MessageDialog } from "components/message-dialog.slint";
+import { FileHostModal } from "components/file-host-modal.slint";
+
+
 
 
 // 左侧视图
@@ -43,6 +48,13 @@ import {
     HistoryItemData,
     HistoryGroupData,
 } from "views/history_center_view.slint";
+import {
+    FileExplorerView,
+    FileItemData,
+    FileTabData,
+    TransferItemData,
+} from "views/file_explorer_view.slint";
+
 
 
 import {
@@ -189,8 +201,36 @@ export component AppWindow inherits Window {
     in-out property <[LocalShellItemData]> launcher-local-items: [];
     /// 快速启动器远程主机资产列表
     in-out property <[HostItemData]> launcher-host-items: root.hosts;
-    /// 主工作区展示视图 ("terminal" 终端视口 | "history" 历史连接中心)
+    /// 主工作区展示视图 ("terminal" 终端视口 | "history" 历史连接中心 | "files" 双盘文件管理)
     in-out property <string> main-view: "terminal";
+
+    // -------------------------------------------------------------------------
+    // 双盘文件管理与 SFTP 传输数据模型与状态 (左右独立 Tab 体系)
+    // -------------------------------------------------------------------------
+    /// 本地文件浏览器 Tab 列表
+    in-out property <[FileTabData]> local-tabs: [];
+    /// 当前激活的本地文件 Tab ID
+    in-out property <string> active-local-tab-id: "";
+    /// 远程 SFTP 文件传输 Tab 列表
+    in-out property <[FileTabData]> remote-tabs: [];
+    /// 当前激活的远程 SFTP Tab ID
+    in-out property <string> active-remote-tab-id: "";
+    /// 本地当前工作目录路径
+    in-out property <string> local-current-path: "";
+    /// 远程当前工作目录路径
+    in-out property <string> remote-current-path: "";
+    /// 本地文件系统可见条目列表
+    in-out property <[FileItemData]> local-files: [];
+    /// 远程 SFTP 文件系统可见条目列表
+    in-out property <[FileItemData]> remote-files: [];
+    /// 当前选中的本地文件 ID
+    in-out property <string> selected-local-id: "";
+    /// 当前选中的远程文件 ID
+    in-out property <string> selected-remote-id: "";
+    /// 异步文件传输任务队列
+    in-out property <[TransferItemData]> transfer-tasks: [];
+
+
 
 
     // -------------------------------------------------------------------------
@@ -478,6 +518,101 @@ export component AppWindow inherits Window {
     /// 侧边栏/主视图活动页签切换
     callback activity-tab-switched(string /* tab_id */);
 
+    // -------------------------------------------------------------------------
+    // 双盘文件管理交互回调 (左右独立 Tab 体系)
+    // -------------------------------------------------------------------------
+    /// 本地文件 Tab 切换
+    callback select-local-tab(string /* tab_id */);
+    /// 本地文件 Tab 关闭
+    callback close-local-tab(string /* tab_id */);
+    /// 新建本地文件 Tab
+    callback new-local-tab();
+    /// 远程文件 Tab 切换
+    callback select-remote-tab(string /* tab_id */);
+    /// 远程文件 Tab 关闭
+    callback close-remote-tab(string /* tab_id */);
+    /// 新建远程文件 Tab
+    callback new-remote-tab();
+    /// 导航本地路径
+    callback navigate-local-path(string /* path */);
+    /// 导航远程路径
+    callback navigate-remote-path(string /* path */);
+    /// 导航本地历史后退 / 前进
+    callback navigate-local-back();
+    callback navigate-local-forward();
+    /// 导航远程历史后退 / 前进
+    callback navigate-remote-back();
+    callback navigate-remote-forward();
+    /// 导航本地上级目录
+    callback navigate-local-up();
+    /// 导航远程上级目录
+    callback navigate-remote-up();
+
+    /// 打开本地文件/目录
+
+    callback open-local-item(string /* path */, bool /* is_dir */);
+    /// 打开远程文件/目录
+    callback open-remote-item(string /* path */, bool /* is_dir */);
+    /// 展开/折叠本地目录树
+    callback toggle-local-expand(string /* path */);
+    /// 展开/折叠远程目录树
+    callback toggle-remote-expand(string /* path */);
+    /// 刷新本地文件列表
+    callback refresh-local-files();
+    /// 刷新远程文件列表
+    callback refresh-remote-files();
+    /// 上传选中本地文件到远程
+    callback upload-file();
+    /// 下载选中远程文件到本地
+    callback download-file();
+    /// 清空已完成的传输任务
+    callback clear-completed-transfers();
+    /// 触发文件/目录拖拽传输任务 (支持单文件与多层级文件夹树)
+    callback start-transfer-task(string /* direction */, string /* source_path */, string /* filename */, bool /* is_dir */, string /* target_path */);
+    /// 展开/折叠传输队列中的文件夹任务
+    callback toggle-transfer-expand(string /* task_id */);
+    /// 在文件页面从左侧双击主机打开远程文件会话
+    callback open-host-files(string /* host_id */);
+    /// 传输任务右键快捷操作 ("pause" | "resume" | "stop" | "retry" | "remove")
+    callback transfer-action(string /* action */, string /* task_id */);
+    /// 文件/目录右键快捷操作 ("open" | "transfer" | "create_folder" | "create_file" | "delete" | "refresh")
+    callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
+    /// 复制文本到系统剪贴板
+    callback copy-to-clipboard(string /* text */);
+
+    // -------------------------------------------------------------------------
+    // 统一错误与消息提示弹窗状态
+    // -------------------------------------------------------------------------
+    /// 提示弹窗显隐开关
+    in-out property <bool> is-dialog-open: false;
+    /// 提示弹窗标题
+    in-out property <string> dialog-title: "提示";
+    /// 提示详情文本
+    in-out property <string> dialog-message: "";
+    /// 提示类型 ("error" | "warning" | "info")
+    in-out property <string> dialog-type: "error";
+
+    /// 左右双盘历史记录前进/后退使能状态
+    in property <bool> local-can-go-back: false;
+    in property <bool> local-can-go-forward: false;
+    in property <bool> remote-can-go-back: false;
+    in property <bool> remote-can-go-forward: false;
+    /// 传输队列面板展开/折叠状态
+    in-out property <bool> is-transfer-queue-expanded: false;
+
+    // -------------------------------------------------------------------------
+    // 文件会话选择弹窗 (FileHostModal) 状态与交互
+    // -------------------------------------------------------------------------
+    in-out property <bool> is-file-host-modal-open: false;
+    in property <[HostItemData]> file-launcher-host-items: [];
+    callback filter-file-launcher(string /* query */);
+    callback open-file-host(string /* host_id */);
+
+
+
+
+
+
 
 
 
@@ -581,6 +716,12 @@ export component AppWindow inherits Window {
                             root.main-view = "history";
                             root.is-left-drawer-open = false;
                             root.navigate-to("history", "");
+                        } else if id == "files" {
+                            // 切换至文件管理页面：左侧展示主机树抽屉，中央展示双盘文件管理器
+                            root.active-left-tab = "files";
+                            root.main-view = "files";
+                            root.is-left-drawer-open = true;
+                            root.navigate-to("files", "");
                         } else {
                             // 资产与设置抽屉：切回终端工作区 + 展开对应抽屉
                             root.main-view = "terminal";
@@ -601,7 +742,7 @@ export component AppWindow inherits Window {
                     width: root.left-drawer-width;
                     clip: true;
 
-                    if root.active-left-tab == "hosts": HostsDrawer {
+                    if root.active-left-tab == "hosts" || root.active-left-tab == "files": HostsDrawer {
                         width: 100%;
                         height: 100%;
                         view-mode <=> root.hosts-view-mode;
@@ -625,19 +766,20 @@ export component AppWindow inherits Window {
                         request-drag-hover(src, idx, offset) => { root.request-drag-hover(src, idx, offset); }
                         search-changed(query) => { root.filter-hosts(query); }
                         create-new-group => { root.is-create-group-open = true; }
-                        host-double-clicked(id) => { root.open-host(id); }
+                        host-double-clicked(id) => {
+                            if root.main-view == "files" {
+                                root.open-host-files(id);
+                            } else {
+                                root.open-host(id);
+                            }
+                        }
                         open-local-shell(type) => { root.open-host("local-" + type); }
-                    }
-
-
-
-                    if root.active-left-tab == "files": FilesDrawer {
-                        collapse => { root.is-left-drawer-open = false; }
                     }
 
                     if root.active-left-tab == "credentials": CredentialsDrawer {
                         collapse => { root.is-left-drawer-open = false; }
                     }
+
 
                     if root.active-left-tab == "snippets": SnippetsDrawer {
                         collapse => { root.is-left-drawer-open = false; }
@@ -793,6 +935,70 @@ export component AppWindow inherits Window {
                     search-terminal(q, c) => { root.search-terminal(q, c); }
                     terminal-resize(cols, rows) => { root.terminal-resize(cols, rows); }
                 }
+
+                // 2.3.3 双盘文件管理与 SFTP 传输视图 (当 main-view == "files" 时展开)
+                file_explorer := FileExplorerView {
+                    visible: root.main-view == "files";
+                    horizontal-stretch: root.main-view == "files" ? 1 : 0;
+                    min-width: 0px;
+                    max-width: root.main-view == "files" ? 100000px : 0px;
+
+                    local-tabs: root.local-tabs;
+                    active-local-tab-id: root.active-local-tab-id;
+                    remote-tabs: root.remote-tabs;
+                    active-remote-tab-id: root.active-remote-tab-id;
+                    local-current-path: root.local-current-path;
+                    remote-current-path: root.remote-current-path;
+                    local-files: root.local-files;
+                    remote-files: root.remote-files;
+                    selected-local-id <=> root.selected-local-id;
+                    selected-remote-id <=> root.selected-remote-id;
+                    transfer-tasks: root.transfer-tasks;
+
+                    select-local-tab(id) => { root.select-local-tab(id); }
+                    close-local-tab(id) => { root.close-local-tab(id); }
+                    new-local-tab => { root.new-local-tab(); }
+                    select-remote-tab(id) => { root.select-remote-tab(id); }
+                    close-remote-tab(id) => { root.close-remote-tab(id); }
+                    new-remote-tab => {
+                        root.filter-file-launcher("");
+                        root.is-file-host-modal-open = true;
+                    }
+
+                    navigate-local-path(p) => { root.navigate-local-path(p); }
+                    navigate-remote-path(p) => { root.navigate-remote-path(p); }
+                    navigate-local-up => { root.navigate-local-up(); }
+                    navigate-remote-up => { root.navigate-remote-up(); }
+                    open-local-item(p, is_dir) => { root.open-local-item(p, is_dir); }
+                    open-remote-item(p, is_dir) => { root.open-remote-item(p, is_dir); }
+                    toggle-local-expand(p) => { root.toggle-local-expand(p); }
+                    toggle-remote-expand(p) => { root.toggle-remote-expand(p); }
+                    local-can-go-back: root.local-can-go-back;
+                    local-can-go-forward: root.local-can-go-forward;
+                    remote-can-go-back: root.remote-can-go-back;
+                    remote-can-go-forward: root.remote-can-go-forward;
+
+                    navigate-local-back => { root.navigate-local-back(); }
+                    navigate-local-forward => { root.navigate-local-forward(); }
+                    navigate-remote-back => { root.navigate-remote-back(); }
+                    navigate-remote-forward => { root.navigate-remote-forward(); }
+
+                    refresh-local => { root.refresh-local-files(); }
+                    refresh-remote => { root.refresh-remote-files(); }
+                    clear-completed-transfers => { root.clear-completed-transfers(); }
+                    start-transfer-task(dir, src, name, is_dir, target) => { root.start-transfer-task(dir, src, name, is_dir, target); }
+                    toggle-transfer-expand(id) => { root.toggle-transfer-expand(id); }
+                    transfer-action(act, tid) => { root.transfer-action(act, tid); }
+                    file-action(act, rem, p, name, is_dir) => { root.file-action(act, rem, p, name, is_dir); }
+                    copy-to-clipboard(text) => { root.copy-to-clipboard(text); }
+                    is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
+                }
+
+
+
+
+
+
 
 
 
@@ -994,5 +1200,33 @@ export component AppWindow inherits Window {
 
         copy-log(text) => { root.copy-history-log(text); }
     }
+
+    // 通用消息与错误提示模态弹窗
+    MessageDialog {
+        is-open <=> root.is-dialog-open;
+        title: root.dialog-title;
+        message: root.dialog-message;
+        dialog-type: root.dialog-type;
+        close => { root.is-dialog-open = false; }
+    }
+
+    // 文件管理会话选择居中卡片弹窗 (单一本地域 + 远程全部主机，点击自动连接 SFTP)
+    FileHostModal {
+        is-open: root.is-file-host-modal-open;
+        host-items: root.file-launcher-host-items;
+        close => { root.is-file-host-modal-open = false; }
+        search-changed(q) => { root.filter-file-launcher(q); }
+        local-selected => {
+            root.is-file-host-modal-open = false;
+            root.open-file-host("local");
+        }
+
+        host-selected(id) => {
+            root.is-file-host-modal-open = false;
+            root.open-file-host(id);
+        }
+    }
 }
+
+
 

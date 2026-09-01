@@ -31,6 +31,9 @@ pub(crate) mod launcher_prewarm;
 
 /// 侧边栏动态注册与 UI 同步服务。
 pub(crate) mod activity_bar_service;
+/// 右侧辅助抽屉动态注册与 UI 同步服务。
+pub(crate) mod right_panel_service;
+
 
 use std::cell::RefCell;
 use std::collections::HashSet;
@@ -111,6 +114,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
     window.set_is_debug_enabled(is_dbg);
     core_state.activity_bar().set_visible("debug", is_dbg);
     activity_bar_service::sync_activity_bar_ui(&window, &core_state);
+    right_panel_service::sync_right_panel_ui(&window, &core_state);
+
 
 
 
@@ -225,6 +230,28 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let history_view_mode = Rc::new(RefCell::new("timeline".to_string()));
     let history_search_query = Rc::new(RefCell::new(String::new()));
 
+    let home_path = directories::BaseDirs::new()
+        .map(|p| p.home_dir().to_string_lossy().to_string())
+        .unwrap_or_else(|| "/".to_string());
+    let initial_local_files = smagical_core::scan_local_directory(&std::path::PathBuf::from(&home_path)).unwrap_or_default();
+
+    // 默认左侧有 1 个本地主目录 Tab，右侧默认无 Tab (呈现连接提示)
+    let local_tabs = Rc::new(RefCell::new(vec![
+        smagical_core::LocalFileTabSession::new(
+            "ltab-1",
+            "本地 (主目录)",
+            &home_path,
+        )
+    ]));
+    let active_local_tab_id = Rc::new(RefCell::new("ltab-1".to_string()));
+    let remote_tabs = Rc::new(RefCell::new(Vec::new()));
+    let active_remote_tab_id = Rc::new(RefCell::new(String::new()));
+    let local_current_path = Rc::new(RefCell::new(home_path));
+    let remote_current_path = Rc::new(RefCell::new(String::new()));
+    let local_file_nodes = Rc::new(RefCell::new(initial_local_files));
+    let remote_file_nodes = Rc::new(RefCell::new(Vec::new()));
+    let transfer_tasks = Rc::new(RefCell::new(Vec::<smagical_core::TransferTask>::new()));
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state: Rc::clone(&core_state),
@@ -250,14 +277,28 @@ pub fn run() -> Result<(), slint::PlatformError> {
         history_view_mode,
         history_search_query,
         persistence_guard: std::sync::Arc::new(crate::session::SessionPersistenceGuard::default()),
+
+        local_tabs: Rc::clone(&local_tabs),
+        active_local_tab_id: Rc::clone(&active_local_tab_id),
+        remote_tabs: Rc::clone(&remote_tabs),
+        active_remote_tab_id: Rc::clone(&active_remote_tab_id),
+        local_current_path: Rc::clone(&local_current_path),
+        remote_current_path: Rc::clone(&remote_current_path),
+        local_file_nodes: Rc::clone(&local_file_nodes),
+        remote_file_nodes: Rc::clone(&remote_file_nodes),
+        transfer_tasks: Rc::clone(&transfer_tasks),
     };
 
 
-    // 初始同步历史会话抽屉数据
+
+
+    // 初始同步历史会话抽屉与双盘文件浏览器数据
     handlers::history_handlers::sync_ui_history(&window, &ctx);
+    handlers::file_handlers::sync_file_explorer_ui(&window, &ctx);
 
     // 统一挂载所有区域的回调事件处理器
     register_all_handlers(&window, &ctx);
+
 
 
     // 持久化多窗格与分割条数据模型引用（保持 ModelRc 实例单一持久，避免 Slint 重建 UI 组件导致拖拽焦点丢失）

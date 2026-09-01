@@ -43,7 +43,7 @@ impl AppGlobalHook for AutoConfigBackupHook {
         50
     }
 
-    fn on_global_config_changed(&self, event: &ConfigChangeEvent) {
+    fn on_config_changed(&self, event: &ConfigChangeEvent) {
         let count = self.backup_count.fetch_add(1, Ordering::Relaxed) + 1;
         tracing::info!(
             target: "smalux::backup",
@@ -65,6 +65,107 @@ impl AppGlobalHook for AutoConfigBackupHook {
         );
     }
 }
+
+/// 主机资产全生命周期与终端会话操作审计日志插件。
+///
+/// 实时监听主机资产变动 (`on_host_asset_*`)、终端会话生命周期 (`on_host_terminal_*`)、
+/// 历史会话操作 (`on_history_*`) 与配置变动，生成符合规范的结构化审计日志。
+pub struct HostAuditLogHook;
+
+impl Default for HostAuditLogHook {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl HostAuditLogHook {
+    /// 创建一个新的主机与会话审计日志插件实例。
+    pub fn new() -> Self {
+        Self
+    }
+}
+
+impl AppGlobalHook for HostAuditLogHook {
+    fn name(&self) -> &'static str {
+        "builtin_host_audit_logger"
+    }
+
+    fn priority(&self) -> i32 {
+        40
+    }
+
+    fn on_host_asset_created(&self, host: &crate::domain::HostRecord) {
+        tracing::info!(
+            target: "audit::host",
+            "[资产审计:新增] 主机 ID: [{}], 名称: '{}', 地址: {}:{}",
+            host.id, host.name, host.address, host.port
+        );
+    }
+
+    fn on_host_asset_updated(&self, old_host: &crate::domain::HostRecord, new_host: &crate::domain::HostRecord) {
+        tracing::warn!(
+            target: "audit::host",
+            "[资产审计:修改] 主机 ID: [{}], 名称: '{}' -> '{}', 地址: {}:{} -> {}:{}",
+            new_host.id, old_host.name, new_host.name, old_host.address, old_host.port, new_host.address, new_host.port
+        );
+    }
+
+    fn on_host_asset_deleted(&self, host_id: &str) {
+        tracing::warn!(
+            target: "audit::host",
+            "[资产审计:删除] 主机 ID: [{}]",
+            host_id
+        );
+    }
+
+    fn on_host_asset_group_toggled(&self, group_id: &str, is_expanded: bool) {
+        tracing::debug!(
+            target: "audit::host",
+            "[资产偏好] 分组 ID: [{}] 切换为: {}",
+            group_id, if is_expanded { "展开" } else { "折叠" }
+        );
+    }
+
+    fn on_host_asset_tree_reordered(&self, src_id: &str, target_id: &str, position: &str) {
+        tracing::info!(
+            target: "audit::host",
+            "[资产拓扑] 节点 [{}] 移动至 [{}] 模式: {}",
+            src_id, target_id, position
+        );
+    }
+
+    fn on_host_terminal_opened(&self, session_id: &str, ctx: &crate::domain::ActiveTerminalSessionContext) {
+        tracing::info!(
+            target: "audit::terminal",
+            "[会话审计:建立] 会话 ID: [{}], 目标主机: '{}' ({}:{}), 登录用户: '{}'",
+            session_id, ctx.host_name, ctx.host_ip, ctx.port, ctx.username
+        );
+    }
+
+    fn on_host_terminal_closed(&self, session_id: &str, duration_secs: u64) {
+        tracing::info!(
+            target: "audit::terminal",
+            "[会话审计:关闭] 会话 ID: [{}], 在线持续时长: {} 秒",
+            session_id, duration_secs
+        );
+    }
+
+    fn on_history_item_deleted(&self, history_id: &str) {
+        tracing::info!(
+            target: "audit::history",
+            "[历史审计:删除] 历史记录 ID: [{}]",
+            history_id
+        );
+    }
+
+    fn on_history_cleared(&self) {
+        tracing::warn!(
+            target: "audit::history",
+            "[历史审计:清空] 用户清空了非置顶历史会话记录"
+        );
+    }
+}
+
 
 type ConfigCallback = Arc<dyn Fn(&ConfigChangeEvent) + Send + Sync>;
 type LeftMenuCallback = Arc<dyn Fn(&str, &str) + Send + Sync>;
@@ -135,19 +236,20 @@ impl AppGlobalHook for FunctionalGlobalHook {
         self.priority
     }
 
-    fn on_global_config_changed(&self, event: &ConfigChangeEvent) {
+    fn on_config_changed(&self, event: &ConfigChangeEvent) {
         if let Some(ref f) = self.on_config_changed_fn {
             f(event);
         }
     }
 
-    fn on_left_menu_clicked(&self, menu_id: &str, old_menu_id: &str) {
+    fn on_shell_left_menu_clicked(&self, menu_id: &str, old_menu_id: &str) {
         if let Some(ref f) = self.on_left_menu_fn {
             f(menu_id, old_menu_id);
         }
     }
 
     fn on_app_before_exit(&self, ctx: &AppExitContext) -> HookDecision {
+
         if let Some(ref f) = self.on_before_exit_fn {
             f(ctx)
         } else {

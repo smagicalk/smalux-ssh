@@ -296,6 +296,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = ctx_recon.core_state.storage().history().save(&h);
 
                 tracing::info!(target: "smagical_ui::history", "历史会话触发重连: {} ({})", h.title, target_id);
+                ctx_recon.core_state.app_hooks().dispatch_history_reconnect_requested(&hist_id);
                 sync_ui_history(&w, &ctx_recon);
 
                 // 发起连接
@@ -326,6 +327,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = ctx_recon_split.core_state.storage().history().save(&h);
 
                 tracing::info!(target: "smagical_ui::history", "历史会话分屏重连: {} ({})", h.title, target_id);
+                ctx_recon_split.core_state.app_hooks().dispatch_history_reconnect_requested(&hist_id);
                 sync_ui_history(&w, &ctx_recon_split);
 
                 // 在新分屏中打开
@@ -340,6 +342,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_delete_history_item(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_del.core_state.storage().history().delete(&hist_id);
+            ctx_del.core_state.app_hooks().dispatch_history_item_deleted(&hist_id);
             tracing::info!(target: "smagical_ui::history", "删除历史会话记录: {}", hist_id);
             sync_ui_history(&w, &ctx_del);
         }
@@ -351,6 +354,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_clear_history(move || {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_clr.core_state.storage().history().clear_all(true);
+            ctx_clr.core_state.app_hooks().dispatch_history_cleared();
             tracing::info!(target: "smagical_ui::history", "清空历史记录 (保留置顶项)");
             sync_ui_history(&w, &ctx_clr);
         }
@@ -362,10 +366,12 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     window.on_toggle_pin_history(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let is_pinned = ctx_pin.core_state.storage().history().toggle_pin(&hist_id).unwrap_or_default();
+            ctx_pin.core_state.app_hooks().dispatch_history_pin_toggled(&hist_id, is_pinned);
             tracing::info!(target: "smagical_ui::history", "切换历史会话置顶状态: {} -> {}", hist_id, if is_pinned { "⭐️ 已置顶" } else { "取消置顶" });
             sync_ui_history(&w, &ctx_pin);
         }
     });
+
 
 
     // 6. 切换时间分组折叠展开
@@ -464,8 +470,9 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_nav = ctx.core_state.clone();
     let window_weak = window.as_weak();
     window.on_activity_tab_switched(move |tab_id| {
-        core_state_nav.app_hooks().dispatch_left_menu_clicked(&tab_id, "");
+        core_state_nav.app_hooks().dispatch_shell_left_menu_clicked(&tab_id, "");
         tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
+
         if let Some(w) = window_weak.upgrade().filter(|w| tab_id == "debug" || w.get_is_debug_modal_open()) {
             crate::debug_ui::sync_ui_debug_logs(&w);
         }

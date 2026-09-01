@@ -18,11 +18,21 @@ pub use app_hook::{
 
 pub use domain::{
     activity_bar::{ActivityBarItem, ActivityBarRegistry},
+    file_item::{
+        format_file_size, format_file_time, generate_mock_remote_directory, scan_local_directory,
+        FileItemData, FileTabSession, LocalFileTabSession, RemoteFileTabSession, TransferDirection,
+        TransferStatus, TransferTask,
+    },
+
     group::GroupRecord,
     history::{HistoryRecord, SessionSnapshotConfig},
     host::{HostRecord, HostStatus},
     navigation::{NavigationRequest, NavigationRouter},
+    right_panel::{RightPanelItem, RightPanelRegistry},
+    terminal_context::{ActiveTerminalSessionContext, TerminalAction},
 };
+
+
 
 
 pub use hook::{
