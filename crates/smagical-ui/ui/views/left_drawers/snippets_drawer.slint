@@ -1,72 +1,349 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
+import { SearchInput } from "../../components/search-input.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { ScrollView } from "std-widgets.slint";
+import { SnippetTreeNode } from "../snippets_view.slint";
 
-/// 指令片段数据结构
-export struct SnippetItemData {
-    id: string,
-    title: string,
-    command: string,
-    category: string,
-}
+export { SnippetTreeNode }
 
-/// 指令片段抽屉 (Snippets Drawer)
+/// 代码片段管理抽屉组件 (Snippets Drawer)
+///
+/// 具备与主机抽屉完全一致的现代化树形多层层级折叠展开、分类检索、拖拽调序与分组迁移能力。
 export component SnippetsDrawer inherits DrawerContainer {
-    title: @tr("指令片段");
+    title: @tr("代码片段");
     collapse-icon: "◀";
 
-    in property <[SnippetItemData]> snippets: [];
+    /// 树形数据源
+    in property <[SnippetTreeNode]> tree-nodes: [];
+    /// 搜索过滤关键词
+    in-out property <string> search-query: "";
+    /// 当前选中的节点 ID
+    in-out property <string> selected-id: "";
 
+    /// 拖拽交互状态
+    in-out property <bool> is-dragging: false;
+    in-out property <string> drag-source-id: "";
+    in-out property <string> drag-source-name: "";
+    in-out property <bool> drag-source-is-group: false;
+    in-out property <string> drop-target-id: "";
+    in-out property <string> drop-target-name: "";
+    in-out property <int> drop-target-index: -1;
+    in-out property <string> drop-position: "inside";
+    in-out property <bool> drop-target-valid: false;
+    in-out property <length> drag-x: 0px;
+    in-out property <length> drag-y: 0px;
 
-    callback execute-snippet(string /* command */);
+    /// 回调事件
+    callback search-changed(string /* query */);
+    callback toggle-group(string /* group-id */);
+    callback select-node(string /* id */, bool /* is-group */);
+    callback create-new-group();
+    callback create-new-snippet();
+    callback execute-snippet(string /* id */);
+    callback move-node(string /* source-id */, string /* target-id */, string /* drop-position */);
+    callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
 
     VerticalLayout {
         padding: 8px;
         spacing: 8px;
 
-        ScrollView {
-            VerticalLayout {
-                spacing: 4px;
+        // 1. 顶部检索框
+        SearchInput {
+            text <=> root.search-query;
+            placeholder: @tr("搜索代码片段、脚本或分组...");
+            changed(text) => { root.search-changed(text); }
+        }
 
-                for snip in root.snippets: Rectangle {
-                    height: 56px;
-                    border-radius: AppTheme.radius-medium;
-                    background: snip-touch.has-hover ? AppTheme.hover-background : transparent;
+        // 2. 栏目标题与操作栏
+        HorizontalLayout {
+            padding-left: 4px;
+            padding-right: 4px;
+            alignment: space-between;
+            height: 22px;
 
-                    snip-touch := TouchArea {
-                        clicked => { root.execute-snippet(snip.command); }
-                        mouse-cursor: pointer;
-                    }
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+
+                Text {
+                    text: @tr("树形层级视图");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    height: 16px;
+                    border-radius: 8px;
+                    background: AppTheme.control-background;
 
                     HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        spacing: 8px;
-                        alignment: center;
+                        padding-left: 6px;
+                        padding-right: 6px;
 
                         Text {
-                            text: "»";
-                            font-size: 14px;
-                            font-weight: 700;
-                            color: AppTheme.accent;
+                            text: root.tree-nodes.length + " 项";
+                            font-size: 9px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
                             vertical-alignment: center;
                         }
+                    }
+                }
+            }
 
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 2px;
+            // 新建分组与新建片段
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: end;
 
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/folder-plus.svg");
+                    clicked => { root.create-new-group(); }
+                }
+
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/plus.svg");
+                    clicked => { root.create-new-snippet(); }
+                }
+            }
+        }
+
+        // 2.5 拖拽时的顶级根目录放置区
+        if root.is-dragging: Rectangle {
+            height: 28px;
+            border-radius: 4px;
+            background: root.drop-target-id == "root" ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
+            border-width: 1.5px;
+            border-color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.border;
+            animate background { duration: 120ms; }
+            animate border-color { duration: 120ms; }
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 6px;
+                alignment: center;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/folder.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.secondary-foreground;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: @tr("移至根目录 (顶级)");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // 3. 核心树形节点滚动视口
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            drawer_scroll := ScrollView {
+                width: 100%;
+                height: 100%;
+
+                VerticalLayout {
+                    spacing: 2px;
+                    alignment: start;
+
+                    for node[idx] in root.tree-nodes: Rectangle {
+                        height: 30px;
+                        width: 100%;
+                        border-radius: 4px;
+                        opacity: (root.is-dragging && node.id == root.drag-source-id) ? 0.35 : 1.0;
+                        background: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid)
+                            ? AppTheme.accent.transparentize(85%)
+                            : (node.id == root.selected-id)
+                                ? AppTheme.control-background
+                                : (item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent);
+                        border-width: 1px;
+                        border-color: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid)
+                            ? AppTheme.accent.transparentize(40%)
+                            : (node.id == root.selected-id ? AppTheme.border : transparent);
+
+                        animate background { duration: root.is-dragging ? 0ms : 120ms; }
+                        animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
+
+                        item-touch := TouchArea {
+                            pointer-event(event) => {
+                                if event.kind == PointerEventKind.down {
+                                    root.drag-source-id = node.id;
+                                    root.drag-source-name = node.name;
+                                    root.drag-source-is-group = node.is-group;
+                                    root.is-dragging = false;
+                                    root.drop-target-index = -1;
+                                }
+                                if event.kind == PointerEventKind.up {
+                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
+                                        if root.drop-target-id == "root" {
+                                            root.move-node(root.drag-source-id, "root", "root");
+                                        } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
+                                            root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                        }
+                                    }
+                                    root.is-dragging = false;
+                                    root.drag-source-id = "";
+                                    root.drop-target-id = "";
+                                    root.drop-target-name = "";
+                                    root.drop-target-index = -1;
+                                    root.drop-position = "inside";
+                                }
+                                if event.kind == PointerEventKind.cancel {
+                                    root.is-dragging = false;
+                                    root.drag-source-id = "";
+                                    root.drop-target-id = "";
+                                    root.drop-target-name = "";
+                                    root.drop-target-index = -1;
+                                    root.drop-position = "inside";
+                                }
+                            }
+                            moved => {
+                                if self.pressed {
+                                    if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
+                                        root.is-dragging = true;
+                                        root.drag-source-id = node.id;
+                                        root.drag-source-name = node.name;
+                                        root.drag-source-is-group = node.is-group;
+                                        root.drag-x = self.mouse-x;
+                                        let total_y = idx * 32px + self.mouse-y;
+                                        root.drag-y = total_y;
+
+                                        let screen_y = total_y + drawer_scroll.viewport-y;
+                                        if screen_y < 16px {
+                                            root.drop-target-index = -1;
+                                            root.drop-target-id = "root";
+                                            root.drop-position = "root";
+                                            root.drop-target-valid = true;
+                                            root.request-drag-hover(root.drag-source-id, -1, 0.0);
+                                        } else {
+                                            let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
+                                            root.drop-target-index = target_idx;
+                                            root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
+                                            root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                                        }
+                                    }
+                                }
+                            }
+                            clicked => {
+                                if !root.is-dragging {
+                                    if node.is-group {
+                                        root.toggle-group(node.id);
+                                    }
+                                    root.selected-id = node.id;
+                                    root.select-node(node.id, node.is_group);
+                                }
+                            }
+                            double-clicked => {
+                                if !node.is-group && !root.is-dragging {
+                                    root.execute-snippet(node.id);
+                                }
+                            }
+                            mouse-cursor: root.is-dragging ? copy : pointer;
+                        }
+
+                        // 拖拽下插指示线
+                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid && root.drop-target-id != "root": Rectangle {
+                            x: 6px + node.level * 14px;
+                            y: parent.height - 2px;
+                            width: Math.min(140px, parent.width - 16px - node.level * 14px);
+                            height: 2px;
+                            background: AppTheme.accent;
+                            border-radius: 1px;
+                            z: 20;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px + node.level * 16px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            alignment: space-between;
+
+                            // 左侧：图标 + 名称
                             HorizontalLayout {
                                 spacing: 6px;
+                                alignment: start;
 
-                                Text {
-                                    text: snip.title;
-                                    font-size: 12px;
-                                    font-weight: 600;
-                                    color: AppTheme.foreground;
+                                // 节点图标
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    if node.is-group: Image {
+                                        source: node.is-expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg");
+                                        width: 14px;
+                                        height: 14px;
+                                        image-fit: contain;
+                                        colorize: (node.id == root.selected-id) ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    }
+
+                                    if !node.is-group: Image {
+                                        source: @image-url("../../assets/icons/terminal.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: (node.id == root.selected-id) ? AppTheme.accent : (item-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                    }
                                 }
 
-                                Rectangle {
+                                // 节点名称
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    Text {
+                                        text: node.name;
+                                        font-size: 11px;
+                                        font-weight: node.is-group ? 600 : 500;
+                                        color: (node.id == root.selected-id) ? AppTheme.accent : AppTheme.foreground;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 右侧：文件夹数量与脚本语言胶囊
+                            HorizontalLayout {
+                                spacing: 5px;
+                                alignment: end;
+
+                                // 文件夹子项计数胶囊
+                                if node.is-group: Rectangle {
+                                    height: 16px;
+                                    border-radius: 8px;
+                                    background: AppTheme.control-background;
+
+                                    HorizontalLayout {
+                                        padding-left: 5px;
+                                        padding-right: 5px;
+
+                                        Text {
+                                            text: node.item_count;
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                // 语言徽标 (仅脚本)
+                                if !node.is-group && node.language != "": Rectangle {
                                     height: 14px;
                                     border-radius: 2px;
                                     background: AppTheme.control-background;
@@ -76,41 +353,13 @@ export component SnippetsDrawer inherits DrawerContainer {
                                         padding-right: 4px;
 
                                         Text {
-                                            text: snip.category;
+                                            text: node.language;
                                             font-size: 9px;
                                             color: AppTheme.secondary-foreground;
                                             vertical-alignment: center;
                                         }
                                     }
                                 }
-                            }
-
-                            Text {
-                                text: snip.command;
-                                font-size: 10px;
-                                color: AppTheme.secondary-foreground;
-                                overflow: elide;
-                            }
-                        }
-
-                        // 运行按钮
-                        Rectangle {
-                            width: 24px;
-                            height: 24px;
-                            border-radius: AppTheme.radius-small;
-                            background: run-touch.has-hover ? AppTheme.accent : AppTheme.control-background;
-
-                            Text {
-                                text: "▶";
-                                font-size: 10px;
-                                color: run-touch.has-hover ? #ffffff : AppTheme.secondary-foreground;
-                                horizontal-alignment: center;
-                                vertical-alignment: center;
-                            }
-
-                            run-touch := TouchArea {
-                                clicked => { root.execute-snippet(snip.command); }
-                                mouse-cursor: pointer;
                             }
                         }
                     }

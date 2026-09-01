@@ -128,6 +128,33 @@ fn attach_default_event_loggers(events: &EventManager) {
         );
     });
     g10.detach();
+
+    let g11 = events.global().listen(|e: &crate::event::SnippetSavedEvent| {
+        tracing::info!(
+            target: "smalux::snippet",
+            "[事件总线:代码片段保存] ID: [{}], 标题: '{}', 是否新建: {}",
+            e.snippet_id, e.title, e.is_new
+        );
+    });
+    g11.detach();
+
+    let g12 = events.global().listen(|e: &crate::event::SnippetDeletedEvent| {
+        tracing::warn!(
+            target: "smalux::snippet",
+            "[事件总线:代码片段删除] ID: [{}] 已从代码片段库中移除",
+            e.snippet_id
+        );
+    });
+    g12.detach();
+
+    let g13 = events.global().listen(|e: &crate::event::SnippetExecutedEvent| {
+        tracing::info!(
+            target: "smalux::snippet",
+            "[事件总线:代码片段执行] ID: [{}], 目标终端: {:?}, 自动执行: {}",
+            e.snippet_id, e.session_id, e.auto_execute
+        );
+    });
+    g13.detach();
 }
 
 impl CoreState {

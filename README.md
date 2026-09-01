@@ -33,6 +33,7 @@
 - 🛠️ **[06. 开发者调试控制台 (06_debug_console.md)](file:///F:/code/rust/smalux-ssh/docs/ui/06_debug_console.md)**
 - 🌐 **[07. 泛型事件分发与生命周期协同 (07_events_and_lifecycle.md)](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md)**
 - 🔐 **[08. 凭据保险库与安全认证中心 (08_credentials_vault.md)](file:///F:/code/rust/smalux-ssh/docs/ui/08_credentials_vault.md)**
+- 📜 **[09. 代码片段与层级脚本中心 (09_code_snippets.md)](file:///F:/code/rust/smalux-ssh/docs/ui/09_code_snippets.md)**
 
 ---
 

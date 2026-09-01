@@ -8,6 +8,7 @@ pub(crate) mod file_handlers;
 pub(crate) mod history_handlers;
 pub(crate) mod host_handlers;
 pub(crate) mod session_handlers;
+pub(crate) mod snippet_handlers;
 pub(crate) mod window_handlers;
 
 use std::cell::RefCell;
@@ -91,6 +92,13 @@ pub(crate) struct AppContext {
     pub transfer_tasks: Rc<RefCell<Vec<smagical_core::TransferTask>>>,
     /// 全局气泡通知服务管理器
     pub notifications: crate::notification_service::NotificationManager,
+
+    /// 内存全量代码片段树形节点镜像缓存
+    pub master_snippet_tree: Rc<RefCell<Vec<crate::snippet_tree_model::RawSnippetTreeNode>>>,
+    /// 代码片段树当前已展开的分组 ID 集合
+    pub expanded_snippet_groups: Rc<RefCell<HashSet<String>>>,
+    /// 代码片段搜索关键词
+    pub snippet_search_query: Rc<RefCell<String>>,
 }
 
 #[allow(dead_code)]
@@ -142,7 +150,9 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     file_handlers::register_file_handlers(window, ctx);
     // 6. 挂载凭据保管与密钥管理交互回调 (筛选、CRUD、一键生成密钥/强密码、安全复制)
     credential_handlers::register_credential_handlers(window, ctx);
-    // 7. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
+    // 7. 挂载代码片段与多层层级管理交互回调 (树形展开、CRUD、变量渲染、命令注入)
+    snippet_handlers::register_snippet_handlers(window, ctx);
+    // 8. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
     debug_handlers::register_debug_handlers(window, ctx);
 }
 

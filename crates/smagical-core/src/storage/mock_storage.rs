@@ -4,10 +4,11 @@ use crate::domain::{
     group::GroupRecord,
     history::HistoryRecord,
     host::{HostRecord, HostStatus},
+    snippet::{SnippetGroupRecord, SnippetRecord},
 };
 use super::{
     AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
-    StorageError, StorageResult,
+    SnippetRepository, StorageError, StorageResult,
 };
 
 
@@ -539,6 +540,168 @@ impl CredentialRepository for MockCredentialRepository {
     }
 }
 
+/// 线程安全的内存代码片段与多层层级分组仓储实现
+#[derive(Debug, Default, Clone)]
+pub struct MockSnippetRepository {
+    snippets: Arc<RwLock<Vec<SnippetRecord>>>,
+    groups: Arc<RwLock<Vec<SnippetGroupRecord>>>,
+}
+
+impl MockSnippetRepository {
+    /// 创建空的内存代码片段仓储
+    pub fn new() -> Self {
+        Self {
+            snippets: Arc::new(RwLock::new(Vec::new())),
+            groups: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// 使用指定片段与分组列表创建内存仓储
+    pub fn with_data(snippets: Vec<SnippetRecord>, groups: Vec<SnippetGroupRecord>) -> Self {
+        Self {
+            snippets: Arc::new(RwLock::new(snippets)),
+            groups: Arc::new(RwLock::new(groups)),
+        }
+    }
+}
+
+impl SnippetRepository for MockSnippetRepository {
+    fn list_all(&self) -> StorageResult<Vec<SnippetRecord>> {
+        let read_guard = self.snippets.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(read_guard.clone())
+    }
+
+    fn list_by_group(&self, group_id: Option<&str>) -> StorageResult<Vec<SnippetRecord>> {
+        let all = self.list_all()?;
+        Ok(all.into_iter().filter(|s| s.parent_group_id.as_deref() == group_id).collect())
+    }
+
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<SnippetRecord>> {
+        let read_guard = self.snippets.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(read_guard.iter().find(|s| s.id == id).cloned())
+    }
+
+    fn search(&self, query: &str) -> StorageResult<Vec<SnippetRecord>> {
+        let all = self.list_all()?;
+        if query.trim().is_empty() {
+            return Ok(all);
+        }
+        let q = query.to_lowercase();
+        Ok(all.into_iter().filter(|s| {
+            s.title.to_lowercase().contains(&q)
+                || s.content.to_lowercase().contains(&q)
+                || s.description.to_lowercase().contains(&q)
+                || s.tags.iter().any(|t| t.to_lowercase().contains(&q))
+                || s.language.to_lowercase().contains(&q)
+        }).collect())
+    }
+
+    fn save(&self, record: &SnippetRecord) -> StorageResult<()> {
+        let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = write_guard.iter().position(|s| s.id == record.id) {
+            write_guard[pos] = record.clone();
+        } else {
+            write_guard.push(record.clone());
+        }
+        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存代码片段: {} ({})", record.title, record.language);
+        Ok(())
+    }
+
+    fn save_batch(&self, records: &[SnippetRecord]) -> StorageResult<()> {
+        let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        for rec in records {
+            if let Some(pos) = write_guard.iter().position(|s| s.id == rec.id) {
+                write_guard[pos] = rec.clone();
+            } else {
+                write_guard.push(rec.clone());
+            }
+        }
+        Ok(())
+    }
+
+    fn delete(&self, id: &str) -> StorageResult<bool> {
+        let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = write_guard.iter().position(|s| s.id == id) {
+            write_guard.remove(pos);
+            tracing::debug!(target: "smagical_core::storage", "MockStorage 删除代码片段: ID={}", id);
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn toggle_favorite(&self, id: &str) -> StorageResult<bool> {
+        let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(snip) = write_guard.iter_mut().find(|s| s.id == id) {
+            snip.is_favorite = !snip.is_favorite;
+            Ok(snip.is_favorite)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn list_groups(&self) -> StorageResult<Vec<SnippetGroupRecord>> {
+        let read_guard = self.groups.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(read_guard.clone())
+    }
+
+    fn get_group_by_id(&self, id: &str) -> StorageResult<Option<SnippetGroupRecord>> {
+        let read_guard = self.groups.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(read_guard.iter().find(|g| g.id == id).cloned())
+    }
+
+    fn save_group(&self, group: &SnippetGroupRecord) -> StorageResult<()> {
+        let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = write_guard.iter().position(|g| g.id == group.id) {
+            write_guard[pos] = group.clone();
+        } else {
+            write_guard.push(group.clone());
+        }
+        Ok(())
+    }
+
+    fn delete_group(&self, id: &str) -> StorageResult<bool> {
+        let mut g_write = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = g_write.iter().position(|g| g.id == id) {
+            let removed = g_write.remove(pos);
+            for child in g_write.iter_mut().filter(|g| g.parent_id.as_deref() == Some(id)) {
+                child.parent_id = removed.parent_id.clone();
+                child.level = child.level.saturating_sub(1);
+            }
+            if let Ok(mut s_write) = self.snippets.write() {
+                for snip in s_write.iter_mut().filter(|s| s.parent_group_id.as_deref() == Some(id)) {
+                    snip.parent_group_id = removed.parent_id.clone();
+                }
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn set_group_expanded(&self, id: &str, expanded: bool) -> StorageResult<()> {
+        let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(g) = write_guard.iter_mut().find(|g| g.id == id) {
+            g.is_expanded = expanded;
+        }
+        Ok(())
+    }
+
+    fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()> {
+        let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        let target_level = if let Some(p_id) = new_parent_id {
+            write_guard.iter().find(|g| g.id == p_id).map(|g| g.level + 1).unwrap_or(0)
+        } else {
+            0
+        };
+        if let Some(g) = write_guard.iter_mut().find(|g| g.id == id) {
+            g.parent_id = new_parent_id.map(|s| s.to_string());
+            g.level = target_level;
+        }
+        Ok(())
+    }
+}
+
 /// 聚合内存存储实现 (MockStorage)
 #[derive(Debug, Clone)]
 pub struct MockStorage {
@@ -546,6 +709,7 @@ pub struct MockStorage {
     groups_repo: MockGroupRepository,
     history_repo: MockHistoryRepository,
     credentials_repo: MockCredentialRepository,
+    snippets_repo: MockSnippetRepository,
 }
 
 impl Default for MockStorage {
@@ -564,6 +728,7 @@ impl MockStorage {
             groups_repo: MockGroupRepository::new(),
             history_repo: MockHistoryRepository::new(),
             credentials_repo,
+            snippets_repo: MockSnippetRepository::new(),
         }
     }
 
@@ -1153,14 +1318,192 @@ logout"#.to_string(),
             },
         ];
 
+        let snippet_groups = vec![
+            SnippetGroupRecord {
+                id: "sgrp-docker".to_string(),
+                name: "Docker 容器与微服务".to_string(),
+                parent_id: None,
+                level: 0,
+                is_expanded: true,
+                sort_order: 0,
+            },
+            SnippetGroupRecord {
+                id: "sgrp-k8s".to_string(),
+                name: "Kubernetes 集群排障".to_string(),
+                parent_id: None,
+                level: 0,
+                is_expanded: true,
+                sort_order: 1,
+            },
+            SnippetGroupRecord {
+                id: "sgrp-ops".to_string(),
+                name: "Linux 系统基础运维".to_string(),
+                parent_id: None,
+                level: 0,
+                is_expanded: true,
+                sort_order: 2,
+            },
+            SnippetGroupRecord {
+                id: "sgrp-ops-net".to_string(),
+                name: "网络与端口诊断".to_string(),
+                parent_id: Some("sgrp-ops".to_string()),
+                level: 1,
+                is_expanded: true,
+                sort_order: 0,
+            },
+            SnippetGroupRecord {
+                id: "sgrp-db".to_string(),
+                name: "数据库维护与慢查询".to_string(),
+                parent_id: None,
+                level: 0,
+                is_expanded: true,
+                sort_order: 3,
+            },
+        ];
+
+        let snippets = vec![
+            SnippetRecord {
+                id: "snip-docker-ps".to_string(),
+                parent_group_id: Some("sgrp-docker".to_string()),
+                title: "Docker 容器健康列表".to_string(),
+                content: "docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}\t{{.Image}}'".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["docker".to_string(), "status".to_string()],
+                auto_execute: true,
+                description: "格式化列出所有正在运行的 Docker 容器及其映射端口".to_string(),
+                is_favorite: true,
+                sort_order: 0,
+                updated_at: "2026-09-01 10:00:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-docker-log".to_string(),
+                parent_group_id: Some("sgrp-docker".to_string()),
+                title: "Docker 实时日志追踪".to_string(),
+                content: "docker logs -f --tail={{lines:100}} {{container_name}}".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["docker".to_string(), "logs".to_string()],
+                auto_execute: true,
+                description: "动态参数化追踪指定容器尾部日志流".to_string(),
+                is_favorite: true,
+                sort_order: 1,
+                updated_at: "2026-09-01 10:15:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-docker-prune".to_string(),
+                parent_group_id: Some("sgrp-docker".to_string()),
+                title: "清理悬空镜像与未用卷".to_string(),
+                content: "docker system prune -f --volumes".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["docker".to_string(), "cleanup".to_string()],
+                auto_execute: false,
+                description: "安全释放 Docker 废弃卷与虚悬镜像存储空间 (仅粘贴需手动确认)".to_string(),
+                is_favorite: false,
+                sort_order: 2,
+                updated_at: "2026-08-30 16:00:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-k8s-abnormal".to_string(),
+                parent_group_id: Some("sgrp-k8s".to_string()),
+                title: "K8s 全命名空间异常 Pod 排查".to_string(),
+                content: "kubectl get pods -A --field-selector=status.phase!=Running,status.phase!=Succeeded".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["k8s".to_string(), "pod".to_string(), "troubleshoot".to_string()],
+                auto_execute: true,
+                description: "快速筛出集群中 CrashLoopBackOff 或 Pending 状态的故障 Pod".to_string(),
+                is_favorite: true,
+                sort_order: 0,
+                updated_at: "2026-08-28 14:00:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-k8s-restart".to_string(),
+                parent_group_id: Some("sgrp-k8s".to_string()),
+                title: "K8s 滚动重启 Deployment".to_string(),
+                content: "kubectl rollout restart deployment/{{deployment_name}} -n {{namespace:default}}".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["k8s".to_string(), "restart".to_string()],
+                auto_execute: true,
+                description: "无损滚动重启指定的 Kubernetes 工作负载".to_string(),
+                is_favorite: false,
+                sort_order: 1,
+                updated_at: "2026-08-29 11:30:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-sys-load".to_string(),
+                parent_group_id: Some("sgrp-ops".to_string()),
+                title: "Linux CPU 与内存负载 Top 20".to_string(),
+                content: "top -b -n 1 | head -n 20".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["linux".to_string(), "performance".to_string()],
+                auto_execute: true,
+                description: "单次截取系统负载、任务队列与前 20 活跃进程".to_string(),
+                is_favorite: false,
+                sort_order: 0,
+                updated_at: "2026-08-25 09:00:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-disk-large".to_string(),
+                parent_group_id: Some("sgrp-ops".to_string()),
+                title: "磁盘大文件扫描 (>500MB)".to_string(),
+                content: "find {{scan_path:/var/log}} -type f -size +{{size_mb:500}}M -exec ls -lh {} + 2>/dev/null | awk '{print $9 \": \" $5}'".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["disk".to_string(), "find".to_string()],
+                auto_execute: true,
+                description: "排查磁盘爆满根因，快速定位指定目录下超过阈值的大文件".to_string(),
+                is_favorite: true,
+                sort_order: 1,
+                updated_at: "2026-08-26 15:40:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-net-port".to_string(),
+                parent_group_id: Some("sgrp-ops-net".to_string()),
+                title: "查询指定端口占用与监听进程".to_string(),
+                content: "lsof -i :{{port:8080}} || netstat -tulnp | grep :{{port:8080}}".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["network".to_string(), "port".to_string()],
+                auto_execute: true,
+                description: "检测本地端口监听状态与绑定 PID 进程名".to_string(),
+                is_favorite: true,
+                sort_order: 0,
+                updated_at: "2026-08-27 18:00:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-db-mysql-process".to_string(),
+                parent_group_id: Some("sgrp-db".to_string()),
+                title: "MySQL 活跃长事务与锁排查".to_string(),
+                content: "mysql -u {{user:root}} -p{{password}} -h {{host:127.0.0.1}} -e 'SHOW FULL PROCESSLIST;'".to_string(),
+                language: "sql".to_string(),
+                tags: vec!["mysql".to_string(), "database".to_string()],
+                auto_execute: false,
+                description: "查看 MySQL 当前执行超过阈值的慢查询与卡顿连接".to_string(),
+                is_favorite: false,
+                sort_order: 0,
+                updated_at: "2026-08-28 20:00:00".to_string(),
+            },
+            SnippetRecord {
+                id: "snip-db-redis-info".to_string(),
+                parent_group_id: Some("sgrp-db".to_string()),
+                title: "Redis 内存占用分析".to_string(),
+                content: "redis-cli -h {{host:127.0.0.1}} -p {{port:6379}} info memory | grep -E 'used_memory_human|used_memory_peak_human|mem_fragmentation_ratio'".to_string(),
+                language: "bash".to_string(),
+                tags: vec!["redis".to_string(), "memory".to_string()],
+                auto_execute: true,
+                description: "获取 Redis 当前内存峰值与碎片率指标".to_string(),
+                is_favorite: true,
+                sort_order: 1,
+                updated_at: "2026-08-30 09:20:00".to_string(),
+            },
+        ];
+
         tracing::info!(
             target: "smagical_core::storage",
-            "初始化 MockStorage 预设种子引擎完成: 已注入 {} 个层级分组, {} 台主机资产, {} 条历史会话记录 (含 {} 份屏幕快照), {} 条凭据记录",
+            "初始化 MockStorage 预设种子引擎完成: 已注入 {} 个层级分组, {} 台主机资产, {} 条历史会话记录 (含 {} 份屏幕快照), {} 条凭据记录, {} 个代码片段分组与 {} 个代码片段",
             groups.len(),
             hosts.len(),
             history.len(),
             snapshots.len(),
-            credentials.len()
+            credentials.len(),
+            snippet_groups.len(),
+            snippets.len()
         );
 
         let hosts_repo = MockHostRepository::with_hosts(hosts);
@@ -1170,6 +1513,7 @@ logout"#.to_string(),
             groups_repo: MockGroupRepository::with_groups(groups),
             history_repo: MockHistoryRepository::with_history_and_snapshots(history, snapshots),
             credentials_repo,
+            snippets_repo: MockSnippetRepository::with_data(snippets, snippet_groups),
         }
     }
 }
@@ -1190,6 +1534,10 @@ impl AppStorage for MockStorage {
 
     fn credentials(&self) -> &dyn CredentialRepository {
         &self.credentials_repo
+    }
+
+    fn snippets(&self) -> &dyn SnippetRepository {
+        &self.snippets_repo
     }
 
     fn reload(&self) -> StorageResult<()> {
@@ -1429,6 +1777,47 @@ mod tests {
         let search_results = storage.credentials().search("1Password").unwrap();
         assert_eq!(search_results.len(), 1);
         assert_eq!(search_results[0].id, "cred-1pwd-agent");
+    }
+
+    #[test]
+    fn test_mock_storage_snippets_and_groups_crud() {
+        let storage = MockStorage::new_seeded();
+
+        // 1. 验证预设种子
+        let groups = storage.snippets().list_groups().unwrap();
+        let snippets = storage.snippets().list_all().unwrap();
+        assert_eq!(groups.len(), 5);
+        assert_eq!(snippets.len(), 10);
+
+        // 2. 按分组过滤
+        let docker_snippets = storage.snippets().list_by_group(Some("sgrp-docker")).unwrap();
+        assert_eq!(docker_snippets.len(), 3);
+
+        // 3. 搜索
+        let search_res = storage.snippets().search("restart").unwrap();
+        assert_eq!(search_res.len(), 1);
+        assert_eq!(search_res[0].id, "snip-k8s-restart");
+
+        // 4. 星标切换
+        let fav_before = storage.snippets().get_by_id("snip-docker-prune").unwrap().unwrap().is_favorite;
+        assert!(!fav_before);
+        let fav_after = storage.snippets().toggle_favorite("snip-docker-prune").unwrap();
+        assert!(fav_after);
+        assert!(storage.snippets().get_by_id("snip-docker-prune").unwrap().unwrap().is_favorite);
+
+        // 5. 新建与删除片段
+        let new_snip = SnippetRecord::new("snip-test", "测试脚本", "echo 'hello'", "bash");
+        storage.snippets().save(&new_snip).unwrap();
+        assert_eq!(storage.snippets().list_all().unwrap().len(), 11);
+        storage.snippets().delete("snip-test").unwrap();
+        assert_eq!(storage.snippets().list_all().unwrap().len(), 10);
+
+        // 6. 新建与移动分组
+        let new_grp = SnippetGroupRecord::child("sgrp-test-child", "子分组", "sgrp-docker", 1);
+        storage.snippets().save_group(&new_grp).unwrap();
+        assert_eq!(storage.snippets().list_groups().unwrap().len(), 6);
+        storage.snippets().delete_group("sgrp-test-child").unwrap();
+        assert_eq!(storage.snippets().list_groups().unwrap().len(), 5);
     }
 }
 

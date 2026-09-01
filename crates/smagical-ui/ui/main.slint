@@ -9,6 +9,9 @@ export { LocalShellItemData } from "components/new-session-modal.slint";
 export { TerminalPaneData, TerminalSplitterData } from "views/center_terminal/terminal_viewport.slint";
 export { FileItemData, FileTabData, TransferItemData } from "views/file_explorer_view.slint";
 export { CredentialItemData } from "views/left_drawers/credentials_drawer.slint";
+export { SnippetTreeNode } from "views/snippets_view.slint";
+export { SnippetParamFieldData } from "components/snippet-run-modal.slint";
+export { QuickCmdData } from "views/right_drawers/snippet_tool_drawer.slint";
 export { ToastItemData } from "components/toast.slint";
 
 
@@ -34,6 +37,9 @@ import { MessageDialog } from "components/message-dialog.slint";
 import { FileHostModal } from "components/file-host-modal.slint";
 import { ToastContainer, ToastItemData } from "components/toast.slint";
 import { CredentialsCenterView } from "views/credentials_view.slint";
+import { SnippetsCenterView, SnippetTreeNode } from "views/snippets_view.slint";
+import { SnippetRunModal, SnippetParamFieldData } from "components/snippet-run-modal.slint";
+import { CreateSnippetGroupModal } from "components/create-snippet-group-modal.slint";
 
 
 
@@ -71,7 +77,6 @@ import {
 } from "views/left_drawers/credentials_drawer.slint";
 import {
     SnippetsDrawer,
-    SnippetItemData,
 } from "views/left_drawers/snippets_drawer.slint";
 import {
     TunnelsDrawer,
@@ -296,6 +301,49 @@ export component AppWindow inherits Window {
     in-out property <string> credential-form-notes: "";
     in-out property <int> credential-form-bound-host-count: 0;
     in-out property <string> credential-form-updated-at: "";
+
+    // -------------------------------------------------------------------------
+    // 代码片段与多层层级管理状态 (Master-Detail 树形与沉浸式编辑)
+    // -------------------------------------------------------------------------
+    /// 代码片段树形节点视图数据
+    in property <[SnippetTreeNode]> snippet-tree-nodes: [];
+    /// 代码片段搜索关键词
+    in-out property <string> snippet-search-query: "";
+    /// 当前选中的代码片段或分组 ID
+    in-out property <string> snippet-selected-id: "";
+    /// 是否有选中的节点
+    in-out property <bool> snippet-has-selection: false;
+    /// 选中的是否为文件夹分组
+    in-out property <bool> snippet-is-selected-group: false;
+
+    /// 代码片段详情编辑表单绑定
+    in-out property <string> snippet-edit-id: "";
+    in-out property <string> snippet-edit-title: "";
+    in-out property <string> snippet-edit-category-name: "";
+    in-out property <string> snippet-edit-language: "bash";
+    in-out property <string> snippet-edit-content: "";
+    in-out property <bool> snippet-edit-auto-execute: true;
+    in-out property <string> snippet-edit-description: "";
+    in-out property <bool> snippet-edit-is-favorite: false;
+    in property <string> snippet-detected-variables-text: "";
+    in property <string> snippet-edit-updated-at: "";
+
+    /// 新建文件夹弹窗状态
+    in property <[GroupOptionData]> snippet-parent-options: [];
+    in-out property <bool> is-create-snippet-group-open: false;
+    in-out property <string> new-snippet-group-name: "";
+    in-out property <string> new-snippet-group-parent-id: "root";
+
+    /// 动态参数填报执行弹窗状态
+    in-out property <bool> is-snippet-run-modal-open: false;
+    in-out property <string> snippet-run-modal-id: "";
+    in-out property <string> snippet-run-modal-title: "";
+    in-out property <string> snippet-run-modal-rendered-command: "";
+    in-out property <[SnippetParamFieldData]> snippet-run-params-list: [];
+
+    /// 右侧伴生工具栏数据源
+    in property <[QuickCmdData]> quick-cmds: [];
+    in-out property <string> quick-cmds-search-query: "";
 
     // -------------------------------------------------------------------------
     // 拖拽调序交互状态机
@@ -535,6 +583,50 @@ export component AppWindow inherits Window {
     callback filter-credentials(string /* category */, string /* query */);
 
     // -------------------------------------------------------------------------
+    // 代码片段与层级分组管理交互回调
+    // -------------------------------------------------------------------------
+    /// 树形搜索过滤
+    callback filter-snippets-tree(string /* query */);
+    /// 展开/折叠分组
+    callback toggle-snippet-group-expanded(string /* group_id */);
+    /// 选中树节点 (片段或分组)
+    callback select-snippet-node(string /* id */, bool /* is_group */);
+    /// 切换片段星标置顶
+    callback toggle-snippet-favorite(string /* id */);
+    /// 开启新建片段
+    callback open-create-snippet();
+    /// 开启新建分组弹窗
+    callback open-create-snippet-group();
+    /// 取消新建分组弹窗
+    callback cancel-create-snippet-group();
+    /// 提交新建分组
+    callback submit-create-snippet-group();
+    /// 弹窗内选择上级父分组
+    callback select-snippet-group-parent(string /* id */);
+    /// 在中心保存当前正在编辑的代码片段
+    callback save-snippet-from-center();
+    /// 删除指定代码片段
+    callback delete-snippet-node(string /* id */);
+    /// 删除指定分组
+    callback delete-snippet-group-node(string /* id */);
+    /// 复制片段代码到系统剪贴板
+    callback copy-snippet-text(string /* id */);
+    /// 触发执行代码片段 (判断是否需要弹窗输入参数)
+    callback execute-snippet-from-center(string /* id */);
+    /// 参数填报弹窗中输入参数修改
+    callback run-snippet-param-changed(int /* index */, string /* val */);
+    /// 取消执行弹窗
+    callback cancel-snippet-run();
+    /// 提交执行弹窗 (渲染命令并注入终端)
+    callback submit-snippet-run();
+    /// 右侧伴生工具栏搜索过滤
+    callback filter-quick-cmds(string /* query */);
+    /// 拖拽移动/调序代码片段或文件夹节点 (source-id, target-id, drop-position)
+    callback move-snippet-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
+    /// 拖拽悬停计算事件回调 (source-id, target-index, offset-in-row)
+    callback request-snippet-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
+
+    // -------------------------------------------------------------------------
     // 开发者 F12 调试控制台专用回调
     // -------------------------------------------------------------------------
 
@@ -546,9 +638,9 @@ export component AppWindow inherits Window {
     callback debug-batch-update-port(string /* new_port_str */);
     /// 注入标准场景测试预设
     callback debug-inject-preset(string /* preset_id */);
-    /// 快捷添加单台主机
+    /// 快速新增主机
     callback debug-quick-add-host(string /* name */, string /* ip */, string /* port_str */, string /* group */);
-    /// 快捷添加嵌套分组
+    /// 快速新增分组
     callback debug-quick-add-group(string /* name */, string /* parent_id */);
     /// 清空全量内存与存储层数据
     callback debug-clear-data();
@@ -562,6 +654,14 @@ export component AppWindow inherits Window {
     callback debug-reset-default-credentials();
     /// 清空所有凭据数据
     callback debug-clear-credentials();
+    /// 批量生成代码片段测试数据
+    callback debug-batch-generate-snippets(string /* count_str */, bool /* overwrite */);
+    /// 快捷添加单条测试代码片段
+    callback debug-quick-add-snippet(string /* title */, string /* lang */, string /* cmd */);
+    /// 恢复默认精选代码片段预设
+    callback debug-reset-default-snippets();
+    /// 清空所有代码片段数据
+    callback debug-clear-snippets();
     /// 清空诊断日志
     callback debug-clear-logs();
     /// 模拟触发测试诊断日志
@@ -799,6 +899,12 @@ export component AppWindow inherits Window {
                             root.main-view = "credentials";
                             root.is-left-drawer-open = false;
                             root.navigate-to("credentials", "");
+                        } else if id == "snippets" {
+                            // 切换至独立全屏代码片段中心大页面 (左侧多层树形 + 右侧沉浸式编辑器)
+                            root.active-left-tab = "snippets";
+                            root.main-view = "snippets";
+                            root.is-left-drawer-open = false;
+                            root.navigate-to("snippets", "");
                         } else if id == "files" {
                             // 切换至文件管理页面：左侧展示主机树抽屉，中央展示双盘文件管理器
                             root.active-left-tab = "files";
@@ -882,7 +988,17 @@ export component AppWindow inherits Window {
                         width: 100%;
                         height: 100%;
                         collapse => { root.is-left-drawer-open = false; }
-                        execute-snippet(cmd) => { root.send-snippet(cmd); }
+                        tree-nodes: root.snippet-tree-nodes;
+                        search-query <=> root.snippet-search-query;
+                        selected-id <=> root.snippet-selected-id;
+                        search-changed(q) => { root.filter-snippets-tree(q); }
+                        toggle-group(id) => { root.toggle-snippet-group-expanded(id); }
+                        select-node(id, is_grp) => { root.select-snippet-node(id, is_grp); }
+                        create-new-group => { root.open-create-snippet-group(); }
+                        create-new-snippet => { root.open-create-snippet(); }
+                        execute-snippet(id) => { root.execute-snippet-from-center(id); }
+                        move-node(src, tgt, pos) => { root.move-snippet-tree-node(src, tgt, pos); }
+                        request-drag-hover(src, idx, off) => { root.request-snippet-drag-hover(src, idx, off); }
                     }
 
                     if root.active-left-tab == "tunnels": TunnelsDrawer {
@@ -1015,6 +1131,40 @@ export component AppWindow inherits Window {
                         root.active-left-tab = "hosts";
                         root.is-left-drawer-open = true;
                     }
+                }
+
+                // 2.3.3 全屏代码片段管理中心 (当 main-view == "snippets" 时展开，左侧树形分组 + 右侧沉浸式详情)
+                if root.main-view == "snippets": SnippetsCenterView {
+                    horizontal-stretch: 1;
+                    tree_nodes: root.snippet-tree-nodes;
+                    search_query <=> root.snippet-search-query;
+                    selected_id <=> root.snippet-selected-id;
+                    has_selection: root.snippet-has-selection;
+                    is_selected_group: root.snippet-is-selected-group;
+                    edit_id <=> root.snippet-edit-id;
+                    edit_title <=> root.snippet-edit-title;
+                    edit_category_name <=> root.snippet-edit-category-name;
+                    edit_language <=> root.snippet-edit-language;
+                    edit_content <=> root.snippet-edit-content;
+                    edit_auto_execute <=> root.snippet-edit-auto-execute;
+                    edit_description <=> root.snippet-edit-description;
+                    edit_is_favorite <=> root.snippet-edit-is-favorite;
+                    detected_variables_text: root.snippet-detected-variables-text;
+                    edit_updated_at: root.snippet-edit-updated-at;
+
+                    search_changed(q) => { root.filter-snippets-tree(q); }
+                    toggle_group_expanded(id) => { root.toggle-snippet-group-expanded(id); }
+                    select_node(id, is_grp) => { root.select-snippet-node(id, is_grp); }
+                    toggle_favorite(id) => { root.toggle-snippet-favorite(id); }
+                    create_snippet => { root.open-create-snippet(); }
+                    create_group => { root.open-create-snippet-group(); }
+                    save_snippet => { root.save-snippet-from-center(); }
+                    delete_snippet(id) => { root.delete-snippet-node(id); }
+                    delete_group(id) => { root.delete-snippet-group-node(id); }
+                    copy_content(id) => { root.copy-snippet-text(id); }
+                    execute_snippet(id) => { root.execute-snippet-from-center(id); }
+                    move_node(src, tgt, pos) => { root.move-snippet-tree-node(src, tgt, pos); }
+                    request_drag_hover(src, idx, off) => { root.request-snippet-drag-hover(src, idx, off); }
                 }
 
 
@@ -1203,7 +1353,10 @@ export component AppWindow inherits Window {
 
                     if root.active-right-tool == "snippets": SnippetToolDrawer {
                         collapse => { root.is-right-drawer-open = false; }
-                        send-to-terminal(cmd) => { root.send-snippet(cmd); }
+                        quick-cmds: root.quick-cmds;
+                        search_query <=> root.quick-cmds-search-query;
+                        search_changed(q) => { root.filter-quick-cmds(q); }
+                        send-to-terminal(id) => { root.execute-snippet-from-center(id); }
                     }
 
                     if root.active-right-tool == "sftp": SftpToolDrawer {
@@ -1281,6 +1434,8 @@ export component AppWindow inherits Window {
         visible-nodes-count: root.tree-nodes.length;
         host-cards-count: root.hosts.length;
         credential-count: root.credentials.length;
+        snippet-count: root.snippet-tree-nodes.length;
+        snippet-group-count: root.snippet-parent-options.length;
         tree-viewport-width: root.tree-content-width;
         current-theme-name: root.current-theme-name;
         is-dark-mode: root.is-dark-mode;
@@ -1304,6 +1459,10 @@ export component AppWindow inherits Window {
         debug-quick-add-credential(ctype, n, d) => { root.debug-quick-add-credential(ctype, n, d); }
         debug-reset-default-credentials => { root.debug-reset-default-credentials(); }
         debug-clear-credentials => { root.debug-clear-credentials(); }
+        debug-batch-generate-snippets(cnt, ovr) => { root.debug-batch-generate-snippets(cnt, ovr); }
+        debug-quick-add-snippet(t, l, c) => { root.debug-quick-add-snippet(t, l, c); }
+        debug-reset-default-snippets => { root.debug-reset-default-snippets(); }
+        debug-clear-snippets => { root.debug-clear-snippets(); }
         clear-logs => { root.debug-clear-logs(); }
         emit-test-log(level) => { root.debug-emit-test-log(level); }
         switch-theme(id) => { root.switch-theme(id); }
@@ -1383,6 +1542,29 @@ export component AppWindow inherits Window {
             root.is-file-host-modal-open = false;
             root.open-file-host(id);
         }
+    }
+
+    // 新建代码片段文件夹弹窗
+    CreateSnippetGroupModal {
+        is_open <=> root.is-create-snippet-group-open;
+        group_name <=> root.new-snippet-group-name;
+        selected_parent_id <=> root.new-snippet-group-parent-id;
+        parent_options: root.snippet-parent-options;
+        cancel => { root.cancel-create-snippet-group(); }
+        submit => { root.submit-create-snippet-group(); }
+        select_parent(id) => { root.select-snippet-group-parent(id); }
+    }
+
+    // 代码片段动态参数填报执行弹窗
+    SnippetRunModal {
+        is_open <=> root.is-snippet-run-modal-open;
+        snippet_id: root.snippet-run-modal-id;
+        snippet_title: root.snippet-run-modal-title;
+        rendered_command <=> root.snippet-run-modal-rendered-command;
+        params_list <=> root.snippet-run-params-list;
+        cancel => { root.cancel-snippet-run(); }
+        submit => { root.submit-snippet-run(); }
+        param_changed(idx, val) => { root.run-snippet-param-changed(idx, val); }
     }
 
     // 全局气泡通知浮层 (z: 1000 最高层级)

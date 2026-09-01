@@ -1,0 +1,248 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { LineEdit, Button, ScrollView } from "std-widgets.slint";
+
+/// 动态参数填报项
+export struct SnippetParamFieldData {
+    key: string,
+    label: string,
+    value: string,
+    default_val: string,
+}
+
+/// 代码片段动态参数填报执行弹窗 (SnippetRunModal)
+export component SnippetRunModal inherits Rectangle {
+    in-out property <bool> is_open: false;
+    in property <string> snippet_id: "";
+    in property <string> snippet_title: "";
+    in property <string> raw_command: "";
+    in-out property <string> rendered_command: "";
+    in-out property <[SnippetParamFieldData]> params_list: [];
+
+    callback cancel;
+    callback submit;
+    callback param_changed(int /* index */, string /* val */);
+
+    if root.is_open: Rectangle {
+        background: #000000.transparentize(0.5);
+
+        // 阻止点击穿透
+        TouchArea { }
+
+        Rectangle {
+            width: 480px;
+            max-height: 520px;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #000000.transparentize(0.4);
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 16px;
+
+                // 1. 顶部标题
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Text {
+                        text: "⚡";
+                        font-size: 16px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: @tr("填充动态参数执行代码片段");
+                        font-size: 14px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: AppTheme.radius-small;
+                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        Text {
+                            text: "✕";
+                            font-size: 12px;
+                            color: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        close-touch := TouchArea {
+                            clicked => { root.cancel(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+
+                // 2. 片段信息
+                Rectangle {
+                    height: 32px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.control-background;
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+                        alignment: center;
+
+                        Text {
+                            text: "📄 " + root.snippet_title;
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 3. 参数填报表单
+                ScrollView {
+                    max-height: 200px;
+                    VerticalLayout {
+                        spacing: 10px;
+
+                        for param[idx] in root.params_list: VerticalLayout {
+                            spacing: 4px;
+
+                            HorizontalLayout {
+                                spacing: 4px;
+                                Text {
+                                    text: param.label;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.foreground;
+                                }
+
+                                if param.default_val != "": Text {
+                                    text: @tr("(默认: ") + param.default_val + ")";
+                                    font-size: 10px;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                            }
+
+                            Rectangle {
+                                height: 32px;
+                                border-radius: AppTheme.radius-medium;
+                                background: AppTheme.panel-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+
+                                    LineEdit {
+                                        text: param.value != "" ? param.value : param.default_val;
+                                        placeholder-text: @tr("请输入 ") + param.label;
+                                        edited(text) => { root.param_changed(idx, text); }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4. 实时合成命令预览区
+                VerticalLayout {
+                    spacing: 4px;
+
+                    Text {
+                        text: @tr("合成命令预览:");
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                    }
+
+                    Rectangle {
+                        height: 48px;
+                        border-radius: AppTheme.radius-medium;
+                        background: #111827;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        HorizontalLayout {
+                            padding: 8px;
+
+                            Text {
+                                text: root.rendered_command;
+                                font-size: 11px;
+                                color: #38bdf8;
+                                overflow: elide;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 5. 底部按钮
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: end;
+
+                    Rectangle {
+                        width: 80px;
+                        height: 32px;
+                        border-radius: AppTheme.radius-medium;
+                        background: cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+
+                        Text {
+                            text: @tr("取消");
+                            font-size: 11px;
+                            color: AppTheme.foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        cancel-touch := TouchArea {
+                            clicked => { root.cancel(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 120px;
+                        height: 32px;
+                        border-radius: AppTheme.radius-medium;
+                        background: submit-touch.has-hover ? #16a34a : #22c55e;
+
+                        HorizontalLayout {
+                            spacing: 4px;
+                            alignment: center;
+
+                            Text {
+                                text: "▶";
+                                font-size: 11px;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: @tr("一键注入执行");
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        submit-touch := TouchArea {
+                            clicked => { root.submit(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

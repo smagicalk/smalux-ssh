@@ -18,11 +18,14 @@ pub mod right_panel;
 pub mod file_item;
 /// SSH 凭据与密钥管理模型。
 pub mod credential;
+/// 代码片段与多层层级分组模型。
+pub mod snippet;
 
 pub use group::GroupRecord;
 pub use history::{HistoryRecord, SessionSnapshotConfig};
 pub use host::{HostRecord, HostStatus};
 pub use credential::{CredentialRecord, CredentialType};
+pub use snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable};
 pub use activity_bar::{ActivityBarItem, ActivityBarRegistry};
 pub use navigation::{NavigationRequest, NavigationRouter};
 pub use terminal_context::{ActiveTerminalSessionContext, TerminalAction};

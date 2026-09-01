@@ -1,0 +1,201 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { LineEdit, Button, ScrollView } from "std-widgets.slint";
+import { GroupOptionData } from "./create-group-modal.slint";
+
+/// 创建代码片段文件夹分组弹窗
+export component CreateSnippetGroupModal inherits Rectangle {
+    in-out property <bool> is_open: false;
+    in-out property <string> group_name: "";
+    in-out property <string> selected_parent_id: "root";
+    in property <[GroupOptionData]> parent_options: [];
+
+    callback cancel;
+    callback submit;
+    callback select_parent(string /* id */);
+
+    if root.is_open: Rectangle {
+        background: #000000.transparentize(0.5);
+
+        TouchArea { }
+
+        Rectangle {
+            width: 400px;
+            max-height: 420px;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #000000.transparentize(0.4);
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 16px;
+
+                // 1. 标题
+                HorizontalLayout {
+                    alignment: center;
+                    spacing: 8px;
+
+                    Text {
+                        text: "📁";
+                        font-size: 16px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: @tr("新建代码片段文件夹");
+                        font-size: 14px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle { horizontal-stretch: 1; }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: AppTheme.radius-small;
+                        background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        Text {
+                            text: "✕";
+                            font-size: 12px;
+                            color: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        close-touch := TouchArea {
+                            clicked => { root.cancel(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+
+                // 2. 文件夹名称
+                VerticalLayout {
+                    spacing: 6px;
+
+                    Text {
+                        text: @tr("文件夹名称");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                    }
+
+                    Rectangle {
+                        height: 34px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+
+                            LineEdit {
+                                text <=> root.group_name;
+                                placeholder-text: @tr("如：Docker 容器运维、K8s 排障...");
+                            }
+                        }
+                    }
+                }
+
+                // 3. 上级父目录选择
+                VerticalLayout {
+                    spacing: 6px;
+
+                    Text {
+                        text: @tr("上级文件夹 (可选多层嵌套)");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                    }
+
+                    ScrollView {
+                        max-height: 120px;
+                        VerticalLayout {
+                            spacing: 2px;
+
+                            for opt in root.parent_options: Rectangle {
+                                height: 28px;
+                                border-radius: AppTheme.radius-small;
+                                background: opt.id == root.selected_parent_id ? AppTheme.accent.transparentize(0.85) : (opt-touch.has-hover ? AppTheme.hover-background : transparent);
+
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 6px;
+                                    alignment: center;
+
+                                    Text {
+                                        text: opt.name;
+                                        font-size: 11px;
+                                        color: opt.id == root.selected_parent_id ? AppTheme.accent : AppTheme.foreground;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+
+                                opt-touch := TouchArea {
+                                    clicked => { root.select_parent(opt.id); }
+                                    mouse-cursor: pointer;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4. 底部操作
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: end;
+
+                    Rectangle {
+                        width: 80px;
+                        height: 32px;
+                        border-radius: AppTheme.radius-medium;
+                        background: cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+
+                        Text {
+                            text: @tr("取消");
+                            font-size: 11px;
+                            color: AppTheme.foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        cancel-touch := TouchArea {
+                            clicked => { root.cancel(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 90px;
+                        height: 32px;
+                        border-radius: AppTheme.radius-medium;
+                        background: submit-touch.has-hover ? AppTheme.accent : AppTheme.accent.transparentize(0.15);
+
+                        Text {
+                            text: @tr("创建");
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: #ffffff;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        submit-touch := TouchArea {
+                            clicked => { root.submit(); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

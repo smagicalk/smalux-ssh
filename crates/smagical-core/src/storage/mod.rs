@@ -132,6 +132,51 @@ pub trait CredentialRepository: Send + Sync {
     fn delete(&self, id: &str) -> StorageResult<bool>;
 }
 
+/// 代码片段与层级分组仓储接口契约
+pub trait SnippetRepository: Send + Sync {
+    /// 获取全部代码片段记录
+    fn list_all(&self) -> StorageResult<Vec<crate::domain::snippet::SnippetRecord>>;
+
+    /// 按所属文件夹分组获取代码片段 (None 表示根目录下)
+    fn list_by_group(&self, group_id: Option<&str>) -> StorageResult<Vec<crate::domain::snippet::SnippetRecord>>;
+
+    /// 根据唯一 ID 查询代码片段
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<crate::domain::snippet::SnippetRecord>>;
+
+    /// 模糊搜索代码片段 (按标题、命令、标签、备注)
+    fn search(&self, query: &str) -> StorageResult<Vec<crate::domain::snippet::SnippetRecord>>;
+
+    /// 保存或更新代码片段
+    fn save(&self, record: &crate::domain::snippet::SnippetRecord) -> StorageResult<()>;
+
+    /// 批量保存代码片段
+    fn save_batch(&self, records: &[crate::domain::snippet::SnippetRecord]) -> StorageResult<()>;
+
+    /// 删除指定代码片段
+    fn delete(&self, id: &str) -> StorageResult<bool>;
+
+    /// 切换星标置顶状态
+    fn toggle_favorite(&self, id: &str) -> StorageResult<bool>;
+
+    /// 获取全部代码片段层级分组
+    fn list_groups(&self) -> StorageResult<Vec<crate::domain::snippet::SnippetGroupRecord>>;
+
+    /// 根据唯一 ID 查询分组
+    fn get_group_by_id(&self, id: &str) -> StorageResult<Option<crate::domain::snippet::SnippetGroupRecord>>;
+
+    /// 保存或更新分组
+    fn save_group(&self, group: &crate::domain::snippet::SnippetGroupRecord) -> StorageResult<()>;
+
+    /// 删除指定分组 (以及其关联的子项/将其子项回退至父级)
+    fn delete_group(&self, id: &str) -> StorageResult<bool>;
+
+    /// 设置分组折叠/展开状态
+    fn set_group_expanded(&self, id: &str, expanded: bool) -> StorageResult<()>;
+
+    /// 移动分组至新的父级分组
+    fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()>;
+}
+
 /// 聚合存储服务门面契约
 pub trait AppStorage: Send + Sync {
     /// 主机仓储句柄
@@ -145,6 +190,9 @@ pub trait AppStorage: Send + Sync {
 
     /// 凭据仓储句柄
     fn credentials(&self) -> &dyn CredentialRepository;
+
+    /// 代码片段仓储句柄
+    fn snippets(&self) -> &dyn SnippetRepository;
 
     /// 强制从物理介质重新加载数据
     fn reload(&self) -> StorageResult<()>;

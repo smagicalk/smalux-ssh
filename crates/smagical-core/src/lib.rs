@@ -21,9 +21,10 @@ pub use event::{
     HostSearchFilteredEvent, HostTreeReorderedEvent, KeyGeneratedEvent, ListenerGuard,
     ModuleActivatedEvent, ModuleDeactivatedEvent, NavigationRequestedEvent,
     NavigationTabClickedEvent, PasswordGeneratedEvent, RightPanelRegisteredEvent,
-    RightPanelSwitchedEvent, RightPanelUnregisteredEvent, TerminalActionRequestedEvent,
-    TerminalFocusChangedEvent, TerminalSessionEvent, TerminalSplitChangedEvent, ThemeChangedEvent,
-    ThemeModeToggledEvent, WindowStateChangedEvent,
+    RightPanelSwitchedEvent, RightPanelUnregisteredEvent, SnippetDeletedEvent,
+    SnippetExecutedEvent, SnippetGroupDeletedEvent, SnippetGroupSavedEvent, SnippetSavedEvent,
+    TerminalActionRequestedEvent, TerminalFocusChangedEvent, TerminalSessionEvent,
+    TerminalSplitChangedEvent, ThemeChangedEvent, ThemeModeToggledEvent, WindowStateChangedEvent,
 };
 
 pub use domain::{
@@ -40,13 +41,14 @@ pub use domain::{
     host::{HostRecord, HostStatus},
     navigation::{NavigationRequest, NavigationRouter},
     right_panel::{RightPanelItem, RightPanelRegistry},
+    snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable},
     terminal_context::{ActiveTerminalSessionContext, TerminalAction},
 };
 
 pub use state::core_state::CoreState;
 pub use storage::{
     AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
-    MockStorage, StorageError, StorageResult,
+    MockStorage, SnippetRepository, StorageError, StorageResult,
 };
 
 

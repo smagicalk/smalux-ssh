@@ -14,6 +14,9 @@ pub mod theme;
 /// 主机资产树形数据模型与纯函数操作层。
 pub(crate) mod tree_model;
 
+/// 代码片段树形数据模型与纯函数操作层。
+pub(crate) mod snippet_tree_model;
+
 /// 终端会话管理与 Slint UI 同步。
 pub(crate) mod session;
 
@@ -254,6 +257,20 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let transfer_tasks = Rc::new(RefCell::new(Vec::<smagical_core::TransferTask>::new()));
     let notifications = notification_service::NotificationManager::new(window.as_weak());
 
+    // 代码片段树形与多层层级初始状态
+    let initial_snippet_master = snippet_tree_model::build_raw_snippet_tree_from_storage(core_state.storage().as_ref());
+    let mut initial_snippet_expanded = HashSet::new();
+    core_state.storage().snippets().list_groups().unwrap_or_default()
+        .into_iter()
+        .for_each(|g| {
+            if g.is_expanded {
+                initial_snippet_expanded.insert(g.id);
+            }
+        });
+    let master_snippet_tree = Rc::new(RefCell::new(initial_snippet_master));
+    let expanded_snippet_groups = Rc::new(RefCell::new(initial_snippet_expanded));
+    let snippet_search_query = Rc::new(RefCell::new(String::new()));
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state: Rc::clone(&core_state),
@@ -290,14 +307,19 @@ pub fn run() -> Result<(), slint::PlatformError> {
         remote_file_nodes: Rc::clone(&remote_file_nodes),
         transfer_tasks: Rc::clone(&transfer_tasks),
         notifications,
+
+        master_snippet_tree,
+        expanded_snippet_groups,
+        snippet_search_query,
     };
 
 
 
 
-    // 初始同步历史会话抽屉与双盘文件浏览器数据
+    // 初始同步历史会话抽屉、双盘文件浏览器与代码片段中心数据
     handlers::history_handlers::sync_ui_history(&window, &ctx);
     handlers::file_handlers::sync_file_explorer_ui(&window, &ctx);
+    handlers::snippet_handlers::sync_ui_snippets(&window, &ctx);
 
     // 统一挂载所有区域的回调事件处理器
     register_all_handlers(&window, &ctx);

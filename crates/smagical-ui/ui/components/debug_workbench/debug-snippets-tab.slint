@@ -1,0 +1,371 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "../base/app-button.slint";
+import { AppFormInput } from "../base/app-form-input.slint";
+import { AppCard } from "../base/app-card.slint";
+
+/// 开发者代码片段与分组专属调试面板 (Snippets Debug Tab)
+export component DebugSnippetsTab inherits VerticalLayout {
+    // 统计指标
+    in property <int> snippet-count: 0;
+    in property <int> group-count: 0;
+
+    // 快捷添加表单
+    in-out property <string> quick-snippet-title: "";
+    in-out property <string> quick-snippet-lang: "bash";
+    in-out property <string> quick-snippet-cmd: "";
+
+    // 批量生成表单
+    in-out property <string> batch-snippet-prefix: "bench-snip-";
+    in-out property <string> batch-snippet-count-str: "10";
+    in-out property <bool> batch-snippet-overwrite: false;
+
+    // 回调事件
+    callback batch-generate-snippets(string, bool); // count_str, overwrite
+    callback quick-add-snippet(string, string, string); // title, lang, cmd
+    callback reset-default-snippets();
+    callback clear-all-snippets();
+
+    spacing: 10px;
+    width: 100%;
+    height: 100%;
+    alignment: start;
+
+    // 1. 顶部指标胶囊与全局数据重置栏
+    Rectangle {
+        height: 50px;
+        width: 100%;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        HorizontalLayout {
+            height: 100%;
+            padding-left: 14px;
+            padding-right: 14px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 12px;
+                alignment: start;
+
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: @tr("📜 代码片段总数: ") + root.snippet-count + @tr(" 条 | 📁 分组: ") + root.group-count + @tr(" 个");
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: end;
+
+                VerticalLayout {
+                    alignment: center;
+                    AppButton {
+                        text: @tr("恢复默认精选片段");
+                        icon: @image-url("../../assets/icons/refresh.svg");
+                        has-icon: true;
+                        variant: "secondary";
+                        clicked => { root.reset-default-snippets(); }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    AppButton {
+                        text: @tr("清空所有片段");
+                        icon: @image-url("../../assets/icons/trash.svg");
+                        has-icon: true;
+                        variant: "danger";
+                        clicked => { root.clear-all-snippets(); }
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. 左右两栏工作台布局
+    HorizontalLayout {
+        spacing: 12px;
+        vertical-stretch: 1;
+        width: 100%;
+
+        // 左侧: 常用预设一键注入与快速添加
+        AppCard {
+            horizontal-stretch: 1;
+            height: 100%;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 10px;
+                alignment: start;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    height: 20px;
+
+                    Image {
+                        source: @image-url("../../assets/icons/terminal.svg");
+                        width: 14px;
+                        height: 14px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("快速注入预设脚本");
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // 预设注入快捷按钮网格
+                VerticalLayout {
+                    spacing: 6px;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Rectangle {
+                            horizontal-stretch: 1; height: 26px; border-radius: 4px;
+                            background: p-s1.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px; border-color: AppTheme.border;
+                            p-s1 := TouchArea {
+                                clicked => {
+                                    root.quick-add-snippet(
+                                        "Docker 容器健康列表",
+                                        "bash",
+                                        "docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}'"
+                                    );
+                                }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "🐳 + Docker ps"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                        }
+
+                        Rectangle {
+                            horizontal-stretch: 1; height: 26px; border-radius: 4px;
+                            background: p-s2.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px; border-color: AppTheme.border;
+                            p-s2 := TouchArea {
+                                clicked => {
+                                    root.quick-add-snippet(
+                                        "K8s 重启 Deployment",
+                                        "bash",
+                                        "kubectl rollout restart deployment/{{deployment}} -n {{namespace:default}}"
+                                    );
+                                }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "☸️ + K8s 重启"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        Rectangle {
+                            horizontal-stretch: 1; height: 26px; border-radius: 4px;
+                            background: p-s3.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px; border-color: AppTheme.border;
+                            p-s3 := TouchArea {
+                                clicked => {
+                                    root.quick-add-snippet(
+                                        "排查端口占用",
+                                        "bash",
+                                        "lsof -i :{{port:8080}} || netstat -tulnp | grep :{{port:8080}}"
+                                    );
+                                }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "🔌 + 端口排查"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                        }
+
+                        Rectangle {
+                            horizontal-stretch: 1; height: 26px; border-radius: 4px;
+                            background: p-s4.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px; border-color: AppTheme.border;
+                            p-s4 := TouchArea {
+                                clicked => {
+                                    root.quick-add-snippet(
+                                        "MySQL 活跃长事务",
+                                        "sql",
+                                        "mysql -u {{user:root}} -p{{password}} -e 'SHOW FULL PROCESSLIST;'"
+                                    );
+                                }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "🐬 + MySQL 慢查询"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: AppTheme.border; }
+
+                Text { text: @tr("快速添加自定义片段:"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+
+                AppFormInput {
+                    label: @tr("片段标题:");
+                    icon: @image-url("../../assets/icons/file-text.svg");
+                    has-icon: true;
+                    text <=> root.quick-snippet-title;
+                }
+
+                AppFormInput {
+                    label: @tr("脚本命令:");
+                    icon: @image-url("../../assets/icons/terminal.svg");
+                    has-icon: true;
+                    text <=> root.quick-snippet-cmd;
+                }
+
+                AppButton {
+                    text: @tr("确认添加单条片段");
+                    icon: @image-url("../../assets/icons/plus.svg");
+                    has-icon: true;
+                    variant: "primary";
+                    clicked => {
+                        if root.quick-snippet-title != "" && root.quick-snippet-cmd != "" {
+                            root.quick-add-snippet(
+                                root.quick-snippet-title,
+                                root.quick-snippet-lang,
+                                root.quick-snippet-cmd
+                            );
+                            root.quick-snippet-title = "";
+                            root.quick-snippet-cmd = "";
+                        }
+                    }
+                }
+            }
+        }
+
+        // 右侧: 批量生成与压测
+        AppCard {
+            horizontal-stretch: 1;
+            height: 100%;
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 10px;
+                alignment: start;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    height: 20px;
+
+                    Image {
+                        source: @image-url("../../assets/icons/zap.svg");
+                        width: 14px;
+                        height: 14px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    Text {
+                        text: @tr("大规模批量造数与压测");
+                        font-size: 12px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+
+                    AppFormInput {
+                        horizontal-stretch: 3;
+                        label: @tr("名称前缀:");
+                        icon: @image-url("../../assets/icons/terminal.svg");
+                        has-icon: true;
+                        text <=> root.batch-snippet-prefix;
+                    }
+
+                    AppFormInput {
+                        horizontal-stretch: 2;
+                        label: @tr("生成数量:");
+                        text <=> root.batch-snippet-count-str;
+                    }
+                }
+
+                // 覆盖模式开关
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Rectangle {
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 3px;
+                        background: root.batch-snippet-overwrite ? AppTheme.accent : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: root.batch-snippet-overwrite ? AppTheme.accent : AppTheme.border;
+                        y: (parent.height - self.height) / 2;
+
+                        TouchArea {
+                            clicked => { root.batch-snippet-overwrite = !root.batch-snippet-overwrite; }
+                            mouse-cursor: pointer;
+                        }
+
+                        if root.batch-snippet-overwrite: Image {
+                            source: @image-url("../../assets/icons/check.svg");
+                            width: 10px;
+                            height: 10px;
+                            colorize: #ffffff;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+
+                    Text {
+                        text: @tr("覆盖现有数据 (未勾选则为追加模式)");
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                AppButton {
+                    text: @tr("⚡ 立即批量生成测试代码片段");
+                    icon: @image-url("../../assets/icons/zap.svg");
+                    has-icon: true;
+                    variant: "primary";
+                    clicked => {
+                        root.batch-generate-snippets(
+                            root.batch-snippet-count-str,
+                            root.batch-snippet-overwrite
+                        );
+                    }
+                }
+
+                // 提示卡片
+                Rectangle {
+                    border-radius: 4px;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 4px;
+
+                        Text {
+                            text: @tr("💡 提示: 批量生成测试片段将同步写入 AppStorage 存储层，并在全屏代码片段中心、多层文件夹树与右侧伴生工具栏中实时响应。");
+                            font-size: 10px;
+                            color: AppTheme.secondary-foreground;
+                            wrap: word-wrap;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

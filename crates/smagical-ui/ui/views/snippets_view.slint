@@ -1,0 +1,897 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { ScrollView, Button, LineEdit } from "std-widgets.slint";
+import { SearchInput } from "../components/search-input.slint";
+import { AppIconButton } from "../components/base/app-icon-button.slint";
+import { AppButton } from "../components/base/app-button.slint";
+
+/// 代码片段树形节点视图模型
+export struct SnippetTreeNode {
+    id: string,
+    name: string,
+    parent_id: string,
+    level: int,
+    is_group: bool,          // true 为文件夹分组，false 为代码片段
+    is_expanded: bool,
+    has_children: bool,
+    item_count: int,         // 子项/脚本数量
+    language: string,        // 脚本语言 (Bash, Python 等)
+    auto_execute: bool,
+    is_favorite: bool,
+}
+
+/// 动态参数填报数据结构
+export struct SnippetParamInputData {
+    key: string,
+    label: string,
+    value: string,
+    default_val: string,
+}
+
+/// 全屏代码片段与多层层级管理中心视图 (SnippetsCenterView)
+export component SnippetsCenterView inherits Rectangle {
+    background: AppTheme.window-background;
+
+    // 树数据源
+    in property <[SnippetTreeNode]> tree_nodes: [];
+    in-out property <string> search_query: "";
+    in-out property <string> selected_id: "";
+
+    // 详情编辑器数据绑定
+    in property <bool> has_selection: false;
+    in property <bool> is_selected_group: false;
+    in-out property <string> edit_id: "";
+    in-out property <string> edit_title: "";
+    in-out property <string> edit_category_name: "";
+    in-out property <string> edit_language: "bash";
+    in-out property <string> edit_content: "";
+    in-out property <bool> edit_auto_execute: true;
+    in-out property <string> edit_description: "";
+    in-out property <bool> edit_is_favorite: false;
+    in property <string> detected_variables_text: "";
+    in property <string> edit_updated_at: "";
+
+    // 拖拽交互状态
+    in-out property <bool> is_dragging: false;
+    in-out property <string> drag_source_id: "";
+    in-out property <string> drag_source_name: "";
+    in-out property <bool> drag_source_is_group: false;
+    in-out property <string> drop_target_id: "";
+    in-out property <string> drop_target_name: "";
+    in-out property <int> drop_target_index: -1;
+    in-out property <string> drop_position: "inside";
+    in-out property <bool> drop_target_valid: false;
+    in-out property <length> drag_x: 0px;
+    in-out property <length> drag_y: 0px;
+
+    // 回调事件
+    callback search_changed(string);
+    callback toggle_group_expanded(string /* group_id */);
+    callback select_node(string /* id */, bool /* is_group */);
+    callback toggle_favorite(string /* id */);
+    callback create_snippet;
+    callback create_group;
+    callback save_snippet;
+    callback delete_snippet(string /* id */);
+    callback delete_group(string /* id */);
+    callback copy_content(string /* id */);
+    callback execute_snippet(string /* id */);
+    callback move_node(string /* source_id */, string /* target_id */, string /* drop_position */);
+    callback request_drag_hover(string /* source_id */, int /* target_index */, float /* offset_in_row */);
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // ==========================================
+        // 1. 左侧：多层文件夹代码片段树导航栏 (支持拖拽移动与调序)
+        // ==========================================
+        Rectangle {
+            width: 320px;
+            background: AppTheme.panel-background;
+
+            // 右侧分割线
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                height: 100%;
+                background: AppTheme.border;
+            }
+
+            VerticalLayout {
+                padding: 10px;
+                spacing: 8px;
+
+                // 1.1 顶部统一检索框
+                SearchInput {
+                    text <=> root.search_query;
+                    placeholder: @tr("搜索代码片段、脚本或文件夹...");
+                    changed(text) => { root.search_changed(text); }
+                }
+
+                // 1.2 标题与操作栏 (层级统计 + 新建分组 + 新建片段)
+                HorizontalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+
+                        Text {
+                            text: @tr("代码片段树形视图");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+
+                        Rectangle {
+                            height: 16px;
+                            border-radius: 8px;
+                            background: AppTheme.control-background;
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+
+                                Text {
+                                    text: root.tree_nodes.length + " 项";
+                                    font-size: 9px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // 新建分组与片段动作按钮组
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: end;
+
+                        AppIconButton {
+                            icon: @image-url("../assets/icons/folder-plus.svg");
+                            clicked => { root.create_group(); }
+                        }
+
+                        AppIconButton {
+                            icon: @image-url("../assets/icons/plus.svg");
+                            clicked => { root.create_snippet(); }
+                        }
+                    }
+                }
+
+                // 1.25 拖拽时的顶级根目录放置区
+                if root.is_dragging: Rectangle {
+                    height: 28px;
+                    border-radius: 4px;
+                    background: root.drop_target_id == "root" ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
+                    border-width: 1.5px;
+                    border-color: root.drop_target_id == "root" ? AppTheme.accent : AppTheme.border;
+                    animate background { duration: 120ms; }
+                    animate border-color { duration: 120ms; }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 6px;
+                        alignment: center;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/folder.svg");
+                                width: 13px;
+                                height: 13px;
+                                image-fit: contain;
+                                colorize: root.drop_target_id == "root" ? AppTheme.accent : AppTheme.secondary-foreground;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("移至根目录 (顶级)");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: root.drop_target_id == "root" ? AppTheme.accent : AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 1.3 树节点滚动列表 (精细缩进与交互)
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+
+                    snippet_scroll := ScrollView {
+                        width: 100%;
+                        height: 100%;
+
+                        VerticalLayout {
+                            spacing: 2px;
+
+                            for node[idx] in root.tree_nodes: Rectangle {
+                                height: 30px;
+                                border-radius: AppTheme.radius-small;
+                                opacity: (root.is_dragging && node.id == root.drag_source_id) ? 0.35 : 1.0;
+                                background: (node.is_group && root.is_dragging && root.drop_target_index == idx && root.drop_target_valid) 
+                                    ? AppTheme.accent.transparentize(85%)
+                                    : (node.id == root.selected_id) 
+                                        ? AppTheme.control-background 
+                                        : (item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent);
+                                border-width: 1px;
+                                border-color: (node.is_group && root.is_dragging && root.drop_target_index == idx && root.drop_target_valid)
+                                    ? AppTheme.accent.transparentize(40%)
+                                    : (node.id == root.selected_id ? AppTheme.border : transparent);
+
+                                animate background { duration: root.is_dragging ? 0ms : 120ms; }
+                                animate opacity { duration: root.is_dragging ? 0ms : 120ms; }
+
+                                item-touch := TouchArea {
+                                    pointer-event(event) => {
+                                        if event.kind == PointerEventKind.down {
+                                            root.drag_source_id = node.id;
+                                            root.drag_source_name = node.name;
+                                            root.drag_source_is_group = node.is_group;
+                                            root.is_dragging = false;
+                                            root.drop_target_index = -1;
+                                        }
+                                        if event.kind == PointerEventKind.up {
+                                            if root.is_dragging && root.drop_target_valid && root.drop_target_id != "" {
+                                                if root.drop_target_id == "root" {
+                                                    root.move_node(root.drag_source_id, "root", "root");
+                                                } else if (root.drop_target_id != root.drag_source_id || root.drop_position != "inside") {
+                                                    root.move_node(root.drag_source_id, root.drop_target_id, root.drop_position);
+                                                }
+                                            }
+                                            root.is_dragging = false;
+                                            root.drag_source_id = "";
+                                            root.drop_target_id = "";
+                                            root.drop_target_name = "";
+                                            root.drop_target_index = -1;
+                                            root.drop_position = "inside";
+                                        }
+                                        if event.kind == PointerEventKind.cancel {
+                                            root.is_dragging = false;
+                                            root.drag_source_id = "";
+                                            root.drop_target_id = "";
+                                            root.drop_target_name = "";
+                                            root.drop_target_index = -1;
+                                            root.drop_position = "inside";
+                                        }
+                                    }
+                                    moved => {
+                                        if self.pressed {
+                                            if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
+                                                root.is_dragging = true;
+                                                root.drag_source_id = node.id;
+                                                root.drag_source_name = node.name;
+                                                root.drag_source_is_group = node.is_group;
+                                                root.drag_x = self.mouse-x;
+                                                let total_y = idx * 32px + self.mouse-y;
+                                                root.drag_y = total_y;
+
+                                                let screen_y = total_y + snippet_scroll.viewport-y;
+                                                if screen_y < 16px {
+                                                    root.drop_target_index = -1;
+                                                    root.drop_target_id = "root";
+                                                    root.drop_position = "root";
+                                                    root.drop_target_valid = true;
+                                                    root.request_drag_hover(root.drag_source_id, -1, 0.0);
+                                                } else {
+                                                    let target_idx = Math.max(0, Math.min(root.tree_nodes.length - 1, Math.floor(total_y / 32px)));
+                                                    root.drop_target_index = target_idx;
+                                                    root.drop_target_valid = (target_idx != idx || root.tree_nodes[target_idx].id != node.id);
+                                                    root.request_drag_hover(root.drag_source_id, target_idx, 0.0);
+                                                }
+                                            }
+                                        }
+                                    }
+                                    clicked => {
+                                        if !root.is_dragging {
+                                            if node.is_group {
+                                                root.toggle_group_expanded(node.id);
+                                            }
+                                            root.select_node(node.id, node.is_group);
+                                        }
+                                    }
+                                    mouse-cursor: root.is_dragging ? copy : pointer;
+                                }
+
+                                // 拖拽下插指示线
+                                if root.is_dragging && root.drop_target_index == idx && root.drop_target_valid && root.drop_target_id != "root": Rectangle {
+                                    x: 6px + node.level * 14px;
+                                    y: parent.height - 2px;
+                                    width: Math.min(140px, parent.width - 16px - node.level * 14px);
+                                    height: 2px;
+                                    background: AppTheme.accent;
+                                    border-radius: 1px;
+                                    z: 20;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 8px + node.level * 16px;
+                                    padding-right: 8px;
+                                    spacing: 6px;
+                                    alignment: space-between;
+
+                                    // 左侧：图标 + 名称
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        // 节点图标 (文件夹/脚本终端图标)
+                                        VerticalLayout {
+                                            alignment: center;
+
+                                            if node.is_group: Image {
+                                                source: node.is_expanded ? @image-url("../assets/icons/folder-open.svg") : @image-url("../assets/icons/folder.svg");
+                                                width: 14px;
+                                                height: 14px;
+                                                image-fit: contain;
+                                                colorize: (node.id == root.selected_id) ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+
+                                            if !node.is_group: Image {
+                                                source: @image-url("../assets/icons/terminal.svg");
+                                                width: 13px;
+                                                height: 13px;
+                                                image-fit: contain;
+                                                colorize: (node.id == root.selected_id) ? AppTheme.accent : (item-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                            }
+                                        }
+
+                                        // 节点标题
+                                        VerticalLayout {
+                                            alignment: center;
+
+                                            Text {
+                                                text: node.name;
+                                                font-size: 11px;
+                                                font-weight: node.is_group ? 600 : 500;
+                                                color: (node.id == root.selected_id) ? AppTheme.accent : AppTheme.foreground;
+                                                overflow: elide;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+
+                                    // 右侧：文件夹数量与脚本语言胶囊
+                                    HorizontalLayout {
+                                        spacing: 5px;
+                                        alignment: end;
+
+                                        // 文件夹子项计数胶囊
+                                        if node.is_group: Rectangle {
+                                            height: 16px;
+                                            border-radius: 8px;
+                                            background: AppTheme.control-background;
+
+                                            HorizontalLayout {
+                                                padding-left: 5px;
+                                                padding-right: 5px;
+
+                                                Text {
+                                                    text: node.item_count;
+                                                    font-size: 9px;
+                                                    font-weight: 600;
+                                                    color: AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+
+                                        // 语言徽标 (仅脚本)
+                                        if !node.is_group && node.language != "": Rectangle {
+                                            height: 14px;
+                                            border-radius: 2px;
+                                            background: AppTheme.control-background;
+
+                                            HorizontalLayout {
+                                                padding-left: 4px;
+                                                padding-right: 4px;
+
+                                                Text {
+                                                    text: node.language;
+                                                    font-size: 9px;
+                                                    color: AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // ==========================================
+        // 2. 右侧：代码片段详情与脚本编辑器 (整洁、对齐、现代规范)
+        // ==========================================
+        Rectangle {
+            horizontal-stretch: 1;
+            background: AppTheme.window-background;
+
+            // 2.0 未选择状态提示
+            if !root.has_selection: Rectangle {
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        alignment: center;
+
+                        Image {
+                            source: @image-url("../assets/icons/terminal.svg");
+                            width: 36px;
+                            height: 36px;
+                            image-fit: contain;
+                            colorize: AppTheme.secondary-foreground.transparentize(60%);
+                        }
+                    }
+
+                    Text {
+                        text: @tr("选择左侧代码片段进行查看或编辑");
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: @tr("支持拖拽调序、跨分组归类与参数化变量 {{var}}");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground.transparentize(50%);
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            // 2.1 选中的是文件夹分组
+            if root.has_selection && root.is_selected_group: Rectangle {
+                VerticalLayout {
+                    padding: 24px;
+                    spacing: 16px;
+                    alignment: start;
+
+                    // 顶部操作栏
+                    HorizontalLayout {
+                        height: 32px;
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: center;
+
+                            Image {
+                                source: @image-url("../assets/icons/folder.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: root.edit_title;
+                                font-size: 15px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: center;
+
+                            AppButton {
+                                text: @tr("新建子片段");
+                                variant: "secondary";
+                                clicked => { root.create_snippet(); }
+                            }
+
+                            AppButton {
+                                text: @tr("删除文件夹");
+                                variant: "danger";
+                                clicked => { root.delete_group(root.edit_id); }
+                            }
+                        }
+                    }
+
+                    // 分割线
+                    Rectangle {
+                        height: 1px;
+                        background: AppTheme.border;
+                    }
+
+                    // 文件夹说明卡片
+                    Rectangle {
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 8px;
+
+                            Text {
+                                text: @tr("文件夹分组信息");
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: AppTheme.foreground;
+                            }
+
+                            Text {
+                                text: @tr("此文件夹可容纳多个脚本片段与子文件夹。您可从左侧树形列表中直接拖拽代码片段移入此文件夹进行归类。");
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2.2 选中的是代码片段 (纯粹的资产管理、查看与编辑)
+            if root.has_selection && !root.is_selected_group: VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+
+                // 2.2.1 顶部只读展示标题栏与操作按钮组
+                HorizontalLayout {
+                    height: 32px;
+                    alignment: space-between;
+
+                    // 左侧：只读图标 + 固定名称标题 (去除了小字和多余信息)
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: center;
+
+                        Image {
+                            source: @image-url("../assets/icons/terminal.svg");
+                            width: 15px;
+                            height: 15px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: root.edit_title != "" ? root.edit_title : @tr("未命名片段");
+                            font-size: 15px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+
+                    // 右侧：管理动作按钮组 (复制、保存修改、删除)
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: center;
+
+                        AppButton {
+                            text: @tr("复制");
+                            variant: "secondary";
+                            clicked => { root.copy_content(root.edit_id); }
+                        }
+
+                        AppButton {
+                            text: @tr("保存修改");
+                            variant: "primary";
+                            clicked => { root.save_snippet(); }
+                        }
+
+                        AppButton {
+                            text: @tr("删除");
+                            variant: "danger";
+                            clicked => { root.delete_snippet(root.edit_id); }
+                        }
+                    }
+                }
+
+                // 分割线
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                // 2.2.2 片段名称与自动执行设置区 (紧凑 56px 高度，零空隙)
+                VerticalLayout {
+                    height: 56px;
+                    spacing: 4px;
+
+                    HorizontalLayout {
+                        height: 20px;
+                        alignment: space-between;
+
+                        Text {
+                            text: @tr("片段名称");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: bottom;
+                        }
+
+                        // 自动追加回车复选框 (底部齐平，纯净无聚焦底色)
+                        Rectangle {
+                            height: 20px;
+                            background: transparent;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: end;
+
+                                Rectangle {
+                                    width: 14px;
+                                    height: 14px;
+                                    border-radius: 3px;
+                                    background: root.edit_auto_execute ? AppTheme.accent : AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: root.edit_auto_execute ? AppTheme.accent : AppTheme.border;
+
+                                    if root.edit_auto_execute: Image {
+                                        source: @image-url("../assets/icons/check.svg");
+                                        width: 9px;
+                                        height: 9px;
+                                        image-fit: contain;
+                                        colorize: #ffffff;
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("自动追加回车执行");
+                                    font-size: 11px;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: bottom;
+                                }
+                            }
+
+                            auto-touch := TouchArea {
+                                clicked => { root.edit_auto_execute = !root.edit_auto_execute; }
+                                mouse-cursor: pointer;
+                            }
+                        }
+                    }
+
+                    // 输入框占满整行 (从左到右自然排布与输入)
+                    Rectangle {
+                        height: 32px;
+                        width: 100%;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: name-input.has-focus ? AppTheme.accent : AppTheme.border;
+                        animate border-color { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                clip: true;
+
+                                if root.edit_title == "" && !name-input.has-focus: Text {
+                                    text: @tr("输入代码片段名称...");
+                                    font-size: 12px;
+                                    color: AppTheme.secondary-foreground.transparentize(40%);
+                                    vertical-alignment: center;
+                                    horizontal-alignment: left;
+                                    x: 0px;
+                                    width: 100%;
+                                    height: 100%;
+                                }
+
+                                name-input := TextInput {
+                                    x: 0px;
+                                    width: 100%;
+                                    height: 100%;
+                                    text <=> root.edit_title;
+                                    font-size: 12px;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: left;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2.2.3 动态参数识别指示行 (独立换行展示)
+                if root.detected_variables_text != "": HorizontalLayout {
+                    height: 24px;
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: @tr("检测到动态参数:");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        height: 22px;
+                        border-radius: AppTheme.radius-small;
+                        background: AppTheme.accent.transparentize(85%);
+                        border-width: 1px;
+                        border-color: AppTheme.accent.transparentize(50%);
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+
+                            Text {
+                                text: root.detected_variables_text;
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.accent;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 2.2.4 脚本主体代码编辑器 (吸收所有多余垂直空间，暗色调色板滚动条，全区域点击精准定位末尾光标)
+                VerticalLayout {
+                    vertical-stretch: 1;
+                    spacing: 4px;
+
+                    Text {
+                        text: @tr("脚本代码");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                        min-height: 220px;
+                        width: 100%;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: code-input.has-focus ? AppTheme.accent : AppTheme.border;
+                        clip: true;
+                        animate border-color { duration: 120ms; }
+
+                        // 占位提示文字 (未聚焦且为空时展示)
+                        if root.edit_content == "" && !code-input.has-focus: Text {
+                            x: 12px;
+                            y: 10px;
+                            text: @tr("在此输入代码片段或 Shell 脚本内容 (支持 {{var}} 动态参数占位符)...");
+                            font-family: "Cascadia Code, Consolas, monospace";
+                            font-size: 12px;
+                            color: AppTheme.secondary-foreground.transparentize(40%);
+                            horizontal-alignment: left;
+                            vertical-alignment: top;
+                        }
+
+                        flick := Flickable {
+                            width: 100%;
+                            height: 100%;
+                            viewport-height: max(self.height, code-input.preferred-height + 20px);
+
+                            VerticalLayout {
+                                padding-left: 12px;
+                                padding-right: 14px;
+                                padding-top: 10px;
+                                padding-bottom: 10px;
+                                alignment: start;
+
+                                code-input := TextInput {
+                                    width: 100%;
+                                    height: max(flick.height - 20px, self.preferred-height);
+                                    text <=> root.edit_content;
+                                    font-family: "Cascadia Code, Consolas, monospace";
+                                    font-size: 12px;
+                                    color: AppTheme.foreground;
+                                    single-line: false;
+                                    wrap: word-wrap;
+                                    horizontal-alignment: left;
+                                    vertical-alignment: top;
+                                    selection-background-color: AppTheme.accent.transparentize(50%);
+                                    selection-foreground-color: #ffffff;
+                                }
+                            }
+                        }
+
+                        // 暗色主题定制竖向滚动条 (与 AppTheme 调色板完美融合)
+                        if flick.viewport-height > flick.height: Rectangle {
+                            x: parent.width - 6px;
+                            y: 2px;
+                            width: 4px;
+                            height: parent.height - 4px;
+                            border-radius: 2px;
+                            background: transparent;
+
+                            // 滚动条滑块 (暗色半透明，悬浮提亮)
+                            Rectangle {
+                                y: -flick.viewport-y * (parent.height - 4px - self.height) / (flick.viewport-height - flick.height);
+                                width: 4px;
+                                height: max(20px, (parent.height - 4px) * ((parent.height - 4px) / flick.viewport-height));
+                                border-radius: 2px;
+                                background: sb-touch.has-hover ? AppTheme.secondary-foreground.transparentize(30%) : AppTheme.secondary-foreground.transparentize(65%);
+                                animate background { duration: 150ms; }
+
+                                sb-touch := TouchArea {
+                                    mouse-cursor: pointer;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2.2.5 备注与说明输入框 (紧凑 56px 高度，零空隙)
+                VerticalLayout {
+                    height: 56px;
+                    spacing: 4px;
+
+                    Text {
+                        text: @tr("备注说明");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                    }
+
+                    Rectangle {
+                        height: 32px;
+                        width: 100%;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: desc-input.has-focus ? AppTheme.accent : AppTheme.border;
+                        animate border-color { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                clip: true;
+
+                                if root.edit_description == "" && !desc-input.has-focus: Text {
+                                    text: @tr("可选：添加代码片段的说明或使用注意事项...");
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground.transparentize(40%);
+                                    vertical-alignment: center;
+                                    horizontal-alignment: left;
+                                    x: 0px;
+                                    width: 100%;
+                                    height: 100%;
+                                }
+
+                                desc-input := TextInput {
+                                    x: 0px;
+                                    width: 100%;
+                                    height: 100%;
+                                    text <=> root.edit_description;
+                                    font-size: 11px;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                    horizontal-alignment: left;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

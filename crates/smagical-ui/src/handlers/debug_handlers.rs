@@ -6,6 +6,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use slint::{ComponentHandle, Model};
 use smagical_core::event::ConfigChangedEvent;
+use smagical_core::AppStorage;
 use smagical_debug::{
     generate_batch_hosts, get_preset_by_id, BatchGenerateConfig,
 };
@@ -974,6 +975,120 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             notif_clr_cred.info("凭据已清空", "所有凭据数据已从存储层完全清除");
         }
     });
+
+    // -------------------------------------------------------------------------
+    // 18. 批量生成代码片段
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let ctx = ctx.clone();
+        window.on_debug_batch_generate_snippets(move |count_str, overwrite| {
+            if let Some(w) = window_weak.upgrade() {
+                let count = count_str.as_str().parse::<usize>().unwrap_or(10).min(100);
+                if overwrite {
+                    if let Ok(existing) = ctx.core_state.storage().snippets().list_all() {
+                        for s in existing {
+                            let _ = ctx.core_state.storage().snippets().delete(&s.id);
+                        }
+                    }
+                }
+
+                let mut new_snippets = Vec::new();
+                for i in 1..=count {
+                    let snip = smagical_core::SnippetRecord {
+                        id: format!("bench-snip-{}", i),
+                        parent_group_id: Some("sgrp-docker".to_string()),
+                        title: format!("压测自动化运维脚本 #{}", i),
+                        content: format!("echo 'Running benchmark test suite #{} on host: {{{{target_host:127.0.0.1}}}}'", i),
+                        language: "bash".to_string(),
+                        tags: vec!["benchmark".to_string(), "test".to_string()],
+                        auto_execute: true,
+                        description: format!("批量压测生成的运维代码片段 #{}", i),
+                        is_favorite: i <= 2,
+                        sort_order: i as i32,
+                        updated_at: "刚刚".to_string(),
+                    };
+                    new_snippets.push(snip);
+                }
+
+                let _ = ctx.core_state.storage().snippets().save_batch(&new_snippets);
+                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
+                ctx.notify_success("代码片段生成完毕", format!("已生成 {} 条测试代码片段并写入存储库", count));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 19. 快捷添加单条测试代码片段
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let ctx = ctx.clone();
+        window.on_debug_quick_add_snippet(move |title, lang, cmd| {
+            if let Some(w) = window_weak.upgrade() {
+                let new_id = format!("snip-quick-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+                let snip = smagical_core::SnippetRecord {
+                    id: new_id,
+                    parent_group_id: None,
+                    title: title.to_string(),
+                    content: cmd.to_string(),
+                    language: lang.to_string(),
+                    tags: vec!["quick-add".to_string()],
+                    auto_execute: true,
+                    description: "从开发者控制台快捷注入的代码片段".to_string(),
+                    is_favorite: true,
+                    sort_order: 0,
+                    updated_at: "刚刚".to_string(),
+                };
+
+                let _ = ctx.core_state.storage().snippets().save(&snip);
+                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
+                ctx.notify_success("片段添加成功", format!("已注入单条测试片段: '{}'", snip.title));
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 20. 恢复默认精选代码片段
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let ctx = ctx.clone();
+        window.on_debug_reset_default_snippets(move || {
+            if let Some(w) = window_weak.upgrade() {
+                let default_storage = smagical_core::MockStorage::new_seeded();
+                if let Ok(groups) = default_storage.snippets().list_groups() {
+                    for g in groups {
+                        let _ = ctx.core_state.storage().snippets().save_group(&g);
+                    }
+                }
+                if let Ok(snippets) = default_storage.snippets().list_all() {
+                    let _ = ctx.core_state.storage().snippets().save_batch(&snippets);
+                }
+                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
+                ctx.notify_success("重置完成", "已恢复 5 个层级分组与 10 条精选代码片段预设");
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 21. 清空所有代码片段
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let ctx = ctx.clone();
+        window.on_debug_clear_snippets(move || {
+            if let Some(w) = window_weak.upgrade() {
+                if let Ok(existing) = ctx.core_state.storage().snippets().list_all() {
+                    for s in existing {
+                        let _ = ctx.core_state.storage().snippets().delete(&s.id);
+                    }
+                }
+                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
+                ctx.notify_info("代码片段已清空", "所有代码片段数据已从存储层完全清除");
+            }
+        });
+    }
 }
 
 

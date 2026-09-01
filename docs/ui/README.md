@@ -16,6 +16,7 @@
 | **06** | **开发者调试控制台** | [06_debug_console.md](file:///F:/code/rust/smalux-ssh/docs/ui/06_debug_console.md) | 资产批量造数、健康状态快速更新、预设写入与 Tracing 实时日志流同步 |
 | **07** | **事件分发与生命周期** | [07_events_and_lifecycle.md](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md) | 泛型事件分发总线 (`EventDispatcher`)、多作用域管理器 (`EventManager`) 与生命周期守卫 |
 | **08** | **凭据保管库与安全认证** | [08_credentials_vault.md](file:///F:/code/rust/smalux-ssh/docs/ui/08_credentials_vault.md) | SSH 密钥/口令安全保管、多算法密钥生成器、随机密码生成器与机密提取审计 |
+| **09** | **代码片段与层级脚本中心** | [09_code_snippets.md](file:///F:/code/rust/smalux-ssh/docs/ui/09_code_snippets.md) | 多层文件夹嵌套树、参数化模板引擎 `{{key:default}}`、全屏中心与双侧边抽屉 |
 
 ---
 

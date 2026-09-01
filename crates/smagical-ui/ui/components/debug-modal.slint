@@ -2,6 +2,7 @@ import { AppTheme } from "../themes/app-theme.slint";
 import { AppIconButton } from "base/app-icon-button.slint";
 import { DebugHostsTab } from "debug_workbench/debug-hosts-tab.slint";
 import { DebugCredentialsTab } from "debug_workbench/debug-credentials-tab.slint";
+import { DebugSnippetsTab } from "debug_workbench/debug-snippets-tab.slint";
 import { DebugSettingsTab } from "debug_workbench/debug-settings-tab.slint";
 import { DebugLogsTab, LogEntryData } from "debug_workbench/debug-logs-tab.slint";
 import { DebugRenderingTab } from "debug_workbench/debug-rendering-tab.slint";
@@ -23,6 +24,10 @@ export component DebugModal inherits Rectangle {
     in property <int> host-cards-count: 0;
     /// 凭据总数
     in property <int> credential-count: 0;
+    /// 代码片段总数
+    in property <int> snippet-count: 0;
+    /// 代码片段分组总数
+    in property <int> snippet-group-count: 0;
     /// 树形视口计算宽度
     in property <length> tree-viewport-width: 240px;
     /// 当前主题名称
@@ -30,7 +35,7 @@ export component DebugModal inherits Rectangle {
     /// 是否为深色模式
     in property <bool> is-dark-mode: true;
 
-    // 当前激活的子面板: "hosts" | "credentials" | "settings" | "logs" | "rendering"
+    // 当前激活的子面板: "hosts" | "credentials" | "snippets" | "settings" | "logs" | "rendering"
     property <string> active-subtab: "hosts";
 
     // --- 回调事件 ---
@@ -59,6 +64,14 @@ export component DebugModal inherits Rectangle {
     callback debug-reset-default-credentials();
     /// 清空所有凭据
     callback debug-clear-credentials();
+    /// 批量生成代码片段 (count_str, overwrite)
+    callback debug-batch-generate-snippets(string, bool);
+    /// 快速新增代码片段 (title, lang, cmd)
+    callback debug-quick-add-snippet(string, string, string);
+    /// 恢复默认代码片段
+    callback debug-reset-default-snippets();
+    /// 清空所有代码片段
+    callback debug-clear-snippets();
     /// 清空日志
     callback clear-logs();
     /// 模拟测试日志
@@ -247,7 +260,44 @@ export component DebugModal inherits Rectangle {
                         }
                     }
 
-                    // 页面 3: 设置与偏好调试 (包含主题配色测试、深浅色翻转与设计令牌)
+                    // 页面 3: 代码片段与脚本调试
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 30px;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.active-subtab == "snippets" ? AppTheme.accent : (b-tab-snip.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                        border-width: 1px;
+                        border-color: root.active-subtab == "snippets" ? AppTheme.accent : AppTheme.border;
+
+                        b-tab-snip := TouchArea {
+                            clicked => { root.active-subtab = "snippets"; }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: center;
+                            spacing: 6px;
+
+                            Image {
+                                source: @image-url("../assets/icons/terminal.svg");
+                                width: 12px;
+                                height: 12px;
+                                image-fit: contain;
+                                colorize: root.active-subtab == "snippets" ? #ffffff : AppTheme.secondary-foreground;
+                                y: (parent.height - self.height) / 2;
+                            }
+
+                            Text {
+                                text: @tr("代码片段调试");
+                                font-size: 11px;
+                                font-weight: root.active-subtab == "snippets" ? 600 : 500;
+                                color: root.active-subtab == "snippets" ? #ffffff : AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 页面 4: 设置与偏好调试 (包含主题配色测试、深浅色翻转与设计令牌)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
@@ -395,7 +445,17 @@ export component DebugModal inherits Rectangle {
                         clear-all-credentials => { root.debug-clear-credentials(); }
                     }
 
-                    // 3. 设置偏好调试 (主题快切、深浅色模式与设计令牌)
+                    // 3. 代码片段与脚本调试
+                    if root.active-subtab == "snippets": DebugSnippetsTab {
+                        snippet-count: root.snippet-count;
+                        group-count: root.snippet-group-count;
+                        batch-generate-snippets(cnt, ovr) => { root.debug-batch-generate-snippets(cnt, ovr); }
+                        quick-add-snippet(t, l, c) => { root.debug-quick-add-snippet(t, l, c); }
+                        reset-default-snippets => { root.debug-reset-default-snippets(); }
+                        clear-all-snippets => { root.debug-clear-snippets(); }
+                    }
+
+                    // 4. 设置偏好调试 (主题快切、深浅色模式与设计令牌)
                     if root.active-subtab == "settings": DebugSettingsTab {
                         current-theme-name: root.current-theme-name;
                         is-dark-mode: root.is-dark-mode;

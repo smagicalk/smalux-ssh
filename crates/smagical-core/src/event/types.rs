@@ -481,3 +481,54 @@ pub struct ModuleDeactivatedEvent {
     /// 失活的模块标识。
     pub target_tab: String,
 }
+
+/// 代码片段保存 (新建/更新) 领域事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnippetSavedEvent {
+    /// 代码片段 ID。
+    pub snippet_id: String,
+    /// 片段标题。
+    pub title: String,
+    /// 所属分组 ID。
+    pub parent_group_id: Option<String>,
+    /// 是否为全新创建。
+    pub is_new: bool,
+}
+
+/// 代码片段从存储库删除事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnippetDeletedEvent {
+    /// 被删除的代码片段 ID。
+    pub snippet_id: String,
+}
+
+/// 代码片段分组保存 (新建/更新) 事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnippetGroupSavedEvent {
+    /// 分组 ID。
+    pub group_id: String,
+    /// 分组名称。
+    pub name: String,
+    /// 父级分组 ID。
+    pub parent_id: Option<String>,
+    /// 是否新建。
+    pub is_new: bool,
+}
+
+/// 代码片段分组删除事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnippetGroupDeletedEvent {
+    /// 被删除的分组 ID。
+    pub group_id: String,
+}
+
+/// 代码片段注入执行事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SnippetExecutedEvent {
+    /// 代码片段 ID。
+    pub snippet_id: String,
+    /// 目标终端会话 ID (可选)。
+    pub session_id: Option<String>,
+    /// 是否自动发送了回车执行。
+    pub auto_execute: bool,
+}
