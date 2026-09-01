@@ -624,7 +624,7 @@ export component SnippetsCenterView inherits Rectangle {
                             vertical-alignment: bottom;
                         }
 
-                        // 自动追加回车复选框 (底部齐平，纯净无聚焦底色)
+                        // 自动追加回车复选框 (底部严格齐平，纯净无聚焦底色)
                         Rectangle {
                             height: 20px;
                             background: transparent;
@@ -633,20 +633,24 @@ export component SnippetsCenterView inherits Rectangle {
                                 spacing: 6px;
                                 alignment: end;
 
-                                Rectangle {
-                                    width: 14px;
-                                    height: 14px;
-                                    border-radius: 3px;
-                                    background: root.edit_auto_execute ? AppTheme.accent : AppTheme.control-background;
-                                    border-width: 1px;
-                                    border-color: root.edit_auto_execute ? AppTheme.accent : AppTheme.border;
+                                VerticalLayout {
+                                    alignment: end;
 
-                                    if root.edit_auto_execute: Image {
-                                        source: @image-url("../assets/icons/check.svg");
-                                        width: 9px;
-                                        height: 9px;
-                                        image-fit: contain;
-                                        colorize: #ffffff;
+                                    Rectangle {
+                                        width: 13px;
+                                        height: 13px;
+                                        border-radius: 3px;
+                                        background: root.edit_auto_execute ? AppTheme.accent : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.edit_auto_execute ? AppTheme.accent : AppTheme.border;
+
+                                        if root.edit_auto_execute: Image {
+                                            source: @image-url("../assets/icons/check.svg");
+                                            width: 8px;
+                                            height: 8px;
+                                            image-fit: contain;
+                                            colorize: #ffffff;
+                                        }
                                     }
                                 }
 

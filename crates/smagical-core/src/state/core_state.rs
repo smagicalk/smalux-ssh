@@ -155,6 +155,24 @@ fn attach_default_event_loggers(events: &EventManager) {
         );
     });
     g13.detach();
+
+    let g14 = events.global().listen(|e: &crate::event::SnippetGroupSavedEvent| {
+        tracing::info!(
+            target: "smalux::snippet",
+            "[事件总线:代码片段分组保存] ID: [{}], 名称: '{}', 父分组: {:?}, 是否新建: {}",
+            e.group_id, e.name, e.parent_id, e.is_new
+        );
+    });
+    g14.detach();
+
+    let g15 = events.global().listen(|e: &crate::event::SnippetGroupDeletedEvent| {
+        tracing::warn!(
+            target: "smalux::snippet",
+            "[事件总线:代码片段分组删除] ID: [{}] 分组已被彻底删除",
+            e.group_id
+        );
+    });
+    g15.detach();
 }
 
 impl CoreState {
@@ -348,5 +366,88 @@ mod tests {
         assert!(!groups.is_empty());
         assert!(!hosts.is_empty());
         assert_eq!(groups[0].id, "grp-prod");
+    }
+
+    #[test]
+    fn test_snippet_lifecycle_event_listeners() {
+        use std::sync::atomic::{AtomicBool, Ordering};
+        use crate::event::{SnippetSavedEvent, SnippetDeletedEvent, SnippetExecutedEvent, SnippetGroupSavedEvent, SnippetGroupDeletedEvent};
+
+        let state = CoreState::new_mock();
+
+        let saved_called = Arc::new(AtomicBool::new(false));
+        let deleted_called = Arc::new(AtomicBool::new(false));
+        let executed_called = Arc::new(AtomicBool::new(false));
+        let grp_saved_called = Arc::new(AtomicBool::new(false));
+        let grp_deleted_called = Arc::new(AtomicBool::new(false));
+
+        let s_flag = saved_called.clone();
+        let _g1 = state.events().listen(move |e: &SnippetSavedEvent| {
+            assert_eq!(e.snippet_id, "snip-test-1");
+            assert_eq!(e.title, "Test Docker Snippet");
+            s_flag.store(true, Ordering::SeqCst);
+        });
+
+        let d_flag = deleted_called.clone();
+        let _g2 = state.events().listen(move |e: &SnippetDeletedEvent| {
+            assert_eq!(e.snippet_id, "snip-test-1");
+            d_flag.store(true, Ordering::SeqCst);
+        });
+
+        let e_flag = executed_called.clone();
+        let _g3 = state.events().listen(move |e: &SnippetExecutedEvent| {
+            assert_eq!(e.snippet_id, "snip-test-1");
+            assert_eq!(e.session_id.as_deref(), Some("sess-101"));
+            assert!(e.auto_execute);
+            e_flag.store(true, Ordering::SeqCst);
+        });
+
+        let gs_flag = grp_saved_called.clone();
+        let _g4 = state.events().listen(move |e: &SnippetGroupSavedEvent| {
+            assert_eq!(e.group_id, "sgrp-ops");
+            assert_eq!(e.name, "运维脚本");
+            gs_flag.store(true, Ordering::SeqCst);
+        });
+
+        let gd_flag = grp_deleted_called.clone();
+        let _g5 = state.events().listen(move |e: &SnippetGroupDeletedEvent| {
+            assert_eq!(e.group_id, "sgrp-ops");
+            gd_flag.store(true, Ordering::SeqCst);
+        });
+
+        // 触发分发
+        state.events().dispatch(&SnippetSavedEvent {
+            snippet_id: "snip-test-1".to_string(),
+            title: "Test Docker Snippet".to_string(),
+            parent_group_id: Some("sgrp-ops".to_string()),
+            is_new: true,
+        });
+
+        state.events().dispatch(&SnippetExecutedEvent {
+            snippet_id: "snip-test-1".to_string(),
+            session_id: Some("sess-101".to_string()),
+            auto_execute: true,
+        });
+
+        state.events().dispatch(&SnippetDeletedEvent {
+            snippet_id: "snip-test-1".to_string(),
+        });
+
+        state.events().dispatch(&SnippetGroupSavedEvent {
+            group_id: "sgrp-ops".to_string(),
+            name: "运维脚本".to_string(),
+            parent_id: None,
+            is_new: true,
+        });
+
+        state.events().dispatch(&SnippetGroupDeletedEvent {
+            group_id: "sgrp-ops".to_string(),
+        });
+
+        assert!(saved_called.load(Ordering::SeqCst));
+        assert!(deleted_called.load(Ordering::SeqCst));
+        assert!(executed_called.load(Ordering::SeqCst));
+        assert!(grp_saved_called.load(Ordering::SeqCst));
+        assert!(grp_deleted_called.load(Ordering::SeqCst));
     }
 }

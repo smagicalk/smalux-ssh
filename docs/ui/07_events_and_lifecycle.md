@@ -80,6 +80,15 @@
 | **`WindowStateChangedEvent`** | `state` ("minimized", "maximized", "restored") | 窗口状态切换 |
 | **`ConfigChangedEvent`** | `key, old_val, new_val, source` | 配置动态变更通知与自动增量备份 |
 
+### 2.6 代码片段与脚本资产域 (Code Snippets & Execution)
+| 事件类型 | 载荷说明 | 业务应用与审计说明 |
+| :--- | :--- | :--- |
+| **`SnippetSavedEvent`** | `snippet_id, title, parent_group_id, is_new` | 代码片段新建/编辑保存广播，触发日志审计与视图同步 |
+| **`SnippetDeletedEvent`** | `snippet_id` | 代码片段从存储库删除事件 |
+| **`SnippetGroupSavedEvent`** | `group_id, name, parent_id, is_new` | 代码片段文件夹新建/编辑保存事件 |
+| **`SnippetGroupDeletedEvent`** | `group_id` | 代码片段文件夹物理删除与子项归集事件 |
+| **`SnippetExecutedEvent`** | `snippet_id, session_id, auto_execute` | 代码片段向终端注入/执行事件（含目标会话与换行状态） |
+
 ---
 
 ## ⚡ 3. 拦截审查模式 (Interception Guard Pattern)
@@ -113,3 +122,28 @@ if before_event.is_aborted() {
 1. **临界区极小化**：`EventDispatcher::dispatch` 仅在获取读锁时快速 clone 当前事件的所有 listener 引用，随即立即释放读锁，随后在**完全无锁**状态下遍历执行回调函数。即使监听者在回调内部再次触发 `listen` 或 `dispatch`，也绝对不会造成死锁。
 2. **Panic 隔离**：分发器通过 `std::panic::catch_unwind` 包装每个监听者的执行，单个监听者的意外崩溃会被捕获并记录错误日志，绝不影响主 UI 线程与其他监听者。
 3. **RAII 自动反注册**：调用 `listen()` 返回 `ListenerGuard`，当持有者对象（如页面/组件）析构时，监听自动从分发器移除，杜绝悬挂闭包与内存泄露；全局常驻监听可调用 `.detach()` 脱离生命周期。
+
+---
+
+## 📋 5. 系统当前常驻运行的默认监听器清单 (Active Listeners Inventory)
+
+在 `CoreState` 状态引擎初始化（[`attach_default_event_loggers`](file:///F:/code/rust/smalux-ssh/crates/smagical-core/src/state/core_state.rs#L32-L180)）时，系统会自动注册以下常驻日志与审计监听器：
+
+| 序号 | 监听事件 (Event Type) | 日志级别 | Target | 监听器职责与输出内容 |
+| :---: | :--- | :---: | :--- | :--- |
+| **1** | `CredentialSavedEvent` | `INFO` | `smalux::credential` | 记录凭据新建/更新详情（ID、名称、算法、凭据类型、指纹、是否新建） |
+| **2** | `CredentialDeletedEvent` | `WARN` | `smalux::credential` | 记录凭据物理删除告警 |
+| **3** | `CredentialSecretCopiedEvent` | `WARN` / `INFO` | `smalux::security` | **安全审计守护**：监控密码/私钥复制动作（高危提取标记并告警） |
+| **4** | `KeyGeneratedEvent` | `INFO` | `smalux::credential` | 记录新生成的密钥规格与公钥 SHA-256 指纹 |
+| **5** | `PasswordGeneratedEvent` | `DEBUG` | `smalux::credential` | 记录强密码生成事件（物理脱敏，杜绝明文写入日志） |
+| **6** | `FileOperationBeforeEvent` | `WARN` | `smalux::security` | **前置安全防御拦截器**：拦截删除系统根目录或 Windows/Linux 关键系统目录 |
+| **7** | `TerminalSessionEvent` | `INFO` | `smalux::terminal` | 记录终端会话开启、关闭与连接切换 |
+| **8** | `ConfigChangedEvent` | `INFO` | `smalux::config` | 记录全局系统配置参数热变动（键名、旧值、新值、变更来源） |
+| **9** | `ThemeChangedEvent` | `INFO` | `smalux::theme` | 记录 UI/终端主题切换与深浅模式状态 |
+| **10** | `WindowStateChangedEvent` | `INFO` | `smalux::window` | 记录窗口最小化、最大化、还原等状态流转 |
+| **11** | `SnippetSavedEvent` | `INFO` | `smalux::snippet` | 记录代码片段新建/修改保存（ID、标题、是否新建） |
+| **12** | `SnippetDeletedEvent` | `WARN` | `smalux::snippet` | 记录代码片段物理删除 |
+| **13** | `SnippetExecutedEvent` | `INFO` | `smalux::snippet` | 记录代码片段向终端注入执行（ID、目标 session_id、自动回车状态） |
+| **14** | `SnippetGroupSavedEvent` | `INFO` | `smalux::snippet` | 记录代码片段文件夹新建/重命名/移动（ID、名称、父级 ID） |
+| **15** | `SnippetGroupDeletedEvent` | `WARN` | `smalux::snippet` | 记录代码片段文件夹物理删除 |
+
