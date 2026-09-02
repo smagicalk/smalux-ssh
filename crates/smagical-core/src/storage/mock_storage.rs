@@ -5,10 +5,11 @@ use crate::domain::{
     history::HistoryRecord,
     host::{HostRecord, HostStatus},
     snippet::{SnippetGroupRecord, SnippetRecord},
+    tunnel::{TunnelRecord, TunnelType},
 };
 use super::{
     AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
-    SnippetRepository, StorageError, StorageResult,
+    SnippetRepository, TunnelRepository, StorageError, StorageResult,
 };
 
 
@@ -702,6 +703,111 @@ impl SnippetRepository for MockSnippetRepository {
     }
 }
 
+/// 线程安全的内存网络隧道与代理仓储实现
+#[derive(Debug, Default, Clone)]
+pub struct MockTunnelRepository {
+    tunnels: Arc<RwLock<Vec<TunnelRecord>>>,
+}
+
+impl MockTunnelRepository {
+    /// 创建空的内存网络隧道仓储
+    pub fn new() -> Self {
+        Self {
+            tunnels: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// 使用指定隧道列表创建内存仓储
+    pub fn with_tunnels(tunnels: Vec<TunnelRecord>) -> Self {
+        Self {
+            tunnels: Arc::new(RwLock::new(tunnels)),
+        }
+    }
+}
+
+impl TunnelRepository for MockTunnelRepository {
+    fn list_all(&self) -> StorageResult<Vec<TunnelRecord>> {
+        let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(guard.clone())
+    }
+
+    fn list_by_type(&self, tunnel_type: TunnelType) -> StorageResult<Vec<TunnelRecord>> {
+        let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(guard.iter().filter(|t| t.tunnel_type == tunnel_type).cloned().collect())
+    }
+
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<TunnelRecord>> {
+        let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(guard.iter().find(|t| t.id == id).cloned())
+    }
+
+    fn search(&self, query: &str) -> StorageResult<Vec<TunnelRecord>> {
+        let q = query.trim().to_lowercase();
+        let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if q.is_empty() {
+            return Ok(guard.clone());
+        }
+        Ok(guard.iter().filter(|t| {
+            t.name.to_lowercase().contains(&q)
+                || t.remote_host.to_lowercase().contains(&q)
+                || t.local_port.to_string().contains(&q)
+                || t.remote_port.to_string().contains(&q)
+                || t.ssh_host_name.to_lowercase().contains(&q)
+                || t.notes.to_lowercase().contains(&q)
+                || t.tunnel_type.as_str().to_lowercase().contains(&q)
+        }).cloned().collect())
+    }
+
+    fn save(&self, record: &TunnelRecord) -> StorageResult<()> {
+        let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(pos) = guard.iter().position(|t| t.id == record.id) {
+            guard[pos] = record.clone();
+        } else {
+            guard.push(record.clone());
+        }
+        Ok(())
+    }
+
+    fn save_batch(&self, records: &[TunnelRecord]) -> StorageResult<()> {
+        for r in records {
+            self.save(r)?;
+        }
+        Ok(())
+    }
+
+    fn delete(&self, id: &str) -> StorageResult<bool> {
+        let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        let len_before = guard.len();
+        guard.retain(|t| t.id != id);
+        Ok(guard.len() < len_before)
+    }
+
+    fn set_running(&self, id: &str, is_running: bool) -> StorageResult<bool> {
+        let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(t) = guard.iter_mut().find(|t| t.id == id) {
+            t.is_running = is_running;
+            if !is_running {
+                t.active_connections = 0;
+            } else if t.active_connections == 0 {
+                t.active_connections = 1;
+            }
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    fn update_metrics(&self, id: &str, active_conn: usize, bytes_in: u64, bytes_out: u64) -> StorageResult<()> {
+        let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        if let Some(t) = guard.iter_mut().find(|t| t.id == id) {
+            t.active_connections = active_conn;
+            t.total_bytes_in += bytes_in;
+            t.total_bytes_out += bytes_out;
+        }
+        Ok(())
+    }
+}
+
 /// 聚合内存存储实现 (MockStorage)
 #[derive(Debug, Clone)]
 pub struct MockStorage {
@@ -710,6 +816,7 @@ pub struct MockStorage {
     history_repo: MockHistoryRepository,
     credentials_repo: MockCredentialRepository,
     snippets_repo: MockSnippetRepository,
+    tunnels_repo: MockTunnelRepository,
 }
 
 impl Default for MockStorage {
@@ -729,6 +836,7 @@ impl MockStorage {
             history_repo: MockHistoryRepository::new(),
             credentials_repo,
             snippets_repo: MockSnippetRepository::new(),
+            tunnels_repo: MockTunnelRepository::new(),
         }
     }
 
@@ -1494,16 +1602,185 @@ logout"#.to_string(),
             },
         ];
 
+        let tunnels = vec![
+            TunnelRecord {
+                id: "tun-mysql-prod".to_string(),
+                name: "生产 MySQL 数据库直连".to_string(),
+                tunnel_type: TunnelType::Local,
+                ssh_host_id: Some("host-prod-01".to_string()),
+                ssh_host_name: "prod-server-01".to_string(),
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 3306,
+                remote_host: "10.0.0.8".to_string(),
+                remote_port: 3306,
+                jump_chain: Vec::new(),
+                is_running: true,
+                auto_start: true,
+                auto_reconnect: true,
+                remote_dns: false,
+                compression: true,
+                active_connections: 3,
+                total_bytes_in: 25 * 1024 * 1024 + 400 * 1024,
+                total_bytes_out: 4 * 1024 * 1024 + 128 * 1024,
+                proxy_proto: String::new(),
+                proxy_username: String::new(),
+                proxy_password: String::new(),
+                notes: "将远程隔离区生产主数据库映射至本地 3306 端口，供本地 Navicat 安全连接".to_string(),
+                updated_at: "2026-09-01 10:20:00".to_string(),
+            },
+            TunnelRecord {
+                id: "tun-redis-k8s".to_string(),
+                name: "K8s Redis 哨兵集群映射".to_string(),
+                tunnel_type: TunnelType::Local,
+                ssh_host_id: Some("host-k8s-m1".to_string()),
+                ssh_host_name: "k8s-master-01".to_string(),
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 6379,
+                remote_host: "10.244.2.15".to_string(),
+                remote_port: 6379,
+                jump_chain: Vec::new(),
+                is_running: true,
+                auto_start: true,
+                auto_reconnect: true,
+                remote_dns: false,
+                compression: false,
+                active_connections: 1,
+                total_bytes_in: 8 * 1024 * 1024,
+                total_bytes_out: 1024 * 1024,
+                proxy_proto: String::new(),
+                proxy_username: String::new(),
+                proxy_password: String::new(),
+                notes: "用于本地查看与排查集群缓存热点 Key 与集群状态".to_string(),
+                updated_at: "2026-08-31 16:45:00".to_string(),
+            },
+            TunnelRecord {
+                id: "tun-webhook-dev".to_string(),
+                name: "公网穿透本地 Webhook 调试".to_string(),
+                tunnel_type: TunnelType::Remote,
+                ssh_host_id: Some("host-gateway".to_string()),
+                ssh_host_name: "gateway-bastion".to_string(),
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 3000,
+                remote_host: "0.0.0.0".to_string(),
+                remote_port: 8080,
+                jump_chain: Vec::new(),
+                is_running: false,
+                auto_start: false,
+                auto_reconnect: true,
+                remote_dns: false,
+                compression: true,
+                active_connections: 0,
+                total_bytes_in: 512 * 1024,
+                total_bytes_out: 1024 * 1024 * 2,
+                proxy_proto: String::new(),
+                proxy_username: String::new(),
+                proxy_password: String::new(),
+                notes: "将公网网关 8080 端口打回本地 Node/Rust 开发服务 3000 端口，接收第三方回调".to_string(),
+                updated_at: "2026-08-30 18:00:00".to_string(),
+            },
+            TunnelRecord {
+                id: "tun-socks5-corp".to_string(),
+                name: "生产全网段 SOCKS5 代理".to_string(),
+                tunnel_type: TunnelType::Dynamic,
+                ssh_host_id: Some("host-prod-01".to_string()),
+                ssh_host_name: "prod-server-01".to_string(),
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 1080,
+                remote_host: "ANY".to_string(),
+                remote_port: 0,
+                jump_chain: Vec::new(),
+                is_running: true,
+                auto_start: false,
+                auto_reconnect: true,
+                remote_dns: true,
+                compression: true,
+                active_connections: 8,
+                total_bytes_in: 1024 * 1024 * 128,
+                total_bytes_out: 1024 * 1024 * 18,
+                proxy_proto: String::new(),
+                proxy_username: String::new(),
+                proxy_password: String::new(),
+                notes: "本地透明 SOCKS5 代理网关，支持浏览器或终端走内网网段统一访问".to_string(),
+                updated_at: "2026-09-02 08:30:00".to_string(),
+            },
+            TunnelRecord {
+                id: "tun-bastion-chain".to_string(),
+                name: "内网第二跳核心堡垒机".to_string(),
+                tunnel_type: TunnelType::JumpHost,
+                ssh_host_id: Some("host-gateway".to_string()),
+                ssh_host_name: "gateway-bastion".to_string(),
+                local_bind: "".to_string(),
+                local_port: 0,
+                remote_host: "10.100.0.1".to_string(),
+                remote_port: 22,
+                jump_chain: vec![
+                    crate::domain::tunnel::JumpHopRecord {
+                        host_id: "host-gateway".to_string(),
+                        host_name: "gateway-bastion".to_string(),
+                        host_address: "10.10.1.1".to_string(),
+                        host_port: 22,
+                        enabled: true,
+                    },
+                    crate::domain::tunnel::JumpHopRecord {
+                        host_id: "host-prod-01".to_string(),
+                        host_name: "prod-server-01".to_string(),
+                        host_address: "10.100.0.1".to_string(),
+                        host_port: 22,
+                        enabled: true,
+                    },
+                ],
+                is_running: true,
+                auto_start: true,
+                auto_reconnect: true,
+                remote_dns: false,
+                compression: false,
+                active_connections: 2,
+                total_bytes_in: 1024 * 1024 * 5,
+                total_bytes_out: 1024 * 1024 * 3,
+                proxy_proto: String::new(),
+                proxy_username: String::new(),
+                proxy_password: String::new(),
+                notes: "级联跳板机 (ProxyJump)，作为访问深度内网物理隔离集群的中转桥梁".to_string(),
+                updated_at: "2026-08-29 14:00:00".to_string(),
+            },
+            TunnelRecord {
+                id: "tun-proxy-corp".to_string(),
+                name: "公司统一出网 HTTP/SOCKS 代理".to_string(),
+                tunnel_type: TunnelType::ProxyServer,
+                ssh_host_id: None,
+                ssh_host_name: "proxy.internal.corp".to_string(),
+                local_bind: "127.0.0.1".to_string(),
+                local_port: 7890,
+                remote_host: "proxy.corp.net".to_string(),
+                remote_port: 7890,
+                jump_chain: Vec::new(),
+                is_running: true,
+                auto_start: false,
+                auto_reconnect: true,
+                remote_dns: true,
+                compression: false,
+                active_connections: 5,
+                total_bytes_in: 1024 * 1024 * 45,
+                total_bytes_out: 1024 * 1024 * 12,
+                proxy_proto: "SOCKS5".to_string(),
+                proxy_username: "corp_user".to_string(),
+                proxy_password: "corp_password".to_string(),
+                notes: "出网专用代理服务，支持 HTTP 与 SOCKS5 双协议转发".to_string(),
+                updated_at: "2026-09-02 09:15:00".to_string(),
+            },
+        ];
+
         tracing::info!(
             target: "smagical_core::storage",
-            "初始化 MockStorage 预设种子引擎完成: 已注入 {} 个层级分组, {} 台主机资产, {} 条历史会话记录 (含 {} 份屏幕快照), {} 条凭据记录, {} 个代码片段分组与 {} 个代码片段",
+            "初始化 MockStorage 预设种子引擎完成: 已注入 {} 个层级分组, {} 台主机资产, {} 条历史会话记录 (含 {} 份屏幕快照), {} 条凭据记录, {} 个代码片段分组, {} 个代码片段与 {} 条网络隧道/代理",
             groups.len(),
             hosts.len(),
             history.len(),
             snapshots.len(),
             credentials.len(),
             snippet_groups.len(),
-            snippets.len()
+            snippets.len(),
+            tunnels.len()
         );
 
         let hosts_repo = MockHostRepository::with_hosts(hosts);
@@ -1514,6 +1791,7 @@ logout"#.to_string(),
             history_repo: MockHistoryRepository::with_history_and_snapshots(history, snapshots),
             credentials_repo,
             snippets_repo: MockSnippetRepository::with_data(snippets, snippet_groups),
+            tunnels_repo: MockTunnelRepository::with_tunnels(tunnels),
         }
     }
 }
@@ -1538,6 +1816,10 @@ impl AppStorage for MockStorage {
 
     fn snippets(&self) -> &dyn SnippetRepository {
         &self.snippets_repo
+    }
+
+    fn tunnels(&self) -> &dyn TunnelRepository {
+        &self.tunnels_repo
     }
 
     fn reload(&self) -> StorageResult<()> {
@@ -1818,6 +2100,52 @@ mod tests {
         assert_eq!(storage.snippets().list_groups().unwrap().len(), 6);
         storage.snippets().delete_group("sgrp-test-child").unwrap();
         assert_eq!(storage.snippets().list_groups().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn test_mock_storage_tunnels_crud_and_status() {
+        let storage = MockStorage::new_seeded();
+
+        // 1. 种子加载校验
+        let tunnels = storage.tunnels().list_all().unwrap();
+        assert_eq!(tunnels.len(), 6);
+
+        // 2. 按类型过滤
+        let locals = storage.tunnels().list_by_type(TunnelType::Local).unwrap();
+        assert_eq!(locals.len(), 2);
+        let remotes = storage.tunnels().list_by_type(TunnelType::Remote).unwrap();
+        assert_eq!(remotes.len(), 1);
+        let proxies = storage.tunnels().list_by_type(TunnelType::ProxyServer).unwrap();
+        assert_eq!(proxies.len(), 1);
+
+        // 3. 搜索过滤
+        let search_mysql = storage.tunnels().search("mysql").unwrap();
+        assert_eq!(search_mysql.len(), 1);
+        assert_eq!(search_mysql[0].id, "tun-mysql-prod");
+
+        // 4. 启停状态切换
+        let is_running = storage.tunnels().get_by_id("tun-webhook-dev").unwrap().unwrap().is_running;
+        assert!(!is_running);
+        storage.tunnels().set_running("tun-webhook-dev", true).unwrap();
+        let is_running_after = storage.tunnels().get_by_id("tun-webhook-dev").unwrap().unwrap().is_running;
+        assert!(is_running_after);
+
+        // 5. 流量更新
+        storage.tunnels().update_metrics("tun-webhook-dev", 2, 1024, 2048).unwrap();
+        let updated = storage.tunnels().get_by_id("tun-webhook-dev").unwrap().unwrap();
+        assert_eq!(updated.active_connections, 2);
+        assert!(updated.total_bytes_in >= 1024);
+
+        // 6. 新建与删除
+        let mut new_tun = updated.clone();
+        new_tun.id = "tun-temp-test".to_string();
+        new_tun.name = "临时测试隧道".to_string();
+        storage.tunnels().save(&new_tun).unwrap();
+        assert_eq!(storage.tunnels().list_all().unwrap().len(), 7);
+
+        let deleted = storage.tunnels().delete("tun-temp-test").unwrap();
+        assert!(deleted);
+        assert_eq!(storage.tunnels().list_all().unwrap().len(), 6);
     }
 }
 

@@ -4,6 +4,7 @@
 
 use std::rc::Rc;
 use slint::ComponentHandle;
+use slint::winit_030::WinitWindowAccessor;
 use smagical_core::event::{
     AppBeforeExitEvent, AppExitEvent, ConfigChangedEvent, ThemeChangedEvent,
     ThemeModeToggledEvent, WindowStateChangedEvent,
@@ -228,6 +229,24 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             });
             w.set_is_window_maximized(!is_max);
             w.window().set_maximized(!is_max);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 5.1 窗口控制: 原生无边框窗口拖动移动 (Winit drag_window 移交 Windows DWM 接管)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    window.on_start_window_drag(move || {
+        if let Some(w) = window_weak.upgrade() {
+            w.window().with_winit_window(|winit_window| {
+                if let Err(e) = winit_window.drag_window() {
+                    tracing::debug!(target: "smagical_ui::window", "Window drag failed: {:?}", e);
+                }
+            });
+            // 拖拽过程中如果窗口从最大化状态被系统 DWM 自动还原，同步 UI 状态
+            if w.get_is_window_maximized() && !w.window().is_maximized() {
+                w.set_is_window_maximized(false);
+            }
         }
     });
 

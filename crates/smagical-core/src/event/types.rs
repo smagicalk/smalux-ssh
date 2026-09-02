@@ -532,3 +532,151 @@ pub struct SnippetExecutedEvent {
     /// 是否自动发送了回车执行。
     pub auto_execute: bool,
 }
+
+/// 隧道或代理配置保存 (新建/更新) 领域事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TunnelSavedEvent {
+    /// 隧道 ID。
+    pub tunnel_id: String,
+    /// 隧道名称。
+    pub name: String,
+    /// 隧道类型 ("Local", "Remote", "Dynamic", "JumpHost", "ProxyServer")。
+    pub tunnel_type: String,
+    /// 是否为全新创建。
+    pub is_new: bool,
+}
+
+/// 隧道或代理配置删除事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TunnelDeletedEvent {
+    /// 被删除的隧道 ID。
+    pub tunnel_id: String,
+}
+
+/// 隧道启动或停止运行状态变更事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TunnelStateChangedEvent {
+    /// 隧道 ID。
+    pub tunnel_id: String,
+    /// 是否处于运行状态 (true 为启动，false 为停止)。
+    pub is_running: bool,
+}
+
+/// 隧道保存前置安全与冲突审查守卫事件 (可被安全守护插件拦截中止)。
+#[derive(Debug, Clone)]
+pub struct TunnelBeforeSaveEvent {
+    /// 待保存的隧道 ID。
+    pub tunnel_id: String,
+    /// 隧道名称。
+    pub name: String,
+    /// 隧道类型 ("Local", "Remote", "Dynamic", "ReverseDynamic", "JumpHost", "ProxyServer")。
+    pub tunnel_type: String,
+    /// 本地监听绑定地址。
+    pub local_bind: String,
+    /// 本地监听端口。
+    pub local_port: u16,
+    /// 远端目标主机。
+    pub remote_host: String,
+    /// 远端目标端口。
+    pub remote_port: u16,
+    /// 级联跳板主机 ID 序列 (用于成环检测)。
+    pub jump_host_ids: Vec<String>,
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    abort_reason: std::sync::Arc<std::sync::RwLock<Option<String>>>,
+}
+
+impl TunnelBeforeSaveEvent {
+    /// 创建新的隧道保存前置审查事件。
+    pub fn new(
+        tunnel_id: impl Into<String>,
+        name: impl Into<String>,
+        tunnel_type: impl Into<String>,
+        local_bind: impl Into<String>,
+        local_port: u16,
+        remote_host: impl Into<String>,
+        remote_port: u16,
+        jump_host_ids: Vec<String>,
+    ) -> Self {
+        Self {
+            tunnel_id: tunnel_id.into(),
+            name: name.into(),
+            tunnel_type: tunnel_type.into(),
+            local_bind: local_bind.into(),
+            local_port,
+            remote_host: remote_host.into(),
+            remote_port,
+            jump_host_ids,
+            cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            abort_reason: std::sync::Arc::new(std::sync::RwLock::new(None)),
+        }
+    }
+
+    /// 拦截并阻止该隧道配置落盘保存。
+    pub fn abort(&self, reason: impl Into<String>) {
+        self.cancelled.store(true, std::sync::atomic::Ordering::SeqCst);
+        *self.abort_reason.write().unwrap() = Some(reason.into());
+    }
+
+    /// 检查操作是否被阻止。
+    pub fn is_aborted(&self) -> bool {
+        self.cancelled.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// 获取拦截的具体业务原因。
+    pub fn abort_reason(&self) -> Option<String> {
+        self.abort_reason.read().unwrap().clone()
+    }
+}
+
+/// 隧道删除前置审查事件 (防止误删正在运行的活跃通道)。
+#[derive(Debug, Clone)]
+pub struct TunnelBeforeDeleteEvent {
+    /// 待删除的隧道 ID。
+    pub tunnel_id: String,
+    /// 目标隧道当前是否正在运行。
+    pub is_running: bool,
+    cancelled: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    abort_reason: std::sync::Arc<std::sync::RwLock<Option<String>>>,
+}
+
+impl TunnelBeforeDeleteEvent {
+    /// 创建新的隧道删除前置审查事件。
+    pub fn new(tunnel_id: impl Into<String>, is_running: bool) -> Self {
+        Self {
+            tunnel_id: tunnel_id.into(),
+            is_running,
+            cancelled: std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            abort_reason: std::sync::Arc::new(std::sync::RwLock::new(None)),
+        }
+    }
+
+    /// 拦截并阻止该隧道物理删除。
+    pub fn abort(&self, reason: impl Into<String>) {
+        self.cancelled.store(true, std::sync::atomic::Ordering::SeqCst);
+        *self.abort_reason.write().unwrap() = Some(reason.into());
+    }
+
+    /// 检查删除是否被阻止。
+    pub fn is_aborted(&self) -> bool {
+        self.cancelled.load(std::sync::atomic::Ordering::SeqCst)
+    }
+
+    /// 获取拦截原因。
+    pub fn abort_reason(&self) -> Option<String> {
+        self.abort_reason.read().unwrap().clone()
+    }
+}
+
+/// 隧道流量度量与连接数流式采样事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TunnelMetricsTickEvent {
+    /// 隧道 ID。
+    pub tunnel_id: String,
+    /// 本周期入站流量增量 (Bytes)。
+    pub bytes_in_delta: u64,
+    /// 本周期出站流量增量 (Bytes)。
+    pub bytes_out_delta: u64,
+    /// 当前活跃 TCP 连接数。
+    pub active_connections: usize,
+}
+

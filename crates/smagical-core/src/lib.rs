@@ -24,7 +24,9 @@ pub use event::{
     RightPanelSwitchedEvent, RightPanelUnregisteredEvent, SnippetDeletedEvent,
     SnippetExecutedEvent, SnippetGroupDeletedEvent, SnippetGroupSavedEvent, SnippetSavedEvent,
     TerminalActionRequestedEvent, TerminalFocusChangedEvent, TerminalSessionEvent,
-    TerminalSplitChangedEvent, ThemeChangedEvent, ThemeModeToggledEvent, WindowStateChangedEvent,
+    TerminalSplitChangedEvent, ThemeChangedEvent, ThemeModeToggledEvent,
+    TunnelBeforeDeleteEvent, TunnelBeforeSaveEvent, TunnelDeletedEvent,
+    TunnelMetricsTickEvent, TunnelSavedEvent, TunnelStateChangedEvent, WindowStateChangedEvent,
 };
 
 pub use domain::{
@@ -43,6 +45,7 @@ pub use domain::{
     right_panel::{RightPanelItem, RightPanelRegistry},
     snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable},
     terminal_context::{ActiveTerminalSessionContext, TerminalAction},
+    tunnel::{JumpHopRecord, TunnelRecord, TunnelType},
 };
 
 pub use state::core_state::CoreState;

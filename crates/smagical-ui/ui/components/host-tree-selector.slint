@@ -1,0 +1,217 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { HostTreeNode } from "../views/left_drawers/hosts_drawer.slint";
+
+/// 主机资产树状选择器组件 (Host Tree Selector)
+///
+/// 专用于端口转发、跳板机等关联主机场景的高复用选择控件。
+/// 核心特性：
+/// 1. 分组与主机节点层级缩进展现；
+/// 2. 分组支持折叠/展开与双击切换；
+/// 3. 主机节点支持单选、状态着色、IP:端口展示；
+/// 4. 双击主机节点可直接触发选定确认；
+/// 5. 内置 Flickable 滚动容器与自隐藏悬浮薄滚动条。
+export component HostTreeSelector inherits Rectangle {
+    in property <[HostTreeNode]> options: [];
+    in-out property <string> selected-id: "";
+    in-out property <string> selected-name: "";
+    in-out property <string> selected-address: "";
+    in-out property <int> selected-port: 22;
+
+    callback selection-changed(string /* id */, string /* name */, string /* address */, int /* port */);
+    callback toggle-group(string /* id */);
+    callback confirmed();
+
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.control-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    clip: true;
+
+    tree-hover := TouchArea {
+        // 捕获悬停态以触发滚动条优雅淡入
+    }
+
+    tree-flick := Flickable {
+        width: 100%;
+        height: 100%;
+        interactive: true;
+
+        VerticalLayout {
+            padding: 4px;
+            spacing: 2px;
+            width: 100%;
+
+            if root.options.length == 0: Rectangle {
+                height: 80px;
+                Text {
+                    text: @tr("暂无主机资产，请先在主机面板中添加主机");
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+
+            for item in root.options: Rectangle {
+                height: 28px;
+
+                HorizontalLayout {
+                    padding-left: 4px + item.level * 14px;
+                    padding-right: 6px;
+                    spacing: 4px;
+                    alignment: start;
+
+                    // 1. 折叠三角指示 (仅分组展示)
+                    if item.is-group: Rectangle {
+                        width: 18px;
+                        height: 24px;
+                        border-radius: 3px;
+                        background: chevron-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        Image {
+                            source: item.is-expanded ? @image-url("../assets/icons/chevron-down.svg") : @image-url("../assets/icons/chevron-right.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: chevron-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        chevron-touch := TouchArea {
+                            clicked => { root.toggle-group(item.id); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    if !item.is-group: Rectangle {
+                        width: 18px;
+                        height: 24px;
+                    }
+
+                    // 2. 节点主体区域
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 26px;
+                        border-radius: 4px;
+                        background: (!item.is-group && item.id == root.selected-id)
+                            ? AppTheme.selected-background
+                            : select-touch.has-hover
+                                ? AppTheme.hover-background
+                                : transparent;
+                        border-width: (!item.is-group && item.id == root.selected-id) ? 1px : 0px;
+                        border-color: AppTheme.accent;
+
+                        animate background { duration: 100ms; }
+
+                        select-touch := TouchArea {
+                            clicked => {
+                                if item.is-group {
+                                    root.toggle-group(item.id);
+                                } else {
+                                    root.selected-id = item.id;
+                                    root.selected-name = item.name;
+                                    root.selected-address = item.address;
+                                    root.selected-port = item.port;
+                                    root.selection-changed(item.id, item.name, item.address, item.port);
+                                }
+                            }
+                            double-clicked => {
+                                if item.is-group {
+                                    root.toggle-group(item.id);
+                                } else {
+                                    root.selected-id = item.id;
+                                    root.selected-name = item.name;
+                                    root.selected-address = item.address;
+                                    root.selected-port = item.port;
+                                    root.selection-changed(item.id, item.name, item.address, item.port);
+                                    root.confirmed();
+                                }
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            alignment: start;
+
+                            // 主机单选指示圆圈 (仅主机节点显示)
+                            if !item.is-group: VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 10px;
+                                    height: 10px;
+                                    border-radius: 5px;
+                                    border-width: 1.5px;
+                                    border-color: item.id == root.selected-id ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    background: item.id == root.selected-id ? AppTheme.accent : transparent;
+                                }
+                            }
+
+                            // 节点图标 (分组显示文件夹，主机显示服务器)
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: item.is-group
+                                        ? (item.is-expanded ? @image-url("../assets/icons/folder-open.svg") : @image-url("../assets/icons/folder.svg"))
+                                        : @image-url("../assets/icons/server.svg");
+                                    width: 13px;
+                                    height: 13px;
+                                    image-fit: contain;
+                                    colorize: item.is-group
+                                        ? AppTheme.secondary-foreground
+                                        : (item.status == "online" ? AppTheme.success : AppTheme.secondary-foreground);
+                                }
+                            }
+
+                            // 节点名称
+                            Text {
+                                text: item.name;
+                                font-size: 11px;
+                                font-weight: (!item.is-group && item.id == root.selected-id) ? 700 : item.is-group ? 600 : 400;
+                                color: (!item.is-group && item.id == root.selected-id)
+                                    ? AppTheme.selected-foreground
+                                    : AppTheme.foreground;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            // 主机地址与端口徽章 (仅主机展示)
+                            if !item.is-group && item.address != "": Text {
+                                text: item.address + ":" + item.port;
+                                font-size: 10px;
+                                font-family: "Cascadia Code, Consolas, monospace";
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                                overflow: elide;
+                            }
+
+                            // 分组子项数量 (仅分组展示)
+                            if item.is-group && item.item-count > 0: Text {
+                                text: "(" + item.item-count + ")";
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 超薄自隐藏悬浮滚动条
+    if tree-flick.viewport-height > tree-flick.height: Rectangle {
+        x: parent.width - self.width - 2px;
+        y: Math.max(2px, Math.min(parent.height - self.height - 2px, (-tree-flick.viewport-y / tree-flick.viewport-height) * tree-flick.height));
+        width: 3px;
+        height: Math.max(20px, (tree-flick.height / tree-flick.viewport-height) * tree-flick.height);
+        border-radius: 1.5px;
+        background: tree-hover.has-hover ? AppTheme.secondary-foreground.transparentize(20%) : AppTheme.secondary-foreground.transparentize(80%);
+        opacity: tree-hover.has-hover ? 0.9 : 0.0;
+
+        animate opacity { duration: 200ms; }
+    }
+}

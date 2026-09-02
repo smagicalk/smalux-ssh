@@ -34,7 +34,15 @@ export component RightToolBar inherits Rectangle {
             clicked => { root.tool-clicked("monitor"); }
         }
 
-        // 2. 快捷命令
+        // 2. 主机专属端口转发与隧道
+        ActionBarItem {
+            icon: @image-url("../assets/icons/tunnel.svg");
+            tooltip: @tr("端口转发与隧道");
+            is-active: root.active-tool == "tunnel";
+            clicked => { root.tool-clicked("tunnel"); }
+        }
+
+        // 3. 快捷命令
         ActionBarItem {
             icon: @image-url("../assets/icons/zap.svg");
             tooltip: @tr("快捷命令库");

@@ -44,6 +44,8 @@ export component TabBar inherits Rectangle {
     callback maximize-window();
     /// 原生窗口关闭应用回调
     callback close-window();
+    /// 原生无边框窗口拖动移动回调
+    callback start-window-drag();
 
 
     height: 38px;
@@ -57,9 +59,14 @@ export component TabBar inherits Rectangle {
         background: AppTheme.border;
     }
 
-    // 整个标题栏底层双击最大化
+    // 整个标题栏底层双击最大化与鼠标拖动窗口
     TouchArea {
         double-clicked => { root.maximize-window(); }
+        pointer-event(event) => {
+            if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                root.start-window-drag();
+            }
+        }
     }
 
     HorizontalLayout {

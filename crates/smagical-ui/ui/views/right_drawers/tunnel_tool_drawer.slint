@@ -1,0 +1,292 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+import { AppButton } from "../../components/base/app-button.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { TunnelItemData } from "../tunnels_view.slint";
+import { ScrollView } from "std-widgets.slint";
+
+export { TunnelItemData }
+
+/// 主机专属端口转发与隧道伴生右侧抽屉组件 (Host Tunnel Tool Drawer)
+///
+/// 紧随当前活动终端主机，呈现归属于该主机的端口转发规则，支持抽屉内一键启停开关与极速新建。
+export component TunnelToolDrawer inherits DrawerContainer {
+    title: @tr("主机端口转发");
+    collapse-icon: "▶";
+
+    in property <string> active-host-name: "";
+    in property <[TunnelItemData]> tunnels: [];
+
+    callback toggle-tunnel-running(string /* id */);
+    callback open-tunnels-hub();
+    callback start-create-tunnel();
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+
+        // 1. 顶部上下文提示与快捷新建栏
+        Rectangle {
+            height: 32px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.control-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 6px;
+                alignment: space-between;
+
+                // 当前聚焦主机提示
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/server.svg");
+                            width: 12px;
+                            height: 12px;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: root.active-host-name != "" ? root.active-host-name : @tr("未连接主机");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            overflow: elide;
+                        }
+                    }
+                }
+
+                // 快速新建按钮
+                AppButton {
+                    text: @tr("+ 新建");
+                    variant: "primary";
+                    height: 22px;
+                    clicked => { root.start-create-tunnel(); }
+                }
+            }
+        }
+
+        // 2. 当前主机隧道列表 / 空状态
+        if root.tunnels.length == 0: Rectangle {
+            vertical-stretch: 1;
+            background: transparent;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 10px;
+
+                Image {
+                    source: @image-url("../../assets/icons/tunnel.svg");
+                    width: 32px;
+                    height: 32px;
+                    colorize: AppTheme.secondary-foreground.transparentize(50%);
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: @tr("当前主机暂无专属端口转发规则");
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    AppButton {
+                        text: @tr("配置端口映射");
+                        variant: "outline";
+                        height: 26px;
+                        clicked => { root.start-create-tunnel(); }
+                    }
+                }
+            }
+        }
+
+        if root.tunnels.length > 0: ScrollView {
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                spacing: 6px;
+                padding-right: 2px;
+
+                for tun in root.tunnels: Rectangle {
+                    height: 58px;
+                    border-radius: AppTheme.radius-medium;
+                    background: item-touch.has-hover ? AppTheme.hover-background : AppTheme.panel-background;
+                    border-width: 1px;
+                    border-color: tun.is-running ? AppTheme.success.transparentize(70%) : AppTheme.border;
+                    animate background { duration: 120ms; }
+                    animate border-color { duration: 120ms; }
+
+                    item-touch := TouchArea {
+                        // 预留点击
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 8px;
+
+                        // 信息区 (靠最左端对齐)
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 3px;
+
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: start;
+
+                                Text {
+                                    text: tun.name;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.foreground;
+                                    overflow: elide;
+                                    horizontal-alignment: left;
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle {
+                                    height: 14px;
+                                    border-radius: 2px;
+                                    background: tun.tunnel-type == "Local"
+                                        ? AppTheme.accent.transparentize(80%)
+                                        : (tun.tunnel-type == "Remote"
+                                            ? #e67e22.transparentize(80%)
+                                            : #9b59b6.transparentize(80%));
+
+                                    HorizontalLayout {
+                                        padding-left: 3px;
+                                        padding-right: 3px;
+                                        Text {
+                                            text: tun.type-badge;
+                                            font-size: 8px;
+                                            font-weight: 700;
+                                            color: tun.tunnel-type == "Local"
+                                                ? AppTheme.accent
+                                                : (tun.tunnel-type == "Remote" ? #e67e22 : #9b59b6);
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 端口映射摘要 (两个 IP 之间带有专门的矢量箭头图标，100% 渲染显示)
+                            HorizontalLayout {
+                                alignment: start;
+                                spacing: 5px;
+
+                                if tun.tunnel-type == "Local" || tun.tunnel-type == "Remote": HorizontalLayout {
+                                    spacing: 5px;
+                                    alignment: start;
+
+                                    Text {
+                                        text: (tun.tunnel-type == "Local" ? tun.local-bind : tun.remote-host) + ":" + (tun.tunnel-type == "Local" ? tun.local-port : tun.remote-port);
+                                        font-size: 10px;
+                                        font-family: "Cascadia Code, Consolas, monospace";
+                                        color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/arrow-right.svg");
+                                            width: 10px;
+                                            height: 10px;
+                                            colorize: tun.is-running ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: (tun.tunnel-type == "Local" ? tun.remote-host : tun.local-bind) + ":" + (tun.tunnel-type == "Local" ? tun.remote-port : tun.local-port);
+                                        font-size: 10px;
+                                        font-family: "Cascadia Code, Consolas, monospace";
+                                        color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                if tun.tunnel-type != "Local" && tun.tunnel-type != "Remote": Text {
+                                    text: tun.route-summary;
+                                    font-size: 10px;
+                                    font-family: "Cascadia Code, Consolas, monospace";
+                                    color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // 启停 Switch 开关按钮 (右端垂直居中)
+                        VerticalLayout {
+                            alignment: center;
+
+                            Rectangle {
+                                width: 32px;
+                                height: 18px;
+                                border-radius: 9px;
+                                background: tun.is-running ? AppTheme.success : AppTheme.border;
+                                animate background { duration: 150ms; }
+
+                                // 拨动圆点
+                                Rectangle {
+                                    x: tun.is-running ? parent.width - self.width - 2px : 2px;
+                                    y: 2px;
+                                    width: 14px;
+                                    height: 14px;
+                                    border-radius: 7px;
+                                    background: #ffffff;
+                                    animate x { duration: 150ms; }
+                                }
+
+                                TouchArea {
+                                    clicked => { root.toggle-tunnel-running(tun.id); }
+                                    mouse-cursor: pointer;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 底部快捷跳转全屏大盘入口
+        Rectangle {
+            height: 30px;
+            border-radius: AppTheme.radius-medium;
+            background: hub-touch.has-hover ? AppTheme.hover-background : transparent;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            animate background { duration: 120ms; }
+
+            hub-touch := TouchArea {
+                clicked => { root.open-tunnels-hub(); }
+                mouse-cursor: pointer;
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 6px;
+
+                Text {
+                    text: @tr("进入网络与隧道管理中心 ➔");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.accent;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

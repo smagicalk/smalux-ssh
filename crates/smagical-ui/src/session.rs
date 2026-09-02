@@ -108,6 +108,8 @@ pub(crate) fn sync_active_session_ui(
         w.set_active_session_tab("".into());
         w.set_has_active_session(false);
         w.set_active_session_name("".into());
+        w.set_active_host_id("".into());
+        w.set_active_host_name("".into());
         w.set_active_host_address("".into());
         w.set_active_host_ping_ms(0);
         w.set_active_host_status("offline".into());
@@ -125,6 +127,8 @@ pub(crate) fn sync_active_session_ui(
             w.set_active_session_tab(active_sess.session_id.clone().into());
             w.set_has_active_session(true);
             w.set_active_session_name(active_sess.display_title.clone().into());
+            w.set_active_host_id(active_sess.host_id.clone().into());
+            w.set_active_host_name(active_sess.host_name.clone().into());
             w.set_active_host_address(active_sess.host_address.clone().into());
             w.set_active_host_ping_ms(active_sess.ping_ms);
             w.set_active_host_status(active_sess.host_status.clone().into());

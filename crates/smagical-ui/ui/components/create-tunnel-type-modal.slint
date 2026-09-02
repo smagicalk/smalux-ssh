@@ -1,0 +1,344 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppIconButton } from "base/app-icon-button.slint";
+
+/// 新建网络资产与隧道类型选择弹窗
+export component CreateTunnelTypeModal inherits Rectangle {
+    in-out property <bool> is-open: false;
+
+    callback cancel();
+    callback select-type(string /* "Local" | "JumpHost" | "ProxyServer" */);
+
+    if root.is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000.transparentize(0.5);
+
+        // 遮罩点击关闭
+        TouchArea {
+            clicked => { root.cancel(); }
+        }
+
+        // 弹窗本体 (精确限定宽高 480x330px，屏幕绝对居中，杜绝拉伸空白)
+        Rectangle {
+            width: 480px;
+            height: 330px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #000000.transparentize(0.4);
+
+            TouchArea { } // 阻止事件穿透到遮罩
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                alignment: start;
+
+                // 1. 弹窗顶部标题与关闭
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 36px;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+                        Text {
+                            text: @tr("新建网络与隧道规则");
+                            font-size: 15px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+                        Text {
+                            text: @tr("请选择您要创建的资产类型，将为您打开专属配置表单");
+                            font-size: 11px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../assets/icons/window-close.svg");
+                            icon-size: 14px;
+                            clicked => { root.cancel(); }
+                        }
+                    }
+                }
+
+                // 2. 三大资产类型选项卡片 (紧凑排列，高度各 72px)
+                VerticalLayout {
+                    spacing: 10px;
+                    alignment: start;
+
+                    // 选项 1: 端口转发 (Port Forwarding)
+                    Rectangle {
+                        height: 72px;
+                        border-radius: AppTheme.radius-medium;
+                        background: fwd-touch.has-hover ? AppTheme.accent.transparentize(90%) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: fwd-touch.has-hover ? AppTheme.accent : AppTheme.border;
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        fwd-touch := TouchArea {
+                            clicked => {
+                                root.is-open = false;
+                                root.select-type("Local");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            spacing: 14px;
+
+                            // 左侧图标块 (外层 VerticalLayout 垂直居中)
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 40px;
+                                    height: 40px;
+                                    border-radius: 8px;
+                                    background: AppTheme.accent.transparentize(85%);
+
+                                    // 图标在块内完全几何居中
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 20px;
+                                        height: 20px;
+                                        source: @image-url("../assets/icons/tunnel.svg");
+                                        colorize: AppTheme.accent;
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                spacing: 4px;
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    Text {
+                                        text: @tr("端口转发 (Port Forwarding)");
+                                        font-size: 13px;
+                                        font-weight: 600;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                    Rectangle {
+                                        height: 18px;
+                                        border-radius: 3px;
+                                        background: AppTheme.accent.transparentize(80%);
+                                        HorizontalLayout {
+                                            padding-left: 5px;
+                                            padding-right: 5px;
+                                            alignment: center;
+                                            Text {
+                                                text: "-L / -R / -D";
+                                                font-size: 9px;
+                                                font-weight: 700;
+                                                color: AppTheme.accent;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("本地、远端或动态 SOCKS5 端口转发与穿透");
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+
+                    // 选项 2: 跳板机 (JumpHost / Bastion)
+                    Rectangle {
+                        height: 72px;
+                        border-radius: AppTheme.radius-medium;
+                        background: jump-touch.has-hover ? #e67e22.transparentize(90%) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: jump-touch.has-hover ? #e67e22 : AppTheme.border;
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        jump-touch := TouchArea {
+                            clicked => {
+                                root.is-open = false;
+                                root.select-type("JumpHost");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            spacing: 14px;
+
+                            // 左侧图标块 (外层 VerticalLayout 垂直居中)
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 40px;
+                                    height: 40px;
+                                    border-radius: 8px;
+                                    background: #e67e22.transparentize(85%);
+
+                                    // 图标在块内完全几何居中
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 20px;
+                                        height: 20px;
+                                        source: @image-url("../assets/icons/shield.svg");
+                                        colorize: #e67e22;
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                spacing: 4px;
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    Text {
+                                        text: @tr("跳板机 (JumpHost / Bastion)");
+                                        font-size: 13px;
+                                        font-weight: 600;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                    Rectangle {
+                                        height: 18px;
+                                        border-radius: 3px;
+                                        background: #e67e22.transparentize(80%);
+                                        HorizontalLayout {
+                                            padding-left: 5px;
+                                            padding-right: 5px;
+                                            alignment: center;
+                                            Text {
+                                                text: "ProxyJump -J";
+                                                font-size: 9px;
+                                                font-weight: 700;
+                                                color: #e67e22;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("配置 ProxyJump 堡垒机中继，供主机连接时绑定");
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+
+                    // 选项 3: 出网代理 (Proxy Server)
+                    Rectangle {
+                        height: 72px;
+                        border-radius: AppTheme.radius-medium;
+                        background: proxy-touch.has-hover ? AppTheme.accent.transparentize(90%) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: proxy-touch.has-hover ? AppTheme.accent : AppTheme.border;
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        proxy-touch := TouchArea {
+                            clicked => {
+                                root.is-open = false;
+                                root.select-type("ProxyServer");
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            spacing: 14px;
+
+                            // 左侧图标块 (外层 VerticalLayout 垂直居中)
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 40px;
+                                    height: 40px;
+                                    border-radius: 8px;
+                                    background: AppTheme.accent.transparentize(85%);
+
+                                    // 图标在块内完全几何居中
+                                    Image {
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                        width: 20px;
+                                        height: 20px;
+                                        source: @image-url("../assets/icons/radio.svg");
+                                        colorize: AppTheme.accent;
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                alignment: center;
+                                spacing: 4px;
+
+                                HorizontalLayout {
+                                    spacing: 8px;
+                                    alignment: start;
+                                    Text {
+                                        text: @tr("出网代理池 (Proxy Server)");
+                                        font-size: 13px;
+                                        font-weight: 600;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                    Rectangle {
+                                        height: 18px;
+                                        border-radius: 3px;
+                                        background: AppTheme.accent.transparentize(80%);
+                                        HorizontalLayout {
+                                            padding-left: 5px;
+                                            padding-right: 5px;
+                                            alignment: center;
+                                            Text {
+                                                text: "HTTP / SOCKS5";
+                                                font-size: 9px;
+                                                font-weight: 700;
+                                                color: AppTheme.accent;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Text {
+                                    text: @tr("配置 HTTP / SOCKS5 代理节点，供主机统一出网");
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground;
+                                    overflow: elide;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

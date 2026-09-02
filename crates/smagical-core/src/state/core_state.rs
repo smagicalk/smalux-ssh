@@ -173,6 +173,84 @@ fn attach_default_event_loggers(events: &EventManager) {
         );
     });
     g15.detach();
+
+    let g16 = events.global().listen(|e: &crate::event::TunnelSavedEvent| {
+        tracing::info!(
+            target: "smalux::tunnel",
+            "[事件总线:网络隧道保存] ID: [{}], 名称: '{}', 类型: '{}', 是否新建: {}",
+            e.tunnel_id, e.name, e.tunnel_type, e.is_new
+        );
+    });
+    g16.detach();
+
+    let g17 = events.global().listen(|e: &crate::event::TunnelDeletedEvent| {
+        tracing::warn!(
+            target: "smalux::tunnel",
+            "[事件总线:网络隧道删除] ID: [{}] 已从网络配置库中移除",
+            e.tunnel_id
+        );
+    });
+    g17.detach();
+
+    let g18 = events.global().listen(|e: &crate::event::TunnelStateChangedEvent| {
+        if e.is_running {
+            tracing::info!(
+                target: "smalux::tunnel",
+                "[事件总线:网络隧道启动] ID: [{}] 隧道已成功启动建立连接",
+                e.tunnel_id
+            );
+        } else {
+            tracing::info!(
+                target: "smalux::tunnel",
+                "[事件总线:网络隧道停止] ID: [{}] 隧道已关闭",
+                e.tunnel_id
+            );
+        }
+    });
+    g18.detach();
+
+    let g19 = events.global().listen(|e: &crate::event::TunnelBeforeSaveEvent| {
+        // 1. 跳板机成环与循环依赖检测
+        let mut seen = std::collections::HashSet::new();
+        for h_id in &e.jump_host_ids {
+            if !seen.insert(h_id) {
+                tracing::warn!(target: "smalux::tunnel", "[配置拦截] 隧道 [{}] 跳板链路检测到重复节点成环: {}", e.tunnel_id, h_id);
+                e.abort(format!("跳板机链路检测到循环依赖节点: {}", h_id));
+                return;
+            }
+        }
+
+        // 2. 端口转发基础端口校验
+        if (e.tunnel_type == "Local" || e.tunnel_type == "Remote") && (e.local_port == 0 || e.remote_port == 0) {
+            tracing::warn!(target: "smalux::tunnel", "[配置拦截] 隧道 [{}] 端口配置不合法 (端口号为 0)", e.tunnel_id);
+            e.abort("端口转发规则的端口号不能为 0！");
+            return;
+        }
+
+        tracing::debug!(
+            target: "smalux::tunnel",
+            "[安全审查:网络隧道保存前置] ID: [{}], 绑定: {}:{}, 远端: {}:{}",
+            e.tunnel_id, e.local_bind, e.local_port, e.remote_host, e.remote_port
+        );
+    });
+    g19.detach();
+
+    let g20 = events.global().listen(|e: &crate::event::TunnelBeforeDeleteEvent| {
+        if e.is_running {
+            tracing::warn!(target: "smalux::tunnel", "[删除拦截] 隧道 [{}] 正在运行中，拒绝物理删除", e.tunnel_id);
+            e.abort("该网络规则当前正在运行中，请先停止运行后再删除！");
+        }
+    });
+    g20.detach();
+
+    let g21 = events.global().listen(|e: &crate::event::TunnelMetricsTickEvent| {
+        tracing::trace!(
+            target: "smalux::tunnel",
+            "[流式度量:网络隧道] ID: [{}], 入向: +{} B, 出向: +{} B, 活跃连接: {}",
+            e.tunnel_id, e.bytes_in_delta, e.bytes_out_delta, e.active_connections
+        );
+    });
+    g21.detach();
 }
 
 impl CoreState {

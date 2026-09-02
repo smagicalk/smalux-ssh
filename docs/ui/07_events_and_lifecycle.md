@@ -89,6 +89,13 @@
 | **`SnippetGroupDeletedEvent`** | `group_id` | 代码片段文件夹物理删除与子项归集事件 |
 | **`SnippetExecutedEvent`** | `snippet_id, session_id, auto_execute` | 代码片段向终端注入/执行事件（含目标会话与换行状态） |
 
+### 2.7 网络隧道与跳板代理域 (Network Tunnels, Jump Hosts & Proxies)
+| 事件类型 | 载荷说明 | 业务应用与审计说明 |
+| :--- | :--- | :--- |
+| **`TunnelSavedEvent`** | `tunnel_id, name, tunnel_type, is_new` | 端口转发/跳板/代理规则新建或更新保存事件 |
+| **`TunnelDeletedEvent`** | `tunnel_id` | 网络规则从配置库物理删除事件 |
+| **`TunnelStateChangedEvent`** | `tunnel_id, is_running` | 隧道启停状态流转变更事件（启动连通/停止释放端口） |
+
 ---
 
 ## ⚡ 3. 拦截审查模式 (Interception Guard Pattern)
@@ -127,7 +134,7 @@ if before_event.is_aborted() {
 
 ## 📋 5. 系统当前常驻运行的默认监听器清单 (Active Listeners Inventory)
 
-在 `CoreState` 状态引擎初始化（[`attach_default_event_loggers`](file:///F:/code/rust/smalux-ssh/crates/smagical-core/src/state/core_state.rs#L32-L180)）时，系统会自动注册以下常驻日志与审计监听器：
+在 `CoreState` 状态引擎初始化（[`attach_default_event_loggers`](file:///F:/code/rust/smalux-ssh/crates/smagical-core/src/state/core_state.rs#L32-L215)）时，系统会自动注册以下 18 个常驻日志与审计监听器：
 
 | 序号 | 监听事件 (Event Type) | 日志级别 | Target | 监听器职责与输出内容 |
 | :---: | :--- | :---: | :--- | :--- |
@@ -146,4 +153,7 @@ if before_event.is_aborted() {
 | **13** | `SnippetExecutedEvent` | `INFO` | `smalux::snippet` | 记录代码片段向终端注入执行（ID、目标 session_id、自动回车状态） |
 | **14** | `SnippetGroupSavedEvent` | `INFO` | `smalux::snippet` | 记录代码片段文件夹新建/重命名/移动（ID、名称、父级 ID） |
 | **15** | `SnippetGroupDeletedEvent` | `WARN` | `smalux::snippet` | 记录代码片段文件夹物理删除 |
+| **16** | `TunnelSavedEvent` | `INFO` | `smalux::tunnel` | 记录网络隧道/代理配置新建或更新持久化（ID、名称、类型、是否新建） |
+| **17** | `TunnelDeletedEvent` | `WARN` | `smalux::tunnel` | 记录网络规则删除 |
+| **18** | `TunnelStateChangedEvent` | `INFO` | `smalux::tunnel` | 记录网络隧道实时启停状态流转（已连通/已释放） |
 

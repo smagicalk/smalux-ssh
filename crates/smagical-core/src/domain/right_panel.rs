@@ -70,6 +70,7 @@ impl Default for RightPanelRegistry {
 
         // 预置默认右侧伴生面板 (标准权重顺序)
         registry.register(RightPanelItem::new("info", "info", "主机与会话详情", 10).with_shortcut("Ctrl+Shift+I"));
+        registry.register(RightPanelItem::new("tunnel", "tunnel", "主机专属端口转发与隧道", 15).with_shortcut("Ctrl+Shift+T"));
         registry.register(RightPanelItem::new("snippets", "terminal", "关联常用脚本与片段", 20).with_shortcut("Ctrl+Shift+S"));
         registry.register(RightPanelItem::new("sftp", "folder", "远端文件快速传输", 30).with_shortcut("Ctrl+Shift+F"));
         registry.register(RightPanelItem::new("ai", "sparkles", "AI 终端智能助手", 40).with_shortcut("Ctrl+Shift+A"));
@@ -189,11 +190,12 @@ mod tests {
     fn test_right_panel_registry_defaults_and_sorting() {
         let mut reg = RightPanelRegistry::default();
         let list = reg.list_visible();
-        assert_eq!(list.len(), 4);
+        assert_eq!(list.len(), 5);
         assert_eq!(list[0].id, "info");
-        assert_eq!(list[1].id, "snippets");
-        assert_eq!(list[2].id, "sftp");
-        assert_eq!(list[3].id, "ai");
+        assert_eq!(list[1].id, "tunnel");
+        assert_eq!(list[2].id, "snippets");
+        assert_eq!(list[3].id, "sftp");
+        assert_eq!(list[4].id, "ai");
 
         // 调整 ai 排序到第一位
         assert!(reg.set_order("ai", 5));

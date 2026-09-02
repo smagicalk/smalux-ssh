@@ -9,6 +9,7 @@ pub(crate) mod history_handlers;
 pub(crate) mod host_handlers;
 pub(crate) mod session_handlers;
 pub(crate) mod snippet_handlers;
+pub(crate) mod tunnel_handlers;
 pub(crate) mod window_handlers;
 
 use std::cell::RefCell;
@@ -99,6 +100,11 @@ pub(crate) struct AppContext {
     pub expanded_snippet_groups: Rc<RefCell<HashSet<String>>>,
     /// 代码片段搜索关键词
     pub snippet_search_query: Rc<RefCell<String>>,
+
+    /// 隧道与网络规则搜索关键词
+    pub tunnel_search_query: Rc<RefCell<String>>,
+    /// 隧道分类过滤 ("all" | "forward" | "jump" | "proxy")
+    pub tunnel_filter_category: Rc<RefCell<String>>,
 }
 
 #[allow(dead_code)]
@@ -152,7 +158,9 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     credential_handlers::register_credential_handlers(window, ctx);
     // 7. 挂载代码片段与多层层级管理交互回调 (树形展开、CRUD、变量渲染、命令注入)
     snippet_handlers::register_snippet_handlers(window, ctx);
-    // 8. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
+    // 8. 挂载网络隧道、跳板机与代理池交互回调 (筛选、CRUD、启停切换、SSH命令生成与复制)
+    tunnel_handlers::register_tunnel_handlers(window, ctx);
+    // 9. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
     debug_handlers::register_debug_handlers(window, ctx);
 }
 

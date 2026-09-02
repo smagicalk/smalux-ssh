@@ -1,0 +1,3011 @@
+// =============================================================================
+// 文件名称: tunnels_view.slint
+// 模块功能: 网络与隧道中心全屏管理界面 (Tunnels & Network Hub)
+// 核心设计: 现代化暗黑极简设计，涵盖端口转发 (-L/-R/-D)、跳板堡垒 (-J) 与代理池，
+//          提供可视化拓扑链路流水图、实时连接与流量度量面板、原生 OpenSSH 命令一键生成。
+// =============================================================================
+
+import { AppTheme } from "../themes/app-theme.slint";
+import { SearchInput } from "../components/search-input.slint";
+import { AppIconButton } from "../components/base/app-icon-button.slint";
+import { AppButton } from "../components/base/app-button.slint";
+import { StatusDot } from "../components/status-dot.slint";
+import { CreateTunnelTypeModal } from "../components/create-tunnel-type-modal.slint";
+import { HostTreeSelector } from "../components/host-tree-selector.slint";
+import { HostTreeNode } from "../views/left_drawers/hosts_drawer.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 跳板机中继节点数据模型 (多跳串联 ProxyJump)
+export struct JumpHopData {
+    host-id: string,
+    host-name: string,
+    host-address: string,
+    host-port: int,
+    enabled: bool,
+}
+
+/// 统一隧道与网络项数据结构
+export struct TunnelItemData {
+    id: string,
+    name: string,
+    tunnel-type: string, // "Local" | "Remote" | "Dynamic" | "JumpHost" | "ProxyServer"
+    type-badge: string,  // "LOCAL -L" | "REMOTE -R" | "SOCKS5 -D" | "BASTION -J" | "PROXY"
+    ssh-host-id: string,
+    ssh-host-name: string,
+    local-bind: string,
+    local-port: int,
+    remote-host: string,
+    remote-port: int,
+    route-summary: string,
+    is-running: bool,
+    auto-start: bool,
+    auto-reconnect: bool,
+    remote-dns: bool,
+    compression: bool,
+    active-connections: int,
+    traffic-in: string,
+    traffic-out: string,
+    notes: string,
+    updated-at: string,
+    ssh-command: string,
+}
+
+/// 网络与隧道全屏管理中心组件 (TunnelsCenterView)
+export component TunnelsCenterView inherits Rectangle {
+    in property <[TunnelItemData]> tunnels: [];
+    in-out property <string> filter-category: "all"; // "all" | "forward" | "jump" | "proxy"
+    in-out property <string> search-query: "";
+    in-out property <string> active-tunnel-id: "";
+
+    // 模式状态机: 新建模式 / 查看模式 / 编辑模式
+    in-out property <bool> is-create-mode: false;
+    in-out property <bool> is-editing: false;
+    in-out property <bool> show-create-modal: false;
+
+    // 表单数据绑定
+    in-out property <string> form-id: "";
+    in-out property <string> form-name: "";
+    in-out property <string> form-type: "Local"; // "Local" | "Remote" | "Dynamic" | "JumpHost" | "ProxyServer"
+    in-out property <string> form-ssh-host-id: "";
+    in-out property <string> form-ssh-host-name: "";
+    in-out property <string> form-local-bind: "127.0.0.1";
+    in-out property <string> form-local-port: "3306";
+    in-out property <string> form-remote-host: "10.0.0.8";
+    in-out property <string> form-remote-port: "3306";
+    in-out property <bool> form-is-running: false;
+    in-out property <bool> form-auto-start: false;
+    in-out property <bool> form-auto-reconnect: true;
+    in-out property <bool> form-remote-dns: false;
+    in-out property <bool> form-compression: true;
+    in-out property <int> form-active-connections: 0;
+    in-out property <string> form-traffic-in: "0 B";
+    in-out property <string> form-traffic-out: "0 B";
+    in-out property <string> form-notes: "";
+    in-out property <string> form-updated-at: "";
+    in-out property <string> form-ssh-command: "";
+    in-out property <[JumpHopData]> form-jump-chain: [];
+    in-out property <string> form-proxy-proto: "SOCKS5";
+    in-out property <string> form-proxy-username: "";
+    in-out property <string> form-proxy-password: "";
+    in-out property <string> host-picker-purpose: "tunnel"; // "tunnel" | "jump-add"
+
+    // 主机树数据与弹窗选择器状态
+    in property <[HostTreeNode]> tree-nodes: [];
+    callback toggle-group(string /* id */);
+    in-out property <bool> is-host-picker-open: false;
+    in-out property <string> temp-selected-host-id: "";
+    in-out property <string> temp-selected-host-name: "";
+    in-out property <string> temp-selected-host-address: "";
+    in-out property <int> temp-selected-host-port: 22;
+
+    // 跳板链路节点操作回调
+    callback add-jump-hop(string /* id */, string /* name */, string /* address */, int /* port */);
+    callback remove-jump-hop(int /* index */);
+    callback move-jump-hop-up(int /* index */);
+    callback move-jump-hop-down(int /* index */);
+    callback toggle-jump-hop-enabled(int /* index */);
+
+    // 回调契约
+    callback select-tunnel(string /* id */);
+    callback toggle-tunnel-running(string /* id */);
+    callback start-create();
+    callback start-create-typed(string /* type */);
+    callback cancel-create();
+    callback start-edit();
+    callback cancel-edit();
+    callback save-tunnel(
+        string /* id */,
+        string /* name */,
+        string /* tunnel_type */,
+        string /* ssh_host_id */,
+        string /* ssh_host_name */,
+        string /* local_bind */,
+        int    /* local_port */,
+        string /* remote_host */,
+        int    /* remote_port */,
+        bool   /* auto_start */,
+        bool   /* auto_reconnect */,
+        bool   /* remote_dns */,
+        bool   /* compression */,
+        string /* notes */
+    );
+    callback delete-tunnel(string /* id */);
+    callback copy-ssh-command(string /* id */);
+    callback copy-custom-text(string /* text */, string /* title */, string /* msg */);
+    callback search-changed(string /* query */);
+    callback filter-category-changed(string /* category */);
+    callback back-to-terminal();
+
+    background: AppTheme.window-background;
+
+    property <bool> has-selection: root.active-tunnel-id != "" || root.is-create-mode;
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // =====================================================================
+        // 1. 左侧 Master 规则列表栏 (320px 宽度)
+        // =====================================================================
+        Rectangle {
+            width: 320px;
+            background: AppTheme.panel-background;
+
+            // 右侧分割线
+            Rectangle {
+                x: parent.width - 1px;
+                width: 1px;
+                height: 100%;
+                background: AppTheme.border;
+            }
+
+            VerticalLayout {
+                padding-top: 12px;
+                padding-bottom: 12px;
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 10px;
+
+                // 1.1 顶部标题栏与返回/新建按钮
+                HorizontalLayout {
+                    height: 28px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        AppIconButton {
+                            icon: @image-url("../assets/icons/arrow-left.svg");
+                            icon-size: 14px;
+                            clicked => { root.back-to-terminal(); }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("网络与隧道中心");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                        }
+                    }
+
+                    AppButton {
+                        text: @tr("+ 新建规则");
+                        variant: "primary";
+                        height: 26px;
+                        clicked => { root.show-create-modal = true; }
+                    }
+                }
+
+                // 1.2 搜索栏
+                SearchInput {
+                    height: 30px;
+                    placeholder: @tr("搜索隧道、端口、目标主机...");
+                    text <=> root.search-query;
+                    changed(q) => { root.search-changed(q); }
+                }
+
+                // 1.3 核心分类快速筛选 Pills
+                HorizontalLayout {
+                    height: 24px;
+                    spacing: 4px;
+
+                    // 全部
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 4px;
+                        background: root.filter-category == "all" ? AppTheme.control-background : transparent;
+                        border-width: root.filter-category == "all" ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        Text {
+                            text: @tr("全部");
+                            font-size: 11px;
+                            font-weight: root.filter-category == "all" ? 600 : 400;
+                            color: root.filter-category == "all" ? AppTheme.accent : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.filter-category = "all";
+                                root.filter-category-changed("all");
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 端口转发
+                    Rectangle {
+                        horizontal-stretch: 1.2;
+                        border-radius: 4px;
+                        background: root.filter-category == "forward" ? AppTheme.control-background : transparent;
+                        border-width: root.filter-category == "forward" ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        Text {
+                            text: @tr("端口转发");
+                            font-size: 11px;
+                            font-weight: root.filter-category == "forward" ? 600 : 400;
+                            color: root.filter-category == "forward" ? AppTheme.accent : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.filter-category = "forward";
+                                root.filter-category-changed("forward");
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 跳板堡垒
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 4px;
+                        background: root.filter-category == "jump" ? AppTheme.control-background : transparent;
+                        border-width: root.filter-category == "jump" ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        Text {
+                            text: @tr("跳板机");
+                            font-size: 11px;
+                            font-weight: root.filter-category == "jump" ? 600 : 400;
+                            color: root.filter-category == "jump" ? AppTheme.accent : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.filter-category = "jump";
+                                root.filter-category-changed("jump");
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 代理池
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: 4px;
+                        background: root.filter-category == "proxy" ? AppTheme.control-background : transparent;
+                        border-width: root.filter-category == "proxy" ? 1px : 0px;
+                        border-color: AppTheme.border;
+
+                        Text {
+                            text: @tr("代理池");
+                            font-size: 11px;
+                            font-weight: root.filter-category == "proxy" ? 600 : 400;
+                            color: root.filter-category == "proxy" ? AppTheme.accent : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.filter-category = "proxy";
+                                root.filter-category-changed("proxy");
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+
+                // 1.4 隧道卡片列表
+                ScrollView {
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        spacing: 6px;
+                        padding-right: 4px;
+
+                        for tun in root.tunnels: Rectangle {
+                            height: 66px;
+                            border-radius: AppTheme.radius-medium;
+                            background: (tun.id == root.active-tunnel-id && !root.is-create-mode)
+                                ? AppTheme.accent.transparentize(85%)
+                                : (tun-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+                            border-width: 1px;
+                            border-color: (tun.id == root.active-tunnel-id && !root.is-create-mode)
+                                ? AppTheme.accent
+                                : (tun.is-running ? AppTheme.success.transparentize(70%) : AppTheme.border);
+                            animate background { duration: 120ms; }
+                            animate border-color { duration: 120ms; }
+
+                            tun-touch := TouchArea {
+                                clicked => { root.select-tunnel(tun.id); }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+
+                                // 核心文本区 (所有文本紧贴左端开始，垂直居中)
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    alignment: center;
+                                    spacing: 3px;
+
+                                    // 第 1 行: 名称与类型徽标 (靠最左端对齐)
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        Text {
+                                            text: tun.name;
+                                            font-size: 12px;
+                                            font-weight: 600;
+                                            color: AppTheme.foreground;
+                                            overflow: elide;
+                                            horizontal-alignment: left;
+                                            vertical-alignment: center;
+                                        }
+
+                                        // 类型小徽章 (仅端口转发 Local, Remote, Dynamic, ReverseDynamic 显示在标题旁)
+                                        if tun.tunnel-type == "Local" || tun.tunnel-type == "Remote" || tun.tunnel-type == "Dynamic" || tun.tunnel-type == "ReverseDynamic": Rectangle {
+                                            height: 14px;
+                                            border-radius: 2px;
+                                            background: tun.tunnel-type == "Local"
+                                                ? AppTheme.accent.transparentize(80%)
+                                                : (tun.tunnel-type == "Remote"
+                                                    ? #e67e22.transparentize(80%)
+                                                    : (tun.tunnel-type == "Dynamic"
+                                                        ? #9b59b6.transparentize(80%)
+                                                        : (tun.tunnel-type == "ReverseDynamic" ? #16a085.transparentize(80%) : AppTheme.control-background)));
+
+                                            HorizontalLayout {
+                                                padding-left: 4px;
+                                                padding-right: 4px;
+                                                Text {
+                                                    text: tun.type-badge;
+                                                    font-size: 8px;
+                                                    font-weight: 700;
+                                                    color: tun.tunnel-type == "Local"
+                                                        ? AppTheme.accent
+                                                        : (tun.tunnel-type == "Remote"
+                                                            ? #e67e22
+                                                            : (tun.tunnel-type == "Dynamic"
+                                                                ? #9b59b6
+                                                                : (tun.tunnel-type == "ReverseDynamic" ? #16a085 : AppTheme.secondary-foreground)));
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 第 2 行: 路由流动简报 (两个 IP 之间带有专门的矢量箭头图标，100% 渲染显示)
+                                    HorizontalLayout {
+                                        alignment: start;
+                                        spacing: 5px;
+
+                                        if tun.tunnel-type == "Local" || tun.tunnel-type == "Remote": HorizontalLayout {
+                                            spacing: 5px;
+                                            alignment: start;
+
+                                            Text {
+                                                text: (tun.tunnel-type == "Local" ? tun.local-bind : tun.remote-host) + ":" + (tun.tunnel-type == "Local" ? tun.local-port : tun.remote-port);
+                                                font-size: 10px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Image {
+                                                    source: @image-url("../assets/icons/arrow-right.svg");
+                                                    width: 10px;
+                                                    height: 10px;
+                                                    colorize: tun.is-running ? AppTheme.accent : AppTheme.secondary-foreground;
+                                                }
+                                            }
+
+                                            Text {
+                                                text: (tun.tunnel-type == "Local" ? tun.remote-host : tun.local-bind) + ":" + (tun.tunnel-type == "Local" ? tun.remote-port : tun.local-port);
+                                                font-size: 10px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+
+                                        if tun.tunnel-type == "JumpHost" || tun.tunnel-type == "ProxyServer": HorizontalLayout {
+                                            spacing: 5px;
+                                            alignment: start;
+
+                                            Text {
+                                                text: tun.tunnel-type == "JumpHost" ? "ProxyJump" : "Proxy";
+                                                font-size: 10px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Image {
+                                                    source: @image-url("../assets/icons/arrow-right.svg");
+                                                    width: 10px;
+                                                    height: 10px;
+                                                    colorize: AppTheme.secondary-foreground;
+                                                }
+                                            }
+
+                                            Text {
+                                                text: tun.remote-host + ":" + tun.remote-port;
+                                                font-size: 10px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+
+                                        if tun.tunnel-type == "Dynamic": Text {
+                                            text: tun.local-bind + ":" + tun.local-port + " (SOCKS5 代理网关)";
+                                            font-size: 10px;
+                                            font-family: "Cascadia Code, Consolas, monospace";
+                                            color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+
+                                        if tun.tunnel-type == "ReverseDynamic": Text {
+                                            text: (tun.ssh-host-name != "" ? tun.ssh-host-name : "远端") + ":" + tun.remote-port + " (远端 SOCKS5 代理网关)";
+                                            font-size: 10px;
+                                            font-family: "Cascadia Code, Consolas, monospace";
+                                            color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    // 第 3 行: 宿主与连接指示 (靠最左端对齐)
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: start;
+
+                                        Text {
+                                            text: @tr("宿主: ") + (tun.ssh-host-name != "" ? tun.ssh-host-name : @tr("直连"));
+                                            font-size: 9px;
+                                            color: AppTheme.secondary-foreground;
+                                            horizontal-alignment: left;
+                                            vertical-alignment: center;
+                                        }
+                                        if tun.is-running && tun.active-connections > 0: Text {
+                                            text: "• " + tun.active-connections + @tr(" 活跃连接");
+                                            font-size: 9px;
+                                            color: AppTheme.success;
+                                            horizontal-alignment: left;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                // 卡片右端控制与标识区 (整体垂直居中)
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    // 启停 Switch 开关按钮 (仅端口转发 Local, Remote, Dynamic 展示开关，垂直居中)
+                                    if tun.tunnel-type == "Local" || tun.tunnel-type == "Remote" || tun.tunnel-type == "Dynamic": Rectangle {
+                                        width: 34px;
+                                        height: 18px;
+                                        border-radius: 9px;
+                                        background: tun.is-running ? AppTheme.success : AppTheme.border;
+                                        animate background { duration: 150ms; }
+
+                                        // 拨动圆点
+                                        Rectangle {
+                                            x: tun.is-running ? parent.width - self.width - 2px : 2px;
+                                            y: 2px;
+                                            width: 14px;
+                                            height: 14px;
+                                            border-radius: 7px;
+                                            background: #ffffff;
+                                            animate x { duration: 150ms; }
+                                        }
+
+                                        sw-touch := TouchArea {
+                                            clicked => {
+                                                if root.active-tunnel-id == tun.id || root.form-id == tun.id {
+                                                    root.form-is-running = !tun.is-running;
+                                                }
+                                                root.toggle-tunnel-running(tun.id);
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 跳板与代理：在卡片最右端展示，整体垂直居中，内部图标在左垂直居中
+                                    if tun.tunnel-type == "JumpHost" || tun.tunnel-type == "ProxyServer": Rectangle {
+                                        height: 24px;
+                                        border-radius: AppTheme.radius-medium;
+                                        background: tun.tunnel-type == "JumpHost"
+                                            ? #e67e22.transparentize(88%)
+                                            : AppTheme.accent.transparentize(88%);
+                                        border-width: 1px;
+                                        border-color: tun.tunnel-type == "JumpHost"
+                                            ? #e67e22.transparentize(65%)
+                                            : AppTheme.accent.transparentize(65%);
+
+                                        HorizontalLayout {
+                                            padding-left: 8px;
+                                            padding-right: 9px;
+                                            spacing: 5px;
+
+                                            // 图标：在左垂直居中
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Image {
+                                                    source: tun.tunnel-type == "JumpHost"
+                                                        ? @image-url("../assets/icons/shield.svg")
+                                                        : @image-url("../assets/icons/radio.svg");
+                                                    width: 12px;
+                                                    height: 12px;
+                                                    colorize: tun.tunnel-type == "JumpHost" ? #e67e22 : AppTheme.accent;
+                                                }
+                                            }
+
+                                            // 文字：垂直居中
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Text {
+                                                    text: tun.tunnel-type == "JumpHost" ? @tr("跳板机") : @tr("代理池");
+                                                    font-size: 10px;
+                                                    font-weight: 600;
+                                                    color: tun.tunnel-type == "JumpHost" ? #e67e22 : AppTheme.accent;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 2. 右侧 Detail: 沉浸式拓扑与详情监控面板
+        // =====================================================================
+        Rectangle {
+            horizontal-stretch: 1;
+            background: AppTheme.window-background;
+
+            // 未选择任何规则时的占位视口
+            if !root.has-selection: VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../assets/icons/tunnel.svg");
+                        width: 48px;
+                        height: 48px;
+                        colorize: AppTheme.secondary-foreground.transparentize(50%);
+                        horizontal-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: @tr("请从左侧选择网络规则，或点击 [+ 新建规则] 配置端口转发与跳板堡垒");
+                    font-size: 13px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                }
+            }
+
+            // 已选定规则或新建模式时的详情面板
+            if root.has-selection: VerticalLayout {
+                padding-top: 16px;
+                padding-bottom: 16px;
+                padding-left: 20px;
+                padding-right: 20px;
+                spacing: 14px;
+
+                // 2.1 顶部动作工具栏
+                HorizontalLayout {
+                    height: 36px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        // 状态指示点
+                        VerticalLayout {
+                            alignment: center;
+                            StatusDot {
+                                status: root.form-is-running ? "online" : "offline";
+                                dot-size: 10px;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Text {
+                                    text: root.is-create-mode ? (
+                                        root.form-type == "JumpHost" ? @tr("新建跳板机配置") : (
+                                            root.form-type == "ProxyServer" ? @tr("新建出网代理配置") : @tr("新建端口转发规则")
+                                        )
+                                    ) : (
+                                        root.is-editing ? (
+                                            root.form-type == "JumpHost" ? @tr("编辑跳板机配置") : (
+                                                root.form-type == "ProxyServer" ? @tr("编辑出网代理配置") : @tr("编辑端口转发规则")
+                                            )
+                                        ) : root.form-name
+                                    );
+                                    font-size: 15px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                }
+
+                                // 状态药丸
+                                Rectangle {
+                                    height: 18px;
+                                    border-radius: 9px;
+                                    background: (root.form-type == "JumpHost")
+                                        ? #e67e22.transparentize(85%)
+                                        : (root.form-type == "ProxyServer")
+                                            ? AppTheme.accent.transparentize(85%)
+                                            : (root.form-is-running ? AppTheme.success.transparentize(85%) : AppTheme.control-background);
+                                    border-width: 1px;
+                                    border-color: (root.form-type == "JumpHost")
+                                        ? #e67e22
+                                        : (root.form-type == "ProxyServer")
+                                            ? AppTheme.accent
+                                            : (root.form-is-running ? AppTheme.success : AppTheme.border);
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 6px;
+                                        Text {
+                                            text: (root.form-type == "JumpHost")
+                                                ? @tr("跳板中继资产 (供主机绑定)")
+                                                : (root.form-type == "ProxyServer")
+                                                    ? @tr("出网代理资产 (供主机绑定)")
+                                                    : (root.form-is-running ? @tr("运行中") : @tr("已停止"));
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: (root.form-type == "JumpHost")
+                                                ? #e67e22
+                                                : (root.form-type == "ProxyServer")
+                                                    ? AppTheme.accent
+                                                    : (root.form-is-running ? AppTheme.success : AppTheme.secondary-foreground);
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 右侧动作按钮组
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        if !root.is-create-mode && !root.is-editing && (root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic"): AppButton {
+                            text: root.form-is-running ? @tr("停止隧道") : @tr("启动隧道");
+                            variant: root.form-is-running ? "outline" : "primary";
+                            height: 28px;
+                            clicked => {
+                                root.form-is-running = !root.form-is-running;
+                                root.toggle-tunnel-running(root.form-id);
+                            }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing && (root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic"): AppButton {
+                            text: @tr("复制 SSH 命令");
+                            height: 28px;
+                            clicked => { root.copy-ssh-command(root.form-id); }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing && root.form-type == "JumpHost": AppButton {
+                            text: @tr("复制 ProxyJump 命令");
+                            height: 28px;
+                            clicked => {
+                                root.copy-custom-text(
+                                    "-J " + (root.form-ssh-host-name != "" ? (root.form-ssh-host-name + "@") : "") + root.form-remote-host + ":" + root.form-remote-port,
+                                    @tr("复制成功"),
+                                    @tr("已复制 OpenSSH ProxyJump 参数")
+                                );
+                            }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing && root.form-type == "ProxyServer": AppButton {
+                            text: @tr("复制代理连接串");
+                            height: 28px;
+                            clicked => {
+                                root.copy-custom-text(
+                                    (root.form-ssh-host-name != "" ? root.form-ssh-host-name.to-lowercase() : "socks5") + "://" + root.form-remote-host + ":" + root.form-remote-port,
+                                    @tr("复制成功"),
+                                    @tr("已复制出网代理连接串")
+                                );
+                            }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing: AppButton {
+                            text: @tr("编辑");
+                            height: 28px;
+                            clicked => { root.start-edit(); }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing: AppButton {
+                            text: @tr("删除");
+                            variant: "danger";
+                            height: 28px;
+                            has-icon: true;
+                            icon: @image-url("../assets/icons/trash.svg");
+                            clicked => { root.delete-tunnel(root.form-id); }
+                        }
+
+                        if root.is-create-mode || root.is-editing: AppButton {
+                            text: @tr("取消");
+                            height: 28px;
+                            clicked => {
+                                if root.is-create-mode {
+                                    root.cancel-create();
+                                } else {
+                                    root.cancel-edit();
+                                }
+                            }
+                        }
+
+                        if root.is-create-mode || root.is-editing: AppButton {
+                            text: @tr("保存配置");
+                            variant: "primary";
+                            height: 28px;
+                            clicked => {
+                                root.save-tunnel(
+                                    root.form-id,
+                                    root.form-name,
+                                    root.form-type,
+                                    root.form-ssh-host-id,
+                                    root.form-ssh-host-name,
+                                    root.form-local-bind,
+                                    root.form-local-port.to-float(),
+                                    root.form-remote-host,
+                                    root.form-remote-port.to-float(),
+                                    root.form-auto-start,
+                                    root.form-auto-reconnect,
+                                    root.form-remote-dns,
+                                    root.form-compression,
+                                    root.form-notes
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // 2.2 可视化拓扑链路流动流水线 (Visual Flow Pipeline - 仅端口转发展示，左中右占满整行)
+                if root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic": Rectangle {
+                    height: 80px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.panel-background;
+                    border-width: 1px;
+                    border-color: root.form-is-running ? AppTheme.accent.transparentize(70%) : AppTheme.border;
+
+                    HorizontalLayout {
+                        padding-left: 16px;
+                        padding-right: 16px;
+                        spacing: 10px;
+
+                        // 节点 A: 本地端 (左侧)
+                        VerticalLayout {
+                            horizontal-stretch: 3;
+                            alignment: center;
+
+                            Rectangle {
+                                height: 50px;
+                                border-radius: 6px;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    Text {
+                                        text: root.form-type == "Remote"
+                                            ? @tr("本地目标服务 (内网端)")
+                                            : (root.form-type == "ReverseDynamic" ? @tr("本地网络 / 出口网关") : @tr("本地端应用 / 客户端"));
+                                        font-size: 10px;
+                                        color: AppTheme.secondary-foreground;
+                                        horizontal-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.form-type == "ReverseDynamic"
+                                            ? @tr("本地网络出口")
+                                            : (root.form-local-bind != "" ? (root.form-local-bind + ":" + root.form-local-port) : ("127.0.0.1:" + root.form-local-port));
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        font-family: "Cascadia Code, Consolas, monospace";
+                                        color: AppTheme.foreground;
+                                        horizontal-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 连接箭头与指示线 1 (SSH 加密中继 - 垂直居中，带箭头图标)
+                        VerticalLayout {
+                            horizontal-stretch: 2;
+                            alignment: center;
+                            spacing: 4px;
+
+                            Text {
+                                text: root.form-is-running
+                                    ? (root.form-type == "Remote"
+                                        ? @tr("● 反向解密穿透已连通")
+                                        : (root.form-type == "ReverseDynamic" ? @tr("● 反向加密隧道已连通") : @tr("● SSH 加密已连通")))
+                                    : @tr("○ SSH 待建立");
+                                font-size: 9px;
+                                color: root.form-is-running
+                                    ? (root.form-type == "Remote"
+                                        ? #e67e22
+                                        : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                                    : AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                                animate color { duration: 150ms; }
+                            }
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Rectangle {
+                                    height: 2px;
+                                    horizontal-stretch: 1;
+                                    background: root.form-is-running
+                                        ? (root.form-type == "Remote"
+                                            ? #e67e22
+                                            : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                                        : AppTheme.border;
+                                    animate background { duration: 150ms; }
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: root.form-type == "Remote" || root.form-type == "ReverseDynamic"
+                                            ? @image-url("../assets/icons/arrow-left.svg")
+                                            : @image-url("../assets/icons/arrow-right.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: root.form-is-running
+                                            ? (root.form-type == "Remote"
+                                                ? #e67e22
+                                                : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                                            : AppTheme.secondary-foreground;
+                                        animate colorize { duration: 150ms; }
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 2px;
+                                    horizontal-stretch: 1;
+                                    background: root.form-is-running
+                                        ? (root.form-type == "Remote"
+                                            ? #e67e22
+                                            : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                                        : AppTheme.border;
+                                    animate background { duration: 150ms; }
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                        }
+
+                        // 节点 B: SSH 宿主 / 跳板机 (中间)
+                        VerticalLayout {
+                            horizontal-stretch: 3;
+                            alignment: center;
+
+                            Rectangle {
+                                height: 50px;
+                                border-radius: 6px;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: root.form-is-running ? AppTheme.accent : AppTheme.border;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    Text {
+                                        text: root.form-type == "ReverseDynamic" ? @tr("SSH 宿主 (SOCKS5 监听端)") : @tr("SSH 宿主服务器 / 跳板机");
+                                        font-size: 10px;
+                                        color: AppTheme.secondary-foreground;
+                                        horizontal-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.form-ssh-host-name != "" ? root.form-ssh-host-name : @tr("直连网关");
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        color: AppTheme.accent;
+                                        horizontal-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 连接箭头与指示线 2 (内网目标直达 / 公网入口直通 - 垂直居中，带箭头图标)
+                        VerticalLayout {
+                            horizontal-stretch: 2;
+                            alignment: center;
+                            spacing: 4px;
+
+                            Text {
+                                text: root.form-type == "Remote"
+                                    ? (root.form-is-running ? @tr("● 公网入站流量直达") : @tr("○ 远端端口待监听"))
+                                    : (root.form-type == "ReverseDynamic"
+                                        ? (root.form-is-running ? @tr("● 远端 SOCKS5 监听就绪") : @tr("○ 远端网关待建立"))
+                                        : @tr("内网转发直达"));
+                                font-size: 9px;
+                                color: root.form-is-running
+                                    ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                                    : AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                                animate color { duration: 150ms; }
+                            }
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Rectangle {
+                                    height: 2px;
+                                    horizontal-stretch: 1;
+                                    background: root.form-is-running
+                                        ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                                        : AppTheme.border;
+                                    animate background { duration: 150ms; }
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: root.form-type == "Remote" || root.form-type == "ReverseDynamic"
+                                            ? @image-url("../assets/icons/arrow-left.svg")
+                                            : @image-url("../assets/icons/arrow-right.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: root.form-is-running
+                                            ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                                            : AppTheme.secondary-foreground;
+                                        animate colorize { duration: 150ms; }
+                                    }
+                                }
+
+                                Rectangle {
+                                    height: 2px;
+                                    horizontal-stretch: 1;
+                                    background: root.form-is-running
+                                        ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                                        : AppTheme.border;
+                                    animate background { duration: 150ms; }
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                        }
+
+                        // 节点 C: 目标远程服务 / 公网监听入口 (右侧)
+                        VerticalLayout {
+                            horizontal-stretch: 3;
+                            alignment: center;
+
+                            Rectangle {
+                                height: 50px;
+                                border-radius: 6px;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 2px;
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    Text {
+                                        text: root.form-type == "Remote"
+                                            ? @tr("远程公网入口 (监听端)")
+                                            : (root.form-type == "Dynamic"
+                                                ? @tr("任意动态网络目标")
+                                                : (root.form-type == "ReverseDynamic" ? @tr("远端应用 (SOCKS5 客户端)") : @tr("目标远程服务 / 机器")));
+                                        font-size: 10px;
+                                        color: AppTheme.secondary-foreground;
+                                        horizontal-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.form-type == "ReverseDynamic"
+                                            ? (root.form-ssh-host-name != "" ? (root.form-ssh-host-name + ":" + root.form-remote-port) : ("远端:" + root.form-remote-port))
+                                            : (root.form-type == "Dynamic"
+                                                ? @tr("任意动态网络目标")
+                                                : (root.form-remote-host != "" ? (root.form-remote-host + ":" + root.form-remote-port) : @tr("未配置远端")));
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        font-family: "Cascadia Code, Consolas, monospace";
+                                        color: AppTheme.foreground;
+                                        horizontal-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2.3 实时运行与流量度量指标 (Live Metrics - 仅端口转发显示)
+                if !root.is-create-mode && !root.is-editing && (root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic"): HorizontalLayout {
+                    height: 60px;
+                    spacing: 10px;
+
+                    // 指标 1: 运行状态
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            padding-left: 12px;
+                            Text {
+                                text: @tr("当前状态");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: root.form-is-running ? @tr("活跃连接中") : @tr("已挂起 / 停止");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: root.form-is-running ? AppTheme.success : AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+
+                    // 指标 2: 活跃连接
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            padding-left: 12px;
+                            Text {
+                                text: @tr("活跃客户端连接");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: root.form-active-connections + @tr(" 个 TCP 会话");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                        }
+                    }
+
+                    // 指标 3: 入站流量
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            padding-left: 12px;
+                            Text {
+                                text: @tr("累计入站流量 (Rx)");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: root.form-traffic-in;
+                                font-size: 13px;
+                                font-weight: 700;
+                                font-family: "Cascadia Code, Consolas, monospace";
+                                color: AppTheme.accent;
+                            }
+                        }
+                    }
+
+                    // 指标 4: 出站流量
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+                            padding-left: 12px;
+                            Text {
+                                text: @tr("累计出站流量 (Tx)");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: root.form-traffic-out;
+                                font-size: 13px;
+                                font-weight: 700;
+                                font-family: "Cascadia Code, Consolas, monospace";
+                                color: #2ecc71;
+                            }
+                        }
+                    }
+                }
+
+                // 2.2.B 跳板堡垒中继资产专属看板
+                if root.form-type == "JumpHost": Rectangle {
+                    height: 70px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.panel-background;
+                    border-width: 1px;
+                    border-color: #e67e22.transparentize(70%);
+
+                    HorizontalLayout {
+                        padding-left: 18px;
+                        padding-right: 18px;
+                        spacing: 14px;
+                        alignment: start;
+
+                        // 图标块：外层垂直居中
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 40px;
+                                height: 40px;
+                                border-radius: 8px;
+                                background: #e67e22.transparentize(85%);
+
+                                // 图标在块内完全几何居中
+                                Image {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    width: 20px;
+                                    height: 20px;
+                                    source: @image-url("../assets/icons/shield.svg");
+                                    colorize: #e67e22;
+                                }
+                            }
+                        }
+
+                        // 文字：从左端紧跟图标开始，垂直居中
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 4px;
+
+                            Text {
+                                text: @tr("OpenSSH ProxyJump (-J) 堡垒中继资产");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: #e67e22;
+                            }
+
+                            Text {
+                                text: @tr("纯静态中继资产。在主机配置中关联此跳板机后，SSH 会话将自动通过该跳板机穿透内网目标，支持密钥与密码透明跳板代理。");
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+                }
+
+                // 2.2.C 静态出网代理专属看板
+                if root.form-type == "ProxyServer": Rectangle {
+                    height: 70px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.panel-background;
+                    border-width: 1px;
+                    border-color: AppTheme.accent.transparentize(70%);
+
+                    HorizontalLayout {
+                        padding-left: 18px;
+                        padding-right: 18px;
+                        spacing: 14px;
+                        alignment: start;
+
+                        // 图标块：外层垂直居中
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 40px;
+                                height: 40px;
+                                border-radius: 8px;
+                                background: AppTheme.accent.transparentize(85%);
+
+                                // 图标在块内完全几何居中
+                                Image {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    width: 20px;
+                                    height: 20px;
+                                    source: @image-url("../assets/icons/radio.svg");
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+                        }
+
+                        // 文字：从左端紧跟图标开始，垂直居中
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 4px;
+
+                            Text {
+                                text: @tr("HTTP / HTTPS / SOCKS5 静态出网代理资产");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: AppTheme.accent;
+                            }
+
+                            Text {
+                                text: @tr("纯静态代理资产。用于网络隔离或企业安全边界，会话或主机可在网络设置中选择本代理统一中继访问外部网络。");
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+                }
+
+                // 2.4 配置详情与表单编辑区
+                ScrollView {
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        alignment: start;
+                        spacing: 12px;
+
+                        // =====================================================
+                        // 表单 A: 端口转发专属表单 (本地/远程/动态网关/反向动态)
+                        // =====================================================
+                        if root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic": VerticalLayout {
+                            alignment: start;
+                            spacing: 12px;
+
+                            // 转发模式单选组 (仅展示 4 项转发模式，不混杂跳板与代理)
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                Text {
+                                    text: @tr("端口转发工作模式");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+
+                                HorizontalLayout {
+                                    height: 28px;
+                                    spacing: 8px;
+
+                                    // 本地转发 Local
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "Local" ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "Local" ? AppTheme.accent : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("本地正向 (-L)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "Local" ? 700 : 400;
+                                            color: root.form-type == "Local" ? AppTheme.accent : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => { root.form-type = "Local"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 远程转发 Remote
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "Remote" ? #e67e22.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "Remote" ? #e67e22 : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("远程反向 (-R)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "Remote" ? 700 : 400;
+                                            color: root.form-type == "Remote" ? #e67e22 : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => { root.form-type = "Remote"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 动态转发 Dynamic (SOCKS5)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "Dynamic" ? #9b59b6.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "Dynamic" ? #9b59b6 : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("动态网关 (-D)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "Dynamic" ? 700 : 400;
+                                            color: root.form-type == "Dynamic" ? #9b59b6 : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => { root.form-type = "Dynamic"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 反向动态 ReverseDynamic (远端 SOCKS5 网关)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "ReverseDynamic" ? #16a085.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("反向动态 (-R)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "ReverseDynamic" ? 700 : 400;
+                                            color: root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => { root.form-type = "ReverseDynamic"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 1. 规则描述名称 (单独一行)
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                width: 100%;
+
+                                Text {
+                                    text: @tr("规则描述名称");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 32px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-name;
+                                            font-size: 12px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. 关联 SSH 宿主主机 (单独一行，点击弹出树形选择主机)
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                width: 100%;
+
+                                Text {
+                                    text: @tr("关联 SSH 宿主主机");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 32px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: (root.is-create-mode || root.is-editing) && host-picker-btn-touch.has-hover
+                                        ? AppTheme.hover-background
+                                        : AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: (root.is-create-mode || root.is-editing) && host-picker-btn-touch.has-hover
+                                        ? AppTheme.accent
+                                        : AppTheme.border;
+
+                                    animate background { duration: 100ms; }
+                                    animate border-color { duration: 100ms; }
+
+                                    HorizontalLayout {
+                                        width: 100%;
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        spacing: 8px;
+
+                                        // 服务器图标
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../assets/icons/server.svg");
+                                                width: 14px;
+                                                height: 14px;
+                                                colorize: root.form-ssh-host-name != "" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+                                        }
+
+                                        // 主机显示名称与 IP:端口
+                                        Text {
+                                            horizontal-stretch: 1;
+                                            text: root.form-ssh-host-name != ""
+                                                ? (root.form-ssh-host-name + (root.form-remote-host != "" ? (" (" + root.form-remote-host + ")") : ""))
+                                                : ((root.is-create-mode || root.is-editing) ? @tr("点击选择关联的 SSH 宿主主机...") : @tr("未关联主机 (直连网关)"));
+                                            font-size: 12px;
+                                            font-weight: root.form-ssh-host-name != "" ? 600 : 400;
+                                            color: root.form-ssh-host-name != "" ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+
+                                        // 下拉选择小箭头 (仅编辑或新建模式展示)
+                                        if root.is-create-mode || root.is-editing: VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../assets/icons/chevron-down.svg");
+                                                width: 12px;
+                                                height: 12px;
+                                                colorize: host-picker-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                            }
+                                        }
+                                    }
+
+                                    host-picker-btn-touch := TouchArea {
+                                        enabled: root.is-create-mode || root.is-editing;
+                                        clicked => {
+                                            root.temp-selected-host-id = root.form-ssh-host-id;
+                                            root.temp-selected-host-name = root.form-ssh-host-name;
+                                            root.temp-selected-host-address = root.form-remote-host;
+                                            root.is-host-picker-open = true;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+                            }
+
+                            // 3. 端口转发配置 (远程和本地端口平分一行，动态不需要填远程则直接占满)
+                            if root.form-type == "Local": HorizontalLayout {
+                                width: 100%;
+                                spacing: 12px;
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text {
+                                        text: @tr("本地监听端口 (Local Port)");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                    }
+                                    Rectangle {
+                                        height: 32px;
+                                        width: 100%;
+                                        border-radius: AppTheme.radius-medium;
+                                        background: AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 10px;
+                                            TextInput {
+                                                width: 100%;
+                                                height: 100%;
+                                                text <=> root.form-local-port;
+                                                font-size: 12px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: center;
+                                                enabled: root.is-create-mode || root.is-editing;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text {
+                                        text: @tr("远端目标服务端口 (Remote Port)");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                    }
+                                    Rectangle {
+                                        height: 32px;
+                                        width: 100%;
+                                        border-radius: AppTheme.radius-medium;
+                                        background: AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 10px;
+                                            TextInput {
+                                                width: 100%;
+                                                height: 100%;
+                                                text <=> root.form-remote-port;
+                                                font-size: 12px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: center;
+                                                enabled: root.is-create-mode || root.is-editing;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.form-type == "Remote": HorizontalLayout {
+                                width: 100%;
+                                spacing: 12px;
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text {
+                                        text: @tr("本地目标服务端口 (Local Port)");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                    }
+                                    Rectangle {
+                                        height: 32px;
+                                        width: 100%;
+                                        border-radius: AppTheme.radius-medium;
+                                        background: AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 10px;
+                                            TextInput {
+                                                width: 100%;
+                                                height: 100%;
+                                                text <=> root.form-local-port;
+                                                font-size: 12px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: center;
+                                                enabled: root.is-create-mode || root.is-editing;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 4px;
+                                    Text {
+                                        text: @tr("远程公网监听端口 (Remote Port)");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                    }
+                                    Rectangle {
+                                        height: 32px;
+                                        width: 100%;
+                                        border-radius: AppTheme.radius-medium;
+                                        background: AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 10px;
+                                            TextInput {
+                                                width: 100%;
+                                                height: 100%;
+                                                text <=> root.form-remote-port;
+                                                font-size: 12px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: center;
+                                                enabled: root.is-create-mode || root.is-editing;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.form-type == "Dynamic": VerticalLayout {
+                                width: 100%;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("本地 SOCKS5 网关监听端口 (Local Port)");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 32px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-local-port;
+                                            font-size: 12px;
+                                            font-family: "Cascadia Code, Consolas, monospace";
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.form-type == "ReverseDynamic": VerticalLayout {
+                                width: 100%;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("远程 SOCKS5 网关监听端口 (Remote Port)");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 32px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-remote-port;
+                                            font-size: 12px;
+                                            font-family: "Cascadia Code, Consolas, monospace";
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 4. 高级选项复选框行 (文字与复选框底线严格对齐)
+                            HorizontalLayout {
+                                height: 22px;
+                                spacing: 20px;
+                                alignment: start;
+
+                                // 复选框 1: 自动重连
+                                Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-auto-reconnect ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-auto-reconnect ? AppTheme.accent : AppTheme.border;
+                                                if root.form-auto-reconnect: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Text {
+                                                text: @tr("断线自动重连");
+                                                font-size: 11px;
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: bottom;
+                                            }
+                                        }
+                                    }
+                                    TouchArea {
+                                        enabled: root.is-create-mode || root.is-editing;
+                                        clicked => { root.form-auto-reconnect = !root.form-auto-reconnect; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+
+                                // 复选框 2: 随软件启动自启
+                                Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-auto-start ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-auto-start ? AppTheme.accent : AppTheme.border;
+                                                if root.form-auto-start: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Text {
+                                                text: @tr("客户端启动时自启");
+                                                font-size: 11px;
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: bottom;
+                                            }
+                                        }
+                                    }
+                                    TouchArea {
+                                        enabled: root.is-create-mode || root.is-editing;
+                                        clicked => { root.form-auto-start = !root.form-auto-start; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+
+                                // 复选框 3: 压缩传输
+                                Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-compression ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-compression ? AppTheme.accent : AppTheme.border;
+                                                if root.form-compression: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Text {
+                                                text: @tr("启用传输压缩 (-C)");
+                                                font-size: 11px;
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: bottom;
+                                            }
+                                        }
+                                    }
+                                    TouchArea {
+                                        enabled: root.is-create-mode || root.is-editing;
+                                        clicked => { root.form-compression = !root.form-compression; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+
+                                // 复选框 4: SOCKS5 远程 DNS
+                                if root.form-type == "Dynamic": Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-remote-dns ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-remote-dns ? AppTheme.accent : AppTheme.border;
+                                                if root.form-remote-dns: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: end;
+                                            Text {
+                                                text: @tr("由代理服务器远程解析 DNS");
+                                                font-size: 11px;
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: bottom;
+                                            }
+                                        }
+                                    }
+                                    TouchArea {
+                                        enabled: root.is-create-mode || root.is-editing;
+                                        clicked => { root.form-remote-dns = !root.form-remote-dns; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+                            }
+
+                            // 备注说明
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                Text {
+                                    text: @tr("备注说明与业务用途");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 50px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    VerticalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        padding-top: 6px;
+                                        padding-bottom: 6px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-notes;
+                                            font-size: 12px;
+                                            color: AppTheme.foreground;
+                                            single-line: false;
+                                            wrap: word-wrap;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // =====================================================
+                        // 表单 B: 跳板机堡垒专属表单 (纯配置资产，无冗余端口与进程开关)
+                        // =====================================================
+                        if root.form-type == "JumpHost": VerticalLayout {
+                            alignment: start;
+                            spacing: 12px;
+
+                            // 1. 跳板机链路描述名称 (单独一行)
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                width: 100%;
+
+                                Text {
+                                    text: @tr("跳板机链路描述名称");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 32px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-name;
+                                            font-size: 12px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. 级联跳板主机节点列表 (按 Hop 顺序串联，每行一个主机)
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 6px;
+                                width: 100%;
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    width: 100%;
+
+                                    Text {
+                                        text: @tr("级联跳板主机顺序 (ProxyJump Chain)");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                    }
+
+                                    Text {
+                                        text: @tr("共 ") + root.form-jump-chain.length + @tr(" 级跳板中继");
+                                        font-size: 10px;
+                                        color: AppTheme.accent;
+                                    }
+                                }
+
+                                // 列表项循环展示选中的主机
+                                for hop[idx] in root.form-jump-chain: Rectangle {
+                                    height: 46px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: hop.enabled ? AppTheme.control-background : AppTheme.control-background.transparentize(50%);
+                                    border-width: 1px;
+                                    border-color: hop.enabled ? AppTheme.border : AppTheme.border.transparentize(50%);
+
+                                    HorizontalLayout {
+                                        padding-left: 12px;
+                                        padding-right: 12px;
+                                        spacing: 10px;
+
+                                        // 左侧：跳板序号徽章
+                                        Rectangle {
+                                            height: 20px;
+                                            border-radius: 4px;
+                                            background: hop.enabled ? #e67e22.transparentize(80%) : AppTheme.border.transparentize(70%);
+                                            y: (parent.height - self.height) / 2;
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                Text {
+                                                    text: "Hop " + (idx + 1);
+                                                    font-size: 10px;
+                                                    font-weight: 700;
+                                                    color: hop.enabled ? #e67e22 : AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+
+                                        // 服务器图标
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../assets/icons/server.svg");
+                                                width: 14px;
+                                                height: 14px;
+                                                colorize: hop.enabled ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+                                        }
+
+                                        // 主机名称与连接地址 (左对齐)
+                                        VerticalLayout {
+                                            alignment: center;
+                                            spacing: 2px;
+                                            horizontal-stretch: 1;
+
+                                            Text {
+                                                text: hop.host-name != "" ? hop.host-name : @tr("未命名主机");
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                                color: hop.enabled ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                                overflow: elide;
+                                            }
+
+                                            Text {
+                                                text: hop.host-address != "" ? (hop.host-address + ":" + hop.host-port) : @tr("默认端口 22");
+                                                font-size: 10px;
+                                                font-family: "Cascadia Code, Consolas, monospace";
+                                                color: AppTheme.secondary-foreground;
+                                                overflow: elide;
+                                            }
+                                        }
+
+                                        // 右侧操作区：调序上移、调序下移、删除、开关
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: end;
+
+                                            // 调序上移按钮 🔼
+                                            Rectangle {
+                                                width: 24px;
+                                                height: 24px;
+                                                border-radius: 4px;
+                                                background: up-touch.has-hover ? AppTheme.hover-background : transparent;
+                                                y: (parent.height - self.height) / 2;
+
+                                                up-touch := TouchArea {
+                                                    enabled: (root.is-create-mode || root.is-editing) && idx > 0;
+                                                    clicked => { root.move-jump-hop-up(idx); }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                Image {
+                                                    source: @image-url("../assets/icons/chevron-up.svg");
+                                                    width: 11px;
+                                                    height: 11px;
+                                                    colorize: ((root.is-create-mode || root.is-editing) && idx > 0)
+                                                        ? (up-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground)
+                                                        : AppTheme.secondary-foreground.transparentize(70%);
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                }
+                                            }
+
+                                            // 调序下移按钮 🔽
+                                            Rectangle {
+                                                width: 24px;
+                                                height: 24px;
+                                                border-radius: 4px;
+                                                background: down-touch.has-hover ? AppTheme.hover-background : transparent;
+                                                y: (parent.height - self.height) / 2;
+
+                                                down-touch := TouchArea {
+                                                    enabled: (root.is-create-mode || root.is-editing) && idx < root.form-jump-chain.length - 1;
+                                                    clicked => { root.move-jump-hop-down(idx); }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                Image {
+                                                    source: @image-url("../assets/icons/chevron-down.svg");
+                                                    width: 11px;
+                                                    height: 11px;
+                                                    colorize: ((root.is-create-mode || root.is-editing) && idx < root.form-jump-chain.length - 1)
+                                                        ? (down-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground)
+                                                        : AppTheme.secondary-foreground.transparentize(70%);
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                }
+                                            }
+
+                                            // 移除节点按钮 🗑️
+                                            if root.is-create-mode || root.is-editing: Rectangle {
+                                                width: 24px;
+                                                height: 24px;
+                                                border-radius: 4px;
+                                                background: del-hop-touch.has-hover ? #e74c3c.transparentize(85%) : transparent;
+                                                y: (parent.height - self.height) / 2;
+
+                                                del-hop-touch := TouchArea {
+                                                    clicked => { root.remove-jump-hop(idx); }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                Image {
+                                                    source: @image-url("../assets/icons/trash.svg");
+                                                    width: 11px;
+                                                    height: 11px;
+                                                    colorize: del-hop-touch.has-hover ? #e74c3c : AppTheme.secondary-foreground;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                }
+                                            }
+
+                                            // 竖直分割线
+                                            Rectangle {
+                                                width: 1px;
+                                                height: 16px;
+                                                background: AppTheme.border;
+                                                y: (parent.height - self.height) / 2;
+                                            }
+
+                                            // 开关 (指这台机器是否启动/参与本次跳板链路)
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                alignment: center;
+
+                                                Text {
+                                                    text: hop.enabled ? @tr("启用") : @tr("旁路");
+                                                    font-size: 10px;
+                                                    color: hop.enabled ? AppTheme.success : AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+
+                                                Rectangle {
+                                                    width: 32px;
+                                                    height: 18px;
+                                                    border-radius: 9px;
+                                                    background: hop.enabled ? AppTheme.accent : AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: hop.enabled ? AppTheme.accent : AppTheme.border;
+                                                    animate background { duration: 120ms; }
+                                                    y: (parent.height - self.height) / 2;
+
+                                                    Rectangle {
+                                                        width: 14px;
+                                                        height: 14px;
+                                                        border-radius: 7px;
+                                                        background: #ffffff;
+                                                        x: hop.enabled ? 16px : 2px;
+                                                        y: 1px;
+                                                        animate x { duration: 120ms; }
+                                                    }
+
+                                                    TouchArea {
+                                                        enabled: root.is-create-mode || root.is-editing;
+                                                        clicked => { root.toggle-jump-hop-enabled(idx); }
+                                                        mouse-cursor: pointer;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 空状态提示 (尚无节点时)
+                                if root.form-jump-chain.length == 0: Rectangle {
+                                    height: 64px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 4px;
+                                        Text {
+                                            text: @tr("尚未添加任何跳板主机节点");
+                                            font-size: 12px;
+                                            color: AppTheme.secondary-foreground;
+                                            horizontal-alignment: center;
+                                        }
+                                        Text {
+                                            text: @tr("请点击下方按钮从现有的主机资产树中添加第一跳中继机");
+                                            font-size: 10px;
+                                            color: AppTheme.secondary-foreground.transparentize(30%);
+                                            horizontal-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                // 列表底部：+ 添加跳板主机节点
+                                if root.is-create-mode || root.is-editing: Rectangle {
+                                    height: 34px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: add-hop-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: add-hop-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+                                    add-hop-touch := TouchArea {
+                                        clicked => {
+                                            root.host-picker-purpose = "jump-add";
+                                            root.temp-selected-host-id = "";
+                                            root.temp-selected-host-name = "";
+                                            root.temp-selected-host-address = "";
+                                            root.temp-selected-host-port = 22;
+                                            root.is-host-picker-open = true;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        spacing: 6px;
+
+                                        Image {
+                                            source: @image-url("../assets/icons/plus.svg");
+                                            width: 12px;
+                                            height: 12px;
+                                            colorize: add-hop-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+
+                                        Text {
+                                            text: @tr("+ 添加跳板中继主机 (从资产树选择)");
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: add-hop-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 3. OpenSSH ProxyJump 级联参数预览卡片
+                            Rectangle {
+                                width: 100%;
+                                border-radius: AppTheme.radius-medium;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                VerticalLayout {
+                                    padding: 10px;
+                                    spacing: 6px;
+
+                                    Text {
+                                        text: @tr("OpenSSH ProxyJump 级联调用参数预览 (-J)");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                    }
+
+                                    Text {
+                                        text: root.form-ssh-command != "" ? root.form-ssh-command : "-J <尚未选择启用跳板节点>";
+                                        font-size: 11px;
+                                        font-family: "Cascadia Code, Consolas, monospace";
+                                        color: AppTheme.accent;
+                                        wrap: word-wrap;
+                                    }
+                                }
+                            }
+
+                            // 备注说明
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                Text {
+                                    text: @tr("备注说明与业务用途");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 50px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    VerticalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        padding-top: 6px;
+                                        padding-bottom: 6px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-notes;
+                                            font-size: 12px;
+                                            color: AppTheme.foreground;
+                                            single-line: false;
+                                            wrap: word-wrap;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // =====================================================
+                        // 表单 C: 出网代理专属表单 (静态代理节点，无端口转发混杂)
+                        // =====================================================
+                        if root.form-type == "ProxyServer": VerticalLayout {
+                            alignment: start;
+                            spacing: 12px;
+
+                            // 代理协议类型单选组
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                width: 100%;
+                                Text {
+                                    text: @tr("代理协议类型");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+
+                                HorizontalLayout {
+                                    height: 28px;
+                                    spacing: 8px;
+                                    width: 100%;
+
+                                    // SOCKS5
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-proxy-proto == "SOCKS5" ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-proxy-proto == "SOCKS5" ? AppTheme.accent : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("SOCKS5 代理");
+                                            font-size: 11px;
+                                            font-weight: root.form-proxy-proto == "SOCKS5" ? 700 : 400;
+                                            color: root.form-proxy-proto == "SOCKS5" ? AppTheme.accent : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => {
+                                                root.form-proxy-proto = "SOCKS5";
+                                                root.form-ssh-host-name = "SOCKS5";
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // HTTP
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-proxy-proto == "HTTP" ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-proxy-proto == "HTTP" ? AppTheme.accent : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("HTTP 代理");
+                                            font-size: 11px;
+                                            font-weight: root.form-proxy-proto == "HTTP" ? 700 : 400;
+                                            color: root.form-proxy-proto == "HTTP" ? AppTheme.accent : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => {
+                                                root.form-proxy-proto = "HTTP";
+                                                root.form-ssh-host-name = "HTTP";
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // HTTPS
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-proxy-proto == "HTTPS" ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-proxy-proto == "HTTPS" ? AppTheme.accent : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("HTTPS 代理");
+                                            font-size: 11px;
+                                            font-weight: root.form-proxy-proto == "HTTPS" ? 700 : 400;
+                                            color: root.form-proxy-proto == "HTTPS" ? AppTheme.accent : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            enabled: root.is-create-mode || root.is-editing;
+                                            clicked => {
+                                                root.form-proxy-proto = "HTTPS";
+                                                root.form-ssh-host-name = "HTTPS";
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 规则名称
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                width: 100%;
+                                Text {
+                                    text: @tr("代理资产描述名称");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 32px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    HorizontalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-name;
+                                            font-size: 12px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 代理服务器与身份认证网格 (统一双列网格，上下严格对齐，左右 50% / 50% 严格平分)
+                            GridLayout {
+                                width: 100%;
+                                spacing: 12px;
+
+                                Row {
+                                    // 代理服务器地址 (左列 50%)
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        min-width: 0px;
+                                        preferred-width: 0px;
+                                        spacing: 4px;
+
+                                        Text {
+                                            text: @tr("代理服务器地址 (IP 或域名)");
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            overflow: elide;
+                                        }
+                                        Rectangle {
+                                            height: 32px;
+                                            border-radius: AppTheme.radius-medium;
+                                            background: AppTheme.control-background;
+                                            border-width: 1px;
+                                            border-color: AppTheme.border;
+
+                                            HorizontalLayout {
+                                                padding-left: 10px;
+                                                padding-right: 10px;
+                                                TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.form-remote-host;
+                                                    font-size: 12px;
+                                                    font-family: "Cascadia Code, Consolas, monospace";
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                    enabled: root.is-create-mode || root.is-editing;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 代理服务端口 (右列 50%)
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        min-width: 0px;
+                                        preferred-width: 0px;
+                                        spacing: 4px;
+
+                                        Text {
+                                            text: @tr("代理服务端口 (Port)");
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            overflow: elide;
+                                        }
+                                        Rectangle {
+                                            height: 32px;
+                                            border-radius: AppTheme.radius-medium;
+                                            background: AppTheme.control-background;
+                                            border-width: 1px;
+                                            border-color: AppTheme.border;
+
+                                            HorizontalLayout {
+                                                padding-left: 10px;
+                                                padding-right: 10px;
+                                                TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.form-remote-port;
+                                                    font-size: 12px;
+                                                    font-family: "Cascadia Code, Consolas, monospace";
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                    enabled: root.is-create-mode || root.is-editing;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Row {
+                                    // 认证用户名 (左列 50%，与上方 IP 严格同列对齐)
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        min-width: 0px;
+                                        preferred-width: 0px;
+                                        spacing: 4px;
+
+                                        Text {
+                                            text: @tr("认证用户名 (可选，留空无需认证)");
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            overflow: elide;
+                                        }
+                                        Rectangle {
+                                            height: 32px;
+                                            border-radius: AppTheme.radius-medium;
+                                            background: AppTheme.control-background;
+                                            border-width: 1px;
+                                            border-color: AppTheme.border;
+
+                                            HorizontalLayout {
+                                                padding-left: 10px;
+                                                padding-right: 10px;
+                                                TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.form-proxy-username;
+                                                    font-size: 12px;
+                                                    font-family: "Cascadia Code, Consolas, monospace";
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                    enabled: root.is-create-mode || root.is-editing;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 认证密码 (右列 50%，与上方 Port 严格同列对齐)
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        min-width: 0px;
+                                        preferred-width: 0px;
+                                        spacing: 4px;
+
+                                        Text {
+                                            text: @tr("认证密码 (可选，留空无需认证)");
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            overflow: elide;
+                                        }
+                                        Rectangle {
+                                            height: 32px;
+                                            border-radius: AppTheme.radius-medium;
+                                            background: AppTheme.control-background;
+                                            border-width: 1px;
+                                            border-color: AppTheme.border;
+
+                                            HorizontalLayout {
+                                                padding-left: 10px;
+                                                padding-right: 10px;
+                                                TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.form-proxy-password;
+                                                    font-size: 12px;
+                                                    font-family: "Cascadia Code, Consolas, monospace";
+                                                    color: AppTheme.foreground;
+                                                    input-type: password;
+                                                    vertical-alignment: center;
+                                                    enabled: root.is-create-mode || root.is-editing;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 实时环境变量代理预览与一键复制
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 6px;
+                                width: 100%;
+
+                                HorizontalLayout {
+                                    width: 100%;
+                                    alignment: start;
+                                    spacing: 6px;
+
+                                    Text {
+                                        text: @tr("全局代理环境变量预览");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Rectangle { horizontal-stretch: 1; }
+
+                                    // 复制按钮
+                                    Rectangle {
+                                        height: 22px;
+                                        border-radius: 4px;
+                                        background: proxy-copy-hover.has-hover ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: proxy-copy-hover.has-hover ? AppTheme.accent : AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 8px;
+                                            padding-right: 8px;
+                                            spacing: 4px;
+                                            alignment: center;
+                                            Text {
+                                                text: "📋";
+                                                font-size: 10px;
+                                                vertical-alignment: center;
+                                            }
+                                            Text {
+                                                text: @tr("复制参数");
+                                                font-size: 10px;
+                                                font-weight: 600;
+                                                color: proxy-copy-hover.has-hover ? AppTheme.accent : AppTheme.foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+
+                                        proxy-copy-hover := TouchArea {
+                                            mouse-cursor: pointer;
+                                            clicked => {
+                                                root.copy-custom-text(root.form-ssh-command, @tr("复制成功"), @tr("已复制代理环境变量配置"));
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.window-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    VerticalLayout {
+                                        padding: 8px;
+                                        Text {
+                                            width: 100%;
+                                            text: root.form-ssh-command != "" ? root.form-ssh-command : @tr("(待填写代理地址与端口)");
+                                            font-family: "Cascadia Code, Consolas, monospace";
+                                            font-size: 11px;
+                                            color: root.form-ssh-command != "" ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(40%);
+                                            wrap: char-wrap;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 备注说明
+                            VerticalLayout {
+                                alignment: start;
+                                spacing: 4px;
+                                width: 100%;
+                                Text {
+                                    text: @tr("备注说明与业务用途");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+                                Rectangle {
+                                    height: 50px;
+                                    width: 100%;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    VerticalLayout {
+                                        padding-left: 10px;
+                                        padding-right: 10px;
+                                        padding-top: 6px;
+                                        padding-bottom: 6px;
+                                        TextInput {
+                                            width: 100%;
+                                            height: 100%;
+                                            text <=> root.form-notes;
+                                            font-size: 12px;
+                                            color: AppTheme.foreground;
+                                            single-line: false;
+                                            wrap: word-wrap;
+                                            enabled: root.is-create-mode || root.is-editing;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. 新建网络资产类型选择弹窗 (Create Tunnel Type Modal)
+    CreateTunnelTypeModal {
+        is-open <=> root.show-create-modal;
+        cancel => { root.show-create-modal = false; }
+        select-type(t) => {
+            root.show-create-modal = false;
+            root.form-type = t;
+            root.is-create-mode = true;
+            root.is-editing = true;
+            root.start-create-typed(t);
+        }
+    }
+
+    // 4. 关联 SSH 宿主主机树形选择弹窗 (Host Picker Modal)
+    if root.is-host-picker-open: Rectangle {
+        x: 0;
+        y: 0;
+        width: 100%;
+        height: 100%;
+        z: 1000;
+
+        // 遮罩层
+        Rectangle {
+            background: #000000.transparentize(50%);
+            TouchArea {
+                // 阻断背景点击
+            }
+        }
+
+        // 弹窗本体
+        Rectangle {
+            width: 440px;
+            height: 380px;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #000000.transparentize(55%);
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                alignment: start;
+
+                // 4.1 标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/server.svg");
+                                width: 15px;
+                                height: 15px;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: root.host-picker-purpose == "jump-add"
+                                ? @tr("添加跳板机中继节点")
+                                : @tr("选择关联 SSH 宿主主机");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 关闭选择弹窗
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: host-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        host-close-touch := TouchArea {
+                            clicked => { root.is-host-picker-open = false; }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            colorize: host-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 4.2 提示说明
+                Text {
+                    text: root.host-picker-purpose == "jump-add"
+                        ? @tr("请在下方资产树中点选要加入跳板链路的中继主机：")
+                        : @tr("请在下方资产树中点选用于建立端口转发的 SSH 宿主主机：");
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground;
+                }
+
+                // 4.3 树形选择器主体
+                HostTreeSelector {
+                    options: root.tree-nodes;
+                    selected-id <=> root.temp-selected-host-id;
+                    selected-name <=> root.temp-selected-host-name;
+                    selected-address <=> root.temp-selected-host-address;
+                    selected-port <=> root.temp-selected-host-port;
+                    toggle-group(id) => { root.toggle-group(id); }
+                    confirmed => {
+                        if root.host-picker-purpose == "jump-add" {
+                            root.add-jump-hop(
+                                root.temp-selected-host-id,
+                                root.temp-selected-host-name,
+                                root.temp-selected-host-address,
+                                root.temp-selected-host-port
+                            );
+                        } else {
+                            root.form-ssh-host-id = root.temp-selected-host-id;
+                            root.form-ssh-host-name = root.temp-selected-host-name;
+                            if root.temp-selected-host-address != "" {
+                                root.form-remote-host = root.temp-selected-host-address;
+                            }
+                        }
+                        root.is-host-picker-open = false;
+                    }
+                    height: 240px;
+                }
+
+                // 4.4 底部操作栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    // 已选提示
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        horizontal-stretch: 1;
+
+                        Text {
+                            text: root.temp-selected-host-name != ""
+                                ? (@tr("已选: ") + root.temp-selected-host-name + (root.temp-selected-host-address != "" ? (" (" + root.temp-selected-host-address + ")") : ""))
+                                : @tr("尚未选择主机");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: root.temp-selected-host-name != "" ? AppTheme.accent : AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                            overflow: elide;
+                        }
+                    }
+
+                    // 按钮组
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        AppButton {
+                            text: @tr("取消");
+                            height: 28px;
+                            clicked => { root.is-host-picker-open = false; }
+                        }
+
+                        AppButton {
+                            text: @tr("确定选定");
+                            variant: "primary";
+                            height: 28px;
+                            enabled: root.temp-selected-host-id != "";
+                            clicked => {
+                                if root.host-picker-purpose == "jump-add" {
+                                    root.add-jump-hop(
+                                        root.temp-selected-host-id,
+                                        root.temp-selected-host-name,
+                                        root.temp-selected-host-address,
+                                        root.temp-selected-host-port
+                                    );
+                                } else {
+                                    root.form-ssh-host-id = root.temp-selected-host-id;
+                                    root.form-ssh-host-name = root.temp-selected-host-name;
+                                    if root.temp-selected-host-address != "" {
+                                        root.form-remote-host = root.temp-selected-host-address;
+                                    }
+                                }
+                                root.is-host-picker-open = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -177,6 +177,36 @@ pub trait SnippetRepository: Send + Sync {
     fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()>;
 }
 
+/// 网络隧道、代理与跳板机仓储接口契约
+pub trait TunnelRepository: Send + Sync {
+    /// 获取全部隧道与代理记录
+    fn list_all(&self) -> StorageResult<Vec<crate::domain::tunnel::TunnelRecord>>;
+
+    /// 按类型获取 (Local / Remote / Dynamic / JumpHost / ProxyServer)
+    fn list_by_type(&self, tunnel_type: crate::domain::tunnel::TunnelType) -> StorageResult<Vec<crate::domain::tunnel::TunnelRecord>>;
+
+    /// 根据唯一 ID 查询单条记录
+    fn get_by_id(&self, id: &str) -> StorageResult<Option<crate::domain::tunnel::TunnelRecord>>;
+
+    /// 模糊搜索隧道 (按名称、端口、目标主机、备注)
+    fn search(&self, query: &str) -> StorageResult<Vec<crate::domain::tunnel::TunnelRecord>>;
+
+    /// 保存或更新隧道记录
+    fn save(&self, record: &crate::domain::tunnel::TunnelRecord) -> StorageResult<()>;
+
+    /// 批量保存隧道记录
+    fn save_batch(&self, records: &[crate::domain::tunnel::TunnelRecord]) -> StorageResult<()>;
+
+    /// 删除指定隧道记录
+    fn delete(&self, id: &str) -> StorageResult<bool>;
+
+    /// 切换或设置运行状态 (is_running)
+    fn set_running(&self, id: &str, is_running: bool) -> StorageResult<bool>;
+
+    /// 更新流量与活跃连接统计
+    fn update_metrics(&self, id: &str, active_conn: usize, bytes_in: u64, bytes_out: u64) -> StorageResult<()>;
+}
+
 /// 聚合存储服务门面契约
 pub trait AppStorage: Send + Sync {
     /// 主机仓储句柄
@@ -193,6 +223,9 @@ pub trait AppStorage: Send + Sync {
 
     /// 代码片段仓储句柄
     fn snippets(&self) -> &dyn SnippetRepository;
+
+    /// 网络隧道与代理仓储句柄
+    fn tunnels(&self) -> &dyn TunnelRepository;
 
     /// 强制从物理介质重新加载数据
     fn reload(&self) -> StorageResult<()>;

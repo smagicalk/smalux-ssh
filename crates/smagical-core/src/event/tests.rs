@@ -183,3 +183,56 @@ fn test_event_manager_lifecycle() {
     assert_eq!(mgr.active_page_ids().len(), 0);
     assert_eq!(mgr.total_listener_count(), 0);
 }
+
+#[test]
+fn test_tunnel_lifecycle_events_and_abortion() {
+    let dispatcher = EventDispatcher::new();
+
+    // 1. 测试保存前拦截 (如端口或跳板成环)
+    let _g_save = dispatcher.listen::<crate::event::TunnelBeforeSaveEvent, _>(|e| {
+        if e.local_port == 0 {
+            e.abort("端口不能为 0");
+        }
+    });
+
+    let ev_invalid = crate::event::TunnelBeforeSaveEvent::new("tun-1", "测试", "Local", "127.0.0.1", 0, "10.0.0.1", 80, vec![]);
+    dispatcher.dispatch(&ev_invalid);
+    assert!(ev_invalid.is_aborted());
+    assert_eq!(ev_invalid.abort_reason(), Some("端口不能为 0".into()));
+
+    let ev_valid = crate::event::TunnelBeforeSaveEvent::new("tun-2", "正常", "Local", "127.0.0.1", 8080, "10.0.0.1", 80, vec![]);
+    dispatcher.dispatch(&ev_valid);
+    assert!(!ev_valid.is_aborted());
+
+    // 2. 测试运行中删除拦截
+    let _g_del = dispatcher.listen::<crate::event::TunnelBeforeDeleteEvent, _>(|e| {
+        if e.is_running {
+            e.abort("运行中禁止删除");
+        }
+    });
+
+    let del_running = crate::event::TunnelBeforeDeleteEvent::new("tun-1", true);
+    dispatcher.dispatch(&del_running);
+    assert!(del_running.is_aborted());
+    assert_eq!(del_running.abort_reason(), Some("运行中禁止删除".into()));
+
+    let del_stopped = crate::event::TunnelBeforeDeleteEvent::new("tun-1", false);
+    dispatcher.dispatch(&del_stopped);
+    assert!(!del_stopped.is_aborted());
+
+    // 3. 测试流量度量事件
+    let metrics_seen = Arc::new(AtomicUsize::new(0));
+    let m_clone = Arc::clone(&metrics_seen);
+    let _g_metric = dispatcher.listen::<crate::event::TunnelMetricsTickEvent, _>(move |e| {
+        m_clone.fetch_add(e.bytes_in_delta as usize, Ordering::SeqCst);
+    });
+
+    dispatcher.dispatch(&crate::event::TunnelMetricsTickEvent {
+        tunnel_id: "tun-1".into(),
+        bytes_in_delta: 1024,
+        bytes_out_delta: 2048,
+        active_connections: 5,
+    });
+    assert_eq!(metrics_seen.load(Ordering::SeqCst), 1024);
+}
+

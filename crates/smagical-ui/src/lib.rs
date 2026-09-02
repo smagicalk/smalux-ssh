@@ -38,6 +38,8 @@ pub(crate) mod activity_bar_service;
 pub(crate) mod right_panel_service;
 /// 全局气泡通知服务。
 pub mod notification_service;
+/// 网络隧道与出网代理全局后台常驻守护服务模块。
+pub(crate) mod tunnel_daemon;
 
 
 use std::cell::RefCell;
@@ -137,6 +139,13 @@ pub fn run() -> Result<(), slint::PlatformError> {
         window.as_weak(),
     ));
     prewarm_service.register(core_state.event_manager());
+
+    // 注册网络隧道与代理全局后台常驻守护服务 (处理跟随整个应用的全局自启与退出注销)
+    let tunnel_daemon = std::sync::Arc::new(tunnel_daemon::TunnelDaemonService::new(
+        core_state.storage().clone(),
+        window.as_weak(),
+    ));
+    tunnel_daemon.register(core_state.event_manager());
 
     // 触发全局应用启动事件
     core_state.events().dispatch(&smagical_core::AppBootEvent);
@@ -271,6 +280,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let expanded_snippet_groups = Rc::new(RefCell::new(initial_snippet_expanded));
     let snippet_search_query = Rc::new(RefCell::new(String::new()));
 
+    let tunnel_search_query = Rc::new(RefCell::new(String::new()));
+    let tunnel_filter_category = Rc::new(RefCell::new("all".to_string()));
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state: Rc::clone(&core_state),
@@ -311,15 +323,37 @@ pub fn run() -> Result<(), slint::PlatformError> {
         master_snippet_tree,
         expanded_snippet_groups,
         snippet_search_query,
+
+        tunnel_search_query,
+        tunnel_filter_category,
     };
 
-
-
-
-    // 初始同步历史会话抽屉、双盘文件浏览器与代码片段中心数据
+    // 初始同步历史会话抽屉、双盘文件浏览器、代码片段中心与网络隧道中枢数据
     handlers::history_handlers::sync_ui_history(&window, &ctx);
     handlers::file_handlers::sync_file_explorer_ui(&window, &ctx);
     handlers::snippet_handlers::sync_ui_snippets(&window, &ctx);
+    handlers::tunnel_handlers::sync_ui_tunnels(&window, &ctx);
+
+    // 初始化默认网络隧道选中项
+    if let Ok(all_tuns) = ctx.core_state.storage().tunnels().list_all() {
+        if let Some(first) = all_tuns.first() {
+            window.set_active_tunnel_id(first.id.clone().into());
+            window.set_tunnel_form_id(first.id.clone().into());
+            window.set_tunnel_form_name(first.name.clone().into());
+            window.set_tunnel_form_type(first.tunnel_type.as_str().into());
+            window.set_tunnel_form_ssh_host_id(first.ssh_host_id.clone().unwrap_or_default().into());
+            window.set_tunnel_form_ssh_host_name(first.ssh_host_name.clone().into());
+            window.set_tunnel_form_local_bind(first.local_bind.clone().into());
+            window.set_tunnel_form_local_port(first.local_port.to_string().into());
+            window.set_tunnel_form_remote_host(first.remote_host.clone().into());
+            window.set_tunnel_form_remote_port(first.remote_port.to_string().into());
+            window.set_tunnel_form_auto_start(first.auto_start);
+            window.set_tunnel_form_auto_reconnect(first.auto_reconnect);
+            window.set_tunnel_form_remote_dns(first.remote_dns);
+            window.set_tunnel_form_compression(first.compression);
+            window.set_tunnel_form_notes(first.notes.clone().into());
+        }
+    }
 
     // 统一挂载所有区域的回调事件处理器
     register_all_handlers(&window, &ctx);

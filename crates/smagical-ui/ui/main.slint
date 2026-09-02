@@ -38,6 +38,8 @@ import { FileHostModal } from "components/file-host-modal.slint";
 import { ToastContainer, ToastItemData } from "components/toast.slint";
 import { CredentialsCenterView } from "views/credentials_view.slint";
 import { SnippetsCenterView, SnippetTreeNode } from "views/snippets_view.slint";
+import { TunnelsCenterView, JumpHopData } from "views/tunnels_view.slint";
+export { JumpHopData } from "views/tunnels_view.slint";
 import { SnippetRunModal, SnippetParamFieldData } from "components/snippet-run-modal.slint";
 import { CreateSnippetGroupModal } from "components/create-snippet-group-modal.slint";
 
@@ -103,6 +105,7 @@ import {
     MonitorDrawer,
     SystemMetricsData,
 } from "views/right_drawers/monitor_drawer.slint";
+import { TunnelToolDrawer } from "views/right_drawers/tunnel_tool_drawer.slint";
 import {
     SnippetToolDrawer,
     QuickCmdData,
@@ -170,6 +173,10 @@ export component AppWindow inherits Window {
     in-out property <bool> has-active-session: false;
     /// 当前激活会话的展示标题
     in-out property <string> active-session-name: "";
+    /// 当前激活会话对应的主机资产 ID
+    in-out property <string> active-host-id: "";
+    /// 当前激活会话的主机资产名称
+    in-out property <string> active-host-name: "";
     /// 当前激活会话的目标主机地址 (如 "192.168.1.101:22")
     in-out property <string> active-host-address: "";
     /// 当前激活会话的网络延迟 (ms)
@@ -346,6 +353,58 @@ export component AppWindow inherits Window {
     in-out property <string> quick-cmds-search-query: "";
 
     // -------------------------------------------------------------------------
+    // 网络隧道、跳板堡垒与代理池状态 (Tunnels & Network Hub)
+    // -------------------------------------------------------------------------
+    /// 全量隧道与网络规则列表
+    in property <[TunnelItemData]> tunnels: [];
+    /// 规则分类过滤 ("all" | "forward" | "jump" | "proxy")
+    in-out property <string> tunnel-filter-category: "all";
+    /// 规则搜索过滤词
+    in-out property <string> tunnel-search-query: "";
+    /// 当前选中隧道 ID
+    in-out property <string> active-tunnel-id: "";
+
+    /// 右侧详情与编辑表单状态
+    in-out property <bool> is-tunnel-create-mode: false;
+    in-out property <bool> is-tunnel-editing: false;
+    in-out property <string> tunnel-form-id: "";
+    in-out property <string> tunnel-form-name: "";
+    in-out property <string> tunnel-form-type: "Local";
+    in-out property <string> tunnel-form-ssh-host-id: "";
+    in-out property <string> tunnel-form-ssh-host-name: "";
+    in-out property <string> tunnel-form-local-bind: "127.0.0.1";
+    in-out property <string> tunnel-form-local-port: "3306";
+    in-out property <string> tunnel-form-remote-host: "10.0.0.8";
+    in-out property <string> tunnel-form-remote-port: "3306";
+    in-out property <bool> tunnel-form-is-running: false;
+    in-out property <bool> tunnel-form-auto-start: false;
+    in-out property <bool> tunnel-form-auto-reconnect: true;
+    in-out property <bool> tunnel-form-remote-dns: false;
+    in-out property <bool> tunnel-form-compression: true;
+    in-out property <int> tunnel-form-active-connections: 0;
+    in-out property <string> tunnel-form-traffic-in: "0 B";
+    in-out property <string> tunnel-form-traffic-out: "0 B";
+    in-out property <string> tunnel-form-notes: "";
+    in-out property <string> tunnel-form-updated-at: "";
+    in-out property <string> tunnel-form-ssh-command: "";
+    /// 跳板机中继链路节点列表
+    in-out property <[JumpHopData]> tunnel-form-jump-chain: [];
+    /// 出网代理协议与认证信息
+    in-out property <string> tunnel-form-proxy-proto: "SOCKS5";
+    in-out property <string> tunnel-form-proxy-username: "";
+    in-out property <string> tunnel-form-proxy-password: "";
+    /// 跳板链路节点操作回调
+    callback add-tunnel-jump-hop(string /* id */, string /* name */, string /* address */, int /* port */);
+    callback remove-tunnel-jump-hop(int /* index */);
+    callback move-tunnel-jump-hop-up(int /* index */);
+    callback move-tunnel-jump-hop-down(int /* index */);
+    callback toggle-tunnel-jump-hop-enabled(int /* index */);
+    /// 当前聚焦终端主机专属的端口转发规则列表
+    in-out property <[TunnelItemData]> host-tunnels: [];
+    /// 请求重新同步当前主机的专属隧道数据
+    callback sync-host-tunnels();
+
+    // -------------------------------------------------------------------------
     // 拖拽调序交互状态机
     // -------------------------------------------------------------------------
     /// 是否正在进行鼠标拖拽操作
@@ -489,6 +548,8 @@ export component AppWindow inherits Window {
     callback maximize-window();
     /// 原生窗口退出应用回调
     callback close-window();
+    /// 原生窗口拖动移动回调
+    callback start-window-drag();
 
     // -------------------------------------------------------------------------
     // 终端核心底层交互回调
@@ -625,6 +686,37 @@ export component AppWindow inherits Window {
     callback move-snippet-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
     /// 拖拽悬停计算事件回调 (source-id, target-index, offset-in-row)
     callback request-snippet-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
+
+    // -------------------------------------------------------------------------
+    // 网络隧道、跳板堡垒与代理池管理回调
+    // -------------------------------------------------------------------------
+    callback select-tunnel(string /* id */);
+    callback toggle-tunnel-running(string /* id */);
+    callback start-create-tunnel();
+    callback start-create-typed-tunnel(string /* type */);
+    callback cancel-create-tunnel();
+    callback start-edit-tunnel();
+    callback cancel-edit-tunnel();
+    callback save-tunnel(
+        string /* id */,
+        string /* name */,
+        string /* tunnel_type */,
+        string /* ssh_host_id */,
+        string /* ssh_host_name */,
+        string /* local_bind */,
+        int    /* local_port */,
+        string /* remote_host */,
+        int    /* remote_port */,
+        bool   /* auto_start */,
+        bool   /* auto_reconnect */,
+        bool   /* remote_dns */,
+        bool   /* compression */,
+        string /* notes */
+    );
+    callback delete-tunnel(string /* id */);
+    callback copy-tunnel-ssh-command(string /* id */);
+    callback filter-tunnels(string /* category */, string /* query */);
+    callback open-tunnels-hub();
 
     // -------------------------------------------------------------------------
     // 开发者 F12 调试控制台专用回调
@@ -867,6 +959,7 @@ export component AppWindow inherits Window {
                     root.maximize-window();
                 }
                 close-window => { root.close-window(); }
+                start-window-drag => { root.start-window-drag(); }
             }
 
             // 2. 中间五栏主工作区 (整齐划一平铺)
@@ -905,6 +998,12 @@ export component AppWindow inherits Window {
                             root.main-view = "snippets";
                             root.is-left-drawer-open = false;
                             root.navigate-to("snippets", "");
+                        } else if id == "tunnels" {
+                            // 切换至独立全屏网络与隧道中心大页面 (左侧规则列表 + 右侧拓扑与指标详情)
+                            root.active-left-tab = "tunnels";
+                            root.main-view = "tunnels";
+                            root.is-left-drawer-open = false;
+                            root.navigate-to("tunnels", "");
                         } else if id == "files" {
                             // 切换至文件管理页面：左侧展示主机树抽屉，中央展示双盘文件管理器
                             root.active-left-tab = "files";
@@ -1005,6 +1104,12 @@ export component AppWindow inherits Window {
                         width: 100%;
                         height: 100%;
                         collapse => { root.is-left-drawer-open = false; }
+                        tunnels: root.tunnels;
+                        toggle-tunnel(id) => { root.toggle-tunnel-running(id); }
+                        open-hub => {
+                            root.main-view = "tunnels";
+                            root.is-left-drawer-open = false;
+                        }
                     }
 
                     if root.active-left-tab == "backup": BackupDrawer {
@@ -1167,9 +1272,78 @@ export component AppWindow inherits Window {
                     request_drag_hover(src, idx, off) => { root.request-snippet-drag-hover(src, idx, off); }
                 }
 
+                // 2.3.4 全屏网络与隧道管理中心 (当 main-view == "tunnels" 时全屏展开)
+                if root.main-view == "tunnels": TunnelsCenterView {
+                    horizontal-stretch: 1;
+                    tunnels: root.tunnels;
+                    filter-category <=> root.tunnel-filter-category;
+                    search-query <=> root.tunnel-search-query;
+                    active-tunnel-id <=> root.active-tunnel-id;
 
+                    is-create-mode <=> root.is-tunnel-create-mode;
+                    is-editing <=> root.is-tunnel-editing;
+                    form-id <=> root.tunnel-form-id;
+                    form-name <=> root.tunnel-form-name;
+                    form-type <=> root.tunnel-form-type;
+                    form-ssh-host-id <=> root.tunnel-form-ssh-host-id;
+                    form-ssh-host-name <=> root.tunnel-form-ssh-host-name;
+                    form-local-bind <=> root.tunnel-form-local-bind;
+                    form-local-port <=> root.tunnel-form-local-port;
+                    form-remote-host <=> root.tunnel-form-remote-host;
+                    form-remote-port <=> root.tunnel-form-remote-port;
+                    form-auto-start <=> root.tunnel-form-auto-start;
+                    form-auto-reconnect <=> root.tunnel-form-auto-reconnect;
+                    form-remote-dns <=> root.tunnel-form-remote-dns;
+                    form-compression <=> root.tunnel-form-compression;
+                    form-is-running <=> root.tunnel-form-is-running;
+                    form-active-connections <=> root.tunnel-form-active-connections;
+                    form-traffic-in <=> root.tunnel-form-traffic-in;
+                    form-traffic-out <=> root.tunnel-form-traffic-out;
+                    form-updated-at <=> root.tunnel-form-updated-at;
+                    form-ssh-command <=> root.tunnel-form-ssh-command;
+                    form-jump-chain <=> root.tunnel-form-jump-chain;
+                    form-proxy-proto <=> root.tunnel-form-proxy-proto;
+                    form-proxy-username <=> root.tunnel-form-proxy-username;
+                    form-proxy-password <=> root.tunnel-form-proxy-password;
+                    form-notes <=> root.tunnel-form-notes;
+                    tree-nodes: root.tree-nodes;
+                    toggle-group(id) => { root.toggle-tree-group(id); }
 
-                // 2.3.3 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
+                    add-jump-hop(id, name, addr, port) => { root.add-tunnel-jump-hop(id, name, addr, port); }
+                    remove-jump-hop(idx) => { root.remove-tunnel-jump-hop(idx); }
+                    move-jump-hop-up(idx) => { root.move-tunnel-jump-hop-up(idx); }
+                    move-jump-hop-down(idx) => { root.move-tunnel-jump-hop-down(idx); }
+                    toggle-jump-hop-enabled(idx) => { root.toggle-tunnel-jump-hop-enabled(idx); }
+
+                    select-tunnel(id) => { root.select-tunnel(id); }
+                    toggle-tunnel-running(id) => { root.toggle-tunnel-running(id); }
+                    start-create => { root.start-create-tunnel(); }
+                    start-create-typed(t) => { root.start-create-typed-tunnel(t); }
+                    cancel-create => { root.cancel-create-tunnel(); }
+                    start-edit => { root.start-edit-tunnel(); }
+                    cancel-edit => { root.cancel-edit-tunnel(); }
+                    save-tunnel(id, name, t_type, h_id, h_name, l_bind, l_port, r_host, r_port, auto_s, auto_r, r_dns, comp, notes) => {
+                        root.save-tunnel(id, name, t_type, h_id, h_name, l_bind, l_port, r_host, r_port, auto_s, auto_r, r_dns, comp, notes);
+                    }
+                    delete-tunnel(id) => { root.delete-tunnel(id); }
+                    copy-ssh-command(id) => { root.copy-tunnel-ssh-command(id); }
+                    copy-custom-text(text, title, msg) => { root.copy-custom-text(text, title, msg); }
+                    search-changed(q) => {
+                        root.tunnel-search-query = q;
+                        root.filter-tunnels(root.tunnel-filter-category, q);
+                    }
+                    filter-category-changed(cat) => {
+                        root.tunnel-filter-category = cat;
+                        root.filter-tunnels(cat, root.tunnel-search-query);
+                    }
+                    back-to-terminal => {
+                        root.main-view = "terminal";
+                        root.active-left-tab = "hosts";
+                        root.is-left-drawer-open = true;
+                    }
+                }
+
+                // 2.3.5 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
                 viewport := TerminalViewport {
                     visible: root.main-view == "terminal";
                     horizontal-stretch: root.main-view == "terminal" ? 1 : 0;
@@ -1351,6 +1525,28 @@ export component AppWindow inherits Window {
                         collapse => { root.is-right-drawer-open = false; }
                     }
 
+                    if root.active-right-tool == "tunnel": TunnelToolDrawer {
+                        collapse => { root.is-right-drawer-open = false; }
+                        active-host-name: root.active-host-name != "" ? root.active-host-name : root.active-session-name;
+                        tunnels: root.host-tunnels;
+                        toggle-tunnel-running(id) => { root.toggle-tunnel-running(id); }
+                        open-tunnels-hub => {
+                            root.active-left-tab = "tunnels";
+                            root.main-view = "tunnels";
+                            root.is-left-drawer-open = false;
+                            root.is-right-drawer-open = false;
+                            root.navigate-to("tunnels", "");
+                        }
+                        start-create-tunnel => {
+                            root.active-left-tab = "tunnels";
+                            root.main-view = "tunnels";
+                            root.is-left-drawer-open = false;
+                            root.is-right-drawer-open = false;
+                            root.start-create-tunnel();
+                            root.navigate-to("tunnels", "");
+                        }
+                    }
+
                     if root.active-right-tool == "snippets": SnippetToolDrawer {
                         collapse => { root.is-right-drawer-open = false; }
                         quick-cmds: root.quick-cmds;
@@ -1382,6 +1578,9 @@ export component AppWindow inherits Window {
                         } else {
                             root.active-right-tool = id;
                             root.is-right-drawer-open = true;
+                            if id == "tunnel" {
+                                root.sync-host-tunnels();
+                            }
                         }
                     }
                 }
