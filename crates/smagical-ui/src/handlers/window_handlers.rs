@@ -494,12 +494,59 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     tracing::debug!(target: "smagical_ui::window", "Window drag failed: {:?}", e);
                 }
             });
-            // 拖拽过程中如果窗口从最大化状态被系统 DWM 自动还原，同步 UI 状态
-            if w.get_is_window_maximized() && !w.window().is_maximized() {
-                w.set_is_window_maximized(false);
+            // 拖拽过程中或结束后如果窗口最大化状态发生变动，同步 UI 状态
+            let is_max = w.window().is_maximized();
+            if w.get_is_window_maximized() != is_max {
+                w.set_is_window_maximized(is_max);
             }
         }
     });
+
+    // -------------------------------------------------------------------------
+    // 5.2 窗口控制: 原生无边框窗口 8 方向边缘拖拽缩放 (Winit drag_resize_window)
+    // -------------------------------------------------------------------------
+    let window_weak_resize = window.as_weak();
+    window.on_start_window_resize(move |dir_str| {
+        if let Some(w) = window_weak_resize.upgrade() {
+            if w.get_is_window_maximized() {
+                return;
+            }
+            let dir = match dir_str.as_str() {
+                "east" => winit::window::ResizeDirection::East,
+                "west" => winit::window::ResizeDirection::West,
+                "north" => winit::window::ResizeDirection::North,
+                "south" => winit::window::ResizeDirection::South,
+                "north-east" => winit::window::ResizeDirection::NorthEast,
+                "north-west" => winit::window::ResizeDirection::NorthWest,
+                "south-east" => winit::window::ResizeDirection::SouthEast,
+                "south-west" => winit::window::ResizeDirection::SouthWest,
+                _ => return,
+            };
+            w.window().with_winit_window(|winit_window| {
+                if let Err(e) = winit_window.drag_resize_window(dir) {
+                    tracing::debug!(target: "smagical_ui::window", "Window resize failed: {:?}", e);
+                }
+            });
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 5.3 窗口状态自适应心跳检测 (实时同步最大化/还原状态与右上角图标)
+    // -------------------------------------------------------------------------
+    let window_weak_sync = window.as_weak();
+    let sync_timer = Box::leak(Box::new(slint::Timer::default()));
+    sync_timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(150),
+        move || {
+            if let Some(w) = window_weak_sync.upgrade() {
+                let is_max = w.window().is_maximized();
+                if w.get_is_window_maximized() != is_max {
+                    w.set_is_window_maximized(is_max);
+                }
+            }
+        },
+    );
 
     // -------------------------------------------------------------------------
     // 6. 动态更新终端字体与字号

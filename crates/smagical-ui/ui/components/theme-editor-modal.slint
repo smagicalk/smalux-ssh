@@ -1,7 +1,6 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppCard } from "base/app-card.slint";
 import { AppButton } from "base/app-button.slint";
-import { ScrollView } from "std-widgets.slint";
 
 /// 调色板色块定义
 struct PaletteSwatch {
@@ -95,9 +94,11 @@ component ColorFieldInput inherits VerticalLayout {
                     mouse-cursor: pointer;
                 }
 
-                Text {
-                    text: "🎨";
-                    font-size: 9px;
+                Image {
+                    source: @image-url("../assets/icons/palette.svg");
+                    width: 11px;
+                    height: 11px;
+                    colorize: btn-p.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
                     horizontal-alignment: center;
                     vertical-alignment: center;
                 }
@@ -404,10 +405,11 @@ export component ThemeEditorModal inherits Rectangle {
                             clicked => { root.close(); }
                             mouse-cursor: pointer;
                         }
-                        Text {
-                            text: "✕";
-                            font-size: 12px;
-                            color: AppTheme.secondary-foreground;
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            colorize: AppTheme.secondary-foreground;
                             horizontal-alignment: center;
                             vertical-alignment: center;
                         }
@@ -423,14 +425,21 @@ export component ThemeEditorModal inherits Rectangle {
                     spacing: 14px;
                     height: 310px;
 
-                    // 左侧全量参数输入表单 (支持竖向滚动条顺畅浏览编辑所有颜色与排版规格)
-                    ScrollView {
+                    // 左侧全量参数输入表单 (Flickable + 自适应极简滚动条，无杂色背景与错位焦点)
+                    Rectangle {
                         horizontal-stretch: 1;
+                        background: transparent;
+                        clip: true;
 
-                        VerticalLayout {
-                            spacing: 12px;
-                            alignment: start;
-                            padding-right: 8px;
+                        flick-form := Flickable {
+                            width: 100%;
+                            height: 100%;
+                            viewport-height: form-content.preferred-height;
+
+                            form-content := VerticalLayout {
+                                spacing: 12px;
+                                alignment: start;
+                                padding-right: 12px;
 
                             // -------------------------------------------------------------
                             // 一、元数据与继承预设 (Metadata & Presets)
@@ -897,6 +906,24 @@ export component ThemeEditorModal inherits Rectangle {
                                 }
                             }
                         }
+
+                        // 极简半透明主题自适应滚动条
+                        if flick-form.viewport-height > flick-form.height: Rectangle {
+                            x: parent.width - 5px;
+                            y: 2px;
+                            width: 3px;
+                            height: parent.height - 4px;
+                            border-radius: 1.5px;
+                            background: transparent;
+
+                            Rectangle {
+                                y: -flick-form.viewport-y * (parent.height - 4px - self.height) / (flick-form.viewport-height - flick-form.height);
+                                width: 3px;
+                                height: max(28px, (flick-form.height / flick-form.viewport-height) * (parent.height - 4px));
+                                border-radius: 1.5px;
+                                background: AppTheme.secondary-foreground.transparentize(60%);
+                            }
+                        }
                     }
 
                     // 右侧: 🖥️ 微型客户端沙盒预览窗口 (370px)
@@ -1353,10 +1380,11 @@ export component ThemeEditorModal inherits Rectangle {
                                     clicked => { root.is-picker-open = false; }
                                     mouse-cursor: pointer;
                                 }
-                                Text {
-                                    text: "✕";
-                                    font-size: 11px;
-                                    color: AppTheme.secondary-foreground;
+                                Image {
+                                    source: @image-url("../assets/icons/window-close.svg");
+                                    width: 10px;
+                                    height: 10px;
+                                    colorize: AppTheme.secondary-foreground;
                                     horizontal-alignment: center;
                                     vertical-alignment: center;
                                 }
@@ -1568,4 +1596,5 @@ export component ThemeEditorModal inherits Rectangle {
             }
         }
     }
+}
 }

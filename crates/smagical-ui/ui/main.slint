@@ -689,6 +689,8 @@ export component AppWindow inherits Window {
     callback force-close-window();
     /// 原生窗口拖动移动回调
     callback start-window-drag();
+    /// 原生无边框窗口 8 方向边缘拖拽调整尺寸回调
+    callback start-window-resize(string);
 
     // -------------------------------------------------------------------------
     // 终端核心底层交互回调
@@ -2268,6 +2270,97 @@ export component AppWindow inherits Window {
         toasts: root.active-toasts;
         position: root.toast-position;
         close-toast(id) => { root.close-toast(id); }
+    }
+
+    // -------------------------------------------------------------------------
+    // 边缘拖动改变窗口大小 (Window Edge & Corner Resize Handles)
+    // 仅在非最大化状态下启用，8 个方向原生无缝拖拽缩放
+    // -------------------------------------------------------------------------
+    if !root.is-window-maximized: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+
+        // 顶边 (North)
+        TouchArea {
+            x: 8px; y: 0px; width: parent.width - 16px; height: 5px;
+            mouse-cursor: n-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("north");
+                }
+            }
+        }
+        // 底边 (South)
+        TouchArea {
+            x: 8px; y: parent.height - 5px; width: parent.width - 16px; height: 5px;
+            mouse-cursor: s-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("south");
+                }
+            }
+        }
+        // 左边 (West)
+        TouchArea {
+            x: 0px; y: 8px; width: 5px; height: parent.height - 16px;
+            mouse-cursor: w-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("west");
+                }
+            }
+        }
+        // 右边 (East)
+        TouchArea {
+            x: parent.width - 5px; y: 8px; width: 5px; height: parent.height - 16px;
+            mouse-cursor: e-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("east");
+                }
+            }
+        }
+        // 左上角 (NorthWest)
+        TouchArea {
+            x: 0px; y: 0px; width: 8px; height: 8px;
+            mouse-cursor: nw-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("north-west");
+                }
+            }
+        }
+        // 右上角 (NorthEast)
+        TouchArea {
+            x: parent.width - 8px; y: 0px; width: 8px; height: 8px;
+            mouse-cursor: ne-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("north-east");
+                }
+            }
+        }
+        // 左下角 (SouthWest)
+        TouchArea {
+            x: 0px; y: parent.height - 8px; width: 8px; height: 8px;
+            mouse-cursor: sw-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("south-west");
+                }
+            }
+        }
+        // 右下角 (SouthEast)
+        TouchArea {
+            x: parent.width - 8px; y: parent.height - 8px; width: 8px; height: 8px;
+            mouse-cursor: se-resize;
+            pointer-event(event) => {
+                if (event.kind == PointerEventKind.down && event.button == PointerEventButton.left) {
+                    root.start-window-resize("south-east");
+                }
+            }
+        }
     }
 }
 

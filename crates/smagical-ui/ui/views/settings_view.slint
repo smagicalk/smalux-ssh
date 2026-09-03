@@ -715,25 +715,27 @@ component PipelineSegmentedControl inherits Rectangle {
 }
 
 /// 标准单行设置项容器 (左端标题+说明，右端输入或者选项框)
+/// 标准单行设置项容器 (左端标题+说明，右端输入或者选项框)
 component SettingsRow inherits Rectangle {
     in property <string> title: "";
     in property <string> subtitle: "";
-    in property <bool> show-border: false;
+    in property <bool> show-border: true;
 
-    min-height: 42px;
+    min-height: 48px;
     background: transparent;
 
     HorizontalLayout {
-        padding-top: 6px;
-        padding-bottom: 6px;
-        padding-left: 24px;
-        padding-right: 32px;
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 18px;
+        padding-right: 18px;
         alignment: space-between;
 
         // 左端：主标题 + 详细辅助说明
         VerticalLayout {
             alignment: center;
             spacing: 2px;
+            horizontal-stretch: 1;
 
             Text {
                 text: root.title;
@@ -756,70 +758,17 @@ component SettingsRow inherits Rectangle {
             @children
         }
     }
-}
 
-/// 设置分组容器 (纯净无横幅底色，与主界面排版完美融为一体)
-component SettingsCard inherits Rectangle {
-    in property <string> title: "";
-    in property <string> subtitle: "";
-    in property <image> icon;
-
-    background: transparent;
-
-    VerticalLayout {
-        alignment: start;
-        spacing: 8px;
-
-        // 分类顶头主标题栏 (纯净无底色横幅)
-        Rectangle {
-            background: transparent;
-
-            HorizontalLayout {
-                padding-top: 14px;
-                padding-bottom: 8px;
-                padding-left: 24px;
-                padding-right: 24px;
-                spacing: 12px;
-                alignment: start;
-
-                if root.icon.width > 0: VerticalLayout {
-                    alignment: center;
-                    width: 18px;
-
-                    Image {
-                        source: root.icon;
-                        width: 18px;
-                        height: 18px;
-                        colorize: AppTheme.accent;
-                    }
-                }
-
-                VerticalLayout {
-                    alignment: center;
-                    spacing: 3px;
-
-                    Text {
-                        text: root.title;
-                        font-size: 14px;
-                        font-weight: 700;
-                        color: AppTheme.foreground;
-                    }
-                    if root.subtitle != "": Text {
-                        text: root.subtitle;
-                        font-size: 11px;
-                        color: AppTheme.secondary-foreground;
-                    }
-                }
-            }
-        }
-
-        // 分组内各项设置行
-        @children
+    if root.show-border: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        width: 100%;
+        background: AppTheme.border.transparentize(65%);
     }
 }
 
-/// 设置二级分类子标题 (轻量优雅无横幅底色，清晰分节)
-component SettingsSubHeader inherits Rectangle {
+/// 设置一级页面大标题 (一级标题独立置顶，透气明亮，引导感强)
+component SettingsPageHeader inherits Rectangle {
     in property <string> title: "";
     in property <string> subtitle: "";
     in property <image> icon;
@@ -827,20 +776,21 @@ component SettingsSubHeader inherits Rectangle {
     background: transparent;
 
     HorizontalLayout {
-        padding-top: 18px;
+        padding-top: 8px;
         padding-bottom: 6px;
-        padding-left: 24px;
-        padding-right: 24px;
-        spacing: 8px;
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 12px;
         alignment: start;
 
         if root.icon.width > 0: VerticalLayout {
             alignment: center;
-            width: 14px;
+            width: 22px;
+
             Image {
                 source: root.icon;
-                width: 14px;
-                height: 14px;
+                width: 22px;
+                height: 22px;
                 colorize: AppTheme.accent;
             }
         }
@@ -851,20 +801,96 @@ component SettingsSubHeader inherits Rectangle {
 
             Text {
                 text: root.title;
-                font-size: 12px;
+                font-size: 16px;
                 font-weight: 700;
                 color: AppTheme.foreground;
             }
             if root.subtitle != "": Text {
                 text: root.subtitle;
-                font-size: 10px;
+                font-size: 11px;
                 color: AppTheme.secondary-foreground;
             }
         }
     }
 }
 
-/// 键盘按键徽章组件
+/// 设置二级业务包裹卡片 (二级标题内嵌于顶部，内容装入独立圆角边框卡片块中)
+component SettingsSectionCard inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <image> icon;
+    in property <bool> has-header: true;
+
+    background: AppTheme.is-global-wallpaper ? AppTheme.surface-background.transparentize(40%) : AppTheme.surface-background;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    clip: true;
+
+    VerticalLayout {
+        alignment: start;
+        spacing: 0px;
+
+        // 二级卡片顶头标题栏 (内嵌于卡片顶部，带浅灰/深灰底色衬托与 1px 细分割线)
+        if root.has-header: Rectangle {
+            height: 42px;
+            background: AppTheme.control-background.transparentize(50%);
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border.transparentize(60%);
+            }
+
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                spacing: 10px;
+                alignment: start;
+
+                if root.icon.width > 0: VerticalLayout {
+                    alignment: center;
+                    width: 15px;
+
+                    Image {
+                        source: root.icon;
+                        width: 15px;
+                        height: 15px;
+                        colorize: AppTheme.accent;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+
+                    Text {
+                        text: root.title;
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                    if root.subtitle != "": Text {
+                        text: root.subtitle;
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // 卡片内部设置项容器
+        VerticalLayout {
+            alignment: start;
+            spacing: 0px;
+            @children
+        }
+    }
+}
+
 component KeyBadge inherits Rectangle {
     in property <string> key-text: "";
 
@@ -1041,8 +1067,13 @@ export component SettingsCenterView inherits Rectangle {
     in-out property <int> setting-default-ssh-port: 22;
     in-out property <int> setting-connect-timeout: 30;
     in-out property <int> setting-keepalive-interval: 30;
+    in-out property <int> setting-keepalive-count-max: 3;
     in-out property <string> setting-host-key-policy: "accept-new";
     in-out property <string> setting-global-proxy-mode: "direct";
+    in-out property <string> setting-global-proxy-server: "127.0.0.1:7890";
+    in-out property <bool> setting-tcp-nodelay: true;
+    in-out property <bool> setting-compression: true;
+    in-out property <bool> setting-legacy-ciphers: false;
     in-out property <bool> setting-auto-reconnect: true;
 
     // 5. 文件与 SFTP 设置属性
@@ -1324,85 +1355,102 @@ export component SettingsCenterView inherits Rectangle {
                 ScrollView {
                     VerticalLayout {
                         alignment: start;
-                        padding-top: 0px;
-                        padding-bottom: 24px;
-                        padding-left: 0px;
-                        padding-right: 0px;
+                        padding-top: 14px;
+                        padding-bottom: 32px;
+                        padding-left: 24px;
+                        padding-right: 28px;
                         spacing: 0px;
 
                                 // ---------------------------------------------------------
                                 // 模块 1: 通用与常规 (General)
                                 // ---------------------------------------------------------
-                                if root.active-category == "general": SettingsCard {
-                                    title: @tr("通用与窗口交互");
-                                    subtitle: @tr("控制客户端界面语言、启动流程与后台挂起行为");
-                                    icon: @image-url("../assets/icons/home.svg");
+                                if root.active-category == "general": VerticalLayout {
+                                    spacing: 16px;
 
-                                    SettingsRow {
-                                        title: @tr("界面显示语言 (Language)");
-                                        subtitle: @tr("设置客户端主界面展示的默认语言");
-                                        LanguageDropdown {
-                                            selected-lang: root.setting-language;
-                                            switch-language(lang) => {
-                                                root.setting-language = lang;
-                                                root.switch-language(lang);
+                                    SettingsPageHeader {
+                                        title: @tr("通用与窗口交互");
+                                        subtitle: @tr("控制客户端界面语言、启动流程与后台挂起行为");
+                                        icon: @image-url("../assets/icons/home.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("界面显示与图形渲染引擎");
+                                        subtitle: @tr("国际化语言环境与底层 GPU 硬件加速光栅化管线");
+                                        icon: @image-url("../assets/icons/settings.svg");
+
+                                        SettingsRow {
+                                            title: @tr("界面显示语言 (Language)");
+                                            subtitle: @tr("设置客户端主界面展示的默认语言");
+                                            LanguageDropdown {
+                                                selected-lang: root.setting-language;
+                                                switch-language(lang) => {
+                                                    root.setting-language = lang;
+                                                    root.switch-language(lang);
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("图形渲染引擎 (Graphics Engine)");
+                                            subtitle: @tr("控制底层 GPU 光栅化渲染管线 (切换需重启客户端生效)");
+                                            show-border: false;
+                                            PipelineSegmentedControl {
+                                                selected-pipe: root.active-rendering-pipeline;
+                                                pipe-selected(p) => {
+                                                    root.switch-rendering-pipeline(p);
+                                                }
                                             }
                                         }
                                     }
 
-                                    SettingsRow {
-                                        title: @tr("图形渲染引擎 (Graphics Engine)");
-                                        subtitle: @tr("控制底层 GPU 光栅化渲染管线 (切换需重启客户端生效)");
-                                        PipelineSegmentedControl {
-                                            selected-pipe: root.active-rendering-pipeline;
-                                            pipe-selected(p) => {
-                                                root.switch-rendering-pipeline(p);
+                                    SettingsSectionCard {
+                                        title: @tr("窗口生命周期与防误触");
+                                        subtitle: @tr("置顶悬浮、安全断开防呆确认与系统托盘常驻");
+                                        icon: @image-url("../assets/icons/home.svg");
+
+                                        SettingsRow {
+                                            title: @tr("窗口始终置顶 (Always on Top)");
+                                            subtitle: @tr("保持主窗口始终位于其他应用窗口最顶层，避免排查故障时频繁切换焦点");
+                                            SettingsSwitch {
+                                                checked: root.setting-always-on-top;
+                                                toggled(c) => {
+                                                    root.setting-always-on-top = c;
+                                                    root.toggle-always-on-top(c);
+                                                }
                                             }
                                         }
-                                    }
 
-                                    SettingsRow {
-                                        title: @tr("窗口始终置顶 (Always on Top)");
-                                        subtitle: @tr("保持主窗口始终位于其他应用窗口最顶层，避免排查故障时频繁切换焦点");
-                                        SettingsSwitch {
-                                            checked: root.setting-always-on-top;
-                                            toggled(c) => {
-                                                root.setting-always-on-top = c;
-                                                root.toggle-always-on-top(c);
+                                        SettingsRow {
+                                            title: @tr("退出应用时确认活跃连接 (Confirm Before Exit)");
+                                            subtitle: @tr("当后台存在未断开的 SSH 或本地终端会话时，点击窗口关闭按钮或按 Alt+F4 弹出防误触提示");
+                                            SettingsSwitch {
+                                                checked: root.setting-confirm-close-active;
+                                                toggled(c) => {
+                                                    root.setting-confirm-close-active = c;
+                                                    root.toggle-confirm-close-active(c);
+                                                }
                                             }
                                         }
-                                    }
 
-                                    SettingsRow {
-                                        title: @tr("退出应用时确认活跃连接 (Confirm Before Exit)");
-                                        subtitle: @tr("当后台存在未断开的 SSH 或本地终端会话时，点击窗口关闭按钮或按 Alt+F4 弹出防误触提示");
-                                        SettingsSwitch {
-                                            checked: root.setting-confirm-close-active;
-                                            toggled(c) => {
-                                                root.setting-confirm-close-active = c;
-                                                root.toggle-confirm-close-active(c);
+                                        SettingsRow {
+                                            title: @tr("点击窗口关闭按钮时行为");
+                                            subtitle: @tr("关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线");
+                                            SettingsSwitch {
+                                                checked: root.setting-close-action == "tray";
+                                                toggled(c) => { root.setting-close-action = c ? "tray" : "exit"; }
                                             }
                                         }
-                                    }
 
-                                    SettingsRow {
-                                        title: @tr("点击窗口关闭按钮时行为");
-                                        subtitle: @tr("关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线");
-                                        SettingsSwitch {
-                                            checked: root.setting-close-action == "tray";
-                                            toggled(c) => { root.setting-close-action = c ? "tray" : "exit"; }
-                                        }
-                                    }
-
-                                    SettingsRow {
-                                        title: @tr("开机随系统自动启动 (Launch on Boot)");
-                                        subtitle: @tr("登录操作系统时自动启动客户端，方便后台网络隧道与端口转发无缝就绪");
-                                        show-border: false;
-                                        SettingsSwitch {
-                                            checked: root.setting-start-on-boot;
-                                            toggled(c) => {
-                                                root.setting-start-on-boot = c;
-                                                root.toggle-start-on-boot(c);
+                                        SettingsRow {
+                                            title: @tr("开机随系统自动启动 (Launch on Boot)");
+                                            subtitle: @tr("登录操作系统时自动启动客户端，方便后台网络隧道与端口转发无缝就绪");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: root.setting-start-on-boot;
+                                                toggled(c) => {
+                                                    root.setting-start-on-boot = c;
+                                                    root.toggle-start-on-boot(c);
+                                                }
                                             }
                                         }
                                     }
@@ -1411,17 +1459,19 @@ export component SettingsCenterView inherits Rectangle {
                                 // ---------------------------------------------------------
                                 // 模块 2: 外观与视效 (Appearance)
                                 // ---------------------------------------------------------
-                                if root.active-category == "appearance": SettingsCard {
-                                    title: @tr("外观与视效偏好");
-                                    subtitle: @tr("个性化定制客户端主视觉、配色方案、界面全局字体与背景毛玻璃壁纸");
-                                    icon: @image-url("../assets/icons/sun.svg");
+                                if root.active-category == "appearance": VerticalLayout {
+                                    spacing: 16px;
 
-                                    // 2.1 配色主题管理与调色板
-                                    SettingsSubHeader {
-                                        title: @tr("配色主题方案与调色板");
-                                        subtitle: @tr("支持自定义创建、导入、导出与一键实时切换");
+                                    SettingsPageHeader {
+                                        title: @tr("外观视效与主题定制");
+                                        subtitle: @tr("个性化定制客户端主视觉、配色方案、界面全局字体与背景毛玻璃壁纸");
                                         icon: @image-url("../assets/icons/sun.svg");
                                     }
+
+                                    SettingsSectionCard {
+                                        title: @tr("配色主题方案与调色板");
+                                        subtitle: @tr("支持自定义创建、导入、导出与一键实时无损热切换");
+                                        icon: @image-url("../assets/icons/sun.svg");
 
                                         // 顶部操作栏与分类筛选胶囊 (标题在上，边距舒适与其它设置项完全对齐)
                                         VerticalLayout {
@@ -1728,12 +1778,12 @@ export component SettingsCenterView inherits Rectangle {
                                             }
                                         }
 
-                                    // 2.2 界面排版与全局字体
-                                    SettingsSubHeader {
+                                    }
+
+                                    SettingsSectionCard {
                                         title: @tr("界面排版与全局字体");
                                         subtitle: @tr("切换客户端界面排版字体，默认查找扫描系统字体与内置高品质设计字体");
                                         icon: @image-url("../assets/icons/type.svg");
-                                    }
 
                                         SettingsRow {
                                             title: @tr("界面全局字体族 (UI Font Family)");
@@ -1749,12 +1799,12 @@ export component SettingsCenterView inherits Rectangle {
                                                 }
                                             }
                                         }
-                                    // 2.3 背景壁纸与轮播
-                                    SettingsSubHeader {
+                                    }
+
+                                    SettingsSectionCard {
                                         title: @tr("背景壁纸与滚动轮播");
                                         subtitle: @tr("设置客户端毛玻璃底衬与壁纸图库，支持多图定时轮播与平滑淡入淡出");
                                         icon: @image-url("../assets/icons/sparkles.svg");
-                                    }
 
                                         // 透底模式
                                         SettingsRow {
@@ -1974,18 +2024,15 @@ export component SettingsCenterView inherits Rectangle {
                                             }
                                         }
 
-                                        // 下方垂直路径列表 (从左端开始展示路径，右端固定删除垃圾桶，整行占满)
+                                        // 下方垂直路径列表 (整行占满，左右不留空隙)
                                         VerticalLayout {
-                                            padding-left: 24px;
-                                            padding-right: 32px;
-                                            padding-bottom: 6px;
+                                            padding-left: 0px;
+                                            padding-right: 0px;
+                                            padding-bottom: 0px;
 
                                             Rectangle {
                                                 height: 180px;
-                                                border-radius: AppTheme.radius-medium;
                                                 background: AppTheme.is-global-wallpaper ? AppTheme.control-background.transparentize(60%) : AppTheme.control-background;
-                                                border-width: 1px;
-                                                border-color: AppTheme.border;
                                                 clip: true;
 
                                                 if root.setting-wallpaper-list.length == 0: Rectangle {
@@ -2004,7 +2051,10 @@ export component SettingsCenterView inherits Rectangle {
 
                                                 if root.setting-wallpaper-list.length > 0: ScrollView {
                                                     VerticalLayout {
-                                                        padding: 6px;
+                                                        padding-left: 18px;
+                                                        padding-right: 18px;
+                                                        padding-top: 6px;
+                                                        padding-bottom: 6px;
                                                         spacing: 4px;
 
                                                         for wp[idx] in root.setting-wallpaper-list: Rectangle {
@@ -2107,6 +2157,8 @@ export component SettingsCenterView inherits Rectangle {
                                                     }
                                                 }
                                             }
+
+                                            Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
                                         }
 
                                         // 轮播策略 (支持两个框：数字+单位直接输入，并提供常用快捷预设按钮点击自动填充)
@@ -2316,19 +2368,24 @@ export component SettingsCenterView inherits Rectangle {
                                         }
                                     }
 
+                                }
+
                                 // ---------------------------------------------------------
                                 // 模块 3: 终端引擎排版 (Terminal)
                                 // ---------------------------------------------------------
-                                if root.active-category == "terminal": SettingsCard {
-                                    title: @tr("终端引擎与排版首选项");
-                                    subtitle: @tr("配置 VT100 字符渲染字模、等宽字体族、光标形态与剪贴板交互行为");
-                                    icon: @image-url("../assets/icons/terminal.svg");
+                                if root.active-category == "terminal": VerticalLayout {
+                                    spacing: 16px;
 
-                                    SettingsSubHeader {
+                                    SettingsPageHeader {
+                                        title: @tr("终端引擎与排版首选项");
+                                        subtitle: @tr("配置 VT100 字符渲染字模、等宽字体族、光标形态与剪贴板交互行为");
+                                        icon: @image-url("../assets/icons/terminal.svg");
+                                    }
+
+                                    SettingsSectionCard {
                                         title: @tr("等宽字体与排版字号");
                                         subtitle: @tr("VT100 字符渲染等宽字体与像素字模尺寸");
                                         icon: @image-url("../assets/icons/type.svg");
-                                    }
 
                                     SettingsRow {
                                         title: @tr("等宽字体族 (Font Family)");
@@ -2415,11 +2472,12 @@ export component SettingsCenterView inherits Rectangle {
                                         }
                                     }
 
-                                    SettingsSubHeader {
+                                    }
+
+                                    SettingsSectionCard {
                                         title: @tr("剪贴板与会话安全");
                                         subtitle: @tr("鼠标便捷复制粘贴、高危多行告警与会话关闭防误触");
                                         icon: @image-url("../assets/icons/clipboard.svg");
-                                    }
 
                                     SettingsRow {
                                         title: @tr("划词自动复制到剪贴板 (Copy on Select)");
@@ -2460,11 +2518,12 @@ export component SettingsCenterView inherits Rectangle {
                                         }
                                     }
 
-                                    SettingsSubHeader {
-                                        title: @tr("智能识别与语法高亮");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("智能识别与运维诊断高亮规则");
                                         subtitle: @tr("终端网页链接点击跳转与运维诊断关键字突出显示");
                                         icon: @image-url("../assets/icons/search.svg");
-                                    }
 
                                     SettingsRow {
                                         title: @tr("智能检测 URL 并支持点击跳转 (Clickable URLs)");
@@ -2478,321 +2537,162 @@ export component SettingsCenterView inherits Rectangle {
                                         }
                                     }
 
-                                    // 终端关键字高亮设置 (上标题下输入框/表格列表)
-                                    Rectangle {
-                                        background: transparent;
+                                    // 终端关键字高亮总控设置项
+                                    SettingsRow {
+                                        title: @tr("运维诊断关键字与正则高亮 (Diagnostic Keywords & Regex Highlighting)");
+                                        subtitle: @tr("自动识别终端输出中的状态代码、IPv4 地址、URL 链接并按照正则表达式规则着色");
+                                        show-border: root.setting-terminal-highlight-keywords;
 
-                                        VerticalLayout {
-                                            padding-left: 24px;
-                                            padding-right: 24px;
-                                            padding-top: 10px;
-                                            padding-bottom: 12px;
-                                            spacing: 12px;
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            alignment: center;
 
-                                            // 1. 上标题与说明 + 总开关
-                                            HorizontalLayout {
-                                                alignment: space-between;
-
-                                                VerticalLayout {
-                                                    spacing: 3px;
-                                                    horizontal-stretch: 1;
-
-                                                    Text {
-                                                        text: @tr("运维诊断关键字与正则高亮 (Diagnostic Keywords & Regex Highlighting)");
-                                                        font-size: 12px;
-                                                        font-weight: 600;
-                                                        color: AppTheme.foreground;
-                                                    }
-                                                    Text {
-                                                        text: @tr("自动识别终端输出中的状态代码、IPv4 地址、URL 链接并按照正则表达式规则着色");
-                                                        font-size: 11px;
-                                                        color: AppTheme.secondary-foreground;
-                                                    }
-                                                }
-
-                                                HorizontalLayout {
-                                                    spacing: 8px;
-                                                    alignment: center;
-
-                                                    Text {
-                                                        text: root.setting-terminal-highlight-keywords ? @tr("已启用") : @tr("已停用");
-                                                        font-size: 11px;
-                                                        color: root.setting-terminal-highlight-keywords ? AppTheme.accent : AppTheme.secondary-foreground;
-                                                        vertical-alignment: center;
-                                                    }
-
-                                                    SettingsSwitch {
-                                                        checked: root.setting-terminal-highlight-keywords;
-                                                        toggled(c) => {
-                                                            root.setting-terminal-highlight-keywords = c;
-                                                            root.change-terminal-highlight-keywords(c);
-                                                        }
-                                                    }
-                                                }
+                                            Text {
+                                                text: root.setting-terminal-highlight-keywords ? @tr("已启用") : @tr("已停用");
+                                                font-size: 11px;
+                                                color: root.setting-terminal-highlight-keywords ? AppTheme.accent : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
                                             }
 
-                                            // 2. 表格列表与添加区域 (当总开关开启时呈现)
-                                            if root.setting-terminal-highlight-keywords: VerticalLayout {
-                                                spacing: 10px;
+                                            SettingsSwitch {
+                                                checked: root.setting-terminal-highlight-keywords;
+                                                toggled(c) => {
+                                                    root.setting-terminal-highlight-keywords = c;
+                                                    root.change-terminal-highlight-keywords(c);
+                                                }
+                                            }
+                                        }
+                                    }
 
-                                                // 表格本体
+                                    // 2. 表格列表与添加区域 (占满整行全宽，左右不留空隙)
+                                    if root.setting-terminal-highlight-keywords: VerticalLayout {
+                                        spacing: 0px;
+
+                                        // 表格本体 (全宽占满整行，左右无任何缝隙)
+                                        Rectangle {
+                                            background: AppTheme.is-global-wallpaper ? AppTheme.control-background.transparentize(60%) : AppTheme.control-background;
+
+                                            VerticalLayout {
+                                                spacing: 0px;
+
+                                                // 表头 (占满整行，padding 匹配 18px 对齐)
                                                 Rectangle {
-                                                    border-radius: AppTheme.radius-medium;
-                                                    background: AppTheme.control-background;
-                                                    border-width: 1px;
-                                                    border-color: AppTheme.border;
+                                                    height: 34px;
+                                                    background: AppTheme.hover-background;
 
-                                                    VerticalLayout {
-                                                        // 表头
-                                                        Rectangle {
-                                                            height: 32px;
-                                                            background: AppTheme.hover-background;
-                                                            border-top-left-radius: AppTheme.radius-medium;
-                                                            border-top-right-radius: AppTheme.radius-medium;
+                                                    HorizontalLayout {
+                                                        padding-left: 18px;
+                                                        padding-right: 18px;
+                                                        spacing: 12px;
+                                                        alignment: start;
 
-                                                            HorizontalLayout {
-                                                                padding-left: 14px;
-                                                                padding-right: 14px;
-                                                                spacing: 12px;
-
-                                                                Text { width: 220px; text: @tr("正则表达式 (Pattern)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; }
-                                                                Text { horizontal-stretch: 1; text: @tr("备注说明"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; }
-                                                                Text { width: 100px; text: @tr("高亮颜色"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; }
-                                                                Text { width: 44px; text: @tr("开关"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
-                                                                Text { width: 40px; text: @tr("删除"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
-                                                            }
-                                                        }
-
-                                                        // 表格数据行
-                                                        for rule[idx] in root.terminal-keyword-rules: VerticalLayout {
-                                                            spacing: 0px;
-                                                            if idx > 0: Rectangle { height: 1px; background: AppTheme.border.transparentize(60%); }
-                                                            Rectangle {
-                                                                height: 38px;
-                                                                background: row-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
-
-                                                                row-touch := TouchArea {}
-
-                                                                HorizontalLayout {
-                                                                    padding-left: 14px;
-                                                                    padding-right: 14px;
-                                                                    spacing: 12px;
-                                                                    alignment: center;
-
-                                                                    // 正则表达式
-                                                                    HorizontalLayout {
-                                                                        width: 220px;
-                                                                        alignment: start;
-                                                                        Rectangle {
-                                                                            height: 24px;
-                                                                            border-radius: 4px;
-                                                                            background: AppTheme.surface-background;
-                                                                            border-width: 1px;
-                                                                            border-color: AppTheme.border;
-                                                                            HorizontalLayout {
-                                                                                padding-left: 8px;
-                                                                                padding-right: 8px;
-                                                                                alignment: center;
-                                                                                Text {
-                                                                                    text: rule.pattern;
-                                                                                    font-size: 11px;
-                                                                                    font-family: "JetBrains Mono, monospace";
-                                                                                    font-weight: 600;
-                                                                                    color: AppTheme.accent;
-                                                                                    vertical-alignment: center;
-                                                                                    overflow: elide;
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    }
-
-                                                                    // 备注
-                                                                    Text {
-                                                                        horizontal-stretch: 1;
-                                                                        text: rule.remark;
-                                                                        font-size: 11px;
-                                                                        color: AppTheme.foreground;
-                                                                        vertical-alignment: center;
-                                                                        overflow: elide;
-                                                                    }
-
-                                                                    // 颜色
-                                                                    HorizontalLayout {
-                                                                        width: 100px;
-                                                                        alignment: start;
-                                                                        Rectangle {
-                                                                            height: 22px;
-                                                                            border-radius: 11px;
-                                                                            background: AppTheme.surface-background;
-                                                                            border-width: 1px;
-                                                                            border-color: AppTheme.border;
-
-                                                                            HorizontalLayout {
-                                                                                padding-left: 6px;
-                                                                                padding-right: 8px;
-                                                                                spacing: 6px;
-                                                                                alignment: center;
-
-                                                                                Rectangle {
-                                                                                    width: 10px;
-                                                                                    height: 10px;
-                                                                                    border-radius: 5px;
-                                                                                    background: rule.rule-color;
-                                                                                }
-
-                                                                                Text {
-                                                                                    text: rule.color-hex;
-                                                                                    font-size: 10px;
-                                                                                    font-family: "JetBrains Mono, monospace";
-                                                                                    color: AppTheme.secondary-foreground;
-                                                                                    vertical-alignment: center;
-                                                                                }
-                                                                            }
-                                                                        }
-                                                                    }
-
-                                                                    // 开关
-                                                                    HorizontalLayout {
-                                                                        width: 44px;
-                                                                        alignment: center;
-                                                                        SettingsSwitch {
-                                                                            checked: rule.enabled;
-                                                                            toggled(c) => {
-                                                                                rule.enabled = c;
-                                                                                root.toggle-keyword-rule(rule.id, c);
-                                                                            }
-                                                                        }
-                                                                    }
-
-                                                                    // 删除
-                                                                    HorizontalLayout {
-                                                                        width: 40px;
-                                                                        alignment: center;
-                                                                        AppIconButton {
-                                                                            icon: @image-url("../assets/icons/trash.svg");
-                                                                            clicked => {
-                                                                                root.delete-keyword-rule(rule.id);
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
+                                                        Text { width: 230px; text: @tr("正则表达式 (Pattern)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
+                                                        Text { horizontal-stretch: 1; text: @tr("规则备注说明"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
+                                                        Text { width: 80px; text: @tr("高亮色彩"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                        Text { width: 50px; text: @tr("启用"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                        Text { width: 44px; text: @tr("删除"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
                                                     }
                                                 }
 
-                                                // 底部添加新规则输入栏 (上标题下输入框)
-                                                Rectangle {
-                                                    height: 42px;
-                                                    border-radius: AppTheme.radius-medium;
-                                                    background: AppTheme.control-background;
-                                                    border-width: 1px;
-                                                    border-color: AppTheme.border;
+                                                // 表格数据行 (占满整行，每行 hover 效果横贯全宽，左右 padding 18px 对齐)
+                                                for rule[idx] in root.terminal-keyword-rules: VerticalLayout {
+                                                    spacing: 0px;
+                                                    Rectangle { height: 1px; background: AppTheme.border.transparentize(60%); }
+                                                    Rectangle {
+                                                        height: 38px;
+                                                        background: row-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
 
-                                                    HorizontalLayout {
-                                                        padding-left: 10px;
-                                                        padding-right: 10px;
-                                                        spacing: 8px;
-                                                        alignment: center;
+                                                        row-touch := TouchArea {}
 
-                                                        // 正则表达式输入框
-                                                        Rectangle {
-                                                            width: 220px;
-                                                            height: 28px;
-                                                            border-radius: AppTheme.radius-small;
-                                                            background: AppTheme.surface-background;
-                                                            border-width: 1px;
-                                                            border-color: add-pat.has-focus ? AppTheme.accent : AppTheme.border;
-
-                                                            HorizontalLayout {
-                                                                padding-left: 8px;
-                                                                padding-right: 8px;
-                                                                alignment: center;
-
-                                                                add-pat := TextInput {
-                                                                    text <=> root.new-rule-pattern;
-                                                                    font-size: 11px;
-                                                                    font-family: "JetBrains Mono, monospace";
-                                                                    color: AppTheme.foreground;
-                                                                    single-line: true;
-                                                                }
-                                                                if root.new-rule-pattern == "": Text {
-                                                                    text: @tr("输入正则表达式...");
-                                                                    font-size: 10px;
-                                                                    color: AppTheme.disabled-foreground;
-                                                                    vertical-alignment: center;
-                                                                }
-                                                            }
-                                                        }
-
-                                                        // 备注说明输入框
-                                                        Rectangle {
-                                                            horizontal-stretch: 1;
-                                                            height: 28px;
-                                                            border-radius: AppTheme.radius-small;
-                                                            background: AppTheme.surface-background;
-                                                            border-width: 1px;
-                                                            border-color: add-rem.has-focus ? AppTheme.accent : AppTheme.border;
-
-                                                            HorizontalLayout {
-                                                                padding-left: 8px;
-                                                                padding-right: 8px;
-                                                                alignment: center;
-
-                                                                add-rem := TextInput {
-                                                                    text <=> root.new-rule-remark;
-                                                                    font-size: 11px;
-                                                                    color: AppTheme.foreground;
-                                                                    single-line: true;
-                                                                }
-                                                                if root.new-rule-remark == "": Text {
-                                                                    text: @tr("规则备注说明...");
-                                                                    font-size: 10px;
-                                                                    color: AppTheme.disabled-foreground;
-                                                                    vertical-alignment: center;
-                                                                }
-                                                            }
-                                                        }
-
-                                                        // 颜色快捷选择胶囊
                                                         HorizontalLayout {
-                                                            spacing: 5px;
-                                                            alignment: center;
+                                                            padding-left: 18px;
+                                                            padding-right: 18px;
+                                                            spacing: 12px;
+                                                            alignment: start;
 
-                                                            for c in [
-                                                                { hex: "#EF4444", clr: #EF4444 },
-                                                                { hex: "#F59E0B", clr: #F59E0B },
-                                                                { hex: "#10B981", clr: #10B981 },
-                                                                { hex: "#3B82F6", clr: #3B82F6 },
-                                                                { hex: "#8B5CF6", clr: #8B5CF6 },
-                                                                { hex: "#EC4899", clr: #EC4899 }
-                                                            ]: Rectangle {
-                                                                width: 18px;
-                                                                height: 18px;
-                                                                border-radius: 9px;
-                                                                background: c.clr;
-                                                                border-width: root.new-rule-color == c.hex ? 2px : 1px;
-                                                                border-color: root.new-rule-color == c.hex ? #FFFFFF : #00000030;
+                                                            // 列 1: 正则表达式 (严格左对齐)
+                                                            HorizontalLayout {
+                                                                width: 230px;
+                                                                alignment: start;
 
-                                                                TouchArea {
-                                                                    clicked => {
-                                                                        root.new-rule-color = c.hex;
-                                                                        root.new-rule-slint-color = c.clr;
+                                                                Rectangle {
+                                                                    height: 24px;
+                                                                    border-radius: 4px;
+                                                                    background: AppTheme.surface-background;
+                                                                    border-width: 1px;
+                                                                    border-color: AppTheme.border;
+
+                                                                    HorizontalLayout {
+                                                                        padding-left: 8px;
+                                                                        padding-right: 8px;
+                                                                        alignment: start;
+
+                                                                        Text {
+                                                                            text: rule.pattern;
+                                                                            font-size: 11px;
+                                                                            font-family: "JetBrains Mono, monospace";
+                                                                            font-weight: 600;
+                                                                            color: AppTheme.accent;
+                                                                            vertical-alignment: center;
+                                                                            horizontal-alignment: left;
+                                                                            overflow: elide;
+                                                                        }
                                                                     }
-                                                                    mouse-cursor: pointer;
                                                                 }
                                                             }
-                                                        }
 
-                                                        // 添加按钮
-                                                        AppButton {
-                                                            text: @tr("+ 添加规则");
-                                                            variant: "primary";
-                                                            clicked => {
-                                                                if root.new-rule-pattern != "" {
-                                                                    root.add-keyword-rule(root.new-rule-pattern, root.new-rule-remark != "" ? root.new-rule-remark : @tr("自定义规则"), root.new-rule-color);
-                                                                    root.new-rule-pattern = "";
-                                                                    root.new-rule-remark = "";
+                                                            // 列 2: 备注说明 (严格左对齐)
+                                                            Text {
+                                                                horizontal-stretch: 1;
+                                                                text: rule.remark;
+                                                                font-size: 11px;
+                                                                color: AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                                horizontal-alignment: left;
+                                                                overflow: elide;
+                                                            }
+
+                                                            // 列 3: 高亮色彩 (纯正圆形色块选择指示器)
+                                                            HorizontalLayout {
+                                                                width: 80px;
+                                                                alignment: center;
+
+                                                                Rectangle {
+                                                                    width: 18px;
+                                                                    height: 18px;
+                                                                    border-radius: 9px;
+                                                                    background: rule.rule-color;
+                                                                    border-width: 1.5px;
+                                                                    border-color: #FFFFFF60;
+                                                                    drop-shadow-blur: 2px;
+                                                                    drop-shadow-color: #00000030;
+                                                                }
+                                                            }
+
+                                                            // 列 4: 开关 (居中对齐)
+                                                            HorizontalLayout {
+                                                                width: 50px;
+                                                                alignment: center;
+
+                                                                SettingsSwitch {
+                                                                    checked: rule.enabled;
+                                                                    toggled(c) => {
+                                                                        rule.enabled = c;
+                                                                        root.toggle-keyword-rule(rule.id, c);
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // 列 5: 删除 (居中对齐)
+                                                            HorizontalLayout {
+                                                                width: 44px;
+                                                                alignment: center;
+
+                                                                AppIconButton {
+                                                                    icon: @image-url("../assets/icons/trash.svg");
+                                                                    clicked => {
+                                                                        root.delete-keyword-rule(rule.id);
+                                                                    }
                                                                 }
                                                             }
                                                         }
@@ -2800,13 +2700,131 @@ export component SettingsCenterView inherits Rectangle {
                                                 }
                                             }
                                         }
-                                    }
 
-                                    SettingsSubHeader {
+                                        // 表格与添加栏之间的分割线
+                                        Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+
+                                        // 底部添加新规则输入栏 (占满整行全宽，左右 padding 18px 对齐)
+                                        Rectangle {
+                                            height: 48px;
+                                            background: AppTheme.control-background;
+
+                                            HorizontalLayout {
+                                                padding-left: 18px;
+                                                padding-right: 18px;
+                                                spacing: 10px;
+                                                alignment: center;
+
+                                                // 正则表达式输入框
+                                                Rectangle {
+                                                    width: 230px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.surface-background;
+                                                    border-width: 1px;
+                                                    border-color: add-pat.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 8px;
+                                                        padding-right: 8px;
+                                                        alignment: center;
+
+                                                        add-pat := TextInput {
+                                                            text <=> root.new-rule-pattern;
+                                                            font-size: 11px;
+                                                            font-family: "JetBrains Mono, monospace";
+                                                            color: AppTheme.foreground;
+                                                            single-line: true;
+                                                        }
+                                                        if root.new-rule-pattern == "": Text {
+                                                            text: @tr("输入正则表达式...");
+                                                            font-size: 10px;
+                                                            color: AppTheme.disabled-foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                // 备注说明输入框
+                                                Rectangle {
+                                                    horizontal-stretch: 1;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.surface-background;
+                                                    border-width: 1px;
+                                                    border-color: add-rem.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 8px;
+                                                        padding-right: 8px;
+                                                        alignment: center;
+
+                                                        add-rem := TextInput {
+                                                            text <=> root.new-rule-remark;
+                                                            font-size: 11px;
+                                                            color: AppTheme.foreground;
+                                                            single-line: true;
+                                                        }
+                                                        if root.new-rule-remark == "": Text {
+                                                            text: @tr("规则备注说明...");
+                                                            font-size: 10px;
+                                                            color: AppTheme.disabled-foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                // 颜色快捷选择胶囊 (6个圆形色块)
+                                                HorizontalLayout {
+                                                    spacing: 6px;
+                                                    alignment: center;
+
+                                                    for c in [
+                                                        { hex: "#EF4444", clr: #EF4444 },
+                                                        { hex: "#F59E0B", clr: #F59E0B },
+                                                        { hex: "#10B981", clr: #10B981 },
+                                                        { hex: "#3B82F6", clr: #3B82F6 },
+                                                        { hex: "#8B5CF6", clr: #8B5CF6 },
+                                                        { hex: "#EC4899", clr: #EC4899 }
+                                                    ]: Rectangle {
+                                                        width: 18px;
+                                                        height: 18px;
+                                                        border-radius: 9px;
+                                                        background: c.clr;
+                                                        border-width: root.new-rule-color == c.hex ? 2px : 1px;
+                                                        border-color: root.new-rule-color == c.hex ? #FFFFFF : #00000030;
+
+                                                        TouchArea {
+                                                            clicked => {
+                                                                root.new-rule-color = c.hex;
+                                                                root.new-rule-slint-color = c.clr;
+                                                            }
+                                                            mouse-cursor: pointer;
+                                                        }
+                                                    }
+                                                }
+
+                                                // 添加按钮
+                                                AppButton {
+                                                    text: @tr("+ 添加规则");
+                                                    variant: "primary";
+                                                    clicked => {
+                                                        if root.new-rule-pattern != "" {
+                                                            root.add-keyword-rule(root.new-rule-pattern, root.new-rule-remark != "" ? root.new-rule-remark : @tr("自定义规则"), root.new-rule-color);
+                                                            root.new-rule-pattern = "";
+                                                            root.new-rule-remark = "";
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                                                    SettingsSectionCard {
                                         title: @tr("光标交互、回滚与告警");
                                         subtitle: @tr("光标视觉样式、历史输出回滚行数与终端蜂鸣提醒");
                                         icon: @image-url("../assets/icons/sparkles.svg");
-                                    }
 
                                     SettingsRow {
                                         title: @tr("终端光标交互形态 (Cursor Style)");
@@ -2959,213 +2977,473 @@ export component SettingsCenterView inherits Rectangle {
                                         }
                                     }
                                 }
+                                }
 
                                 // ---------------------------------------------------------
                                 // 模块 4: 网络与 SSH 策略 (Network)
                                 // ---------------------------------------------------------
-                                if root.active-category == "network": SettingsCard {
-                                    title: @tr("网络传输与 SSH 链路策略");
-                                    subtitle: @tr("配置默认连接超时、TCP 心跳保活与自动重连退避算法");
-                                    icon: @image-url("../assets/icons/tunnel.svg");
+                                if root.active-category == "network": VerticalLayout {
+                                    spacing: 16px;
 
-                                    SettingsRow {
-                                        title: @tr("SSH 连接超时时间 (Connection Timeout)");
-                                        subtitle: @tr("在发起 SSH 握手或 TCP 套接字建立时的最大等待时间");
-                                        Text { text: root.setting-connect-timeout + " " + @tr("秒 (默认 30s)"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+                                    SettingsPageHeader {
+                                        title: @tr("网络传输与 SSH 链路策略");
+                                        subtitle: @tr("配置默认出站网络代理、TCP 握手保活、数据流压缩与异常恢复算法");
+                                        icon: @image-url("../assets/icons/tunnel.svg");
                                     }
 
-                                    SettingsRow {
-                                        title: @tr("TCP 心跳保活探测间隔 (ServerAliveInterval)");
-                                        subtitle: @tr("向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开");
-                                        Text { text: @tr("每") + " " + root.setting-keepalive-interval + " " + @tr("秒发送一次保活包"); font-size: 11px; font-weight: 600; color: AppTheme.accent; }
-                                    }
+                                    // 卡片 1: 全局网络代理与出站策略
+                                    SettingsSectionCard {
+                                        title: @tr("全局出站代理与路由");
+                                        subtitle: @tr("设置默认网络出站通道；单个主机高级设置中可单独配置并覆盖此项");
+                                        icon: @image-url("../assets/icons/tunnel.svg");
 
-                                    SettingsRow {
-                                        title: @tr("网络异常断线自动重连 (Auto Reconnect)");
-                                        subtitle: @tr("当网络闪断或链路重置时，自动以指数退避算法 (1s, 2s, 4s, 8s...) 尝试静默重连");
-                                        show-border: false;
-                                        SettingsSwitch {
-                                            checked: root.setting-auto-reconnect;
-                                             toggled(c) => { root.setting-auto-reconnect = c; }
-                                        }
-                                    }
-                                }
+                                        SettingsRow {
+                                            title: @tr("默认出站代理模式 (Proxy Mode)");
+                                            subtitle: @tr("选择直连、跟随操作系统系统代理或指定全局 SOCKS5 / HTTP 代理");
 
-                                // ---------------------------------------------------------
-                                // 模块 5: 文件与 SFTP 偏好 (Files)
-                                // ---------------------------------------------------------
-                                if root.active-category == "files": SettingsCard {
-                                    title: @tr("文件传输与 SFTP 偏好");
-                                    subtitle: @tr("管理远程 SFTP 浏览器下载路径、隐藏文件展示与传输并发数");
-                                    icon: @image-url("../assets/icons/folder.svg");
-
-                                    SettingsRow {
-                                        title: @tr("默认本地下载目录 (Default Download Dir)");
-                                        subtitle: @tr("从远程 SFTP 下载文件时默认保存的本地文件夹路径");
-                                        Text { text: @tr("系统默认下载目录 (~/Downloads)"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
-                                    }
-
-                                    SettingsRow {
-                                        title: @tr("显示隐藏文件与点文件 (Show Hidden Files)");
-                                        subtitle: @tr("在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc)");
-                                        SettingsSwitch {
-                                            checked: true;
-                                        }
-                                    }
-
-                                    SettingsRow {
-                                        title: @tr("SFTP 文件传输并发连接数 (Transfer Concurrency)");
-                                        subtitle: @tr("多文件批量上传与下载时的并行工作协程数");
-                                        show-border: false;
-                                        Text { text: "4 " + @tr("并发线程"); font-size: 11px; font-weight: 600; color: AppTheme.accent; }
-                                    }
-                                }
-
-                                // ---------------------------------------------------------
-                                // 模块 6: 快捷键与键盘操作 (Keybindings)
-                                // ---------------------------------------------------------
-                                if root.active-category == "shortcuts": SettingsCard {
-                                    title: @tr("快捷键与全局键位映射");
-                                    subtitle: @tr("查看并自定义高频终端操作、多窗格分屏与命令面板的快捷操作");
-                                    icon: @image-url("../assets/icons/key.svg");
-
-                                    for item in root.keybindings: SettingsRow {
-                                        title: item.action-name;
-                                        subtitle: item.category + " " + @tr("操作分类");
-
-                                        HorizontalLayout {
-                                            spacing: 6px;
-                                            KeyBadge { key-text: item.primary-key; }
-                                            if item.secondary-key != "": Text { text: "/"; font-size: 10px; color: AppTheme.disabled-foreground; vertical-alignment: center; }
-                                            if item.secondary-key != "": KeyBadge { key-text: item.secondary-key; }
-                                        }
-                                    }
-                                }
-
-                                // ---------------------------------------------------------
-                                // 模块 6: 数据备份与迁移 ★ (核心一级分类)
-                                // ---------------------------------------------------------
-                                if root.active-category == "backup": SettingsCard {
-                                    title: @tr("数据备份、导入与跨工具迁移");
-                                    subtitle: @tr("导出完整加密备份包、从系统 OpenSSH 与第三方终端工具一键导入资产、管理本地配置历史快照");
-                                    icon: @image-url("../assets/icons/archive.svg");
-
-                                    // 卡片内小节 1: 导出备份
-                                    SettingsRow {
-                                        title: @tr("⤓ 导出全量加密备份文件 (.toml / .json)");
-                                        subtitle: @tr("包含所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
-
-                                        AppButton {
-                                            text: @tr("⤓ 立即导出备份包");
-                                            variant: "primary";
-                                            clicked => { root.export-backup-archive(true); }
-                                        }
-                                    }
-
-                                    // 卡片内小节 2: 从系统 OpenSSH 导入
-                                    SettingsRow {
-                                        title: @tr("📥 一键扫描并导入本机 ~/.ssh/config");
-                                        subtitle: @tr("自动解析本地 OpenSSH 配置文件，识别 Host 别名、IP 地址、端口与私钥 IdentityFile");
-
-                                        AppButton {
-                                            text: @tr("🔍 扫描并预览主机清单");
-                                            variant: "secondary";
-                                            clicked => { root.scan-and-import-openssh(); }
-                                        }
-                                    }
-
-                                    // 卡片内小节 3: 从第三方终端工具迁移
-                                    SettingsRow {
-                                        title: @tr("📥 从外部工具一键迁移 (Termius / Xshell / MobaXterm)");
-                                        subtitle: @tr("支持解析并批量导入从其他桌面终端软件导出的 .json、.tsv 或会话配置文件");
-
-                                        AppButton {
-                                            text: @tr("📂 选择文件导入...");
-                                            variant: "secondary";
-                                            clicked => { root.import-external-file(); }
-                                        }
-                                    }
-
-                                    // 卡片内小节 4: 本地自动快照历史
-                                    SettingsRow {
-                                        title: @tr("🕒 本地最近自动配置快照");
-                                        subtitle: @tr("应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚");
-                                        show-border: false;
-
-                                        VerticalLayout {
-                                            width: 480px;
-                                            spacing: 6px;
-
-                                            for snap in root.snapshot-history: Rectangle {
-                                                height: 34px;
+                                            Rectangle {
+                                                height: 28px;
                                                 border-radius: AppTheme.radius-medium;
                                                 background: AppTheme.control-background;
                                                 border-width: 1px;
                                                 border-color: AppTheme.border;
 
                                                 HorizontalLayout {
-                                                    padding-left: 10px;
-                                                    padding-right: 10px;
-                                                    spacing: 12px;
-                                                    alignment: space-between;
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for pm in [
+                                                        { id: "direct", name: @tr("直连 (禁用代理)") },
+                                                        { id: "system", name: @tr("跟随系统代理") },
+                                                        { id: "custom", name: @tr("自定义代理") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-global-proxy-mode == pm.id ? AppTheme.accent : pm-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        pm-t := TouchArea {
+                                                            clicked => { root.setting-global-proxy-mode = pm.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: pm.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-global-proxy-mode == pm.id ? 700 : 500;
+                                                                color: root.setting-global-proxy-mode == pm.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-global-proxy-mode == "custom": SettingsRow {
+                                            title: @tr("自定义代理服务器与端口 (Proxy Server)");
+                                            subtitle: @tr("格式支持 socks5://127.0.0.1:7890 或 http://127.0.0.1:7890");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-small;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: proxy-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    alignment: center;
+                                                    proxy-inp := TextInput {
+                                                        text <=> root.setting-global-proxy-server;
+                                                        font-size: 11px;
+                                                        font-family: "JetBrains Mono, monospace";
+                                                        color: AppTheme.foreground;
+                                                        single-line: true;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("跳板机 / 堡垒机全局链 (Default Jump Host)");
+                                            subtitle: @tr("针对无公网 IP 的隔离内网，配置全局统一前置跳板节点 (支持多级 ProxyJump 链)");
+                                            show-border: false;
+                                            Text { text: @tr("可在主机配置中单独绑定"); font-size: 11px; color: AppTheme.secondary-foreground; }
+                                        }
+                                    }
+
+                                    // 卡片 2: 连接握手与链路心跳保活
+                                    SettingsSectionCard {
+                                        title: @tr("连接超时与心跳保活探测");
+                                        subtitle: @tr("TCP 握手时限、定期 Keepalive 心跳探测包与防空闲断开");
+                                        icon: @image-url("../assets/icons/clock.svg");
+
+                                        SettingsRow {
+                                            title: @tr("SSH 连接超时时间 (Connection Timeout)");
+                                            subtitle: @tr("在发起 SSH 握手或 TCP 套接字建立时的最大等待时限 (秒)");
+                                            Text { text: root.setting-connect-timeout + " " + @tr("秒 (默认 30s)"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("TCP 心跳保活探测间隔 (ServerAliveInterval)");
+                                            subtitle: @tr("向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开");
+                                            Text { text: @tr("每") + " " + root.setting-keepalive-interval + " " + @tr("秒发送一次保活包"); font-size: 11px; font-weight: 600; color: AppTheme.accent; }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("心跳保活最大丢失阈值 (ServerAliveCountMax)");
+                                            subtitle: @tr("若连续发送心跳探测均未得到服务器响应，判定链路断开的连续重试次数");
+                                            Text { text: root.setting-keepalive-count-max + " " + @tr("次无响应判定断开"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("禁用 Nagle 延迟算法 (TCP_NODELAY)");
+                                            subtitle: @tr("立即发出每个键盘击键字符包，减少终端光标与字符回显微延迟");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: root.setting-tcp-nodelay;
+                                                toggled(c) => { root.setting-tcp-nodelay = c; }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 协议安全与传输优化
+                                    SettingsSectionCard {
+                                        title: @tr("协议安全策略与数据流压缩");
+                                        subtitle: @tr("主机密钥指纹检查、链路层实时压缩与老旧算法兼容");
+                                        icon: @image-url("../assets/icons/shield.svg");
+
+                                        SettingsRow {
+                                            title: @tr("主机密钥防篡改验证策略 (StrictHostKeyChecking)");
+                                            subtitle: @tr("防止针对 SSH 连接的中间人嗅探攻击 (MITM)；未知或指纹变更的主机将触发安全警告");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for hk in [
+                                                        { id: "accept-new", name: @tr("首次自动信任 (accept-new)") },
+                                                        { id: "ask", name: @tr("严格每次询问 (ask)") },
+                                                        { id: "yes", name: @tr("仅限已知主机 (yes)") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-host-key-policy == hk.id ? AppTheme.accent : hk-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        hk-t := TouchArea {
+                                                            clicked => { root.setting-host-key-policy = hk.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: hk.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-host-key-policy == hk.id ? 700 : 500;
+                                                                color: root.setting-host-key-policy == hk.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("启用链路层 gzip 数据流压缩 (ssh -C)");
+                                            subtitle: @tr("压缩所有终端文本输出与 SFTP 传输数据流，显著提升跨国网络与低带宽连接速度");
+                                            SettingsSwitch {
+                                                checked: root.setting-compression;
+                                                toggled(c) => { root.setting-compression = c; }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("兼容遗留设备老旧加密算法 (Legacy Ciphers Fallback)");
+                                            subtitle: @tr("允许协商 3DES、Diffie-Hellman Group 1 等已弃用算法（仅建议调试陈旧网络设备时开启）");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: root.setting-legacy-ciphers;
+                                                toggled(c) => { root.setting-legacy-ciphers = c; }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 4: 异常断线恢复与自动重试
+                                    SettingsSectionCard {
+                                        title: @tr("异常断线恢复与自动重试");
+                                        subtitle: @tr("网络闪断、Wi-Fi 切换或休眠恢复后使用指数退避算法自动静默恢复连接");
+                                        icon: @image-url("../assets/icons/refresh.svg");
+
+                                        SettingsRow {
+                                            title: @tr("网络异常断线自动重连 (Auto Reconnect)");
+                                            subtitle: @tr("当网络闪断或链路重置时，自动以指数退避算法 (1s, 2s, 4s, 8s...) 尝试静默重连");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: root.setting-auto-reconnect;
+                                                toggled(c) => { root.setting-auto-reconnect = c; }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if root.active-category == "files": VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("文件传输与 SFTP 偏好");
+                                        subtitle: @tr("管理远程 SFTP 浏览器下载路径、隐藏文件展示与传输并发数");
+                                        icon: @image-url("../assets/icons/folder.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("目录路径与文件树视图");
+                                        subtitle: @tr("本地下载存储位置与隐藏点文件显隐过滤");
+                                        icon: @image-url("../assets/icons/folder.svg");
+
+                                        SettingsRow {
+                                            title: @tr("默认本地下载目录 (Default Download Dir)");
+                                            subtitle: @tr("从远程 SFTP 下载文件时默认保存的本地文件夹路径");
+                                            Text { text: @tr("系统默认下载目录 (~/Downloads)"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("显示隐藏文件与点文件 (Show Hidden Files)");
+                                            subtitle: @tr("在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc)");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: true;
+                                            }
+                                        }
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("传输性能与工作协程");
+                                        subtitle: @tr("多文件批量上传与下载时的并行工作协程数");
+                                        icon: @image-url("../assets/icons/settings.svg");
+
+                                        SettingsRow {
+                                            title: @tr("SFTP 文件传输并发连接数 (Transfer Concurrency)");
+                                            subtitle: @tr("多文件批量上传与下载时的并行工作协程数");
+                                            show-border: false;
+                                            Text { text: "4 " + @tr("并发线程"); font-size: 11px; font-weight: 600; color: AppTheme.accent; }
+                                        }
+                                    }
+                                }
+
+                                // ---------------------------------------------------------
+                                // 模块 6: 快捷键与键盘操作 (Keybindings)
+                                // ---------------------------------------------------------
+                                if root.active-category == "shortcuts": VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("快捷键与全局键位映射");
+                                        subtitle: @tr("查看并自定义高频终端操作、多窗格分屏与命令面板的快捷操作");
+                                        icon: @image-url("../assets/icons/key.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("全局快捷操作清单");
+                                        subtitle: @tr("常用会话切换、多窗格分屏、复制粘贴与开发者调试快捷键");
+                                        icon: @image-url("../assets/icons/key.svg");
+
+                                        for item in root.keybindings: SettingsRow {
+                                            title: item.action-name;
+                                            subtitle: item.category + " " + @tr("操作分类");
+
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                KeyBadge { key-text: item.primary-key; }
+                                                if item.secondary-key != "": Text { text: "/"; font-size: 10px; color: AppTheme.disabled-foreground; vertical-alignment: center; }
+                                                if item.secondary-key != "": KeyBadge { key-text: item.secondary-key; }
+                                            }
+                                        }
+                                    }
+                                }
+
+
+                                // ---------------------------------------------------------
+                                // 模块 6: 数据备份与迁移 ★ (核心一级分类)
+                                // ---------------------------------------------------------
+                                if root.active-category == "backup": VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("数据备份、导入与跨工具迁移");
+                                        subtitle: @tr("导出完整加密备份包、从系统 OpenSSH 与第三方终端工具一键导入资产、管理本地配置历史快照");
+                                        icon: @image-url("../assets/icons/archive.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("全量加密数据备份");
+                                        subtitle: @tr("导出所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
+                                        icon: @image-url("../assets/icons/archive.svg");
+
+                                        SettingsRow {
+                                            title: @tr("⤓ 导出全量加密备份文件 (.toml / .json)");
+                                            subtitle: @tr("包含所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("⤓ 立即导出备份包");
+                                                variant: "primary";
+                                                clicked => { root.export-backup-archive(true); }
+                                            }
+                                        }
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("外部配置资产导入与迁移");
+                                        subtitle: @tr("从本机系统 OpenSSH 或其他桌面终端软件批量导入资产");
+                                        icon: @image-url("../assets/icons/folder.svg");
+
+                                        SettingsRow {
+                                            title: @tr("📥 一键扫描并导入本机 ~/.ssh/config");
+                                            subtitle: @tr("自动解析本地 OpenSSH 配置文件，识别 Host 别名、IP 地址、端口与私钥 IdentityFile");
+
+                                            AppButton {
+                                                text: @tr("🔍 扫描并预览主机清单");
+                                                variant: "secondary";
+                                                clicked => { root.scan-and-import-openssh(); }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("📥 从外部工具一键迁移 (Termius / Xshell / MobaXterm)");
+                                            subtitle: @tr("支持解析并批量导入从其他桌面终端软件导出的 .json、.tsv 或会话配置文件");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("📂 选择文件导入...");
+                                                variant: "secondary";
+                                                clicked => { root.import-external-file(); }
+                                            }
+                                        }
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("本地配置自动快照历史");
+                                        subtitle: @tr("应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚");
+                                        icon: @image-url("../assets/icons/clock.svg");
+
+                                        SettingsRow {
+                                            title: @tr("🕒 本地最近自动配置快照");
+                                            subtitle: @tr("应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚");
+                                            show-border: false;
+
+                                            VerticalLayout {
+                                                width: 480px;
+                                                spacing: 6px;
+
+                                                for snap in root.snapshot-history: Rectangle {
+                                                    height: 34px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
 
                                                     HorizontalLayout {
-                                                        spacing: 8px;
-                                                        alignment: center;
-                                                        Text { text: "• " + snap.timestamp; font-size: 10px; font-weight: 600; color: AppTheme.accent; }
-                                                        Text { text: snap.description; font-size: 10px; color: AppTheme.foreground; }
-                                                        Text { text: "(" + snap.host-count + " " + @tr("主机") + ", " + snap.cred-count + " " + @tr("凭据") + ")"; font-size: 9px; color: AppTheme.secondary-foreground; }
-                                                    }
+                                                        padding-left: 10px;
+                                                        padding-right: 10px;
+                                                        spacing: 12px;
+                                                        alignment: space-between;
 
-                                                    AppButton {
-                                                        text: @tr("↺ 回滚");
-                                                        variant: "secondary";
-                                                        clicked => { root.rollback-snapshot(snap.id); }
+                                                        HorizontalLayout {
+                                                            spacing: 8px;
+                                                            alignment: center;
+                                                            Text { text: "• " + snap.timestamp; font-size: 10px; font-weight: 600; color: AppTheme.accent; }
+                                                            Text { text: snap.description; font-size: 10px; color: AppTheme.foreground; }
+                                                            Text { text: "(" + snap.host-count + " " + @tr("主机") + ", " + snap.cred-count + " " + @tr("凭据") + ")"; font-size: 9px; color: AppTheme.secondary-foreground; }
+                                                        }
+
+                                                        AppButton {
+                                                            text: @tr("↺ 回滚");
+                                                            variant: "secondary";
+                                                            clicked => { root.rollback-snapshot(snap.id); }
+                                                        }
                                                     }
                                                 }
                                             }
                                         }
                                     }
                                 }
-
                                 // ---------------------------------------------------------
-                                // 模块 7: 安全与高级诊断 (Advanced)
-                                // ---------------------------------------------------------
-                                if root.active-category == "security": SettingsCard {
-                                    title: @tr("安全隐私与开发者诊断");
-                                    subtitle: @tr("本地凭据加密主密码、F12 开发者调试控制台入口与运行时诊断日志级别");
-                                    icon: @image-url("../assets/icons/shield.svg");
+                                if root.active-category == "security": VerticalLayout {
+                                    spacing: 16px;
 
-                                    SettingsRow {
-                                        title: @tr("本地凭据主密码保护 (Master Password)");
-                                        subtitle: @tr("使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护");
-                                        SettingsSwitch {
-                                            checked: root.setting-master-password-enabled;
-                                            toggled(c) => { root.setting-master-password-enabled = c; }
-                                        }
+                                    SettingsPageHeader {
+                                        title: @tr("安全隐私与开发者诊断");
+                                        subtitle: @tr("本地凭据加密主密码、F12 开发者调试控制台入口与运行时诊断日志级别");
+                                        icon: @image-url("../assets/icons/shield.svg");
                                     }
 
-                                    SettingsRow {
-                                        title: @tr("🛠️ 开发者调试控制台 (Developer Debug Panel)");
-                                        subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
-                                        SettingsSwitch {
-                                            checked: root.setting-debug-enabled;
-                                            toggled(c) => {
-                                                root.setting-debug-enabled = c;
-                                                root.toggle-debug-enabled(c);
+                                    SettingsSectionCard {
+                                        title: @tr("本地凭据保险箱加密");
+                                        subtitle: @tr("使用主控密码对本地私钥与密码执行 AES-256 高强度加密保护");
+                                        icon: @image-url("../assets/icons/shield.svg");
+
+                                        SettingsRow {
+                                            title: @tr("本地凭据主密码保护 (Master Password)");
+                                            subtitle: @tr("使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: root.setting-master-password-enabled;
+                                                toggled(c) => { root.setting-master-password-enabled = c; }
                                             }
                                         }
                                     }
 
-                                    SettingsRow {
-                                        title: @tr("危险区：恢复出厂设置 (Factory Reset)");
-                                        subtitle: @tr("清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）");
-                                        show-border: false;
+                                    SettingsSectionCard {
+                                        title: @tr("开发者控制台与运行时诊断");
+                                        subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
+                                        icon: @image-url("../assets/icons/settings.svg");
 
-                                        AppButton {
-                                            text: @tr("⚠️ 恢复默认偏好");
-                                            variant: "danger";
-                                            clicked => { root.factory-reset-settings(); }
+                                        SettingsRow {
+                                            title: @tr("🛠️ 开发者调试控制台 (Developer Debug Panel)");
+                                            subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: root.setting-debug-enabled;
+                                                toggled(c) => {
+                                                    root.setting-debug-enabled = c;
+                                                    root.toggle-debug-enabled(c);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("危险区域 (Danger Zone)");
+                                        subtitle: @tr("重置本地偏好设置与清除临时状态（不会删除已保存的主机资产）");
+                                        icon: @image-url("../assets/icons/alert-triangle.svg");
+
+                                        SettingsRow {
+                                            title: @tr("危险区：恢复出厂设置 (Factory Reset)");
+                                            subtitle: @tr("清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("⚠️ 恢复默认偏好");
+                                                variant: "danger";
+                                                clicked => { root.factory-reset-settings(); }
+                                            }
                                         }
                                     }
                                 }

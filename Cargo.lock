@@ -4548,6 +4548,7 @@ dependencies = [
  "tracing",
  "uuid",
  "vt100",
+ "winit",
 ]
 
 [[package]]
