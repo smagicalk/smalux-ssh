@@ -137,7 +137,7 @@ export component SnippetsCenterView inherits Rectangle {
                                 padding-right: 6px;
 
                                 Text {
-                                    text: root.tree_nodes.length + " 项";
+                                    text: root.tree_nodes.length + " " + @tr("项");
                                     font-size: 9px;
                                     font-weight: 600;
                                     color: AppTheme.secondary-foreground;
@@ -649,7 +649,7 @@ export component SnippetsCenterView inherits Rectangle {
                                             width: 8px;
                                             height: 8px;
                                             image-fit: contain;
-                                            colorize: #ffffff;
+                                            colorize: AppTheme.selected-foreground;
                                         }
                                     }
                                 }
@@ -810,7 +810,7 @@ export component SnippetsCenterView inherits Rectangle {
                                     horizontal-alignment: left;
                                     vertical-alignment: top;
                                     selection-background-color: AppTheme.accent.transparentize(50%);
-                                    selection-foreground-color: #ffffff;
+                                    selection-foreground-color: AppTheme.selected-foreground;
                                 }
                             }
                         }

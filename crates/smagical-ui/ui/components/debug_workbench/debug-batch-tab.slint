@@ -9,7 +9,7 @@ export component DebugBatchTab inherits HorizontalLayout {
     in-out property <string> batch-start-ip-str: "10";
     in-out property <string> batch-ip-prefix: "192.168.1.";
     in-out property <string> batch-port-str: "22";
-    in-out property <string> batch-group: "集群/k8s";
+    in-out property <string> batch-group: @tr("集群/k8s");
     in-out property <string> batch-status-mode: "random";
     in-out property <string> batch-new-port-str: "2222";
 
@@ -83,28 +83,28 @@ export component DebugBatchTab inherits HorizontalLayout {
                     background: q10.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                     border-width: 1px; border-color: AppTheme.border;
                     q10 := TouchArea { clicked => { root.batch-count-str = "10"; } mouse-cursor: pointer; }
-                    Text { text: "10 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "10 " + @tr("台"); font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
                     background: q20.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                     border-width: 1px; border-color: AppTheme.border;
                     q20 := TouchArea { clicked => { root.batch-count-str = "20"; } mouse-cursor: pointer; }
-                    Text { text: "20 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "20 " + @tr("台"); font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
                     background: q50.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                     border-width: 1px; border-color: AppTheme.border;
                     q50 := TouchArea { clicked => { root.batch-count-str = "50"; } mouse-cursor: pointer; }
-                    Text { text: "50 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "50 " + @tr("台"); font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
                 Rectangle {
                     horizontal-stretch: 1; border-radius: AppTheme.radius-small;
                     background: q100.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                     border-width: 1px; border-color: AppTheme.border;
                     q100 := TouchArea { clicked => { root.batch-count-str = "100"; } mouse-cursor: pointer; }
-                    Text { text: "100 台"; font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                    Text { text: "100 " + @tr("台"); font-size: 10px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                 }
             }
 

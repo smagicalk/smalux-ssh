@@ -6,7 +6,7 @@ export component NotesToolDrawer inherits DrawerContainer {
     title: @tr("会话备忘笔记");
     collapse-icon: "▶";
 
-    in-out property <string> note-text: "1. 生产环境 Nginx 配置在 /etc/nginx/sites-available\n2. 每日凌晨 02:00 定时执行数据冷备\n3. 应急联系人: ops-team@company.internal";
+    in-out property <string> note-text: @tr("1. 生产环境 Nginx 配置在 /etc/nginx/sites-available\n2. 每日凌晨 02:00 定时执行数据冷备\n3. 应急联系人: ops-team@company.internal");
 
     VerticalLayout {
         padding: 8px;

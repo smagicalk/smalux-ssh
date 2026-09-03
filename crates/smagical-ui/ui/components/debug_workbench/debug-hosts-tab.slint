@@ -17,7 +17,7 @@ export component DebugHostsTab inherits VerticalLayout {
     in-out property <string> batch-start-ip-str: "10";
     in-out property <string> batch-ip-prefix: "192.168.1.";
     in-out property <string> batch-port-str: "22";
-    in-out property <string> batch-group: "集群/k8s";
+    in-out property <string> batch-group: @tr("集群/k8s");
     in-out property <string> batch-status-mode: "random";
     in-out property <bool> batch-overwrite: false;
     in-out property <string> batch-new-port-str: "2222";
@@ -26,7 +26,7 @@ export component DebugHostsTab inherits VerticalLayout {
     in-out property <string> quick-host-name: "";
     in-out property <string> quick-host-ip: "192.168.1.50";
     in-out property <string> quick-host-port: "22";
-    in-out property <string> quick-host-group: "生产集群/核心库";
+    in-out property <string> quick-host-group: @tr("生产集群/核心库");
     in-out property <string> quick-group-name: "";
 
     // 回调事件
@@ -168,7 +168,7 @@ export component DebugHostsTab inherits VerticalLayout {
                     AppFormInput {
                         horizontal-stretch: 3;
                         label: @tr("名称前缀:");
-                        placeholder: "如 k8s-node-";
+                        placeholder: @tr("如 k8s-node-");
                         text <=> root.batch-prefix;
                     }
 
@@ -190,27 +190,27 @@ export component DebugHostsTab inherits VerticalLayout {
                         background: q10.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                         border-width: 1px; border-color: AppTheme.border;
                         q10 := TouchArea { clicked => { root.batch-count-str = "10"; } mouse-cursor: pointer; }
-                        Text { text: "10 台"; font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                        Text { text: "10 " + @tr("台"); font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                     }
                     Rectangle {
                         horizontal-stretch: 1; border-radius: AppTheme.radius-small;
                         background: q50.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                         border-width: 1px; border-color: AppTheme.border;
                         q50 := TouchArea { clicked => { root.batch-count-str = "50"; } mouse-cursor: pointer; }
-                        Text { text: "50 台"; font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                        Text { text: "50 " + @tr("台"); font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                     }
                     Rectangle {
                         horizontal-stretch: 1; border-radius: AppTheme.radius-small;
                         background: q100.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                         border-width: 1px; border-color: AppTheme.border;
                         q100 := TouchArea { clicked => { root.batch-count-str = "100"; } mouse-cursor: pointer; }
-                        Text { text: "100 台"; font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                        Text { text: "100 " + @tr("台"); font-size: 9px; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
                     }
                 }
 
                 AppFormInput {
                     label: @tr("归属分组路径:");
-                    placeholder: "集群/k8s";
+                    placeholder: @tr("集群/k8s");
                     text <=> root.batch-group;
                 }
 
@@ -298,7 +298,7 @@ export component DebugHostsTab inherits VerticalLayout {
                     AppFormInput {
                         horizontal-stretch: 3;
                         label: @tr("主机名:");
-                        placeholder: "如 web-prod-01";
+                        placeholder: @tr("如 web-prod-01");
                         text <=> root.quick-host-name;
                     }
 
@@ -318,7 +318,7 @@ export component DebugHostsTab inherits VerticalLayout {
 
                 AppFormInput {
                     label: @tr("归属分组路径:");
-                    placeholder: "生产集群/核心库";
+                    placeholder: @tr("生产集群/核心库");
                     text <=> root.quick-host-group;
                 }
 

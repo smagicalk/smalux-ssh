@@ -30,17 +30,34 @@ export global AppTheme {
     in-out property <brush> custom-danger: #e74848;
     in-out property <brush> custom-info: #589df6;
 
-    out property <brush> window-background: use-system-palette ? Palette.background : custom-window-background;
-    out property <brush> panel-background: use-system-palette ? Palette.alternate-background : custom-panel-background;
-    out property <brush> surface-background: use-system-palette ? Palette.background : custom-surface-background;
-    out property <brush> control-background: use-system-palette ? Palette.control-background : custom-control-background;
+    // -------------------------------------------------------------------------
+    // 壁纸感知状态与自适应透光体系
+    // -------------------------------------------------------------------------
+    in-out property <string> wallpaper-mode: "none";
+    in-out property <float> wallpaper-opacity: 0.20;
+    out property <bool> is-global-wallpaper: wallpaper-mode == "global";
+
+    // 基础纯色固态画刷 (Solid Base Colors)
+    out property <brush> base-window-background: use-system-palette ? Palette.background : custom-window-background;
+    out property <brush> base-panel-background: use-system-palette ? Palette.alternate-background : custom-panel-background;
+    out property <brush> base-surface-background: use-system-palette ? Palette.background : custom-surface-background;
+    out property <brush> base-control-background: use-system-palette ? Palette.control-background : custom-control-background;
+
+    // 自适应全局透光画刷 (Adaptive Wallpaper-Aware Brushes)
+    // Zone A: 外层外壳与导航透底/亚克力透光 (65% 透明度透出壁纸)
+    out property <brush> window-background: is-global-wallpaper ? transparent : base-window-background;
+    out property <brush> panel-background: is-global-wallpaper ? base-panel-background.transparentize(65%) : base-panel-background;
+    // Zone B: 悬浮操作台与卡片拥有 28% 基础底色 + 72% 高通透磨砂
+    out property <brush> surface-background: is-global-wallpaper ? base-surface-background.transparentize(72%) : base-surface-background;
+    // Zone C: 按钮、输入框、控制胶囊支持 80% 轻盈透光，消除大色块遮挡
+    out property <brush> control-background: is-global-wallpaper ? base-control-background.transparentize(80%) : base-control-background;
     out property <brush> foreground: use-system-palette ? Palette.foreground : custom-foreground;
     out property <brush> secondary-foreground: use-system-palette ? Palette.alternate-foreground : custom-secondary-foreground;
     out property <brush> disabled-foreground: use-system-palette ? Palette.control-foreground : custom-disabled-foreground;
     out property <brush> accent: use-system-palette ? Palette.accent-background : custom-accent;
-    out property <brush> hover-background: custom-hover-background;
-    out property <brush> pressed-background: custom-pressed-background;
-    out property <brush> selected-background: use-system-palette ? Palette.selection-background : custom-selected-background;
+    out property <brush> hover-background: is-global-wallpaper ? custom-hover-background.transparentize(60%) : custom-hover-background;
+    out property <brush> pressed-background: is-global-wallpaper ? custom-pressed-background.transparentize(45%) : custom-pressed-background;
+    out property <brush> selected-background: is-global-wallpaper ? (use-system-palette ? Palette.selection-background.transparentize(50%) : custom-selected-background.transparentize(50%)) : (use-system-palette ? Palette.selection-background : custom-selected-background);
     out property <brush> selected-foreground: use-system-palette ? Palette.selection-foreground : custom-selected-foreground;
     out property <brush> border: use-system-palette ? Palette.border : custom-border;
     out property <brush> focus-border: custom-focus-border;

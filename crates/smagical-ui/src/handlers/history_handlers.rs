@@ -70,29 +70,48 @@ pub(crate) fn format_duration(secs: u64) -> String {
 }
 
 /// 将单个历史记录实体转换为 Slint UI 数据项
-fn map_history_item(r: &HistoryRecord, _now: u64, is_aggregated: bool) -> HistoryItemData {
+fn map_history_item(r: &HistoryRecord, _now: u64, is_aggregated: bool, is_en: bool) -> HistoryItemData {
     let conn_dt = format_datetime(r.connected_at);
     let disc_time = if let Some(disc) = r.disconnected_at {
         format_time_only(disc)
     } else if r.exit_status == "active" {
-        "进行中".to_string()
+        if is_en { "In Progress".to_string() } else { "进行中".to_string() }
     } else {
         format_time_only(r.connected_at + r.duration_secs)
     };
     let dur_text = format_duration(r.duration_secs);
-    let status_desc = match r.exit_status.as_str() {
-        "active" => "🟢 活跃中",
-        "success" | "closed" => "⚪ 正常退出",
-        "timeout" => "🔴 连接超时",
-        "auth_failed" => "🟠 认证失败",
-        "error" => "🔴 异常中断",
-        _ => "⚪ 正常退出",
+    let status_desc = if is_en {
+        match r.exit_status.as_str() {
+            "active" => "🟢 Active",
+            "success" | "closed" => "⚪ Normal Exit",
+            "timeout" => "🔴 Connection Timeout",
+            "auth_failed" => "🟠 Auth Failed",
+            "error" => "🔴 Error Aborted",
+            _ => "⚪ Normal Exit",
+        }
+    } else {
+        match r.exit_status.as_str() {
+            "active" => "🟢 活跃中",
+            "success" | "closed" => "⚪ 正常退出",
+            "timeout" => "🔴 连接超时",
+            "auth_failed" => "🟠 认证失败",
+            "error" => "🔴 异常中断",
+            _ => "⚪ 正常退出",
+        }
     };
 
     let subtitle = if is_aggregated {
-        format!("{}@{} · 累计连接 {} 次 · 最近连接: {} · 累计时长: {}", r.username, r.address, r.connect_count, conn_dt, dur_text)
+        if is_en {
+            format!("{}@{} · Total {} connections · Last: {} · Duration: {}", r.username, r.address, r.connect_count, conn_dt, dur_text)
+        } else {
+            format!("{}@{} · 累计连接 {} 次 · 最近连接: {} · 累计时长: {}", r.username, r.address, r.connect_count, conn_dt, dur_text)
+        }
     } else {
-        format!("{}@{} · 连接: {} · 断开: {} · 统计时长: {} · {}", r.username, r.address, conn_dt, disc_time, dur_text, status_desc)
+        if is_en {
+            format!("{}@{} · Connected: {} · Disconnected: {} · Duration: {} · {}", r.username, r.address, conn_dt, disc_time, dur_text, status_desc)
+        } else {
+            format!("{}@{} · 连接: {} · 断开: {} · 统计时长: {} · {}", r.username, r.address, conn_dt, disc_time, dur_text, status_desc)
+        }
     };
 
     let time_text = conn_dt.clone();
@@ -123,6 +142,7 @@ pub(crate) fn sync_ui_history_from_state(
     view_mode: &str,
     collapsed_set: &std::collections::HashSet<String>,
 ) {
+    let is_en = window.get_current_language() == "en-US";
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -150,20 +170,16 @@ pub(crate) fn sync_ui_history_from_state(
     let groups: Vec<HistoryGroupData> = if view_mode == "hosts" {
         // 按主机聚合模式 (去重并累加连接次数)
         let mut host_map: std::collections::HashMap<String, HistoryRecord> = std::collections::HashMap::new();
-        for r in &filtered_records {
-            let key = if let Some(ref hid) = r.host_id {
-                hid.clone()
-            } else {
-                r.address.clone()
-            };
-            host_map
-                .entry(key)
+        for r in filtered_records {
+            let key = format!("{}@{}", r.username, r.address);
+            host_map.entry(key)
                 .and_modify(|existing| {
-                    existing.connect_count += r.connect_count.max(1);
+                    existing.connect_count += r.connect_count;
+                    existing.duration_secs += r.duration_secs;
                     if r.connected_at > existing.connected_at {
                         existing.connected_at = r.connected_at;
+                        existing.disconnected_at = r.disconnected_at;
                         existing.exit_status = r.exit_status.clone();
-                        existing.duration_secs = r.duration_secs;
                     }
                     if r.is_pinned {
                         existing.is_pinned = true;
@@ -181,7 +197,7 @@ pub(crate) fn sync_ui_history_from_state(
 
         let items: Vec<HistoryItemData> = aggregated_list
             .iter()
-            .map(|r| map_history_item(r, now, true))
+            .map(|r| map_history_item(r, now, true, is_en))
             .collect();
 
         if items.is_empty() {
@@ -189,7 +205,7 @@ pub(crate) fn sync_ui_history_from_state(
         } else {
             vec![HistoryGroupData {
                 group_id: "all_hosts".into(),
-                group_name: "全部主机 (按频次)".into(),
+                group_name: if is_en { "All Hosts (By Frequency)".into() } else { "全部主机 (按频次)".into() },
                 item_count: items.len() as i32,
                 is_collapsed: collapsed_set.contains("all_hosts"),
                 items: slint::ModelRc::from(Rc::new(slint::VecModel::from(items))),
@@ -203,7 +219,7 @@ pub(crate) fn sync_ui_history_from_state(
         let mut earlier_items = Vec::new();
 
         for r in &filtered_records {
-            let item = map_history_item(r, now, false);
+            let item = map_history_item(r, now, false, is_en);
             if r.is_pinned {
                 pinned_items.push(item);
             } else {
@@ -222,7 +238,7 @@ pub(crate) fn sync_ui_history_from_state(
         if !pinned_items.is_empty() {
             result_groups.push(HistoryGroupData {
                 group_id: "pinned".into(),
-                group_name: "置顶常用".into(),
+                group_name: if is_en { "Pinned".into() } else { "置顶常用".into() },
                 item_count: pinned_items.len() as i32,
                 is_collapsed: collapsed_set.contains("pinned"),
                 items: slint::ModelRc::from(Rc::new(slint::VecModel::from(pinned_items))),
@@ -231,7 +247,7 @@ pub(crate) fn sync_ui_history_from_state(
         if !today_items.is_empty() {
             result_groups.push(HistoryGroupData {
                 group_id: "today".into(),
-                group_name: "今天".into(),
+                group_name: if is_en { "Today".into() } else { "今天".into() },
                 item_count: today_items.len() as i32,
                 is_collapsed: collapsed_set.contains("today"),
                 items: slint::ModelRc::from(Rc::new(slint::VecModel::from(today_items))),
@@ -240,7 +256,7 @@ pub(crate) fn sync_ui_history_from_state(
         if !yesterday_items.is_empty() {
             result_groups.push(HistoryGroupData {
                 group_id: "yesterday".into(),
-                group_name: "昨天".into(),
+                group_name: if is_en { "Yesterday".into() } else { "昨天".into() },
                 item_count: yesterday_items.len() as i32,
                 is_collapsed: collapsed_set.contains("yesterday"),
                 items: slint::ModelRc::from(Rc::new(slint::VecModel::from(yesterday_items))),
@@ -249,7 +265,7 @@ pub(crate) fn sync_ui_history_from_state(
         if !earlier_items.is_empty() {
             result_groups.push(HistoryGroupData {
                 group_id: "earlier".into(),
-                group_name: "更早".into(),
+                group_name: if is_en { "Earlier".into() } else { "更早".into() },
                 item_count: earlier_items.len() as i32,
                 is_collapsed: collapsed_set.contains("earlier"),
                 items: slint::ModelRc::from(Rc::new(slint::VecModel::from(earlier_items))),

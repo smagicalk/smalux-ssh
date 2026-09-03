@@ -9,8 +9,105 @@ use smagical_core::event::{TerminalSessionEvent, TerminalSplitChangedEvent};
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
 use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, PaneGroup};
-use crate::terminal::{encode_key_event, SplitNode, SplitOrientation};
+use crate::terminal::{encode_key_event, SplitNode, SplitOrientation, TerminalInstance};
 
+
+/// 核心执行关闭指定终端会话逻辑 (移除 Tab、销毁 PTY、重组分屏并写盘归档)
+fn execute_close_session(
+    id_str: &str,
+    pane_groups: &Rc<std::cell::RefCell<Vec<PaneGroup>>>,
+    active_pane_id: &Rc<std::cell::RefCell<String>>,
+    global_split_tree: &Rc<std::cell::RefCell<Option<SplitNode>>>,
+    active_terminals: &Rc<std::cell::RefCell<std::collections::HashMap<String, TerminalInstance>>>,
+    ctx: &AppContext,
+    window: &AppWindow,
+) {
+    let mut groups = pane_groups.borrow_mut();
+    let mut active_pid = active_pane_id.borrow_mut();
+    let mut split_tree = global_split_tree.borrow_mut();
+
+    // 捕获终端屏幕快照并杀灭底层 PTY 进程与 Alacritty 实例
+    let mut snapshot_opt = None;
+    if let Some(mut instance) = active_terminals.borrow_mut().remove(id_str) {
+        let snap = instance.snapshot_text(500);
+        if !snap.trim().is_empty() {
+            snapshot_opt = Some((snap.lines().count() as u32, snap));
+        }
+        let _ = instance.pty.kill();
+    }
+
+    let mut target_group_idx = None;
+    for (idx, g) in groups.iter_mut().enumerate() {
+        if let Some(pos) = g.tabs.iter().position(|t| t.session_id == id_str) {
+            g.tabs.remove(pos);
+            target_group_idx = Some(idx);
+            if g.active_tab_id == id_str && !g.tabs.is_empty() {
+                let next_pos = if pos > 0 { pos - 1 } else { 0 };
+                g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
+            }
+            break;
+        }
+    }
+
+    if let Some(idx) = target_group_idx
+        && groups[idx].tabs.is_empty()
+    {
+        let closed_pid = groups[idx].pane_id.clone();
+        groups.remove(idx);
+
+        if let Some(tree) = split_tree.as_mut() {
+            tree.close_pane(&closed_pid);
+            if tree.leaf_count() <= 1 {
+                *split_tree = None;
+            }
+        }
+
+        if !groups.is_empty() {
+            *active_pid = groups[0].pane_id.clone();
+        } else {
+            *active_pid = String::new();
+        }
+    }
+
+    let is_split = split_tree.is_some();
+    sync_active_session_ui(window, &groups, &active_pid, is_split);
+    crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx.core_state);
+    ctx.core_state.events().dispatch(&TerminalSessionEvent {
+        session_id: id_str.to_string(),
+        host_id: "".into(),
+        action: "closed".into(),
+    });
+    tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
+
+    let storage_async = ctx.core_state.storage().clone();
+    let window_weak_async = window.as_weak();
+    let search_q = ctx.history_search_query.borrow().clone();
+    let view_mode = ctx.history_view_mode.borrow().clone();
+    let collapsed = ctx.collapsed_history_groups.borrow().clone();
+    let id_owned = id_str.to_string();
+
+    ctx.persistence_guard.spawn(move || {
+        if let Some((lines_count, snap_text)) = snapshot_opt {
+            let hist_id = format!("hist-{}", id_owned);
+            let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500);
+            if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id) {
+                h.record_snapshot(lines_count);
+                let _ = storage_async.history().save(&h);
+            }
+        }
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w_ui) = window_weak_async.upgrade() {
+                crate::handlers::history_handlers::sync_ui_history_from_state(
+                    &w_ui,
+                    storage_async.as_ref(),
+                    &search_q,
+                    &view_mode,
+                    &collapsed,
+                );
+            }
+        });
+    });
+}
 
 /// 注册终端会话与启动器相关交互回调。
 ///
@@ -20,216 +117,151 @@ use crate::terminal::{encode_key_event, SplitNode, SplitOrientation};
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
+    // 待确认关闭的会话 ID 挂起槽位
+    let pending_close_tab_id = Rc::new(std::cell::RefCell::new(Option::<String>::None));
+
     // -------------------------------------------------------------------------
-    // 1. 关闭会话 Tab 回调
+    // 1. 关闭会话 Tab 回调 (带活跃连接前置监听与防误触拦截)
     // -------------------------------------------------------------------------
-    // 当用户点击某个 Tab 上的关闭按钮 (x) 时触发。
-    // 算法逻辑：在所有分屏窗格组中查找到包含目标会话的窗格，将其从该窗格的 Tab 序列中移除。
-    // 若该窗格被清空，则自动销毁该窗格并在多分屏二叉树中执行合并。
     let window_weak = window.as_weak();
     let pane_groups_close = Rc::clone(&ctx.pane_groups);
     let active_pane_id_close = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close = Rc::clone(&ctx.active_terminals);
+    let pending_close_tab_id_close = Rc::clone(&pending_close_tab_id);
     let ctx_close = ctx.clone();
     window.on_close_tab(move |sess_id| {
-
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
-            let mut groups = pane_groups_close.borrow_mut();
-            let mut active_pid = active_pane_id_close.borrow_mut();
-            let mut split_tree = global_split_tree_close.borrow_mut();
 
-            // 捕获终端屏幕快照并杀灭底层 PTY 进程与 Alacritty 实例
-            let mut snapshot_opt = None;
-            if let Some(mut instance) = active_terminals_close.borrow_mut().remove(&id_str) {
-                let snap = instance.snapshot_text(500);
-                if !snap.trim().is_empty() {
-                    snapshot_opt = Some((snap.lines().count() as u32, snap));
-                }
-                let _ = instance.pty.kill();
-            }
+            // 拦截检查：查询目标 Tab 元数据
+            let session_opt = pane_groups_close.borrow().iter()
+                .flat_map(|g| g.tabs.iter())
+                .find(|t| t.session_id == id_str)
+                .cloned();
 
-            let mut target_group_idx = None;
-            for (idx, g) in groups.iter_mut().enumerate() {
-                if let Some(pos) = g.tabs.iter().position(|t| t.session_id == id_str) {
-                    g.tabs.remove(pos);
-                    target_group_idx = Some(idx);
-                    if g.active_tab_id == id_str && !g.tabs.is_empty() {
-                        let next_pos = if pos > 0 { pos - 1 } else { 0 };
-                        g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
-                    }
-                    break;
-                }
-            }
+            if w.get_setting_confirm_close_tab() {
+                if let Some(info) = session_opt {
+                    let is_remote = !info.host_id.starts_with("local-") && !info.host_address.starts_with("Local");
+                    let title = if is_remote {
+                        format!("断开远程主机连接: {}", info.display_title)
+                    } else {
+                        format!("关闭终端会话: {}", info.display_title)
+                    };
+                    let msg = if is_remote {
+                        format!("确定要断开与主机 [{}] 的 SSH 连接吗？未保存的工作和远程正在运行的任务将立即终止。", info.host_name)
+                    } else {
+                        format!("确定要关闭本地终端 [{}] 吗？正在运行的进程将被终止。", info.display_title)
+                    };
 
-            if let Some(idx) = target_group_idx
-                && groups[idx].tabs.is_empty()
-            {
-                let closed_pid = groups[idx].pane_id.clone();
-                groups.remove(idx);
-
-                if let Some(tree) = split_tree.as_mut() {
-                    tree.close_pane(&closed_pid);
-                    if tree.leaf_count() <= 1 {
-                        *split_tree = None;
-                    }
-                }
-
-                if !groups.is_empty() {
-                    *active_pid = groups[0].pane_id.clone();
-                } else {
-                    *active_pid = String::new();
+                    *pending_close_tab_id_close.borrow_mut() = Some(id_str);
+                    w.set_tab_close_confirm_title(title.into());
+                    w.set_tab_close_confirm_message(msg.into());
+                    w.set_is_tab_close_confirm_open(true);
+                    tracing::info!(target: "smagical_ui::session", "拦截关闭 Tab 操作并呼出确认弹窗: {}", info.display_title);
+                    return;
                 }
             }
 
-            let is_split = split_tree.is_some();
-            sync_active_session_ui(&w, &groups, &active_pid, is_split);
-            crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_close.core_state);
-            ctx_close.core_state.events().dispatch(&TerminalSessionEvent {
-                session_id: id_str.clone(),
-                host_id: "".into(),
-                action: "closed".into(),
-            });
-            tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
-
-
-
-            let storage_async = ctx_close.core_state.storage().clone();
-            let window_weak_async = window_weak.clone();
-            let search_q = ctx_close.history_search_query.borrow().clone();
-            let view_mode = ctx_close.history_view_mode.borrow().clone();
-            let collapsed = ctx_close.collapsed_history_groups.borrow().clone();
-
-            ctx_close.persistence_guard.spawn(move || {
-                if let Some((lines_count, snap_text)) = snapshot_opt {
-                    let hist_id = format!("hist-{}", id_str);
-                    let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500);
-                    if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id) {
-                        h.record_snapshot(lines_count);
-                        let _ = storage_async.history().save(&h);
-                    }
-                }
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(w_ui) = window_weak_async.upgrade() {
-                        crate::handlers::history_handlers::sync_ui_history_from_state(
-                            &w_ui,
-                            storage_async.as_ref(),
-                            &search_q,
-                            &view_mode,
-                            &collapsed,
-                        );
-                    }
-                });
-            });
+            execute_close_session(
+                &id_str,
+                &pane_groups_close,
+                &active_pane_id_close,
+                &global_split_tree_close,
+                &active_terminals_close,
+                &ctx_close,
+                &w,
+            );
         }
     });
-
-
 
     // -------------------------------------------------------------------------
     // 1.1 关闭指定窗格内的指定 Tab 回调
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
-    let pane_groups_close_pane_tab = Rc::clone(&ctx.pane_groups);
-    let active_pane_id_close_pane_tab = Rc::clone(&ctx.active_pane_id);
-    let global_split_tree_close_pane_tab = Rc::clone(&ctx.global_split_tree);
-    let active_terminals_close_pane_tab = Rc::clone(&ctx.active_terminals);
-    let ctx_close_pane = ctx.clone();
-    window.on_close_pane_tab(move |pane_id, tab_id| {
+    let window_weak_pane = window.as_weak();
+    let pane_groups_pane = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_pane = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_pane = Rc::clone(&ctx.global_split_tree);
+    let active_terminals_pane = Rc::clone(&ctx.active_terminals);
+    let pending_close_tab_id_pane = Rc::clone(&pending_close_tab_id);
+    let ctx_pane = ctx.clone();
+    window.on_close_pane_tab(move |_pane_id, tab_id| {
+        if let Some(w) = window_weak_pane.upgrade() {
+            let id_str = tab_id.to_string();
 
-        if let Some(w) = window_weak.upgrade() {
-            let p_id = pane_id.to_string();
-            let t_id = tab_id.to_string();
-            let mut groups = pane_groups_close_pane_tab.borrow_mut();
-            let mut active_pid = active_pane_id_close_pane_tab.borrow_mut();
-            let mut split_tree = global_split_tree_close_pane_tab.borrow_mut();
+            let session_opt = pane_groups_pane.borrow().iter()
+                .flat_map(|g| g.tabs.iter())
+                .find(|t| t.session_id == id_str)
+                .cloned();
 
-            // 捕获终端屏幕快照并杀灭底层 PTY 进程与 Alacritty 实例
-            let mut snapshot_opt = None;
-            if let Some(mut instance) = active_terminals_close_pane_tab.borrow_mut().remove(&t_id) {
-                let snap = instance.snapshot_text(500);
-                if !snap.trim().is_empty() {
-                    snapshot_opt = Some((snap.lines().count() as u32, snap));
-                }
-                let _ = instance.pty.kill();
-            }
+            if w.get_setting_confirm_close_tab() {
+                if let Some(info) = session_opt {
+                    let is_remote = !info.host_id.starts_with("local-") && !info.host_address.starts_with("Local");
+                    let title = if is_remote {
+                        format!("断开远程主机连接: {}", info.display_title)
+                    } else {
+                        format!("关闭终端会话: {}", info.display_title)
+                    };
+                    let msg = if is_remote {
+                        format!("确定要断开与主机 [{}] 的 SSH 连接吗？未保存的工作和远程正在运行的任务将立即终止。", info.host_name)
+                    } else {
+                        format!("确定要关闭本地终端 [{}] 吗？正在运行的进程将被终止。", info.display_title)
+                    };
 
-            let mut target_group_idx = None;
-            for (idx, g) in groups.iter_mut().enumerate() {
-                if g.pane_id == p_id {
-                    if let Some(pos) = g.tabs.iter().position(|t| t.session_id == t_id) {
-                        g.tabs.remove(pos);
-                        target_group_idx = Some(idx);
-                        if g.active_tab_id == t_id && !g.tabs.is_empty() {
-                            let next_pos = if pos > 0 { pos - 1 } else { 0 };
-                            g.active_tab_id = g.tabs[next_pos.min(g.tabs.len() - 1)].session_id.clone();
-                        }
-                    }
-                    break;
+                    *pending_close_tab_id_pane.borrow_mut() = Some(id_str);
+                    w.set_tab_close_confirm_title(title.into());
+                    w.set_tab_close_confirm_message(msg.into());
+                    w.set_is_tab_close_confirm_open(true);
+                    return;
                 }
             }
 
-            if let Some(idx) = target_group_idx
-                && groups[idx].tabs.is_empty()
-            {
-                let closed_pid = groups[idx].pane_id.clone();
-                groups.remove(idx);
+            execute_close_session(
+                &id_str,
+                &pane_groups_pane,
+                &active_pane_id_pane,
+                &global_split_tree_pane,
+                &active_terminals_pane,
+                &ctx_pane,
+                &w,
+            );
+        }
+    });
 
-                if let Some(tree) = split_tree.as_mut() {
-                    tree.close_pane(&closed_pid);
-                    if tree.leaf_count() <= 1 {
-                        *split_tree = None;
-                    }
-                }
-
-                if !groups.is_empty() {
-                    *active_pid = groups[0].pane_id.clone();
-                } else {
-                    *active_pid = String::new();
-                }
+    // -------------------------------------------------------------------------
+    // 1.2 确认关闭单个 Tab 回调 (在确认弹窗中点击“断开并关闭”)
+    // -------------------------------------------------------------------------
+    let window_weak_confirm = window.as_weak();
+    let pane_groups_confirm = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_confirm = Rc::clone(&ctx.active_pane_id);
+    let global_split_tree_confirm = Rc::clone(&ctx.global_split_tree);
+    let active_terminals_confirm = Rc::clone(&ctx.active_terminals);
+    let pending_close_tab_id_confirm = Rc::clone(&pending_close_tab_id);
+    let ctx_confirm = ctx.clone();
+    window.on_confirm_close_tab(move || {
+        if let Some(w) = window_weak_confirm.upgrade() {
+            if let Some(id_str) = pending_close_tab_id_confirm.borrow_mut().take() {
+                execute_close_session(
+                    &id_str,
+                    &pane_groups_confirm,
+                    &active_pane_id_confirm,
+                    &global_split_tree_confirm,
+                    &active_terminals_confirm,
+                    &ctx_confirm,
+                    &w,
+                );
             }
+        }
+    });
 
-
-            let is_split = split_tree.is_some();
-            sync_active_session_ui(&w, &groups, &active_pid, is_split);
-            crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_close_pane.core_state);
-            ctx_close_pane.core_state.events().dispatch(&TerminalSessionEvent {
-                session_id: t_id.clone(),
-                host_id: "".into(),
-                action: "closed".into(),
-            });
-            tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭 Tab: {}", p_id, t_id);
-
-
-
-            let storage_async = ctx_close_pane.core_state.storage().clone();
-            let window_weak_async = window_weak.clone();
-            let search_q = ctx_close_pane.history_search_query.borrow().clone();
-            let view_mode = ctx_close_pane.history_view_mode.borrow().clone();
-            let collapsed = ctx_close_pane.collapsed_history_groups.borrow().clone();
-
-            ctx_close_pane.persistence_guard.spawn(move || {
-                if let Some((lines_count, snap_text)) = snapshot_opt {
-                    let hist_id = format!("hist-{}", t_id);
-                    let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500);
-                    if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id) {
-                        h.record_snapshot(lines_count);
-                        let _ = storage_async.history().save(&h);
-                    }
-                }
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(w_ui) = window_weak_async.upgrade() {
-                        crate::handlers::history_handlers::sync_ui_history_from_state(
-                            &w_ui,
-                            storage_async.as_ref(),
-                            &search_q,
-                            &view_mode,
-                            &collapsed,
-                        );
-                    }
-                });
-            });
+    // -------------------------------------------------------------------------
+    // 1.3 切换“关闭标签页时防误触确认”开关回调
+    // -------------------------------------------------------------------------
+    let window_weak_toggle = window.as_weak();
+    window.on_toggle_confirm_close_tab(move |enabled| {
+        if let Some(w) = window_weak_toggle.upgrade() {
+            w.set_setting_confirm_close_tab(enabled);
+            tracing::info!(target: "smagical_ui::settings", "关闭标签页时防误触确认设置为: {}", enabled);
         }
     });
 

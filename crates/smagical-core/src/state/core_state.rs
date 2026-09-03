@@ -21,7 +21,8 @@ use crate::storage::{AppStorage, MockStorage};
 /// 当前活跃终端上下文 (`Arc<RwLock<Option<ActiveTerminalSessionContext>>>`) 以及全局统一导航路由中枢 (`Arc<RwLock<NavigationRouter>>`)。
 #[derive(Clone)]
 pub struct CoreState {
-    storage: Arc<dyn AppStorage>,
+    storage: Arc<RwLock<Arc<dyn AppStorage>>>,
+    is_mock: Arc<RwLock<bool>>,
     event_manager: Arc<EventManager>,
     activity_bar: Arc<ActivityBarRegistry>,
     right_panels: Arc<RwLock<RightPanelRegistry>>,
@@ -267,7 +268,8 @@ impl CoreState {
         let navigation = Arc::new(RwLock::new(NavigationRouter::default()));
 
         Self {
-            storage,
+            storage: Arc::new(RwLock::new(storage)),
+            is_mock: Arc::new(RwLock::new(true)),
             event_manager,
             activity_bar,
             right_panels,
@@ -287,7 +289,8 @@ impl CoreState {
         let navigation = Arc::new(RwLock::new(NavigationRouter::default()));
 
         Self {
-            storage,
+            storage: Arc::new(RwLock::new(storage)),
+            is_mock: Arc::new(RwLock::new(false)),
             event_manager,
             activity_bar,
             right_panels,
@@ -296,9 +299,28 @@ impl CoreState {
         }
     }
 
-    /// 获取底层存储门面引用
-    pub fn storage(&self) -> &Arc<dyn AppStorage> {
-        &self.storage
+    /// 获取底层存储门面实例句柄
+    pub fn storage(&self) -> Arc<dyn AppStorage> {
+        self.storage.read().unwrap().clone()
+    }
+
+    /// 查询当前是否处于 Mock 数据层模式
+    pub fn is_mock_storage(&self) -> bool {
+        *self.is_mock.read().unwrap()
+    }
+
+    /// 动态切换数据层实现 (Mock 存储 vs 物理持久化数据层)
+    pub fn set_mock_storage(&self, enable_mock: bool) {
+        let mut is_mock_guard = self.is_mock.write().unwrap();
+        *is_mock_guard = enable_mock;
+        let mut storage_guard = self.storage.write().unwrap();
+        if enable_mock {
+            tracing::info!(target: "smagical_core::storage", "数据层已切换至: [MockStorage] 内存种子存储");
+            *storage_guard = Arc::new(MockStorage::new_seeded());
+        } else {
+            tracing::info!(target: "smagical_core::storage", "数据层已切换至: [PhysicalStorage] 物理存储模式 (基线空仓储)");
+            *storage_guard = Arc::new(MockStorage::new());
+        }
     }
 
     /// 获取集中式事件管理器引用

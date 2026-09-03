@@ -549,7 +549,7 @@ export component FileExplorerView inherits Rectangle {
                                     }
 
                                     Text {
-                                        text: tab.title;
+                                        text: tab.host-id == "local" ? (tab.title == "本地 (主目录)" || tab.title == "Local (Home)" ? @tr("本地 (主目录)") : (tab.title == "本地" || tab.title == "本地目录" || tab.title == "Local Directory" ? @tr("本地目录") : tab.title)) : tab.title;
                                         font-size: 11px;
                                         font-weight: tab.is-active ? 700 : 500;
                                         color: tab.is-active ? AppTheme.foreground : (local-tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
@@ -813,7 +813,7 @@ export component FileExplorerView inherits Rectangle {
                                 spacing: 8px;
 
                                 Text {
-                                    text: "名称";
+                                    text: @tr("名称");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
@@ -821,7 +821,7 @@ export component FileExplorerView inherits Rectangle {
                                     vertical-alignment: center;
                                 }
                                 Text {
-                                    text: "大小";
+                                    text: @tr("大小");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
@@ -830,7 +830,7 @@ export component FileExplorerView inherits Rectangle {
                                     vertical-alignment: center;
                                 }
                                 Text {
-                                    text: "修改时间";
+                                    text: @tr("修改时间");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
@@ -1191,7 +1191,7 @@ export component FileExplorerView inherits Rectangle {
 
 
                                     Text {
-                                        text: tab.title;
+                                        text: tab.host-id == "local" ? (tab.title == "本地 (主目录)" || tab.title == "Local (Home)" ? @tr("本地 (主目录)") : (tab.title == "本地" || tab.title == "本地目录" || tab.title == "Local Directory" ? @tr("本地目录") : tab.title)) : tab.title;
                                         font-size: 11px;
                                         font-weight: tab.is-active ? 700 : 500;
                                         color: tab.is-active ? AppTheme.foreground : (remote-tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
@@ -1279,7 +1279,7 @@ export component FileExplorerView inherits Rectangle {
                             }
 
                             Text {
-                                text: "未打开远程 SFTP 会话";
+                                text: @tr("未打开远程 SFTP 会话");
                                 font-size: 15px;
                                 font-weight: 700;
                                 color: AppTheme.foreground;
@@ -1287,7 +1287,7 @@ export component FileExplorerView inherits Rectangle {
                             }
 
                             Text {
-                                text: "请在左侧主机列表双击选择主机，或点击右上角「+」连接远程主机";
+                                text: @tr("请在左侧主机列表双击选择主机，或点击右上角「+」连接远程主机");
                                 font-size: 12px;
                                 color: AppTheme.disabled-foreground;
                                 horizontal-alignment: center;
@@ -1296,7 +1296,7 @@ export component FileExplorerView inherits Rectangle {
                             HorizontalLayout {
                                 alignment: center;
                                 Rectangle {
-                                    width: 146px;
+                                    min-width: 146px;
                                     height: 32px;
                                     border-radius: 4px;
                                     background: connect-touch.has-hover ? AppTheme.accent.transparentize(20%) : AppTheme.accent;
@@ -1307,6 +1307,8 @@ export component FileExplorerView inherits Rectangle {
                                     }
 
                                     HorizontalLayout {
+                                        padding-left: 16px;
+                                        padding-right: 16px;
                                         alignment: center;
                                         spacing: 6px;
 
@@ -1322,7 +1324,7 @@ export component FileExplorerView inherits Rectangle {
                                         }
 
                                         Text {
-                                            text: "连接远程主机";
+                                            text: @tr("连接远程主机");
                                             font-size: 12px;
                                             font-weight: 600;
                                             color: #ffffff;
@@ -1532,7 +1534,7 @@ export component FileExplorerView inherits Rectangle {
                                 spacing: 8px;
 
                                 Text {
-                                    text: "名称";
+                                    text: @tr("名称");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
@@ -1540,7 +1542,7 @@ export component FileExplorerView inherits Rectangle {
                                     vertical-alignment: center;
                                 }
                                 Text {
-                                    text: "大小";
+                                    text: @tr("大小");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
@@ -1549,16 +1551,16 @@ export component FileExplorerView inherits Rectangle {
                                     vertical-alignment: center;
                                 }
                                 Text {
-                                    text: "权限";
+                                    text: @tr("权限");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
-                                    width: 75px;
+                                    width: 85px;
                                     horizontal-alignment: center;
                                     vertical-alignment: center;
                                 }
                                 Text {
-                                    text: "修改时间";
+                                    text: @tr("修改时间");
                                     font-size: 11px;
                                     font-weight: 600;
                                     color: AppTheme.disabled-foreground;
@@ -1737,7 +1739,7 @@ export component FileExplorerView inherits Rectangle {
                                                 text: item.permissions;
                                                 font-size: 10px;
                                                 color: AppTheme.disabled-foreground;
-                                                width: 75px;
+                                                width: 85px;
                                                 horizontal-alignment: center;
                                                 vertical-alignment: center;
                                             }
@@ -1861,7 +1863,7 @@ export component FileExplorerView inherits Rectangle {
                                     alignment: center;
 
                                     Text {
-                                        text: root.transfer-tasks.length > 0 ? (root.transfer-tasks.length + " 个任务") : "空闲";
+                                        text: root.transfer-tasks.length > 0 ? (root.transfer-tasks.length + " " + @tr("个任务")) : @tr("空闲");
                                         font-size: 10px;
                                         font-weight: 600;
                                         color: AppTheme.secondary-foreground;
@@ -2223,7 +2225,7 @@ export component FileExplorerView inherits Rectangle {
                                             }
 
                                             Text {
-                                                text: Math.round(task.progress * 100) + "%" + (task.is-dir ? " (总进度)" : "");
+                                                text: Math.round(task.progress * 100) + "%" + (task.is-dir ? (" " + @tr("(总进度)")) : "");
                                                 font-size: 9px;
                                                 font-weight: 700;
                                                 color: AppTheme.foreground;
@@ -2353,7 +2355,7 @@ export component FileExplorerView inherits Rectangle {
                 }
 
                 Text {
-                    text: root.transfer-tasks.length > 0 ? ("(" + root.transfer-tasks.length + " 个传输任务进行中 - 点击展开)") : "(当前无活动任务 - 点击展开)";
+                    text: root.transfer-tasks.length > 0 ? ("(" + root.transfer-tasks.length + " " + @tr("个传输任务进行中 - 点击展开") + ")") : @tr("(当前无活动任务 - 点击展开)");
                     font-size: 11px;
                     color: bot-bar-touch.has-hover ? AppTheme.accent : AppTheme.disabled-foreground;
                     vertical-alignment: center;
@@ -2364,7 +2366,7 @@ export component FileExplorerView inherits Rectangle {
                 }
 
                 Text {
-                    text: "本地项: " + root.local-files.length + " | 远程项: " + root.remote-files.length;
+                    text: @tr("本地项: ") + root.local-files.length + " | " + @tr("远程项: ") + root.remote-files.length;
                     font-size: 11px;
                     color: AppTheme.disabled-foreground;
                     vertical-alignment: center;
@@ -2430,7 +2432,7 @@ export component FileExplorerView inherits Rectangle {
                         padding-right: 5px;
                         alignment: center;
                         Text {
-                            text: is-valid-target ? (root.drag-source == "local" ? "上传" : "下载") : "无效";
+                            text: is-valid-target ? (root.drag-source == "local" ? @tr("上传") : @tr("下载")) : @tr("无效");
                             font-size: 9px;
                             font-weight: 700;
                             color: is-valid-target ? (root.drag-source == "local" ? #3b82f6 : #10b981) : AppTheme.disabled-foreground;
@@ -2478,7 +2480,7 @@ export component FileExplorerView inherits Rectangle {
             }
 
             Text {
-                text: root.drag-tab-title;
+                text: (root.drag-tab-title == "本地 (主目录)" || root.drag-tab-title == "Local (Home)") ? @tr("本地 (主目录)") : ((root.drag-tab-title == "本地" || root.drag-tab-title == "本地目录" || root.drag-tab-title == "Local Directory") ? @tr("本地目录") : root.drag-tab-title);
                 font-size: 11px;
                 font-weight: 600;
                 color: root.is-tab-drop-valid ? AppTheme.foreground : AppTheme.disabled-foreground;
@@ -2499,7 +2501,7 @@ export component FileExplorerView inherits Rectangle {
                         padding-right: 5px;
                         alignment: center;
                         Text {
-                            text: root.is-tab-drop-valid ? "移动" : "禁止";
+                            text: root.is-tab-drop-valid ? @tr("移动") : @tr("禁止");
                             font-size: 9px;
                             font-weight: 700;
                             color: root.is-tab-drop-valid ? (root.drag-tab-source == "remote" ? #10b981 : #3b82f6) : AppTheme.danger;

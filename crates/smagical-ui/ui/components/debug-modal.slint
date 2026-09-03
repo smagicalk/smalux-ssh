@@ -35,6 +35,28 @@ export component DebugModal inherits Rectangle {
     /// 是否为深色模式
     in property <bool> is-dark-mode: true;
 
+    /// 实验特性门控
+    in-out property <bool> flag-desktop-notifications: false;
+    in-out property <bool> flag-terminal-crt-shader: false;
+    in-out property <bool> flag-cloud-sync: false;
+    in-out property <bool> flag-terminal-scratchpad: false;
+
+    /// 核心设置状态实时探针
+    in property <bool> setting-always-on-top: false;
+    in property <bool> setting-confirm-close-tab: true;
+    in property <bool> setting-confirm-close-active: true;
+    in property <string> wallpaper-mode: "none";
+    in property <string> wallpaper-slideshow-interval: "none";
+    in property <int> wallpaper-count: 0;
+
+    in-out property <bool> use-mock-storage: true;
+
+    /// 设置调试相关回调
+    callback toggle-feature-flag(string, bool);
+    callback toggle-mock-storage(bool);
+    callback apply-config-preset(string);
+    callback reset-all-settings();
+
     // 当前激活的子面板: "hosts" | "credentials" | "snippets" | "settings" | "logs" | "rendering"
     property <string> active-subtab: "hosts";
 
@@ -104,10 +126,10 @@ export component DebugModal inherits Rectangle {
         }
 
         // =========================================================================
-        // 主弹窗卡片 (780x560px 居中大窗)
+        // 主弹窗卡片 (860x560px 居中大窗)
         // =========================================================================
         Rectangle {
-            width: 780px;
+            width: 860px;
             height: 560px;
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
@@ -183,7 +205,7 @@ export component DebugModal inherits Rectangle {
 
                 // 2. 顶部子标签切换导航栏 (按页面与核心功能清晰分类)
                 HorizontalLayout {
-                    spacing: 8px;
+                    spacing: 6px;
                     height: 32px;
 
                     // 页面 1: 主机管理调试 (包含批量生成、预设注入、快捷增删、状态治理与树形指标)
@@ -202,14 +224,16 @@ export component DebugModal inherits Rectangle {
 
                         HorizontalLayout {
                             alignment: center;
-                            spacing: 6px;
+                            spacing: 5px;
+                            padding-left: 6px;
+                            padding-right: 6px;
 
                             Image {
                                 source: @image-url("../assets/icons/server.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "hosts" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "hosts" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
@@ -217,8 +241,9 @@ export component DebugModal inherits Rectangle {
                                 text: @tr("主机资产调试");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "hosts" ? 600 : 500;
-                                color: root.active-subtab == "hosts" ? #ffffff : AppTheme.foreground;
+                                color: root.active-subtab == "hosts" ? AppTheme.selected-foreground : AppTheme.foreground;
                                 vertical-alignment: center;
+                                overflow: elide;
                             }
                         }
                     }
@@ -239,14 +264,16 @@ export component DebugModal inherits Rectangle {
 
                         HorizontalLayout {
                             alignment: center;
-                            spacing: 6px;
+                            spacing: 5px;
+                            padding-left: 6px;
+                            padding-right: 6px;
 
                             Image {
                                 source: @image-url("../assets/icons/key.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "credentials" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "credentials" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
@@ -254,8 +281,9 @@ export component DebugModal inherits Rectangle {
                                 text: @tr("凭据密钥调试");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "credentials" ? 600 : 500;
-                                color: root.active-subtab == "credentials" ? #ffffff : AppTheme.foreground;
+                                color: root.active-subtab == "credentials" ? AppTheme.selected-foreground : AppTheme.foreground;
                                 vertical-alignment: center;
+                                overflow: elide;
                             }
                         }
                     }
@@ -276,14 +304,16 @@ export component DebugModal inherits Rectangle {
 
                         HorizontalLayout {
                             alignment: center;
-                            spacing: 6px;
+                            spacing: 5px;
+                            padding-left: 6px;
+                            padding-right: 6px;
 
                             Image {
                                 source: @image-url("../assets/icons/terminal.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "snippets" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "snippets" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
@@ -291,8 +321,9 @@ export component DebugModal inherits Rectangle {
                                 text: @tr("代码片段调试");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "snippets" ? 600 : 500;
-                                color: root.active-subtab == "snippets" ? #ffffff : AppTheme.foreground;
+                                color: root.active-subtab == "snippets" ? AppTheme.selected-foreground : AppTheme.foreground;
                                 vertical-alignment: center;
+                                overflow: elide;
                             }
                         }
                     }
@@ -313,14 +344,16 @@ export component DebugModal inherits Rectangle {
 
                         HorizontalLayout {
                             alignment: center;
-                            spacing: 6px;
+                            spacing: 5px;
+                            padding-left: 6px;
+                            padding-right: 6px;
 
                             Image {
                                 source: @image-url("../assets/icons/settings.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "settings" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "settings" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
@@ -328,8 +361,9 @@ export component DebugModal inherits Rectangle {
                                 text: @tr("设置外观调试");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "settings" ? 600 : 500;
-                                color: root.active-subtab == "settings" ? #ffffff : AppTheme.foreground;
+                                color: root.active-subtab == "settings" ? AppTheme.selected-foreground : AppTheme.foreground;
                                 vertical-alignment: center;
+                                overflow: elide;
                             }
                         }
                     }
@@ -350,14 +384,16 @@ export component DebugModal inherits Rectangle {
 
                         HorizontalLayout {
                             alignment: center;
-                            spacing: 6px;
+                            spacing: 5px;
+                            padding-left: 6px;
+                            padding-right: 6px;
 
                             Image {
                                 source: @image-url("../assets/icons/file-text.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "logs" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "logs" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
@@ -365,8 +401,9 @@ export component DebugModal inherits Rectangle {
                                 text: @tr("实时日志流");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "logs" ? 600 : 500;
-                                color: root.active-subtab == "logs" ? #ffffff : AppTheme.foreground;
+                                color: root.active-subtab == "logs" ? AppTheme.selected-foreground : AppTheme.foreground;
                                 vertical-alignment: center;
+                                overflow: elide;
                             }
                         }
                     }
@@ -387,14 +424,16 @@ export component DebugModal inherits Rectangle {
 
                         HorizontalLayout {
                             alignment: center;
-                            spacing: 6px;
+                            spacing: 5px;
+                            padding-left: 6px;
+                            padding-right: 6px;
 
                             Image {
                                 source: @image-url("../assets/icons/sparkles.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: root.active-subtab == "rendering" ? #ffffff : AppTheme.secondary-foreground;
+                                colorize: root.active-subtab == "rendering" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
                                 y: (parent.height - self.height) / 2;
                             }
 
@@ -402,8 +441,9 @@ export component DebugModal inherits Rectangle {
                                 text: @tr("图形渲染管线");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "rendering" ? 600 : 500;
-                                color: root.active-subtab == "rendering" ? #ffffff : AppTheme.foreground;
+                                color: root.active-subtab == "rendering" ? AppTheme.selected-foreground : AppTheme.foreground;
                                 vertical-alignment: center;
+                                overflow: elide;
                             }
                         }
                     }
@@ -455,10 +495,28 @@ export component DebugModal inherits Rectangle {
                         clear-all-snippets => { root.debug-clear-snippets(); }
                     }
 
-                    // 4. 设置偏好调试 (主题快切、深浅色模式与设计令牌)
+                    // 4. 设置偏好调试 (实验特性门控、核心设置探针、预设配置注入与主题快切)
                     if root.active-subtab == "settings": DebugSettingsTab {
+                        flag-desktop-notifications <=> root.flag-desktop-notifications;
+                        flag-terminal-crt-shader <=> root.flag-terminal-crt-shader;
+                        flag-cloud-sync <=> root.flag-cloud-sync;
+                        flag-terminal-scratchpad <=> root.flag-terminal-scratchpad;
+                        use-mock-storage <=> root.use-mock-storage;
+
                         current-theme-name: root.current-theme-name;
                         is-dark-mode: root.is-dark-mode;
+                        active-rendering-pipeline: root.active-pipeline;
+                        setting-always-on-top: root.setting-always-on-top;
+                        setting-confirm-close-tab: root.setting-confirm-close-tab;
+                        setting-confirm-close-active: root.setting-confirm-close-active;
+                        wallpaper-mode: root.wallpaper-mode;
+                        wallpaper-slideshow-interval: root.wallpaper-slideshow-interval;
+                        wallpaper-count: root.wallpaper-count;
+
+                        toggle-feature-flag(f, e) => { root.toggle-feature-flag(f, e); }
+                        toggle-mock-storage(e) => { root.toggle-mock-storage(e); }
+                        apply-config-preset(p) => { root.apply-config-preset(p); }
+                        reset-all-settings => { root.reset-all-settings(); }
                         switch-theme(id) => { root.switch-theme(id); }
                         toggle-color-mode => { root.toggle-color-mode(); }
                     }

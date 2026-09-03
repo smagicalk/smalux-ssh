@@ -1,5 +1,6 @@
 use std::sync::{Arc, RwLock};
 use crate::domain::{
+    config::AppConfigRecord,
     credential::{CredentialRecord, CredentialType},
     group::GroupRecord,
     history::HistoryRecord,
@@ -8,7 +9,7 @@ use crate::domain::{
     tunnel::{TunnelRecord, TunnelType},
 };
 use super::{
-    AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
+    AppStorage, ConfigRepository, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
     SnippetRepository, TunnelRepository, StorageError, StorageResult,
 };
 
@@ -808,6 +809,54 @@ impl TunnelRepository for MockTunnelRepository {
     }
 }
 
+/// 线程安全的内存配置仓储实现
+#[derive(Debug, Default, Clone)]
+pub struct MockConfigRepository {
+    config: Arc<RwLock<AppConfigRecord>>,
+}
+
+impl MockConfigRepository {
+    /// 创建带有默认应用偏好配置的内存配置仓储
+    pub fn new() -> Self {
+        Self {
+            config: Arc::new(RwLock::new(AppConfigRecord::default())),
+        }
+    }
+
+    /// 使用自定义配置记录创建内存配置仓储
+    pub fn with_config(config: AppConfigRecord) -> Self {
+        Self {
+            config: Arc::new(RwLock::new(config)),
+        }
+    }
+}
+
+impl ConfigRepository for MockConfigRepository {
+    fn get(&self) -> StorageResult<AppConfigRecord> {
+        let guard = self.config.read().map_err(|e| StorageError::Backend(e.to_string()))?;
+        Ok(guard.clone())
+    }
+
+    fn save(&self, config: &AppConfigRecord) -> StorageResult<()> {
+        let mut guard = self.config.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        *guard = config.clone();
+        Ok(())
+    }
+
+    fn reset_to_default(&self) -> StorageResult<AppConfigRecord> {
+        let mut guard = self.config.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        let default_config = AppConfigRecord::default();
+        *guard = default_config.clone();
+        Ok(default_config)
+    }
+
+    fn update(&self, mutate: Box<dyn FnOnce(&mut AppConfigRecord) + Send>) -> StorageResult<AppConfigRecord> {
+        let mut guard = self.config.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+        mutate(&mut *guard);
+        Ok(guard.clone())
+    }
+}
+
 /// 聚合内存存储实现 (MockStorage)
 #[derive(Debug, Clone)]
 pub struct MockStorage {
@@ -817,6 +866,7 @@ pub struct MockStorage {
     credentials_repo: MockCredentialRepository,
     snippets_repo: MockSnippetRepository,
     tunnels_repo: MockTunnelRepository,
+    config_repo: MockConfigRepository,
 }
 
 impl Default for MockStorage {
@@ -837,6 +887,7 @@ impl MockStorage {
             credentials_repo,
             snippets_repo: MockSnippetRepository::new(),
             tunnels_repo: MockTunnelRepository::new(),
+            config_repo: MockConfigRepository::new(),
         }
     }
 
@@ -1792,6 +1843,7 @@ logout"#.to_string(),
             credentials_repo,
             snippets_repo: MockSnippetRepository::with_data(snippets, snippet_groups),
             tunnels_repo: MockTunnelRepository::with_tunnels(tunnels),
+            config_repo: MockConfigRepository::new(),
         }
     }
 }
@@ -1820,6 +1872,10 @@ impl AppStorage for MockStorage {
 
     fn tunnels(&self) -> &dyn TunnelRepository {
         &self.tunnels_repo
+    }
+
+    fn config(&self) -> &dyn ConfigRepository {
+        &self.config_repo
     }
 
     fn reload(&self) -> StorageResult<()> {
@@ -2146,6 +2202,39 @@ mod tests {
         let deleted = storage.tunnels().delete("tun-temp-test").unwrap();
         assert!(deleted);
         assert_eq!(storage.tunnels().list_all().unwrap().len(), 6);
+    }
+
+    #[test]
+    fn test_mock_storage_config_crud_and_update() {
+        let storage = MockStorage::new_seeded();
+
+        // 1. 读取初始默认配置
+        let cfg = storage.config().get().unwrap();
+        assert_eq!(cfg.language, "zh-CN");
+        assert_eq!(cfg.theme_id, "builtin.ui.darcula");
+        assert_eq!(cfg.font_size, 13.0);
+        assert!(!cfg.flag_desktop_notifications);
+
+        // 2. 局部修改 update
+        let updated = storage.config().update(Box::new(|c| {
+            c.font_size = 15.0;
+            c.theme_id = "builtin.ui.one-dark".to_string();
+            c.flag_desktop_notifications = true;
+        })).unwrap();
+        assert_eq!(updated.font_size, 15.0);
+        assert_eq!(updated.theme_id, "builtin.ui.one-dark");
+        assert!(updated.flag_desktop_notifications);
+
+        // 3. 读取验证
+        let fresh = storage.config().get().unwrap();
+        assert_eq!(fresh.font_size, 15.0);
+        assert_eq!(fresh.theme_id, "builtin.ui.one-dark");
+
+        // 4. 重置回默认值
+        let reset = storage.config().reset_to_default().unwrap();
+        assert_eq!(reset.font_size, 13.0);
+        assert_eq!(reset.theme_id, "builtin.ui.darcula");
+        assert!(!reset.flag_desktop_notifications);
     }
 }
 

@@ -22,6 +22,8 @@ pub mod credential;
 pub mod snippet;
 /// 网络隧道、代理与跳板机模型。
 pub mod tunnel;
+/// 全局偏好与系统配置模型。
+pub mod config;
 
 pub use group::GroupRecord;
 pub use history::{HistoryRecord, SessionSnapshotConfig};
@@ -29,6 +31,7 @@ pub use host::{HostRecord, HostStatus};
 pub use credential::{CredentialRecord, CredentialType};
 pub use snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable};
 pub use tunnel::{TunnelRecord, TunnelType};
+pub use config::AppConfigRecord;
 pub use activity_bar::{ActivityBarItem, ActivityBarRegistry};
 pub use navigation::{NavigationRequest, NavigationRouter};
 pub use terminal_context::{ActiveTerminalSessionContext, TerminalAction};

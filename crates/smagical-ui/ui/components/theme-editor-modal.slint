@@ -1,0 +1,1571 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppCard } from "base/app-card.slint";
+import { AppButton } from "base/app-button.slint";
+import { ScrollView } from "std-widgets.slint";
+
+/// 调色板色块定义
+struct PaletteSwatch {
+    hex: string,
+    c: color,
+}
+
+/// 颜色字段输入组件 (Hex 文本输入 + 颜色方块弹窗选择 + 调色盘图标)
+component ColorFieldInput inherits VerticalLayout {
+    in property <string> label: "";
+    in-out property <string> hex-value: "#000000";
+    in property <brush> preview-brush: #000000;
+    callback changed(string);
+    callback pick-color();
+
+    spacing: 3px;
+    alignment: start;
+
+    HorizontalLayout {
+        alignment: space-between;
+        Text {
+            text: root.label;
+            font-size: 10px;
+            font-weight: 500;
+            color: AppTheme.secondary-foreground;
+            overflow: elide;
+        }
+    }
+
+    Rectangle {
+        height: 28px;
+        width: 100%;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.control-background;
+        border-width: 1px;
+        border-color: t-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+        animate border-color { duration: 120ms; }
+
+        HorizontalLayout {
+            padding-left: 5px;
+            padding-right: 5px;
+            spacing: 5px;
+            alignment: space-between;
+
+            // 颜色预览小方块 (支持点击弹窗选择颜色)
+            color-box := Rectangle {
+                width: 20px;
+                height: 20px;
+                border-radius: 4px;
+                background: root.preview-brush;
+                border-width: box-touch.has-hover ? 2px : 1px;
+                border-color: box-touch.has-hover ? AppTheme.accent : #ffffff40;
+                y: (parent.height - self.height) / 2;
+
+                box-touch := TouchArea {
+                    clicked => { root.pick-color(); }
+                    mouse-cursor: pointer;
+                }
+            }
+
+            // Hex 文本输入
+            Rectangle {
+                horizontal-stretch: 1;
+                clip: true;
+                t-inp := TextInput {
+                    width: 100%;
+                    height: 100%;
+                    text <=> root.hex-value;
+                    font-size: 11px;
+                    font-family: "JetBrains Mono";
+                    color: AppTheme.foreground;
+                    selection-background-color: AppTheme.selected-background;
+                    selection-foreground-color: AppTheme.selected-foreground;
+                    vertical-alignment: center;
+                    horizontal-alignment: left;
+                    edited => { root.changed(self.text); }
+                }
+            }
+
+            // 调色盘小按钮
+            Rectangle {
+                width: 18px;
+                height: 18px;
+                border-radius: 3px;
+                background: btn-p.has-hover ? AppTheme.hover-background : transparent;
+                y: (parent.height - self.height) / 2;
+
+                btn-p := TouchArea {
+                    clicked => { root.pick-color(); }
+                    mouse-cursor: pointer;
+                }
+
+                Text {
+                    text: "🎨";
+                    font-size: 9px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+/// 规格尺寸数值字段输入组件 (标签 + 数值输入框 + 单位 px)
+component MetricFieldInput inherits VerticalLayout {
+    in property <string> label: "";
+    in-out property <string> value-text: "4";
+    callback changed(string);
+
+    spacing: 3px;
+    alignment: start;
+
+    HorizontalLayout {
+        alignment: space-between;
+        Text {
+            text: root.label;
+            font-size: 10px;
+            font-weight: 500;
+            color: AppTheme.secondary-foreground;
+            overflow: elide;
+        }
+    }
+
+    Rectangle {
+        height: 28px;
+        width: 100%;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.control-background;
+        border-width: 1px;
+        border-color: m-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+        animate border-color { duration: 120ms; }
+
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 4px;
+            alignment: space-between;
+
+            Rectangle {
+                horizontal-stretch: 1;
+                clip: true;
+                m-inp := TextInput {
+                    width: 100%;
+                    height: 100%;
+                    text <=> root.value-text;
+                    font-size: 11px;
+                    font-family: "JetBrains Mono";
+                    color: AppTheme.foreground;
+                    selection-background-color: AppTheme.selected-background;
+                    selection-foreground-color: AppTheme.selected-foreground;
+                    vertical-alignment: center;
+                    horizontal-alignment: left;
+                    edited => { root.changed(self.text); }
+                }
+            }
+
+            Text {
+                text: "px";
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+/// 主题设计与定制工坊弹窗 (Theme Studio Modal)
+export component ThemeEditorModal inherits Rectangle {
+    in-out property <bool> is-open: false;
+
+    // 表单状态属性
+    in-out property <string> theme-name: "My Custom Theme";
+    in-out property <string> theme-author: "User";
+    in-out property <string> theme-base: "builtin.ui.darcula";
+    in-out property <string> theme-period: "night";
+
+    // 18 个全量颜色文本字段
+    in-out property <string> color-window-bg: "#1e1e2e";
+    in-out property <string> color-panel-bg: "#181825";
+    in-out property <string> color-surface-bg: "#313244";
+    in-out property <string> color-control-bg: "#383a4c";
+    in-out property <string> color-foreground: "#cdd6f4";
+    in-out property <string> color-secondary-fg: "#a6adc8";
+    in-out property <string> color-disabled-fg: "#6c7086";
+    in-out property <string> color-accent: "#cba6f7";
+    in-out property <string> color-hover-bg: "#45475a";
+    in-out property <string> color-pressed-bg: "#585b70";
+    in-out property <string> color-selected-bg: "#cba6f7";
+    in-out property <string> color-selected-fg: "#ffffff";
+    in-out property <string> color-border: "#45475a";
+    in-out property <string> color-focus-border: "#cba6f7";
+    in-out property <string> color-success: "#a6e3a1";
+    in-out property <string> color-warning: "#f9e2af";
+    in-out property <string> color-danger: "#f38ba8";
+    in-out property <string> color-info: "#89b4fa";
+
+    // 18 个全量预览笔刷 (由 Rust 同步更新)
+    in property <brush> preview-window-bg: #1e1e2e;
+    in property <brush> preview-panel-bg: #181825;
+    in property <brush> preview-surface-bg: #313244;
+    in property <brush> preview-control-bg: #383a4c;
+    in property <brush> preview-foreground: #cdd6f4;
+    in property <brush> preview-secondary-fg: #a6adc8;
+    in property <brush> preview-disabled-fg: #6c7086;
+    in property <brush> preview-accent: #cba6f7;
+    in property <brush> preview-hover-bg: #45475a;
+    in property <brush> preview-pressed-bg: #585b70;
+    in property <brush> preview-selected-bg: #cba6f7;
+    in property <brush> preview-selected-fg: #ffffff;
+    in property <brush> preview-border: #45475a;
+    in property <brush> preview-focus-border: #cba6f7;
+    in property <brush> preview-success: #a6e3a1;
+    in property <brush> preview-warning: #f9e2af;
+    in property <brush> preview-danger: #f38ba8;
+    in property <brush> preview-info: #89b4fa;
+
+    // 9 个全量几何尺寸排版数值
+    in-out property <string> metric-radius-small: "2";
+    in-out property <string> metric-radius-medium: "4";
+    in-out property <string> metric-radius-large: "8";
+    in-out property <string> metric-spacing-small: "4";
+    in-out property <string> metric-spacing-medium: "8";
+    in-out property <string> metric-spacing-large: "16";
+    in-out property <string> metric-border-width: "1";
+    in-out property <string> metric-control-height: "32";
+    in-out property <string> metric-icon-size: "16";
+
+    // TOML 源码文本
+    in-out property <string> theme-toml: "";
+
+    // 弹窗式色盘圆盘取色器状态
+    in-out property <bool> is-picker-open: false;
+    in-out property <string> picker-target-key: "";
+    in-out property <string> picker-target-label: "";
+    in-out property <string> picker-hex-value: "#1e1e2e";
+    in-out property <brush> picker-preview-brush: #1e1e2e;
+
+    in-out property <float> wheel-indicator-x: 90.0;
+    in-out property <float> wheel-indicator-y: 90.0;
+    in-out property <float> wheel-brightness: 1.0;
+    in-out property <brush> wheel-hue-brush: #ff0000;
+
+    property <[PaletteSwatch]> swatches-base: [
+        { hex: "#0d1117", c: #0d1117 },
+        { hex: "#161b22", c: #161b22 },
+        { hex: "#1e1e2e", c: #1e1e2e },
+        { hex: "#181825", c: #181825 },
+        { hex: "#282a36", c: #282a36 },
+        { hex: "#272822", c: #272822 },
+        { hex: "#f6f8fa", c: #f6f8fa },
+        { hex: "#ffffff", c: #ffffff },
+    ];
+
+    property <[PaletteSwatch]> swatches-surface: [
+        { hex: "#313244", c: #313244 },
+        { hex: "#45475a", c: #45475a },
+        { hex: "#585b70", c: #585b70 },
+        { hex: "#6e7681", c: #6e7681 },
+        { hex: "#8b949e", c: #8b949e },
+        { hex: "#cdd6f4", c: #cdd6f4 },
+        { hex: "#e6edf3", c: #e6edf3 },
+        { hex: "#f0f6fc", c: #f0f6fc },
+    ];
+
+    property <[PaletteSwatch]> swatches-accent: [
+        { hex: "#3b82f6", c: #3b82f6 },
+        { hex: "#06b6d4", c: #06b6d4 },
+        { hex: "#10b981", c: #10b981 },
+        { hex: "#22c55e", c: #22c55e },
+        { hex: "#eab308", c: #eab308 },
+        { hex: "#f97316", c: #f97316 },
+        { hex: "#ef4444", c: #ef4444 },
+        { hex: "#cba6f7", c: #cba6f7 },
+    ];
+
+    function open-color-picker(key: string, label: string, current-hex: string, current-brush: brush) {
+        root.picker-target-key = key;
+        root.picker-target-label = label;
+        root.picker-hex-value = current-hex;
+        root.picker-preview-brush = current-brush;
+        root.picker-hex-changed(current-hex);
+        root.is-picker-open = true;
+    }
+
+    function select-preset-color(hex: string, c: color) {
+        root.picker-hex-value = hex;
+        root.picker-preview-brush = c;
+        root.picker-hex-changed(hex);
+    }
+
+    function commit-picker-color(hex: string) {
+        if root.picker-target-key == "window_bg" { root.color-window-bg = hex; root.color-field-changed("window_bg", hex); }
+        if root.picker-target-key == "panel_bg" { root.color-panel-bg = hex; root.color-field-changed("panel_bg", hex); }
+        if root.picker-target-key == "surface_bg" { root.color-surface-bg = hex; root.color-field-changed("surface_bg", hex); }
+        if root.picker-target-key == "control_bg" { root.color-control-bg = hex; root.color-field-changed("control_bg", hex); }
+        if root.picker-target-key == "foreground" { root.color-foreground = hex; root.color-field-changed("foreground", hex); }
+        if root.picker-target-key == "secondary_fg" { root.color-secondary-fg = hex; root.color-field-changed("secondary_fg", hex); }
+        if root.picker-target-key == "disabled_fg" { root.color-disabled-fg = hex; root.color-field-changed("disabled_fg", hex); }
+        if root.picker-target-key == "accent" { root.color-accent = hex; root.color-field-changed("accent", hex); }
+        if root.picker-target-key == "hover_bg" { root.color-hover-bg = hex; root.color-field-changed("hover_bg", hex); }
+        if root.picker-target-key == "pressed_bg" { root.color-pressed-bg = hex; root.color-field-changed("pressed_bg", hex); }
+        if root.picker-target-key == "selected_bg" { root.color-selected-bg = hex; root.color-field-changed("selected_bg", hex); }
+        if root.picker-target-key == "selected_fg" { root.color-selected-fg = hex; root.color-field-changed("selected_fg", hex); }
+        if root.picker-target-key == "border" { root.color-border = hex; root.color-field-changed("border", hex); }
+        if root.picker-target-key == "focus_border" { root.color-focus-border = hex; root.color-field-changed("focus_border", hex); }
+        if root.picker-target-key == "success" { root.color-success = hex; root.color-field-changed("success", hex); }
+        if root.picker-target-key == "warning" { root.color-warning = hex; root.color-field-changed("warning", hex); }
+        if root.picker-target-key == "danger" { root.color-danger = hex; root.color-field-changed("danger", hex); }
+        if root.picker-target-key == "info" { root.color-info = hex; root.color-field-changed("info", hex); }
+    }
+
+    // 回调事件
+    callback close();
+    callback apply-preset(string);
+    callback color-field-changed(string, string);
+    callback metric-field-changed(string, string);
+    callback meta-field-changed(string, string);
+    callback parse-and-sync-from-toml(string);
+    callback copy-toml(string);
+    callback save-and-activate();
+
+    // 色轮取色器回调
+    callback wheel-coord-picked(float, float);
+    callback wheel-brightness-picked(float);
+    callback picker-hex-changed(string);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000088;
+
+        // 遮罩背景防穿透
+        TouchArea {
+            width: 100%;
+            height: 100%;
+        }
+
+        // 居中主视窗
+        Rectangle {
+            width: 880px;
+            height: 610px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000080;
+            drop-shadow-offset-y: 10px;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+
+                // -----------------------------------------------------------------
+                // 弹窗顶部标题栏
+                // -----------------------------------------------------------------
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 28px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        Text {
+                            text: "🎨";
+                            font-size: 16px;
+                            vertical-alignment: center;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 1px;
+
+                            Text {
+                                text: @tr("主题设计与定制工坊 (Theme Studio)");
+                                font-size: 14px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                            Text {
+                                text: @tr("支持实时表单调色、沙盒窗口渲染验证与标准 TOML 源码双向同步");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+
+                    // 关闭按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: btn-cls.has-hover ? AppTheme.hover-background : transparent;
+                        btn-cls := TouchArea {
+                            clicked => { root.close(); }
+                            mouse-cursor: pointer;
+                        }
+                        Text {
+                            text: "✕";
+                            font-size: 12px;
+                            color: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+
+                // -----------------------------------------------------------------
+                // 区域 1: 上半区 (左侧表单调色板 + 右侧微型沙盒视窗)
+                // -----------------------------------------------------------------
+                HorizontalLayout {
+                    spacing: 14px;
+                    height: 310px;
+
+                    // 左侧全量参数输入表单 (支持竖向滚动条顺畅浏览编辑所有颜色与排版规格)
+                    ScrollView {
+                        horizontal-stretch: 1;
+
+                        VerticalLayout {
+                            spacing: 12px;
+                            alignment: start;
+                            padding-right: 8px;
+
+                            // -------------------------------------------------------------
+                            // 一、元数据与继承预设 (Metadata & Presets)
+                            // -------------------------------------------------------------
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                // 行 1: 主题名称与作者
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    height: 44px;
+
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 2px;
+                                        Text { text: @tr("主题名称 (Name)"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                                        Rectangle {
+                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: inp-name.has-focus ? AppTheme.accent : AppTheme.border;
+                                            TouchArea { clicked => { inp-name.focus(); } }
+                                            HorizontalLayout {
+                                                padding-left: 8px; padding-right: 8px;
+                                                inp-name := TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.theme-name;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    selection-background-color: AppTheme.selected-background;
+                                                    vertical-alignment: center;
+                                                    edited => { root.meta-field-changed("name", self.text); }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        width: 130px;
+                                        spacing: 2px;
+                                        Text { text: @tr("作者 (Author)"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                                        Rectangle {
+                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: inp-auth.has-focus ? AppTheme.accent : AppTheme.border;
+                                            TouchArea { clicked => { inp-auth.focus(); } }
+                                            HorizontalLayout {
+                                                padding-left: 8px; padding-right: 8px;
+                                                inp-auth := TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.theme-author;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    selection-background-color: AppTheme.selected-background;
+                                                    vertical-alignment: center;
+                                                    edited => { root.meta-field-changed("author", self.text); }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 行 2: 继承基底与明暗风格
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    height: 44px;
+
+                                    VerticalLayout {
+                                        horizontal-stretch: 1;
+                                        spacing: 2px;
+                                        Text { text: @tr("继承基底 (Base Theme)"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                                        Rectangle {
+                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: inp-base.has-focus ? AppTheme.accent : AppTheme.border;
+                                            TouchArea { clicked => { inp-base.focus(); } }
+                                            HorizontalLayout {
+                                                padding-left: 8px; padding-right: 8px;
+                                                inp-base := TextInput {
+                                                    width: 100%;
+                                                    height: 100%;
+                                                    text <=> root.theme-base;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    selection-background-color: AppTheme.selected-background;
+                                                    vertical-alignment: center;
+                                                    edited => { root.meta-field-changed("base", self.text); }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        width: 130px;
+                                        spacing: 2px;
+                                        Text { text: @tr("视觉倾向 (Period)"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                                        Rectangle {
+                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
+                                            HorizontalLayout {
+                                                padding: 2px; spacing: 2px;
+                                                Rectangle {
+                                                    horizontal-stretch: 1; border-radius: 3px;
+                                                    background: root.theme-period == "night" ? AppTheme.accent : transparent;
+                                                    TouchArea { clicked => { root.theme-period = "night"; root.meta-field-changed("period", "night"); } mouse-cursor: pointer; }
+                                                    Text { text: @tr("深色 (Night)"); font-size: 9px; font-weight: 600; color: root.theme-period == "night" ? AppTheme.selected-foreground : AppTheme.secondary-foreground; horizontal-alignment: center; vertical-alignment: center; }
+                                                }
+                                                Rectangle {
+                                                    horizontal-stretch: 1; border-radius: 3px;
+                                                    background: root.theme-period == "day" ? AppTheme.accent : transparent;
+                                                    TouchArea { clicked => { root.theme-period = "day"; root.meta-field-changed("period", "day"); } mouse-cursor: pointer; }
+                                                    Text { text: @tr("浅色 (Day)"); font-size: 9px; font-weight: 600; color: root.theme-period == "day" ? AppTheme.selected-foreground : AppTheme.secondary-foreground; horizontal-alignment: center; vertical-alignment: center; }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 行 3: 快速调色板预设胶囊
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    height: 22px;
+
+                                    Text {
+                                        text: @tr("快速预设:");
+                                        font-size: 10px;
+                                        color: AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Rectangle {
+                                        border-radius: 3px; background: p-dar.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
+                                        p-dar := TouchArea { clicked => { root.apply-preset("darcula"); } mouse-cursor: pointer; }
+                                        HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "Darcula"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
+                                    }
+
+                                    Rectangle {
+                                        border-radius: 3px; background: p-od.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
+                                        p-od := TouchArea { clicked => { root.apply-preset("onedark"); } mouse-cursor: pointer; }
+                                        HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "One Dark"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
+                                    }
+
+                                    Rectangle {
+                                        border-radius: 3px; background: p-tok.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
+                                        p-tok := TouchArea { clicked => { root.apply-preset("tokyo"); } mouse-cursor: pointer; }
+                                        HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "Tokyo Night"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
+                                    }
+
+                                    Rectangle {
+                                        border-radius: 3px; background: p-nord.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
+                                        p-nord := TouchArea { clicked => { root.apply-preset("nord"); } mouse-cursor: pointer; }
+                                        HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "Nord"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
+                                    }
+
+                                    Rectangle {
+                                        border-radius: 3px; background: p-gh.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
+                                        p-gh := TouchArea { clicked => { root.apply-preset("github-light"); } mouse-cursor: pointer; }
+                                        HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "GitHub Light"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
+                                    }
+                                }
+                            }
+
+                            // -------------------------------------------------------------
+                            // 二、基础层次底色 (Base Backgrounds)
+                            // -------------------------------------------------------------
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: "🎨 " + @tr("基础层次底色 (Background Colors)");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                }
+
+                                GridLayout {
+                                    spacing-horizontal: 10px;
+                                    spacing-vertical: 6px;
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("主窗口底色 (window-background)");
+                                            hex-value <=> root.color-window-bg;
+                                            preview-brush: root.preview-window-bg;
+                                            changed(v) => { root.color-field-changed("window_bg", v); }
+                                            pick-color => { root.open-color-picker("window_bg", @tr("主窗口底色"), root.color-window-bg, root.preview-window-bg); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("侧栏面板底色 (panel-background)");
+                                            hex-value <=> root.color-panel-bg;
+                                            preview-brush: root.preview-panel-bg;
+                                            changed(v) => { root.color-field-changed("panel_bg", v); }
+                                            pick-color => { root.open-color-picker("panel_bg", @tr("侧栏面板底色"), root.color-panel-bg, root.preview-panel-bg); }
+                                        }
+                                    }
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("卡片表面底色 (surface-background)");
+                                            hex-value <=> root.color-surface-bg;
+                                            preview-brush: root.preview-surface-bg;
+                                            changed(v) => { root.color-field-changed("surface_bg", v); }
+                                            pick-color => { root.open-color-picker("surface_bg", @tr("卡片表面底色"), root.color-surface-bg, root.preview-surface-bg); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("输入控件底色 (control-background)");
+                                            hex-value <=> root.color-control-bg;
+                                            preview-brush: root.preview-control-bg;
+                                            changed(v) => { root.color-field-changed("control_bg", v); }
+                                            pick-color => { root.open-color-picker("control_bg", @tr("输入控件底色"), root.color-control-bg, root.preview-control-bg); }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // -------------------------------------------------------------
+                            // 三、文本与交互强调 (Foreground & Interactive)
+                            // -------------------------------------------------------------
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: "✨ " + @tr("文字与交互强调 (Foreground & Accent)");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                }
+
+                                GridLayout {
+                                    spacing-horizontal: 10px;
+                                    spacing-vertical: 6px;
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("核心主前景色 (foreground)");
+                                            hex-value <=> root.color-foreground;
+                                            preview-brush: root.preview-foreground;
+                                            changed(v) => { root.color-field-changed("foreground", v); }
+                                            pick-color => { root.open-color-picker("foreground", @tr("核心主前景色"), root.color-foreground, root.preview-foreground); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("次要文本颜色 (secondary-foreground)");
+                                            hex-value <=> root.color-secondary-fg;
+                                            preview-brush: root.preview-secondary-fg;
+                                            changed(v) => { root.color-field-changed("secondary_fg", v); }
+                                            pick-color => { root.open-color-picker("secondary_fg", @tr("次要文本颜色"), root.color-secondary-fg, root.preview-secondary-fg); }
+                                        }
+                                    }
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("禁用弱化文本 (disabled-foreground)");
+                                            hex-value <=> root.color-disabled-fg;
+                                            preview-brush: root.preview-disabled-fg;
+                                            changed(v) => { root.color-field-changed("disabled_fg", v); }
+                                            pick-color => { root.open-color-picker("disabled_fg", @tr("禁用弱化文本"), root.color-disabled-fg, root.preview-disabled-fg); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("品牌主题强调色 (accent)");
+                                            hex-value <=> root.color-accent;
+                                            preview-brush: root.preview-accent;
+                                            changed(v) => { root.color-field-changed("accent", v); }
+                                            pick-color => { root.open-color-picker("accent", @tr("品牌主题强调色"), root.color-accent, root.preview-accent); }
+                                        }
+                                    }
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("指针悬停微亮底色 (hover-background)");
+                                            hex-value <=> root.color-hover-bg;
+                                            preview-brush: root.preview-hover-bg;
+                                            changed(v) => { root.color-field-changed("hover_bg", v); }
+                                            pick-color => { root.open-color-picker("hover_bg", @tr("指针悬停微亮底色"), root.color-hover-bg, root.preview-hover-bg); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("按钮按下激活底色 (pressed-background)");
+                                            hex-value <=> root.color-pressed-bg;
+                                            preview-brush: root.preview-pressed-bg;
+                                            changed(v) => { root.color-field-changed("pressed_bg", v); }
+                                            pick-color => { root.open-color-picker("pressed_bg", @tr("按钮按下激活底色"), root.color-pressed-bg, root.preview-pressed-bg); }
+                                        }
+                                    }
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("选中项目底色 (selected-background)");
+                                            hex-value <=> root.color-selected-bg;
+                                            preview-brush: root.preview-selected-bg;
+                                            changed(v) => { root.color-field-changed("selected_bg", v); }
+                                            pick-color => { root.open-color-picker("selected_bg", @tr("选中项目底色"), root.color-selected-bg, root.preview-selected-bg); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("选中项前景色 (selected-foreground)");
+                                            hex-value <=> root.color-selected-fg;
+                                            preview-brush: root.preview-selected-fg;
+                                            changed(v) => { root.color-field-changed("selected_fg", v); }
+                                            pick-color => { root.open-color-picker("selected_fg", @tr("选中项前景色"), root.color-selected-fg, root.preview-selected-fg); }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // -------------------------------------------------------------
+                            // 四、边框与语义状态反馈 (Borders & Semantics)
+                            // -------------------------------------------------------------
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: "🛡️ " + @tr("边框与状态色 (Borders & Status Colors)");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                }
+
+                                GridLayout {
+                                    spacing-horizontal: 10px;
+                                    spacing-vertical: 6px;
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("通用分割描边 (border)");
+                                            hex-value <=> root.color-border;
+                                            preview-brush: root.preview-border;
+                                            changed(v) => { root.color-field-changed("border", v); }
+                                            pick-color => { root.open-color-picker("border", @tr("通用分割描边"), root.color-border, root.preview-border); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("聚焦高亮边框 (focus-border)");
+                                            hex-value <=> root.color-focus-border;
+                                            preview-brush: root.preview-focus-border;
+                                            changed(v) => { root.color-field-changed("focus_border", v); }
+                                            pick-color => { root.open-color-picker("focus_border", @tr("聚焦高亮边框"), root.color-focus-border, root.preview-focus-border); }
+                                        }
+                                    }
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("成功/在线状态色 (success)");
+                                            hex-value <=> root.color-success;
+                                            preview-brush: root.preview-success;
+                                            changed(v) => { root.color-field-changed("success", v); }
+                                            pick-color => { root.open-color-picker("success", @tr("成功/在线状态色"), root.color-success, root.preview-success); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("警告提示状态色 (warning)");
+                                            hex-value <=> root.color-warning;
+                                            preview-brush: root.preview-warning;
+                                            changed(v) => { root.color-field-changed("warning", v); }
+                                            pick-color => { root.open-color-picker("warning", @tr("警告提示状态色"), root.color-warning, root.preview-warning); }
+                                        }
+                                    }
+
+                                    Row {
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("错误/危险状态色 (danger)");
+                                            hex-value <=> root.color-danger;
+                                            preview-brush: root.preview-danger;
+                                            changed(v) => { root.color-field-changed("danger", v); }
+                                            pick-color => { root.open-color-picker("danger", @tr("错误/危险状态色"), root.color-danger, root.preview-danger); }
+                                        }
+                                        ColorFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("通知信息状态色 (info)");
+                                            hex-value <=> root.color-info;
+                                            preview-brush: root.preview-info;
+                                            changed(v) => { root.color-field-changed("info", v); }
+                                            pick-color => { root.open-color-picker("info", @tr("通知信息状态色"), root.color-info, root.preview-info); }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // -------------------------------------------------------------
+                            // 五、几何尺寸与排版规范 (Metrics)
+                            // -------------------------------------------------------------
+                            VerticalLayout {
+                                spacing: 6px;
+
+                                Text {
+                                    text: "📐 " + @tr("几何尺寸与排版规范 (Metrics [px])");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                }
+
+                                GridLayout {
+                                    spacing-horizontal: 10px;
+                                    spacing-vertical: 6px;
+
+                                    Row {
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("紧凑微圆角 (radius-small)");
+                                            value-text <=> root.metric-radius-small;
+                                            changed(v) => { root.metric-field-changed("radius_small", v); }
+                                        }
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("标准中圆角 (radius-medium)");
+                                            value-text <=> root.metric-radius-medium;
+                                            changed(v) => { root.metric-field-changed("radius_medium", v); }
+                                        }
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("大圆角 (radius-large)");
+                                            value-text <=> root.metric-radius-large;
+                                            changed(v) => { root.metric-field-changed("radius_large", v); }
+                                        }
+                                    }
+
+                                    Row {
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("紧凑间距 (spacing-small)");
+                                            value-text <=> root.metric-spacing-small;
+                                            changed(v) => { root.metric-field-changed("spacing_small", v); }
+                                        }
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("标准间距 (spacing-medium)");
+                                            value-text <=> root.metric-spacing-medium;
+                                            changed(v) => { root.metric-field-changed("spacing_medium", v); }
+                                        }
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("大版块间距 (spacing-large)");
+                                            value-text <=> root.metric-spacing-large;
+                                            changed(v) => { root.metric-field-changed("spacing_large", v); }
+                                        }
+                                    }
+
+                                    Row {
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("基础描边线宽 (border-width)");
+                                            value-text <=> root.metric-border-width;
+                                            changed(v) => { root.metric-field-changed("border_width", v); }
+                                        }
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("控件基准高度 (control-height)");
+                                            value-text <=> root.metric-control-height;
+                                            changed(v) => { root.metric-field-changed("control_height", v); }
+                                        }
+                                        MetricFieldInput {
+                                            horizontal-stretch: 1;
+                                            label: @tr("图标物理规格 (icon-size)");
+                                            value-text <=> root.metric-icon-size;
+                                            changed(v) => { root.metric-field-changed("icon_size", v); }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 右侧: 🖥️ 微型客户端沙盒预览窗口 (370px)
+                    Rectangle {
+                        width: 370px;
+                        border-radius: AppTheme.radius-medium;
+                        background: root.preview-panel-bg;
+                        border-width: 1px;
+                        border-color: root.preview-border;
+                        clip: true;
+
+                        VerticalLayout {
+                            spacing: 0px;
+
+                            // 1. 模拟标题栏
+                            Rectangle {
+                                height: 26px;
+                                background: root.preview-panel-bg;
+                                border-width: 1px;
+                                border-color: root.preview-border;
+
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    spacing: 6px;
+                                    alignment: space-between;
+
+                                    // 三色小圆点
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: start;
+                                        y: (parent.height - 8px) / 2;
+                                        Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #ff5f56; }
+                                        Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #ffbd2e; }
+                                        Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #27c93f; }
+                                    }
+
+                                    Text {
+                                        text: "smalux-ssh - " + root.theme-name;
+                                        font-size: 9px;
+                                        font-weight: 600;
+                                        color: root.preview-foreground;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+
+                                    Rectangle { width: 28px; }
+                                }
+                            }
+
+                            // 2. 模拟主体 (左侧树 95px + 右侧终端)
+                            HorizontalLayout {
+                                spacing: 0px;
+                                vertical-stretch: 1;
+
+                                // 模拟侧边导航栏
+                                Rectangle {
+                                    width: 95px;
+                                    background: root.preview-panel-bg;
+                                    border-width: 1px;
+                                    border-color: root.preview-border;
+
+                                    VerticalLayout {
+                                        padding: 6px;
+                                        spacing: 4px;
+                                        alignment: start;
+
+                                        // 选中项
+                                        Rectangle {
+                                            height: 22px;
+                                            border-radius: 3px;
+                                            background: root.preview-accent;
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                spacing: 4px;
+                                                Text { text: "●"; font-size: 8px; color: #ffffff; vertical-alignment: center; }
+                                                Text { text: "prod-server"; font-size: 8px; font-weight: 600; color: #ffffff; vertical-alignment: center; overflow: elide; }
+                                            }
+                                        }
+
+                                        // 普通项
+                                        Rectangle {
+                                            height: 20px;
+                                            border-radius: 3px;
+                                            background: transparent;
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                spacing: 4px;
+                                                Text { text: "○"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; }
+                                                Text { text: "dev-gateway"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; overflow: elide; }
+                                            }
+                                        }
+
+                                        Rectangle {
+                                            height: 20px;
+                                            border-radius: 3px;
+                                            background: transparent;
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                spacing: 4px;
+                                                Text { text: "○"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; }
+                                                Text { text: "db-replica"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; overflow: elide; }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 模拟终端视口
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    background: root.preview-window-bg;
+
+                                    VerticalLayout {
+                                        spacing: 0px;
+
+                                        // 模拟 Tab 栏
+                                        Rectangle {
+                                            height: 22px;
+                                            background: root.preview-surface-bg;
+                                            border-width: 1px;
+                                            border-color: root.preview-border;
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                alignment: start;
+                                                Rectangle {
+                                                    width: 90px;
+                                                    background: root.preview-window-bg;
+                                                    border-width: 1px;
+                                                    border-color: root.preview-border;
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text { text: "ssh: prod-server"; font-size: 8px; font-weight: 600; color: root.preview-foreground; vertical-alignment: center; }
+                                                    }
+                                                    Rectangle {
+                                                        y: parent.height - 2px;
+                                                        height: 2px;
+                                                        width: 100%;
+                                                        background: root.preview-accent;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 模拟终端内容
+                                        VerticalLayout {
+                                            padding: 8px;
+                                            spacing: 4px;
+                                            alignment: start;
+
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                Text { text: "smalux@prod:~$"; font-size: 9px; font-family: "JetBrains Mono"; font-weight: 700; color: root.preview-accent; }
+                                                Text { text: "docker ps -a"; font-size: 9px; font-family: "JetBrains Mono"; color: root.preview-foreground; }
+                                            }
+
+                                            Text {
+                                                text: "CONTAINER ID   IMAGE      STATUS";
+                                                font-size: 8px;
+                                                font-family: "JetBrains Mono";
+                                                color: root.preview-secondary-fg;
+                                            }
+                                            Text {
+                                                text: "3a4b5c6d7e8f   redis:7    Up 12 days (healthy)";
+                                                font-size: 8px;
+                                                font-family: "JetBrains Mono";
+                                                color: root.preview-foreground;
+                                            }
+
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                padding-top: 4px;
+                                                Text { text: "smalux@prod:~$"; font-size: 9px; font-family: "JetBrains Mono"; font-weight: 700; color: root.preview-accent; }
+                                                Rectangle { width: 5px; height: 10px; background: root.preview-accent; y: (parent.height - self.height) / 2; }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 3. 模拟底部卡片与操作条
+                            Rectangle {
+                                height: 32px;
+                                background: root.preview-surface-bg;
+                                border-width: 1px;
+                                border-color: root.preview-border;
+
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    alignment: space-between;
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        Text { text: "Latency: 22ms"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; }
+                                    }
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: end;
+
+                                        Rectangle {
+                                            width: 52px;
+                                            height: 20px;
+                                            border-radius: 3px;
+                                            background: root.preview-accent;
+                                            Text { text: "Connect"; font-size: 8px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 区域 2: 📜 TOML 配置代码 (双向解析与编辑)
+                // -----------------------------------------------------------------
+                VerticalLayout {
+                    spacing: 4px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 22px;
+
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+                            Text { text: "📜"; font-size: 12px; vertical-alignment: center; }
+                            Text {
+                                text: @tr("TOML 主题配置源码 (支持双向实时修改与解析)");
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: end;
+
+                            // 复制配置按钮
+                            Rectangle {
+                                height: 22px;
+                                border-radius: 3px;
+                                background: btn-cp.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+                                btn-cp := TouchArea {
+                                    clicked => { root.copy-toml(root.theme-toml); }
+                                    mouse-cursor: pointer;
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px; padding-right: 8px;
+                                    Text { text: @tr("📋 复制配置"); font-size: 10px; font-weight: 600; color: AppTheme.secondary-foreground; vertical-alignment: center; }
+                                }
+                            }
+
+                            // 从代码同步到表单按钮
+                            Rectangle {
+                                height: 22px;
+                                border-radius: 3px;
+                                background: btn-sy.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.accent;
+                                btn-sy := TouchArea {
+                                    clicked => { root.parse-and-sync-from-toml(root.theme-toml); }
+                                    mouse-cursor: pointer;
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px; padding-right: 8px;
+                                    Text { text: @tr("🔄 从代码解析同步到表单"); font-size: 10px; font-weight: 600; color: AppTheme.accent; vertical-alignment: center; }
+                                }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 120px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.surface-background;
+                        border-width: 1px;
+                        border-color: toml-in.has-focus ? AppTheme.accent : AppTheme.border;
+                        clip: true;
+
+                        flick-toml := Flickable {
+                            width: 100%;
+                            height: 100%;
+                            viewport-height: max(self.height, toml-in.preferred-height + 16px);
+
+                            VerticalLayout {
+                                padding-left: 10px;
+                                padding-right: 12px;
+                                padding-top: 8px;
+                                padding-bottom: 8px;
+                                alignment: start;
+
+                                toml-in := TextInput {
+                                    width: 100%;
+                                    height: max(flick-toml.height - 16px, self.preferred-height);
+                                    text <=> root.theme-toml;
+                                    font-size: 11px;
+                                    font-family: "JetBrains Mono";
+                                    color: AppTheme.foreground;
+                                    single-line: false;
+                                    wrap: no-wrap;
+                                    horizontal-alignment: left;
+                                    vertical-alignment: top;
+                                    selection-background-color: AppTheme.accent.transparentize(50%);
+                                    selection-foreground-color: #ffffff;
+                                }
+                            }
+                        }
+
+                        // 滚动条滑块
+                        if flick-toml.viewport-height > flick-toml.height: Rectangle {
+                            x: parent.width - 5px;
+                            y: 2px;
+                            width: 3px;
+                            height: parent.height - 4px;
+                            border-radius: 1.5px;
+                            background: transparent;
+
+                            Rectangle {
+                                y: -flick-toml.viewport-y * (parent.height - 4px - self.height) / (flick-toml.viewport-height - flick-toml.height);
+                                width: 3px;
+                                height: max(20px, (flick-toml.height / flick-toml.viewport-height) * (parent.height - 4px));
+                                border-radius: 1.5px;
+                                background: AppTheme.secondary-foreground.transparentize(60%);
+                            }
+                        }
+                    }
+                }
+
+                // -----------------------------------------------------------------
+                // 区域 3: 底部操作栏
+                // -----------------------------------------------------------------
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        Text {
+                            text: @tr("提示: 既可通过左侧调色板修改，也可直接编辑 TOML 源码保存。");
+                            font-size: 10px;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: end;
+
+                        // 取消按钮
+                        Rectangle {
+                            width: 80px;
+                            height: 30px;
+                            border-radius: AppTheme.radius-medium;
+                            background: b-cancel.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            b-cancel := TouchArea {
+                                clicked => { root.close(); }
+                                mouse-cursor: pointer;
+                            }
+                            Text { text: @tr("取消"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
+                        }
+
+                        // 保存并激活按钮
+                        Rectangle {
+                            width: 130px;
+                            height: 30px;
+                            border-radius: AppTheme.radius-medium;
+                            background: b-save.has-hover ? AppTheme.accent.brighter(10%) : AppTheme.accent;
+                            b-save := TouchArea {
+                                clicked => {
+                                    root.save-and-activate();
+                                }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 6px;
+                                Text { text: "💾"; font-size: 11px; vertical-alignment: center; }
+                                Text { text: @tr("保存并立即激活"); font-size: 11px; font-weight: 700; color: #ffffff; vertical-alignment: center; }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // =================================================================
+            // 浮层：🎨 现代化色相环圆盘取色器 (Circular Color Wheel Picker)
+            // =================================================================
+            if root.is-picker-open: Rectangle {
+                width: 100%;
+                height: 100%;
+                background: #00000088;
+
+                TouchArea {
+                    clicked => { root.is-picker-open = false; }
+                }
+
+                Rectangle {
+                    width: 380px;
+                    height: 440px;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                    border-radius: AppTheme.radius-large;
+                    background: AppTheme.panel-background;
+                    border-width: 1.5px;
+                    border-color: AppTheme.accent;
+                    drop-shadow-blur: 28px;
+                    drop-shadow-color: #00000099;
+                    drop-shadow-offset-y: 8px;
+
+                    TouchArea {}
+
+                    VerticalLayout {
+                        padding: 16px;
+                        spacing: 10px;
+                        alignment: start;
+
+                        // 1. 顶部标题栏
+                        HorizontalLayout {
+                            alignment: space-between;
+                            height: 24px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                Text { text: "🎨"; font-size: 14px; vertical-alignment: center; }
+                                Text {
+                                    text: @tr("色相圆盘取色器 · ") + root.picker-target-label;
+                                    font-size: 12px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 22px;
+                                height: 22px;
+                                border-radius: 11px;
+                                background: p-cls.has-hover ? AppTheme.hover-background : transparent;
+                                p-cls := TouchArea {
+                                    clicked => { root.is-picker-open = false; }
+                                    mouse-cursor: pointer;
+                                }
+                                Text {
+                                    text: "✕";
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // 2. 🌈 核心取色色轮圆盘 (180x180 px，支持全角度色相 + 径向饱和度选取)
+                        HorizontalLayout {
+                            alignment: center;
+                            height: 180px;
+
+                            Rectangle {
+                                width: 180px;
+                                height: 180px;
+                                clip: false;
+
+                                Image {
+                                    source: @image-url("../assets/color-wheel.png");
+                                    width: 180px;
+                                    height: 180px;
+                                }
+
+                                // 交互触摸区域 (支持点击与按住拖拽)
+                                wheel-touch := TouchArea {
+                                    width: 180px;
+                                    height: 180px;
+                                    mouse-cursor: crosshair;
+
+                                    moved => {
+                                        if self.pressed {
+                                            root.wheel-coord-picked(
+                                                (self.mouse-x - 90px) / 90px,
+                                                (self.mouse-y - 90px) / 90px
+                                            );
+                                        }
+                                    }
+
+                                    clicked => {
+                                        root.wheel-coord-picked(
+                                            (self.mouse-x - 90px) / 90px,
+                                            (self.mouse-y - 90px) / 90px
+                                        );
+                                    }
+                                }
+
+                                // 🎯 动态指针圆环 (跟随取色位置精准移动)
+                                Rectangle {
+                                    x: (root.wheel-indicator-x * 1px) - 7px;
+                                    y: (root.wheel-indicator-y * 1px) - 7px;
+                                    width: 14px;
+                                    height: 14px;
+                                    border-radius: 7px;
+                                    border-width: 2px;
+                                    border-color: #ffffff;
+                                    background: root.picker-preview-brush;
+                                    drop-shadow-blur: 4px;
+                                    drop-shadow-color: #000000bb;
+                                }
+                            }
+                        }
+
+                        // 3. 🌗 明度调节滑块 (Value / Brightness Slider)
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: center;
+                            height: 24px;
+
+                            Text {
+                                text: @tr("明度");
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+
+                            Rectangle {
+                                width: 260px;
+                                height: 14px;
+                                border-radius: 7px;
+                                background: @linear-gradient(90deg, #000000 0%, root.wheel-hue-brush 100%);
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+                                clip: false;
+
+                                TouchArea {
+                                    mouse-cursor: pointer;
+                                    moved => {
+                                        if self.pressed {
+                                            root.wheel-brightness-picked(max(0.0, min(1.0, self.mouse-x / parent.width)));
+                                        }
+                                    }
+                                    clicked => {
+                                        root.wheel-brightness-picked(max(0.0, min(1.0, self.mouse-x / parent.width)));
+                                    }
+                                }
+
+                                // 滑块手柄
+                                Rectangle {
+                                    x: max(0px, min(parent.width - 16px, (root.wheel-brightness * (parent.width - 16px))));
+                                    y: -1px;
+                                    width: 16px;
+                                    height: 16px;
+                                    border-radius: 8px;
+                                    border-width: 2px;
+                                    border-color: #ffffff;
+                                    background: root.picker-preview-brush;
+                                    drop-shadow-blur: 3px;
+                                    drop-shadow-color: #00000080;
+                                }
+                            }
+                        }
+
+                        // 4. 当前颜色预览与 Hex 直接输入栏
+                        Rectangle {
+                            height: 38px;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                spacing: 8px;
+                                alignment: space-between;
+
+                                Rectangle {
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 4px;
+                                    border-width: 1px;
+                                    border-color: #ffffff40;
+                                    background: root.picker-preview-brush;
+                                    y: (parent.height - self.height) / 2;
+                                }
+
+                                Rectangle {
+                                    horizontal-stretch: 1;
+                                    clip: true;
+
+                                    pick-inp := TextInput {
+                                        width: 100%;
+                                        height: 100%;
+                                        text <=> root.picker-hex-value;
+                                        font-size: 13px;
+                                        font-family: "JetBrains Mono";
+                                        font-weight: 700;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                        edited => {
+                                            root.picker-hex-changed(self.text);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 5. 常用预设快捷小色块 (单排 8 颗经典色)
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: center;
+                            height: 24px;
+
+                            for s in root.swatches-accent: Rectangle {
+                                width: 32px;
+                                height: 20px;
+                                border-radius: 3px;
+                                border-width: 1px;
+                                border-color: sw-chip.has-hover ? AppTheme.accent : #ffffff22;
+                                background: s.c;
+
+                                sw-chip := TouchArea {
+                                    clicked => {
+                                        root.picker-hex-changed(s.hex);
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+                            }
+                        }
+
+                        // 6. 底部确认关闭
+                        HorizontalLayout {
+                            alignment: end;
+                            spacing: 8px;
+
+                            Rectangle {
+                                width: 80px;
+                                height: 28px;
+                                border-radius: AppTheme.radius-medium;
+                                background: AppTheme.accent;
+                                TouchArea {
+                                    clicked => {
+                                        root.is-picker-open = false;
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+                                Text {
+                                    text: @tr("完成");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: #ffffff;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

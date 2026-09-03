@@ -10,9 +10,9 @@ pub use model::{
     ColorScheme, ResolvedTerminalTheme, ResolvedUiTheme, TerminalThemeDefinition,
     TerminalThemeTokens, TerminalThemeTokensPatch, ThemeError, ThemeId, ThemeKind, ThemeMetadata,
     ThemePeriod, ThemeWarning, UiThemeDefinition, UiThemeMetrics, UiThemeMetricsPatch,
-    UiThemeTokens, UiThemeTokensPatch,
+    UiThemeTokens, UiThemeTokensPatch, THEME_SCHEMA_VERSION,
 };
-pub use repository::{FileThemeRepository, LoadedTheme, ThemeRepository};
+pub use repository::{FileThemeRepository, LoadedTheme, MemoryThemeRepository, ThemeRepository};
 pub use selection::{ThemeDeleteImpact, ThemeSelectionConfig};
 pub use service::{TerminalImport, ThemeService};
 
@@ -601,4 +601,36 @@ color-scheme = "dark"
         let parsed = themes.import_ui_toml(&rgba).unwrap();
         assert_eq!(parsed.ui.accent.as_deref(), Some("#589DF680"));
     }
+
+    #[test]
+    fn test_theme_studio_generated_toml_parses_and_saves_successfully() {
+        let mut themes = ThemeService::new();
+        let toml_str = r##"schema-version = 1
+id = "custom.ui.my-dark-theme"
+name = "My Dark Theme"
+kind = "ui"
+period = "night"
+base = "builtin.ui.darcula"
+author = "User"
+
+[ui]
+color-scheme = "dark"
+window-background = "#1e1e2e"
+panel-background = "#181825"
+surface-background = "#313244"
+hover-background = "#45475a"
+foreground = "#cdd6f4"
+secondary-foreground = "#a6adc8"
+accent = "#cba6f7"
+border = "#45475a"
+"##;
+        let def = themes.import_ui_toml(toml_str).unwrap();
+        assert_eq!(def.metadata.id.as_ref(), "custom.ui.my-dark-theme");
+        assert_eq!(def.ui.window_background.as_deref(), Some("#1e1e2e"));
+        assert_eq!(def.ui.accent.as_deref(), Some("#cba6f7"));
+        themes.save_ui(def.clone()).unwrap();
+        // Replace existing
+        themes.replace_ui(def).unwrap();
+    }
 }
+

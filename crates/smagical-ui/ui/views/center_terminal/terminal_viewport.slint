@@ -732,7 +732,7 @@ export component TerminalViewport inherits Rectangle {
         opacity: root.is-tab-drop-valid ? 0.90 : 0.45;
         background: AppTheme.surface-background.transparentize(15%);
         border-width: 1.5px;
-        border-color: root.is-tab-drop-valid ? #3b82f6 : AppTheme.danger;
+        border-color: root.is-tab-drop-valid ? AppTheme.accent : AppTheme.danger;
         drop-shadow-blur: 8px;
         drop-shadow-color: #000000.transparentize(40%);
 
@@ -749,7 +749,7 @@ export component TerminalViewport inherits Rectangle {
                     width: 13px;
                     height: 13px;
                     image-fit: contain;
-                    colorize: root.is-tab-drop-valid ? #3b82f6 : AppTheme.disabled-foreground;
+                    colorize: root.is-tab-drop-valid ? AppTheme.accent : AppTheme.disabled-foreground;
                 }
             }
 

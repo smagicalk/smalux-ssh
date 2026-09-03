@@ -87,7 +87,7 @@ export component HistoryDetailModal inherits Rectangle {
                         Rectangle {
                             height: 20px;
                             border-radius: 4px;
-                            background: root.exit-status == "active" ? #22c55e22 : (root.exit-status == "timeout" || root.exit-status == "error" ? #ef444422 : (root.exit-status == "auth_failed" ? #f59e0b22 : #64748b22));
+                            background: root.exit-status == "active" ? AppTheme.success.transparentize(85%) : (root.exit-status == "timeout" || root.exit-status == "error" ? AppTheme.danger.transparentize(85%) : (root.exit-status == "auth_failed" ? AppTheme.warning.transparentize(85%) : AppTheme.secondary-foreground.transparentize(85%)));
                             y: (parent.height - self.height) / 2;
 
                             HorizontalLayout {
@@ -100,7 +100,7 @@ export component HistoryDetailModal inherits Rectangle {
                                     width: 6px;
                                     height: 6px;
                                     border-radius: 3px;
-                                    background: root.exit-status == "active" ? #22c55e : (root.exit-status == "timeout" || root.exit-status == "error" ? #ef4444 : (root.exit-status == "auth_failed" ? #f59e0b : #64748b));
+                                    background: root.exit-status == "active" ? AppTheme.success : (root.exit-status == "timeout" || root.exit-status == "error" ? AppTheme.danger : (root.exit-status == "auth_failed" ? AppTheme.warning : AppTheme.secondary-foreground));
                                     y: (parent.height - self.height) / 2;
                                 }
 
@@ -108,7 +108,7 @@ export component HistoryDetailModal inherits Rectangle {
                                     text: root.exit-status == "active" ? @tr("活跃中") : (root.exit-status == "timeout" ? @tr("连接超时") : (root.exit-status == "auth_failed" ? @tr("认证失败") : (root.exit-status == "error" ? @tr("异常中断") : @tr("正常退出"))));
                                     font-size: 10px;
                                     font-weight: 600;
-                                    color: root.exit-status == "active" ? #22c55e : (root.exit-status == "timeout" || root.exit-status == "error" ? #ef4444 : (root.exit-status == "auth_failed" ? #f59e0b : AppTheme.secondary-foreground));
+                                    color: root.exit-status == "active" ? AppTheme.success : (root.exit-status == "timeout" || root.exit-status == "error" ? AppTheme.danger : (root.exit-status == "auth_failed" ? AppTheme.warning : AppTheme.secondary-foreground));
                                     vertical-alignment: center;
                                 }
                             }
@@ -330,20 +330,18 @@ export component HistoryDetailModal inherits Rectangle {
                         border-color: AppTheme.border;
                         clip: true;
 
-                        snap-flick := Flickable {
-                            visible: root.snapshot-content != "";
-                            interactive: false; // 禁用拖拽滚屏，使鼠标拖拽完全用于文本划选高亮与复制
+                        if root.snapshot-content != "": ScrollView {
                             width: 100%;
                             height: 100%;
-                            viewport-width: Math.max(self.width, 720px);
-                            viewport-height: Math.max(self.height, root.snapshot-lines * 17px + 24px);
+                            viewport-width: Math.max(self.width - 16px, 720px);
+                            viewport-height: Math.max(self.height - 16px, root.snapshot-lines * 17px + 24px);
 
                             // 可直接鼠标划选高亮、自由复制的只读终端文本框
                             TextInput {
                                 x: 12px;
                                 y: 10px;
-                                width: snap-flick.viewport-width - 24px;
-                                height: snap-flick.viewport-height - 20px;
+                                width: parent.viewport-width - 24px;
+                                height: parent.viewport-height - 20px;
                                 text: root.snapshot-content;
                                 read-only: true;
                                 single-line: false;
@@ -353,36 +351,6 @@ export component HistoryDetailModal inherits Rectangle {
                                 color: AppTheme.foreground;
                                 selection-background-color: AppTheme.selected-background;
                                 selection-foreground-color: AppTheme.selected-foreground;
-                            }
-                        }
-
-
-
-                        // 极简主题竖向滚动条滑块 (半透明细条，悬停亮起，与主窗口配色浑然一体)
-                        if root.snapshot-content != "" && snap-flick.viewport-height > snap-flick.height: Rectangle {
-                            x: parent.width - self.width - 3px;
-                            y: (-snap-flick.viewport-y / snap-flick.viewport-height) * parent.height;
-                            width: 5px;
-                            height: Math.max(24px, (snap-flick.height / snap-flick.viewport-height) * parent.height);
-                            border-radius: 2.5px;
-                            background: vscroll-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(65%);
-
-                            vscroll-touch := TouchArea {
-                                // 鼠标悬停高亮反馈
-                            }
-                        }
-
-                        // 极简主题横向滚动条滑块 (宽文本时出现)
-                        if root.snapshot-content != "" && snap-flick.viewport-width > snap-flick.width: Rectangle {
-                            x: (-snap-flick.viewport-x / snap-flick.viewport-width) * parent.width;
-                            y: parent.height - self.height - 3px;
-                            height: 5px;
-                            width: Math.max(24px, (snap-flick.width / snap-flick.viewport-width) * parent.width);
-                            border-radius: 2.5px;
-                            background: hscroll-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(65%);
-
-                            hscroll-touch := TouchArea {
-                                // 鼠标悬停高亮反馈
                             }
                         }
 
@@ -415,14 +383,15 @@ export component HistoryDetailModal inherits Rectangle {
                     alignment: space-between;
                     height: 32px;
 
-                    // 左侧错误提示 (采用原生矢量图标，彻底避免系统 Emoji 字体缺失或裁剪变形)
+                    // 左侧错误提示 (垂直绝对居中对齐，采用主题警告色)
                     HorizontalLayout {
                         spacing: 6px;
                         alignment: start;
+                        y: (parent.height - self.height) / 2;
 
                         if root.error-msg != "": HorizontalLayout {
                             spacing: 6px;
-                            alignment: start;
+                            alignment: center;
 
                             VerticalLayout {
                                 alignment: center;
@@ -432,18 +401,15 @@ export component HistoryDetailModal inherits Rectangle {
                                     width: 13px;
                                     height: 13px;
                                     image-fit: contain;
-                                    colorize: #ef4444;
+                                    colorize: AppTheme.danger;
                                 }
                             }
 
-                            TextInput {
+                            Text {
                                 text: root.error-msg;
                                 font-size: 11px;
-                                color: #ef4444;
-                                read-only: true;
-                                single-line: true;
-                                selection-background-color: AppTheme.selected-background;
-                                selection-foreground-color: AppTheme.selected-foreground;
+                                color: AppTheme.danger;
+                                vertical-alignment: center;
                             }
                         }
                     }
@@ -456,14 +422,14 @@ export component HistoryDetailModal inherits Rectangle {
                         alignment: end;
 
                         AppButton {
-                            width: 90px;
+                            min-width: 90px;
                             text: @tr("关闭");
                             variant: "secondary";
                             clicked => { root.close(); }
                         }
 
                         AppButton {
-                            width: 90px;
+                            min-width: 90px;
                             text: @tr("发起连接");
                             has-icon: true;
                             icon: @image-url("../assets/icons/play.svg");

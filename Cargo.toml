@@ -42,6 +42,11 @@ fontdue = "0.9"
 arboard = "3"
 vt100 = "0.15"
 
+[profile.dev]
+# 降低局部变量调试符号（保留 panic 行号与堆栈追踪），显著降低 PDB 体积和 MSVC 磁盘写入耗时
+debug = 1
+
+
 
 
 

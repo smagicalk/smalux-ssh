@@ -5,7 +5,7 @@
 /// 基于纯内存与预设种子的 Mock 存储实现。
 pub mod mock_storage;
 
-use crate::domain::{group::GroupRecord, history::HistoryRecord, host::HostRecord};
+use crate::domain::{config::AppConfigRecord, group::GroupRecord, history::HistoryRecord, host::HostRecord};
 
 /// 存储操作统一结果类型
 pub type StorageResult<T> = Result<T, StorageError>;
@@ -207,6 +207,21 @@ pub trait TunnelRepository: Send + Sync {
     fn update_metrics(&self, id: &str, active_conn: usize, bytes_in: u64, bytes_out: u64) -> StorageResult<()>;
 }
 
+/// 全局偏好与系统配置仓储接口契约
+pub trait ConfigRepository: Send + Sync {
+    /// 获取当前全局配置快照
+    fn get(&self) -> StorageResult<AppConfigRecord>;
+
+    /// 保存全量配置
+    fn save(&self, config: &AppConfigRecord) -> StorageResult<()>;
+
+    /// 重置所有配置回初始默认值
+    fn reset_to_default(&self) -> StorageResult<AppConfigRecord>;
+
+    /// 快捷修改单个或部分配置属性
+    fn update(&self, mutate: Box<dyn FnOnce(&mut AppConfigRecord) + Send>) -> StorageResult<AppConfigRecord>;
+}
+
 /// 聚合存储服务门面契约
 pub trait AppStorage: Send + Sync {
     /// 主机仓储句柄
@@ -226,6 +241,9 @@ pub trait AppStorage: Send + Sync {
 
     /// 网络隧道与代理仓储句柄
     fn tunnels(&self) -> &dyn TunnelRepository;
+
+    /// 全局系统与偏好配置仓储句柄
+    fn config(&self) -> &dyn ConfigRepository;
 
     /// 强制从物理介质重新加载数据
     fn reload(&self) -> StorageResult<()>;

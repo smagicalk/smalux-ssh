@@ -141,14 +141,14 @@ export component DebugSnippetsTab inherits VerticalLayout {
                             p-s1 := TouchArea {
                                 clicked => {
                                     root.quick-add-snippet(
-                                        "Docker 容器健康列表",
+                                        @tr("Docker 容器健康列表"),
                                         "bash",
                                         "docker ps --format 'table {{.Names}}\\t{{.Status}}\\t{{.Ports}}'"
                                     );
                                 }
                                 mouse-cursor: pointer;
                             }
-                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "🐳 + Docker ps"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: @tr("🐳 + Docker ps"); font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
                         }
 
                         Rectangle {
@@ -158,14 +158,14 @@ export component DebugSnippetsTab inherits VerticalLayout {
                             p-s2 := TouchArea {
                                 clicked => {
                                     root.quick-add-snippet(
-                                        "K8s 重启 Deployment",
+                                        @tr("K8s 重启 Deployment"),
                                         "bash",
                                         "kubectl rollout restart deployment/{{deployment}} -n {{namespace:default}}"
                                     );
                                 }
                                 mouse-cursor: pointer;
                             }
-                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "☸️ + K8s 重启"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: @tr("☸️ + K8s 重启"); font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
                         }
                     }
 
@@ -178,14 +178,14 @@ export component DebugSnippetsTab inherits VerticalLayout {
                             p-s3 := TouchArea {
                                 clicked => {
                                     root.quick-add-snippet(
-                                        "排查端口占用",
+                                        @tr("排查端口占用"),
                                         "bash",
                                         "lsof -i :{{port:8080}} || netstat -tulnp | grep :{{port:8080}}"
                                     );
                                 }
                                 mouse-cursor: pointer;
                             }
-                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "🔌 + 端口排查"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: @tr("🔌 + 端口排查"); font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
                         }
 
                         Rectangle {
@@ -195,14 +195,14 @@ export component DebugSnippetsTab inherits VerticalLayout {
                             p-s4 := TouchArea {
                                 clicked => {
                                     root.quick-add-snippet(
-                                        "MySQL 活跃长事务",
+                                        @tr("MySQL 活跃长事务"),
                                         "sql",
                                         "mysql -u {{user:root}} -p{{password}} -e 'SHOW FULL PROCESSLIST;'"
                                     );
                                 }
                                 mouse-cursor: pointer;
                             }
-                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: "🐬 + MySQL 慢查询"; font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
+                            HorizontalLayout { padding-left: 8px; padding-right: 8px; alignment: center; Text { text: @tr("🐬 + MySQL 慢查询"); font-size: 10px; color: AppTheme.foreground; vertical-alignment: center; } }
                         }
                     }
                 }

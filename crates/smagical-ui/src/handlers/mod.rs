@@ -8,7 +8,9 @@ pub(crate) mod file_handlers;
 pub(crate) mod history_handlers;
 pub(crate) mod host_handlers;
 pub(crate) mod session_handlers;
+pub(crate) mod settings_handlers;
 pub(crate) mod snippet_handlers;
+pub(crate) mod theme_handlers;
 pub(crate) mod tunnel_handlers;
 pub(crate) mod window_handlers;
 
@@ -50,7 +52,19 @@ pub(crate) struct AppContext {
     pub cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
 
     /// 全局配色主题管理器服务 (Theme Service)
-    pub themes: Rc<ThemeService>,
+    pub themes: Rc<RefCell<ThemeService>>,
+    /// 主题数据层仓储管理器 (纯内存数据层 Theme Repository，无本地文件)
+    pub theme_repo: Option<Rc<RefCell<smagical_core::theme::MemoryThemeRepository>>>,
+    /// 背景壁纸图片画廊路径列表 (Wallpaper Gallery)
+    pub wallpapers: Rc<RefCell<Vec<String>>>,
+    /// 当前激活生效的壁纸索引
+    pub active_wallpaper_idx: Rc<RefCell<usize>>,
+    /// 壁纸轮播定时器
+    pub wallpaper_timer: Rc<RefCell<Option<slint::Timer>>>,
+    /// 壁纸按需预加载内存 LRU 缓存 (Wallpaper LRU Preload Cache)
+    pub wallpaper_cache: Rc<RefCell<std::collections::HashMap<String, slint::Image>>>,
+    /// 壁纸空闲延时预加载单次定时器句柄 (Idle Preload Timer)
+    pub wallpaper_preload_timer: Rc<RefCell<Option<slint::Timer>>>,
     /// 终端像素帧光栅化渲染器实例 (Terminal Renderer)
     pub terminal_renderer: Rc<RefCell<Option<crate::terminal::TerminalRenderer>>>,
     /// 活跃分屏窗格组列表 (每个窗格拥有独立的 Tab 序列与激活状态)
@@ -162,6 +176,10 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     tunnel_handlers::register_tunnel_handlers(window, ctx);
     // 9. 挂载开发者调试面板专用回调 (批量造数、状态批量更新、预设写入、日志清空等)
     debug_handlers::register_debug_handlers(window, ctx);
+    // 10. 挂载全屏偏好设置中心交互回调 (备份导出、OpenSSH配置导入、恢复出厂等)
+    settings_handlers::register_settings_handlers(window, ctx);
+    // 11. 挂载配色主题管理与背景壁纸轮播回调 (自定义、导入、导出、删除、多壁纸轮播)
+    theme_handlers::register_theme_and_wallpaper_handlers(window, ctx);
 }
 
 

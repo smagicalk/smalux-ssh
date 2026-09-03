@@ -71,6 +71,69 @@ pub fn restore_system_theme(window: &AppWindow, service: &ThemeService) -> Resul
     apply_theme_by_id(window, service, "builtin.ui.system")
 }
 
+/// 同步当前主题服务的全部可用 UI 主题至 Slint 视图模型
+pub fn sync_ui_themes(window: &AppWindow, service: &ThemeService) {
+    let mut custom_themes = Vec::new();
+    let mut dark_themes = Vec::new();
+    let mut light_themes = Vec::new();
+    let mut all_options = Vec::new();
+
+    for def in service.list_ui() {
+        let id_str = def.metadata.id.as_ref();
+        let is_builtin = id_str.starts_with("builtin.");
+        let is_dark = def.metadata.period.map(|p| p == smagical_core::theme::ThemePeriod::Night).unwrap_or(true);
+        if let Ok(resolved) = service.resolve_ui(id_str) {
+            let bg_color = parse_color(&resolved.tokens.window_background);
+            let fg_color = parse_color(&resolved.tokens.foreground);
+            let accent_color = parse_color(&resolved.tokens.accent);
+            let preview_color = parse_color(&resolved.tokens.surface_background);
+
+            let opt = crate::generated::ThemeOption {
+                id: id_str.into(),
+                name: def.metadata.name.clone().into(),
+                is_builtin,
+                is_dark,
+                bg_color: Brush::from(bg_color),
+                fg_color: Brush::from(fg_color),
+                accent_color: Brush::from(accent_color),
+                color_preview: Brush::from(preview_color),
+            };
+
+            all_options.push(opt.clone());
+            if !is_builtin {
+                custom_themes.push(opt);
+            } else if is_dark {
+                dark_themes.push(opt);
+            } else {
+                light_themes.push(opt);
+            }
+        }
+    }
+
+    let chunk_rows = |items: Vec<crate::generated::ThemeOption>| -> Vec<crate::generated::ThemeRow> {
+        items
+            .chunks(5)
+            .map(|chunk| crate::generated::ThemeRow {
+                items: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk.to_vec()))),
+            })
+            .collect()
+    };
+
+    window.set_custom_themes_count(custom_themes.len() as i32);
+    window.set_dark_themes_count(dark_themes.len() as i32);
+    window.set_light_themes_count(light_themes.len() as i32);
+
+    window.set_custom_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(custom_themes.clone()))));
+    window.set_dark_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(dark_themes.clone()))));
+    window.set_light_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(light_themes.clone()))));
+
+    window.set_custom_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(custom_themes)))));
+    window.set_dark_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(dark_themes)))));
+    window.set_light_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(light_themes)))));
+
+    window.set_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_options))));
+}
+
 fn parse_color(value: &str) -> Color {
     let hex = value.trim_start_matches('#');
     let channel =

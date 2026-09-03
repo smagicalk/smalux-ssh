@@ -138,6 +138,82 @@ impl ThemeRepository for FileThemeRepository {
     }
 }
 
+/// 纯内存/数据层主题仓储实现 (0 磁盘 I/O，不写入本地物理文件，直接在数据层维护)
+#[derive(Debug, Clone)]
+pub struct MemoryThemeRepository {
+    virtual_directory: PathBuf,
+    themes: std::sync::Arc<std::sync::RwLock<Vec<LoadedTheme>>>,
+}
+
+impl Default for MemoryThemeRepository {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemoryThemeRepository {
+    /// 创建全新的内存主题仓储
+    pub fn new() -> Self {
+        Self {
+            virtual_directory: PathBuf::from("memory://themes"),
+            themes: std::sync::Arc::new(std::sync::RwLock::new(Vec::new())),
+        }
+    }
+
+    /// 使用已有主题列表初始化
+    pub fn with_themes(initial: Vec<LoadedTheme>) -> Self {
+        Self {
+            virtual_directory: PathBuf::from("memory://themes"),
+            themes: std::sync::Arc::new(std::sync::RwLock::new(initial)),
+        }
+    }
+
+    /// 获取底层主题并发读写锁
+    pub fn themes_raw(&self) -> std::sync::Arc<std::sync::RwLock<Vec<LoadedTheme>>> {
+        self.themes.clone()
+    }
+}
+
+impl ThemeRepository for MemoryThemeRepository {
+    fn active_directory(&self) -> &Path {
+        &self.virtual_directory
+    }
+
+    fn discover(&self) -> Result<Vec<LoadedTheme>, ThemeError> {
+        let guard = self.themes.read().map_err(|e| ThemeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+        Ok(guard.clone())
+    }
+
+    fn save_ui(&self, theme: &UiThemeDefinition) -> Result<PathBuf, ThemeError> {
+        let mut guard = self.themes.write().map_err(|e| ThemeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+        guard.retain(|t| match t {
+            LoadedTheme::Ui(u) => u.metadata.id != theme.metadata.id,
+            _ => true,
+        });
+        guard.push(LoadedTheme::Ui(theme.clone()));
+        Ok(self.virtual_directory.join(format!("{}.toml", theme.metadata.id)))
+    }
+
+    fn save_terminal(&self, theme: &TerminalThemeDefinition) -> Result<PathBuf, ThemeError> {
+        let mut guard = self.themes.write().map_err(|e| ThemeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+        guard.retain(|t| match t {
+            LoadedTheme::Terminal(tm) => tm.metadata.id != theme.metadata.id,
+            _ => true,
+        });
+        guard.push(LoadedTheme::Terminal(theme.clone()));
+        Ok(self.virtual_directory.join(format!("{}.toml", theme.metadata.id)))
+    }
+
+    fn delete(&self, id: &ThemeId) -> Result<(), ThemeError> {
+        let mut guard = self.themes.write().map_err(|e| ThemeError::Io(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))?;
+        guard.retain(|t| match t {
+            LoadedTheme::Ui(u) => &u.metadata.id != id,
+            LoadedTheme::Terminal(tm) => &tm.metadata.id != id,
+        });
+        Ok(())
+    }
+}
+
 fn ensure_writable(directory: &Path) -> Result<(), std::io::Error> {
     fs::create_dir_all(directory)?;
     let probe = directory.join(format!(".write-test-{}", uuid::Uuid::new_v4()));

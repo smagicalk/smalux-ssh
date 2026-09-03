@@ -13,8 +13,43 @@ use theme::apply_theme_by_id;
 
 use crate::generated::AppWindow;
 use crate::handlers::AppContext;
+use crate::{theme, AppTheme};
 
-use crate::theme;
+#[cfg(target_os = "windows")]
+fn is_autostart_enabled() -> bool {
+    std::process::Command::new("reg")
+        .args(["query", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "smalux-ssh"])
+        .output()
+        .map(|o| o.status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "windows"))]
+fn is_autostart_enabled() -> bool {
+    false
+}
+
+#[cfg(target_os = "windows")]
+fn set_autostart_enabled(enabled: bool) -> std::io::Result<()> {
+    if enabled {
+        let exe_path = std::env::current_exe()?;
+        let path_str = exe_path.to_string_lossy();
+        let val = format!("\"{}\"", path_str);
+        std::process::Command::new("reg")
+            .args(["add", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "smalux-ssh", "/t", "REG_SZ", "/d", &val, "/f"])
+            .output()?;
+    } else {
+        let _ = std::process::Command::new("reg")
+            .args(["delete", r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run", "/v", "smalux-ssh", "/f"])
+            .output();
+    }
+    Ok(())
+}
+
+#[cfg(not(target_os = "windows"))]
+fn set_autostart_enabled(_enabled: bool) -> std::io::Result<()> {
+    Ok(())
+}
 
 /// 注册窗口级通用交互回调。
 ///
@@ -67,8 +102,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 "System"
             };
 
-            match apply_theme_by_id(&w, &themes_clone, normalized_id) {
+            match apply_theme_by_id(&w, &*themes_clone.borrow(), normalized_id) {
                 Ok(()) => {
+                    w.set_current_theme_id(normalized_id.into());
                     w.set_current_theme_name(name.into());
                     let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
                     w.set_is_dark_mode(!is_light);
@@ -82,6 +118,11 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                         new_val: normalized_id.to_string(),
                         source: "switch_theme".into(),
                     });
+                    let id_for_cfg = normalized_id.to_string();
+                    let _ = core_state_theme.storage().config().update(Box::new(move |c| {
+                        c.theme_id = id_for_cfg;
+                        c.is_dark_mode = !is_light;
+                    }));
                     tracing::info!(target: "smagical_ui::theme", "切换应用配色主题: {} ({})", name, normalized_id);
 
                 }
@@ -105,11 +146,13 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             let next_dark = !is_dark;
 
             if next_dark {
-                let _ = apply_theme_by_id(&w, &themes_clone, "builtin.ui.darcula");
+                let _ = apply_theme_by_id(&w, &*themes_clone.borrow(), "builtin.ui.darcula");
+                w.set_current_theme_id("builtin.ui.darcula".into());
                 w.set_current_theme_name("Darcula".into());
                 w.set_is_dark_mode(true);
             } else {
-                let _ = apply_theme_by_id(&w, &themes_clone, "builtin.ui.github-light");
+                let _ = apply_theme_by_id(&w, &*themes_clone.borrow(), "builtin.ui.github-light");
+                w.set_current_theme_id("builtin.ui.github-light".into());
                 w.set_current_theme_name("GitHub Light".into());
                 w.set_is_dark_mode(false);
             }
@@ -174,31 +217,239 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
 
+    // 同步初始化系统开机自启状态
+    window.set_setting_start_on_boot(is_autostart_enabled());
+
     // -------------------------------------------------------------------------
-    // 3. 窗口控制: 关闭应用 (带安全守护与退出归档)
+    // 3. 窗口控制: 关闭应用 (带活跃会话前置拦截、托盘保护与退出归档)
     // -------------------------------------------------------------------------
-    // 点击右上角红色关闭按钮时，安全退出客户端进程。
+    // 点击右上角红色关闭按钮时，根据配置执行活跃会话拦截、托盘最小化或安全退出。
+    let window_weak = window.as_weak();
     let core_state_close = ctx.core_state.clone();
     let pane_groups_close = Rc::clone(&ctx.pane_groups);
     let persistence_guard_close = std::sync::Arc::clone(&ctx.persistence_guard);
+    let notif_close = ctx.notifications.clone();
     window.on_close_window(move || {
-        let active_count: usize = pane_groups_close.borrow().iter().map(|g| g.tabs.len()).sum();
-        let before_exit_event = AppBeforeExitEvent::new(active_count);
-        core_state_close.events().dispatch(&before_exit_event);
-        if before_exit_event.is_aborted() {
-            tracing::warn!(
-                target: "smagical_ui::window",
-                "应用退出流程被安全守护拦截: {:?}",
-                before_exit_event.abort_reason()
-            );
-            return;
+        if let Some(w) = window_weak.upgrade() {
+            let mut remote_count = 0;
+            let mut local_count = 0;
+            for g in pane_groups_close.borrow().iter() {
+                for t in &g.tabs {
+                    if t.host_id.starts_with("local-") || t.host_address.starts_with("Local") {
+                        local_count += 1;
+                    } else {
+                        remote_count += 1;
+                    }
+                }
+            }
+            let active_count = remote_count + local_count;
+
+            // A. 如果开启了活跃会话防呆确认，且当前有活跃会话（优先拦截弹窗）
+            if active_count > 0 && w.get_setting_confirm_close_active() {
+                w.set_is_exit_confirm_open(true);
+                tracing::info!(
+                    target: "smagical_ui::window",
+                    "检测到 {} 个远程 SSH 会话和 {} 个本地终端正在运行，拦截关闭并弹出二次确认",
+                    remote_count, local_count
+                );
+                return;
+            }
+
+            // B. 如果设置关闭时最小化到系统托盘 (tray)
+            if w.get_setting_close_action() == "tray" {
+                w.window().set_minimized(true);
+                notif_close.info("已最小化到后台", "网络隧道与 SSH 会话在后台持续保持连接中");
+                tracing::info!(target: "smagical_ui::window", "窗口关闭动作已转为托盘后台运行");
+                return;
+            }
+
+            // C. 正常直接退出
+            let before_exit_event = AppBeforeExitEvent::new(active_count);
+            core_state_close.events().dispatch(&before_exit_event);
+            if before_exit_event.is_aborted() {
+                tracing::warn!(
+                    target: "smagical_ui::window",
+                    "应用退出流程被安全守护拦截: {:?}",
+                    before_exit_event.abort_reason()
+                );
+                return;
+            }
+            persistence_guard_close.flush_and_wait(std::time::Duration::from_millis(1000));
+            core_state_close.events().dispatch(&AppExitEvent { exit_code: 0 });
+            std::process::exit(0);
         }
-        // 等待所有后台会话历史持久化写盘完成，杜绝数据丢失
-        persistence_guard_close.flush_and_wait(std::time::Duration::from_millis(1000));
-        core_state_close.events().dispatch(&AppExitEvent { exit_code: 0 });
+    });
+
+    // -------------------------------------------------------------------------
+    // 3.0 系统原生关闭事件生命周期拦截 (Alt+F4 / 任务栏关闭等原生事件)
+    // -------------------------------------------------------------------------
+    let window_weak_req = window.as_weak();
+    let pane_groups_req = Rc::clone(&ctx.pane_groups);
+    window.window().on_close_requested(move || -> slint::CloseRequestResponse {
+        if let Some(w) = window_weak_req.upgrade() {
+            let active_count: usize = pane_groups_req.borrow().iter().map(|g| g.tabs.len()).sum();
+            if active_count > 0 && w.get_setting_confirm_close_active() {
+                w.set_is_exit_confirm_open(true);
+                return slint::CloseRequestResponse::KeepWindowShown;
+            }
+            if w.get_setting_close_action() == "tray" {
+                w.window().set_minimized(true);
+                return slint::CloseRequestResponse::KeepWindowShown;
+            }
+        }
+        slint::CloseRequestResponse::HideWindow
+    });
+
+    // -------------------------------------------------------------------------
+    // 3.1 强制退出应用回调 (用户在二次防呆弹窗中点击“强行退出”)
+    // -------------------------------------------------------------------------
+    let core_state_force = ctx.core_state.clone();
+    let persistence_guard_force = std::sync::Arc::clone(&ctx.persistence_guard);
+    window.on_force_close_window(move || {
+        persistence_guard_force.flush_and_wait(std::time::Duration::from_millis(1000));
+        core_state_force.events().dispatch(&AppExitEvent { exit_code: 0 });
         std::process::exit(0);
     });
 
+    // -------------------------------------------------------------------------
+    // 3.2 窗口控制: 窗口始终置顶 (Always on Top)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let notif_top = ctx.notifications.clone();
+    window.on_toggle_always_on_top(move |always_on_top| {
+        if let Some(w) = window_weak.upgrade() {
+            w.set_setting_always_on_top(always_on_top);
+            w.window().with_winit_window(|winit_window| {
+                let level = if always_on_top {
+                    slint::winit_030::winit::window::WindowLevel::AlwaysOnTop
+                } else {
+                    slint::winit_030::winit::window::WindowLevel::Normal
+                };
+                winit_window.set_window_level(level);
+            });
+            if always_on_top {
+                notif_top.info("窗口置顶已开启", "客户端窗口将始终显示在其他应用之上");
+            } else {
+                notif_top.info("窗口置顶已关闭", "客户端窗口已恢复普通层级");
+            }
+            tracing::info!(target: "smagical_ui::window", "窗口置顶状态设置为: {}", always_on_top);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 3.3 系统开机自启设置 (Launch on Boot)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let notif_boot = ctx.notifications.clone();
+    let core_state_boot = ctx.core_state.clone();
+    window.on_toggle_start_on_boot(move |enabled| {
+        if let Some(w) = window_weak.upgrade() {
+            w.set_setting_start_on_boot(enabled);
+            let _ = core_state_boot.storage().config().update(Box::new(move |c| {
+                c.start_on_boot = enabled;
+            }));
+            match set_autostart_enabled(enabled) {
+                Ok(()) => {
+                    if enabled {
+                        notif_boot.success("开机自启已开启", "客户端已添加至 Windows 登录自启动列表");
+                    } else {
+                        notif_boot.info("开机自启已关闭", "已从 Windows 登录自启动列表中移除");
+                    }
+                    tracing::info!(target: "smagical_ui::settings", "开机自启设置为: {}", enabled);
+                }
+                Err(e) => {
+                    notif_boot.error("设置开机自启失败", &format!("{}", e));
+                    tracing::error!(target: "smagical_ui::settings", "设置开机自启失败: {}", e);
+                }
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 3.4 退出时含活跃会话防呆确认设置
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    window.on_toggle_confirm_close_active(move |enabled| {
+        if let Some(w) = window_weak.upgrade() {
+            w.set_setting_confirm_close_active(enabled);
+            tracing::info!(target: "smagical_ui::settings", "退出时活跃会话防呆确认设置为: {}", enabled);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 3.5 切换图形渲染引擎及重启确认拦截
+    // -------------------------------------------------------------------------
+    let pending_pipeline_restart = Rc::new(std::cell::RefCell::new(Option::<String>::None));
+
+    let window_weak_pipe = window.as_weak();
+    let pending_pipe_for_switch = Rc::clone(&pending_pipeline_restart);
+    window.on_switch_rendering_pipeline(move |pipe_id| {
+        if let Some(w) = window_weak_pipe.upgrade() {
+            let p_str = pipe_id.to_string();
+            let cur = w.get_active_rendering_pipeline().to_string();
+            if cur == p_str {
+                return;
+            }
+
+            let pipe_name = match p_str.as_str() {
+                "winit-skia" => "Skia Auto (推荐)",
+                "winit-skia-opengl" => "Skia OpenGL",
+                "winit-skia-vulkan" => "Skia Vulkan",
+                "winit-skia-software" => "CPU 软件安全渲染",
+                _ => p_str.as_str(),
+            };
+
+            *pending_pipe_for_switch.borrow_mut() = Some(p_str.clone());
+            w.set_restart_confirm_message(
+                format!("切换渲染引擎为 [{}] 需要重启客户端以完成底层 GPU 显卡管线重新绑定。是否立即重启？", pipe_name).into()
+            );
+            w.set_is_restart_confirm_open(true);
+            tracing::info!(target: "smagical_ui::settings", "请求切换渲染引擎为: {}，已唤起重启确认弹窗", p_str);
+        }
+    });
+
+    let window_weak_restart = window.as_weak();
+    let pending_pipe_for_restart = Rc::clone(&pending_pipeline_restart);
+    let persistence_guard_restart = std::sync::Arc::clone(&ctx.persistence_guard);
+    window.on_confirm_restart_pipeline(move || {
+        if let Some(w) = window_weak_restart.upgrade() {
+            if let Some(p_str) = pending_pipe_for_restart.borrow_mut().take() {
+                w.set_active_rendering_pipeline(p_str.clone().into());
+                unsafe {
+                    std::env::set_var("SLINT_BACKEND", &p_str);
+                }
+                tracing::info!(target: "smagical_ui::settings", "正在执行客户端安全重启以生效全新渲染管线: [{}]...", p_str);
+
+                persistence_guard_restart.flush_and_wait(std::time::Duration::from_millis(500));
+
+                if let Ok(exe_path) = std::env::current_exe() {
+                    let mut cmd = std::process::Command::new(exe_path);
+                    cmd.env("SLINT_BACKEND", &p_str);
+                    if let Err(e) = cmd.spawn() {
+                        tracing::error!(target: "smagical_ui::settings", "重启客户端拉起新进程失败: {:?}", e);
+                    } else {
+                        std::process::exit(0);
+                    }
+                }
+            }
+        }
+    });
+
+    let window_weak_cancel = window.as_weak();
+    let pending_pipe_for_cancel = Rc::clone(&pending_pipeline_restart);
+    let notif_pipe_cancel = ctx.notifications.clone();
+    window.on_cancel_restart_pipeline(move || {
+        if let Some(w) = window_weak_cancel.upgrade() {
+            if let Some(p_str) = pending_pipe_for_cancel.borrow_mut().take() {
+                w.set_active_rendering_pipeline(p_str.clone().into());
+                unsafe {
+                    std::env::set_var("SLINT_BACKEND", &p_str);
+                }
+                notif_pipe_cancel.info("渲染引擎配置已更新", "新管线首选项已保存，将在下次启动客户端时自动加载生效");
+                tracing::info!(target: "smagical_ui::settings", "用户选择稍后重启，渲染管线 [{}] 已暂存并在下次启动生效", p_str);
+            }
+        }
+    });
 
     // -------------------------------------------------------------------------
     // 4. 窗口控制: 最小化
@@ -257,12 +508,18 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let renderer_clone = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_clone = Rc::clone(&ctx.active_terminals);
+    let core_state_font = ctx.core_state.clone();
     window.on_set_terminal_font(move |font_name_or_path, font_size| {
         if let Some(w) = window_weak.upgrade() {
             let font_str = font_name_or_path.as_str();
             let size = if font_size <= 0.0 { 14.0 } else { font_size };
             w.set_terminal_font_family(font_str.into());
             w.set_terminal_font_size(size);
+            let font_for_cfg = font_str.to_string();
+            let _ = core_state_font.storage().config().update(Box::new(move |c| {
+                c.font_family = font_for_cfg;
+                c.font_size = size;
+            }));
 
             if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
                 let font_bytes = if std::path::Path::new(font_str).exists() {
@@ -321,39 +578,142 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let renderer_clone = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_clone = Rc::clone(&ctx.active_terminals);
+    let core_state_wp = ctx.core_state.clone();
+    let wallpaper_cache_ref = Rc::clone(&ctx.wallpaper_cache);
+    let wallpaper_preload_timer_ref = Rc::clone(&ctx.wallpaper_preload_timer);
+    let wallpapers_ref = Rc::clone(&ctx.wallpapers);
+    let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
     window.on_set_wallpaper(move |mode, image_path, opacity| {
         if let Some(w) = window_weak.upgrade() {
             let mode_str = mode.as_str();
-            let path_str = image_path.as_str();
+            let mut path_str = image_path.as_str().to_string();
             let op = if opacity <= 0.0 { 0.20 } else { opacity.min(1.0) };
 
-            w.set_wallpaper_mode(mode_str.into());
+            // 若传入路径为空，自动从持久化配置或当前壁纸列表中寻找当前激活的壁纸
+            if path_str.is_empty() || !std::path::Path::new(&path_str).exists() {
+                if let Ok(cfg) = core_state_wp.storage().config().get() {
+                    if !cfg.wallpaper_path.is_empty() && std::path::Path::new(&cfg.wallpaper_path).exists() {
+                        path_str = cfg.wallpaper_path;
+                    } else if !cfg.wallpaper_list.is_empty() && cfg.wallpaper_active_index < cfg.wallpaper_list.len() {
+                        path_str = cfg.wallpaper_list[cfg.wallpaper_active_index].clone();
+                    }
+                }
+            }
 
-            let img = if !path_str.is_empty() && std::path::Path::new(path_str).exists() {
-                slint::Image::load_from_path(std::path::Path::new(path_str)).unwrap_or_default()
+            w.set_wallpaper_mode(mode_str.into());
+            let theme_global = w.global::<AppTheme>();
+            theme_global.set_wallpaper_mode(mode_str.into());
+            theme_global.set_wallpaper_opacity(op);
+
+            // 1. 优先从内存 LRU 缓存中极速读取（0ms，不卡顿）
+            let cached_img_opt = if !path_str.is_empty() && std::path::Path::new(&path_str).exists() {
+                let mut cache = wallpaper_cache_ref.borrow_mut();
+                if let Some(cached) = cache.get(&path_str) {
+                    Some(cached.clone())
+                } else if let Ok(raw_c) = crate::handlers::theme_handlers::WALLPAPER_RAW_CACHE.lock() {
+                    if let Some((raw, rw, rh)) = raw_c.get(&path_str) {
+                        let pixel_buffer = slint::SharedPixelBuffer::clone_from_slice(raw, *rw, *rh);
+                        let loaded = slint::Image::from_rgba8(pixel_buffer);
+                        if cache.len() >= 4 {
+                            if let Some(oldest) = cache.keys().next().cloned() {
+                                cache.remove(&oldest);
+                            }
+                        }
+                        cache.insert(path_str.clone(), loaded.clone());
+                        Some(loaded)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
             } else {
-                slint::Image::default()
+                Some(slint::Image::default())
             };
 
-            match mode_str {
-                "global" => {
-                    w.set_global_wallpaper_image(img);
-                    w.set_global_wallpaper_opacity(op);
-                    if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
-                        renderer.set_background_opacity(85); // 适度半透明透底
-                    }
+            if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
+                match mode_str {
+                    "global" => renderer.set_background_opacity(75),
+                    "terminal" => renderer.set_background_opacity(70),
+                    _ => renderer.set_background_opacity(100),
                 }
-                "terminal" => {
-                    w.set_terminal_wallpaper_image(img);
-                    w.set_terminal_wallpaper_opacity(op);
-                    if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
-                        renderer.set_background_opacity(70); // 终端视口透底
+            }
+
+            let apply_wallpaper_ui = |w: &crate::generated::AppWindow, m_str: &str, img: slint::Image, opacity_val: f32| {
+                match m_str {
+                    "global" => {
+                        // 平滑双缓冲淡入淡出（Cross-fade）
+                        let prev_img = w.get_global_wallpaper_image();
+                        if prev_img.size().width > 0 {
+                            w.set_prev_wallpaper_image(prev_img);
+                            w.set_wallpaper_crossfade(0.0);
+                        } else {
+                            w.set_wallpaper_crossfade(1.0);
+                        }
+                        w.set_global_wallpaper_image(img.clone());
+                        w.set_global_wallpaper_opacity(opacity_val);
+                        w.set_terminal_wallpaper_image(img);
+                        w.set_terminal_wallpaper_opacity(opacity_val);
                     }
+                    "terminal" => {
+                        w.set_terminal_wallpaper_image(img);
+                        w.set_terminal_wallpaper_opacity(opacity_val);
+                    }
+                    _ => {}
                 }
-                _ => {
-                    if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
-                        renderer.set_background_opacity(100); // 纯色不透明
+            };
+
+            // 2. 如果缓存已有，立即在 0ms 呈现；否则交给后台线程异步解码投递，主 UI 线程耗时恒等于 0ms
+            if let Some(img) = cached_img_opt {
+                apply_wallpaper_ui(&w, mode_str, img, op);
+            } else {
+                let window_weak_bg = window_weak.clone();
+                let path_to_load = path_str.clone();
+                let mode_bg = mode_str.to_string();
+
+                std::thread::spawn(move || {
+                    if let Some(pixel_buffer) = crate::handlers::theme_handlers::load_pixel_buffer_fast(&path_to_load) {
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = window_weak_bg.upgrade() {
+                                let img = slint::Image::from_rgba8(pixel_buffer);
+                                match mode_bg.as_str() {
+                                    "global" => {
+                                        let prev_img = w.get_global_wallpaper_image();
+                                        if prev_img.size().width > 0 {
+                                            w.set_prev_wallpaper_image(prev_img);
+                                            w.set_wallpaper_crossfade(0.0);
+                                        } else {
+                                            w.set_wallpaper_crossfade(1.0);
+                                        }
+                                        w.set_global_wallpaper_image(img.clone());
+                                        w.set_global_wallpaper_opacity(op);
+                                        w.set_terminal_wallpaper_image(img);
+                                        w.set_terminal_wallpaper_opacity(op);
+                                    }
+                                    "terminal" => {
+                                        w.set_terminal_wallpaper_image(img);
+                                        w.set_terminal_wallpaper_opacity(op);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        });
                     }
+                });
+            }
+
+            // 自动触发下一张壁纸的按需后台静默预加载
+            if let Ok(wps) = wallpapers_ref.try_borrow() {
+                let all_imgs = crate::handlers::theme_handlers::resolve_all_wallpaper_images(&wps);
+                if all_imgs.len() > 1 {
+                    let cur_idx = *active_idx_ref.borrow();
+                    let next_idx = (cur_idx + 1) % all_imgs.len();
+                    let next_path = all_imgs[next_idx].clone();
+                    crate::handlers::theme_handlers::schedule_wallpaper_preload(
+                        next_path,
+                        Rc::clone(&wallpaper_cache_ref),
+                        Rc::clone(&wallpaper_preload_timer_ref),
+                    );
                 }
             }
 

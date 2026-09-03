@@ -1,8 +1,8 @@
 import { AppTheme } from "../themes/app-theme.slint";
-import { LineEdit, Button, ScrollView } from "std-widgets.slint";
+import { AppButton } from "base/app-button.slint";
 import { GroupOptionData } from "./create-group-modal.slint";
 
-/// 创建代码片段文件夹分组弹窗
+/// 创建代码片段文件夹分组弹窗组件 (样式与主机分组弹窗高度统一)
 export component CreateSnippetGroupModal inherits Rectangle {
     in-out property <bool> is_open: false;
     in-out property <string> group_name: "";
@@ -13,185 +13,407 @@ export component CreateSnippetGroupModal inherits Rectangle {
     callback submit;
     callback select_parent(string /* id */);
 
+    /// 控制上级文件夹下拉选取列表的显隐
+    property <bool> is_dropdown_open: false;
+    /// 当前选中的上级文件夹显示名称
+    in-out property <string> selected_parent_name: @tr("根目录 (作为顶级文件夹)");
+
     if root.is_open: Rectangle {
-        background: #000000.transparentize(0.5);
+        width: 100%;
+        height: 100%;
+        background: #00000088; // 遮罩半透明背景
 
-        TouchArea { }
+        TouchArea {
+            // 拦截背景误触
+        }
 
+        // =====================================================================
+        // 主弹窗卡片 (440px 宽度，与主机分组弹窗尺寸风格完全一致)
+        // =====================================================================
         Rectangle {
-            width: 400px;
-            max-height: 420px;
+            width: 440px;
+            height: root.is_dropdown_open ? 380px : 260px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             border-radius: AppTheme.radius-large;
-            background: AppTheme.surface-background;
+            background: AppTheme.panel-background;
             border-width: 1px;
             border-color: AppTheme.border;
             drop-shadow-blur: 24px;
-            drop-shadow-color: #000000.transparentize(0.4);
+            drop-shadow-color: #00000080;
+
+            animate height { duration: 150ms; }
 
             VerticalLayout {
-                padding: 20px;
-                spacing: 16px;
+                padding: 16px;
+                spacing: 12px;
+                alignment: start;
 
-                // 1. 标题
+                // 1. 弹窗标题栏
                 HorizontalLayout {
-                    alignment: center;
-                    spacing: 8px;
+                    alignment: space-between;
+                    height: 24px;
 
-                    Text {
-                        text: "📁";
-                        font-size: 16px;
-                        vertical-alignment: center;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/folder-plus.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: @tr("新建代码片段文件夹");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
                     }
 
-                    Text {
-                        text: @tr("新建代码片段文件夹");
-                        font-size: 14px;
-                        font-weight: 700;
-                        color: AppTheme.foreground;
-                        vertical-alignment: center;
-                    }
-
-                    Rectangle { horizontal-stretch: 1; }
-
+                    // 关闭按钮
                     Rectangle {
                         width: 24px;
                         height: 24px;
-                        border-radius: AppTheme.radius-small;
+                        border-radius: 4px;
                         background: close-touch.has-hover ? AppTheme.hover-background : transparent;
 
+                        close-touch := TouchArea {
+                            clicked => {
+                                root.is_dropdown_open = false;
+                                root.cancel();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 分割线
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                // 2. 所属上级文件夹
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 5px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 14px;
+
                         Text {
-                            text: "✕";
-                            font-size: 12px;
+                            text: @tr("所属上级文件夹:");
+                            font-size: 11px;
+                            font-weight: 600;
                             color: AppTheme.secondary-foreground;
-                            horizontal-alignment: center;
                             vertical-alignment: center;
                         }
 
-                        close-touch := TouchArea {
-                            clicked => { root.cancel(); }
+                        Text {
+                            text: root.selected_parent_id == "root" || root.selected_parent_id == "" ? @tr("当前: 顶级目录") : @tr("当前: 子文件夹");
+                            font-size: 10px;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // 上级选择栏
+                    Rectangle {
+                        width: 100%;
+                        height: 36px;
+                        border-radius: AppTheme.radius-medium;
+                        background: picker-touch.has-hover ? AppTheme.hover-background.transparentize(20%) : AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: (picker-touch.has-hover || root.is_dropdown_open) ? AppTheme.accent : AppTheme.border;
+
+                        picker-touch := TouchArea {
+                            clicked => {
+                                root.is_dropdown_open = !root.is_dropdown_open;
+                            }
                             mouse-cursor: pointer;
                         }
-                    }
-                }
-
-                // 2. 文件夹名称
-                VerticalLayout {
-                    spacing: 6px;
-
-                    Text {
-                        text: @tr("文件夹名称");
-                        font-size: 11px;
-                        font-weight: 600;
-                        color: AppTheme.foreground;
-                    }
-
-                    Rectangle {
-                        height: 34px;
-                        border-radius: AppTheme.radius-medium;
-                        background: AppTheme.panel-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
 
                         HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            spacing: 8px;
+                            alignment: space-between;
 
-                            LineEdit {
-                                text <=> root.group_name;
-                                placeholder-text: @tr("如：Docker 容器运维、K8s 排障...");
-                            }
-                        }
-                    }
-                }
+                            HorizontalLayout {
+                                spacing: 8px;
+                                alignment: start;
+                                horizontal-stretch: 1;
 
-                // 3. 上级父目录选择
-                VerticalLayout {
-                    spacing: 6px;
-
-                    Text {
-                        text: @tr("上级文件夹 (可选多层嵌套)");
-                        font-size: 11px;
-                        font-weight: 600;
-                        color: AppTheme.foreground;
-                    }
-
-                    ScrollView {
-                        max-height: 120px;
-                        VerticalLayout {
-                            spacing: 2px;
-
-                            for opt in root.parent_options: Rectangle {
-                                height: 28px;
-                                border-radius: AppTheme.radius-small;
-                                background: opt.id == root.selected_parent_id ? AppTheme.accent.transparentize(0.85) : (opt-touch.has-hover ? AppTheme.hover-background : transparent);
-
-                                HorizontalLayout {
-                                    padding-left: 8px;
-                                    padding-right: 8px;
-                                    spacing: 6px;
+                                VerticalLayout {
                                     alignment: center;
-
-                                    Text {
-                                        text: opt.name;
-                                        font-size: 11px;
-                                        color: opt.id == root.selected_parent_id ? AppTheme.accent : AppTheme.foreground;
-                                        vertical-alignment: center;
-                                        overflow: elide;
+                                    Image {
+                                        source: @image-url("../assets/icons/folder.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: AppTheme.accent;
                                     }
                                 }
 
-                                opt-touch := TouchArea {
-                                    clicked => { root.select_parent(opt.id); }
-                                    mouse-cursor: pointer;
+                                Text {
+                                    text: root.selected_parent_name;
+                                    font-size: 12px;
+                                    font-weight: 500;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
+                            }
+
+                            // 下拉指示箭头
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../assets/icons/chevron-down.svg");
+                                    width: 10px;
+                                    height: 10px;
+                                    image-fit: contain;
+                                    colorize: (picker-touch.has-hover || root.is_dropdown_open) ? AppTheme.accent : AppTheme.secondary-foreground;
+                                }
+                            }
+                        }
+                    }
+
+                    // 展开的父级列表
+                    if root.is_dropdown_open: Rectangle {
+                        width: 100%;
+                        height: 110px;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        clip: true;
+
+                        Flickable {
+                            viewport-height: (root.parent_options.length + 1) * 28px;
+                            VerticalLayout {
+                                padding: 4px;
+                                spacing: 2px;
+
+                                // 根目录选项
+                                Rectangle {
+                                    height: 26px;
+                                    border-radius: AppTheme.radius-small;
+                                    background: (root.selected_parent_id == "root" || root.selected_parent_id == "") ?
+                                        AppTheme.accent.transparentize(85%) :
+                                        (root-touch.has-hover ? AppTheme.hover-background : transparent);
+
+                                    root-touch := TouchArea {
+                                        clicked => {
+                                            root.selected_parent_id = "root";
+                                            root.selected_parent_name = @tr("根目录 (作为顶级文件夹)");
+                                            root.select_parent("root");
+                                            root.is_dropdown_open = false;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../assets/icons/folder.svg");
+                                                width: 12px;
+                                                height: 12px;
+                                                image-fit: contain;
+                                                colorize: (root.selected_parent_id == "root" || root.selected_parent_id == "") ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+                                        }
+
+                                        Text {
+                                            text: @tr("根目录 (作为顶级文件夹)");
+                                            font-size: 11px;
+                                            font-weight: (root.selected_parent_id == "root" || root.selected_parent_id == "") ? 600 : 400;
+                                            color: (root.selected_parent_id == "root" || root.selected_parent_id == "") ? AppTheme.accent : AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+                                // 动态父级选项
+                                for opt in root.parent_options: Rectangle {
+                                    height: 26px;
+                                    border-radius: AppTheme.radius-small;
+                                    background: opt.id == root.selected_parent_id ?
+                                        AppTheme.accent.transparentize(85%) :
+                                        (item-touch.has-hover ? AppTheme.hover-background : transparent);
+
+                                    item-touch := TouchArea {
+                                        clicked => {
+                                            root.selected_parent_id = opt.id;
+                                            root.selected_parent_name = opt.name;
+                                            root.select_parent(opt.id);
+                                            root.is_dropdown_open = false;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        spacing: 6px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../assets/icons/folder.svg");
+                                                width: 12px;
+                                                height: 12px;
+                                                image-fit: contain;
+                                                colorize: opt.id == root.selected_parent_id ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+                                        }
+
+                                        Text {
+                                            text: opt.name;
+                                            font-size: 11px;
+                                            font-weight: opt.id == root.selected_parent_id ? 600 : 400;
+                                            color: opt.id == root.selected_parent_id ? AppTheme.accent : AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
-                // 4. 底部操作
-                HorizontalLayout {
-                    spacing: 10px;
-                    alignment: end;
+                // 3. 文件夹名称
+                VerticalLayout {
+                    width: 100%;
+                    spacing: 4px;
 
-                    Rectangle {
-                        width: 80px;
-                        height: 32px;
-                        border-radius: AppTheme.radius-medium;
-                        background: cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-
-                        Text {
-                            text: @tr("取消");
-                            font-size: 11px;
-                            color: AppTheme.foreground;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-
-                        cancel-touch := TouchArea {
-                            clicked => { root.cancel(); }
-                            mouse-cursor: pointer;
-                        }
+                    Text {
+                        text: @tr("文件夹名称 *:");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        height: 14px;
+                        vertical-alignment: center;
                     }
 
                     Rectangle {
-                        width: 90px;
-                        height: 32px;
+                        width: 100%;
+                        height: 36px;
                         border-radius: AppTheme.radius-medium;
-                        background: submit-touch.has-hover ? AppTheme.accent : AppTheme.accent.transparentize(0.15);
+                        background: AppTheme.control-background;
+                        border-width: name-input.has-focus ? 1.5px : 1px;
+                        border-color: name-input.has-focus ? AppTheme.accent : AppTheme.border;
+                        clip: true;
 
-                        Text {
-                            text: @tr("创建");
-                            font-size: 11px;
-                            font-weight: 700;
-                            color: #ffffff;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                        animate border-color { duration: 120ms; }
+
+                        TouchArea {
+                            clicked => { name-input.focus(); }
                         }
 
-                        submit-touch := TouchArea {
-                            clicked => { root.submit(); }
-                            mouse-cursor: pointer;
+                        Image {
+                            source: @image-url("../assets/icons/folder.svg");
+                            x: 10px;
+                            y: (parent.height - self.height) / 2;
+                            width: 13px;
+                            height: 13px;
+                            image-fit: contain;
+                            colorize: name-input.has-focus ? AppTheme.accent : AppTheme.secondary-foreground;
+                            animate colorize { duration: 120ms; }
+                        }
+
+                        Rectangle {
+                            x: 31px;
+                            y: 0px;
+                            width: parent.width - 41px;
+                            height: 100%;
+                            clip: true;
+
+                            if root.group_name == "" && !name-input.has-focus: Text {
+                                text: @tr("请输入文件夹名称，例如: Docker 容器运维、日常脚本...");
+                                font-size: 11px;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                                horizontal-alignment: left;
+                                x: 0px;
+                                width: 100%;
+                                height: 100%;
+                                overflow: elide;
+                            }
+
+                            name-input := TextInput {
+                                text <=> root.group_name;
+                                width: 100%;
+                                height: 100%;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                                horizontal-alignment: left;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+
+                                accepted => {
+                                    if root.group_name != "" {
+                                        root.submit();
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 4. 底部操作按键栏 (取消 / 确定创建)
+                HorizontalLayout {
+                    width: 100%;
+                    height: 32px;
+                    alignment: end;
+                    spacing: 10px;
+
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        min-width: 80px;
+                        clicked => {
+                            root.is_dropdown_open = false;
+                            root.cancel();
+                        }
+                    }
+
+                    AppButton {
+                        text: @tr("确定创建");
+                        variant: "primary";
+                        min-width: 90px;
+                        enabled: root.group_name != "";
+                        clicked => {
+                            root.is_dropdown_open = false;
+                            root.submit();
                         }
                     }
                 }

@@ -131,7 +131,7 @@ export component HostsDrawer inherits DrawerContainer {
                 width: 58px;
                 height: 28px;
                 border-radius: 4px;
-                background: AppTheme.surface-background;
+                background: AppTheme.is-global-wallpaper ? transparent : AppTheme.surface-background;
                 border-width: 1px;
                 border-color: AppTheme.border;
 
@@ -143,9 +143,9 @@ export component HostsDrawer inherits DrawerContainer {
                     Rectangle {
                         horizontal-stretch: 1;
                         border-radius: 3px;
-                        background: root.view-mode == "tree" ? AppTheme.control-background : tree-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+                        background: root.view-mode == "tree" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(75%) : AppTheme.control-background) : tree-btn-touch.has-hover ? AppTheme.hover-background : transparent;
                         border-width: root.view-mode == "tree" ? 1px : 0px;
-                        border-color: AppTheme.border;
+                        border-color: root.view-mode == "tree" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(40%) : AppTheme.border) : transparent;
 
                         animate background { duration: 120ms; }
 
@@ -169,9 +169,9 @@ export component HostsDrawer inherits DrawerContainer {
                     Rectangle {
                         horizontal-stretch: 1;
                         border-radius: 3px;
-                        background: root.view-mode == "card" ? AppTheme.control-background : card-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+                        background: root.view-mode == "card" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(75%) : AppTheme.control-background) : card-btn-touch.has-hover ? AppTheme.hover-background : transparent;
                         border-width: root.view-mode == "card" ? 1px : 0px;
-                        border-color: AppTheme.border;
+                        border-color: root.view-mode == "card" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(40%) : AppTheme.border) : transparent;
 
                         animate background { duration: 120ms; }
 
@@ -223,7 +223,7 @@ export component HostsDrawer inherits DrawerContainer {
                         padding-right: 6px;
 
                         Text {
-                            text: root.hosts.length + " 台";
+                            text: root.hosts.length + " " + @tr("台");
                             font-size: 9px;
                             font-weight: 600;
                             color: AppTheme.secondary-foreground;
@@ -466,7 +466,7 @@ export component HostsDrawer inherits DrawerContainer {
                                     alignment: center;
 
                                     Text {
-                                        text: node.name;
+                                        text: (node.is-group && (node.name == "默认分组" || node.name == "Default Group")) ? @tr("默认分组") : node.name;
                                         font-size: 11px;
                                         font-weight: node.is-group ? 600 : node.id == root.selected-host-id ? 600 : 400;
                                         color: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid) ? AppTheme.accent : node.is-group ? AppTheme.foreground : node.id == root.selected-host-id ? AppTheme.foreground : tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;

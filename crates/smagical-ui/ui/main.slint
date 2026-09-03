@@ -40,8 +40,11 @@ import { CredentialsCenterView } from "views/credentials_view.slint";
 import { SnippetsCenterView, SnippetTreeNode } from "views/snippets_view.slint";
 import { TunnelsCenterView, JumpHopData } from "views/tunnels_view.slint";
 export { JumpHopData } from "views/tunnels_view.slint";
+import { SettingsCenterView, SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
+export { SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
 import { SnippetRunModal, SnippetParamFieldData } from "components/snippet-run-modal.slint";
 import { CreateSnippetGroupModal } from "components/create-snippet-group-modal.slint";
+import { ThemeEditorModal } from "components/theme-editor-modal.slint";
 
 
 
@@ -88,6 +91,7 @@ import { BackupDrawer } from "views/left_drawers/backup_drawer.slint";
 import {
     SettingsDrawer,
     ThemeOption,
+    ThemeRow,
 } from "views/left_drawers/settings_drawer.slint";
 
 // 中央主视图
@@ -160,8 +164,14 @@ export component AppWindow inherits Window {
     in-out property <bool> is-dark-mode: true;
     /// 当前生效的配色主题展示名称 (如: "Darcula", "GitHub Light")
     in-out property <string> current-theme-name: "Darcula";
+    /// 当前生效的配色主题唯一稳定标识 ID
+    in-out property <string> current-theme-id: "builtin.ui.darcula";
     /// 当前生效的底层图形渲染管线 (如: "winit-skia", "winit-skia-opengl", "winit-skia-vulkan", "winit-femtovg")
     in-out property <string> active-rendering-pipeline: "winit-skia";
+    /// 当前生效的界面语言 ("zh-CN" / "en-US")
+    in-out property <string> current-language: "zh-CN";
+    /// 语言切换回调
+    callback switch-language(string /* "zh-CN" or "en-US" */);
 
 
     // -------------------------------------------------------------------------
@@ -478,6 +488,8 @@ export component AppWindow inherits Window {
 
     /// 壁纸展示模式 ("none" 无壁纸 | "global" 全局磨砂壁纸 | "terminal" 仅终端视口壁纸)
     in-out property <string> wallpaper-mode: "none";
+    /// 当前选中的壁纸文件绝对路径
+    in-out property <string> wallpaper-path: "";
     /// 全局磨砂背景壁纸位图
     in-out property <image> global-wallpaper-image;
     /// 全局背景壁纸不透明度 (0.0 ~ 1.0)
@@ -491,6 +503,64 @@ export component AppWindow inherits Window {
     /// 终端字体字号 (默认 14.0 px)
     in-out property <float> terminal-font-size: 14.0;
 
+
+    // -------------------------------------------------------------------------
+    // 窗口通用设置属性与交互状态
+    // -------------------------------------------------------------------------
+    /// 窗口关闭按钮行为 ("tray" | "exit")
+    in-out property <string> setting-close-action: "tray";
+    /// 关闭会话标签页时防误触确认开关
+    in-out property <bool> setting-confirm-close-tab: true;
+    /// 退出时含活跃会话防呆确认开关
+    in-out property <bool> setting-confirm-close-active: true;
+    /// 窗口始终置顶开关
+    in-out property <bool> setting-always-on-top: false;
+    /// 开机自启开关
+    in-out property <bool> setting-start-on-boot: false;
+    /// 退出应用确认二次弹窗显隐开关
+    in-out property <bool> is-exit-confirm-open: false;
+    /// 关闭单标签页确认二次弹窗显隐开关
+    in-out property <bool> is-tab-close-confirm-open: false;
+    /// 关闭单标签页确认弹窗标题
+    in-out property <string> tab-close-confirm-title: "";
+    /// 关闭单标签页确认弹窗详细文本
+    in-out property <string> tab-close-confirm-message: "";
+    /// 切换渲染引擎重启确认弹窗显隐开关
+    in-out property <bool> is-restart-confirm-open: false;
+    /// 切换渲染引擎重启确认弹窗文本
+    in-out property <string> restart-confirm-message: "";
+
+    /// 界面全局字体
+    in-out property <string> setting-ui-font: "系统默认 (System Default)";
+    in property <[string]> available-ui-fonts: ["系统默认 (System Default)", "Microsoft YaHei UI", "Segoe UI", "PingFang SC", "Inter", "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas"];
+    callback change-ui-font(string /* font_name */);
+
+    /// 终端高级首选项
+    in-out property <bool> setting-terminal-url-click: true;
+    in-out property <bool> setting-terminal-highlight-keywords: true;
+    in-out property <string> setting-terminal-custom-keywords: "error,failed,fatal,warning,warn,success,ok,done";
+    in-out property <string> setting-cursor-style: "block";
+    in-out property <bool> setting-cursor-blink: true;
+    in-out property <int> setting-scrollback-lines: 10000;
+    in-out property <string> setting-bell-style: "visual";
+    in-out property <[KeywordHighlightRule]> terminal-keyword-rules: [
+        { id: "kw_err", pattern: "\\b(ERROR|FATAL|CRITICAL|Failed|Error)\\b", remark: @tr("致命错误与失败"), color-hex: "#EF4444", rule-color: #EF4444, enabled: true },
+        { id: "kw_warn", pattern: "\\b(WARN|WARNING|Warning|Warn)\\b", remark: @tr("告警提示与注意"), color-hex: "#F59E0B", rule-color: #F59E0B, enabled: true },
+        { id: "kw_ok", pattern: "\\b(SUCCESS|OK|Finished|Done)\\b", remark: @tr("执行成功与确认"), color-hex: "#10B981", rule-color: #10B981, enabled: true },
+        { id: "kw_url", pattern: "https?://[^\\s/$.?#].[^\\s]*", remark: @tr("网络超链接 URL"), color-hex: "#3B82F6", rule-color: #3B82F6, enabled: true },
+        { id: "kw_ip", pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b", remark: @tr("IPv4 主机地址"), color-hex: "#8B5CF6", rule-color: #8B5CF6, enabled: true },
+    ];
+
+    callback change-terminal-url-click(bool);
+    callback change-terminal-highlight-keywords(bool);
+    callback change-terminal-custom-keywords(string);
+    callback change-cursor-style(string);
+    callback change-cursor-blink(bool);
+    callback change-scrollback-lines(int);
+    callback change-bell-style(string);
+    callback add-keyword-rule(string /* pattern */, string /* remark */, string /* color_hex */);
+    callback toggle-keyword-rule(string /* id */, bool /* enabled */);
+    callback delete-keyword-rule(string /* id */);
 
     // -------------------------------------------------------------------------
     // 窗口与业务路由回调
@@ -507,6 +577,74 @@ export component AppWindow inherits Window {
     callback switch-theme(string /* theme_id */);
     /// 切换深色/浅色外观模式回调
     callback toggle-color-mode();
+    /// 切换窗口始终置顶回调
+    callback toggle-always-on-top(bool);
+    /// 切换开机自启动回调
+    callback toggle-start-on-boot(bool);
+    /// 切换关闭会话标签页前确认回调
+    callback toggle-confirm-close-tab(bool);
+    /// 切换关闭含活跃会话窗口前确认回调
+    callback toggle-confirm-close-active(bool);
+    /// 确认关闭单个标签页回调
+    callback confirm-close-tab();
+    /// 切换底层图形渲染管线首选项
+    callback switch-rendering-pipeline(string);
+    /// 确认立即重启生效渲染管线
+    callback confirm-restart-pipeline();
+    /// 稍后重启生效渲染管线
+    callback cancel-restart-pipeline();
+
+    // -------------------------------------------------------------------------
+    // 主题管理与壁纸画廊属性与回调
+    // -------------------------------------------------------------------------
+    in property <[ThemeOption]> themes: [];
+    in property <[ThemeOption]> custom-themes: [];
+    in property <[ThemeOption]> dark-themes: [];
+    in property <[ThemeOption]> light-themes: [];
+    in property <[ThemeRow]> custom-theme-rows: [];
+    in property <[ThemeRow]> dark-theme-rows: [];
+    in property <[ThemeRow]> light-theme-rows: [];
+    in property <int> custom-themes-count: 0;
+    in property <int> dark-themes-count: 0;
+    in property <int> light-themes-count: 0;
+    in-out property <[string]> wallpaper-list: [];
+    in-out property <int> wallpaper-active-index: 0;
+    in-out property <string> wallpaper-slideshow-interval: "none";
+    in-out property <string> wallpaper-transition-effect: "fade";
+    in-out property <image> prev-wallpaper-image;
+    in-out property <float> wallpaper-crossfade: 1.0;
+    animate wallpaper-crossfade { duration: 350ms; easing: ease-in-out; }
+
+    /// 导入外部配色主题
+    callback import-theme();
+    /// 导出当前配色主题
+    callback export-current-theme();
+    /// 创建新的自定义主题
+    callback create-custom-theme();
+    /// 删除指定的自定义主题
+    callback delete-custom-theme(string /* theme_id */);
+    /// 添加壁纸图片
+    callback add-wallpaper-image();
+    /// 添加壁纸文件夹 (批量扫描并导入其中全部图片)
+    callback add-wallpaper-folder();
+    /// 移除指定索引壁纸
+    callback remove-wallpaper-image(int /* index */);
+    /// 选中指定索引壁纸
+    callback select-wallpaper-image(int /* index */);
+    /// 设置壁纸轮播配置
+    callback set-wallpaper-slideshow(string /* interval */, string /* transition */);
+
+    // -------------------------------------------------------------------------
+    // 偏好设置与备份数据管理回调
+    // -------------------------------------------------------------------------
+    /// 导出全量加密备份包
+    callback export-backup-archive(bool /* include_passwords */);
+    /// 扫描并导入系统 ~/.ssh/config 资产
+    callback scan-and-import-openssh();
+    /// 导入外部第三方终端软件资产 (Termius / Xshell)
+    callback import-external-assets();
+    /// 恢复出厂设置回调
+    callback factory-reset-settings();
 
     /// 树形视图分组折叠/展开回调
     callback toggle-tree-group(string /* group-id */);
@@ -539,7 +677,6 @@ export component AppWindow inherits Window {
     /// 关闭指定分屏窗格内除目标 Tab 以外的其他会话回调
     callback close-other-tabs(string /* pane_id */, string /* tab_id */);
     /// 向当前终端发送指令片段回调
-
     callback send-snippet(string /* cmd */);
 
     /// 原生窗口最小化回调
@@ -548,6 +685,8 @@ export component AppWindow inherits Window {
     callback maximize-window();
     /// 原生窗口退出应用回调
     callback close-window();
+    /// 强制退出应用回调 (确认弹窗确认后)
+    callback force-close-window();
     /// 原生窗口拖动移动回调
     callback start-window-drag();
 
@@ -855,7 +994,7 @@ export component AppWindow inherits Window {
     /// 提示弹窗显隐开关
     in-out property <bool> is-dialog-open: false;
     /// 提示弹窗标题
-    in-out property <string> dialog-title: "提示";
+    in-out property <string> dialog-title: @tr("提示");
     /// 提示详情文本
     in-out property <string> dialog-message: "";
     /// 提示类型 ("error" | "warning" | "info")
@@ -876,6 +1015,107 @@ export component AppWindow inherits Window {
     in property <[HostItemData]> file-launcher-host-items: [];
     callback filter-file-launcher(string /* query */);
     callback open-file-host(string /* host_id */);
+
+    // -------------------------------------------------------------------------
+    // 实验室特性门控与设置调试 (Feature Flags & Settings Debug)
+    // -------------------------------------------------------------------------
+    in-out property <bool> flag-desktop-notifications: false;
+    in-out property <bool> flag-terminal-crt-shader: false;
+    in-out property <bool> flag-cloud-sync: false;
+    in-out property <bool> flag-terminal-scratchpad: false;
+    in-out property <bool> use-mock-storage: true;
+
+    in-out property <bool> setting-desktop-notification: false;
+    in-out property <bool> setting-terminal-crt: false;
+
+    callback toggle-feature-flag(string, bool);
+    callback toggle-mock-storage(bool);
+    callback apply-config-preset(string);
+    callback reset-all-settings();
+    callback toggle-desktop-notification(bool);
+    callback toggle-terminal-crt(bool);
+
+    // -------------------------------------------------------------------------
+    // 主题定制与设计工坊 (Theme Studio Modal)
+    // -------------------------------------------------------------------------
+    in-out property <bool> is-theme-editor-open: false;
+    in-out property <string> theme-editor-name: "My Custom Theme";
+    in-out property <string> theme-editor-author: "User";
+    in-out property <string> theme-editor-base: "builtin.ui.darcula";
+    in-out property <string> theme-editor-period: "night";
+
+    in-out property <string> theme-editor-window-bg: "#1e1e2e";
+    in-out property <string> theme-editor-panel-bg: "#181825";
+    in-out property <string> theme-editor-surface-bg: "#313244";
+    in-out property <string> theme-editor-control-bg: "#383a4c";
+    in-out property <string> theme-editor-foreground: "#cdd6f4";
+    in-out property <string> theme-editor-secondary-fg: "#a6adc8";
+    in-out property <string> theme-editor-disabled-fg: "#6c7086";
+    in-out property <string> theme-editor-accent: "#cba6f7";
+    in-out property <string> theme-editor-hover-bg: "#45475a";
+    in-out property <string> theme-editor-pressed-bg: "#585b70";
+    in-out property <string> theme-editor-selected-bg: "#cba6f7";
+    in-out property <string> theme-editor-selected-fg: "#ffffff";
+    in-out property <string> theme-editor-border: "#45475a";
+    in-out property <string> theme-editor-focus-border: "#cba6f7";
+    in-out property <string> theme-editor-success: "#a6e3a1";
+    in-out property <string> theme-editor-warning: "#f9e2af";
+    in-out property <string> theme-editor-danger: "#f38ba8";
+    in-out property <string> theme-editor-info: "#89b4fa";
+
+    in property <brush> theme-editor-preview-window-bg: #1e1e2e;
+    in property <brush> theme-editor-preview-panel-bg: #181825;
+    in property <brush> theme-editor-preview-surface-bg: #313244;
+    in property <brush> theme-editor-preview-control-bg: #383a4c;
+    in property <brush> theme-editor-preview-foreground: #cdd6f4;
+    in property <brush> theme-editor-preview-secondary-fg: #a6adc8;
+    in property <brush> theme-editor-preview-disabled-fg: #6c7086;
+    in property <brush> theme-editor-preview-accent: #cba6f7;
+    in property <brush> theme-editor-preview-hover-bg: #45475a;
+    in property <brush> theme-editor-preview-pressed-bg: #585b70;
+    in property <brush> theme-editor-preview-selected-bg: #cba6f7;
+    in property <brush> theme-editor-preview-selected-fg: #ffffff;
+    in property <brush> theme-editor-preview-border: #45475a;
+    in property <brush> theme-editor-preview-focus-border: #cba6f7;
+    in property <brush> theme-editor-preview-success: #a6e3a1;
+    in property <brush> theme-editor-preview-warning: #f9e2af;
+    in property <brush> theme-editor-preview-danger: #f38ba8;
+    in property <brush> theme-editor-preview-info: #89b4fa;
+
+    in-out property <string> theme-editor-metric-radius-small: "2";
+    in-out property <string> theme-editor-metric-radius-medium: "4";
+    in-out property <string> theme-editor-metric-radius-large: "8";
+    in-out property <string> theme-editor-metric-spacing-small: "4";
+    in-out property <string> theme-editor-metric-spacing-medium: "8";
+    in-out property <string> theme-editor-metric-spacing-large: "16";
+    in-out property <string> theme-editor-metric-border-width: "1";
+    in-out property <string> theme-editor-metric-control-height: "32";
+    in-out property <string> theme-editor-metric-icon-size: "16";
+
+    in-out property <string> theme-editor-toml: "";
+
+    // 色轮取色器属性与回调
+    in-out property <float> theme-editor-wheel-indicator-x: 90.0;
+    in-out property <float> theme-editor-wheel-indicator-y: 90.0;
+    in-out property <float> theme-editor-wheel-brightness: 1.0;
+    in-out property <brush> theme-editor-wheel-hue-brush: #ff0000;
+    in-out property <brush> theme-editor-picker-brush: #1e1e2e;
+    in-out property <string> theme-editor-picker-hex: "#1e1e2e";
+    in-out property <string> theme-editor-picker-target-key: "window_bg";
+    in-out property <string> theme-editor-picker-target-label: "窗口底色";
+
+    callback open-theme-editor();
+    callback theme-editor-color-changed(string, string);
+    callback theme-editor-metric-changed(string, string);
+    callback theme-editor-meta-changed(string, string);
+    callback theme-editor-parse-toml(string);
+    callback theme-editor-copy-toml(string);
+    callback theme-editor-apply-preset(string);
+    callback theme-editor-save-and-activate();
+
+    callback theme-editor-wheel-coord-picked(float, float);
+    callback theme-editor-wheel-brightness-picked(float);
+    callback theme-editor-picker-hex-changed(string);
 
 
 
@@ -917,21 +1157,29 @@ export component AppWindow inherits Window {
         }
     }
 
-    // 顶层主容器 (外层带边框圆角)
+    // 顶层主容器 (外层带边框圆角与固态底基)
     Rectangle {
         border-radius: 8px;
         border-width: 1px;
         border-color: AppTheme.border;
-        background: AppTheme.window-background;
+        background: AppTheme.base-window-background;
         clip: true;
 
-        // 全局磨砂壁纸层 (当 wallpaper-mode == "global" 且图像有效时展示)
+        // 全局壁纸层 (双缓冲淡入淡出，平滑过渡，绝不卡顿)
+        if root.wallpaper-mode == "global" && root.prev-wallpaper-image.width > 0 && root.wallpaper-crossfade < 1.0: Image {
+            source: root.prev-wallpaper-image;
+            width: 100%;
+            height: 100%;
+            image-fit: cover;
+            opacity: root.global-wallpaper-opacity * (1.0 - root.wallpaper-crossfade);
+        }
+
         if root.wallpaper-mode == "global" && root.global-wallpaper-image.width > 0: Image {
             source: root.global-wallpaper-image;
             width: 100%;
             height: 100%;
             image-fit: cover;
-            opacity: root.global-wallpaper-opacity;
+            opacity: root.global-wallpaper-opacity * root.wallpaper-crossfade;
         }
 
         VerticalLayout {
@@ -1010,6 +1258,12 @@ export component AppWindow inherits Window {
                             root.main-view = "files";
                             root.is-left-drawer-open = true;
                             root.navigate-to("files", "");
+                        } else if id == "settings" {
+                            // 切换至独立全屏偏好设置中心大页面 (含外观、终端、网络、快捷键与数据备份)
+                            root.active-left-tab = "settings";
+                            root.main-view = "settings";
+                            root.is-left-drawer-open = false;
+                            root.navigate-to("settings", "");
                         } else {
                             // 资产与设置抽屉：切回终端工作区 + 展开对应抽屉
                             root.main-view = "terminal";
@@ -1343,7 +1597,104 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 2.3.5 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
+                // 2.3.5 全屏偏好设置中心 (当 main-view == "settings" 时全屏展开，含备份迁移、外观、终端排版)
+                if root.main-view == "settings": SettingsCenterView {
+                    horizontal-stretch: 1;
+                    is-dark-mode <=> root.is-dark-mode;
+                    setting-debug-enabled <=> root.is-debug-enabled;
+                    setting-wallpaper-mode <=> root.wallpaper-mode;
+                    setting-wallpaper-opacity <=> root.global-wallpaper-opacity;
+
+                    setting-close-action <=> root.setting-close-action;
+                    setting-confirm-close-tab <=> root.setting-confirm-close-tab;
+                    setting-confirm-close-active <=> root.setting-confirm-close-active;
+                    setting-always-on-top <=> root.setting-always-on-top;
+                    setting-start-on-boot <=> root.setting-start-on-boot;
+                    active-rendering-pipeline <=> root.active-rendering-pipeline;
+
+                    toggle-always-on-top(c) => { root.toggle-always-on-top(c); }
+                    toggle-start-on-boot(c) => { root.toggle-start-on-boot(c); }
+                    toggle-confirm-close-tab(c) => { root.toggle-confirm-close-tab(c); }
+                    toggle-confirm-close-active(c) => { root.toggle-confirm-close-active(c); }
+                    switch-rendering-pipeline(p) => { root.switch-rendering-pipeline(p); }
+
+                    close-settings => {
+                        root.main-view = "terminal";
+                        root.active-left-tab = "hosts";
+                        root.is-left-drawer-open = true;
+                    }
+                    themes: root.themes;
+                    custom-themes: root.custom-themes;
+                    dark-themes: root.dark-themes;
+                    light-themes: root.light-themes;
+                    custom-theme-rows: root.custom-theme-rows;
+                    dark-theme-rows: root.dark-theme-rows;
+                    light-theme-rows: root.light-theme-rows;
+                    custom-themes-count: root.custom-themes-count;
+                    dark-themes-count: root.dark-themes-count;
+                    light-themes-count: root.light-themes-count;
+                    current-theme-id <=> root.current-theme-id;
+                    switch-theme(id) => { root.switch-theme(id); }
+                    import-theme => { root.import-theme(); }
+                    export-current-theme => { root.export-current-theme(); }
+                    create-custom-theme => { root.open-theme-editor(); }
+                    delete-custom-theme(id) => { root.delete-custom-theme(id); }
+
+                    setting-wallpaper-list <=> root.wallpaper-list;
+                    setting-wallpaper-path <=> root.wallpaper-path;
+                    setting-wallpaper-active-index <=> root.wallpaper-active-index;
+                    setting-wallpaper-slideshow <=> root.wallpaper-slideshow-interval;
+                    setting-wallpaper-transition <=> root.wallpaper-transition-effect;
+                    add-wallpaper => { root.add-wallpaper-image(); }
+                    add-wallpaper-folder => { root.add-wallpaper-folder(); }
+                    remove-wallpaper(idx) => { root.remove-wallpaper-image(idx); }
+                    select-wallpaper(idx) => { root.select-wallpaper-image(idx); }
+                    set-wallpaper-slideshow(interval, transition) => { root.set-wallpaper-slideshow(interval, transition); }
+
+                    toggle-dark-mode => { root.toggle-color-mode(); }
+                    toggle-debug-enabled(enabled) => { root.toggle-debug-enabled(enabled); }
+                    change-terminal-font(font, size) => { root.set-terminal-font(font, size); }
+                    change-wallpaper(mode, path, opacity) => { root.set-wallpaper(mode, path, opacity); }
+
+                    export-backup-archive(inc_pass) => { root.export-backup-archive(inc_pass); }
+                    scan-and-import-openssh => { root.scan-and-import-openssh(); }
+                    import-external-file => { root.import-external-assets(); }
+                    factory-reset-settings => { root.factory-reset-settings(); }
+
+                    setting-language <=> root.current-language;
+                    switch-language(lang) => { root.switch-language(lang); }
+
+                    setting-ui-font <=> root.setting-ui-font;
+                    available-ui-fonts: root.available-ui-fonts;
+                    change-ui-font(f) => { root.change-ui-font(f); }
+
+                    setting-terminal-url-click <=> root.setting-terminal-url-click;
+                    setting-terminal-highlight-keywords <=> root.setting-terminal-highlight-keywords;
+                    setting-terminal-custom-keywords <=> root.setting-terminal-custom-keywords;
+                    setting-cursor-style <=> root.setting-cursor-style;
+                    setting-cursor-blink <=> root.setting-cursor-blink;
+                    setting-scrollback-lines <=> root.setting-scrollback-lines;
+                    setting-bell-style <=> root.setting-bell-style;
+
+                    change-terminal-url-click(c) => { root.change-terminal-url-click(c); }
+                    change-terminal-highlight-keywords(c) => { root.change-terminal-highlight-keywords(c); }
+                    change-terminal-custom-keywords(k) => { root.change-terminal-custom-keywords(k); }
+                    change-cursor-style(s) => { root.change-cursor-style(s); }
+                    change-cursor-blink(b) => { root.change-cursor-blink(b); }
+                    change-scrollback-lines(l) => { root.change-scrollback-lines(l); }
+                    change-bell-style(s) => { root.change-bell-style(s); }
+
+                    flag-terminal-crt-shader: root.flag-terminal-crt-shader;
+                    setting-terminal-crt <=> root.setting-terminal-crt;
+                    toggle-terminal-crt(c) => { root.toggle-terminal-crt(c); }
+
+                    terminal-keyword-rules <=> root.terminal-keyword-rules;
+                    add-keyword-rule(p, r, c) => { root.add-keyword-rule(p, r, c); }
+                    toggle-keyword-rule(id, e) => { root.toggle-keyword-rule(id, e); }
+                    delete-keyword-rule(id) => { root.delete-keyword-rule(id); }
+                }
+
+                // 2.3.6 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
                 viewport := TerminalViewport {
                     visible: root.main-view == "terminal";
                     horizontal-stretch: root.main-view == "terminal" ? 1 : 0;
@@ -1672,10 +2023,104 @@ export component AppWindow inherits Window {
         restart-app => { root.debug-restart-app(); }
         force-repaint => { root.debug-force-repaint(); }
         run-benchmark => { root.debug-run-benchmark(); }
+
+        flag-desktop-notifications <=> root.flag-desktop-notifications;
+        flag-terminal-crt-shader <=> root.flag-terminal-crt-shader;
+        flag-cloud-sync <=> root.flag-cloud-sync;
+        flag-terminal-scratchpad <=> root.flag-terminal-scratchpad;
+        use-mock-storage <=> root.use-mock-storage;
+        setting-always-on-top: root.setting-always-on-top;
+        setting-confirm-close-tab: root.setting-confirm-close-tab;
+        setting-confirm-close-active: root.setting-confirm-close-active;
+        wallpaper-mode: root.wallpaper-mode;
+        wallpaper-slideshow-interval: root.wallpaper-slideshow-interval;
+        wallpaper-count: root.wallpaper-list.length;
+        toggle-feature-flag(f, e) => { root.toggle-feature-flag(f, e); }
+        toggle-mock-storage(e) => { root.toggle-mock-storage(e); }
+        apply-config-preset(p) => { root.apply-config-preset(p); }
+        reset-all-settings => { root.reset-all-settings(); }
     }
 
+    // 主题设计与定制工坊弹窗 (可视化表单、微型沙盒视窗与 TOML 双向代码编辑器)
+    ThemeEditorModal {
+        is-open: root.is-theme-editor-open;
+        theme-name <=> root.theme-editor-name;
+        theme-author <=> root.theme-editor-author;
+        theme-base <=> root.theme-editor-base;
+        theme-period <=> root.theme-editor-period;
 
+        color-window-bg <=> root.theme-editor-window-bg;
+        color-panel-bg <=> root.theme-editor-panel-bg;
+        color-surface-bg <=> root.theme-editor-surface-bg;
+        color-control-bg <=> root.theme-editor-control-bg;
+        color-foreground <=> root.theme-editor-foreground;
+        color-secondary-fg <=> root.theme-editor-secondary-fg;
+        color-disabled-fg <=> root.theme-editor-disabled-fg;
+        color-accent <=> root.theme-editor-accent;
+        color-hover-bg <=> root.theme-editor-hover-bg;
+        color-pressed-bg <=> root.theme-editor-pressed-bg;
+        color-selected-bg <=> root.theme-editor-selected-bg;
+        color-selected-fg <=> root.theme-editor-selected-fg;
+        color-border <=> root.theme-editor-border;
+        color-focus-border <=> root.theme-editor-focus-border;
+        color-success <=> root.theme-editor-success;
+        color-warning <=> root.theme-editor-warning;
+        color-danger <=> root.theme-editor-danger;
+        color-info <=> root.theme-editor-info;
 
+        preview-window-bg: root.theme-editor-preview-window-bg;
+        preview-panel-bg: root.theme-editor-preview-panel-bg;
+        preview-surface-bg: root.theme-editor-preview-surface-bg;
+        preview-control-bg: root.theme-editor-preview-control-bg;
+        preview-foreground: root.theme-editor-preview-foreground;
+        preview-secondary-fg: root.theme-editor-preview-secondary-fg;
+        preview-disabled-fg: root.theme-editor-preview-disabled-fg;
+        preview-accent: root.theme-editor-preview-accent;
+        preview-hover-bg: root.theme-editor-preview-hover-bg;
+        preview-pressed-bg: root.theme-editor-preview-pressed-bg;
+        preview-selected-bg: root.theme-editor-preview-selected-bg;
+        preview-selected-fg: root.theme-editor-preview-selected-fg;
+        preview-border: root.theme-editor-preview-border;
+        preview-focus-border: root.theme-editor-preview-focus-border;
+        preview-success: root.theme-editor-preview-success;
+        preview-warning: root.theme-editor-preview-warning;
+        preview-danger: root.theme-editor-preview-danger;
+        preview-info: root.theme-editor-preview-info;
+
+        metric-radius-small <=> root.theme-editor-metric-radius-small;
+        metric-radius-medium <=> root.theme-editor-metric-radius-medium;
+        metric-radius-large <=> root.theme-editor-metric-radius-large;
+        metric-spacing-small <=> root.theme-editor-metric-spacing-small;
+        metric-spacing-medium <=> root.theme-editor-metric-spacing-medium;
+        metric-spacing-large <=> root.theme-editor-metric-spacing-large;
+        metric-border-width <=> root.theme-editor-metric-border-width;
+        metric-control-height <=> root.theme-editor-metric-control-height;
+        metric-icon-size <=> root.theme-editor-metric-icon-size;
+
+        theme-toml <=> root.theme-editor-toml;
+
+        wheel-indicator-x <=> root.theme-editor-wheel-indicator-x;
+        wheel-indicator-y <=> root.theme-editor-wheel-indicator-y;
+        wheel-brightness <=> root.theme-editor-wheel-brightness;
+        wheel-hue-brush: root.theme-editor-wheel-hue-brush;
+        picker-preview-brush: root.theme-editor-picker-brush;
+        picker-hex-value <=> root.theme-editor-picker-hex;
+        picker-target-key <=> root.theme-editor-picker-target-key;
+        picker-target-label <=> root.theme-editor-picker-target-label;
+
+        close => { root.is-theme-editor-open = false; }
+        apply-preset(p) => { root.theme-editor-apply-preset(p); }
+        color-field-changed(f, v) => { root.theme-editor-color-changed(f, v); }
+        metric-field-changed(f, v) => { root.theme-editor-metric-changed(f, v); }
+        meta-field-changed(f, v) => { root.theme-editor-meta-changed(f, v); }
+        parse-and-sync-from-toml(s) => { root.theme-editor-parse-toml(s); }
+        copy-toml(s) => { root.theme-editor-copy-toml(s); }
+        save-and-activate => { root.theme-editor-save-and-activate(); }
+
+        wheel-coord-picked(x, y) => { root.theme-editor-wheel-coord-picked(x, y); }
+        wheel-brightness-picked(b) => { root.theme-editor-wheel-brightness-picked(b); }
+        picker-hex-changed(h) => { root.theme-editor-picker-hex-changed(h); }
+    }
 
     // 快速新建终端会话居中卡片弹窗
     NewSessionModal {
@@ -1724,6 +2169,57 @@ export component AppWindow inherits Window {
         message: root.dialog-message;
         dialog-type: root.dialog-type;
         close => { root.is-dialog-open = false; }
+    }
+
+    // 关闭窗口含活跃会话二次防呆确认弹窗
+    MessageDialog {
+        is-open <=> root.is-exit-confirm-open;
+        title: @tr("确认退出应用程序");
+        message: @tr("当前仍有活跃的终端或 SSH 会话正在运行。强行退出将导致远程任务与网络隧道中断，确定要退出吗？");
+        dialog-type: "warning";
+        show-cancel: true;
+        confirm-text: @tr("强行退出");
+        cancel-text: @tr("继续使用");
+        close => { root.is-exit-confirm-open = false; }
+        confirmed => {
+            root.is-exit-confirm-open = false;
+            root.force-close-window();
+        }
+    }
+
+    // 关闭单个终端会话标签页防误触确认弹窗
+    MessageDialog {
+        is-open <=> root.is-tab-close-confirm-open;
+        title: root.tab-close-confirm-title != "" ? root.tab-close-confirm-title : @tr("确认关闭终端会话");
+        message: root.tab-close-confirm-message != "" ? root.tab-close-confirm-message : @tr("确定要断开并关闭此会话吗？远程正在运行的任务将被中断。");
+        dialog-type: "warning";
+        show-cancel: true;
+        confirm-text: @tr("断开并关闭");
+        cancel-text: @tr("取消");
+        close => { root.is-tab-close-confirm-open = false; }
+        confirmed => {
+            root.is-tab-close-confirm-open = false;
+            root.confirm-close-tab();
+        }
+    }
+
+    // 切换渲染引擎重启确认弹窗
+    MessageDialog {
+        is-open <=> root.is-restart-confirm-open;
+        title: @tr("切换图形渲染引擎");
+        message: root.restart-confirm-message != "" ? root.restart-confirm-message : @tr("切换图形渲染引擎需要重启客户端以重新初始化底层 GPU 显卡管线，是否立即重启？");
+        dialog-type: "warning";
+        show-cancel: true;
+        confirm-text: @tr("立即重启");
+        cancel-text: @tr("稍后重启");
+        close => {
+            root.is-restart-confirm-open = false;
+            root.cancel-restart-pipeline();
+        }
+        confirmed => {
+            root.is-restart-confirm-open = false;
+            root.confirm-restart-pipeline();
+        }
     }
 
     // 文件管理会话选择居中卡片弹窗 (单一本地域 + 远程全部主机，点击自动连接 SFTP)

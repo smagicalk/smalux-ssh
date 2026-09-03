@@ -4,19 +4,19 @@ import { ScrollView } from "std-widgets.slint";
 /// 开发者调试面板 - 渲染引擎与图形诊断子 Tab (Rendering Diagnostics & Engine Tab)
 export component DebugRenderingTab inherits ScrollView {
     /// 当前生效的 GUI 渲染引擎名称
-    in property <string> engine-name: "Skia 2D (Google Chrome / Flutter 同款)";
+    in property <string> engine-name: @tr("Skia 2D (Google Chrome / Flutter 同款)");
     /// GPU 硬件加速管线
-    in property <string> gpu-pipeline: "GPU 硬件加速 (DirectX / OpenGL / Vulkan)";
+    in property <string> gpu-pipeline: @tr("GPU 硬件加速 (DirectX / OpenGL / Vulkan)");
     /// 终端像素视口管线
-    in property <string> terminal-pipeline: "fontdue SIMD 矢量光栅化 + Alacritty VT100 状态机";
+    in property <string> terminal-pipeline: @tr("fontdue SIMD 矢量光栅化 + Alacritty VT100 状态机");
     /// 静态内联 SVG 图标总数
     in property <int> svg-count: 42;
     /// 目标刷新帧率
-    in property <string> target-fps: "120 FPS (8.3ms 极速吞吐)";
+    in property <string> target-fps: @tr("120 FPS (8.3ms 极速吞吐)");
     /// 脏矩形增量渲染状态
-    in property <string> damage-tracking: "已启用 (Partial Repaint / 0% 待机功耗)";
+    in property <string> damage-tracking: @tr("已启用 (Partial Repaint / 0% 待机功耗)");
     /// 字体微调排版技术
-    in property <string> font-hinting: "DirectWrite / FreeType 次像素抗锯齿";
+    in property <string> font-hinting: @tr("DirectWrite / FreeType 次像素抗锯齿");
 
     /// 当前运行时已激活的管线 ID
     in property <string> current-active-pipeline: "winit-skia";
@@ -153,9 +153,9 @@ export component DebugRenderingTab inherits ScrollView {
                                     colorize: root.selected-pipeline == "winit-skia" ? #ffffff : AppTheme.accent;
                                     y: (parent.height - self.height) / 2;
                                 }
-                                Text { text: "Skia Auto (官方推荐)"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia" ? #ffffff : AppTheme.foreground; }
+                                Text { text: @tr("Skia Auto (官方推荐)"); font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia" ? #ffffff : AppTheme.foreground; }
                             }
-                            Text { text: "DirectX/DWM 硬件自动加速"; font-size: 9px; color: root.selected-pipeline == "winit-skia" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                            Text { text: @tr("DirectX/DWM 硬件自动加速"); font-size: 9px; color: root.selected-pipeline == "winit-skia" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
                         }
                     }
 
@@ -192,7 +192,7 @@ export component DebugRenderingTab inherits ScrollView {
                                 }
                                 Text { text: "Skia OpenGL"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-opengl" ? #ffffff : AppTheme.foreground; }
                             }
-                            Text { text: "强制标准 OpenGL 硬件加速管线"; font-size: 9px; color: root.selected-pipeline == "winit-skia-opengl" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                            Text { text: @tr("强制标准 OpenGL 硬件加速管线"); font-size: 9px; color: root.selected-pipeline == "winit-skia-opengl" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
                         }
                     }
                 }
@@ -234,7 +234,7 @@ export component DebugRenderingTab inherits ScrollView {
                                 }
                                 Text { text: "Skia Vulkan"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-vulkan" ? #ffffff : AppTheme.foreground; }
                             }
-                            Text { text: "现代 Vulkan 超低开销显卡直通"; font-size: 9px; color: root.selected-pipeline == "winit-skia-vulkan" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                            Text { text: @tr("现代 Vulkan 超低开销显卡直通"); font-size: 9px; color: root.selected-pipeline == "winit-skia-vulkan" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
                         }
                     }
 
@@ -269,9 +269,9 @@ export component DebugRenderingTab inherits ScrollView {
                                     colorize: root.selected-pipeline == "winit-skia-software" ? #ffffff : AppTheme.secondary-foreground;
                                     y: (parent.height - self.height) / 2;
                                 }
-                                Text { text: "Skia CPU 纯软解"; font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-software" ? #ffffff : AppTheme.foreground; }
+                                Text { text: @tr("Skia CPU 纯软解"); font-size: 11px; font-weight: 700; color: root.selected-pipeline == "winit-skia-software" ? #ffffff : AppTheme.foreground; }
                             }
-                            Text { text: "SIMD 纯 CPU 光栅化 (0 显卡依赖)"; font-size: 9px; color: root.selected-pipeline == "winit-skia-software" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
+                            Text { text: @tr("SIMD 纯 CPU 光栅化 (0 显卡依赖)"); font-size: 9px; color: root.selected-pipeline == "winit-skia-software" ? #e0f2fe : AppTheme.secondary-foreground; horizontal-alignment: center; }
                         }
                     }
                 }
@@ -421,7 +421,7 @@ export component DebugRenderingTab inherits ScrollView {
                         horizontal-stretch: 1;
                         spacing: 2px;
                         Text { text: @tr("静态打包图标总数:"); font-size: 10px; color: AppTheme.secondary-foreground; }
-                        Text { text: "" + root.svg-count + " 个全量矢量资产"; font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
+                        Text { text: "" + root.svg-count + " " + @tr("个全量矢量资产"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
                     }
 
                     VerticalLayout {
@@ -435,14 +435,14 @@ export component DebugRenderingTab inherits ScrollView {
                         horizontal-stretch: 1;
                         spacing: 2px;
                         Text { text: @tr("预估显存总占用:"); font-size: 10px; color: AppTheme.secondary-foreground; }
-                        Text { text: "~168 KB (微量无感)"; font-size: 11px; font-weight: 700; color: AppTheme.accent; }
+                        Text { text: @tr("~168 KB (微量无感)"); font-size: 11px; font-weight: 700; color: AppTheme.accent; }
                     }
 
                     VerticalLayout {
                         horizontal-stretch: 1;
                         spacing: 2px;
                         Text { text: @tr("运行时磁盘 I/O 开销:"); font-size: 10px; color: AppTheme.secondary-foreground; }
-                        Text { text: "0 ms (静态内联)"; font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
+                        Text { text: @tr("0 ms (静态内联)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
                     }
                 }
             }
@@ -498,7 +498,7 @@ export component DebugRenderingTab inherits ScrollView {
 
                     // 按钮 1: 强制重绘
                     Rectangle {
-                        width: 95px;
+                        min-width: 95px;
                         height: 28px;
                         border-radius: AppTheme.radius-medium;
                         background: btn-rp.has-hover ? AppTheme.hover-background : AppTheme.control-background;
@@ -512,6 +512,8 @@ export component DebugRenderingTab inherits ScrollView {
                         }
 
                         HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
                             alignment: center;
                             spacing: 4px;
                             Image {
@@ -533,7 +535,7 @@ export component DebugRenderingTab inherits ScrollView {
 
                     // 按钮 2: 仅保存 (下次生效)
                     Rectangle {
-                        width: 125px;
+                        min-width: 125px;
                         height: 28px;
                         border-radius: AppTheme.radius-medium;
                         background: btn-save.has-hover ? AppTheme.control-background.darker(0.1) : AppTheme.control-background;
@@ -550,6 +552,8 @@ export component DebugRenderingTab inherits ScrollView {
                         }
 
                         HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
                             alignment: center;
                             spacing: 4px;
                             Image {
@@ -572,7 +576,7 @@ export component DebugRenderingTab inherits ScrollView {
 
                     // 按钮 3: 保存并立即重启
                     Rectangle {
-                        width: 135px;
+                        min-width: 135px;
                         height: 28px;
                         border-radius: AppTheme.radius-medium;
                         background: btn-restart.has-hover ? #dc2626 : (root.selected-pipeline != root.current-active-pipeline ? #ea580c : AppTheme.accent);
@@ -586,6 +590,8 @@ export component DebugRenderingTab inherits ScrollView {
                         }
 
                         HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
                             alignment: center;
                             spacing: 4px;
                             Image {

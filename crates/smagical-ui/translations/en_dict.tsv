@@ -1,0 +1,897 @@
+smalux - 现代 Rust SSH 终端工作台	smalux - Modern Rust SSH Terminal Workbench
+主机	Hosts
+主机管理	Hosts
+主机资产	Host Assets
+远程主机资产 (Remote Hosts)	Remote Host Assets (Remote Hosts)
+远程主机资产 (Remote SSH Hosts)	Remote Host Assets (Remote SSH Hosts)
+远程主机资产 (Remote SFTP Hosts)	Remote Host Assets (Remote SFTP Hosts)
+本地终端环境 (Local Shells)	Local Shell Environments (Local Shells)
+本地文件系统 (Local Filesystem)	Local Filesystem
+凭据管理	Credentials
+凭据保管	Credentials
+凭据保管箱	Credentials Vault
+代码片段	Snippets
+代码片段库	Snippets Library
+常用代码片段库	Snippets Library
+网络与隧道	Tunnels
+网络隧道	Tunnels
+网络与隧道中心	Network & Tunnels Hub
+连接历史	History
+连接历史中心	Connection History Hub
+历史记录	History
+文件管理	File Manager
+文件管理器	File Explorer
+偏好设置	Preferences
+偏好设置中心	Preferences Center
+会话	Sessions
+系统监控	System Monitor
+主机实时监控	Live Host Monitor
+开发者调试控制台	Developer Debug Console
+开发者调试控制台 (Developer Debug Panel)	Developer Debug Console (Developer Debug Panel)
+开发者调试工作台 (Workbench)	Developer Debug Workbench
+新建	New
++ 新建	+ New
++ 新建规则	+ New Rule
++ 立即录入	+ Add Now
+保存	Save
+保存修改	Save Changes
+保存配置	Save Config
+保存并创建	Save & Create
+保存并立即重启	Save & Restart Now
+保存 (下次生效)	Save (Applies Next Run)
+取消	Cancel
+确定	OK
+确认	Confirm
+确定选定	Select
+确认创建	Create
+编辑	Edit
+编辑中	Editing
+删除	Delete
+重命名	Rename
+刷新	Refresh
+刷新目录	Refresh Directory
+复制	Copy
+复制成功	Copied
+已复制 ✓	Copied ✓
+复制 IP	Copy IP
+复制参数	Copy Arguments
+复制完整路径	Copy Full Path
+复制密码	Copy Password
+复制私钥	Copy Private Key
+复制公钥	Copy Public Key
+复制管道	Copy Pipe
+复制快照	Copy Snapshot
+复制选中文本	Copy Selected Text
+复制 SSH 命令	Copy SSH Command
+复制 ProxyJump 命令	Copy ProxyJump Command
+复制代理连接串	Copy Proxy Connection String
+已复制代理环境变量配置	Proxy environment variables copied
+已复制 OpenSSH ProxyJump 参数	OpenSSH ProxyJump arguments copied
+已复制出网代理连接串	Outbound proxy connection string copied
+已复制公钥	Public key copied
+已复制私钥	Private key copied
+已复制指纹	Fingerprint copied
+公钥指纹已复制至剪贴板	Public key fingerprint copied to clipboard
+SSH 公钥已复制至剪贴板	SSH public key copied to clipboard
+私钥文本已成功复制至系统剪贴板	Private key text copied to clipboard
+粘贴	Paste
+粘贴剪贴板内容	Paste Clipboard Content
+清屏	Clear Screen
+清空	Clear
+清空历史	Clear History
+清空日志	Clear Logs
+清空已完成	Clear Completed
+清空全量数据	Clear All Data
+清空所有片段	Clear All Snippets
+清空所有凭据	Clear All Credentials
+关闭	Close
+全选	Select All
+全部	All
+提示	Notice
+警告	Warning
+错误	Error
+失败	Failed
+成功	Success
+在线	Online
+离线	Offline
+全在线	All Online
+全离线	All Offline
+全告警	All Warning
+全部在线	All Online
+全部离线	All Offline
+全部告警	All Warning
+活跃中	Active
+运行中	Running
+已停止	Stopped
+已完成	Completed
+传输中	Transferring
+空闲	Idle
+进行中	In Progress
+已挂起 / 停止	Suspended / Stopped
+认证失败	Auth Failed
+连接超时	Timed Out
+异常中断	Aborted
+正常退出	Exited Normally
+禁止	Forbidden
+移动	Move
+无效	Invalid
+无匹配	No Match
+展开并显示	Expand & Show
+收起并隐藏	Collapse & Hide
+搜索...	Search...
+搜索主机 (支持名称 / IP / 分组)...	Search hosts (name / IP / group)...
+搜索主机、IP或分组...	Search hosts, IP, or group...
+搜索本地终端或远程主机 (支持名称 / IP / 分组)...	Search local terminals or remote hosts (name / IP / group)...
+搜索凭据...	Search credentials...
+搜索凭据名称、用户名、指纹...	Search credential name, username, fingerprint...
+搜索代码片段、脚本或分组...	Search snippets, scripts, or groups...
+搜索代码片段、脚本或文件夹...	Search snippets, scripts, or folders...
+搜索片段...	Search snippets...
+搜索隧道、端口、目标主机...	Search tunnels, ports, target hosts...
+搜索全部配置项 (字体、壁纸、心跳、备份、快捷键...)	Search preferences (font, wallpaper, keepalive, backup, keys...)
+输入主机名、命令或 > 执行操作 (Esc 退出)...	Type host name, command, or > for actions (Esc to exit)...
+按 ↑↓ 导航  |  Enter 确认  |  Esc 关闭	↑↓ to navigate  |  Enter to confirm  |  Esc to close
+请尝试其他搜索关键词	Please try different search keywords
+请尝试输入其他主机名称、IP 或用户名	Try typing another host name, IP, or username
+未找到匹配的主机连接记录	No matching host connection records found
+未找到匹配的本地终端或远程主机	No matching local terminals or remote hosts found
+未找到匹配的历史记录	No matching history records found
+未找到匹配的凭据记录	No matching credential records found
+未找到匹配的远程主机	No matching remote hosts found
+暂无历史连接记录	No connection history yet
+暂无连接记录	No connection records
+暂无连接历史	No connection history
+暂无凭据记录	No credential records
+暂无已保存凭据	No saved credentials yet
+暂无实时诊断日志事件	No live diagnostic log events
+暂无终端屏幕输出快照	No terminal screen output snapshot
+暂无主机资产，请先在主机面板中添加主机	No host assets yet. Please add a host in the hosts panel first
+暂无文件传输任务 (直接拖拽左/右侧文件或目录即可触发实时上传/下载)	No active transfers (drag and drop files/folders to trigger upload/download)
+在「主机」页面双击主机发起远程连接后将自动记录	Double-click a host on the Hosts page to connect; records will appear here
+在「主机管理」中双击任意远程主机发起连接后，将自动在此沉淀连接足迹	Connect to any remote host in Host Management to log connection history here
+💡 提示：点击任意条目即可快速创建并激活新终端会话	Tip: Click any item to quickly create and activate a new terminal session
+💡 提示：点击任意远程主机即可自动建立 SFTP 会话并打开文件管理	Tip: Click any remote host to automatically open SFTP file management
+新建主机	New Host
+新建分组	New Group
+新建主机分组	New Host Group
+主机名称:	Host Name:
+主机名:	Host Name:
+主机名称	Host Name
+IP 地址:	IP Address:
+SSH 端口:	SSH Port:
+所属上级分组:	Parent Group:
+选择所属上级分组	Select Parent Group
+选取上级	Select Parent
+新分组名称:	New Group Name:
+请输入分组名称，例如: 微服务集群、测试数据库...	Enter group name, e.g. Microservices, Test Database...
+根目录 (作为顶级分组)	Root Directory (Top-level Group)
+当前: 顶级根目录	Current: Top-level Root
+当前: 子分组	Current: Subgroup
+已选: 	Selected: 
+尚未选择主机	No host selected
+未命名主机	Unnamed Host
+台	hosts
+台主机	hosts
+主机数: 	Hosts: 
+ | 可见节点: 	 | Visible Nodes: 
+共 	Total 
+全部主机列表	All Hosts List
+树形层级视图	Hierarchical Tree View
+展开可见节点	Expanded Visible Nodes
+移入此分组	Move into this group
+移至根目录 (顶级)	Move to root (Top-level)
+移至根目录 (未分组)	Move to root (Ungrouped)
+请在下方树形结构中点选新分组的父级归属（支持多级折叠/展开与双击选定）：	Select the parent group from the tree below (supports multi-level fold/expand and double-click):
+请从左侧双击主机发起连接，或点击右上角 + 快速新建本地/远程终端	Double-click a host to connect, or click + to open a new local/remote terminal
+新建凭据	New Credential
+凭据名称 *	Credential Name *
+凭据名称:	Credential Name:
+凭据显示名称 *	Credential Display Name *
+凭据名称	Credential Name
+凭据类型	Credential Type
+密码	Password
+密钥	Key
+账号密码	Account & Password
+SSH 密钥对	SSH Key Pair
+类型: 密码	Type: Password
+类型: 密钥	Type: Key
+类型: Agent	Type: Agent
+默认登录用户名	Default Login Username
+默认登录用户名 *	Default Login Username *
+登录密码	Login Password
+登录密码 *	Login Password *
+私钥内容 (Private Key PEM) *	Private Key PEM *
+私钥内容 (OpenSSH PEM 格式)	Private Key Content (OpenSSH PEM format)
+私钥保护口令 (可选)	Private Key Passphrase (Optional)
+私钥保护口令 (Passphrase)	Key Passphrase
+导出的 SSH 公钥 (可配置于目标机器 authorized_keys)	Exported SSH Public Key (for target authorized_keys)
+公钥指纹 (SHA256)	Public Key Fingerprint (SHA256)
+命名管道路径	Named Pipe Path
+Agent 管道路径 *	Agent Pipe Path *
+Agent 标识	Agent Identifier
+常用 Agent 快速预设 (点击一键填入管道路径)	Common Agent Presets (click to autofill pipe path)
+一键生成密钥对	Generate Keypair
+重新生成密钥对	Regenerate Keypair
+重新生成随机密码	Regenerate Random Password
+随机生成强密码	Generate Strong Password
+未设置用户	User Not Set
+未生成指纹	Fingerprint Not Generated
+未导入私钥	Private Key Not Imported
+外部代理	External Agent
+管道: 	Pipe: 
+项凭据 · 实时保护	credentials · live protected
+尚未录入凭据	No credentials enrolled
+请从左侧选择凭据以查看详情	Select a credential on the left to view details
+1Password 密码管理器内置 SSH 认证代理管道	1Password built-in SSH authentication agent pipe
+Windows 内置 OpenSSH Authentication Agent 服务管道	Windows built-in OpenSSH Authentication Agent service pipe
+Bitwarden / Vaultwarden 桌面端托管 SSH 代理	Bitwarden / Vaultwarden desktop managed SSH agent
+KeePassXC 本地密码库 SSH Agent 代理	KeePassXC local database SSH Agent proxy
+PuTTY / WinSCP Pageant 经典认证协议代理	PuTTY / WinSCP Pageant authentication agent
+GnuPG / YubiKey 智能卡 SSH 认证代理管道	GnuPG / YubiKey Smart Card SSH agent pipe
+新建代码片段	New Snippet
+新建代码片段文件夹	New Snippet Folder
+新建子片段	New Child Snippet
+片段名称	Snippet Name
+片段标题:	Snippet Title:
+未命名片段	Unnamed Snippet
+文件夹名称	Folder Name
+上级文件夹 (可选多层嵌套)	Parent Folder (Multi-level nesting)
+脚本代码	Script Code
+脚本命令:	Script Command:
+自动追加回车执行	Auto Append Enter to Execute
+支持拖拽调序、跨分组归类与参数化变量 {{var}}	Supports drag-and-drop reordering, nesting, and parameterized {{var}}
+在此输入代码片段或 Shell 脚本内容 (支持 {{var}} 动态参数占位符)...	Enter snippet or Shell script here (supports {{var}} dynamic parameter placeholders)...
+输入代码片段名称...	Enter snippet name...
+如：Docker 容器运维、K8s 排障...	e.g. Docker ops, K8s troubleshooting...
+可选：添加代码片段的说明或使用注意事项...	Optional: Add notes or usage considerations for this snippet...
+检测到动态参数:	Dynamic Parameters Detected:
+填充动态参数执行代码片段	Fill Parameters to Execute Snippet
+合成命令预览:	Rendered Command Preview:
+一键注入执行	Inject & Execute
+▶ 填入终端	▶ Paste into Terminal
+选择左侧代码片段进行查看或编辑	Select a snippet on the left to view or edit
+项	Items
+本地工作目录 (Local Disk)	Local Working Directory (Local Disk)
+未打开远程 SFTP 会话	No Remote SFTP Session Open
+请在左侧主机列表双击选择主机，或点击右上角「+」连接远程主机	Double-click a host on the left or click '+' at top right to connect
+连接远程主机	Connect Remote Host
+打开文件	Open File
+选择并打开文件会话	Select and Open File Session
+新建文件	New File
+新建文件夹	New Folder
+删除文件夹	Delete Folder
+进入目录	Enter Directory
+上传	Upload
+下载	Download
+上传到远程	Upload to Remote
+下载到本地	Download to Local
+重新上传	Retry Upload
+重新下载	Retry Download
+暂停传输	Pause Transfer
+继续传输	Resume Transfer
+停止传输	Stop Transfer
+传输队列	Transfer Queue
+传输进度	Transfer Progress
+传输速度	Transfer Speed
+↑ 上传速率	↑ Upload Speed
+↓ 下载速率	↓ Download Speed
+↑ 上传文件到当前目录	↑ Upload Files to Current Directory
+▤ 常用远程目录书签	▤ Remote Bookmarks
+文件大小	File Size
+大小	Size
+权限	Permissions
+修改时间	Modified Time
+名称	Name
+目标路径	Target Path
+源路径 (文件名 / 目录)	Source Path (File / Folder)
+个任务	tasks
+(总进度)	(Total Progress)
+个传输任务进行中 - 点击展开	transfer tasks in progress - click to expand
+(当前无活动任务 - 点击展开)	(No active tasks - click to expand)
+本地项: 	Local items: 
+远程项: 	Remote items: 
+文件传输队列与实时任务	File Transfer Queue & Live Tasks
+端口转发	Port Forwarding
+端口转发 (Port Forwarding)	Port Forwarding
+端口转发与隧道	Port Forwarding & Tunnels
+端口转发工作模式	Forwarding Mode
+本地正向 (-L)	Local Forwarding (-L)
+远程反向 (-R)	Remote Forwarding (-R)
+动态网关 (-D)	Dynamic Gateway (-D)
+反向动态 (-R)	Reverse Dynamic (-R)
+跳板机	Jump Host
+跳板机 (JumpHost / Bastion)	Jump Host (JumpHost / Bastion)
+出网代理池 (Proxy Server)	Outbound Proxy Pool (Proxy Server)
+出网代理资产 (供主机绑定)	Outbound Proxy Assets (for host binding)
+跳板中继资产 (供主机绑定)	Jump Relay Assets (for host binding)
+OpenSSH ProxyJump (-J) 堡垒中继资产	OpenSSH ProxyJump (-J) Bastion Relay Assets
+HTTP / HTTPS / SOCKS5 静态出网代理资产	HTTP / HTTPS / SOCKS5 Static Outbound Proxy Assets
+本地、远端或动态 SOCKS5 端口转发与穿透	Local, remote, or dynamic SOCKS5 port forwarding and tunneling
+配置 ProxyJump 堡垒机中继，供主机连接时绑定	Configure ProxyJump bastion relay for host connection binding
+配置 HTTP / SOCKS5 代理节点，供主机统一出网	Configure HTTP / SOCKS5 proxy node for unified host egress
+新建网络与隧道规则	New Network & Tunnel Rule
+请选择您要创建的资产类型，将为您打开专属配置表单	Select the asset type to open its configuration form
+新建端口转发规则	New Port Forwarding Rule
+新建跳板机配置	New Jump Host Config
+新建出网代理配置	New Outbound Proxy Config
+编辑端口转发规则	Edit Port Forwarding Rule
+编辑跳板机配置	Edit Jump Host Config
+编辑出网代理配置	Edit Outbound Proxy Config
+规则描述名称	Rule Description Name
+跳板机链路描述名称	Jump Chain Description Name
+代理资产描述名称	Proxy Asset Description Name
+关联 SSH 宿主主机	Associated SSH Host
+点击选择关联的 SSH 宿主主机...	Click to select associated SSH host...
+未关联主机 (直连网关)	No Host Associated (Direct Gateway)
+本地监听端口 (Local Port)	Local Listen Port (Local Port)
+远端目标服务端口 (Remote Port)	Remote Target Service Port (Remote Port)
+本地目标服务端口 (Local Port)	Local Target Service Port (Local Port)
+远程公网监听端口 (Remote Port)	Remote Public Listen Port (Remote Port)
+本地 SOCKS5 网关监听端口 (Local Port)	Local SOCKS5 Gateway Listen Port (Local Port)
+远程 SOCKS5 网关监听端口 (Remote Port)	Remote SOCKS5 Gateway Listen Port (Remote Port)
+客户端启动时自启	Start on Client Launch
+断线自动重连	Auto Reconnect on Disconnect
+启用传输压缩 (-C)	Enable Compression (-C)
+由代理服务器远程解析 DNS	Remote DNS Resolution via Proxy
+备注说明与业务用途	Notes & Business Purpose
+级联跳板主机顺序 (ProxyJump Chain)	Jump Host Cascade Order (ProxyJump Chain)
++ 添加跳板中继主机 (从资产树选择)	+ Add Jump Relay Host (Select from tree)
+尚未添加任何跳板主机节点	No jump host nodes added yet
+请点击下方按钮从现有的主机资产树中添加第一跳中继机	Click button below to add first hop relay from existing hosts
+代理协议类型	Proxy Protocol Type
+代理服务器地址 (IP 或域名)	Proxy Server Address (IP or Domain)
+代理服务端口 (Port)	Proxy Service Port (Port)
+认证用户名 (可选，留空无需认证)	Auth Username (Optional, blank if none)
+认证密码 (可选，留空无需认证)	Auth Password (Optional, blank if none)
+全局代理环境变量预览	Global Proxy Environment Variables Preview
+(待填写代理地址与端口)	(Fill proxy address and port)
+OpenSSH ProxyJump 级联调用参数预览 (-J)	OpenSSH ProxyJump Arguments Preview (-J)
+-J <尚未选择启用跳板节点>	-J <No jump nodes selected yet>
+启动隧道	Start Tunnel
+停止隧道	Stop Tunnel
+直连	Direct
+直连网关	Direct Gateway
+旁路	Bypass
+内网转发直达	Intranet Forwarding Direct
+远端应用 (SOCKS5 客户端)	Remote App (SOCKS5 Client)
+目标远程服务 / 机器	Target Remote Service / Machine
+任意动态网络目标	Arbitrary Dynamic Network Target
+未配置远端	Remote Not Configured
+远端	Remote
+远端: 	Remote: 
+远端:	Remote:
+宿主: 	Host: 
+(SOCKS5 代理网关)	(SOCKS5 Proxy Gateway)
+(远端 SOCKS5 代理网关)	(Remote SOCKS5 Proxy Gateway)
+累计入站流量 (Rx)	Total Inbound Traffic (Rx)
+累计出站流量 (Tx)	Total Outbound Traffic (Tx)
+活跃客户端连接	Active Client Connections
+个 TCP 会话	TCP sessions
+级跳板中继	hops relay
+活跃连接	active connections
+请在下方资产树中点选用于建立端口转发的 SSH 宿主主机：	Select SSH host from tree below to establish port forwarding:
+请在下方资产树中点选要加入跳板链路的中继主机：	Select relay host from tree below to add to jump chain:
+请从左侧选择网络规则，或点击 [+ 新建规则] 配置端口转发与跳板堡垒	Select a network rule on the left, or click [+ New Rule] to configure
+时间流	Timeline
+按主机	By Host
+会话历史详情与终端快照	Session History Details & Terminal Snapshot
+未连接主机	No Connected Host
+连接与断开时间	Connect & Disconnect Times
+统计时长	Total Duration
+终端输出快照	Terminal Screen Snapshot
+（无屏幕记录）	(No screen capture recorded)
+该会话在建立快照机制前断开，或会话执行过程中未产生屏幕文本输出	Session disconnected before snapshot or produced no terminal output
+返回终端 (ESC)	Back to Terminal (ESC)
+返回终端视口	Back to Terminal Viewport
+发起连接	Connect
+移除记录	Remove Record
+关闭其他会话	Close Other Sessions
+通用与窗口	General & Window
+通用与窗口交互	General & Window Interactions
+控制客户端界面语言、启动流程与后台挂起行为	Configure UI language, launch flow, and background suspension behavior
+界面显示语言 (Language)	UI Display Language (Language)
+设置客户端主界面展示的默认语言	Choose the display language for the client user interface
+中央终端视口	Central Terminal Viewport
+应用启动时默认视图 (Startup View)	Startup View
+冷启动桌面客户端时自动聚焦的初始页面	Initial view automatically focused when client launches
+点击窗口关闭按钮时行为	Close Window Button Action
+关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线	Minimize to system tray on close to keep SSH sessions and tunnels alive
+桌面气泡消息通知	Desktop Toast Notifications
+在终端长命令执行完毕、文件传输成功或网络隧道自动重连时弹出系统通知	Show desktop alerts when long commands finish, transfers succeed, or tunnels reconnect
+外观与视效	Appearance & Visuals
+外观与主题配色	Appearance & Color Themes
+个性化定制客户端主视觉、终端 ANSI 调色板与背景毛玻璃壁纸	Customize UI aesthetic, terminal ANSI palette, and acrylic wallpaper
+配色主题方案 (Color Theme)	Color Theme
+选择全局 UI 与终端调色板（实时热生效）	Choose global UI and terminal palette (applies instantly in real-time)
+背景磨砂壁纸模式 (Wallpaper & Acrylic)	Wallpaper & Acrylic Frosted Glass Mode
+开启现代化亚克力毛玻璃底衬，支持全局透底或终端视口独立透底	Enable modern acrylic frosted glass backdrop, supporting global or terminal-only opacity
+纯色无壁纸	Solid Color (No Wallpaper)
+全局毛玻璃磨砂	Global Acrylic Frosted
+仅终端视口透底	Terminal Viewport Only
+壁纸磨砂不透明度 (Opacity)	Wallpaper Frosted Opacity
+调节背景壁纸透光度 (推荐 15% ~ 25%，过高可能影响终端可读性)	Adjust background opacity (recommended 15%-25%; higher may affect readability)
+终端引擎排版	Terminal Typography
+终端引擎与排版首选项	Terminal Engine & Typography Preferences
+配置 VT100 字符渲染字模、等宽字体族、光标形态与剪贴板交互行为	Configure VT100 glyph rasterization, monospace fonts, cursor styles, and clipboard
+等宽字体族 (Font Family)	Monospace Font Family
+选择终端光栅化渲染等宽字体 (建议预装 Nerd Font 图标字体)	Select monospace font for terminal rasterization (Nerd Font recommended)
+终端字号大小 (Font Size)	Terminal Font Size
+字符像素栅格大小 (默认 13px，可无级微调)	Character pixel raster size (default 13px, smoothly adjustable)
+划词自动复制到剪贴板 (Copy on Select)	Copy on Select
+在终端视口中用鼠标选中文字时，立即自动复制，无需手动按快捷键	Automatically copy selected text in terminal viewport without pressing shortcut keys
+鼠标右键单击快速粘贴 (Paste on Right Click)	Paste on Right Click
+在终端视口右击直接粘贴当前系统剪贴板文本	Right-click anywhere inside the terminal viewport to instantly paste clipboard text
+粘贴多行或含回车命令时前置告警	Warn Before Pasting Multi-line or Enter Commands
+防止意外在生产服务器直接执行复制进来的换行危险命令	Prevent accidental execution of dangerous multi-line commands on production servers
+网络与 SSH	Network & SSH
+网络传输与 SSH 链路策略	Network Transport & SSH Connection Policies
+配置默认连接超时、TCP 心跳保活与自动重连退避算法	Configure default timeout, TCP keepalive heartbeat, and reconnect backoff algorithms
+SSH 连接超时时间 (Connection Timeout)	SSH Connection Timeout
+在发起 SSH 握手或 TCP 套接字建立时的最大等待时间	Maximum waiting time when establishing SSH handshake or TCP sockets
+秒 (默认 30s)	seconds (default 30s)
+TCP 心跳保活探测间隔 (ServerAliveInterval)	TCP Keepalive Heartbeat Interval (ServerAliveInterval)
+向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开	Send periodic empty packets to remote host to prevent idle disconnects by firewalls or NAT
+每	Every
+秒发送一次保活包	seconds send a keepalive packet
+网络异常断线自动重连 (Auto Reconnect)	Auto Reconnect on Network Failure
+当网络闪断或链路重置时，自动以指数退避算法 (1s, 2s, 4s, 8s...) 尝试静默重连	Automatically attempt silent reconnect using exponential backoff (1s, 2s, 4s, 8s...) on link resets
+快捷键绑定	Keybindings
+快捷键与全局键位映射	Keybindings & Global Key Mappings
+查看并自定义高频终端操作、多窗格分屏与命令面板的快捷操作	View and customize shortcuts for terminal operations, pane splitting, and command palette
+操作分类	Operations
+新建终端会话 Tab	New Terminal Session Tab
+垂直拆分当前窗格	Split Current Pane Vertically
+水平拆分当前窗格	Split Current Pane Horizontally
+独占全屏最大化当前窗格	Maximize Current Pane to Fullscreen
+关闭当前聚焦窗格	Close Current Focused Pane
+在终端历史缓冲区查找	Find in Terminal History Buffer
+清屏并重置视口	Clear Screen and Reset Viewport
+呼出全局命令调色板	Open Global Command Palette
+打开偏好设置中心	Open Preferences Center
+分屏	Split Screen
+全局	Global
+数据备份与迁移	Backup & Migration
+数据备份与导入	Backup & Import
+数据备份、导入与跨工具迁移	Data Backup, Import & Cross-Tool Migration
+导出完整加密备份包、从系统 OpenSSH 与第三方终端工具一键导入资产、管理本地配置历史快照	Export encrypted backup archive, import assets from OpenSSH and third-party tools, and manage snapshots
+⤓ 导出全量加密备份文件 (.toml / .json)	⤓ Export Full Encrypted Backup Archive (.toml / .json)
+包含所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则	Includes all host assets, group tree hierarchy, credentials vault, snippets, and tunnel rules
+⤓ 立即导出备份包	⤓ Export Backup Archive Now
+📥 一键扫描并导入本机 ~/.ssh/config	📥 Scan and Import Local ~/.ssh/config
+自动解析本地 OpenSSH 配置文件，识别 Host 别名、IP 地址、端口与私钥 IdentityFile	Automatically parse local OpenSSH config for Host aliases, IPs, ports, and IdentityFiles
+🔍 扫描并预览主机清单	🔍 Scan & Preview Host Inventory
+📥 从外部工具一键迁移 (Termius / Xshell / MobaXterm)	📥 One-Click Migration from External Tools (Termius / Xshell / MobaXterm)
+支持解析并批量导入从其他桌面终端软件导出的 .json、.tsv 或会话配置文件	Supports parsing and batch importing .json, .tsv, or session configs exported from other terminals
+📂 选择文件导入...	📂 Select File to Import...
+🕒 本地最近自动配置快照	🕒 Recent Automatic Local Configuration Snapshots
+应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚	App automatically saves lightweight snapshots before imports or major edits for lossless rollback
+↺ 回滚	↺ Rollback
+网络规则重构前自动安全快照	Automatic safety snapshot before network rules refactoring
+全量主机资产定期快照	Periodic full host assets snapshot
+安全与高级诊断	Security & Advanced Diagnostics
+安全隐私与开发者诊断	Security, Privacy & Developer Diagnostics
+本地凭据加密主密码、F12 开发者调试控制台入口与运行时诊断日志级别	Local credential encryption master password, F12 debug console toggle, and diagnostic logging
+本地凭据主密码保护 (Master Password)	Local Credentials Master Password Protection (Master Password)
+使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护	Use master password to encrypt locally stored private keys and passwords with AES-256
+🛠️ 开发者调试控制台 (Developer Debug Panel)	🛠️ Developer Debug Console (Developer Debug Panel)
+在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器	Show debug console entry on the left activity bar and enable F12 to invoke diagnostic capture
+危险区：恢复出厂设置 (Factory Reset)	Danger Zone: Factory Reset (Factory Reset)
+清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）	Reset all user preference settings to defaults (will not delete saved host assets)
+⚠️ 恢复默认偏好	⚠️ Reset Preferences to Defaults
+主机资产调试	Host Assets
+凭据密钥调试	Credentials
+代码片段调试	Snippets
+设置外观调试	Appearance
+图形渲染管线	Pipeline
+实时日志流	Live Logs
+Skia 原生图形渲染管线矩阵 (Google Skia Pipelines)	Skia Native Graphics Pipeline Matrix (Google Skia Pipelines)
+Skia Auto (官方推荐)	Skia Auto (Recommended)
+DirectX/DWM 硬件自动加速	DirectX/DWM Hardware Acceleration
+强制标准 OpenGL 硬件加速管线	Enforce Standard OpenGL Hardware Acceleration Pipeline
+现代 Vulkan 超低开销显卡直通	Modern Vulkan Ultra-low Overhead GPU Passthrough
+Skia CPU 纯软解	Skia CPU Pure Software Rasterizer
+SIMD 纯 CPU 光栅化 (0 显卡依赖)	SIMD Pure CPU Rasterization (Zero GPU Dependency)
+静态打包图标总数:	Static Packaged Icons Total:
+个全量矢量资产	full vector assets
+GPU 纹理缓存池状态:	GPU Texture Cache Status:
+42 / 42 全部已预热常驻	42 / 42 All Pre-warmed & Resident
+预估显存总占用:	Estimated VRAM Footprint:
+~168 KB (微量无感)	~168 KB (Negligible)
+运行时磁盘 I/O 开销:	Runtime Disk I/O Overhead:
+0 ms (静态内联)	0 ms (Statically Inlined)
+Skia 2D (Google Chrome / Flutter 同款)	Skia 2D (Google Chrome / Flutter Equivalent)
+GPU 硬件加速 (DirectX / OpenGL / Vulkan)	GPU Hardware Acceleration (DirectX / OpenGL / Vulkan)
+fontdue SIMD 矢量光栅化 + Alacritty VT100 状态机	fontdue SIMD Vector Rasterizer + Alacritty VT100 State Machine
+120 FPS (8.3ms 极速吞吐)	120 FPS (8.3ms High Throughput)
+已启用 (Partial Repaint / 0% 待机功耗)	Enabled (Partial Repaint / 0% Standby Power)
+DirectWrite / FreeType 次像素抗锯齿	DirectWrite / FreeType Subpixel Anti-aliasing
+GitHub Light (纯白明亮)	GitHub Light (Clean White)
+Solarized Light (暖黄护眼)	Solarized Light (Warm Eye-care)
+Docker 容器健康列表	Docker Container Health List
+🐳 + Docker ps	🐳 + Docker ps
+K8s 重启 Deployment	K8s Restart Deployment
+☸️ + K8s 重启	☸️ + K8s Restart
+排查端口占用	Troubleshoot Port In Use
+🔌 + 端口排查	🔌 + Port Troubleshoot
+MySQL 活跃长事务	MySQL Active Long Transactions
+🐬 + MySQL 慢查询	🐬 + MySQL Slow Queries
+生产 Ed25519 密钥 (带口令)	Production Ed25519 Key (Passphrase Protected)
+🔑 + Ed25519 密钥	🔑 + Ed25519 Key
+CI/CD RSA-4096 密钥	CI/CD RSA-4096 Key
+📜 + RSA 密钥	📜 + RSA Key
+堡垒机特权 Root 密码	Bastion Privileged Root Password
+🔒 + Root 密码	🔒 + Root Password
+10 台	10 Hosts
+20 台	20 Hosts
+50 台	50 Hosts
+100 台	100 Hosts
+AI 终端助手	AI Terminal Assistant
+AI 运维副驾驶	AI Ops Copilot
+输入自然语言，自动生成 Linux Shell 指令与参数	Type natural language to automatically generate Linux Shell commands
+例如: 查找大于100MB的日志文件...	e.g. Find log files larger than 100MB...
+CPU 使用率	CPU Usage
+内存占用 (RAM)	Memory Usage (RAM)
+磁盘空间 (/dev/sda1)	Disk Space (/dev/sda1)
+会话备忘笔记	Session Notes
+✎ 当前主机会话专用备忘录 (自动保存)	✎ Current host session private memo (auto saved)
+SFTP 文件传输	SFTP File Transfer
+SFTP 传输	SFTP Transfer
+批量更新所有端口	Batch Update All Ports
+批量修改全量主机在线状态:	Batch Update All Hosts Status:
+批量修改与数据治理	Batch Updates & Data Governance
+批量重置全量主机端口:	Batch Reset All Host Ports:
+批量主机生成	Batch Host Generation
+批量主机生成与场景注入	Batch Host Generation & Scenario Injection
+批量追加生成	Batch Append Hosts
+立即批量生成主机	Generate Hosts Now
+一键场景预设:	Scenario Presets:
+注入场景	Inject Scenario
+覆盖并生成	Overwrite & Generate
+覆盖现有数据 (未勾选则为追加模式)	Overwrite existing data (append if unchecked)
+恢复初始 (3台)	Reset to Initial (3 Hosts)
+恢复默认精选片段	Reset to Default Curated Snippets
+恢复默认精选预设	Reset to Default Curated Presets
+恢复默认预设	Reset to Default Presets
+单项增删改与状态治理	Single Item CRUD & Status Governance
+快速添加单台主机	Quick Add Single Host
+快速添加新分组	Quick Add New Group
+快速添加自定义片段:	Quick Add Custom Snippet:
+快速添加自定义凭据:	Quick Add Custom Credential:
+快速注入预设脚本	Quick Inject Preset Script
+预设凭据单项注入	Preset Credential Injection
+确认添加单条片段	Confirm Add Snippet
+确认添加单条凭据	Confirm Add Credential
+确认添加分组	Confirm Add Group
+确认添加主机	Confirm Add Host
+模拟诊断日志	Simulate Diagnostic Logs
+请在上方点击「模拟诊断日志」或在主界面执行操作以捕获 Tracing 事件	Click 'Simulate Diagnostic Logs' or interact with UI to capture Tracing events
+重置与清空:	Reset & Clear:
+全量卡片总数:	Total Cards:
+全量节点总数:	Total Nodes:
+全量主机数	Total Hosts
+全量总节点	Total Nodes
+全量状态一键批量变更:	Batch Change All States:
+生成数量:	Quantity:
+数量 (台):	Count (hosts):
+起始 IP 末位:	Starting IP Last Octet:
+名称前缀:	Name Prefix:
+IP 前缀网段:	IP Prefix Subnet:
+归属分组路径 (支持 / 嵌套):	Group Path (supports /):
+归属分组路径:	Group Path:
+分组路径 (支持 / 嵌套，如 生产/k8s):	Group Path (supports /, e.g. Prod/k8s):
+状态分配策略:	Status Distribution Policy:
+随机分布	Random Distribution
+随机波动	Random Fluctuation
+混合随机	Mixed Random
+混合类型	Mixed Types
+全密码	All Passwords
+全密钥	All Keys
+全 Agent	All Agents
+凭据类型分布:	Credential Type Distribution:
+树视口测算宽	Tree Viewport Computed Width
+树视口测算宽度:	Tree Viewport Computed Width:
+当前展开可见数:	Currently Expanded Visible Count:
+当前激活: 	Active: 
+画质与运行指标 (Quality & Telemetry)	Quality & Telemetry Metrics
+垂直同步与刷新率	V-Sync & Refresh Rate
+次像素排版抗锯齿	Subpixel Typography Anti-aliasing
+局部增量重绘 (Damage)	Partial Repaint (Damage Tracking)
+强制重绘	Force Repaint
+状态: 完美锐利渲染	Status: Crisp Sharp Rendering
+状态: 自适应高刷匹配	Status: Adaptive High Refresh Rate
+待机功耗: ~0.0% CPU	Standby Power: ~0.0% CPU
+GUI 布局与数据探针指标	GUI Layout & Data Probes
+UI 设计令牌 (Design Tokens) 探针	UI Design Tokens Probes
+主色强调 (Accent):	Accent Color (Accent):
+前景色 (Foreground):	Foreground (Foreground):
+面板底色 (Panel):	Panel Background (Panel):
+控件边框 (Border):	Control Border (Border):
+主题切换与外观治理 (当前: 	Theme Switch & Appearance (Current: 
+主题配色体系测试 (当前生效: 	Theme Palette Matrix Test (Active: 
+深色主题组 (Dark Themes):	Dark Themes:
+浅色主题组 (Light Themes):	Light Themes:
+切换至深色模式	Switch to Dark Mode
+切换至浅色模式	Switch to Light Mode
+当前: 深色模式	Current: Dark Mode
+当前: 浅色模式	Current: Light Mode
+深色模式	Dark Mode
+浅色模式	Light Mode
+🛠️ 渲染管线自检与应用操作	🛠️ Rendering Pipeline Self-Check & Operations
+SVG 矢量资产预热与显存池 (Resource Atlas)	SVG Vector Asset Pre-warming & VRAM Pool (Resource Atlas)
+在左侧栏显示调试入口并开启诊断抓取	Show debug entry in left sidebar and enable diagnostic capture
+1. 企业生产全集群预设 (35+ 主机)	1. Enterprise Production Cluster Preset (35+ Hosts)
+2. 极简精简数据预设 (3 台主机)	2. Minimalist Data Preset (3 Hosts)
+3. 超长命名极限测试 (50+ 字符)	3. Ultra-long Name Stress Test (50+ Chars)
+35+ 企业全集群	35+ Enterprise Cluster
+4. 极深层级嵌套树 (5 级结构)	4. Deeply Nested Tree Preset (5 Levels)
+5. 全告警与离线故障集 (Troubleshooting)	5. All-Warning & Offline Fault Set (Troubleshooting)
+6 层深嵌套树	6-Level Nested Tree
+包含超长主机与微服务集群名称，验证平滑横向滚动与动态视口宽度自适应	Contains ultra-long host and cluster names to verify horizontal scrolling and auto-width
+包含丢包路由、高延迟网关、断电主机及磁盘故障节点	Contains packet-loss routes, high latency gateways, powered-off hosts, and disk failures
+包含生产 Web、K8s 编排、PG/Redis 核心库、大数据与 AI 算力中心	Contains Production Web, K8s orchestration, PG/Redis, Big Data, and AI compute nodes
+验证小数据量下的空状态呈现、滚动条隐藏及轻量加载表现	Verifies empty state, scrollbar hiding, and lightweight loading under small datasets
+全球基础设施 -> 亚太 -> 杭州可用区 -> 机架 POD -> 刀片计算阵列	Global Infra -> APAC -> Hangzhou AZ -> Rack POD -> Blade Compute Array
+» 推荐生成指令	» Recommended Generated Command
+● 反向加密隧道已连通	● Reverse Encrypted Tunnel Connected
+● 反向解密穿透已连通	● Reverse Decrypted Penetration Connected
+● 公网入站流量直达	● Public Inbound Traffic Direct
+● 远端 SOCKS5 监听就绪	● Remote SOCKS5 Listening Ready
+● SSH 加密已连通	● SSH Encryption Connected
+○ 远端端口待监听	○ Remote Port Pending
+○ 远端网关待建立	○ Remote Gateway Pending
+○ SSH 待建立	○ SSH Pending
+◐ UI & 终端主题	◐ UI & Terminal Themes
+⚠️ 目标管线已变更为 [	⚠️ Target pipeline changed to [
+⚡ 立即批量生成测试代码片段	⚡ Batch Generate Test Snippets
+⚡ 立即批量生成测试凭据	⚡ Batch Generate Test Credentials
+✓ 配置已保存至本地，将在下次启动客户端时生效	✓ Config saved locally, applies next client launch
+⤓ 配置备份与迁移	⤓ Config Backup & Migration
+个	
+条	entries
+条 | 📁 分组: 	entries | 📁 Group: 
+(默认: 	(Default: 
+]，需重启客户端加载生效	], restart client to apply
+文件与 SFTP	Files & SFTP
+新建终端会话	New Terminal Session
+向下分屏	Split Down
+向右分屏	Split Right
+浏览和管理本机磁盘文件目录	Browse and manage local disk files and directories
+文件夹分组信息	Folder Group Info
+未匹配到凭据	No credential matched
+当前主机暂无专属端口转发规则	No forwarding rules configured for current host
+当前状态	Current Status
+运行: {} 天  |  进程: {}	Uptime: {} days  |  Procs: {}
+字号: 13px  |  光标: 闪烁块状	Size: 13px  |  Cursor: Blinking Block
+等宽字体: JetBrains Mono / Fira Code	Monospace: JetBrains Mono / Fira Code
+自定义终端外观、网络连接、快捷键与全量数据备份策略	Customize terminal look, network, shortcuts, and full backups
+AES-256 加密保管库	AES-256 Encrypted Vault
+导出完整加密备份包 (.toml)	Export full encrypted backup archive (.toml)
+导入系统 ~/.ssh/config 主机	Import hosts from ~/.ssh/config
+导入 Termius / Xshell 资产	Import Termius / Xshell assets
+选择关联 SSH 宿主主机	Select Associated SSH Host
+HTTP 代理	HTTP Proxy
+HTTPS 代理	HTTPS Proxy
+SOCKS5 代理	SOCKS5 Proxy
+SSH 宿主 (SOCKS5 监听端)	SSH Host (SOCKS5 Listener)
+SSH 宿主服务器 / 跳板机	SSH Host Server / Jump Host
+SSH 代理 / 管道	SSH Agent / Pipe
+中继节点	Relay Nodes
+选择 SSH 宿主	Select SSH Host
+远端应用 (客户端)	Remote Application (Client)
+本地 / 客户端	Local / Client
+端口:	Port:
+密钥算法: 	Key Algorithm: 
+密钥算法与生成	Key Algorithm & Generation
+ Ed25519 (推荐)	Ed25519 (Recommended)
+Ed25519 (推荐)	Ed25519 (Recommended)
+状态	Status
+状态: 	Status: 
+终端	Terminal
+面板	Panel
+备注说明	Notes
+凭据	Credentials
+凭据存储总数: 	Total Credentials: 
+代码片段总数: 	Total Snippets: 
+从外部工具一键导入	Import from External Tools
+一键扫描并导入本机 ~/.ssh/config	Scan and Import Local ~/.ssh/config
+代码片段树形视图	Snippets Tree View
+添加跳板机中继节点	Add Jump Host Relay Node
+配置端口映射	Configure Port Forwarding
+请输入 	Please enter 
+本地端应用 / 客户端	Local Application / Client
+本地目标服务 (内网端)	Local Target Service (Intranet)
+本地网络 / 出口网关	Local Network / Egress Gateway
+本地网络出口	Local Network Egress
+公网入站	Public Inbound
+私网穿透	Private Penetration
+反向隧道	Reverse Tunnel
+正向隧道	Forward Tunnel
+动态代理	Dynamic Proxy
+跳板级联	Jump Cascade
+中间资产	Relay Asset
+目标资产	Target Asset
+待填写	Pending
+已保存	Saved
+已激活	Active
+就绪	Ready
+监听中	Listening
+目标主机与身份	Target Host & Identity
+大规模批量造数与压测	Massive Mock Generation & Stress Testing
+代理	Proxy
+快捷命令库	Quick Command Library
+代理池	Proxy Pool
+远程公网入口 (监听端)	Remote Public Inbound (Listener)
+活跃连接中	Actively Connected
+默认端口 22	Default Port 22
+启用	Enabled
+⌨️ 终端首选项	⌨️ Terminal Preferences
+🛠️ 开发者调试控制台	🛠️ Developer Debug Console
+进入网络与隧道管理中心	Go to Network & Tunnels Hub
+主机端口转发	Host Port Forwarding
+进入网络与隧道管理中心 ➔	Go to Network & Tunnels Hub ➔
+💻 本地文件系统 (Local Filesystem)	💻 Local Filesystem
+🌐 远程主机资产 (Remote SFTP Hosts)	🌐 Remote SFTP Hosts
+🌐 远程主机资产 (Remote Hosts)	🌐 Remote Hosts
+💻 本地终端环境 (Local Shells)	💻 Local Shell Environments
+🌐 远程主机资产 (Remote SSH Hosts)	🌐 Remote SSH Hosts
+🔐 凭据存储总数: 	🔐 Total Credentials: 
+📜 代码片段总数: 	📜 Total Snippets: 
+ 条 | 📁 分组: 	 entries | 📁 Group: 
+📥 从外部工具一键导入	📥 Import from External Tools
+已选: 	Selected: 
+(默认: 	(Default: 
+请输入 	Please enter 
+ 条	 entries
+ 个	
+管道: 	Pipe: 
+密钥算法: 	Key Algorithm: 
+本地项: 	Local items: 
+远程项: 	Remote items: 
+宿主: 	Host: 
+ 活跃连接	 active connections
+ 个 TCP 会话	 TCP sessions
+共 	Total 
+ 级跳板中继	 hops relay
+主题切换与外观治理 (当前: 	Theme Switch & Appearance (Current: 
+当前激活: 	Active: 
+主题配色体系测试 (当前生效: 	Theme Palette Matrix Test (Active: 
+如 k8s-node-	e.g. k8s-node-
+集群/k8s	Cluster/k8s
+如 web-prod-01	e.g. web-prod-01
+生产集群/核心库	Prod-Cluster/Core-DB
+集群/核心库	Cluster/Core-DB
+本地 (主目录)	Local (Home)
+本地目录	Local Directory
+本地	Local
+远程	Remote
+条记录	records
+置顶常用	Pinned
+置顶	Pinned
+今天	Today
+昨天	Yesterday
+更早	Earlier
+全部主机 (按频次)	All Hosts (By Frequency)
+默认分组	Default Group
+移入此分组	Move into this group
+窗口始终置顶 (Always on Top)	Always on Top
+保持主窗口始终位于其他应用窗口最顶层，避免排查故障时频繁切换焦点	Keep the main window always on top of other applications
+关闭含活跃会话窗口时确认	Confirm Before Closing Active Sessions
+当后台存在未断开的 SSH 或本地终端会话时，点击关闭按钮前弹出安全确认对话框	Prompt for confirmation before closing if active SSH or local terminal sessions exist
+开机随系统自动启动 (Launch on Boot)	Launch on System Startup
+登录操作系统时自动启动客户端，方便后台网络隧道与端口转发无缝就绪	Automatically launch the client upon logging into the OS to keep tunnels and sessions ready
+确认退出应用程序	Confirm Exit Application
+当前仍有活跃的终端或 SSH 会话正在运行。强行退出将导致远程任务与网络隧道中断，确定要退出吗？	Active terminal or SSH sessions are currently running. Exiting will terminate remote tasks and network tunnels. Are you sure you want to exit?
+强行退出	Force Exit
+退出应用	Exit Application
+继续使用	Continue Using
+关闭会话标签页时确认 (Confirm Closing Tab)	Confirm Before Closing Tab
+关闭正在运行的远程 SSH 或本地终端标签页前弹出安全确认，防止手滑误断开	Prompt for confirmation before closing active remote SSH or local terminal tabs
+退出应用时确认活跃连接 (Confirm Before Exit)	Confirm Before Exiting With Active Sessions
+当后台存在未断开的 SSH 或本地终端会话时，点击窗口关闭按钮或按 Alt+F4 弹出防误触提示	Prompt for confirmation before exiting if active SSH or local terminal sessions exist
+确认关闭终端会话	Confirm Close Terminal Session
+断开并关闭	Disconnect and Close
+图形渲染引擎 (Graphics Engine)	Graphics Engine
+控制底层 GPU 光栅化渲染管线 (切换需重启客户端生效)	Controls GPU rasterization pipeline (restart required to take effect)
+CPU 软件安全渲染	CPU Software Safe Rendering
+D3D/DWM 硬件加速	D3D/DWM Hardware Acceleration
+标准 OpenGL 加速	Standard OpenGL Acceleration
+现代 Vulkan 极速管线	Modern Vulkan Pipeline
+防花屏/低发热/兼容	Anti-glitch/Cool/Compatible
+切换图形渲染引擎	Switch Graphics Engine
+切换图形渲染引擎需要重启客户端以重新初始化底层 GPU 显卡管线，是否立即重启？	Switching the graphics engine requires restarting the client to reinitialize the GPU pipeline. Restart now?
+立即重启	Restart Now
+稍后重启	Restart Later
+确定要断开并关闭此会话吗？远程正在运行的任务将被中断。	Are you sure you want to disconnect and close this session? Remote running tasks will be interrupted.
+推荐	Recommended
+用户	User
+生效中	Active
+配色主题方案与调色板	Color Themes & Palette
+个性化定制客户端主视觉与终端 ANSI 调色板，支持自定义创建、导入与导出	Personalize client visuals and terminal ANSI palettes, supporting custom creation, import, and export
+主题生态管理 (Theme Actions)	Theme Actions
+支持导入标准 TOML 或 Windows Terminal 配色，或基于当前主题派生新主题	Supports importing standard TOML or Windows Terminal color schemes, or deriving new themes from the current one
+新建主题	New Theme
+导入主题	Import Theme
+导出当前	Export Current
+主题画廊 (Theme Gallery)	Theme Gallery
+点击即时热生效，可预览背景色、前景色、强调色及表面调色板	Click for instant preview of background, foreground, accent, and surface palette
+背景壁纸与滚动轮播	Wallpapers & Slideshow
+设置客户端毛玻璃底衬与壁纸图库，支持多图定时轮播与平滑淡入淡出	Configure acrylic backdrop and wallpaper gallery with scheduled rotation and smooth fading
+透底显示模式 (Display Mode)	Display Mode
+选择纯色无壁纸、仅终端视口透底或全局亚克力毛玻璃磨砂	Choose solid background, terminal-only translucency, or global acrylic frosted glass
+仅终端透底	Terminal Only
+壁纸图库画廊 (Wallpaper Gallery)	Wallpaper Gallery
+添加多张本地壁纸图片，点击切换即时生效，开启轮播后按策略自动切换	Add multiple local wallpaper images, click to switch immediately, and cycle automatically when slideshow is enabled
+添加壁纸图片	Add Wallpaper
+壁纸轮播切换策略 (Rotation Interval)	Rotation Interval
+在图库中自动按间隔时间循环播放下一张壁纸	Automatically cycle through gallery wallpapers at specified intervals
+单张固定	Static
+分钟	Minutes
+小时	Hours
+每次启动	Every Startup
+壁纸切换动效 (Transition Effect)	Transition Effect
+选择轮播壁纸更替时的视效动画	Select visual animation effect for wallpaper transitions
+平滑淡入淡出 (Cross-fade)	Cross-fade
+水平视差滚动 (Slide)	Slide
+实验特性与功能显隐门控 (Feature Flags)	Feature Flags & Lab Controls
+开启的实验特性将实时挂载并显现在偏好设置中，关闭后平滑隐藏	Enabled experimental features will dynamically show in Preferences, smoothly hiding when disabled
+全部开启	Enable All
+全部关闭	Disable All
+系统级桌面托盘气泡通知 (OS Desktop Notification)	OS Desktop Notification (Desktop Push)
+开启后在偏好设置通用页显示对应选项，会话断开或长任务结束向 Windows 托盘推流	Shows in General settings; pushes to Windows Action Center on disconnect or long command finish
+终端复古 CRT 扫描线着色器 (Terminal CRT Shader)	Terminal Retro CRT Shader
+开启后在偏好设置终端页显示对应选项，为字符渲染叠加微凸显像管与荧光扫描线特效	Shows in Terminal settings; overlays curved CRT glass and raster scanlines over glyphs
+云端多端加密备份与同步原型 (Cloud Sync Prototype)	Cloud Sync Prototype
+开启后在偏好设置备份页显示云端同步选项，基于端到端加密同步配置与主机资产	Shows in Backup settings; syncs config and assets with end-to-end encryption
+终端侧边临时便签划词板 (Terminal Scratchpad)	Terminal Scratchpad
+开启后在右侧活动栏显示 Scratchpad 工具抽屉，用于终端划词文本临时收集备忘	Shows Scratchpad drawer in the right activity bar for temporary text notes
+核心设置状态实时探针 (Settings Live Inspector)	Settings Live Inspector
+实时侦测当前内存配置与持久化状态，免去翻看底层配置文件的繁琐	Inspects in-memory and persisted configurations in real time without digging into config files
+主窗口置顶	Window Always-on-Top
+开启 (Always)	Enabled (Always)
+常规 (Normal)	Normal
+Tab关闭二次确认	Confirm Tab Close
+开启 (Safe)	Safe (On)
+关闭 (Fast)	Fast (Off)
+活跃配色主题	Active Theme
+透底壁纸状态	Backdrop Wallpaper State
+全局毛玻璃	Global Acrylic
+壁纸轮播图库	Wallpaper Gallery
+张	items
+配置预设注入与出厂重置 (Presets & Recovery)	Config Presets & Factory Reset
+快速注入高负载全功能测试场景或将应用设置恢复出厂干净初始状态	Quickly inject high-load testing profiles or reset all application preferences to clean defaults
+极客全开压测模式	Geek Mode (All Features On)
+极简轻量兼容模式	Minimal Lightweight Mode
+恢复出厂默认设置	Restore Factory Defaults
+主题配色体系快测 (当前: 	Quick Theme Switch (Active: 
+系统级桌面气泡通知 (Desktop Push)	OS Desktop Notifications (Desktop Push)
+[实验特性] 长耗时命令结束或会话异常断开时向 Windows 系统托盘推送通知	[Experimental] Send Windows desktop notifications when sessions disconnect or long commands complete
+复古 CRT 扫描线显像管着色器 (Retro CRT Shader)	Retro CRT Scanline Shader
+[实验特性] 为终端字符渲染叠加复古显像管微弯曲曲面与光栅扫描线特效	[Experimental] Overlays curved CRT glass curvature and phosphorescent scanlines over terminal glyphs
+主题设计与定制工坊 (Theme Studio)	Theme Studio (Custom Themes)
+支持实时表单调色、沙盒窗口渲染验证与标准 TOML 源码双向同步	Real-time palette tuning, sandbox window preview, and bi-directional TOML code synchronization
+主题名称 (Name)	Theme Name
+作者 (Author)	Author
+继承基底 (Base Theme)	Base Theme
+视觉倾向 (Period)	Period
+深色 (Night)	Night (Dark)
+浅色 (Day)	Day (Light)
+窗口底色 (window_bg)	Window Background (window_bg)
+主前景色 (foreground)	Foreground (foreground)
+侧边面板底色 (panel_bg)	Panel Background (panel_bg)
+次要文本色 (secondary_fg)	Secondary Foreground (secondary_fg)
+表面卡片底色 (surface_bg)	Surface Background (surface_bg)
+品牌强调主色 (accent)	Accent Color (accent)
+边框分割线 (border)	Border Color (border)
+悬停底色 (hover_bg)	Hover Background (hover_bg)
+TOML 主题配置源码 (支持双向实时修改与解析)	TOML Theme Configuration (Bi-directional Code Editor)
+📋 复制配置	📋 Copy Config
+🔄 从代码解析同步到表单	🔄 Parse & Sync to Form
+提示: 既可通过左侧调色板修改，也可直接编辑 TOML 源码保存。	Tip: You can tune colors using the left palette or directly edit the raw TOML source code.
+保存并立即激活	Save & Activate
+快速调色板:	Quick Palettes:
+
+
+
+
+
+

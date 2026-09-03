@@ -51,11 +51,16 @@ export component DebugPresetTab inherits Rectangle {
                     }
 
                     Rectangle {
-                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        min-width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
                         background: p1-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
                         y: (parent.height - self.height) / 2;
                         p1-t := TouchArea { clicked => { root.inject-preset("rich_clusters"); } mouse-cursor: pointer; }
-                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; vertical-alignment: center; }
+                        }
                     }
                 }
             }
@@ -95,11 +100,16 @@ export component DebugPresetTab inherits Rectangle {
                     }
 
                     Rectangle {
-                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        min-width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
                         background: p2-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
                         y: (parent.height - self.height) / 2;
                         p2-t := TouchArea { clicked => { root.inject-preset("minimal"); } mouse-cursor: pointer; }
-                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; vertical-alignment: center; }
+                        }
                     }
                 }
             }
@@ -139,11 +149,16 @@ export component DebugPresetTab inherits Rectangle {
                     }
 
                     Rectangle {
-                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        min-width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
                         background: p3-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
                         y: (parent.height - self.height) / 2;
                         p3-t := TouchArea { clicked => { root.inject-preset("long_names"); } mouse-cursor: pointer; }
-                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; vertical-alignment: center; }
+                        }
                     }
                 }
             }
@@ -183,11 +198,16 @@ export component DebugPresetTab inherits Rectangle {
                     }
 
                     Rectangle {
-                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        min-width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
                         background: p4-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
                         y: (parent.height - self.height) / 2;
                         p4-t := TouchArea { clicked => { root.inject-preset("deep_nested"); } mouse-cursor: pointer; }
-                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; vertical-alignment: center; }
+                        }
                     }
                 }
             }
@@ -227,11 +247,16 @@ export component DebugPresetTab inherits Rectangle {
                     }
 
                     Rectangle {
-                        width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
+                        min-width: 90px; height: 28px; border-radius: AppTheme.radius-medium;
                         background: p5-t.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
                         y: (parent.height - self.height) / 2;
                         p5-t := TouchArea { clicked => { root.inject-preset("faults"); } mouse-cursor: pointer; }
-                        Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: center;
+                            Text { text: @tr("注入场景"); font-size: 11px; font-weight: 600; color: #ffffff; vertical-alignment: center; }
+                        }
                     }
                 }
             }

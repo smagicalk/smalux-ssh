@@ -83,9 +83,9 @@ export component TerminalPaneView inherits Rectangle {
     callback tab-drag-ended();
 
     // -------------------------------------------------------------------------
-    // 3. 视觉容器与边框样式
+    // 3. 视觉容器与边框样式 (设为 transparent 允许底层终端或全局壁纸自然透出)
     // -------------------------------------------------------------------------
-    background: AppTheme.window-background;
+    background: transparent;
     border-width: root.is-active && root.total-panes > 1 ? 1.5px : (root.total-panes > 1 ? 1px : 0px);
     border-color: root.is-active ? AppTheme.accent : AppTheme.border;
     clip: true;

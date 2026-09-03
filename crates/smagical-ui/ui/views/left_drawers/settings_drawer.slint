@@ -7,6 +7,16 @@ export struct ThemeOption {
     id: string,
     name: string,
     color-preview: brush,
+    is-builtin: bool,
+    is-dark: bool,
+    bg-color: brush,
+    fg-color: brush,
+    accent-color: brush,
+}
+
+/// 主题卡片多排栅格行数据模型
+export struct ThemeRow {
+    items: [ThemeOption],
 }
 
 /// 偏好设置抽屉 (Settings Drawer)

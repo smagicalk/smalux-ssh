@@ -470,7 +470,7 @@ export component TunnelsCenterView inherits Rectangle {
                                         }
 
                                         if tun.tunnel-type == "Dynamic": Text {
-                                            text: tun.local-bind + ":" + tun.local-port + " (SOCKS5 代理网关)";
+                                            text: tun.local-bind + ":" + tun.local-port + " " + @tr("(SOCKS5 代理网关)");
                                             font-size: 10px;
                                             font-family: "Cascadia Code, Consolas, monospace";
                                             color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
@@ -478,7 +478,7 @@ export component TunnelsCenterView inherits Rectangle {
                                         }
 
                                         if tun.tunnel-type == "ReverseDynamic": Text {
-                                            text: (tun.ssh-host-name != "" ? tun.ssh-host-name : "远端") + ":" + tun.remote-port + " (远端 SOCKS5 代理网关)";
+                                            text: (tun.ssh-host-name != "" ? tun.ssh-host-name : @tr("远端")) + ":" + tun.remote-port + " " + @tr("(远端 SOCKS5 代理网关)");
                                             font-size: 10px;
                                             font-family: "Cascadia Code, Consolas, monospace";
                                             color: tun.is-running ? AppTheme.foreground : AppTheme.secondary-foreground;
@@ -1059,7 +1059,7 @@ export component TunnelsCenterView inherits Rectangle {
                                     }
                                     Text {
                                         text: root.form-type == "ReverseDynamic"
-                                            ? (root.form-ssh-host-name != "" ? (root.form-ssh-host-name + ":" + root.form-remote-port) : ("远端:" + root.form-remote-port))
+                                            ? (root.form-ssh-host-name != "" ? (root.form-ssh-host-name + ":" + root.form-remote-port) : (@tr("远端:") + root.form-remote-port))
                                             : (root.form-type == "Dynamic"
                                                 ? @tr("任意动态网络目标")
                                                 : (root.form-remote-host != "" ? (root.form-remote-host + ":" + root.form-remote-port) : @tr("未配置远端")));
@@ -2335,7 +2335,7 @@ export component TunnelsCenterView inherits Rectangle {
                                     }
 
                                     Text {
-                                        text: root.form-ssh-command != "" ? root.form-ssh-command : "-J <尚未选择启用跳板节点>";
+                                        text: root.form-ssh-command != "" ? root.form-ssh-command : @tr("-J <尚未选择启用跳板节点>");
                                         font-size: 11px;
                                         font-family: "Cascadia Code, Consolas, monospace";
                                         color: AppTheme.accent;

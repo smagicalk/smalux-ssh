@@ -1,0 +1,4363 @@
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: smalux-ssh 0.1.0\n"
+"POT-Creation-Date: 2026-09-03 09:15+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=1; plural=0;\n"
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:126
+msgctxt "AppWindow"
+msgid "smalux - 现代 Rust SSH 终端工作台"
+msgstr ""
+
+#. 提示弹窗标题
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:948
+msgctxt "AppWindow"
+msgid "提示"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:1991
+msgctxt "AppWindow"
+msgid "确认退出应用程序"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:1992
+msgctxt "AppWindow"
+msgid ""
+"当前仍有活跃的终端或 SSH 会话正在运行。强行退出将导致远"
+"程任务与网络隧道中断，确定要退出吗？"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:1995
+msgctxt "AppWindow"
+msgid "强行退出"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:1996
+msgctxt "AppWindow"
+msgid "继续使用"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2007
+msgctxt "AppWindow"
+msgid "确认关闭终端会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2008
+msgctxt "AppWindow"
+msgid "确定要断开并关闭此会话吗？远程正在运行的任务将被中断。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2011
+msgctxt "AppWindow"
+msgid "断开并关闭"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2012
+msgctxt "AppWindow"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2023
+msgctxt "AppWindow"
+msgid "切换图形渲染引擎"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2024
+msgctxt "AppWindow"
+msgid ""
+"切换图形渲染引擎需要重启客户端以重新初始化底层 GPU 显卡"
+"管线，是否立即重启？"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2027
+msgctxt "AppWindow"
+msgid "立即重启"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\main.slint:2028
+msgctxt "AppWindow"
+msgid "稍后重启"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:50
+msgctxt "CommandPalette"
+msgid "输入主机名、命令或 > 执行操作 (Esc 退出)..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\command-palette.slint:67
+msgctxt "CommandPalette"
+msgid "按 ↑↓ 导航  |  Enter 确认  |  Esc 关闭"
+msgstr ""
+
+#. 当前选中的目标父级分组名称
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:19
+msgctxt "CreateGroupModal"
+msgid "根目录 (作为顶级分组)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:86
+msgctxt "CreateGroupModal"
+msgid "新建主机分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:138
+msgctxt "CreateGroupModal"
+msgid "所属上级分组:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:146
+msgctxt "CreateGroupModal"
+msgid "当前: 顶级根目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:146
+msgctxt "CreateGroupModal"
+msgid "当前: 子分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:236
+msgctxt "CreateGroupModal"
+msgid "选取上级"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:254
+msgctxt "CreateGroupModal"
+msgid "新分组名称:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:299
+msgctxt "CreateGroupModal"
+msgid "请输入分组名称，例如: 微服务集群、测试数据库..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:369
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:369
+msgctxt "CreateGroupModal"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:380
+msgctxt "CreateGroupModal"
+msgid "确认创建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:446
+msgctxt "CreateGroupModal"
+msgid "选择所属上级分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:480
+msgctxt "CreateGroupModal"
+msgid "请在下方树形结构中点选新分组的父级归属（支持多级折叠/展开与双击选定）："
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:511
+msgctxt "CreateGroupModal"
+msgid "已选: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-group-modal.slint:573
+msgctxt "CreateGroupModal"
+msgid "确定选定"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-snippet-group-modal.slint:47
+msgctxt "CreateSnippetGroupModal"
+msgid "新建代码片段文件夹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-snippet-group-modal.slint:82
+msgctxt "CreateSnippetGroupModal"
+msgid "文件夹名称"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-snippet-group-modal.slint:101
+msgctxt "CreateSnippetGroupModal"
+msgid "如：Docker 容器运维、K8s 排障..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-snippet-group-modal.slint:112
+msgctxt "CreateSnippetGroupModal"
+msgid "上级文件夹 (可选多层嵌套)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-snippet-group-modal.slint:173
+msgctxt "CreateSnippetGroupModal"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-snippet-group-modal.slint:197
+msgctxt "CreateSnippetGroupModal"
+msgid "创建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:50
+msgctxt "CreateTunnelTypeModal"
+msgid "新建网络与隧道规则"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:56
+msgctxt "CreateTunnelTypeModal"
+msgid "请选择您要创建的资产类型，将为您打开专属配置表单"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:130
+msgctxt "CreateTunnelTypeModal"
+msgid "端口转发 (Port Forwarding)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:156
+msgctxt "CreateTunnelTypeModal"
+msgid "本地、远端或动态 SOCKS5 端口转发与穿透"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:218
+msgctxt "CreateTunnelTypeModal"
+msgid "跳板机 (JumpHost / Bastion)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:244
+msgctxt "CreateTunnelTypeModal"
+msgid "配置 ProxyJump 堡垒机中继，供主机连接时绑定"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:306
+msgctxt "CreateTunnelTypeModal"
+msgid "出网代理池 (Proxy Server)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\create-tunnel-type-modal.slint:332
+msgctxt "CreateTunnelTypeModal"
+msgid "配置 HTTP / SOCKS5 代理节点，供主机统一出网"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:163
+msgctxt "DebugModal"
+msgid "开发者调试工作台 (Workbench)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:186
+msgctxt "DebugModal"
+msgid "主机数: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:186
+msgctxt "DebugModal"
+msgid " | 可见节点: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:238
+msgctxt "DebugModal"
+msgid "主机资产调试"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:278
+msgctxt "DebugModal"
+msgid "凭据密钥调试"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:318
+msgctxt "DebugModal"
+msgid "代码片段调试"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:358
+msgctxt "DebugModal"
+msgid "设置外观调试"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:398
+msgctxt "DebugModal"
+msgid "实时日志流"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug-modal.slint:438
+msgctxt "DebugModal"
+msgid "图形渲染管线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\drawer-container.slint:5
+msgctxt "DrawerContainer"
+msgid "面板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:73
+msgctxt "FileHostModal"
+msgid "选择并打开文件会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:89
+msgctxt "FileHostModal"
+msgid "搜索主机 (支持名称 / IP / 分组)..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:107
+msgctxt "FileHostModal"
+msgid "💻 本地文件系统 (Local Filesystem)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:157
+msgctxt "FileHostModal"
+msgid "本地工作目录 (Local Disk)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:167
+msgctxt "FileHostModal"
+msgid "浏览和管理本机磁盘文件目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:223
+msgctxt "FileHostModal"
+msgid "🌐 远程主机资产 (Remote SFTP Hosts)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:237
+msgctxt "FileHostModal"
+msgid "未找到匹配的远程主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\file-host-modal.slint:250
+msgctxt "FileHostModal"
+msgid "💡 提示：点击任意远程主机即可自动建立 SFTP 会话并打开文件管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:79
+msgctxt "HistoryDetailModal"
+msgid "会话历史详情与终端快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:108
+msgctxt "HistoryDetailModal"
+msgid "活跃中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:108
+msgctxt "HistoryDetailModal"
+msgid "连接超时"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:108
+msgctxt "HistoryDetailModal"
+msgid "认证失败"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:108
+msgctxt "HistoryDetailModal"
+msgid "异常中断"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:108
+msgctxt "HistoryDetailModal"
+msgid "正常退出"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:162
+msgctxt "HistoryDetailModal"
+msgid "目标主机与身份"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:194
+msgctxt "HistoryDetailModal"
+msgid "连接与断开时间"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:200
+msgctxt "HistoryDetailModal"
+msgid "进行中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:225
+msgctxt "HistoryDetailModal"
+msgid "统计时长"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:261
+msgctxt "HistoryDetailModal"
+msgid "终端输出快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:269
+msgctxt "HistoryDetailModal"
+msgid "（无屏幕记录）"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:314
+msgctxt "HistoryDetailModal"
+msgid "已复制 ✓"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:314
+msgctxt "HistoryDetailModal"
+msgid "复制快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:394
+msgctxt "HistoryDetailModal"
+msgid "暂无终端屏幕输出快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:401
+msgctxt "HistoryDetailModal"
+msgid "该会话在建立快照机制前断开，或会话执行过程中未产生屏幕文本输出"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:460
+msgctxt "HistoryDetailModal"
+msgid "关闭"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\history-detail-modal.slint:467
+msgctxt "HistoryDetailModal"
+msgid "发起连接"
+msgstr ""
+
+#. 列表分组标题说明 (若为空字符串则不渲染标题)
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\host-picker-list.slint:133
+msgctxt "HostPickerList"
+msgid "🌐 远程主机资产 (Remote Hosts)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\host-tree-selector.slint:47
+msgctxt "HostTreeSelector"
+msgid "暂无主机资产，请先在主机面板中添加主机"
+msgstr ""
+
+#. 弹窗标题
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\message-dialog.slint:9
+msgctxt "MessageDialog"
+msgid "提示"
+msgstr ""
+
+#. 确认按钮文字
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\message-dialog.slint:18
+msgctxt "MessageDialog"
+msgid "确定"
+msgstr ""
+
+#. 取消按钮文字
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\message-dialog.slint:20
+msgctxt "MessageDialog"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\new-session-modal.slint:73
+msgctxt "NewSessionModal"
+msgid "新建终端会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\new-session-modal.slint:90
+msgctxt "NewSessionModal"
+msgid "搜索本地终端或远程主机 (支持名称 / IP / 分组)..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\new-session-modal.slint:108
+msgctxt "NewSessionModal"
+msgid "💻 本地终端环境 (Local Shells)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\new-session-modal.slint:228
+msgctxt "NewSessionModal"
+msgid "🌐 远程主机资产 (Remote SSH Hosts)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\new-session-modal.slint:242
+msgctxt "NewSessionModal"
+msgid "未找到匹配的本地终端或远程主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\new-session-modal.slint:255
+msgctxt "NewSessionModal"
+msgid "💡 提示：点击任意条目即可快速创建并激活新终端会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\search-input.slint:6
+msgctxt "SearchInput"
+msgid "搜索..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\snippet-run-modal.slint:57
+msgctxt "SnippetRunModal"
+msgid "填充动态参数执行代码片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\snippet-run-modal.slint:129
+msgctxt "SnippetRunModal"
+msgid "(默认: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\snippet-run-modal.slint:148
+msgctxt "SnippetRunModal"
+msgid "请输入 "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\snippet-run-modal.slint:162
+msgctxt "SnippetRunModal"
+msgid "合成命令预览:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\snippet-run-modal.slint:209
+msgctxt "SnippetRunModal"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\snippet-run-modal.slint:237
+msgctxt "SnippetRunModal"
+msgid "一键注入执行"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\tab-item.slint:6
+msgctxt "TabItem"
+msgid "会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:168
+msgctxt "ThemeEditorModal"
+msgid "主题设计与定制工坊 (Theme Studio)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:174
+msgctxt "ThemeEditorModal"
+msgid "支持实时表单调色、沙盒窗口渲染验证与标准 TOML 源码双向同步"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:224
+msgctxt "ThemeEditorModal"
+msgid "主题名称 (Name)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:247
+msgctxt "ThemeEditorModal"
+msgid "作者 (Author)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:276
+msgctxt "ThemeEditorModal"
+msgid "继承基底 (Base Theme)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:299
+msgctxt "ThemeEditorModal"
+msgid "视觉倾向 (Period)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:308
+msgctxt "ThemeEditorModal"
+msgid "深色 (Night)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:314
+msgctxt "ThemeEditorModal"
+msgid "浅色 (Day)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:327
+msgctxt "ThemeEditorModal"
+msgid "快速调色板:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:369
+msgctxt "ThemeEditorModal"
+msgid "窗口底色 (window_bg)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:376
+msgctxt "ThemeEditorModal"
+msgid "主前景色 (foreground)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:387
+msgctxt "ThemeEditorModal"
+msgid "侧边面板底色 (panel_bg)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:394
+msgctxt "ThemeEditorModal"
+msgid "次要文本色 (secondary_fg)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:405
+msgctxt "ThemeEditorModal"
+msgid "表面卡片底色 (surface_bg)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:412
+msgctxt "ThemeEditorModal"
+msgid "品牌强调主色 (accent)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:423
+msgctxt "ThemeEditorModal"
+msgid "边框分割线 (border)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:430
+msgctxt "ThemeEditorModal"
+msgid "悬停底色 (hover_bg)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:667
+msgctxt "ThemeEditorModal"
+msgid "TOML 主题配置源码 (支持双向实时修改与解析)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:692
+msgctxt "ThemeEditorModal"
+msgid "📋 复制配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:709
+msgctxt "ThemeEditorModal"
+msgid "🔄 从代码解析同步到表单"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:744
+msgctxt "ThemeEditorModal"
+msgid "提示: 既可通过左侧调色板修改，也可直接编辑 TOML 源码保存。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:767
+msgctxt "ThemeEditorModal"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\theme-editor-modal.slint:786
+msgctxt "ThemeEditorModal"
+msgid "保存并立即激活"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:12
+msgctxt "DebugBatchTab"
+msgid "集群/k8s"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:51
+msgctxt "DebugBatchTab"
+msgid "批量主机生成"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:65
+msgctxt "DebugBatchTab"
+msgid "名称前缀:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:71
+msgctxt "DebugBatchTab"
+msgid "数量 (台):"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:86
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:86
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:86
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:86
+msgctxt "DebugBatchTab"
+msgid "台"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:117
+msgctxt "DebugBatchTab"
+msgid "IP 前缀网段:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:123
+msgctxt "DebugBatchTab"
+msgid "起始 IP 末位:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:134
+msgctxt "DebugBatchTab"
+msgid "归属分组路径 (支持 / 嵌套):"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:140
+msgctxt "DebugBatchTab"
+msgid "SSH 端口:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:149
+msgctxt "DebugBatchTab"
+msgid "状态分配策略:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:159
+msgctxt "DebugBatchTab"
+msgid "混合随机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:166
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:166
+msgctxt "DebugBatchTab"
+msgid "全部在线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:173
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:173
+msgctxt "DebugBatchTab"
+msgid "全部告警"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:180
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:180
+msgctxt "DebugBatchTab"
+msgid "全部离线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:191
+msgctxt "DebugBatchTab"
+msgid "批量追加生成"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:211
+msgctxt "DebugBatchTab"
+msgid "覆盖并生成"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:257
+msgctxt "DebugBatchTab"
+msgid "批量修改与数据治理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:269
+msgctxt "DebugBatchTab"
+msgid "批量修改全量主机在线状态:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:300
+msgctxt "DebugBatchTab"
+msgid "随机波动"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:309
+msgctxt "DebugBatchTab"
+msgid "批量重置全量主机端口:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:320
+msgctxt "DebugBatchTab"
+msgid "批量更新所有端口"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:333
+msgctxt "DebugBatchTab"
+msgid "重置与清空:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:340
+msgctxt "DebugBatchTab"
+msgid "恢复初始 (3台)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-batch-tab.slint:349
+msgctxt "DebugBatchTab"
+msgid "清空全量数据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:55
+msgctxt "DebugCredentialsTab"
+msgid "🔐 凭据存储总数: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:55
+msgctxt "DebugCredentialsTab"
+msgid " 条"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:70
+msgctxt "DebugCredentialsTab"
+msgid "恢复默认精选预设"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:81
+msgctxt "DebugCredentialsTab"
+msgid "清空所有凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:123
+msgctxt "DebugCredentialsTab"
+msgid "预设凭据单项注入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:145
+msgctxt "DebugCredentialsTab"
+msgid "生产 Ed25519 密钥 (带口令)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:151
+msgctxt "DebugCredentialsTab"
+msgid "🔑 + Ed25519 密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:162
+msgctxt "DebugCredentialsTab"
+msgid "CI/CD RSA-4096 密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:168
+msgctxt "DebugCredentialsTab"
+msgid "📜 + RSA 密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:236
+msgctxt "DebugCredentialsTab"
+msgid "堡垒机特权 Root 密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:242
+msgctxt "DebugCredentialsTab"
+msgid "🔒 + Root 密码"
+msgstr ""
+
+#. 快速添加自定义凭据
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:251
+msgctxt "DebugCredentialsTab"
+msgid "快速添加自定义凭据:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:254
+msgctxt "DebugCredentialsTab"
+msgid "凭据名称:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:263
+msgctxt "DebugCredentialsTab"
+msgid "类型: 密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:268
+msgctxt "DebugCredentialsTab"
+msgid "类型: 密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:273
+msgctxt "DebugCredentialsTab"
+msgid "类型: Agent"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:280
+msgctxt "DebugCredentialsTab"
+msgid "确认添加单条凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:323
+msgctxt "DebugCredentialsTab"
+msgid "大规模批量造数与压测"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:336
+msgctxt "DebugCredentialsTab"
+msgid "名称前缀:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:344
+msgctxt "DebugCredentialsTab"
+msgid "生成数量:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:352
+msgctxt "DebugCredentialsTab"
+msgid "凭据类型分布:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:358
+msgctxt "DebugCredentialsTab"
+msgid "混合类型"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:364
+msgctxt "DebugCredentialsTab"
+msgid "全密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:370
+msgctxt "DebugCredentialsTab"
+msgid "全密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:376
+msgctxt "DebugCredentialsTab"
+msgid "全 Agent"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:413
+msgctxt "DebugCredentialsTab"
+msgid "覆盖现有数据 (未勾选则为追加模式)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:421
+msgctxt "DebugCredentialsTab"
+msgid "⚡ 立即批量生成测试凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-credentials-tab.slint:446
+msgctxt "DebugCredentialsTab"
+msgid ""
+"💡 提示: 批量生成测试凭据将同步写入 AppStorage 存储层，并在"
+"凭据中心与左侧凭据抽屉中实时响应。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:10
+msgctxt "DebugCrudTab"
+msgid "生产集群/核心库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:51
+msgctxt "DebugCrudTab"
+msgid "快速添加单台主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:60
+msgctxt "DebugCrudTab"
+msgid "主机名称:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:71
+msgctxt "DebugCrudTab"
+msgid "IP 地址:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:79
+msgctxt "DebugCrudTab"
+msgid "端口:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:85
+msgctxt "DebugCrudTab"
+msgid "归属分组路径 (支持 / 嵌套):"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:92
+msgctxt "DebugCrudTab"
+msgid "确认添加主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:136
+msgctxt "DebugCrudTab"
+msgid "快速添加新分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:145
+msgctxt "DebugCrudTab"
+msgid "分组路径 (支持 / 嵌套，如 生产/k8s):"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-crud-tab.slint:152
+msgctxt "DebugCrudTab"
+msgid "确认添加分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:20
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:20
+msgctxt "DebugHostsTab"
+msgid "集群/k8s"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:29
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:29
+msgctxt "DebugHostsTab"
+msgid "生产集群/核心库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:70
+msgctxt "DebugHostsTab"
+msgid "全量主机数"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:77
+msgctxt "DebugHostsTab"
+msgid "展开可见节点"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:84
+msgctxt "DebugHostsTab"
+msgid "全量总节点"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:91
+msgctxt "DebugHostsTab"
+msgid "树视口测算宽"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:104
+msgctxt "DebugHostsTab"
+msgid "恢复默认预设"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:115
+msgctxt "DebugHostsTab"
+msgid "清空全量数据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:157
+msgctxt "DebugHostsTab"
+msgid "批量主机生成与场景注入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:170
+msgctxt "DebugHostsTab"
+msgid "名称前缀:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:171
+msgctxt "DebugHostsTab"
+msgid "如 k8s-node-"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:177
+msgctxt "DebugHostsTab"
+msgid "生成数量:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:193
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:193
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:193
+msgctxt "DebugHostsTab"
+msgid "台"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:212
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:212
+msgctxt "DebugHostsTab"
+msgid "归属分组路径:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:218
+msgctxt "DebugHostsTab"
+msgid "立即批量生成主机"
+msgstr ""
+
+#. 场景预设注入快捷项
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:237
+msgctxt "DebugHostsTab"
+msgid "一键场景预设:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:248
+msgctxt "DebugHostsTab"
+msgid "35+ 企业全集群"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:256
+msgctxt "DebugHostsTab"
+msgid "6 层深嵌套树"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:287
+msgctxt "DebugHostsTab"
+msgid "单项增删改与状态治理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:300
+msgctxt "DebugHostsTab"
+msgid "主机名:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:301
+msgctxt "DebugHostsTab"
+msgid "如 web-prod-01"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:307
+msgctxt "DebugHostsTab"
+msgid "端口:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:314
+msgctxt "DebugHostsTab"
+msgid "IP 地址:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:326
+msgctxt "DebugHostsTab"
+msgid "快速添加单台主机"
+msgstr ""
+
+#. 批量状态更新
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:344
+msgctxt "DebugHostsTab"
+msgid "全量状态一键批量变更:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:355
+msgctxt "DebugHostsTab"
+msgid "全在线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:363
+msgctxt "DebugHostsTab"
+msgid "全告警"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:371
+msgctxt "DebugHostsTab"
+msgid "全离线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-hosts-tab.slint:379
+msgctxt "DebugHostsTab"
+msgid "随机分布"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:46
+msgctxt "DebugInspectorTab"
+msgid "GUI 布局与数据探针指标"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:59
+msgctxt "DebugInspectorTab"
+msgid "全量节点总数:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:65
+msgctxt "DebugInspectorTab"
+msgid "当前展开可见数:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:71
+msgctxt "DebugInspectorTab"
+msgid "全量卡片总数:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:77
+msgctxt "DebugInspectorTab"
+msgid "树视口测算宽度:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:100
+msgctxt "DebugInspectorTab"
+msgid "主题切换与外观治理 (当前: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:107
+msgctxt "DebugInspectorTab"
+msgid "浅色模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-inspector-tab.slint:107
+msgctxt "DebugInspectorTab"
+msgid "深色模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-logs-tab.slint:63
+msgctxt "DebugLogsTab"
+msgid "模拟诊断日志"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-logs-tab.slint:73
+msgctxt "DebugLogsTab"
+msgid "清空日志"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-logs-tab.slint:96
+msgctxt "DebugLogsTab"
+msgid "暂无实时诊断日志事件"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-logs-tab.slint:104
+msgctxt "DebugLogsTab"
+msgid "请在上方点击「模拟诊断日志」或在主界面执行操作以捕获 Tracing 事件"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:48
+msgctxt "DebugPresetTab"
+msgid "1. 企业生产全集群预设 (35+ 主机)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:49
+msgctxt "DebugPresetTab"
+msgid "包含生产 Web、K8s 编排、PG/Redis 核心库、大数据与 AI 算力中心"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:62
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:62
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:62
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:62
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:62
+msgctxt "DebugPresetTab"
+msgid "注入场景"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:97
+msgctxt "DebugPresetTab"
+msgid "2. 极简精简数据预设 (3 台主机)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:98
+msgctxt "DebugPresetTab"
+msgid "验证小数据量下的空状态呈现、滚动条隐藏及轻量加载表现"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:146
+msgctxt "DebugPresetTab"
+msgid "3. 超长命名极限测试 (50+ 字符)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:147
+msgctxt "DebugPresetTab"
+msgid "包含超长主机与微服务集群名称，验证平滑横向滚动与动态视口宽度自适应"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:195
+msgctxt "DebugPresetTab"
+msgid "4. 极深层级嵌套树 (5 级结构)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:196
+msgctxt "DebugPresetTab"
+msgid "全球基础设施 -> 亚太 -> 杭州可用区 -> 机架 POD -> 刀片计算阵列"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:244
+msgctxt "DebugPresetTab"
+msgid "5. 全告警与离线故障集 (Troubleshooting)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-preset-tab.slint:245
+msgctxt "DebugPresetTab"
+msgid "包含丢包路由、高延迟网关、断电主机及磁盘故障节点"
+msgstr ""
+
+#. 当前生效的 GUI 渲染引擎名称
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:7
+msgctxt "DebugRenderingTab"
+msgid "Skia 2D (Google Chrome / Flutter 同款)"
+msgstr ""
+
+#. GPU 硬件加速管线
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:9
+msgctxt "DebugRenderingTab"
+msgid "GPU 硬件加速 (DirectX / OpenGL / Vulkan)"
+msgstr ""
+
+#. 终端像素视口管线
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:11
+msgctxt "DebugRenderingTab"
+msgid "fontdue SIMD 矢量光栅化 + Alacritty VT100 状态机"
+msgstr ""
+
+#. 目标刷新帧率
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:15
+msgctxt "DebugRenderingTab"
+msgid "120 FPS (8.3ms 极速吞吐)"
+msgstr ""
+
+#. 脏矩形增量渲染状态
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:17
+msgctxt "DebugRenderingTab"
+msgid "已启用 (Partial Repaint / 0% 待机功耗)"
+msgstr ""
+
+#. 字体微调排版技术
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:19
+msgctxt "DebugRenderingTab"
+msgid "DirectWrite / FreeType 次像素抗锯齿"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:81
+msgctxt "DebugRenderingTab"
+msgid "Skia 原生图形渲染管线矩阵 (Google Skia Pipelines)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:110
+msgctxt "DebugRenderingTab"
+msgid "当前激活: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:156
+msgctxt "DebugRenderingTab"
+msgid "Skia Auto (官方推荐)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:158
+msgctxt "DebugRenderingTab"
+msgid "DirectX/DWM 硬件自动加速"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:195
+msgctxt "DebugRenderingTab"
+msgid "强制标准 OpenGL 硬件加速管线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:237
+msgctxt "DebugRenderingTab"
+msgid "现代 Vulkan 超低开销显卡直通"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:272
+msgctxt "DebugRenderingTab"
+msgid "Skia CPU 纯软解"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:274
+msgctxt "DebugRenderingTab"
+msgid "SIMD 纯 CPU 光栅化 (0 显卡依赖)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:311
+msgctxt "DebugRenderingTab"
+msgid "画质与运行指标 (Quality & Telemetry)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:334
+msgctxt "DebugRenderingTab"
+msgid "次像素排版抗锯齿"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:336
+msgctxt "DebugRenderingTab"
+msgid "状态: 完美锐利渲染"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:352
+msgctxt "DebugRenderingTab"
+msgid "局部增量重绘 (Damage)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:354
+msgctxt "DebugRenderingTab"
+msgid "待机功耗: ~0.0% CPU"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:370
+msgctxt "DebugRenderingTab"
+msgid "垂直同步与刷新率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:372
+msgctxt "DebugRenderingTab"
+msgid "状态: 自适应高刷匹配"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:409
+msgctxt "DebugRenderingTab"
+msgid "SVG 矢量资产预热与显存池 (Resource Atlas)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:423
+msgctxt "DebugRenderingTab"
+msgid "静态打包图标总数:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:424
+msgctxt "DebugRenderingTab"
+msgid "个全量矢量资产"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:430
+msgctxt "DebugRenderingTab"
+msgid "GPU 纹理缓存池状态:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:431
+msgctxt "DebugRenderingTab"
+msgid "42 / 42 全部已预热常驻"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:437
+msgctxt "DebugRenderingTab"
+msgid "预估显存总占用:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:438
+msgctxt "DebugRenderingTab"
+msgid "~168 KB (微量无感)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:444
+msgctxt "DebugRenderingTab"
+msgid "运行时磁盘 I/O 开销:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:445
+msgctxt "DebugRenderingTab"
+msgid "0 ms (静态内联)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:474
+msgctxt "DebugRenderingTab"
+msgid "⚠️ 目标管线已变更为 ["
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:474
+msgctxt "DebugRenderingTab"
+msgid "]，需重启客户端加载生效"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:480
+msgctxt "DebugRenderingTab"
+msgid "🛠️ 渲染管线自检与应用操作"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:486
+msgctxt "DebugRenderingTab"
+msgid "✓ 配置已保存至本地，将在下次启动客户端时生效"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:528
+msgctxt "DebugRenderingTab"
+msgid "强制重绘"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:568
+msgctxt "DebugRenderingTab"
+msgid "保存 (下次生效)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-rendering-tab.slint:606
+msgctxt "DebugRenderingTab"
+msgid "保存并立即重启"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:194
+msgctxt "DebugSettingsTab"
+msgid "实验特性与功能显隐门控 (Feature Flags)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:200
+msgctxt "DebugSettingsTab"
+msgid "开启的实验特性将实时挂载并显现在偏好设置中，关闭后平滑隐藏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:226
+msgctxt "DebugSettingsTab"
+msgid "全部开启"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:249
+msgctxt "DebugSettingsTab"
+msgid "全部关闭"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:265
+msgctxt "DebugSettingsTab"
+msgid "系统级桌面托盘气泡通知 (OS Desktop Notification)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:266
+msgctxt "DebugSettingsTab"
+msgid ""
+"长耗时命令结束或会话异常断开时向 Windows 系统托盘推送通知 "
+"(直接在此控制生效)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:277
+msgctxt "DebugSettingsTab"
+msgid "终端复古 CRT 扫描线着色器 (Terminal CRT Shader)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:278
+msgctxt "DebugSettingsTab"
+msgid ""
+"开启后在偏好设置终端页显示对应选项，为字符渲染叠加微凸"
+"显像管与荧光扫描线特效"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:289
+msgctxt "DebugSettingsTab"
+msgid "云端多端加密备份与同步原型 (Cloud Sync Prototype)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:290
+msgctxt "DebugSettingsTab"
+msgid "开启后在偏好设置备份页显示云端同步选项，基于端到端加密同步配置与主机资产"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:301
+msgctxt "DebugSettingsTab"
+msgid "终端侧边临时便签划词板 (Terminal Scratchpad)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:302
+msgctxt "DebugSettingsTab"
+msgid "开启后在右侧活动栏显示 Scratchpad 工具抽屉，用于终端划词文本临时收集备忘"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:340
+msgctxt "DebugSettingsTab"
+msgid "核心设置状态实时探针 (Settings Live Inspector)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:346
+msgctxt "DebugSettingsTab"
+msgid "实时侦测当前内存配置与持久化状态，免去翻看底层配置文件的繁琐"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:370
+msgctxt "DebugSettingsTab"
+msgid "图形渲染管线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:385
+msgctxt "DebugSettingsTab"
+msgid "主窗口置顶"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:386
+msgctxt "DebugSettingsTab"
+msgid "开启 (Always)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:386
+msgctxt "DebugSettingsTab"
+msgid "常规 (Normal)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:400
+msgctxt "DebugSettingsTab"
+msgid "Tab关闭二次确认"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:401
+msgctxt "DebugSettingsTab"
+msgid "开启 (Safe)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:401
+msgctxt "DebugSettingsTab"
+msgid "关闭 (Fast)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:420
+msgctxt "DebugSettingsTab"
+msgid "活跃配色主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:435
+msgctxt "DebugSettingsTab"
+msgid "透底壁纸状态"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:436
+msgctxt "DebugSettingsTab"
+msgid "纯色无壁纸"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:436
+msgctxt "DebugSettingsTab"
+msgid "仅终端透底"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:436
+msgctxt "DebugSettingsTab"
+msgid "全局毛玻璃"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:450
+msgctxt "DebugSettingsTab"
+msgid "壁纸轮播图库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:451
+msgctxt "DebugSettingsTab"
+msgid "张"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:485
+msgctxt "DebugSettingsTab"
+msgid "配置预设注入与出厂重置 (Presets & Recovery)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:491
+msgctxt "DebugSettingsTab"
+msgid "快速注入高负载全功能测试场景或将应用设置恢复出厂干净初始状态"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:518
+msgctxt "DebugSettingsTab"
+msgid "极客全开压测模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:536
+msgctxt "DebugSettingsTab"
+msgid "极简轻量兼容模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:554
+msgctxt "DebugSettingsTab"
+msgid "恢复出厂默认设置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:590
+msgctxt "DebugSettingsTab"
+msgid "主题配色体系快测 (当前: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:625
+msgctxt "DebugSettingsTab"
+msgid "深色模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-settings-tab.slint:625
+msgctxt "DebugSettingsTab"
+msgid "浅色模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:55
+msgctxt "DebugSnippetsTab"
+msgid "📜 代码片段总数: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:55
+msgctxt "DebugSnippetsTab"
+msgid " 条 | 📁 分组: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:55
+msgctxt "DebugSnippetsTab"
+msgid " 个"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:70
+msgctxt "DebugSnippetsTab"
+msgid "恢复默认精选片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:81
+msgctxt "DebugSnippetsTab"
+msgid "清空所有片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:123
+msgctxt "DebugSnippetsTab"
+msgid "快速注入预设脚本"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:144
+msgctxt "DebugSnippetsTab"
+msgid "Docker 容器健康列表"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:151
+msgctxt "DebugSnippetsTab"
+msgid "🐳 + Docker ps"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:161
+msgctxt "DebugSnippetsTab"
+msgid "K8s 重启 Deployment"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:168
+msgctxt "DebugSnippetsTab"
+msgid "☸️ + K8s 重启"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:181
+msgctxt "DebugSnippetsTab"
+msgid "排查端口占用"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:188
+msgctxt "DebugSnippetsTab"
+msgid "🔌 + 端口排查"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:198
+msgctxt "DebugSnippetsTab"
+msgid "MySQL 活跃长事务"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:205
+msgctxt "DebugSnippetsTab"
+msgid "🐬 + MySQL 慢查询"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:212
+msgctxt "DebugSnippetsTab"
+msgid "快速添加自定义片段:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:215
+msgctxt "DebugSnippetsTab"
+msgid "片段标题:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:222
+msgctxt "DebugSnippetsTab"
+msgid "脚本命令:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:229
+msgctxt "DebugSnippetsTab"
+msgid "确认添加单条片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:273
+msgctxt "DebugSnippetsTab"
+msgid "大规模批量造数与压测"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:286
+msgctxt "DebugSnippetsTab"
+msgid "名称前缀:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:294
+msgctxt "DebugSnippetsTab"
+msgid "生成数量:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:329
+msgctxt "DebugSnippetsTab"
+msgid "覆盖现有数据 (未勾选则为追加模式)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:337
+msgctxt "DebugSnippetsTab"
+msgid "⚡ 立即批量生成测试代码片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\components\debug_workbench\debug-snippets-tab.slint:361
+msgctxt "DebugSnippetsTab"
+msgid ""
+"💡 提示: 批量生成测试片段将同步写入 AppStorage 存储层，并在"
+"全屏代码片段中心、多层文件夹树与右侧伴生工具栏中实时"
+"响应。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:126
+msgctxt "CredentialsCenterView"
+msgid "凭据管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:171
+msgctxt "CredentialsCenterView"
+msgid "新建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:213
+msgctxt "CredentialsCenterView"
+msgid "全部"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:242
+msgctxt "CredentialsCenterView"
+msgid "密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:271
+msgctxt "CredentialsCenterView"
+msgid "密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:300
+msgctxt "CredentialsCenterView"
+msgid "代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:313
+msgctxt "CredentialsCenterView"
+msgid "搜索凭据..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:345
+msgctxt "CredentialsCenterView"
+msgid "未匹配到凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:345
+msgctxt "CredentialsCenterView"
+msgid "暂无凭据记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:471
+msgctxt "CredentialsCenterView"
+msgid "未生成指纹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:482
+msgctxt "CredentialsCenterView"
+msgid "未设置用户"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:492
+msgctxt "CredentialsCenterView"
+msgid "管道: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:492
+msgctxt "CredentialsCenterView"
+msgid "外部代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:501
+msgctxt "CredentialsCenterView"
+msgid "台主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:542
+msgctxt "CredentialsCenterView"
+msgid "新建凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:555
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:555
+msgctxt "CredentialsCenterView"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:561
+msgctxt "CredentialsCenterView"
+msgid "保存并创建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:601
+msgctxt "CredentialsCenterView"
+msgid "SSH 密钥对"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:618
+msgctxt "CredentialsCenterView"
+msgid "账号密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:635
+msgctxt "CredentialsCenterView"
+msgid "SSH Agent"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:659
+msgctxt "CredentialsCenterView"
+msgid "凭据名称 *"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:689
+msgctxt "CredentialsCenterView"
+msgid "密钥算法与生成"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:698
+msgctxt "CredentialsCenterView"
+msgid "一键生成密钥对"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:712
+msgctxt "CredentialsCenterView"
+msgid "Ed25519 (推荐)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:732
+msgctxt "CredentialsCenterView"
+msgid "私钥内容 (Private Key PEM) *"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:744
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:744
+msgctxt "CredentialsCenterView"
+msgid "已复制私钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:744
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:744
+msgctxt "CredentialsCenterView"
+msgid "私钥文本已成功复制至系统剪贴板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:752
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:752
+msgctxt "CredentialsCenterView"
+msgid "复制私钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:787
+msgctxt "CredentialsCenterView"
+msgid "私钥保护口令 (可选)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:821
+msgctxt "CredentialsCenterView"
+msgid "默认登录用户名 *"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:837
+msgctxt "CredentialsCenterView"
+msgid "登录密码 *"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:843
+msgctxt "CredentialsCenterView"
+msgid "随机生成强密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:880
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:880
+msgctxt "CredentialsCenterView"
+msgid "常用 Agent 快速预设 (点击一键填入管道路径)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:894
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:894
+msgctxt "CredentialsCenterView"
+msgid "1Password 密码管理器内置 SSH 认证代理管道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:913
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:913
+msgctxt "CredentialsCenterView"
+msgid "Windows 内置 OpenSSH Authentication Agent 服务管道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:932
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:932
+msgctxt "CredentialsCenterView"
+msgid "Bitwarden / Vaultwarden 桌面端托管 SSH 代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:951
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:951
+msgctxt "CredentialsCenterView"
+msgid "KeePassXC 本地密码库 SSH Agent 代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:970
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:970
+msgctxt "CredentialsCenterView"
+msgid "PuTTY / WinSCP Pageant 经典认证协议代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:989
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:989
+msgctxt "CredentialsCenterView"
+msgid "GnuPG / YubiKey 智能卡 SSH 认证代理管道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1005
+msgctxt "CredentialsCenterView"
+msgid "Agent 管道路径 *"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1020
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1020
+msgctxt "CredentialsCenterView"
+msgid "备注说明"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1094
+msgctxt "CredentialsCenterView"
+msgid "编辑中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1114
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1114
+msgctxt "CredentialsCenterView"
+msgid "复制公钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1114
+msgctxt "CredentialsCenterView"
+msgid "复制密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1114
+msgctxt "CredentialsCenterView"
+msgid "复制管道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1120
+msgctxt "CredentialsCenterView"
+msgid "编辑"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1129
+msgctxt "CredentialsCenterView"
+msgid "删除"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1150
+msgctxt "CredentialsCenterView"
+msgid "保存修改"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1185
+msgctxt "CredentialsCenterView"
+msgid "凭据显示名称 *"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1219
+msgctxt "CredentialsCenterView"
+msgid "密钥算法: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1229
+msgctxt "CredentialsCenterView"
+msgid "重新生成密钥对"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1239
+msgctxt "CredentialsCenterView"
+msgid "公钥指纹 (SHA256)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1261
+msgctxt "CredentialsCenterView"
+msgid "已复制指纹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1261
+msgctxt "CredentialsCenterView"
+msgid "公钥指纹已复制至剪贴板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1265
+msgctxt "CredentialsCenterView"
+msgid "复制"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1283
+msgctxt "CredentialsCenterView"
+msgid "导出的 SSH 公钥 (可配置于目标机器 authorized_keys)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1290
+msgctxt "CredentialsCenterView"
+msgid "已复制公钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1290
+msgctxt "CredentialsCenterView"
+msgid "SSH 公钥已复制至剪贴板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1331
+msgctxt "CredentialsCenterView"
+msgid "私钥内容 (OpenSSH PEM 格式)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1351
+msgctxt "CredentialsCenterView"
+msgid "收起并隐藏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1351
+msgctxt "CredentialsCenterView"
+msgid "展开并显示"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1398
+msgctxt "CredentialsCenterView"
+msgid "未导入私钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1422
+msgctxt "CredentialsCenterView"
+msgid "私钥保护口令 (Passphrase)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1465
+msgctxt "CredentialsCenterView"
+msgid "默认登录用户名"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1493
+msgctxt "CredentialsCenterView"
+msgid "登录密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1503
+msgctxt "CredentialsCenterView"
+msgid "重新生成随机密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1675
+msgctxt "CredentialsCenterView"
+msgid "Agent 标识"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1700
+msgctxt "CredentialsCenterView"
+msgid "命名管道路径"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\credentials_view.slint:1781
+msgctxt "CredentialsCenterView"
+msgid "请从左侧选择凭据以查看详情"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:94
+msgctxt "TransferContextMenu"
+msgid "继续传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:94
+msgctxt "TransferContextMenu"
+msgid "暂停传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:106
+msgctxt "TransferContextMenu"
+msgid "停止传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:119
+msgctxt "TransferContextMenu"
+msgid "重新下载"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:119
+msgctxt "TransferContextMenu"
+msgid "重新上传"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:133
+msgctxt "TransferContextMenu"
+msgid "移除记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:165
+msgctxt "FileContextMenu"
+msgid "进入目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:165
+msgctxt "FileContextMenu"
+msgid "打开文件"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:176
+msgctxt "FileContextMenu"
+msgid "下载到本地"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:176
+msgctxt "FileContextMenu"
+msgid "上传到远程"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:190
+msgctxt "FileContextMenu"
+msgid "新建文件夹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:201
+msgctxt "FileContextMenu"
+msgid "新建文件"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:212
+msgctxt "FileContextMenu"
+msgid "刷新目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:226
+msgctxt "FileContextMenu"
+msgid "复制完整路径"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:237
+msgctxt "FileContextMenu"
+msgid "删除"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:552
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:552
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:552
+msgctxt "FileExplorerView"
+msgid "本地 (主目录)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:552
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:552
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:552
+msgctxt "FileExplorerView"
+msgid "本地目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:816
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:816
+msgctxt "FileExplorerView"
+msgid "名称"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:824
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:824
+msgctxt "FileExplorerView"
+msgid "大小"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:833
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:833
+msgctxt "FileExplorerView"
+msgid "修改时间"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1282
+msgctxt "FileExplorerView"
+msgid "未打开远程 SFTP 会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1290
+msgctxt "FileExplorerView"
+msgid "请在左侧主机列表双击选择主机，或点击右上角「+」连接远程主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1327
+msgctxt "FileExplorerView"
+msgid "连接远程主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1554
+msgctxt "FileExplorerView"
+msgid "权限"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1845
+msgctxt "FileExplorerView"
+msgid "文件传输队列与实时任务"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1866
+msgctxt "FileExplorerView"
+msgid "个任务"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1866
+msgctxt "FileExplorerView"
+msgid "空闲"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1911
+msgctxt "FileExplorerView"
+msgid "清空已完成"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1966
+msgctxt "FileExplorerView"
+msgid "源路径 (文件名 / 目录)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1976
+msgctxt "FileExplorerView"
+msgid "目标路径"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1986
+msgctxt "FileExplorerView"
+msgid "文件大小"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:1996
+msgctxt "FileExplorerView"
+msgid "传输进度"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2006
+msgctxt "FileExplorerView"
+msgid "传输速度"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2016
+msgctxt "FileExplorerView"
+msgid "状态"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2045
+msgctxt "FileExplorerView"
+msgid "暂无文件传输任务 (直接拖拽左/右侧文件或目录即可触发实时上传/下载)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2228
+msgctxt "FileExplorerView"
+msgid "(总进度)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2266
+msgctxt "FileExplorerView"
+msgid "已完成"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2266
+msgctxt "FileExplorerView"
+msgid "失败"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2266
+msgctxt "FileExplorerView"
+msgid "传输中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2350
+msgctxt "FileExplorerView"
+msgid "传输队列"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2358
+msgctxt "FileExplorerView"
+msgid "个传输任务进行中 - 点击展开"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2358
+msgctxt "FileExplorerView"
+msgid "(当前无活动任务 - 点击展开)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2369
+msgctxt "FileExplorerView"
+msgid "本地项: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2369
+msgctxt "FileExplorerView"
+msgid "远程项: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2435
+msgctxt "FileExplorerView"
+msgid "上传"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2435
+msgctxt "FileExplorerView"
+msgid "下载"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2435
+msgctxt "FileExplorerView"
+msgid "无效"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2504
+msgctxt "FileExplorerView"
+msgid "移动"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\file_explorer_view.slint:2504
+msgctxt "FileExplorerView"
+msgid "禁止"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:71
+msgctxt "HistoryCenterView"
+msgid "连接历史中心"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:86
+msgctxt "HistoryCenterView"
+msgid "暂无连接记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:94
+msgctxt "HistoryCenterView"
+msgid ""
+"记录所有远程 SSH 主机连接足迹 · 点击卡片操作项可查看会话"
+"快照详情或直接发起重连"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:197
+msgctxt "HistoryCenterView"
+msgid "清空历史"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:240
+msgctxt "HistoryCenterView"
+msgid "返回终端视口"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:314
+msgctxt "HistoryCenterView"
+msgid "置顶常用"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:314
+msgctxt "HistoryCenterView"
+msgid "今天"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:314
+msgctxt "HistoryCenterView"
+msgid "昨天"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:314
+msgctxt "HistoryCenterView"
+msgid "更早"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:314
+msgctxt "HistoryCenterView"
+msgid "全部主机 (按频次)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:325
+msgctxt "HistoryCenterView"
+msgid "台"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:567
+msgctxt "HistoryCenterView"
+msgid "未找到匹配的主机连接记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:567
+msgctxt "HistoryCenterView"
+msgid "暂无历史连接记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:575
+msgctxt "HistoryCenterView"
+msgid "请尝试输入其他主机名称、IP 或用户名"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\history_center_view.slint:575
+msgctxt "HistoryCenterView"
+msgid "在「主机管理」中双击任意远程主机发起连接后，将自动在此沉淀连接足迹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:92
+msgctxt "LeftActivityBar"
+msgid "切换至浅色模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_activity_bar.slint:92
+msgctxt "LeftActivityBar"
+msgid "切换至深色模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:32
+msgctxt "RightToolBar"
+msgid "系统监控"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:40
+msgctxt "RightToolBar"
+msgid "端口转发与隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:48
+msgctxt "RightToolBar"
+msgid "快捷命令库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:56
+msgctxt "RightToolBar"
+msgid "SFTP 传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:64
+msgctxt "RightToolBar"
+msgid "会话备忘笔记"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_tool_bar.slint:72
+msgctxt "RightToolBar"
+msgid "AI 终端助手"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:325
+msgctxt "ThemeCard"
+msgid "用户"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:374
+msgctxt "WallpaperItemCard"
+msgid "生效中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:738
+msgctxt "SettingsCenterView"
+msgid "新建终端会话 Tab"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:738
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:738
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:738
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:738
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:738
+msgctxt "SettingsCenterView"
+msgid "终端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:739
+msgctxt "SettingsCenterView"
+msgid "垂直拆分当前窗格"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:739
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:739
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:739
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:739
+msgctxt "SettingsCenterView"
+msgid "分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:740
+msgctxt "SettingsCenterView"
+msgid "水平拆分当前窗格"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:741
+msgctxt "SettingsCenterView"
+msgid "独占全屏最大化当前窗格"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:742
+msgctxt "SettingsCenterView"
+msgid "关闭当前聚焦窗格"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:743
+msgctxt "SettingsCenterView"
+msgid "复制选中文本"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:744
+msgctxt "SettingsCenterView"
+msgid "粘贴剪贴板内容"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:745
+msgctxt "SettingsCenterView"
+msgid "在终端历史缓冲区查找"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:746
+msgctxt "SettingsCenterView"
+msgid "清屏并重置视口"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:747
+msgctxt "SettingsCenterView"
+msgid "呼出全局命令调色板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:747
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:747
+msgctxt "SettingsCenterView"
+msgid "全局"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:748
+msgctxt "SettingsCenterView"
+msgid "打开偏好设置中心"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:753
+msgctxt "SettingsCenterView"
+msgid "网络规则重构前自动安全快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:754
+msgctxt "SettingsCenterView"
+msgid "全量主机资产定期快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:866
+msgctxt "SettingsCenterView"
+msgid "偏好设置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:872
+msgctxt "SettingsCenterView"
+msgid "自定义终端外观、网络连接、快捷键与全量数据备份策略"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:885
+msgctxt "SettingsCenterView"
+msgid "搜索全部配置项 (字体、壁纸、心跳、备份、快捷键...)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:927
+msgctxt "SettingsCenterView"
+msgid "通用与窗口"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:935
+msgctxt "SettingsCenterView"
+msgid "外观与视效"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:943
+msgctxt "SettingsCenterView"
+msgid "终端引擎排版"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:951
+msgctxt "SettingsCenterView"
+msgid "网络与 SSH"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:959
+msgctxt "SettingsCenterView"
+msgid "文件与 SFTP"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:967
+msgctxt "SettingsCenterView"
+msgid "快捷键绑定"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:975
+msgctxt "SettingsCenterView"
+msgid "数据备份与迁移"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:984
+msgctxt "SettingsCenterView"
+msgid "安全与高级诊断"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1011
+msgctxt "SettingsCenterView"
+msgid "通用与窗口交互"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1012
+msgctxt "SettingsCenterView"
+msgid "控制客户端界面语言、启动流程与后台挂起行为"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1016
+msgctxt "SettingsCenterView"
+msgid "界面显示语言 (Language)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1017
+msgctxt "SettingsCenterView"
+msgid "设置客户端主界面展示的默认语言"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1028
+msgctxt "SettingsCenterView"
+msgid "图形渲染引擎 (Graphics Engine)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1029
+msgctxt "SettingsCenterView"
+msgid "控制底层 GPU 光栅化渲染管线 (切换需重启客户端生效)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1039
+msgctxt "SettingsCenterView"
+msgid "窗口始终置顶 (Always on Top)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1040
+msgctxt "SettingsCenterView"
+msgid "保持主窗口始终位于其他应用窗口最顶层，避免排查故障时频繁切换焦点"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1051
+msgctxt "SettingsCenterView"
+msgid "关闭会话标签页时确认 (Confirm Closing Tab)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1052
+msgctxt "SettingsCenterView"
+msgid "关闭正在运行的远程 SSH 或本地终端标签页前弹出安全确认，防止手滑误断开"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1063
+msgctxt "SettingsCenterView"
+msgid "退出应用时确认活跃连接 (Confirm Before Exit)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1064
+msgctxt "SettingsCenterView"
+msgid ""
+"当后台存在未断开的 SSH 或本地终端会话时，点击窗口关闭按"
+"钮或按 Alt+F4 弹出防误触提示"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1075
+msgctxt "SettingsCenterView"
+msgid "点击窗口关闭按钮时行为"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1076
+msgctxt "SettingsCenterView"
+msgid "关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1084
+msgctxt "SettingsCenterView"
+msgid "开机随系统自动启动 (Launch on Boot)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1085
+msgctxt "SettingsCenterView"
+msgid "登录操作系统时自动启动客户端，方便后台网络隧道与端口转发无缝就绪"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1105
+msgctxt "SettingsCenterView"
+msgid "配色主题方案与调色板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1106
+msgctxt "SettingsCenterView"
+msgid "个性化定制客户端主视觉与终端 ANSI 调色板，支持自定义创建、导入与导出"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1111
+msgctxt "SettingsCenterView"
+msgid "主题生态管理 (Theme Actions)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1112
+msgctxt "SettingsCenterView"
+msgid "支持导入标准 TOML 或 Windows Terminal 配色，或基于当前主题派生新主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1119
+msgctxt "SettingsCenterView"
+msgid "新建主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1127
+msgctxt "SettingsCenterView"
+msgid "导入主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1135
+msgctxt "SettingsCenterView"
+msgid "导出当前"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1146
+msgctxt "SettingsCenterView"
+msgid "主题画廊 (Theme Gallery)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1147
+msgctxt "SettingsCenterView"
+msgid "点击即时热生效，可预览背景色、前景色、强调色及表面调色板"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1177
+msgctxt "SettingsCenterView"
+msgid "背景壁纸与滚动轮播"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1178
+msgctxt "SettingsCenterView"
+msgid "设置客户端毛玻璃底衬与壁纸图库，支持多图定时轮播与平滑淡入淡出"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1183
+msgctxt "SettingsCenterView"
+msgid "透底显示模式 (Display Mode)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1184
+msgctxt "SettingsCenterView"
+msgid "选择纯色无壁纸、仅终端视口透底或全局亚克力毛玻璃磨砂"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1198
+msgctxt "SettingsCenterView"
+msgid "纯色无壁纸"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1199
+msgctxt "SettingsCenterView"
+msgid "仅终端透底"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1200
+msgctxt "SettingsCenterView"
+msgid "全局毛玻璃磨砂"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1237
+msgctxt "SettingsCenterView"
+msgid "壁纸磨砂不透明度 (Opacity)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1238
+msgctxt "SettingsCenterView"
+msgid "调节背景壁纸透光度 (推荐 15% ~ 25%，过高可能影响终端可读性)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1292
+msgctxt "SettingsCenterView"
+msgid "壁纸图库画廊 (Wallpaper Gallery)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1293
+msgctxt "SettingsCenterView"
+msgid "添加多张本地壁纸图片，点击切换即时生效，开启轮播后按策略自动切换"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1300
+msgctxt "SettingsCenterView"
+msgid "添加壁纸图片"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1335
+msgctxt "SettingsCenterView"
+msgid "壁纸轮播切换策略 (Rotation Interval)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1336
+msgctxt "SettingsCenterView"
+msgid "在图库中自动按间隔时间循环播放下一张壁纸"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1350
+msgctxt "SettingsCenterView"
+msgid "单张固定"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1351
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1351
+msgctxt "SettingsCenterView"
+msgid "分钟"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1353
+msgctxt "SettingsCenterView"
+msgid "小时"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1354
+msgctxt "SettingsCenterView"
+msgid "每次启动"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1391
+msgctxt "SettingsCenterView"
+msgid "壁纸切换动效 (Transition Effect)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1392
+msgctxt "SettingsCenterView"
+msgid "选择轮播壁纸更替时的视效动画"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1407
+msgctxt "SettingsCenterView"
+msgid "平滑淡入淡出 (Cross-fade)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1408
+msgctxt "SettingsCenterView"
+msgid "水平视差滚动 (Slide)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1449
+msgctxt "SettingsCenterView"
+msgid "终端引擎与排版首选项"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1450
+msgctxt "SettingsCenterView"
+msgid "配置 VT100 字符渲染字模、等宽字体族、光标形态与剪贴板交互行为"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1454
+msgctxt "SettingsCenterView"
+msgid "等宽字体族 (Font Family)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1455
+msgctxt "SettingsCenterView"
+msgid "选择终端光栅化渲染等宽字体 (建议预装 Nerd Font 图标字体)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1485
+msgctxt "SettingsCenterView"
+msgid "终端字号大小 (Font Size)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1486
+msgctxt "SettingsCenterView"
+msgid "字符像素栅格大小 (默认 13px，可无级微调)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1524
+msgctxt "SettingsCenterView"
+msgid "划词自动复制到剪贴板 (Copy on Select)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1525
+msgctxt "SettingsCenterView"
+msgid "在终端视口中用鼠标选中文字时，立即自动复制，无需手动按快捷键"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1533
+msgctxt "SettingsCenterView"
+msgid "鼠标右键单击快速粘贴 (Paste on Right Click)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1534
+msgctxt "SettingsCenterView"
+msgid "在终端视口右击直接粘贴当前系统剪贴板文本"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1542
+msgctxt "SettingsCenterView"
+msgid "粘贴多行或含回车命令时前置告警"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1543
+msgctxt "SettingsCenterView"
+msgid "防止意外在生产服务器直接执行复制进来的换行危险命令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1553
+msgctxt "SettingsCenterView"
+msgid "复古 CRT 扫描线显像管着色器 (Retro CRT Shader)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1554
+msgctxt "SettingsCenterView"
+msgid "[实验特性] 为终端字符渲染叠加复古显像管微弯曲曲面与光栅扫描线特效"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1570
+msgctxt "SettingsCenterView"
+msgid "网络传输与 SSH 链路策略"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1571
+msgctxt "SettingsCenterView"
+msgid "配置默认连接超时、TCP 心跳保活与自动重连退避算法"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1575
+msgctxt "SettingsCenterView"
+msgid "SSH 连接超时时间 (Connection Timeout)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1576
+msgctxt "SettingsCenterView"
+msgid "在发起 SSH 握手或 TCP 套接字建立时的最大等待时间"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1577
+msgctxt "SettingsCenterView"
+msgid "秒 (默认 30s)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1581
+msgctxt "SettingsCenterView"
+msgid "TCP 心跳保活探测间隔 (ServerAliveInterval)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1582
+msgctxt "SettingsCenterView"
+msgid ""
+"向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空"
+"闲超时而被强行断开"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1583
+msgctxt "SettingsCenterView"
+msgid "每"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1583
+msgctxt "SettingsCenterView"
+msgid "秒发送一次保活包"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1587
+msgctxt "SettingsCenterView"
+msgid "网络异常断线自动重连 (Auto Reconnect)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1588
+msgctxt "SettingsCenterView"
+msgid ""
+"当网络闪断或链路重置时，自动以指数退避算法 (1s, 2s, 4s, "
+"8s...) 尝试静默重连"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1601
+msgctxt "SettingsCenterView"
+msgid "快捷键与全局键位映射"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1602
+msgctxt "SettingsCenterView"
+msgid "查看并自定义高频终端操作、多窗格分屏与命令面板的快捷操作"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1607
+msgctxt "SettingsCenterView"
+msgid "操作分类"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1622
+msgctxt "SettingsCenterView"
+msgid "数据备份、导入与跨工具迁移"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1623
+msgctxt "SettingsCenterView"
+msgid ""
+"导出完整加密备份包、从系统 OpenSSH 与第三方终端工具一键导"
+"入资产、管理本地配置历史快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1628
+msgctxt "SettingsCenterView"
+msgid "⤓ 导出全量加密备份文件 (.toml / .json)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1629
+msgctxt "SettingsCenterView"
+msgid "包含所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1632
+msgctxt "SettingsCenterView"
+msgid "⤓ 立即导出备份包"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1640
+msgctxt "SettingsCenterView"
+msgid "📥 一键扫描并导入本机 ~/.ssh/config"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1641
+msgctxt "SettingsCenterView"
+msgid ""
+"自动解析本地 OpenSSH 配置文件，识别 Host 别名、IP 地址、端口"
+"与私钥 IdentityFile"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1644
+msgctxt "SettingsCenterView"
+msgid "🔍 扫描并预览主机清单"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1652
+msgctxt "SettingsCenterView"
+msgid "📥 从外部工具一键迁移 (Termius / Xshell / MobaXterm)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1653
+msgctxt "SettingsCenterView"
+msgid "支持解析并批量导入从其他桌面终端软件导出的 .json、.tsv 或会话配置文件"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1656
+msgctxt "SettingsCenterView"
+msgid "📂 选择文件导入..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1664
+msgctxt "SettingsCenterView"
+msgid "🕒 本地最近自动配置快照"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1665
+msgctxt "SettingsCenterView"
+msgid ""
+"应用在每次执行批量导入、大改动或升级前自动保存本地轻量"
+"快照，支持随时一键无损回滚"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1690
+msgctxt "SettingsCenterView"
+msgid "主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1690
+msgctxt "SettingsCenterView"
+msgid "凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1694
+msgctxt "SettingsCenterView"
+msgid "↺ 回滚"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1708
+msgctxt "SettingsCenterView"
+msgid "安全隐私与开发者诊断"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1709
+msgctxt "SettingsCenterView"
+msgid "本地凭据加密主密码、F12 开发者调试控制台入口与运行时诊断日志级别"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1713
+msgctxt "SettingsCenterView"
+msgid "本地凭据主密码保护 (Master Password)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1714
+msgctxt "SettingsCenterView"
+msgid "使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1722
+msgctxt "SettingsCenterView"
+msgid "🛠️ 开发者调试控制台 (Developer Debug Panel)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1723
+msgctxt "SettingsCenterView"
+msgid "在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1734
+msgctxt "SettingsCenterView"
+msgid "危险区：恢复出厂设置 (Factory Reset)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1735
+msgctxt "SettingsCenterView"
+msgid "清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1739
+msgctxt "SettingsCenterView"
+msgid "⚠️ 恢复默认偏好"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:107
+msgctxt "SnippetsCenterView"
+msgid "搜索代码片段、脚本或文件夹..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:123
+msgctxt "SnippetsCenterView"
+msgid "代码片段树形视图"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:140
+msgctxt "SnippetsCenterView"
+msgid "项"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:197
+msgctxt "SnippetsCenterView"
+msgid "移至根目录 (顶级)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:443
+msgctxt "SnippetsCenterView"
+msgid "选择左侧代码片段进行查看或编辑"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:451
+msgctxt "SnippetsCenterView"
+msgid "支持拖拽调序、跨分组归类与参数化变量 {{var}}"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:498
+msgctxt "SnippetsCenterView"
+msgid "新建子片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:504
+msgctxt "SnippetsCenterView"
+msgid "删除文件夹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:529
+msgctxt "SnippetsCenterView"
+msgid "文件夹分组信息"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:536
+msgctxt "SnippetsCenterView"
+msgid ""
+"此文件夹可容纳多个脚本片段与子文件夹。您可从左侧树形列"
+"表中直接拖拽代码片段移入此文件夹进行归类。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:570
+msgctxt "SnippetsCenterView"
+msgid "未命名片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:585
+msgctxt "SnippetsCenterView"
+msgid "复制"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:591
+msgctxt "SnippetsCenterView"
+msgid "保存修改"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:597
+msgctxt "SnippetsCenterView"
+msgid "删除"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:620
+msgctxt "SnippetsCenterView"
+msgid "片段名称"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:658
+msgctxt "SnippetsCenterView"
+msgid "自动追加回车执行"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:691
+msgctxt "SnippetsCenterView"
+msgid "输入代码片段名称..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:723
+msgctxt "SnippetsCenterView"
+msgid "检测到动态参数:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:760
+msgctxt "SnippetsCenterView"
+msgid "脚本代码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:781
+msgctxt "SnippetsCenterView"
+msgid "在此输入代码片段或 Shell 脚本内容 (支持 {{var}} 动态参数占位符)..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:850
+msgctxt "SnippetsCenterView"
+msgid "备注说明"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\snippets_view.slint:874
+msgctxt "SnippetsCenterView"
+msgid "可选：添加代码片段的说明或使用注意事项..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:187
+msgctxt "TunnelsCenterView"
+msgid "网络与隧道中心"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:196
+msgctxt "TunnelsCenterView"
+msgid "+ 新建规则"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:206
+msgctxt "TunnelsCenterView"
+msgid "搜索隧道、端口、目标主机..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:225
+msgctxt "TunnelsCenterView"
+msgid "全部"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:251
+msgctxt "TunnelsCenterView"
+msgid "端口转发"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:277
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:277
+msgctxt "TunnelsCenterView"
+msgid "跳板机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:303
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:303
+msgctxt "TunnelsCenterView"
+msgid "代理池"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:473
+msgctxt "TunnelsCenterView"
+msgid "(SOCKS5 代理网关)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:481
+msgctxt "TunnelsCenterView"
+msgid "远端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:481
+msgctxt "TunnelsCenterView"
+msgid "(远端 SOCKS5 代理网关)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:495
+msgctxt "TunnelsCenterView"
+msgid "宿主: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:495
+msgctxt "TunnelsCenterView"
+msgid "直连"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:502
+msgctxt "TunnelsCenterView"
+msgid " 活跃连接"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:620
+msgctxt "TunnelsCenterView"
+msgid "请从左侧选择网络规则，或点击 [+ 新建规则] 配置端口转发与跳板堡垒"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:662
+msgctxt "TunnelsCenterView"
+msgid "新建跳板机配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:663
+msgctxt "TunnelsCenterView"
+msgid "新建出网代理配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:663
+msgctxt "TunnelsCenterView"
+msgid "新建端口转发规则"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:667
+msgctxt "TunnelsCenterView"
+msgid "编辑跳板机配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:668
+msgctxt "TunnelsCenterView"
+msgid "编辑出网代理配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:668
+msgctxt "TunnelsCenterView"
+msgid "编辑端口转发规则"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:698
+msgctxt "TunnelsCenterView"
+msgid "跳板中继资产 (供主机绑定)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:700
+msgctxt "TunnelsCenterView"
+msgid "出网代理资产 (供主机绑定)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:701
+msgctxt "TunnelsCenterView"
+msgid "运行中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:701
+msgctxt "TunnelsCenterView"
+msgid "已停止"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:723
+msgctxt "TunnelsCenterView"
+msgid "停止隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:723
+msgctxt "TunnelsCenterView"
+msgid "启动隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:733
+msgctxt "TunnelsCenterView"
+msgid "复制 SSH 命令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:739
+msgctxt "TunnelsCenterView"
+msgid "复制 ProxyJump 命令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:744
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:744
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:744
+msgctxt "TunnelsCenterView"
+msgid "复制成功"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:745
+msgctxt "TunnelsCenterView"
+msgid "已复制 OpenSSH ProxyJump 参数"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:751
+msgctxt "TunnelsCenterView"
+msgid "复制代理连接串"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:757
+msgctxt "TunnelsCenterView"
+msgid "已复制出网代理连接串"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:763
+msgctxt "TunnelsCenterView"
+msgid "编辑"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:769
+msgctxt "TunnelsCenterView"
+msgid "删除"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:778
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:778
+msgctxt "TunnelsCenterView"
+msgid "取消"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:790
+msgctxt "TunnelsCenterView"
+msgid "保存配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:847
+msgctxt "TunnelsCenterView"
+msgid "本地目标服务 (内网端)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:848
+msgctxt "TunnelsCenterView"
+msgid "本地网络 / 出口网关"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:848
+msgctxt "TunnelsCenterView"
+msgid "本地端应用 / 客户端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:855
+msgctxt "TunnelsCenterView"
+msgid "本地网络出口"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:877
+msgctxt "TunnelsCenterView"
+msgid "● 反向解密穿透已连通"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:878
+msgctxt "TunnelsCenterView"
+msgid "● 反向加密隧道已连通"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:878
+msgctxt "TunnelsCenterView"
+msgid "● SSH 加密已连通"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:879
+msgctxt "TunnelsCenterView"
+msgid "○ SSH 待建立"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:955
+msgctxt "TunnelsCenterView"
+msgid "SSH 宿主 (SOCKS5 监听端)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:955
+msgctxt "TunnelsCenterView"
+msgid "SSH 宿主服务器 / 跳板机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:961
+msgctxt "TunnelsCenterView"
+msgid "直连网关"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:980
+msgctxt "TunnelsCenterView"
+msgid "● 公网入站流量直达"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:980
+msgctxt "TunnelsCenterView"
+msgid "○ 远端端口待监听"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:982
+msgctxt "TunnelsCenterView"
+msgid "● 远端 SOCKS5 监听就绪"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:982
+msgctxt "TunnelsCenterView"
+msgid "○ 远端网关待建立"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:983
+msgctxt "TunnelsCenterView"
+msgid "内网转发直达"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1052
+msgctxt "TunnelsCenterView"
+msgid "远程公网入口 (监听端)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1054
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1054
+msgctxt "TunnelsCenterView"
+msgid "任意动态网络目标"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1055
+msgctxt "TunnelsCenterView"
+msgid "远端应用 (SOCKS5 客户端)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1055
+msgctxt "TunnelsCenterView"
+msgid "目标远程服务 / 机器"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1062
+msgctxt "TunnelsCenterView"
+msgid "远端:"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1065
+msgctxt "TunnelsCenterView"
+msgid "未配置远端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1097
+msgctxt "TunnelsCenterView"
+msgid "当前状态"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1102
+msgctxt "TunnelsCenterView"
+msgid "活跃连接中"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1102
+msgctxt "TunnelsCenterView"
+msgid "已挂起 / 停止"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1123
+msgctxt "TunnelsCenterView"
+msgid "活跃客户端连接"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1128
+msgctxt "TunnelsCenterView"
+msgid " 个 TCP 会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1149
+msgctxt "TunnelsCenterView"
+msgid "累计入站流量 (Rx)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1176
+msgctxt "TunnelsCenterView"
+msgid "累计出站流量 (Tx)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1233
+msgctxt "TunnelsCenterView"
+msgid "OpenSSH ProxyJump (-J) 堡垒中继资产"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1240
+msgctxt "TunnelsCenterView"
+msgid ""
+"纯静态中继资产。在主机配置中关联此跳板机后，SSH 会话将自"
+"动通过该跳板机穿透内网目标，支持密钥与密码透明跳板代"
+"理。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1290
+msgctxt "TunnelsCenterView"
+msgid "HTTP / HTTPS / SOCKS5 静态出网代理资产"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1297
+msgctxt "TunnelsCenterView"
+msgid ""
+"纯静态代理资产。用于网络隔离或企业安全边界，会话或主机"
+"可在网络设置中选择本代理统一中继访问外部网络。"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1325
+msgctxt "TunnelsCenterView"
+msgid "端口转发工作模式"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1344
+msgctxt "TunnelsCenterView"
+msgid "本地正向 (-L)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1368
+msgctxt "TunnelsCenterView"
+msgid "远程反向 (-R)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1392
+msgctxt "TunnelsCenterView"
+msgid "动态网关 (-D)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1416
+msgctxt "TunnelsCenterView"
+msgid "反向动态 (-R)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1440
+msgctxt "TunnelsCenterView"
+msgid "规则描述名称"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1476
+msgctxt "TunnelsCenterView"
+msgid "关联 SSH 宿主主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1518
+msgctxt "TunnelsCenterView"
+msgid "点击选择关联的 SSH 宿主主机..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1518
+msgctxt "TunnelsCenterView"
+msgid "未关联主机 (直连网关)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1560
+msgctxt "TunnelsCenterView"
+msgid "本地监听端口 (Local Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1594
+msgctxt "TunnelsCenterView"
+msgid "远端目标服务端口 (Remote Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1633
+msgctxt "TunnelsCenterView"
+msgid "本地目标服务端口 (Local Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1667
+msgctxt "TunnelsCenterView"
+msgid "远程公网监听端口 (Remote Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1703
+msgctxt "TunnelsCenterView"
+msgid "本地 SOCKS5 网关监听端口 (Local Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1738
+msgctxt "TunnelsCenterView"
+msgid "远程 SOCKS5 网关监听端口 (Remote Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1802
+msgctxt "TunnelsCenterView"
+msgid "断线自动重连"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1844
+msgctxt "TunnelsCenterView"
+msgid "客户端启动时自启"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1886
+msgctxt "TunnelsCenterView"
+msgid "启用传输压缩 (-C)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1928
+msgctxt "TunnelsCenterView"
+msgid "由代理服务器远程解析 DNS"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1948
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1948
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1948
+msgctxt "TunnelsCenterView"
+msgid "备注说明与业务用途"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:1995
+msgctxt "TunnelsCenterView"
+msgid "跳板机链路描述名称"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2035
+msgctxt "TunnelsCenterView"
+msgid "级联跳板主机顺序 (ProxyJump Chain)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2042
+msgctxt "TunnelsCenterView"
+msgid "共 "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2042
+msgctxt "TunnelsCenterView"
+msgid " 级跳板中继"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2100
+msgctxt "TunnelsCenterView"
+msgid "未命名主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2108
+msgctxt "TunnelsCenterView"
+msgid "默认端口 22"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2210
+msgctxt "TunnelsCenterView"
+msgid "启用"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2210
+msgctxt "TunnelsCenterView"
+msgid "旁路"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2260
+msgctxt "TunnelsCenterView"
+msgid "尚未添加任何跳板主机节点"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2266
+msgctxt "TunnelsCenterView"
+msgid "请点击下方按钮从现有的主机资产树中添加第一跳中继机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2308
+msgctxt "TunnelsCenterView"
+msgid "+ 添加跳板中继主机 (从资产树选择)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2331
+msgctxt "TunnelsCenterView"
+msgid "OpenSSH ProxyJump 级联调用参数预览 (-J)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2338
+msgctxt "TunnelsCenterView"
+msgid "-J <尚未选择启用跳板节点>"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2398
+msgctxt "TunnelsCenterView"
+msgid "代理协议类型"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2418
+msgctxt "TunnelsCenterView"
+msgid "SOCKS5 代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2445
+msgctxt "TunnelsCenterView"
+msgid "HTTP 代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2472
+msgctxt "TunnelsCenterView"
+msgid "HTTPS 代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2498
+msgctxt "TunnelsCenterView"
+msgid "代理资产描述名称"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2541
+msgctxt "TunnelsCenterView"
+msgid "代理服务器地址 (IP 或域名)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2579
+msgctxt "TunnelsCenterView"
+msgid "代理服务端口 (Port)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2619
+msgctxt "TunnelsCenterView"
+msgid "认证用户名 (可选，留空无需认证)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2657
+msgctxt "TunnelsCenterView"
+msgid "认证密码 (可选，留空无需认证)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2702
+msgctxt "TunnelsCenterView"
+msgid "全局代理环境变量预览"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2730
+msgctxt "TunnelsCenterView"
+msgid "复制参数"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2741
+msgctxt "TunnelsCenterView"
+msgid "已复制代理环境变量配置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2758
+msgctxt "TunnelsCenterView"
+msgid "(待填写代理地址与端口)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2880
+msgctxt "TunnelsCenterView"
+msgid "添加跳板机中继节点"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2881
+msgctxt "TunnelsCenterView"
+msgid "选择关联 SSH 宿主主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2915
+msgctxt "TunnelsCenterView"
+msgid "请在下方资产树中点选要加入跳板链路的中继主机："
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2916
+msgctxt "TunnelsCenterView"
+msgid "请在下方资产树中点选用于建立端口转发的 SSH 宿主主机："
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2962
+msgctxt "TunnelsCenterView"
+msgid "已选: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2963
+msgctxt "TunnelsCenterView"
+msgid "尚未选择主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\tunnels_view.slint:2984
+msgctxt "TunnelsCenterView"
+msgid "确定选定"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_context_menu.slint:40
+msgctxt "TabContextMenu"
+msgid "复制 IP"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_context_menu.slint:54
+msgctxt "TabContextMenu"
+msgid "向右分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_context_menu.slint:67
+msgctxt "TabContextMenu"
+msgid "向下分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_context_menu.slint:83
+msgctxt "TabContextMenu"
+msgid "关闭"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\tab_context_menu.slint:95
+msgctxt "TabContextMenu"
+msgid "关闭其他会话"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_context_menu.slint:38
+msgctxt "TerminalContextMenu"
+msgid "复制"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_context_menu.slint:51
+msgctxt "TerminalContextMenu"
+msgid "粘贴"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_context_menu.slint:63
+msgctxt "TerminalContextMenu"
+msgid "全选"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_context_menu.slint:78
+msgctxt "TerminalContextMenu"
+msgid "清屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_context_menu.slint:93
+msgctxt "TerminalContextMenu"
+msgid "向右分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_context_menu.slint:106
+msgctxt "TerminalContextMenu"
+msgid "向下分屏"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_find_bar.slint:73
+msgctxt "TerminalFindBar"
+msgid "无匹配"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\center_terminal\terminal_viewport.slint:714
+msgctxt "TerminalViewport"
+msgid "请从左侧双击主机发起连接，或点击右上角 + 快速新建本地/远程终端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:6
+msgctxt "BackupDrawer"
+msgid "数据备份与导入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:18
+msgctxt "BackupDrawer"
+msgid "⤓ 配置备份与迁移"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:38
+msgctxt "BackupDrawer"
+msgid "导出完整加密备份包 (.toml)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:48
+msgctxt "BackupDrawer"
+msgid "📥 从外部工具一键导入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:68
+msgctxt "BackupDrawer"
+msgid "导入系统 ~/.ssh/config 主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\backup_drawer.slint:91
+msgctxt "BackupDrawer"
+msgid "导入 Termius / Xshell 资产"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:30
+msgctxt "CredentialsDrawer"
+msgid "凭据保管"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:89
+msgctxt "CredentialsDrawer"
+msgid "AES-256 加密保管库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:96
+msgctxt "CredentialsDrawer"
+msgid "项凭据 · 实时保护"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:96
+msgctxt "CredentialsDrawer"
+msgid "尚未录入凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:131
+msgctxt "CredentialsDrawer"
+msgid "新建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:176
+msgctxt "CredentialsDrawer"
+msgid "全部"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:205
+msgctxt "CredentialsDrawer"
+msgid "密钥"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:234
+msgctxt "CredentialsDrawer"
+msgid "密码"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:263
+msgctxt "CredentialsDrawer"
+msgid "代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:278
+msgctxt "CredentialsDrawer"
+msgid "搜索凭据名称、用户名、指纹..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:317
+msgctxt "CredentialsDrawer"
+msgid "未找到匹配的凭据记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:317
+msgctxt "CredentialsDrawer"
+msgid "暂无已保存凭据"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:341
+msgctxt "CredentialsDrawer"
+msgid "+ 立即录入"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:466
+msgctxt "CredentialsDrawer"
+msgid "未生成指纹"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:477
+msgctxt "CredentialsDrawer"
+msgid "未设置用户"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:487
+msgctxt "CredentialsDrawer"
+msgid "管道: "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:487
+msgctxt "CredentialsDrawer"
+msgid "外部代理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\credentials_drawer.slint:496
+msgctxt "CredentialsDrawer"
+msgid "台主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:14
+msgctxt "FilesDrawer"
+msgid "文件管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\files_drawer.slint:30
+msgctxt "FilesDrawer"
+msgid "▤ 常用远程目录书签"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:33
+msgctxt "HistoryDrawer"
+msgid "连接历史"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:61
+msgctxt "HistoryDrawer"
+msgid "共 "
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:61
+msgctxt "HistoryDrawer"
+msgid "条记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:61
+msgctxt "HistoryDrawer"
+msgid "暂无连接记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:94
+msgctxt "HistoryDrawer"
+msgid "清空"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:198
+msgctxt "HistoryDrawer"
+msgid "时间流"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:234
+msgctxt "HistoryDrawer"
+msgid "按主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:280
+msgctxt "HistoryDrawer"
+msgid "置顶常用"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:280
+msgctxt "HistoryDrawer"
+msgid "今天"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:280
+msgctxt "HistoryDrawer"
+msgid "昨天"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:280
+msgctxt "HistoryDrawer"
+msgid "更早"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:280
+msgctxt "HistoryDrawer"
+msgid "全部主机 (按频次)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:509
+msgctxt "HistoryDrawer"
+msgid "未找到匹配的历史记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:509
+msgctxt "HistoryDrawer"
+msgid "暂无连接历史"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:517
+msgctxt "HistoryDrawer"
+msgid "请尝试其他搜索关键词"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\history_drawer.slint:517
+msgctxt "HistoryDrawer"
+msgid "在「主机」页面双击主机发起远程连接后将自动记录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:61
+msgctxt "HostsDrawer"
+msgid "主机管理"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:123
+msgctxt "HostsDrawer"
+msgid "搜索主机、IP或分组..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:209
+msgctxt "HostsDrawer"
+msgid "树形层级视图"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:209
+msgctxt "HostsDrawer"
+msgid "全部主机列表"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:226
+msgctxt "HostsDrawer"
+msgid "台"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:284
+msgctxt "HostsDrawer"
+msgid "移至根目录 (未分组)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:469
+msgctxt "HostsDrawer"
+msgid "默认分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\hosts_drawer.slint:493
+msgctxt "HostsDrawer"
+msgid "移入此分组"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:19
+msgctxt "SettingsDrawer"
+msgid "偏好设置"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:39
+msgctxt "SettingsDrawer"
+msgid "◐ UI & 终端主题"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:107
+msgctxt "SettingsDrawer"
+msgid "⌨️ 终端首选项"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:114
+msgctxt "SettingsDrawer"
+msgid "等宽字体: JetBrains Mono / Fira Code"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:120
+msgctxt "SettingsDrawer"
+msgid "字号: 13px  |  光标: 闪烁块状"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:145
+msgctxt "SettingsDrawer"
+msgid "🛠️ 开发者调试控制台"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\settings_drawer.slint:152
+msgctxt "SettingsDrawer"
+msgid "在左侧栏显示调试入口并开启诊断抓取"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:14
+msgctxt "SnippetsDrawer"
+msgid "代码片段"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:54
+msgctxt "SnippetsDrawer"
+msgid "搜索代码片段、脚本或分组..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:70
+msgctxt "SnippetsDrawer"
+msgid "树形层级视图"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:87
+msgctxt "SnippetsDrawer"
+msgid "项"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\snippets_drawer.slint:144
+msgctxt "SnippetsDrawer"
+msgid "移至根目录 (顶级)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:11
+msgctxt "TunnelsDrawer"
+msgid "网络隧道"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\left_drawers\tunnels_drawer.slint:46
+msgctxt "TunnelsDrawer"
+msgid "进入网络与隧道管理中心"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:7
+msgctxt "AiToolDrawer"
+msgid "AI 运维副驾驶"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:32
+msgctxt "AiToolDrawer"
+msgid "输入自然语言，自动生成 Linux Shell 指令与参数"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:38
+msgctxt "AiToolDrawer"
+msgid "例如: 查找大于100MB的日志文件..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:43
+msgctxt "AiToolDrawer"
+msgid "» 推荐生成指令"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\ai_tool_drawer.slint:87
+msgctxt "AiToolDrawer"
+msgid "▶ 填入终端"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:19
+msgctxt "MonitorDrawer"
+msgid "主机实时监控"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:59
+msgctxt "MonitorDrawer"
+msgid "运行: {} 天  |  进程: {}"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:72
+msgctxt "MonitorDrawer"
+msgid "CPU 使用率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:86
+msgctxt "MonitorDrawer"
+msgid "内存占用 (RAM)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:100
+msgctxt "MonitorDrawer"
+msgid "磁盘空间 (/dev/sda1)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:126
+msgctxt "MonitorDrawer"
+msgid "↓ 下载速率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\monitor_drawer.slint:133
+msgctxt "MonitorDrawer"
+msgid "↑ 上传速率"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:6
+msgctxt "NotesToolDrawer"
+msgid "会话备忘笔记"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:9
+msgctxt "NotesToolDrawer"
+msgid ""
+"1. 生产环境 Nginx 配置在 /etc/nginx/sites-available\n2. 每日凌晨 "
+"02:00 定时执行数据冷备\n3. 应急联系人: ops-"
+"team@company.internal"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\notes_tool_drawer.slint:16
+msgctxt "NotesToolDrawer"
+msgid "✎ 当前主机会话专用备忘录 (自动保存)"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:14
+msgctxt "SftpToolDrawer"
+msgid "SFTP 文件传输"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\sftp_tool_drawer.slint:59
+msgctxt "SftpToolDrawer"
+msgid "↑ 上传文件到当前目录"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\snippet_tool_drawer.slint:16
+msgctxt "SnippetToolDrawer"
+msgid "常用代码片段库"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\snippet_tool_drawer.slint:51
+msgctxt "SnippetToolDrawer"
+msgid "搜索片段..."
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\tunnel_tool_drawer.slint:15
+msgctxt "TunnelToolDrawer"
+msgid "主机端口转发"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\tunnel_tool_drawer.slint:60
+msgctxt "TunnelToolDrawer"
+msgid "未连接主机"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\tunnel_tool_drawer.slint:71
+msgctxt "TunnelToolDrawer"
+msgid "+ 新建"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\tunnel_tool_drawer.slint:97
+msgctxt "TunnelToolDrawer"
+msgid "当前主机暂无专属端口转发规则"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\tunnel_tool_drawer.slint:106
+msgctxt "TunnelToolDrawer"
+msgid "配置端口映射"
+msgstr ""
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\right_drawers\tunnel_tool_drawer.slint:283
+msgctxt "TunnelToolDrawer"
+msgid "进入网络与隧道管理中心 ➔"
+msgstr ""

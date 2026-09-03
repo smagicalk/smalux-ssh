@@ -209,7 +209,7 @@ export component CreateGroupModal inherits Rectangle {
 
                             // 右侧：选取 / 更改 胶囊按钮
                             Rectangle {
-                                width: 72px;
+                                min-width: 72px;
                                 height: 24px;
                                 border-radius: 3px;
                                 background: picker-btn-touch.has-hover ? AppTheme.accent.transparentize(80%) : AppTheme.hover-background;
@@ -218,6 +218,8 @@ export component CreateGroupModal inherits Rectangle {
                                 y: (parent.height - self.height) / 2;
 
                                 HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
                                     alignment: center;
                                     spacing: 4px;
 
@@ -522,7 +524,7 @@ export component CreateGroupModal inherits Rectangle {
 
                             // 取消选择
                             Rectangle {
-                                width: 68px;
+                                min-width: 68px;
                                 height: 30px;
                                 border-radius: AppTheme.radius-medium;
                                 background: picker-cancel-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
@@ -534,18 +536,22 @@ export component CreateGroupModal inherits Rectangle {
                                     mouse-cursor: pointer;
                                 }
 
-                                Text {
-                                    text: @tr("取消");
-                                    font-size: 11px;
-                                    color: AppTheme.foreground;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    alignment: center;
+                                    Text {
+                                        text: @tr("取消");
+                                        font-size: 11px;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
                                 }
                             }
 
                             // 确定选定
                             Rectangle {
-                                width: 86px;
+                                min-width: 86px;
                                 height: 30px;
                                 border-radius: AppTheme.radius-medium;
                                 background: picker-confirm-touch.has-hover ? AppTheme.accent.darker(12%) : AppTheme.accent;
@@ -559,13 +565,17 @@ export component CreateGroupModal inherits Rectangle {
                                     mouse-cursor: pointer;
                                 }
 
-                                Text {
-                                    text: @tr("确定选定");
-                                    font-size: 11px;
-                                    font-weight: 600;
-                                    color: #ffffff;
-                                    horizontal-alignment: center;
-                                    vertical-alignment: center;
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    alignment: center;
+                                    Text {
+                                        text: @tr("确定选定");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: #ffffff;
+                                        vertical-alignment: center;
+                                    }
                                 }
                             }
                         }

@@ -166,9 +166,9 @@ export component CreateTunnelTypeModal inherits Rectangle {
                     Rectangle {
                         height: 72px;
                         border-radius: AppTheme.radius-medium;
-                        background: jump-touch.has-hover ? #e67e22.transparentize(90%) : AppTheme.control-background;
+                        background: jump-touch.has-hover ? AppTheme.warning.transparentize(90%) : AppTheme.control-background;
                         border-width: 1px;
-                        border-color: jump-touch.has-hover ? #e67e22 : AppTheme.border;
+                        border-color: jump-touch.has-hover ? AppTheme.warning : AppTheme.border;
                         animate background { duration: 120ms; }
                         animate border-color { duration: 120ms; }
 
@@ -192,7 +192,7 @@ export component CreateTunnelTypeModal inherits Rectangle {
                                     width: 40px;
                                     height: 40px;
                                     border-radius: 8px;
-                                    background: #e67e22.transparentize(85%);
+                                    background: AppTheme.warning.transparentize(85%);
 
                                     // 图标在块内完全几何居中
                                     Image {
@@ -201,7 +201,7 @@ export component CreateTunnelTypeModal inherits Rectangle {
                                         width: 20px;
                                         height: 20px;
                                         source: @image-url("../assets/icons/shield.svg");
-                                        colorize: #e67e22;
+                                        colorize: AppTheme.warning;
                                     }
                                 }
                             }
@@ -224,7 +224,7 @@ export component CreateTunnelTypeModal inherits Rectangle {
                                     Rectangle {
                                         height: 18px;
                                         border-radius: 3px;
-                                        background: #e67e22.transparentize(80%);
+                                        background: AppTheme.warning.transparentize(80%);
                                         HorizontalLayout {
                                             padding-left: 5px;
                                             padding-right: 5px;
@@ -233,7 +233,7 @@ export component CreateTunnelTypeModal inherits Rectangle {
                                                 text: "ProxyJump -J";
                                                 font-size: 9px;
                                                 font-weight: 700;
-                                                color: #e67e22;
+                                                color: AppTheme.warning;
                                                 vertical-alignment: center;
                                             }
                                         }

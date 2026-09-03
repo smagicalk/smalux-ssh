@@ -94,17 +94,41 @@ pub(crate) fn map_file_item_to_ui(item: &FileItemData) -> SlintFileItemData {
 
 /// 仅同步左侧本地 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
 pub(crate) fn sync_local_tabs_only(window: &AppWindow, ctx: &AppContext) {
+    let is_en = window.get_current_language() == "en-US";
     let local_tabs = ctx.local_tabs.borrow();
     let active_local_id = ctx.active_local_tab_id.borrow().clone();
     let ui_local_tabs: Vec<SlintFileTabData> = local_tabs
         .iter()
-        .map(|t| SlintFileTabData {
-            id: t.tab_id.clone().into(),
-            host_id: "local".into(),
-            title: t.title.clone().into(),
-            subtitle: t.current_path.clone().into(),
-            status: "online".into(),
-            is_active: t.tab_id == active_local_id,
+        .map(|t| {
+            let display_title = if is_en {
+                if t.title == "本地 (主目录)" {
+                    "Local (Home)".to_string()
+                } else if t.title.starts_with("本地 #") {
+                    t.title.replace("本地 #", "Local #")
+                } else if t.title == "本地" || t.title == "本地目录" {
+                    "Local Directory".to_string()
+                } else {
+                    t.title.clone()
+                }
+            } else {
+                if t.title == "Local (Home)" {
+                    "本地 (主目录)".to_string()
+                } else if t.title.starts_with("Local #") {
+                    t.title.replace("Local #", "本地 #")
+                } else if t.title == "Local Directory" {
+                    "本地目录".to_string()
+                } else {
+                    t.title.clone()
+                }
+            };
+            SlintFileTabData {
+                id: t.tab_id.clone().into(),
+                host_id: "local".into(),
+                title: display_title.into(),
+                subtitle: t.current_path.clone().into(),
+                status: "online".into(),
+                is_active: t.tab_id == active_local_id,
+            }
         })
         .collect();
     window.set_local_tabs(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_local_tabs))));

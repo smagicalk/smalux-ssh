@@ -189,14 +189,14 @@ export component HistoryCenterView inherits Rectangle {
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
-                                colorize: clear-btn-touch.has-hover ? #ef4444 : AppTheme.secondary-foreground;
+                                colorize: clear-btn-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
                             }
                         }
 
                         Text {
                             text: @tr("清空历史");
                             font-size: 11px;
-                            color: clear-btn-touch.has-hover ? #ef4444 : AppTheme.secondary-foreground;
+                            color: clear-btn-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
                             vertical-alignment: center;
                         }
                     }
@@ -311,7 +311,7 @@ export component HistoryCenterView inherits Rectangle {
                         Text {
                             x: group.group-id == "pinned" ? 39px : 24px;
                             y: (parent.height - self.height) / 2;
-                            text: group.group-name;
+                            text: group.group-id == "pinned" ? @tr("置顶常用") : (group.group-id == "today" ? @tr("今天") : (group.group-id == "yesterday" ? @tr("昨天") : (group.group-id == "earlier" ? @tr("更早") : (group.group-id == "all_hosts" ? @tr("全部主机 (按频次)") : (group.group-name == "置顶常用" || group.group-name == "置顶" || group.group-name == "Pinned" ? @tr("置顶常用") : (group.group-name == "更早" || group.group-name == "Earlier" ? @tr("更早") : (group.group-name == "今天" || group.group-name == "Today" ? @tr("今天") : (group.group-name == "昨天" || group.group-name == "Yesterday" ? @tr("昨天") : group.group-name))))))));
                             font-size: 12px;
                             font-weight: 700;
                             color: group.group-id == "pinned" ? AppTheme.accent : AppTheme.foreground;
@@ -322,7 +322,7 @@ export component HistoryCenterView inherits Rectangle {
                         Text {
                             x: parent.width - self.width - 16px;
                             y: (parent.height - self.height) / 2;
-                            text: "(" + group.item-count + " 台)";
+                            text: "(" + group.item-count + " " + @tr("台") + ")";
                             font-size: 11px;
                             color: AppTheme.disabled-foreground;
                             vertical-alignment: center;
@@ -371,7 +371,7 @@ export component HistoryCenterView inherits Rectangle {
                                     width: 8px;
                                     height: 8px;
                                     border-radius: 4px;
-                                    background: item.exit-status == "active" ? #22c55e : (item.exit-status == "timeout" || item.exit-status == "error" ? #ef4444 : (item.exit-status == "auth_failed" ? #f59e0b : #64748b));
+                                    background: item.exit-status == "active" ? AppTheme.success : (item.exit-status == "timeout" || item.exit-status == "error" ? AppTheme.danger : (item.exit-status == "auth_failed" ? AppTheme.warning : AppTheme.secondary-foreground));
                                     border-width: 1.5px;
                                     border-color: AppTheme.surface-background;
                                 }
@@ -536,7 +536,7 @@ export component HistoryCenterView inherits Rectangle {
                                         height: 13px;
                                         source: @image-url("../assets/icons/trash.svg");
                                         image-fit: contain;
-                                        colorize: del-touch.has-hover ? #ef4444 : AppTheme.secondary-foreground;
+                                        colorize: del-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
                                     }
                                 }
                             }

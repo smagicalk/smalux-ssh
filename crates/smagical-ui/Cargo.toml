@@ -18,8 +18,10 @@ arboard.workspace = true
 vt100.workspace = true
 directories.workspace = true
 uuid.workspace = true
+serde_json.workspace = true
 smagical-core = { path = "../smagical-core" }
 smagical-debug = { path = "../smagical-debug" }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 
 
 

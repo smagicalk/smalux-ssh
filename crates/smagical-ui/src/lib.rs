@@ -90,21 +90,27 @@ pub fn run() -> Result<(), slint::PlatformError> {
         cached_shells.read().unwrap().clone(),
     ))));
 
-    // 初始化核心主题服务
-    let themes = match initialize_theme_service(None) {
-        Ok(service) => Rc::new(service),
+    // 初始化核心主题仓储与服务 (接入数据层内存仓储，0 本地物理文件 I/O)
+    let memory_repo = smagical_core::theme::MemoryThemeRepository::new();
+    let themes = match initialize_theme_service(Some(&memory_repo)) {
+        Ok(service) => Rc::new(RefCell::new(service)),
         Err(err) => {
             tracing::error!(target: "smagical_ui::theme", "初始化主题服务失败: {:?}", err);
             return Err(slint::PlatformError::Other("初始化主题服务失败".into()));
         }
     };
+    let theme_repo = Some(Rc::new(RefCell::new(memory_repo)));
 
     // 应用默认初始主题 (Darcula)
-    if let Err(err) = apply_theme_by_id(&window, &themes, "builtin.ui.darcula") {
+    if let Err(err) = apply_theme_by_id(&window, &*themes.borrow(), "builtin.ui.darcula") {
         tracing::error!(target: "smagical_ui::theme", "应用默认主题失败: {:?}", err);
     }
+    window.set_current_theme_id("builtin.ui.darcula".into());
     window.set_current_theme_name("Darcula".into());
     window.set_is_dark_mode(true);
+
+    // 同步初始化全部可用主题至 Slint 界面
+    crate::theme::sync_ui_themes(&window, &themes.borrow());
 
     // 初始化图形渲染管线标识
     let initial_pipeline = std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "winit-skia".to_string());
@@ -283,6 +289,14 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let tunnel_search_query = Rc::new(RefCell::new(String::new()));
     let tunnel_filter_category = Rc::new(RefCell::new("all".to_string()));
 
+    let initial_config = core_state.storage().config().get().unwrap_or_default();
+
+    let wallpapers = Rc::new(RefCell::new(initial_config.wallpaper_list.clone()));
+    let active_wallpaper_idx = Rc::new(RefCell::new(initial_config.wallpaper_active_index));
+    let wallpaper_timer = Rc::new(RefCell::new(None));
+    let wallpaper_preload_timer = Rc::new(RefCell::new(None));
+    let wallpaper_cache = Rc::new(RefCell::new(std::collections::HashMap::new()));
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state: Rc::clone(&core_state),
@@ -296,6 +310,12 @@ pub fn run() -> Result<(), slint::PlatformError> {
         next_session_num,
         cached_shells,
         themes,
+        theme_repo,
+        wallpapers,
+        active_wallpaper_idx,
+        wallpaper_timer,
+        wallpaper_cache,
+        wallpaper_preload_timer,
         terminal_renderer: Rc::clone(&terminal_renderer),
 
         pane_groups: Rc::clone(&pane_groups),
@@ -357,6 +377,46 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 统一挂载所有区域的回调事件处理器
     register_all_handlers(&window, &ctx);
+
+    // 同步底层配置仓储 (ConfigRepository) 状态至 Slint 界面
+    window.set_current_language(initial_config.language.as_str().into());
+    window.set_setting_close_action(initial_config.close_action.as_str().into());
+    window.set_setting_start_on_boot(initial_config.start_on_boot);
+    window.set_setting_confirm_close_tab(initial_config.confirm_close_tab);
+    window.set_setting_confirm_close_active(initial_config.confirm_close_active);
+
+    window.set_current_theme_id(initial_config.theme_id.as_str().into());
+    window.set_is_dark_mode(initial_config.is_dark_mode);
+    window.invoke_switch_theme(initial_config.theme_id.as_str().into());
+
+    window.set_terminal_font_family(initial_config.font_family.as_str().into());
+    window.set_terminal_font_size(initial_config.font_size);
+
+    window.set_is_debug_enabled(initial_config.debug_enabled);
+    window.set_flag_desktop_notifications(initial_config.flag_desktop_notifications);
+    window.set_flag_terminal_crt_shader(initial_config.flag_terminal_crt_shader);
+    window.set_flag_cloud_sync(initial_config.flag_cloud_sync);
+    window.set_flag_terminal_scratchpad(initial_config.flag_terminal_scratchpad);
+
+    // 同步壁纸状态至全局 AppTheme 令牌
+    let theme_global = window.global::<AppTheme>();
+    theme_global.set_wallpaper_mode(initial_config.wallpaper_mode.as_str().into());
+    theme_global.set_wallpaper_opacity(initial_config.wallpaper_opacity);
+
+    // 壁纸画廊数据与初始渲染
+    if !initial_config.wallpaper_list.is_empty() {
+        let slint_strings: Vec<slint::SharedString> = initial_config.wallpaper_list.iter().map(|s| s.as_str().into()).collect();
+        window.set_wallpaper_list(slint::ModelRc::new(slint::VecModel::from(slint_strings)));
+        window.set_wallpaper_active_index(initial_config.wallpaper_active_index as i32);
+        if initial_config.wallpaper_active_index < initial_config.wallpaper_list.len() {
+            let wp_path = &initial_config.wallpaper_list[initial_config.wallpaper_active_index];
+            window.invoke_set_wallpaper(
+                initial_config.wallpaper_mode.as_str().into(),
+                wp_path.as_str().into(),
+                initial_config.wallpaper_opacity,
+            );
+        }
+    }
 
 
 

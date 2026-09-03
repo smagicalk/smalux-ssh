@@ -6,14 +6,23 @@ export component MessageDialog inherits Rectangle {
     /// 弹窗显隐状态
     in-out property <bool> is-open: false;
     /// 弹窗标题
-    in property <string> title: "提示";
+    in property <string> title: @tr("提示");
     /// 提示详情文本
     in property <string> message: "";
     /// 弹窗类型: "error" (错误) | "warning" (告警) | "info" (信息)
     in property <string> dialog-type: "error";
 
+    /// 是否显示取消按钮 (用于确认弹窗)
+    in property <bool> show-cancel: false;
+    /// 确认按钮文字
+    in property <string> confirm-text: @tr("确定");
+    /// 取消按钮文字
+    in property <string> cancel-text: @tr("取消");
+
     /// 关闭弹窗事件回调
     callback close();
+    /// 确认操作回调
+    callback confirmed();
 
     if is-open: Rectangle {
         width: 100%;
@@ -111,17 +120,27 @@ export component MessageDialog inherits Rectangle {
                     }
                 }
 
-                // 3. 底部确定按钮
+                // 3. 底部操作按钮
                 HorizontalLayout {
                     alignment: end;
+                    spacing: 8px;
                     height: 32px;
 
-                    AppButton {
-                        text: "确定";
-                        variant: "primary";
+                    if root.show-cancel: AppButton {
+                        text: root.cancel-text;
+                        variant: "secondary";
                         clicked => {
                             root.is-open = false;
                             root.close();
+                        }
+                    }
+
+                    AppButton {
+                        text: root.confirm-text;
+                        variant: root.dialog-type == "error" ? "danger" : root.dialog-type == "warning" ? "primary" : "primary";
+                        clicked => {
+                            root.is-open = false;
+                            root.confirmed();
                         }
                     }
                 }

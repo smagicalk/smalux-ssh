@@ -1089,6 +1089,182 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
         });
     }
+
+    // -------------------------------------------------------------------------
+    // 22. 实验室特性门控切换 (Feature Flags)
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let notif = ctx.notifications.clone();
+        let core_state_flag = ctx.core_state.clone();
+        window.on_toggle_feature_flag(move |flag_name, enabled| {
+            let f = flag_name.as_str();
+            let label = match f {
+                "desktop_notifications" => "系统级桌面托盘气泡通知",
+                "terminal_crt_shader" => "终端复古 CRT 着色器",
+                "cloud_sync" => "云端多端加密备份与同步",
+                "terminal_scratchpad" => "终端临时便签划词板",
+                _ => f,
+            };
+            if f == "desktop_notifications" {
+                if enabled {
+                    notif.success("桌面通知已开启", "系统级桌面托盘气泡通知已直接在 Debug 控制台开启生效");
+                } else {
+                    notif.info("桌面通知已关闭", "已停止向系统托盘推送桌面气泡通知");
+                }
+            } else if enabled {
+                notif.success("实验特性已开启", &format!("已在主界面与设置中挂载「{}」", label));
+            } else {
+                notif.info("实验特性已隐藏", &format!("已在主界面与设置中关闭并隐藏「{}」", label));
+            }
+            let f_str = f.to_string();
+            let _ = core_state_flag.storage().config().update(Box::new(move |c| {
+                match f_str.as_str() {
+                    "desktop_notifications" => c.flag_desktop_notifications = enabled,
+                    "terminal_crt_shader" => c.flag_terminal_crt_shader = enabled,
+                    "cloud_sync" => c.flag_cloud_sync = enabled,
+                    "terminal_scratchpad" => c.flag_terminal_scratchpad = enabled,
+                    _ => {}
+                }
+            }));
+            if let Some(w) = window_weak.upgrade() {
+                match f {
+                    "desktop_notifications" => w.set_flag_desktop_notifications(enabled),
+                    "terminal_crt_shader" => w.set_flag_terminal_crt_shader(enabled),
+                    "cloud_sync" => w.set_flag_cloud_sync(enabled),
+                    "terminal_scratchpad" => w.set_flag_terminal_scratchpad(enabled),
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 22.1 切换 Mock 数据层 (Toggle Mock Storage)
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let notif = ctx.notifications.clone();
+        let core_state_mock = ctx.core_state.clone();
+        window.on_toggle_mock_storage(move |enabled| {
+            core_state_mock.set_mock_storage(enabled);
+            if let Some(w) = window_weak.upgrade() {
+                w.set_use_mock_storage(enabled);
+            }
+            if enabled {
+                notif.success("数据层切换成功", "已切换至 [Mock 数据层] 内存种子存储模式");
+            } else {
+                notif.info("数据层切换成功", "已切换至 [物理持久化存储模式] (方便后续接入真实物理存储进行调试)");
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 23. 配置预设注入 (Config Presets)
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let notif = ctx.notifications.clone();
+        window.on_apply_config_preset(move |preset_name| {
+            let p = preset_name.as_str();
+            if let Some(w) = window_weak.upgrade() {
+                match p {
+                    "flags_all_on" => {
+                        w.set_flag_desktop_notifications(true);
+                        w.set_flag_terminal_crt_shader(true);
+                        w.set_flag_cloud_sync(true);
+                        w.set_flag_terminal_scratchpad(true);
+                        notif.success("全部实验特性已开启", "所有实验室特性门控已开启，已在设置中全量显现");
+                    }
+                    "flags_all_off" => {
+                        w.set_flag_desktop_notifications(false);
+                        w.set_flag_terminal_crt_shader(false);
+                        w.set_flag_cloud_sync(false);
+                        w.set_flag_terminal_scratchpad(false);
+                        notif.info("全部实验特性已关闭", "已静默隐藏所有未定或实验阶段的功能选项");
+                    }
+                    "geek" => {
+                        w.set_flag_desktop_notifications(true);
+                        w.set_flag_terminal_crt_shader(true);
+                        w.set_flag_cloud_sync(true);
+                        w.set_flag_terminal_scratchpad(true);
+                        w.set_setting_confirm_close_tab(false);
+                        w.set_setting_confirm_close_active(false);
+                        w.set_active_rendering_pipeline("winit-skia".into());
+                        notif.success("极客全开模式", "已启用所有实验特性与高速无确认流模式");
+                    }
+                    "minimal" => {
+                        w.set_flag_desktop_notifications(false);
+                        w.set_flag_terminal_crt_shader(false);
+                        w.set_flag_cloud_sync(false);
+                        w.set_flag_terminal_scratchpad(false);
+                        w.set_wallpaper_mode("none".into());
+                        w.invoke_set_wallpaper("none".into(), "".into(), 0.20);
+                        w.set_setting_confirm_close_tab(true);
+                        w.set_setting_confirm_close_active(true);
+                        notif.info("极简轻量模式", "已关闭壁纸、隐藏实验特性并恢复安全拦截");
+                    }
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 24. 恢复出厂设置 (Reset All Settings)
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        let notif = ctx.notifications.clone();
+        let core_state_reset = ctx.core_state.clone();
+        window.on_reset_all_settings(move || {
+            let _ = core_state_reset.storage().config().reset_to_default();
+            if let Some(w) = window_weak.upgrade() {
+                w.set_flag_desktop_notifications(false);
+                w.set_flag_terminal_crt_shader(false);
+                w.set_flag_cloud_sync(false);
+                w.set_flag_terminal_scratchpad(false);
+                w.set_setting_desktop_notification(false);
+                w.set_setting_terminal_crt(false);
+                w.set_setting_always_on_top(false);
+                w.set_setting_start_on_boot(false);
+                w.set_setting_confirm_close_tab(true);
+                w.set_setting_confirm_close_active(true);
+                w.set_wallpaper_mode("none".into());
+                w.invoke_set_wallpaper("none".into(), "".into(), 0.20);
+                w.invoke_switch_theme("builtin.ui.darcula".into());
+                notif.success("恢复出厂设置成功", "所有应用偏好配置与实验特性已重置回初始状态");
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 25. 系统桌面气泡通知设置切换
+    // -------------------------------------------------------------------------
+    {
+        let notif = ctx.notifications.clone();
+        window.on_toggle_desktop_notification(move |enabled| {
+            if enabled {
+                notif.success("系统级桌面通知", "已开启系统级桌面托盘气泡通知推送");
+            } else {
+                notif.info("系统级桌面通知", "已停用系统级桌面托盘气泡通知推送");
+            }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 26. 复古 CRT 着色器设置切换
+    // -------------------------------------------------------------------------
+    {
+        let notif = ctx.notifications.clone();
+        window.on_toggle_terminal_crt(move |enabled| {
+            if enabled {
+                notif.success("终端复古 CRT 特效", "已开启复古显像管微弯曲曲面与荧光扫描线滤镜");
+            } else {
+                notif.info("终端复古 CRT 特效", "已关闭复古 CRT 滤镜，恢复标准高清光栅排版");
+            }
+        });
+    }
 }
 
 
