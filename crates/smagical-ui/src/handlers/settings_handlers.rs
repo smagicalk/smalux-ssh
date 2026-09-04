@@ -10,7 +10,7 @@ use slint::ComponentHandle;
 use smagical_core::domain::host::{HostRecord, HostStatus};
 use smagical_core::event::types::HostAssetChangedEvent;
 
-use crate::generated::{AppWindow, KeywordHighlightRule};
+use crate::generated::{AppTheme, AppWindow, KeywordHighlightRule};
 use crate::handlers::AppContext;
 
 /// 注册偏好设置中心与全量数据备份/迁移交互回调
@@ -256,7 +256,27 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         window.set_setting_global_proxy_auth(cfg.global_proxy_auth);
         window.set_setting_global_proxy_user(cfg.global_proxy_user.as_str().into());
         window.set_setting_global_proxy_pass(cfg.global_proxy_pass.as_str().into());
+        window.set_setting_connect_timeout(cfg.ssh_timeout_seconds as i32);
+        window.set_setting_keepalive_interval(cfg.keepalive_interval as i32);
+        window.set_setting_keepalive_count_max(cfg.keepalive_count_max as i32);
+        window.set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
+        window.set_setting_tcp_nodelay(cfg.tcp_nodelay);
+        window.set_setting_modal_opacity(cfg.modal_opacity);
     }
+
+    let core_state_mo = ctx.core_state.clone();
+    let window_weak_mo = window.as_weak();
+    window.on_change_modal_opacity(move |opacity| {
+        let op = opacity.clamp(0.5, 1.0);
+        if let Some(w) = window_weak_mo.upgrade() {
+            w.set_setting_modal_opacity(op);
+            let theme_global = w.global::<AppTheme>();
+            theme_global.set_modal_opacity(op);
+        }
+        let _ = core_state_mo.storage().config().update(Box::new(move |c| {
+            c.modal_opacity = op;
+        }));
+    });
 
     let notif_font = ctx.notifications.clone();
     let core_state_font = ctx.core_state.clone();
@@ -516,6 +536,73 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             c.global_proxy_user = u_save;
             c.global_proxy_pass = p_save;
         }));
+    });
+
+    let notif_handshake = ctx.notifications.clone();
+    let core_state_handshake = ctx.core_state.clone();
+    let window_weak_handshake = window.as_weak();
+    window.on_change_network_handshake(move |timeout, interval, count_max| {
+        let t_val = timeout.clamp(5, 300) as u32;
+        let i_val = interval.clamp(0, 300) as u32;
+        let c_val = count_max.clamp(1, 20) as u32;
+
+        if let Some(w) = window_weak_handshake.upgrade() {
+            w.set_setting_connect_timeout(t_val as i32);
+            w.set_setting_keepalive_interval(i_val as i32);
+            w.set_setting_keepalive_count_max(c_val as i32);
+        }
+
+        let _ = core_state_handshake.storage().config().update(Box::new(move |c| {
+            c.ssh_timeout_seconds = t_val;
+            c.keepalive_interval = i_val;
+            c.keepalive_count_max = c_val;
+        }));
+
+        let keepalive_desc = if i_val == 0 {
+            "保活心跳已禁用".to_string()
+        } else {
+            format!("心跳 {}s / 重试 {} 次", i_val, c_val)
+        };
+        notif_handshake.success(
+            "网络握手参数已更新",
+            &format!("连接超时 {} 秒，{}", t_val, keepalive_desc),
+        );
+        tracing::info!(
+            target: "smagical_ui::settings",
+            "SSH握手参数变更: 超时={}s, 保活={}s, 最大重试={}",
+            t_val, i_val, c_val
+        );
+    });
+
+    let notif_hk = ctx.notifications.clone();
+    let core_state_hk = ctx.core_state.clone();
+    let window_weak_hk = window.as_weak();
+    window.on_change_host_key_policy(move |policy| {
+        let p_str = policy.to_string();
+        if let Some(w) = window_weak_hk.upgrade() {
+            w.set_setting_host_key_policy(p_str.clone().into());
+        }
+        let p_save = p_str.clone();
+        let _ = core_state_hk.storage().config().update(Box::new(move |c| {
+            c.host_key_checking = p_save;
+        }));
+        notif_hk.info("主机公钥指纹策略已变更", &format!("已切换为「{}」", p_str));
+    });
+
+    let notif_tcp = ctx.notifications.clone();
+    let core_state_tcp = ctx.core_state.clone();
+    let window_weak_tcp = window.as_weak();
+    window.on_change_tcp_nodelay(move |enabled| {
+        if let Some(w) = window_weak_tcp.upgrade() {
+            w.set_setting_tcp_nodelay(enabled);
+        }
+        let _ = core_state_tcp.storage().config().update(Box::new(move |c| {
+            c.tcp_nodelay = enabled;
+        }));
+        notif_tcp.info(
+            if enabled { "TCP_NODELAY 已启用" } else { "TCP_NODELAY 已禁用" },
+            if enabled { "已开启 Nagle 算法规避，最小化终端小包交互延迟" } else { "已恢复标准 TCP 缓冲合并" },
+        );
     });
 
     // -------------------------------------------------------------------------

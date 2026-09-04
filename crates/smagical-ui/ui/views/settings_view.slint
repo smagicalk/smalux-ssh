@@ -164,13 +164,24 @@ component LanguageDropdown inherits Rectangle {
                             font-size: 11px;
                             color: root.selected-lang == "zh-CN" ? AppTheme.accent : AppTheme.foreground;
                             vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
                         }
 
-                        if root.selected-lang == "zh-CN": Text {
-                            text: "✓";
-                            font-size: 11px;
-                            color: AppTheme.accent;
-                            vertical-alignment: center;
+                        if root.selected-lang == "zh-CN": Rectangle {
+                            width: 14px;
+                            height: 14px;
+                            y: (parent.height - self.height) / 2;
+
+                            Image {
+                                source: @image-url("../assets/icons/check.svg");
+                                width: 12px;
+                                height: 12px;
+                                colorize: AppTheme.accent;
+                                image-fit: contain;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
                         }
                     }
                 }
@@ -200,13 +211,24 @@ component LanguageDropdown inherits Rectangle {
                             font-size: 11px;
                             color: root.selected-lang == "en-US" ? AppTheme.accent : AppTheme.foreground;
                             vertical-alignment: center;
+                            horizontal-stretch: 1;
+                            overflow: elide;
                         }
 
-                        if root.selected-lang == "en-US": Text {
-                            text: "✓";
-                            font-size: 11px;
-                            color: AppTheme.accent;
-                            vertical-alignment: center;
+                        if root.selected-lang == "en-US": Rectangle {
+                            width: 14px;
+                            height: 14px;
+                            y: (parent.height - self.height) / 2;
+
+                            Image {
+                                source: @image-url("../assets/icons/check.svg");
+                                width: 12px;
+                                height: 12px;
+                                colorize: AppTheme.accent;
+                                image-fit: contain;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
                         }
                     }
                 }
@@ -219,8 +241,19 @@ component LanguageDropdown inherits Rectangle {
 component FontDropdown inherits Rectangle {
     in-out property <string> selected-font: "系统默认 (System Default)";
     in property <[string]> font-list: [];
-    in property <length> popup-max-height: 280px;
+    in property <length> popup-max-height: 180px;
     callback font-selected(string);
+
+    pure function is-font-selected(sel: string, cur: string) -> bool {
+        if sel == cur {
+            return true;
+        }
+        if (sel == "" || sel == "系统默认" || sel == "System Default" || sel == "default" || sel == "系统默认 (System Default)") &&
+           (cur == "" || cur == "系统默认" || cur == "System Default" || cur == "default" || cur == "系统默认 (System Default)") {
+            return true;
+        }
+        return false;
+    }
 
     width: 220px;
     height: 28px;
@@ -235,20 +268,25 @@ component FontDropdown inherits Rectangle {
         alignment: space-between;
 
         Text {
-            text: root.selected-font;
+            text: (root.selected-font == "" || root.selected-font == "系统默认" || root.selected-font == "default") ? "系统默认 (System Default)" : root.selected-font;
             font-size: 11px;
-            font-family: root.selected-font == "系统默认 (System Default)" ? "" : root.selected-font;
+            font-family: (root.selected-font == "系统默认 (System Default)" || root.selected-font == "系统默认" || root.selected-font == "") ? "" : root.selected-font;
             font-weight: 500;
             color: AppTheme.foreground;
             vertical-alignment: center;
             overflow: elide;
+            horizontal-stretch: 1;
         }
 
-        Text {
-            text: "▼";
-            font-size: 8px;
-            color: AppTheme.secondary-foreground;
-            vertical-alignment: center;
+        Rectangle {
+            width: 12px;
+            Text {
+                text: "▼";
+                font-size: 8px;
+                color: AppTheme.secondary-foreground;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
         }
     }
 
@@ -263,9 +301,12 @@ component FontDropdown inherits Rectangle {
         x: 0px;
         y: root.height + 4px;
         width: root.width;
+        height: Math.min(180px, root.font-list.length * 30px + 10px);
+        close-policy: close-on-click-outside;
 
         Rectangle {
             width: root.width;
+            height: parent.height;
             border-radius: AppTheme.radius-medium;
             background: AppTheme.modal-background;
             border-width: 1px;
@@ -273,46 +314,65 @@ component FontDropdown inherits Rectangle {
             drop-shadow-blur: 16px;
             drop-shadow-color: #00000099;
             drop-shadow-offset-y: 4px;
+            clip: true;
 
-            VerticalLayout {
-                padding: 4px;
-                spacing: 2px;
+            ScrollView {
+                width: 100%;
+                height: 100%;
 
-                for f in root.font-list: Rectangle {
-                    height: 28px;
-                    border-radius: AppTheme.radius-small;
-                    background: root.selected-font == f ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
+                VerticalLayout {
+                    alignment: start;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    padding-left: 4px;
+                    padding-right: 12px;
+                    spacing: 2px;
 
-                    f-opt := TouchArea {
-                        clicked => {
-                            root.selected-font = f;
-                            root.font-selected(f);
-                            font-popup.close();
-                        }
-                        mouse-cursor: pointer;
-                    }
+                    for f in root.font-list: Rectangle {
+                        height: 28px;
+                        border-radius: AppTheme.radius-small;
+                        background: is-font-selected(root.selected-font, f) ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
 
-                    HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        alignment: space-between;
-
-                        Text {
-                            text: f;
-                            font-size: 11px;
-                            font-family: f == "系统默认 (System Default)" ? "" : f;
-                            color: root.selected-font == f ? AppTheme.accent : AppTheme.foreground;
-                            font-weight: root.selected-font == f ? 700 : 400;
-                            vertical-alignment: center;
-                            overflow: elide;
+                        f-opt := TouchArea {
+                            scroll-event(event) => {
+                                reject
+                            }
+                            clicked => {
+                                root.selected-font = f;
+                                root.font-selected(f);
+                                font-popup.close();
+                            }
+                            mouse-cursor: pointer;
                         }
 
-                        if root.selected-font == f: Text {
-                            text: "✓";
-                            font-size: 11px;
-                            color: AppTheme.accent;
-                            font-weight: 700;
-                            vertical-alignment: center;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: space-between;
+
+                            Text {
+                                text: f;
+                                font-size: 11px;
+                                font-family: (f == "系统默认 (System Default)" || f == "系统默认") ? "" : f;
+                                color: is-font-selected(root.selected-font, f) ? AppTheme.accent : AppTheme.foreground;
+                                font-weight: is-font-selected(root.selected-font, f) ? 700 : 400;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            if is-font-selected(root.selected-font, f): Rectangle {
+                                width: 14px;
+                                Image {
+                                    source: @image-url("../assets/icons/check.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.accent;
+                                    image-fit: contain;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
                         }
                     }
                 }
@@ -716,11 +776,12 @@ component PipelineSegmentedControl inherits Rectangle {
 }
 
 /// 标准单行设置项容器 (左端标题+说明，右端输入或者选项框)
-/// 标准单行设置项容器 (左端标题+说明，右端输入或者选项框)
 component SettingsRow inherits Rectangle {
     in property <string> title: "";
     in property <string> subtitle: "";
     in property <bool> show-border: true;
+    in property <image> icon;
+    in property <bool> has-icon: false;
 
     min-height: 48px;
     background: transparent;
@@ -732,24 +793,42 @@ component SettingsRow inherits Rectangle {
         padding-right: 18px;
         alignment: space-between;
 
-        // 左端：主标题 + 详细辅助说明
-        VerticalLayout {
-            alignment: center;
-            spacing: 2px;
+        HorizontalLayout {
+            alignment: start;
+            spacing: 10px;
             horizontal-stretch: 1;
 
-            Text {
-                text: root.title;
-                font-size: 12px;
-                font-weight: 500;
-                color: AppTheme.foreground;
+            if root.has-icon || root.icon.width > 0: VerticalLayout {
+                alignment: center;
+                width: 16px;
+                Image {
+                    source: root.icon;
+                    width: 16px;
+                    height: 16px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                }
             }
 
-            if root.subtitle != "": Text {
-                text: root.subtitle;
-                font-size: 10px;
-                color: AppTheme.secondary-foreground;
-                wrap: word-wrap;
+            // 左端：主标题 + 详细辅助说明
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.title;
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: AppTheme.foreground;
+                }
+
+                if root.subtitle != "": Text {
+                    text: root.subtitle;
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                    wrap: word-wrap;
+                }
             }
         }
 
@@ -1026,6 +1105,7 @@ export component SettingsCenterView inherits Rectangle {
     in-out property <string> setting-wallpaper-mode: "none";
     in-out property <string> setting-wallpaper-path: "";
     in-out property <float> setting-wallpaper-opacity: 0.20;
+    in-out property <float> setting-modal-opacity: 1.0;
     in-out property <[string]> setting-wallpaper-list: [];
     in-out property <int> setting-wallpaper-active-index: 0;
     in-out property <string> setting-wallpaper-slideshow: "none";
@@ -1103,10 +1183,20 @@ export component SettingsCenterView inherits Rectangle {
     in-out property <bool> setting-legacy-ciphers: false;
     in-out property <bool> setting-auto-reconnect: true;
 
-    // 5. 文件与 SFTP 设置属性
-    in-out property <string> setting-sftp-default-local: "Home";
+    // 5. 传输与文件管理属性
+    in-out property <string> setting-sftp-default-local: "~/Downloads";
+    in-out property <string> setting-sftp-default-remote: "~";
     in-out property <bool> setting-sftp-show-hidden: false;
+    in-out property <bool> setting-sftp-confirm-delete: true;
     in-out property <string> setting-sftp-conflict-policy: "ask";
+    in-out property <bool> setting-sftp-resume: true;
+    in-out property <bool> setting-sftp-preserve-attributes: true;
+    in-out property <int> setting-sftp-concurrency: 4;
+    in-out property <string> setting-sftp-upload-limit: "unlimited";
+    in-out property <string> setting-sftp-download-limit: "unlimited";
+    in-out property <string> setting-sftp-editor-mode: "builtin";
+    in-out property <string> setting-sftp-custom-editor: "";
+    in-out property <string> setting-sftp-exclude-patterns: ".git, .DS_Store, node_modules, __pycache__, *.tmp";
 
     // 6. 快捷键清单
     in property <[SettingKeybindingItem]> keybindings: [
@@ -1129,11 +1219,49 @@ export component SettingsCenterView inherits Rectangle {
         { id: "snap-2", timestamp: "2026-08-31 18:30:00", description: @tr("全量主机资产定期快照"), host-count: 12, cred-count: 5 },
     ];
 
-    // 8. 安全与高级
+    // 8. 多端云同步与数据备份属性
+    in-out property <string> setting-cloud-sync-backend: "off"; // "off", "webdav", "s3", "gist", "custom"
+    in-out property <string> setting-webdav-url: "https://dav.jianguoyun.com/dav/";
+    in-out property <string> setting-webdav-user: "";
+    in-out property <string> setting-webdav-pass: "";
+    in-out property <string> setting-webdav-dir: "/smalux_backup";
+    in-out property <string> setting-s3-endpoint: "";
+    in-out property <string> setting-s3-bucket: "";
+    in-out property <string> setting-s3-key-id: "";
+    in-out property <string> setting-s3-access-key: "";
+    in-out property <string> setting-s3-region: "us-east-1";
+    in-out property <string> setting-gist-token: "";
+    in-out property <string> setting-gist-id: "";
+    in-out property <string> setting-custom-sync-url: "https://api.smalux.internal/v1/sync";
+    in-out property <string> setting-custom-sync-token: "";
+    in-out property <string> setting-custom-sync-client-id: "desktop-client";
+    in-out property <string> setting-cloud-e2ee-pass: "";
+    in-out property <string> setting-cloud-sync-interval: "manual"; // "manual", "startup", "1h", "daily"
+    in-out property <string> setting-cloud-sync-status: "";
+    in-out property <bool> setting-sync-include-hosts: true;
+    in-out property <bool> setting-sync-include-creds: true;
+    in-out property <bool> setting-sync-include-snippets: true;
+    in-out property <bool> setting-sync-include-tunnels: true;
+    in-out property <bool> setting-sync-include-settings: true;
+
+    // 9. 安全与高级诊断属性
     in-out property <bool> setting-master-password-enabled: false;
     in-out property <string> setting-auto-lock-timeout: "never";
+    in-out property <bool> setting-biometric-unlock: false;
+    in-out property <bool> setting-lock-on-minimize: false;
+    in-out property <bool> setting-clear-clipboard-timeout: true;
+    in-out property <bool> setting-confirm-dangerous-commands: true;
+    in-out property <bool> setting-session-audit-logging: false;
     in-out property <bool> setting-debug-enabled: true;
     in-out property <string> setting-log-level: "INFO";
+    in-out property <bool> setting-debug-log-channel: true;
+
+    // 主密码设置/修改模态弹窗交互状态
+    property <bool> is-master-pwd-modal-open: false;
+    property <string> master-pwd-old: "";
+    property <string> master-pwd-new: "";
+    property <string> master-pwd-confirm: "";
+    property <string> master-pwd-error-msg: "";
 
     // 9. 实验室特性门控与关联设置
     in property <bool> flag-terminal-crt-shader: false;
@@ -1170,6 +1298,8 @@ export component SettingsCenterView inherits Rectangle {
     callback set-wallpaper-slideshow(string /* interval */, string /* transition */);
     /// 切换深浅色模式
     callback toggle-dark-mode();
+    /// 修改模态弹窗透光度 (实验特性)
+    callback change-modal-opacity(float /* opacity */);
     /// 修改全局界面字体
     callback change-ui-font(string /* font_name */);
     /// 修改终端字体
@@ -1214,6 +1344,12 @@ export component SettingsCenterView inherits Rectangle {
     callback change-close-action(string /* action */);
     /// 全局出站代理策略与凭据更新
     callback change-global-proxy(string /* mode */, string /* server */, bool /* auth */, string /* user */, string /* pass */);
+    /// 网络超时与心跳保活握手参数更新 (timeout, keepalive_interval, keepalive_count_max)
+    callback change-network-handshake(int /* timeout */, int /* interval */, int /* count_max */);
+    /// 主机公钥指纹验证策略切换
+    callback change-host-key-policy(string /* policy */);
+    /// TCP_NODELAY 延迟算法切换
+    callback change-tcp-nodelay(bool /* enabled */);
 
     // 备份与迁移回调
     /// 导出加密备份包
@@ -1332,25 +1468,25 @@ export component SettingsCenterView inherits Rectangle {
                             clicked => { root.active-category = "appearance"; root.select-category("appearance"); }
                         }
 
-                        // 分类 3: 终端
+                        // 分类 3: 终端首选项
                         CategoryNavButton {
-                            text: @tr("终端引擎排版");
+                            text: @tr("终端首选项");
                             icon: @image-url("../assets/icons/terminal.svg");
                             is-active: root.active-category == "terminal";
                             clicked => { root.active-category = "terminal"; root.select-category("terminal"); }
                         }
 
-                        // 分类 4: 网络
+                        // 分类 4: 网络连接与代理
                         CategoryNavButton {
-                            text: @tr("网络与 SSH");
+                            text: @tr("网络连接与代理");
                             icon: @image-url("../assets/icons/tunnel.svg");
                             is-active: root.active-category == "network";
                             clicked => { root.active-category = "network"; root.select-category("network"); }
                         }
 
-                        // 分类 5: 文件
+                        // 分类 5: 传输与文件管理
                         CategoryNavButton {
-                            text: @tr("文件与 SFTP");
+                            text: @tr("传输与文件管理");
                             icon: @image-url("../assets/icons/folder.svg");
                             is-active: root.active-category == "files";
                             clicked => { root.active-category = "files"; root.select-category("files"); }
@@ -1364,9 +1500,9 @@ export component SettingsCenterView inherits Rectangle {
                             clicked => { root.active-category = "shortcuts"; root.select-category("shortcuts"); }
                         }
 
-                        // 分类 7: 数据备份与迁移 ★ (核心一级菜单)
+                        // 分类 7: 数据备份与同步 ★ (核心一级菜单)
                         CategoryNavButton {
-                            text: @tr("数据备份与迁移");
+                            text: @tr("数据备份与同步");
                             icon: @image-url("../assets/icons/archive.svg");
                             is-active: root.active-category == "backup";
                             show-dot: true;
@@ -2042,6 +2178,142 @@ export component SettingsCenterView inherits Rectangle {
                                             }
                                         }
 
+                                        // 模态弹窗不透明度调节 (实验特性，支持鼠标任意拖动/点击 + 直接输入数字百分比 + 微调步进)
+                                        SettingsRow {
+                                            title: @tr("弹窗底板不透明度 (Modal Opacity)");
+                                            subtitle: @tr("[实验特性] 调节壁纸模式下弹出窗口与菜单的不透明度 (默认 100% 纯色遮挡防重叠，支持 60%~100% 微调)");
+
+                                            HorizontalLayout {
+                                                spacing: 10px;
+                                                alignment: center;
+
+                                                // 步进减小按钮 -
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-left.svg");
+                                                    clicked => {
+                                                        if root.setting-modal-opacity > 0.60 {
+                                                            root.setting-modal-opacity = Math.round((root.setting-modal-opacity - 0.05) * 100) / 100;
+                                                            root.change-modal-opacity(root.setting-modal-opacity);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 鼠标可直接点击与自由按住拖动的滑动槽轨
+                                                Rectangle {
+                                                    width: 180px;
+                                                    height: 24px;
+                                                    background: transparent;
+
+                                                    // 槽轨底色
+                                                    Rectangle {
+                                                        y: (parent.height - self.height) / 2;
+                                                        width: parent.width;
+                                                        height: 6px;
+                                                        border-radius: 3px;
+                                                        background: AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: AppTheme.border;
+
+                                                        // 进度填充层
+                                                        Rectangle {
+                                                            x: 0px;
+                                                            width: Math.max(0px, Math.min(parent.width, parent.width * root.setting-modal-opacity));
+                                                            height: 100%;
+                                                            border-radius: 3px;
+                                                            background: AppTheme.accent;
+                                                        }
+                                                    }
+
+                                                    // 滑动手柄圆形浮块 (Thumb Handle)
+                                                    Rectangle {
+                                                        x: Math.max(0px, Math.min(parent.width - self.width, parent.width * root.setting-modal-opacity - self.width / 2));
+                                                        y: (parent.height - self.height) / 2;
+                                                        width: 14px;
+                                                        height: 14px;
+                                                        border-radius: 7px;
+                                                        background: #ffffff;
+                                                        border-width: 2.5px;
+                                                        border-color: AppTheme.accent;
+                                                        drop-shadow-blur: 4px;
+                                                        drop-shadow-color: #00000030;
+                                                    }
+
+                                                    // 交互拦截层：鼠标按下/点击/拖动平滑控制
+                                                    TouchArea {
+                                                        mouse-cursor: pointer;
+                                                        pointer-event(event) => {
+                                                            if event.kind == PointerEventKind.down {
+                                                                let raw_pct: float = self.mouse-x / self.width;
+                                                                let clamped: float = Math.max(0.60, Math.min(1.0, raw_pct));
+                                                                root.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                                                root.change-modal-opacity(root.setting-modal-opacity);
+                                                            }
+                                                        }
+                                                        moved => {
+                                                            if self.pressed {
+                                                                let raw_pct: float = self.mouse-x / self.width;
+                                                                let clamped: float = Math.max(0.60, Math.min(1.0, raw_pct));
+                                                                root.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                                                root.change-modal-opacity(root.setting-modal-opacity);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // 步进增加按钮 +
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-right.svg");
+                                                    clicked => {
+                                                        if root.setting-modal-opacity < 1.0 {
+                                                            root.setting-modal-opacity = Math.min(1.0, Math.round((root.setting-modal-opacity + 0.05) * 100) / 100);
+                                                            root.change-modal-opacity(root.setting-modal-opacity);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 直接数字输入框 (支持直接键入 60~100 或 0.6~1.0)
+                                                Rectangle {
+                                                    width: 58px;
+                                                    height: 24px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: modal-op-input.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 6px;
+                                                        padding-right: 6px;
+                                                        spacing: 2px;
+                                                        alignment: center;
+
+                                                        modal-op-input := TextInput {
+                                                            text: Math.round(root.setting-modal-opacity * 100);
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.accent;
+                                                            horizontal-alignment: center;
+                                                            vertical-alignment: center;
+                                                            single-line: true;
+                                                            accepted => {
+                                                                let raw_val = self.text.to-float();
+                                                                let val = raw_val > 1.0 ? raw_val / 100.0 : raw_val;
+                                                                let clamped = Math.max(0.60, Math.min(1.0, val));
+                                                                root.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                                                root.change-modal-opacity(root.setting-modal-opacity);
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            text: "%";
+                                                            font-size: 10px;
+                                                            color: AppTheme.secondary-foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
                                         // 壁纸图库画廊 (上面标题 下面列表)
                                         SettingsRow {
                                             title: @tr("壁纸图库画廊 (Wallpaper Gallery)");
@@ -2416,14 +2688,14 @@ export component SettingsCenterView inherits Rectangle {
                                 }
 
                                 // ---------------------------------------------------------
-                                // 模块 3: 终端引擎排版 (Terminal)
+                                // 模块 3: 终端首选项 (Terminal Preferences)
                                 // ---------------------------------------------------------
                                 if root.active-category == "terminal": VerticalLayout {
                                     spacing: 16px;
 
                                     SettingsPageHeader {
-                                        title: @tr("终端引擎与排版首选项");
-                                        subtitle: @tr("配置 VT100 字符渲染字模、等宽字体族、光标形态与剪贴板交互行为");
+                                        title: @tr("终端首选项");
+                                        subtitle: @tr("配置 VT100 字符渲染等宽字体族、光标外观交互、高亮诊断规则与会话缓冲区");
                                         icon: @image-url("../assets/icons/terminal.svg");
                                     }
 
@@ -2717,6 +2989,7 @@ export component SettingsCenterView inherits Rectangle {
                                                                 Rectangle {
                                                                     width: 18px;
                                                                     height: 18px;
+                                                                    y: (parent.height - self.height) / 2;
                                                                     border-radius: 9px;
                                                                     background: rule.rule-color;
                                                                     border-width: 1.5px;
@@ -2787,39 +3060,44 @@ export component SettingsCenterView inherits Rectangle {
                                                 padding-right: 18px;
                                                 alignment: space-between;
 
-                                                // 左侧提示说明
-                                                HorizontalLayout {
-                                                    spacing: 8px;
-                                                    alignment: start;
-                                                    Image {
-                                                        source: @image-url("../assets/icons/sparkles.svg");
-                                                        width: 13px;
-                                                        height: 13px;
-                                                        colorize: AppTheme.accent;
-                                                        y: (parent.height - self.height) / 2;
-                                                    }
-                                                    Text {
-                                                        text: @tr("支持根据正则表达式对终端输出中的关键错误、告警与状态实时着色");
-                                                        font-size: 11px;
-                                                        color: AppTheme.secondary-foreground;
-                                                        vertical-alignment: center;
+                                                // 左侧提示说明 (垂直居中)
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    HorizontalLayout {
+                                                        spacing: 8px;
+                                                        alignment: start;
+                                                        Image {
+                                                            source: @image-url("../assets/icons/sparkles.svg");
+                                                            width: 13px;
+                                                            height: 13px;
+                                                            colorize: AppTheme.accent;
+                                                        }
+                                                        Text {
+                                                            text: @tr("支持根据正则表达式对终端输出中的关键错误、告警与状态实时着色");
+                                                            font-size: 11px;
+                                                            color: AppTheme.secondary-foreground;
+                                                            vertical-alignment: center;
+                                                        }
                                                     }
                                                 }
 
-                                                // 右侧打开新建规则弹窗按钮
-                                                AppButton {
-                                                    text: @tr("+ 添加高亮规则");
-                                                    icon: @image-url("../assets/icons/plus.svg");
-                                                    has-icon: true;
-                                                    variant: "primary";
-                                                    clicked => {
-                                                        root.is-editing-keyword-rule = false;
-                                                        root.editing-keyword-rule-id = "";
-                                                        root.new-rule-pattern = "";
-                                                        root.new-rule-remark = "";
-                                                        root.new-rule-color = "#EF4444";
-                                                        root.new-rule-slint-color = #EF4444;
-                                                        root.is-add-keyword-modal-open = true;
+                                                // 右侧打开新建规则弹窗按钮 (垂直居中，单图标)
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    AppButton {
+                                                        text: @tr("添加高亮规则");
+                                                        icon: @image-url("../assets/icons/plus.svg");
+                                                        has-icon: true;
+                                                        variant: "primary";
+                                                        clicked => {
+                                                            root.is-editing-keyword-rule = false;
+                                                            root.editing-keyword-rule-id = "";
+                                                            root.new-rule-pattern = "";
+                                                            root.new-rule-remark = "";
+                                                            root.new-rule-color = "#EF4444";
+                                                            root.new-rule-slint-color = #EF4444;
+                                                            root.is-add-keyword-modal-open = true;
+                                                        }
                                                     }
                                                 }
                                             }
@@ -2986,14 +3264,14 @@ export component SettingsCenterView inherits Rectangle {
                                 }
 
                                 // ---------------------------------------------------------
-                                // 模块 4: 网络与 SSH 策略 (Network)
+                                // 模块 4: 网络连接与代理 (Network & Proxy Connections)
                                 // ---------------------------------------------------------
                                 if root.active-category == "network": VerticalLayout {
                                     spacing: 16px;
 
                                     SettingsPageHeader {
-                                        title: @tr("网络传输与 SSH 链路策略");
-                                        subtitle: @tr("配置默认出站网络代理、TCP 握手保活、数据流压缩与异常恢复算法");
+                                        title: @tr("网络连接与代理");
+                                        subtitle: @tr("配置默认出站网络代理、SSH 握手超时、Keepalive 心跳保活与数据流压缩");
                                         icon: @image-url("../assets/icons/tunnel.svg");
                                     }
 
@@ -3064,18 +3342,26 @@ export component SettingsCenterView inherits Rectangle {
                                                 border-width: 1px;
                                                 border-color: proxy-inp.has-focus ? AppTheme.accent : AppTheme.border;
 
+                                                TouchArea {
+                                                    clicked => { proxy-inp.focus(); }
+                                                    mouse-cursor: text;
+                                                }
+
                                                 HorizontalLayout {
+                                                    height: 100%;
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    alignment: center;
                                                     proxy-inp := TextInput {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        vertical-alignment: center;
                                                         text <=> root.setting-global-proxy-server;
                                                         font-size: 11px;
                                                         font-family: "JetBrains Mono, monospace";
                                                         color: AppTheme.foreground;
                                                         single-line: true;
-                                                        edited => {
-                                                            root.change-global-proxy(root.setting-global-proxy-mode, self.text, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
+                                                        accepted => {
+                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
                                                         }
                                                     }
                                                 }
@@ -3090,7 +3376,6 @@ export component SettingsCenterView inherits Rectangle {
                                                 checked: root.setting-global-proxy-auth;
                                                 toggled(c) => {
                                                     root.setting-global-proxy-auth = c;
-                                                    root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, c, root.setting-global-proxy-user, root.setting-global-proxy-pass);
                                                 }
                                             }
                                         }
@@ -3107,17 +3392,25 @@ export component SettingsCenterView inherits Rectangle {
                                                 border-width: 1px;
                                                 border-color: pu-inp.has-focus ? AppTheme.accent : AppTheme.border;
 
+                                                TouchArea {
+                                                    clicked => { pu-inp.focus(); }
+                                                    mouse-cursor: text;
+                                                }
+
                                                 HorizontalLayout {
+                                                    height: 100%;
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    alignment: center;
                                                     pu-inp := TextInput {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        vertical-alignment: center;
                                                         text <=> root.setting-global-proxy-user;
                                                         font-size: 11px;
                                                         color: AppTheme.foreground;
                                                         single-line: true;
-                                                        edited => {
-                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, self.text, root.setting-global-proxy-pass);
+                                                        accepted => {
+                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
                                                         }
                                                     }
                                                 }
@@ -3136,19 +3429,43 @@ export component SettingsCenterView inherits Rectangle {
                                                 border-width: 1px;
                                                 border-color: pp-inp.has-focus ? AppTheme.accent : AppTheme.border;
 
+                                                TouchArea {
+                                                    clicked => { pp-inp.focus(); }
+                                                    mouse-cursor: text;
+                                                }
+
                                                 HorizontalLayout {
+                                                    height: 100%;
                                                     padding-left: 8px;
                                                     padding-right: 8px;
-                                                    alignment: center;
                                                     pp-inp := TextInput {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        vertical-alignment: center;
                                                         text <=> root.setting-global-proxy-pass;
                                                         font-size: 11px;
                                                         color: AppTheme.foreground;
                                                         single-line: true;
-                                                        edited => {
-                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, self.text);
+                                                        accepted => {
+                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
                                                         }
                                                     }
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-global-proxy-mode == "custom": SettingsRow {
+                                            title: @tr("应用代理设置 (Apply Proxy Settings)");
+                                            subtitle: @tr("保存并立即应用自定义代理配置 (亦可在输入框直接按回车保存)");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("保存代理配置");
+                                                icon: @image-url("../assets/icons/check.svg");
+                                                has-icon: true;
+                                                variant: "primary";
+                                                clicked => {
+                                                    root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
                                                 }
                                             }
                                         }
@@ -3170,19 +3487,160 @@ export component SettingsCenterView inherits Rectangle {
                                         SettingsRow {
                                             title: @tr("SSH 连接超时时间 (Connection Timeout)");
                                             subtitle: @tr("在发起 SSH 握手或 TCP 套接字建立时的最大等待时限 (秒)");
-                                            Text { text: root.setting-connect-timeout + " " + @tr("秒 (默认 30s)"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-connect-timeout > 5 {
+                                                            root.setting-connect-timeout -= 5;
+                                                            root.change-network-handshake(root.setting-connect-timeout, root.setting-keepalive-interval, root.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 68px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: root.setting-connect-timeout + " " + @tr("秒");
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-connect-timeout < 300 {
+                                                            root.setting-connect-timeout += 5;
+                                                            root.change-network-handshake(root.setting-connect-timeout, root.setting-keepalive-interval, root.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         SettingsRow {
                                             title: @tr("TCP 心跳保活探测间隔 (ServerAliveInterval)");
-                                            subtitle: @tr("向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开");
-                                            Text { text: @tr("每") + " " + root.setting-keepalive-interval + " " + @tr("秒发送一次保活包"); font-size: 11px; font-weight: 600; color: AppTheme.accent; }
+                                            subtitle: @tr("向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开 (0 为禁用)");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-keepalive-interval >= 5 {
+                                                            root.setting-keepalive-interval -= 5;
+                                                            root.change-network-handshake(root.setting-connect-timeout, root.setting-keepalive-interval, root.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 78px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: root.setting-keepalive-interval == 0 ? @tr("已禁用") : (root.setting-keepalive-interval + " " + @tr("秒"));
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: root.setting-keepalive-interval == 0 ? AppTheme.secondary-foreground : AppTheme.accent;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-keepalive-interval < 300 {
+                                                            root.setting-keepalive-interval += 5;
+                                                            root.change-network-handshake(root.setting-connect-timeout, root.setting-keepalive-interval, root.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         SettingsRow {
                                             title: @tr("心跳保活最大丢失阈值 (ServerAliveCountMax)");
                                             subtitle: @tr("若连续发送心跳探测均未得到服务器响应，判定链路断开的连续重试次数");
-                                            Text { text: root.setting-keepalive-count-max + " " + @tr("次无响应判定断开"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-keepalive-count-max > 1 {
+                                                            root.setting-keepalive-count-max -= 1;
+                                                            root.change-network-handshake(root.setting-connect-timeout, root.setting-keepalive-interval, root.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 58px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: root.setting-keepalive-count-max + " " + @tr("次");
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-keepalive-count-max < 20 {
+                                                            root.setting-keepalive-count-max += 1;
+                                                            root.change-network-handshake(root.setting-connect-timeout, root.setting-keepalive-interval, root.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         SettingsRow {
@@ -3191,7 +3649,10 @@ export component SettingsCenterView inherits Rectangle {
                                             show-border: false;
                                             SettingsSwitch {
                                                 checked: root.setting-tcp-nodelay;
-                                                toggled(c) => { root.setting-tcp-nodelay = c; }
+                                                toggled(c) => {
+                                                    root.setting-tcp-nodelay = c;
+                                                    root.change-tcp-nodelay(c);
+                                                }
                                             }
                                         }
                                     }
@@ -3227,7 +3688,10 @@ export component SettingsCenterView inherits Rectangle {
                                                         animate background { duration: 120ms; }
 
                                                         hk-t := TouchArea {
-                                                            clicked => { root.setting-host-key-policy = hk.id; }
+                                                            clicked => {
+                                                                root.setting-host-key-policy = hk.id;
+                                                                root.change-host-key-policy(hk.id);
+                                                            }
                                                             mouse-cursor: pointer;
                                                         }
 
@@ -3290,42 +3754,404 @@ export component SettingsCenterView inherits Rectangle {
                                     spacing: 16px;
 
                                     SettingsPageHeader {
-                                        title: @tr("文件传输与 SFTP 偏好");
-                                        subtitle: @tr("管理远程 SFTP 浏览器下载路径、隐藏文件展示与传输并发数");
+                                        title: @tr("传输与文件管理");
+                                        subtitle: @tr("管理远程 SFTP 浏览器下载路径、文件传输冲突策略、并发协程与外部编辑器");
                                         icon: @image-url("../assets/icons/folder.svg");
                                     }
 
+                                    // 卡片 1: 路径与文件浏览器视口
                                     SettingsSectionCard {
-                                        title: @tr("目录路径与文件树视图");
-                                        subtitle: @tr("本地下载存储位置与隐藏点文件显隐过滤");
+                                        title: @tr("路径导航与文件浏览器视口");
+                                        subtitle: @tr("本地下载存储位置、远程初始目录与隐藏文件显隐过滤");
                                         icon: @image-url("../assets/icons/folder.svg");
 
                                         SettingsRow {
                                             title: @tr("默认本地下载目录 (Default Download Dir)");
                                             subtitle: @tr("从远程 SFTP 下载文件时默认保存的本地文件夹路径");
-                                            Text { text: @tr("系统默认下载目录 (~/Downloads)"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; }
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                Text {
+                                                    text: root.setting-sftp-default-local;
+                                                    font-size: 11px;
+                                                    font-weight: 600;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                                AppButton {
+                                                    text: @tr("浏览选择...");
+                                                    variant: "secondary";
+                                                    clicked => { }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("默认远程初始工作目录 (Default Remote Dir)");
+                                            subtitle: @tr("建立 SFTP 会话时初始打开的远程路径 (如 ~ 用户主目录或 / 根路径)");
+
+                                            Rectangle {
+                                                width: 160px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> root.setting-sftp-default-remote;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
                                         }
 
                                         SettingsRow {
                                             title: @tr("显示隐藏文件与点文件 (Show Hidden Files)");
-                                            subtitle: @tr("在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc)");
+                                            subtitle: @tr("在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc, .env)");
+                                            SettingsSwitch {
+                                                checked <=> root.setting-sftp-show-hidden;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("删除远程文件二次安全确认 (Confirm Deletion)");
+                                            subtitle: @tr("在远程服务器上删除文件或目录前弹出模态弹窗二次核验，防止误操作");
                                             show-border: false;
                                             SettingsSwitch {
-                                                checked: true;
+                                                checked <=> root.setting-sftp-confirm-delete;
                                             }
                                         }
                                     }
 
+                                    // 卡片 2: 传输引擎与冲突策略
                                     SettingsSectionCard {
-                                        title: @tr("传输性能与工作协程");
-                                        subtitle: @tr("多文件批量上传与下载时的并行工作协程数");
+                                        title: @tr("传输引擎与冲突策略");
+                                        subtitle: @tr("同名文件传输冲突解决、大文件断点续传与 POSIX 权限保留");
+                                        icon: @image-url("../assets/icons/refresh.svg");
+
+                                        SettingsRow {
+                                            title: @tr("文件存在重名冲突策略 (Conflict Resolution)");
+                                            subtitle: @tr("当目标目录已存在同名文件时的默认处理规则");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for pol in [
+                                                        { id: "ask", name: @tr("每次询问 (ask)") },
+                                                        { id: "overwrite", name: @tr("覆盖 (overwrite)") },
+                                                        { id: "skip", name: @tr("跳过 (skip)") },
+                                                        { id: "rename", name: @tr("自动重命名 (rename)") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-sftp-conflict-policy == pol.id ? AppTheme.accent : pol-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        pol-t := TouchArea {
+                                                            clicked => { root.setting-sftp-conflict-policy = pol.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: pol.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-sftp-conflict-policy == pol.id ? 700 : 500;
+                                                                color: root.setting-sftp-conflict-policy == pol.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("大文件断点续传支持 (Resume Interrupted Transfers)");
+                                            subtitle: @tr("网络中断或任务暂停后自动从断点位置恢复传输，避免大文件重传");
+                                            SettingsSwitch {
+                                                checked <=> root.setting-sftp-resume;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("保留原始文件属性 (Preserve Attributes & Timestamps)");
+                                            subtitle: @tr("传输时尽可能保留文件的原始 POSIX 读写执行权限与修改时间戳 (mtime/atime)");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked <=> root.setting-sftp-preserve-attributes;
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 并发与带宽流量控制
+                                    SettingsSectionCard {
+                                        title: @tr("并发性能与带宽流量控制");
+                                        subtitle: @tr("多任务并行工作协程数与单任务上下行传输速率限制");
                                         icon: @image-url("../assets/icons/settings.svg");
 
                                         SettingsRow {
-                                            title: @tr("SFTP 文件传输并发连接数 (Transfer Concurrency)");
-                                            subtitle: @tr("多文件批量上传与下载时的并行工作协程数");
+                                            title: @tr("SFTP 最大并发传输连接数 (Transfer Concurrency)");
+                                            subtitle: @tr("多文件批量上传与下载时的并行工作协程数 (范围 1 ~ 16，默认 4)");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-sftp-concurrency > 1 {
+                                                            root.setting-sftp-concurrency = root.setting-sftp-concurrency - 1;
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 48px;
+                                                    height: 26px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    Text {
+                                                        text: root.setting-sftp-concurrency;
+                                                        font-size: 12px;
+                                                        font-weight: 700;
+                                                        color: AppTheme.foreground;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if root.setting-sftp-concurrency < 16 {
+                                                            root.setting-sftp-concurrency = root.setting-sftp-concurrency + 1;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("单任务上传速率限制 (Upload Speed Limit)");
+                                            subtitle: @tr("限制单任务上传带宽，避免占满网络上行导致其他终端交互卡顿");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for lim in [
+                                                        { id: "unlimited", name: @tr("不限速") },
+                                                        { id: "1mb", name: "1 MB/s" },
+                                                        { id: "5mb", name: "5 MB/s" },
+                                                        { id: "10mb", name: "10 MB/s" }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-sftp-upload-limit == lim.id ? AppTheme.accent : ul-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        ul-t := TouchArea {
+                                                            clicked => { root.setting-sftp-upload-limit = lim.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: lim.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-sftp-upload-limit == lim.id ? 700 : 500;
+                                                                color: root.setting-sftp-upload-limit == lim.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("单任务下载速率限制 (Download Speed Limit)");
+                                            subtitle: @tr("限制单任务下载带宽，保证网络均衡");
                                             show-border: false;
-                                            Text { text: "4 " + @tr("并发线程"); font-size: 11px; font-weight: 600; color: AppTheme.accent; }
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for lim in [
+                                                        { id: "unlimited", name: @tr("不限速") },
+                                                        { id: "2mb", name: "2 MB/s" },
+                                                        { id: "10mb", name: "10 MB/s" },
+                                                        { id: "20mb", name: "20 MB/s" }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-sftp-download-limit == lim.id ? AppTheme.accent : dl-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        dl-t := TouchArea {
+                                                            clicked => { root.setting-sftp-download-limit = lim.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: lim.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-sftp-download-limit == lim.id ? 700 : 500;
+                                                                color: root.setting-sftp-download-limit == lim.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 4: 外部编辑器与传输排除规则
+                                    SettingsSectionCard {
+                                        title: @tr("外部编辑器与过滤排除规则");
+                                        subtitle: @tr("远程文件双击打开方式、外部自定义编辑器与同步忽略规则黑名单");
+                                        icon: @image-url("../assets/icons/file-text.svg");
+
+                                        SettingsRow {
+                                            title: @tr("远程文件双击打开方式 (Remote File Editor)");
+                                            subtitle: @tr("选择使用客户端内置轻量编辑器、系统默认程序关联或外部命令行程序");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for ed in [
+                                                        { id: "builtin", name: @tr("内置编辑器") },
+                                                        { id: "system", name: @tr("系统默认程序") },
+                                                        { id: "custom", name: @tr("自定义程序") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-sftp-editor-mode == ed.id ? AppTheme.accent : ed-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        ed-t := TouchArea {
+                                                            clicked => { root.setting-sftp-editor-mode = ed.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: ed.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-sftp-editor-mode == ed.id ? 700 : 500;
+                                                                color: root.setting-sftp-editor-mode == ed.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-sftp-editor-mode == "custom": SettingsRow {
+                                            title: @tr("自定义外部编辑器程序路径 (Editor Executable)");
+                                            subtitle: @tr("输入外部程序执行命令 (如 code, notepad++, subl 或完整路径)");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> root.setting-sftp-custom-editor;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("传输忽略规则黑名单 (Exclusion Patterns)");
+                                            subtitle: @tr("目录传输时忽略的文件或文件夹 (逗号分隔，如 .git, node_modules, *.tmp)");
+                                            show-border: false;
+
+                                            Rectangle {
+                                                width: 320px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> root.setting-sftp-exclude-patterns;
+                                                    font-size: 10px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
                                         }
                                     }
                                 }
@@ -3369,20 +4195,20 @@ export component SettingsCenterView inherits Rectangle {
                                     spacing: 16px;
 
                                     SettingsPageHeader {
-                                        title: @tr("数据备份、导入与跨工具迁移");
-                                        subtitle: @tr("导出完整加密备份包、从系统 OpenSSH 与第三方终端工具一键导入资产、管理本地配置历史快照");
+                                        title: @tr("数据备份、跨工具迁移与多端云同步");
+                                        subtitle: @tr("本地全量加密备份/还原、多端云同步 (WebDAV / Amazon S3 / GitHub Gist / 自建服务器) 与配置快照历史");
                                         icon: @image-url("../assets/icons/archive.svg");
                                     }
 
+                                    // 卡片 1: 本地全量加密备份与恢复
                                     SettingsSectionCard {
-                                        title: @tr("全量加密数据备份");
-                                        subtitle: @tr("导出所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
+                                        title: @tr("本地全量加密备份与快速还原");
+                                        subtitle: @tr("导出或导入所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
                                         icon: @image-url("../assets/icons/archive.svg");
 
                                         SettingsRow {
-                                            title: @tr("⤓ 导出全量加密备份文件 (.toml / .json)");
-                                            subtitle: @tr("包含所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
-                                            show-border: false;
+                                            title: @tr("⤓ 导出全量加密备份文件 (.smalux / .json)");
+                                            subtitle: @tr("打包所有资产与偏好设置，数据经客户端端到端高强度加密保护");
 
                                             AppButton {
                                                 text: @tr("⤓ 立即导出备份包");
@@ -3390,8 +4216,551 @@ export component SettingsCenterView inherits Rectangle {
                                                 clicked => { root.export-backup-archive(true); }
                                             }
                                         }
+
+                                        SettingsRow {
+                                            title: @tr("⤒ 从本地加密备份包还原资产 (Restore Backup)");
+                                            subtitle: @tr("选择本机已导出的 .smalux 备份文件，输入解密口令无损恢复全部资产");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("⤒ 选择文件还原...");
+                                                variant: "secondary";
+                                                clicked => { root.import-external-file(); }
+                                            }
+                                        }
                                     }
 
+                                    // 卡片 2: 多端多协议云同步矩阵 (WebDAV / S3 / Gist / 自建服务器)
+                                    SettingsSectionCard {
+                                        title: @tr("多端多协议云同步矩阵 (Cloud Sync Matrix)");
+                                        subtitle: @tr("支持 WebDAV (坚果云/NAS)、Amazon S3 兼容对象存储、GitHub Gist 以及自建同步服务");
+                                        icon: @image-url("../assets/icons/server.svg");
+
+                                        // 协议切换选择器
+                                        SettingsRow {
+                                            title: @tr("云同步后端协议 (Cloud Sync Backend)");
+                                            subtitle: @tr("选择用于存储和同步资产数据的远端提供商或自建服务");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for bk in [
+                                                        { id: "off", name: @tr("关闭云同步") },
+                                                        { id: "webdav", name: "WebDAV" },
+                                                        { id: "s3", name: "Amazon S3" },
+                                                        { id: "gist", name: "GitHub Gist" },
+                                                        { id: "custom", name: @tr("自建备份服务 ★") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-cloud-sync-backend == bk.id ? AppTheme.accent : bk-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        bk-t := TouchArea {
+                                                            clicked => { root.setting-cloud-sync-backend = bk.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: bk.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-cloud-sync-backend == bk.id ? 700 : 500;
+                                                                color: root.setting-cloud-sync-backend == bk.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // WebDAV 配置项
+                                        if root.setting-cloud-sync-backend == "webdav": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("WebDAV 服务器地址 (Server URL)");
+                                                subtitle: @tr("如 https://dav.jianguoyun.com/dav/ 或群晖 NAS WebDAV 端点");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-webdav-url;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("WebDAV 账户名 (Username)");
+                                                subtitle: @tr("登录 WebDAV 服务的用户名或邮箱");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-webdav-user;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("WebDAV 访问密码 / 应用令牌 (App Password)");
+                                                subtitle: @tr("建议使用应用专用独立密码 (App Specific Password)");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-webdav-pass;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("远程备份子目录 (Remote Directory)");
+                                                subtitle: @tr("在 WebDAV 根目录下存放备份的文件夹 (默认 /smalux_backup)");
+                                                Rectangle {
+                                                    width: 200px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-webdav-dir;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // S3 配置项
+                                        if root.setting-cloud-sync-backend == "s3": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("S3 Endpoint 节点地址 (Custom Endpoint)");
+                                                subtitle: @tr("留空为 AWS 标准 S3；MinIO / Cloudflare R2 / 阿里云 OSS 请填对应完整 URL");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-s3-endpoint;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("S3 存储桶名称 (Bucket Name)");
+                                                subtitle: @tr("用于存放加密备份的 S3 Bucket 名称");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-s3-bucket;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("Access Key ID");
+                                                subtitle: @tr("S3 访问密钥 ID");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-s3-key-id;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("Secret Access Key");
+                                                subtitle: @tr("S3 私密访问密钥");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-s3-access-key;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("存储区域 Region");
+                                                subtitle: @tr("S3 Bucket 所在地域 (如 us-east-1, auto, ap-northeast-1)");
+                                                Rectangle {
+                                                    width: 160px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-s3-region;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // GitHub Gist 配置项
+                                        if root.setting-cloud-sync-backend == "gist": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("GitHub 个人访问令牌 (Personal Access Token)");
+                                                subtitle: @tr("需具备 gist 权限的 GitHub PAT 访问令牌 (ghp_xxx)");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-gist-token;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("Gist ID (可选)");
+                                                subtitle: @tr("已有私有 Gist 的哈希 ID；留空将在首次同步时自动创建专用私有 Gist");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-gist-id;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // 自建备份服务接口配置项 ★
+                                        if root.setting-cloud-sync-backend == "custom": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("自建备份服务器 API 端点 (Server Endpoint URL)");
+                                                subtitle: @tr("兼容 Smalux Backup API 标准 REST 端点 (如 https://api.smalux.internal/v1/sync)");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-custom-sync-url;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("认证令牌 (Bearer Auth Token / API Key)");
+                                                subtitle: @tr("自建备份服务端用于鉴权与租户隔离的 Bearer Token");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-custom-sync-token;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("设备客户端标识 (Client Identifier)");
+                                                subtitle: @tr("当前设备的唯一标识符，用于服务端多端冲突检测 (如 desktop-win-01)");
+                                                Rectangle {
+                                                    width: 200px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> root.setting-custom-sync-client-id;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // 云同步操作按钮组
+                                        if root.setting-cloud-sync-backend != "off": SettingsRow {
+                                            title: @tr("云端同步操作与连通性检测");
+                                            subtitle: @tr("测试远端连接、立即双向同步或从云端拉取覆盖本地");
+                                            show-border: false;
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: end;
+
+                                                AppButton {
+                                                    text: @tr("⚡ 测试连通性");
+                                                    variant: "secondary";
+                                                    clicked => { }
+                                                }
+
+                                                AppButton {
+                                                    text: @tr("☁️ 立即同步");
+                                                    variant: "primary";
+                                                    clicked => { }
+                                                }
+
+                                                AppButton {
+                                                    text: @tr("⬇️ 从云端拉取覆盖");
+                                                    variant: "secondary";
+                                                    clicked => { }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 云同步安全与自动同步计划
+                                    if root.setting-cloud-sync-backend != "off": SettingsSectionCard {
+                                        title: @tr("端到端加密与自动同步策略");
+                                        subtitle: @tr("客户端全量加密主密钥 (E2EE) 与自动化定时增量同步");
+                                        icon: @image-url("../assets/icons/shield.svg");
+
+                                        SettingsRow {
+                                            title: @tr("端到端客户端加密口令 (E2EE Master Key)");
+                                            subtitle: @tr("数据在离开本地前全量 AES-256 加密，第三方对象存储或 Gist 无法读取明文");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> root.setting-cloud-e2ee-pass;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("自动同步调度频率 (Sync Schedule)");
+                                            subtitle: @tr("设置自动化定时后台增量同步计划");
+                                            show-border: false;
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for iv in [
+                                                        { id: "manual", name: @tr("手动同步") },
+                                                        { id: "startup", name: @tr("启动与关闭时") },
+                                                        { id: "1h", name: @tr("每小时") },
+                                                        { id: "daily", name: @tr("每天") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-cloud-sync-interval == iv.id ? AppTheme.accent : iv-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        iv-t := TouchArea {
+                                                            clicked => { root.setting-cloud-sync-interval = iv.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: iv.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-cloud-sync-interval == iv.id ? 700 : 500;
+                                                                color: root.setting-cloud-sync-interval == iv.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 4: 外部配置资产导入与迁移
                                     SettingsSectionCard {
                                         title: @tr("外部配置资产导入与迁移");
                                         subtitle: @tr("从本机系统 OpenSSH 或其他桌面终端软件批量导入资产");
@@ -3421,6 +4790,7 @@ export component SettingsCenterView inherits Rectangle {
                                         }
                                     }
 
+                                    // 卡片 5: 本地配置自动快照历史
                                     SettingsSectionCard {
                                         title: @tr("本地配置自动快照历史");
                                         subtitle: @tr("应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚");
@@ -3473,35 +4843,175 @@ export component SettingsCenterView inherits Rectangle {
 
                                     SettingsPageHeader {
                                         title: @tr("安全隐私与开发者诊断");
-                                        subtitle: @tr("本地凭据加密主密码、F12 开发者调试控制台入口与运行时诊断日志级别");
+                                        subtitle: @tr("本地主密码保护、凭据保险箱、剪贴板自动清空、会话审计与开发者诊断");
                                         icon: @image-url("../assets/icons/shield.svg");
                                     }
 
+                                    // 卡片 1: 本地主密码加密与保险箱安全
                                     SettingsSectionCard {
-                                        title: @tr("本地凭据保险箱加密");
-                                        subtitle: @tr("使用主控密码对本地私钥与密码执行 AES-256 高强度加密保护");
+                                        title: @tr("本地凭据保险箱与主密码安全");
+                                        subtitle: @tr("使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护");
                                         icon: @image-url("../assets/icons/shield.svg");
 
                                         SettingsRow {
-                                            title: @tr("本地凭据主密码保护 (Master Password)");
-                                            subtitle: @tr("使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护");
+                                            title: @tr("启用本地凭据主密码保护 (Master Password)");
+                                            subtitle: @tr("开启后，所有 SSH 私钥与连接密码将使用 Argon2id 派生密钥进行高强度 AES-256 加密");
+
+                                            HorizontalLayout {
+                                                spacing: 10px;
+                                                alignment: center;
+
+                                                if root.setting-master-password-enabled: Text {
+                                                    text: @tr("已受主密码保护 (AES-256)");
+                                                    font-size: 10px;
+                                                    color: #10B981;
+                                                    font-weight: 600;
+                                                    vertical-alignment: center;
+                                                }
+
+                                                SettingsSwitch {
+                                                    checked: root.setting-master-password-enabled;
+                                                    toggled(c) => {
+                                                        if c && !root.setting-master-password-enabled {
+                                                            root.is-master-pwd-modal-open = true;
+                                                            root.master-pwd-old = "";
+                                                            root.master-pwd-new = "";
+                                                            root.master-pwd-confirm = "";
+                                                            root.master-pwd-error-msg = "";
+                                                        } else if !c {
+                                                            root.setting-master-password-enabled = false;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-master-password-enabled: SettingsRow {
+                                            title: @tr("主密码管理 (Manage Master Password)");
+                                            subtitle: @tr("随时验证旧密码并更新客户端主密码");
+
+                                            AppButton {
+                                                text: @tr("🔑 修改主密码...");
+                                                variant: "secondary";
+                                                clicked => {
+                                                    root.is-master-pwd-modal-open = true;
+                                                    root.master-pwd-old = "";
+                                                    root.master-pwd-new = "";
+                                                    root.master-pwd-confirm = "";
+                                                    root.master-pwd-error-msg = "";
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("空闲自动锁定超时 (Auto-lock Timeout)");
+                                            subtitle: @tr("当客户端处于闲置无操作状态达设定时间后，自动锁定凭据保险箱");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for lk in [
+                                                        { id: "never", name: @tr("从不") },
+                                                        { id: "5m", name: "5 " + @tr("分钟") },
+                                                        { id: "15m", name: "15 " + @tr("分钟") },
+                                                        { id: "30m", name: "30 " + @tr("分钟") },
+                                                        { id: "1h", name: "1 " + @tr("小时") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-auto-lock-timeout == lk.id ? AppTheme.accent : lk-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        lk-t := TouchArea {
+                                                            clicked => { root.setting-auto-lock-timeout = lk.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: lk.name;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-auto-lock-timeout == lk.id ? 700 : 500;
+                                                                color: root.setting-auto-lock-timeout == lk.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("Windows Hello / 生物识别快捷解锁 (Biometric Unlock)");
+                                            subtitle: @tr("允许首次通过主密码解锁后，使用系统指纹或面容识别快捷解锁");
+                                            SettingsSwitch {
+                                                checked <=> root.setting-biometric-unlock;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("窗口最小化或退出时立即锁定 (Lock on Minimize)");
+                                            subtitle: @tr("将客户端最小化到系统托盘或切出后台时立即清除内存派生密钥");
                                             show-border: false;
                                             SettingsSwitch {
-                                                checked: root.setting-master-password-enabled;
-                                                toggled(c) => { root.setting-master-password-enabled = c; }
+                                                checked <=> root.setting-lock-on-minimize;
                                             }
                                         }
                                     }
 
+                                    // 卡片 2: 剪贴板与会话操作安全防护
                                     SettingsSectionCard {
-                                        title: @tr("开发者控制台与运行时诊断");
-                                        subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
-                                        icon: @image-url("../assets/icons/settings.svg");
+                                        title: @tr("剪贴板与操作安全防护");
+                                        subtitle: @tr("敏感凭据自动清除、高危破坏性指令预警与会话审计日志");
+                                        icon: @image-url("../assets/icons/shield.svg");
 
                                         SettingsRow {
-                                            title: @tr("🛠️ 开发者调试控制台 (Developer Debug Panel)");
-                                            subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
+                                            title: @tr("敏感剪贴板自动清除 (Clear Clipboard Timeout)");
+                                            subtitle: @tr("从凭据库或终端复制密码/私钥 30 秒后自动清空系统剪贴板，防止恶意窥探");
+                                            SettingsSwitch {
+                                                checked <=> root.setting-clear-clipboard-timeout;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("高危破坏性指令执行预警 (Dangerous Command Warning)");
+                                            subtitle: @tr("在终端中输入 rm -rf, mkfs, reboot, fdisk 等危险命令时突出高亮警示");
+                                            SettingsSwitch {
+                                                checked <=> root.setting-confirm-dangerous-commands;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("会话操作安全审计日志 (Session Audit Logging)");
+                                            subtitle: @tr("在本地安全加密记录所有终端连接历史、高危操作命令时间戳与审计踪迹");
                                             show-border: false;
+                                            SettingsSwitch {
+                                                checked <=> root.setting-session-audit-logging;
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 开发者控制台与底层诊断 (原通用迁移合并)
+                                    SettingsSectionCard {
+                                        title: @tr("开发者控制台与底层诊断");
+                                        subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
+                                        icon: @image-url("../assets/icons/bug.svg");
+
+                                        SettingsRow {
+                                            has-icon: true;
+                                            icon: @image-url("../assets/icons/bug.svg");
+                                            title: @tr("开发者调试模式 (Developer Debug Mode)");
+                                            subtitle: @tr("开启开发者调试控制台 (F12) 与左侧活动栏诊断入口；关闭时仅隐藏调试入口，内部已配参数保持生效");
                                             SettingsSwitch {
                                                 checked: root.setting-debug-enabled;
                                                 toggled(c) => {
@@ -3510,8 +5020,60 @@ export component SettingsCenterView inherits Rectangle {
                                                 }
                                             }
                                         }
+
+                                        SettingsRow {
+                                            title: @tr("全局运行时日志输出等级 (Log Level Filter)");
+                                            subtitle: @tr("过滤全局 tracing 诊断日志输出阈值 (排查问题时建议设为 DEBUG)");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for lv in ["DEBUG", "INFO", "WARN", "ERROR"]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: root.setting-log-level == lv ? AppTheme.accent : lv-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        lv-t := TouchArea {
+                                                            clicked => { root.setting-log-level = lv; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: lv;
+                                                                font-size: 10px;
+                                                                font-weight: root.setting-log-level == lv ? 700 : 500;
+                                                                color: root.setting-log-level == lv ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("运行时日志自动滚动通道 (Auto-scroll Log Channel)");
+                                            subtitle: @tr("当打开调试面板时实时保持最新日志自动滚动置底");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked <=> root.setting-debug-log-channel;
+                                            }
+                                        }
                                     }
 
+                                    // 卡片 4: 危险区域 (Danger Zone)
                                     SettingsSectionCard {
                                         title: @tr("危险区域 (Danger Zone)");
                                         subtitle: @tr("重置本地偏好设置与清除临时状态（不会删除已保存的主机资产）");
@@ -3778,6 +5340,7 @@ export component SettingsCenterView inherits Rectangle {
                         }
 
                         HorizontalLayout {
+                            height: 32px;
                             spacing: 12px;
                             alignment: start;
 
@@ -3795,15 +5358,17 @@ export component SettingsCenterView inherits Rectangle {
                                 }
 
                                 HorizontalLayout {
+                                    height: 100%;
                                     padding-left: 10px;
                                     padding-right: 12px;
                                     spacing: 8px;
                                     alignment: center;
 
-                                    // 纯圆形高亮颜色预览
+                                    // 纯圆形高亮颜色预览 (垂直居中)
                                     Rectangle {
                                         width: 18px;
                                         height: 18px;
+                                        y: (parent.height - self.height) / 2;
                                         border-radius: 9px;
                                         background: root.new-rule-slint-color;
                                         border-width: 1.5px;
@@ -3823,11 +5388,15 @@ export component SettingsCenterView inherits Rectangle {
                                 }
                             }
 
-                            // 调色盘取色器按钮 (打开色相圆盘取色器)
-                            AppButton {
-                                text: @tr("🎨 色相圆盘取色器...");
-                                variant: "secondary";
-                                clicked => { root.open-keyword-color-wheel(); }
+                            // 调色盘取色器按钮 (打开色相圆盘取色器，垂直居中)
+                            VerticalLayout {
+                                height: 32px;
+                                alignment: center;
+                                AppButton {
+                                    text: @tr("🎨 色相圆盘取色器...");
+                                    variant: "secondary";
+                                    clicked => { root.open-keyword-color-wheel(); }
+                                }
                             }
                         }
                     }
@@ -3882,9 +5451,12 @@ export component SettingsCenterView inherits Rectangle {
     // 🎨 共享色相圆盘取色器弹窗 (ColorWheelPickerModal)
     // =========================================================================
     ColorWheelPickerModal {
+        width: 100%;
+        height: 100%;
+        z: 2000;
         is-open: root.is-keyword-color-wheel-open;
         title: @tr("高亮色彩取色器 · 色相圆盘");
-        hex-value: root.color-picker-hex;
+        hex-value <=> root.color-picker-hex;
         preview-brush: root.color-picker-preview-brush;
         indicator-x: root.color-picker-indicator-x;
         indicator-y: root.color-picker-indicator-y;
@@ -3903,6 +5475,233 @@ export component SettingsCenterView inherits Rectangle {
 
         close => {
             root.is-keyword-color-wheel-open = false;
+        }
+    }
+
+    // =========================================================================
+    // 🔑 主密码设置与修改模态弹窗 (Master Password Modal)
+    // =========================================================================
+    if root.is-master-pwd-modal-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6;
+        z: 1500;
+
+        TouchArea {
+            clicked => { root.is-master-pwd-modal-open = false; }
+        }
+
+        Rectangle {
+            width: 460px;
+            height: root.setting-master-password-enabled ? 370px : 320px;
+            background: AppTheme.modal-background;
+            border-radius: AppTheme.radius-large;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: 8px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            TouchArea { /* 阻止冒泡关闭 */ }
+
+            VerticalLayout {
+                padding: 22px;
+                spacing: 14px;
+
+                // 标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: center;
+                        Image {
+                            source: @image-url("../assets/icons/shield.svg");
+                            width: 18px;
+                            height: 18px;
+                            colorize: AppTheme.accent;
+                        }
+                        Text {
+                            text: root.setting-master-password-enabled ? @tr("修改主密码 (Change Master Password)") : @tr("启用并设置主密码 (Set Master Password)");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: close-pwd-t.has-hover ? AppTheme.hover-background : transparent;
+                        close-pwd-t := TouchArea {
+                            clicked => { root.is-master-pwd-modal-open = false; }
+                            mouse-cursor: pointer;
+                        }
+                        Text {
+                            text: "✕";
+                            font-size: 12px;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+
+                // 说明文本
+                Text {
+                    text: @tr("主密码用于生成 Argon2id 派生密钥，对存储在本地的所有 SSH 私钥、主机登录凭据进行全量 AES-256 加密。应用不存储明文且不支持找回，请务必妥善牢记！");
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                    wrap: word-wrap;
+                }
+
+                // 输入表单
+                VerticalLayout {
+                    spacing: 10px;
+
+                    // 若已开启，需输入旧密码
+                    if root.setting-master-password-enabled: HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Text {
+                            text: @tr("当前旧密码:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                text <=> root.master-pwd-old;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+        }
+    }
+                        }
+                    }
+
+                    // 新密码
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Text {
+                            text: @tr("新主密码:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                text <=> root.master-pwd-new;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+        }
+    }
+                        }
+                    }
+
+                    // 确认新密码
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Text {
+                            text: @tr("确认新密码:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                text <=> root.master-pwd-confirm;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+        }
+    }
+                        }
+                    }
+
+                    // 错误提示
+                    if root.master-pwd-error-msg != "": Text {
+                        text: root.master-pwd-error-msg;
+                        font-size: 10px;
+                        color: #EF4444;
+                        font-weight: 600;
+                    }
+                }
+
+                // 底部操作按钮
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 10px;
+
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        clicked => {
+                            root.is-master-pwd-modal-open = false;
+                        }
+                    }
+
+                    AppButton {
+                        text: @tr("确认保存主密码");
+                        variant: "primary";
+                        clicked => {
+                            if root.master-pwd-new == "" {
+                                root.master-pwd-error-msg = @tr("新密码不能为空！");
+                            } else if root.master-pwd-new != root.master-pwd-confirm {
+                                root.master-pwd-error-msg = @tr("两次输入的新密码不一致！");
+                            } else if root.master-pwd-new.character-count < 6 {
+                                root.master-pwd-error-msg = @tr("主密码长度至少需为 6 位！");
+                            } else {
+                                root.setting-master-password-enabled = true;
+                                root.master-pwd-error-msg = "";
+                                root.is-master-pwd-modal-open = false;
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

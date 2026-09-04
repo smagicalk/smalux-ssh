@@ -27,6 +27,8 @@ use crate::tree_model::{
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
+    window.set_is_log_capture_enabled(smagical_debug::is_log_capture_enabled());
+
     // -------------------------------------------------------------------------
     // 0.1 批量生成主机资产
     // -------------------------------------------------------------------------
@@ -657,6 +659,26 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
+    // 12.1 UI 日志捕获独立开关切换回调
+    // -------------------------------------------------------------------------
+    let notif_log = ctx.notifications.clone();
+    let window_weak_log = window.as_weak();
+    window.on_toggle_log_capture(move |enabled| {
+        smagical_debug::set_log_capture_enabled(enabled);
+        if let Some(w) = window_weak_log.upgrade() {
+            w.set_is_log_capture_enabled(enabled);
+            if enabled {
+                sync_ui_debug_logs(&w);
+            }
+        }
+        if enabled {
+            notif_log.info("日志捕获已开启", "UI 诊断日志通道已恢复接收全局事件");
+        } else {
+            notif_log.info("日志捕获已暂停", "UI 诊断日志通道已挂起，停止追加新日志");
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // 13. 开发者调试控制台实时日志流自动同步定时器 (500ms 刷新)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
@@ -665,7 +687,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         slint::TimerMode::Repeated,
         std::time::Duration::from_millis(500),
         move || {
-            if let Some(w) = window_weak.upgrade().filter(|w| w.get_is_debug_modal_open() && smagical_debug::is_debug_enabled()) {
+            if let Some(w) = window_weak.upgrade().filter(|w| w.get_is_debug_modal_open()) {
                 sync_ui_debug_logs(&w);
             }
         },

@@ -48,6 +48,7 @@ export component DebugModal inherits Rectangle {
     in property <string> wallpaper-mode: "none";
     in property <string> wallpaper-slideshow-interval: "none";
     in property <int> wallpaper-count: 0;
+    in-out property <float> setting-modal-opacity: 1.0;
 
     in-out property <bool> use-mock-storage: true;
 
@@ -56,6 +57,7 @@ export component DebugModal inherits Rectangle {
     callback toggle-mock-storage(bool);
     callback apply-config-preset(string);
     callback reset-all-settings();
+    callback change-modal-opacity(float);
 
     // 当前激活的子面板: "hosts" | "credentials" | "snippets" | "settings" | "logs" | "rendering"
     property <string> active-subtab: "hosts";
@@ -106,6 +108,11 @@ export component DebugModal inherits Rectangle {
     callback force-repaint();
     /// 终端 120Hz 吞吐基准压测
     callback run-benchmark();
+    /// 日志捕获通道开关
+    callback toggle-log-capture(bool);
+    in-out property <bool> is-log-capture-enabled: true;
+    /// 跳转偏好设置分类
+    callback navigate-to-settings(string);
     /// 切换图形渲染管线
     callback switch-pipeline(string);
     /// 保存管线配置 (下次生效)
@@ -408,7 +415,7 @@ export component DebugModal inherits Rectangle {
                         }
                     }
 
-                    // 页面 5: 渲染管线矩阵 (纯 Skia 4 大管线、安全重启与 120Hz 基准压测)
+                    // 页面 6: 图形渲染监控看板 (运行时架构指标、显存图集与诊断压测)
                     Rectangle {
                         horizontal-stretch: 1;
                         height: 30px;
@@ -429,7 +436,7 @@ export component DebugModal inherits Rectangle {
                             padding-right: 6px;
 
                             Image {
-                                source: @image-url("../assets/icons/sparkles.svg");
+                                source: @image-url("../assets/icons/activity.svg");
                                 width: 12px;
                                 height: 12px;
                                 image-fit: contain;
@@ -438,7 +445,7 @@ export component DebugModal inherits Rectangle {
                             }
 
                             Text {
-                                text: @tr("图形渲染管线");
+                                text: @tr("图形渲染监控");
                                 font-size: 11px;
                                 font-weight: root.active-subtab == "rendering" ? 600 : 500;
                                 color: root.active-subtab == "rendering" ? AppTheme.selected-foreground : AppTheme.foreground;
@@ -495,23 +502,16 @@ export component DebugModal inherits Rectangle {
                         clear-all-snippets => { root.debug-clear-snippets(); }
                     }
 
-                    // 4. 设置偏好调试 (实验特性门控、核心设置探针、预设配置注入与主题快切)
+                    // 4. 设置偏好调试 (实验特性门控、预设配置注入与主题快切)
                     if root.active-subtab == "settings": DebugSettingsTab {
                         flag-desktop-notifications <=> root.flag-desktop-notifications;
                         flag-terminal-crt-shader <=> root.flag-terminal-crt-shader;
                         flag-cloud-sync <=> root.flag-cloud-sync;
                         flag-terminal-scratchpad <=> root.flag-terminal-scratchpad;
                         use-mock-storage <=> root.use-mock-storage;
-
                         current-theme-name: root.current-theme-name;
                         is-dark-mode: root.is-dark-mode;
-                        active-rendering-pipeline: root.active-pipeline;
-                        setting-always-on-top: root.setting-always-on-top;
-                        setting-confirm-close-tab: root.setting-confirm-close-tab;
-                        setting-confirm-close-active: root.setting-confirm-close-active;
-                        wallpaper-mode: root.wallpaper-mode;
-                        wallpaper-slideshow-interval: root.wallpaper-slideshow-interval;
-                        wallpaper-count: root.wallpaper-count;
+                        setting-modal-opacity <=> root.setting-modal-opacity;
 
                         toggle-feature-flag(f, e) => { root.toggle-feature-flag(f, e); }
                         toggle-mock-storage(e) => { root.toggle-mock-storage(e); }
@@ -519,23 +519,34 @@ export component DebugModal inherits Rectangle {
                         reset-all-settings => { root.reset-all-settings(); }
                         switch-theme(id) => { root.switch-theme(id); }
                         toggle-color-mode => { root.toggle-color-mode(); }
+                        change-modal-opacity(op) => { root.change-modal-opacity(op); }
                     }
 
-                    // 4. 实时日志流
+                    // 5. 实时日志流
                     if root.active-subtab == "logs": DebugLogsTab {
                         logs: root.logs;
+                        is-log-capture-enabled <=> root.is-log-capture-enabled;
+                        toggle-log-capture(e) => { root.toggle-log-capture(e); }
                         clear-logs => { root.clear-logs(); }
                         emit-test-log(lvl) => { root.emit-test-log(lvl); }
                     }
 
-                    // 5. 图形渲染管线
+                    // 6. 图形渲染运行时监控看板
                     if root.active-subtab == "rendering": DebugRenderingTab {
                         current-active-pipeline: root.active-pipeline;
+                        active-theme-name: root.current-theme-name;
+                        is-dark-mode: root.is-dark-mode;
+                        setting-always-on-top: root.setting-always-on-top;
+                        setting-confirm-close-tab: root.setting-confirm-close-tab;
+                        wallpaper-mode: root.wallpaper-mode;
+                        setting-modal-opacity: root.setting-modal-opacity;
+
                         switch-pipeline(id) => { root.switch-pipeline(id); }
                         save-pipeline => { root.save-pipeline(); }
                         apply-and-restart => { root.restart-app(); }
                         force-repaint => { root.force-repaint(); }
                         run-benchmark => { root.run-benchmark(); }
+                        navigate-to-settings(cat) => { root.close(); root.navigate-to-settings(cat); }
                     }
                 }
             }

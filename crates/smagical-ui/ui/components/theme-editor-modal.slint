@@ -1324,6 +1324,9 @@ export component ThemeEditorModal inherits Rectangle {
 
             // 🎨 现代化色相环圆盘取色器 (调用独立抽取的通用 ColorWheelPickerModal 组件)
             ColorWheelPickerModal {
+                width: 100%;
+                height: 100%;
+                z: 2000;
                 is-open: root.is-picker-open;
                 title: @tr("色相圆盘取色器 · ") + root.picker-target-label;
                 hex-value <=> root.picker-hex-value;

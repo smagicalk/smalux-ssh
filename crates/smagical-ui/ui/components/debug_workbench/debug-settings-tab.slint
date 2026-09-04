@@ -1,5 +1,6 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { AppButton } from "../base/app-button.slint";
+import { AppIconButton } from "../base/app-icon-button.slint";
 import { AppCard } from "../base/app-card.slint";
 import { ScrollView } from "std-widgets.slint";
 
@@ -135,17 +136,9 @@ export component DebugSettingsTab inherits ScrollView {
     in-out property <bool> flag-cloud-sync: false;
     in-out property <bool> flag-terminal-scratchpad: false;
     in-out property <bool> use-mock-storage: true;
-
-    // 核心设置状态实时探针
     in property <string> current-theme-name: "Darcula";
     in property <bool> is-dark-mode: true;
-    in property <string> active-rendering-pipeline: "winit-skia";
-    in property <bool> setting-always-on-top: false;
-    in property <bool> setting-confirm-close-tab: true;
-    in property <bool> setting-confirm-close-active: true;
-    in property <string> wallpaper-mode: "none";
-    in property <string> wallpaper-slideshow-interval: "none";
-    in property <int> wallpaper-count: 0;
+    in-out property <float> setting-modal-opacity: 1.0;
 
     callback toggle-feature-flag(string, bool);
     callback toggle-mock-storage(bool);
@@ -153,6 +146,7 @@ export component DebugSettingsTab inherits ScrollView {
     callback reset-all-settings();
     callback switch-theme(string);
     callback toggle-color-mode();
+    callback change-modal-opacity(float);
 
     width: 100%;
     height: 100%;
@@ -321,148 +315,117 @@ export component DebugSettingsTab inherits ScrollView {
                         root.toggle-feature-flag("terminal_scratchpad", c);
                     }
                 }
-            }
-        }
 
-        // =========================================================================
-        // 卡片 2: ⚙️ 核心设置状态实时探针 (Settings Live Probes)
-        // =========================================================================
-        AppCard {
-            width: 100%;
-
-            VerticalLayout {
-                padding: 14px;
-                spacing: 10px;
-                alignment: start;
-
+                // 特性行 5: 模态弹窗不透明度微调 (Modal Opacity)
                 HorizontalLayout {
-                    spacing: 6px;
-                    alignment: start;
-                    height: 24px;
-
-                    Text {
-                        text: "⚙️";
-                        font-size: 14px;
-                        vertical-alignment: center;
-                    }
+                    alignment: space-between;
+                    height: 36px;
+                    padding-left: 8px;
+                    padding-right: 8px;
 
                     VerticalLayout {
                         alignment: center;
-                        spacing: 1px;
-
+                        spacing: 2px;
                         Text {
-                            text: @tr("核心设置状态实时探针 (Settings Live Inspector)");
-                            font-size: 12px;
-                            font-weight: 700;
+                            text: @tr("壁纸模式弹窗底板不透明度 (Modal Opacity)");
+                            font-size: 11px;
+                            font-weight: 600;
                             color: AppTheme.foreground;
                         }
                         Text {
-                            text: @tr("实时侦测当前内存配置与持久化状态，免去翻看底层配置文件的繁琐");
+                            text: @tr("[实验特性] 调节全局壁纸模式下模态弹窗背景透明度 (默认 100% 纯色以防字体重叠)");
                             font-size: 9px;
                             color: AppTheme.secondary-foreground;
                         }
                     }
-                }
 
-                Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: center;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
 
-                // 2x3 网格状态指示卡片
-                HorizontalLayout {
-                    spacing: 8px;
-                    height: 50px;
-
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: AppTheme.radius-small;
-                        background: AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 3px;
-                            alignment: center;
-                            Text { text: @tr("图形渲染管线"); font-size: 9px; color: AppTheme.secondary-foreground; }
-                            Text { text: root.active-rendering-pipeline; font-size: 11px; font-weight: 700; color: AppTheme.accent; overflow: elide; }
+                        AppIconButton {
+                            icon: @image-url("../../assets/icons/arrow-left.svg");
+                            y: (parent.height - self.height) / 2;
+                            clicked => {
+                                if root.setting-modal-opacity > 0.60 {
+                                    root.setting-modal-opacity = Math.round((root.setting-modal-opacity - 0.05) * 100) / 100;
+                                    root.change-modal-opacity(root.setting-modal-opacity);
+                                }
+                            }
                         }
-                    }
 
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: AppTheme.radius-small;
-                        background: AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 3px;
-                            alignment: center;
-                            Text { text: @tr("主窗口置顶"); font-size: 9px; color: AppTheme.secondary-foreground; }
-                            Text { text: root.setting-always-on-top ? @tr("开启 (Always)") : @tr("常规 (Normal)"); font-size: 11px; font-weight: 700; color: root.setting-always-on-top ? #10b981 : AppTheme.foreground; }
+                        Rectangle {
+                            width: 62px;
+                            height: 24px;
+                            y: (parent.height - self.height) / 2;
+                            border-radius: AppTheme.radius-small;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: modal-op-input.has-focus ? AppTheme.accent : AppTheme.border;
+
+                            TouchArea {
+                                clicked => { modal-op-input.focus(); }
+                                mouse-cursor: text;
+                            }
+
+                            HorizontalLayout {
+                                height: 100%;
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 2px;
+                                alignment: center;
+
+                                modal-op-input := TextInput {
+                                    width: 36px;
+                                    height: 100%;
+                                    text: Math.round(root.setting-modal-opacity * 100);
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.accent;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                    single-line: true;
+                                    edited => {
+                                        let raw_val = self.text.to-float();
+                                        if raw_val >= 60 && raw_val <= 100 {
+                                            let val = raw_val / 100.0;
+                                            root.setting-modal-opacity = Math.round(val * 100) / 100;
+                                            root.change-modal-opacity(root.setting-modal-opacity);
+                                        } else if raw_val >= 0.60 && raw_val <= 1.0 {
+                                            root.setting-modal-opacity = Math.round(raw_val * 100) / 100;
+                                            root.change-modal-opacity(root.setting-modal-opacity);
+                                        }
+                                    }
+                                    accepted => {
+                                        let raw_val = self.text.to-float();
+                                        let val = raw_val > 1.0 ? raw_val / 100.0 : raw_val;
+                                        let clamped = Math.max(0.60, Math.min(1.0, val));
+                                        root.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                        root.change-modal-opacity(root.setting-modal-opacity);
+                                    }
+                                }
+
+                                Text {
+                                    text: "%";
+                                    font-size: 10px;
+                                    color: AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
                         }
-                    }
 
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: AppTheme.radius-small;
-                        background: AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 3px;
-                            alignment: center;
-                            Text { text: @tr("Tab关闭二次确认"); font-size: 9px; color: AppTheme.secondary-foreground; }
-                            Text { text: root.setting-confirm-close-tab ? @tr("开启 (Safe)") : @tr("关闭 (Fast)"); font-size: 11px; font-weight: 700; color: root.setting-confirm-close-tab ? #10b981 : #f59e0b; }
-                        }
-                    }
-                }
-
-                HorizontalLayout {
-                    spacing: 8px;
-                    height: 50px;
-
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: AppTheme.radius-small;
-                        background: AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 3px;
-                            alignment: center;
-                            Text { text: @tr("活跃配色主题"); font-size: 9px; color: AppTheme.secondary-foreground; }
-                            Text { text: root.current-theme-name + (root.is-dark-mode ? " (Dark)" : " (Light)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; overflow: elide; }
-                        }
-                    }
-
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: AppTheme.radius-small;
-                        background: AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 3px;
-                            alignment: center;
-                            Text { text: @tr("透底壁纸状态"); font-size: 9px; color: AppTheme.secondary-foreground; }
-                            Text { text: root.wallpaper-mode == "none" ? @tr("纯色无壁纸") : root.wallpaper-mode == "terminal" ? @tr("仅终端透底") : @tr("全局毛玻璃"); font-size: 11px; font-weight: 700; color: AppTheme.accent; }
-                        }
-                    }
-
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: AppTheme.radius-small;
-                        background: AppTheme.control-background;
-                        border-width: 1px;
-                        border-color: AppTheme.border;
-                        VerticalLayout {
-                            padding: 6px;
-                            spacing: 3px;
-                            alignment: center;
-                            Text { text: @tr("壁纸轮播图库"); font-size: 9px; color: AppTheme.secondary-foreground; }
-                            Text { text: root.wallpaper-count + " " + @tr("张") + " / " + root.wallpaper-slideshow-interval; font-size: 11px; font-weight: 700; color: AppTheme.foreground; }
+                        AppIconButton {
+                            icon: @image-url("../../assets/icons/arrow-right.svg");
+                            y: (parent.height - self.height) / 2;
+                            clicked => {
+                                if root.setting-modal-opacity < 1.0 {
+                                    root.setting-modal-opacity = Math.min(1.0, Math.round((root.setting-modal-opacity + 0.05) * 100) / 100);
+                                    root.change-modal-opacity(root.setting-modal-opacity);
+                                }
+                            }
                         }
                     }
                 }
@@ -470,7 +433,7 @@ export component DebugSettingsTab inherits ScrollView {
         }
 
         // =========================================================================
-        // 卡片 3: 🛠️ 预设配置一键注入与出厂归一化 (Config Presets & Reset)
+        // 卡片 2: 🛠️ 预设配置一键注入与出厂归一化 (Config Presets & Reset)
         // =========================================================================
         AppCard {
             width: 100%;

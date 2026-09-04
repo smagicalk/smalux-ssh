@@ -412,6 +412,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let theme_global = window.global::<AppTheme>();
     theme_global.set_wallpaper_mode(initial_config.wallpaper_mode.as_str().into());
     theme_global.set_wallpaper_opacity(initial_config.wallpaper_opacity);
+    theme_global.set_modal_opacity(initial_config.modal_opacity);
+    window.set_setting_modal_opacity(initial_config.modal_opacity);
 
     // 壁纸画廊数据与初始渲染
     if !initial_config.wallpaper_list.is_empty() {

@@ -41,6 +41,9 @@ pub struct AppConfigRecord {
     /// 界面全局字体名称 (如 "Microsoft YaHei UI", "Inter")
     #[serde(default = "default_ui_font")]
     pub ui_font: String,
+    /// 实验特性：壁纸模式下模态弹窗与下拉面板不透明度 (0.50 ~ 1.0，默认为 1.0 完全纯色遮挡防重叠)
+    #[serde(default = "default_modal_opacity")]
+    pub modal_opacity: f32,
 
     /// 终端使用的等宽字体名称
     pub font_family: String,
@@ -98,6 +101,117 @@ pub struct AppConfigRecord {
     /// 全局代理认证密码
     #[serde(default)]
     pub global_proxy_pass: String,
+    /// 启用 TCP_NODELAY 规避 Nagle 算法降低交互延迟
+    #[serde(default = "default_true")]
+    pub tcp_nodelay: bool,
+
+    // --- 传输与文件管理 (SFTP & File Transfers) ---
+    /// 默认远程初始工作目录 (如 "~" 或 "/")
+    #[serde(default = "default_sftp_remote")]
+    pub sftp_default_remote: String,
+    /// 删除远程文件二次确认
+    #[serde(default = "default_true")]
+    pub sftp_confirm_delete: bool,
+    /// 大文件断点续传支持
+    #[serde(default = "default_true")]
+    pub sftp_resume_transfer: bool,
+    /// 保留原始 POSIX 权限与时间戳
+    #[serde(default = "default_true")]
+    pub sftp_preserve_attributes: bool,
+    /// 最大并发传输连接数
+    #[serde(default = "default_sftp_concurrency")]
+    pub sftp_concurrency: u32,
+    /// 单任务上传速率限制 ("unlimited", "1mb", "5mb", "10mb")
+    #[serde(default = "default_unlimited")]
+    pub sftp_upload_limit: String,
+    /// 单任务下载速率限制 ("unlimited", "2mb", "10mb", "20mb")
+    #[serde(default = "default_unlimited")]
+    pub sftp_download_limit: String,
+    /// 远程文件双击打开方式 ("builtin", "system", "custom")
+    #[serde(default = "default_sftp_editor")]
+    pub sftp_editor_mode: String,
+    /// 自定义外部编辑器程序命令
+    #[serde(default)]
+    pub sftp_custom_editor: String,
+    /// 传输过滤忽略黑名单
+    #[serde(default = "default_sftp_excludes")]
+    pub sftp_exclude_patterns: String,
+
+    // --- 多端云同步与数据备份 (Cloud Sync & Backup Matrix) ---
+    /// 云同步后端协议 ("off", "webdav", "s3", "gist", "custom")
+    #[serde(default = "default_off")]
+    pub cloud_sync_backend: String,
+    /// WebDAV 服务器地址
+    #[serde(default)]
+    pub cloud_sync_webdav_url: String,
+    /// WebDAV 用户名
+    #[serde(default)]
+    pub cloud_sync_webdav_user: String,
+    /// WebDAV 密码或应用令牌
+    #[serde(default)]
+    pub cloud_sync_webdav_pass: String,
+    /// WebDAV 远程备份子目录
+    #[serde(default = "default_webdav_dir")]
+    pub cloud_sync_webdav_dir: String,
+    /// S3 自定义 Endpoint
+    #[serde(default)]
+    pub cloud_sync_s3_endpoint: String,
+    /// S3 存储桶 Bucket
+    #[serde(default)]
+    pub cloud_sync_s3_bucket: String,
+    /// S3 Access Key ID
+    #[serde(default)]
+    pub cloud_sync_s3_key_id: String,
+    /// S3 Secret Access Key
+    #[serde(default)]
+    pub cloud_sync_s3_access_key: String,
+    /// S3 区域 Region
+    #[serde(default = "default_s3_region")]
+    pub cloud_sync_s3_region: String,
+    /// GitHub Gist Personal Access Token
+    #[serde(default)]
+    pub cloud_sync_gist_token: String,
+    /// GitHub Gist ID
+    #[serde(default)]
+    pub cloud_sync_gist_id: String,
+    /// 自建备份服务器 API 端点
+    #[serde(default = "default_custom_sync_url")]
+    pub cloud_sync_custom_url: String,
+    /// 自建备份服务器 Bearer Token
+    #[serde(default)]
+    pub cloud_sync_custom_token: String,
+    /// 设备客户端标识符
+    #[serde(default = "default_custom_client_id")]
+    pub cloud_sync_custom_client_id: String,
+    /// 端到端客户端加密口令 (E2EE)
+    #[serde(default)]
+    pub cloud_sync_e2ee_pass: String,
+    /// 自动同步调度频率 ("manual", "startup", "1h", "daily")
+    #[serde(default = "default_sync_interval")]
+    pub cloud_sync_interval: String,
+
+    // --- 安全与高级诊断 (Security & Vault Protection) ---
+    /// 启用本地凭据主密码保护
+    #[serde(default)]
+    pub master_password_enabled: bool,
+    /// 空闲自动锁定超时 ("never", "5m", "15m", "30m", "1h")
+    #[serde(default = "default_auto_lock")]
+    pub auto_lock_timeout: String,
+    /// Windows Hello / 生物识别快捷解锁
+    #[serde(default)]
+    pub biometric_unlock: bool,
+    /// 窗口最小化或退出时立即锁定
+    #[serde(default)]
+    pub lock_on_minimize: bool,
+    /// 敏感剪贴板自动清除 (30秒)
+    #[serde(default = "default_true")]
+    pub clear_clipboard_timeout: bool,
+    /// 高危破坏性指令执行预警
+    #[serde(default = "default_true")]
+    pub confirm_dangerous_commands: bool,
+    /// 会话操作安全审计日志
+    #[serde(default)]
+    pub session_audit_logging: bool,
 
     /// 开发者调试控制台启用开关 (F12)
     pub debug_enabled: bool,
@@ -136,6 +250,7 @@ impl Default for AppConfigRecord {
             wallpaper_slideshow_interval: "off".to_string(),
             wallpaper_transition_effect: "fade".to_string(),
             ui_font: default_ui_font(),
+            modal_opacity: default_modal_opacity(),
 
             // 终端
             font_family: "JetBrains Mono".to_string(),
@@ -163,6 +278,47 @@ impl Default for AppConfigRecord {
             global_proxy_auth: false,
             global_proxy_user: String::new(),
             global_proxy_pass: String::new(),
+            tcp_nodelay: true,
+
+            // 传输与文件管理
+            sftp_default_remote: default_sftp_remote(),
+            sftp_confirm_delete: true,
+            sftp_resume_transfer: true,
+            sftp_preserve_attributes: true,
+            sftp_concurrency: default_sftp_concurrency(),
+            sftp_upload_limit: default_unlimited(),
+            sftp_download_limit: default_unlimited(),
+            sftp_editor_mode: default_sftp_editor(),
+            sftp_custom_editor: String::new(),
+            sftp_exclude_patterns: default_sftp_excludes(),
+
+            // 云同步与数据备份
+            cloud_sync_backend: default_off(),
+            cloud_sync_webdav_url: "https://dav.jianguoyun.com/dav/".to_string(),
+            cloud_sync_webdav_user: String::new(),
+            cloud_sync_webdav_pass: String::new(),
+            cloud_sync_webdav_dir: default_webdav_dir(),
+            cloud_sync_s3_endpoint: String::new(),
+            cloud_sync_s3_bucket: String::new(),
+            cloud_sync_s3_key_id: String::new(),
+            cloud_sync_s3_access_key: String::new(),
+            cloud_sync_s3_region: default_s3_region(),
+            cloud_sync_gist_token: String::new(),
+            cloud_sync_gist_id: String::new(),
+            cloud_sync_custom_url: default_custom_sync_url(),
+            cloud_sync_custom_token: String::new(),
+            cloud_sync_custom_client_id: default_custom_client_id(),
+            cloud_sync_e2ee_pass: String::new(),
+            cloud_sync_interval: default_sync_interval(),
+
+            // 安全与高级诊断
+            master_password_enabled: false,
+            auto_lock_timeout: default_auto_lock(),
+            biometric_unlock: false,
+            lock_on_minimize: false,
+            clear_clipboard_timeout: true,
+            confirm_dangerous_commands: true,
+            session_audit_logging: false,
 
             // 调试与特性门控
             debug_enabled: true,
@@ -177,6 +333,10 @@ impl Default for AppConfigRecord {
 
 fn default_ui_font() -> String {
     "系统默认 (System Default)".to_string()
+}
+
+fn default_modal_opacity() -> f32 {
+    1.0
 }
 
 fn default_true() -> bool {
@@ -197,4 +357,52 @@ fn default_proxy_mode() -> String {
 
 fn default_proxy_server() -> String {
     "127.0.0.1:7890".to_string()
+}
+
+fn default_sftp_remote() -> String {
+    "~".to_string()
+}
+
+fn default_sftp_concurrency() -> u32 {
+    4
+}
+
+fn default_unlimited() -> String {
+    "unlimited".to_string()
+}
+
+fn default_sftp_editor() -> String {
+    "builtin".to_string()
+}
+
+fn default_sftp_excludes() -> String {
+    ".git, .DS_Store, node_modules, __pycache__, *.tmp".to_string()
+}
+
+fn default_off() -> String {
+    "off".to_string()
+}
+
+fn default_webdav_dir() -> String {
+    "/smalux_backup".to_string()
+}
+
+fn default_s3_region() -> String {
+    "us-east-1".to_string()
+}
+
+fn default_custom_sync_url() -> String {
+    "https://api.smalux.internal/v1/sync".to_string()
+}
+
+fn default_custom_client_id() -> String {
+    "desktop-client".to_string()
+}
+
+fn default_sync_interval() -> String {
+    "manual".to_string()
+}
+
+fn default_auto_lock() -> String {
+    "never".to_string()
 }

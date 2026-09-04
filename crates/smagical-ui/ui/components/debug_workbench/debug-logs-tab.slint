@@ -11,9 +11,11 @@ export struct LogEntryData {
 export component DebugLogsTab inherits VerticalLayout {
     in property <[LogEntryData]> logs: [];
     in-out property <string> log-filter-level: "ALL";
+    in-out property <bool> is-log-capture-enabled: true;
 
     callback clear-logs();
     callback emit-test-log(string);
+    callback toggle-log-capture(bool);
 
     width: 100%;
     height: 100%;
@@ -57,6 +59,43 @@ export component DebugLogsTab inherits VerticalLayout {
         HorizontalLayout {
             spacing: 6px;
             alignment: end;
+
+            Rectangle {
+                height: 24px;
+                border-radius: AppTheme.radius-small;
+                background: root.is-log-capture-enabled ? #10b98122 : AppTheme.control-background;
+                border-width: 1px;
+                border-color: root.is-log-capture-enabled ? #10b981 : AppTheme.border;
+
+                TouchArea {
+                    clicked => {
+                        root.is-log-capture-enabled = !root.is-log-capture-enabled;
+                        root.toggle-log-capture(root.is-log-capture-enabled);
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    spacing: 5px;
+                    alignment: center;
+                    Rectangle {
+                        width: 6px;
+                        height: 6px;
+                        border-radius: 3px;
+                        background: root.is-log-capture-enabled ? #10b981 : #94a3b8;
+                        y: (parent.height - self.height) / 2;
+                    }
+                    Text {
+                        text: root.is-log-capture-enabled ? @tr("捕获通道: 开启") : @tr("捕获通道: 暂停");
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: root.is-log-capture-enabled ? #10b981 : AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
 
             AppButton {
                 height: 24px;

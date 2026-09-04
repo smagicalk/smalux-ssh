@@ -83,13 +83,24 @@ export component SettingsDrawer inherits DrawerContainer {
                             font-size: 11px;
                             color: t.id == root.current-theme-id ? AppTheme.selected-foreground : AppTheme.foreground;
                             horizontal-alignment: left;
+                            horizontal-stretch: 1;
+                            overflow: elide;
                         }
 
-                        if t.id == root.current-theme-id: Text {
-                            text: "✓";
-                            font-size: 12px;
-                            font-weight: 700;
-                            color: AppTheme.accent;
+                        if t.id == root.current-theme-id: Rectangle {
+                            width: 14px;
+                            height: 14px;
+                            y: (parent.height - self.height) / 2;
+
+                            Image {
+                                source: @image-url("../../assets/icons/check.svg");
+                                width: 12px;
+                                height: 12px;
+                                colorize: AppTheme.accent;
+                                image-fit: contain;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
                         }
                     }
                 }

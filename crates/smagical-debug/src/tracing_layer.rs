@@ -22,22 +22,34 @@ static GLOBAL_LOG_BUFFER: OnceLock<Arc<Mutex<DebugLogBuffer>>> = OnceLock::new()
 /// 全局 Debug 调试功能开启/关闭开关 (默认开启 true)
 static IS_DEBUG_ENABLED: AtomicBool = AtomicBool::new(true);
 
+/// 全局 UI 日志捕获通道独立开关 (默认开启 true，与 debug 模式解绑)
+static IS_LOG_CAPTURE_ENABLED: AtomicBool = AtomicBool::new(true);
+
 /// 设置全局 Debug 功能开启/关闭状态。
-///
-/// 若关闭 debug，将自动清空当前内存中的日志缓冲区，并停止捕获任何 UI 诊断日志。
 pub fn set_debug_enabled(enabled: bool) {
     IS_DEBUG_ENABLED.store(enabled, Ordering::SeqCst);
-    if !enabled
-        && let Ok(mut buf) = get_global_log_buffer().lock()
-    {
-        buf.clear();
-    }
-
 }
 
 /// 查询全局 Debug 功能是否处于开启状态。
 pub fn is_debug_enabled() -> bool {
     IS_DEBUG_ENABLED.load(Ordering::SeqCst)
+}
+
+/// 设置全局 UI 日志捕获通道开启/关闭状态。
+///
+/// 若关闭捕获，将自动清空当前内存中的日志缓冲区，并停止捕获新的 UI 诊断日志。
+pub fn set_log_capture_enabled(enabled: bool) {
+    IS_LOG_CAPTURE_ENABLED.store(enabled, Ordering::SeqCst);
+    if !enabled
+        && let Ok(mut buf) = get_global_log_buffer().lock()
+    {
+        buf.clear();
+    }
+}
+
+/// 查询全局 UI 日志捕获通道是否处于开启状态。
+pub fn is_log_capture_enabled() -> bool {
+    IS_LOG_CAPTURE_ENABLED.load(Ordering::SeqCst)
 }
 
 /// 获取或初始化全局 UI 日志缓冲区
@@ -95,7 +107,7 @@ where
     S: Subscriber,
 {
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        if !is_debug_enabled() {
+        if !is_log_capture_enabled() {
             return;
         }
 

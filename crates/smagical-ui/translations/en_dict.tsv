@@ -483,6 +483,7 @@ TCP 心跳保活探测间隔 (ServerAliveInterval)	TCP Keepalive Heartbeat Inter
 代码片段调试	Snippets
 设置外观调试	Appearance
 图形渲染管线	Pipeline
+图形渲染监控	Rendering Telemetry
 实时日志流	Live Logs
 Skia 原生图形渲染管线矩阵 (Google Skia Pipelines)	Skia Native Graphics Pipeline Matrix (Google Skia Pipelines)
 Skia Auto (官方推荐)	Skia Auto (Recommended)
@@ -895,3 +896,44 @@ TOML 主题配置源码 (支持双向实时修改与解析)	TOML Theme Configura
 
 
 
+终端首选项	Terminal Preferences
+配置 VT100 字符渲染等宽字体族、光标外观交互、高亮诊断规则与会话缓冲区	Configure VT100 glyph monospace fonts, cursor interactions, highlight rules and scrollback buffer
+网络连接与代理	Network & Proxy Connections
+配置默认出站网络代理、SSH 握手超时、Keepalive 心跳保活与数据流压缩	Configure outbound proxies, SSH handshake timeout, keepalive heartbeat and stream compression
+传输与文件管理	Transfers & File Management
+管理远程 SFTP 浏览器下载路径、文件传输冲突策略、并发协程与外部编辑器	Manage remote SFTP download paths, conflict policies, concurrency, and external editors
+数据备份与同步	Data Backup & Cloud Sync
+数据备份、跨工具迁移与多端云同步	Data Backup, Migration & Cloud Sync
+本地全量加密备份/还原、多端云同步 (WebDAV / Amazon S3 / GitHub Gist / 自建服务器) 与配置快照历史	Local encrypted backup/restore, multi-backend cloud sync (WebDAV/S3/Gist/Custom) and snapshot history
+本地全量加密备份与快速还原	Local Encrypted Backup & Fast Restore
+多端多协议云同步矩阵 (Cloud Sync Matrix)	Multi-Backend Cloud Sync Matrix
+云同步后端协议 (Cloud Sync Backend)	Cloud Sync Backend Protocol
+自建备份服务 ★	Custom Backup Server ★
+自建备份服务器 API 端点 (Server Endpoint URL)	Custom Backup Server API Endpoint URL
+端到端加密与自动同步策略	End-to-End Encryption & Auto Sync Schedule
+端到端客户端加密口令 (E2EE Master Key)	End-to-End Client Encryption Master Key (E2EE)
+启用本地凭据主密码保护 (Master Password)	Enable Master Password Protection
+修改主密码 (Change Master Password)	Change Master Password
+启用并设置主密码 (Set Master Password)	Set Master Password
+已受主密码保护 (AES-256)	Protected by Master Password (AES-256)
+主密码管理 (Manage Master Password)	Master Password Management
+空闲自动锁定超时 (Auto-lock Timeout)	Auto-lock Idle Timeout
+Windows Hello / 生物识别快捷解锁 (Biometric Unlock)	Windows Hello / Biometric Quick Unlock
+窗口最小化或退出时立即锁定 (Lock on Minimize)	Lock Immediately on Minimize or Exit
+敏感剪贴板自动清除 (Clear Clipboard Timeout)	Clear Sensitive Clipboard Timeout
+高危破坏性指令执行预警 (Dangerous Command Warning)	Dangerous Destructive Command Warning
+会话操作安全审计日志 (Session Audit Logging)	Session Security Audit Logging
+路径导航与文件浏览器视口	Paths & File Explorer Viewport
+默认远程初始工作目录 (Default Remote Dir)	Default Remote Working Directory
+删除远程文件二次安全确认 (Confirm Deletion)	Confirm Remote File Deletion
+传输引擎与冲突策略	Transfer Engine & Conflict Policies
+文件存在重名冲突策略 (Conflict Resolution)	File Conflict Resolution Policy
+大文件断点续传支持 (Resume Interrupted Transfers)	Resume Interrupted Transfers
+保留原始文件属性 (Preserve Attributes & Timestamps)	Preserve Attributes & Timestamps
+并发性能与带宽流量控制	Concurrency & Bandwidth Limits
+单任务上传速率限制 (Upload Speed Limit)	Upload Speed Limit
+单任务下载速率限制 (Download Speed Limit)	Download Speed Limit
+外部编辑器与过滤排除规则	External Editor & Exclusion Filters
+远程文件双击打开方式 (Remote File Editor)	Remote File Double-click Action
+自定义外部编辑器程序路径 (Editor Executable)	Custom External Editor Executable
+传输忽略规则黑名单 (Exclusion Patterns)	Transfer Exclusion Patterns

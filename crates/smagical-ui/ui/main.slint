@@ -151,6 +151,10 @@ export component AppWindow inherits Window {
     in-out property <bool> is-debug-modal-open: false;
     /// 全局开发者调试功能开关 (默认开启 true，关闭则隐藏侧边栏图标并停止日志收集)
     in-out property <bool> is-debug-enabled: true;
+    /// 全局 UI 日志捕获独立开关 (默认开启 true，可独立于 debug 开关控制内存捕获)
+    in-out property <bool> is-log-capture-enabled: true;
+    /// 全屏偏好设置中心当前激活的分类 ("general", "appearance", "terminal", "network", "sync", "about")
+    in-out property <string> active-settings-category: "general";
     /// 动态左侧活动栏主功能菜单项列表
     in-out property <[ActivityBarItemData]> top-activity-items: [];
     /// 动态左侧活动栏底部系统菜单项列表
@@ -499,6 +503,8 @@ export component AppWindow inherits Window {
     in-out property <image> terminal-wallpaper-image;
     /// 终端专属背景壁纸不透明度 (0.0 ~ 1.0)
     in-out property <float> terminal-wallpaper-opacity: 0.20;
+    /// 实验特性：壁纸模式下模态弹窗与下拉面板不透明度 (0.50 ~ 1.0，默认为 1.0 完全纯色遮挡防重叠)
+    in-out property <float> setting-modal-opacity: 1.0;
     /// 终端字体名称 (如 "JetBrains Mono" / "Consolas")
     in-out property <string> terminal-font-family: "JetBrains Mono";
     /// 终端字体字号 (默认 14.0 px)
@@ -558,6 +564,12 @@ export component AppWindow inherits Window {
     in-out property <string> setting-global-proxy-user: "";
     in-out property <string> setting-global-proxy-pass: "";
 
+    in-out property <int> setting-connect-timeout: 30;
+    in-out property <int> setting-keepalive-interval: 30;
+    in-out property <int> setting-keepalive-count-max: 3;
+    in-out property <string> setting-host-key-policy: "accept-new";
+    in-out property <bool> setting-tcp-nodelay: true;
+
     in-out property <bool> setting-copy-on-select: false;
     in-out property <bool> setting-paste-on-right-click: true;
     in-out property <bool> setting-warn-multiline-paste: true;
@@ -574,6 +586,10 @@ export component AppWindow inherits Window {
     callback change-warn-multiline-paste(bool);
     callback change-close-action(string);
     callback change-global-proxy(string, string, bool, string, string);
+    callback change-network-handshake(int, int, int);
+    callback change-host-key-policy(string);
+    callback change-tcp-nodelay(bool);
+    callback toggle-log-capture(bool);
     callback add-keyword-rule(string /* pattern */, string /* remark */, string /* color_hex */);
     callback update-keyword-rule(string /* id */, string /* pattern */, string /* remark */, string /* color_hex */);
     callback toggle-keyword-rule(string /* id */, bool /* enabled */);
@@ -1053,6 +1069,7 @@ export component AppWindow inherits Window {
     callback reset-all-settings();
     callback toggle-desktop-notification(bool);
     callback toggle-terminal-crt(bool);
+    callback change-modal-opacity(float /* opacity */);
 
     // -------------------------------------------------------------------------
     // 主题定制与设计工坊 (Theme Studio Modal)
@@ -1619,10 +1636,13 @@ export component AppWindow inherits Window {
                 // 2.3.5 全屏偏好设置中心 (当 main-view == "settings" 时全屏展开，含备份迁移、外观、终端排版)
                 if root.main-view == "settings": SettingsCenterView {
                     horizontal-stretch: 1;
+                    active-category <=> root.active-settings-category;
                     is-dark-mode <=> root.is-dark-mode;
                     setting-debug-enabled <=> root.is-debug-enabled;
                     setting-wallpaper-mode <=> root.wallpaper-mode;
                     setting-wallpaper-opacity <=> root.global-wallpaper-opacity;
+                    setting-modal-opacity <=> root.setting-modal-opacity;
+                    change-modal-opacity(op) => { root.change-modal-opacity(op); }
 
                     setting-close-action <=> root.setting-close-action;
                     setting-confirm-close-tab <=> root.setting-confirm-close-tab;
@@ -1719,6 +1739,12 @@ export component AppWindow inherits Window {
                     setting-global-proxy-user <=> root.setting-global-proxy-user;
                     setting-global-proxy-pass <=> root.setting-global-proxy-pass;
 
+                    setting-connect-timeout <=> root.setting-connect-timeout;
+                    setting-keepalive-interval <=> root.setting-keepalive-interval;
+                    setting-keepalive-count-max <=> root.setting-keepalive-count-max;
+                    setting-host-key-policy <=> root.setting-host-key-policy;
+                    setting-tcp-nodelay <=> root.setting-tcp-nodelay;
+
                     setting-terminal-font: root.terminal-font-family;
                     setting-terminal-font-size: Math.round(root.terminal-font-size);
 
@@ -1731,6 +1757,9 @@ export component AppWindow inherits Window {
                     change-warn-multiline-paste(c) => { root.change-warn-multiline-paste(c); }
                     change-close-action(a) => { root.change-close-action(a); }
                     change-global-proxy(m, s, a, u, p) => { root.change-global-proxy(m, s, a, u, p); }
+                    change-network-handshake(t, i, c) => { root.change-network-handshake(t, i, c); }
+                    change-host-key-policy(p) => { root.change-host-key-policy(p); }
+                    change-tcp-nodelay(c) => { root.change-tcp-nodelay(c); }
 
                     color-picker-indicator-x <=> root.theme-editor-wheel-indicator-x;
                     color-picker-indicator-y <=> root.theme-editor-wheel-indicator-y;
@@ -2089,10 +2118,18 @@ export component AppWindow inherits Window {
         wallpaper-mode: root.wallpaper-mode;
         wallpaper-slideshow-interval: root.wallpaper-slideshow-interval;
         wallpaper-count: root.wallpaper-list.length;
+        setting-modal-opacity <=> root.setting-modal-opacity;
+        is-log-capture-enabled <=> root.is-log-capture-enabled;
+        toggle-log-capture(e) => { root.toggle-log-capture(e); }
+        navigate-to-settings(cat) => {
+            root.main-view = "settings";
+            root.active-settings-category = cat;
+        }
         toggle-feature-flag(f, e) => { root.toggle-feature-flag(f, e); }
         toggle-mock-storage(e) => { root.toggle-mock-storage(e); }
         apply-config-preset(p) => { root.apply-config-preset(p); }
         reset-all-settings => { root.reset-all-settings(); }
+        change-modal-opacity(op) => { root.change-modal-opacity(op); }
     }
 
     // 主题设计与定制工坊弹窗 (可视化表单、微型沙盒视窗与 TOML 双向代码编辑器)

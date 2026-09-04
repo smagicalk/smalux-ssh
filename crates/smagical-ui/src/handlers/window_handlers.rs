@@ -184,7 +184,6 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             crate::activity_bar_service::sync_activity_bar_ui(&w, &core_state_debug);
             if !enabled {
                 w.set_is_debug_modal_open(false);
-                w.set_debug_logs(slint::ModelRc::default());
                 if w.get_active_left_tab() == "debug" {
                     w.set_active_left_tab("hosts".into());
                 }
@@ -197,6 +196,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 new_val: if enabled { "true" } else { "false" }.into(),
                 source: "toggle_debug_enabled".into(),
             });
+            let _ = core_state_debug.storage().config().update(Box::new(move |c| {
+                c.debug_enabled = enabled;
+            }));
             tracing::info!(target: "smagical_ui::settings", "开发者调试控制台已{}", if enabled { "开启" } else { "关闭" });
         }
     });

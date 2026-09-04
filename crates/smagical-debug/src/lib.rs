@@ -21,7 +21,8 @@ pub use models::{DebugHostCard, DebugLogEntry, DebugLogLevel, DebugRawNode};
 pub use presets::{get_preset_by_id, PresetKind};
 pub use tracing_layer::{
     clean_expired_logs, get_default_log_dir, get_global_log_buffer, init_tracing,
-    is_debug_enabled, set_debug_enabled, TracingGuard, UiLogLayer,
+    is_debug_enabled, is_log_capture_enabled, set_debug_enabled, set_log_capture_enabled,
+    TracingGuard, UiLogLayer,
 };
 
 

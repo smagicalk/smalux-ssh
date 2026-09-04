@@ -36,14 +36,15 @@ export global AppTheme {
     in-out property <string> wallpaper-mode: "none";
     in-out property <float> wallpaper-opacity: 0.20;
     out property <bool> is-global-wallpaper: wallpaper-mode == "global";
+    in-out property <float> modal-opacity: 1.0;
 
     // 基础纯色固态画刷 (Solid Base Colors)
     out property <brush> base-window-background: use-system-palette ? Palette.background : custom-window-background;
     out property <brush> base-panel-background: use-system-palette ? Palette.alternate-background : custom-panel-background;
     out property <brush> base-surface-background: use-system-palette ? Palette.background : custom-surface-background;
     out property <brush> base-control-background: use-system-palette ? Palette.control-background : custom-control-background;
-    // 弹窗与悬浮面板专用纯色背景 (彻底避免壁纸模式下透出背部页面文字)
-    out property <brush> modal-background: base-panel-background;
+    // 弹窗与悬浮面板专用纯色背景 (彻底避免壁纸模式下透出背部页面文字，支持实验性透明度微调)
+    out property <brush> modal-background: (is-global-wallpaper && modal-opacity < 1.0) ? base-panel-background.transparentize(1.0 - modal-opacity) : base-panel-background;
 
     // 自适应全局透光画刷 (Adaptive Wallpaper-Aware Brushes)
     // Zone A: 外层外壳与导航透底/亚克力透光 (65% 透明度透出壁纸)
