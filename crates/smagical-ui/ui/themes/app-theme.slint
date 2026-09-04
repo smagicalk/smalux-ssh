@@ -42,6 +42,8 @@ export global AppTheme {
     out property <brush> base-panel-background: use-system-palette ? Palette.alternate-background : custom-panel-background;
     out property <brush> base-surface-background: use-system-palette ? Palette.background : custom-surface-background;
     out property <brush> base-control-background: use-system-palette ? Palette.control-background : custom-control-background;
+    // 弹窗与悬浮面板专用纯色背景 (彻底避免壁纸模式下透出背部页面文字)
+    out property <brush> modal-background: base-panel-background;
 
     // 自适应全局透光画刷 (Adaptive Wallpaper-Aware Brushes)
     // Zone A: 外层外壳与导航透底/亚克力透光 (65% 透明度透出壁纸)

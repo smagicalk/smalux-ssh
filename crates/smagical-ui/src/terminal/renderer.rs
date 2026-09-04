@@ -83,6 +83,10 @@ pub struct TerminalRenderer {
     glyph_cache: HashMap<char, (Metrics, Vec<u8>)>,
     /// 配色方案
     palette: TerminalPalette,
+    /// 光标样式 ("block" | "beam" | "underline")
+    pub cursor_style: String,
+    /// 光标呼吸闪烁开关
+    pub cursor_blink: bool,
 }
 
 impl TerminalRenderer {
@@ -134,7 +138,19 @@ impl TerminalRenderer {
             ascii_cache,
             glyph_cache: HashMap::new(),
             palette: TerminalPalette::default(),
+            cursor_style: "block".to_string(),
+            cursor_blink: true,
         })
+    }
+
+    /// 设置光标形态 ("block" | "beam" | "underline")
+    pub fn set_cursor_style(&mut self, style: &str) {
+        self.cursor_style = style.to_string();
+    }
+
+    /// 设置光标是否闪烁
+    pub fn set_cursor_blink(&mut self, blink: bool) {
+        self.cursor_blink = blink;
     }
 
 
@@ -466,16 +482,24 @@ impl TerminalRenderer {
 
 
 
-            // 2.3 光标绘制 (反色/高亮方块，仅在最底端未回滚时显示)
+            // 2.3 光标绘制 (支持方块 block、竖线 beam、下划线 underline，支持呼吸闪烁)
+            let is_blink_visible = !self.cursor_blink
+                || ((std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() / 530) % 2 == 0);
+
             if is_cursor_visible
+                && is_blink_visible
                 && cursor_point.column.0 == col as usize
                 && cursor_point.line.0 == renderable_cell.point.line.0
             {
-                let max_x = (cell_x + cell_width).min(img_width);
-                let max_y = (cell_y + cell_height).min(img_height);
-                for py in cell_y..max_y {
+                let (c_min_x, c_max_x, c_min_y, c_max_y) = match self.cursor_style.as_str() {
+                    "beam" => (cell_x, (cell_x + 2).min(img_width), cell_y, (cell_y + cell_height).min(img_height)),
+                    "underline" => (cell_x, (cell_x + cell_width).min(img_width), (cell_y + cell_height.saturating_sub(2)).min(img_height), (cell_y + cell_height).min(img_height)),
+                    _ => (cell_x, (cell_x + cell_width).min(img_width), cell_y, (cell_y + cell_height).min(img_height)), // "block"
+                };
+
+                for py in c_min_y..c_max_y {
                     let row_offset = (py * img_width * 4) as usize;
-                    for px in cell_x..max_x {
+                    for px in c_min_x..c_max_x {
                         let px_offset = row_offset + (px * 4) as usize;
                         raw_pixels[px_offset] = ((raw_pixels[px_offset] as u32 + cur_col[0] as u32) / 2) as u8;
                         raw_pixels[px_offset + 1] = ((raw_pixels[px_offset + 1] as u32 + cur_col[1] as u32) / 2) as u8;
@@ -591,4 +615,64 @@ fn get_terminal_monospace_font() -> Option<Vec<u8>> {
     }
     None
 }
+
+/// 根据字体名称或族名在系统字体目录中查找匹配的字体文件数据
+pub fn find_font_by_name(font_name: &str) -> Option<Vec<u8>> {
+    let fn_clean = font_name.trim();
+    if fn_clean.is_empty() || fn_clean == "JetBrains Mono" {
+        if !EMBEDDED_JETBRAINS_MONO.is_empty() {
+            return Some(EMBEDDED_JETBRAINS_MONO.to_vec());
+        }
+    }
+
+    let fn_lower = fn_clean.to_lowercase();
+
+    #[cfg(windows)]
+    {
+        let win_dir = std::env::var("WINDIR").unwrap_or_else(|_| "C:\\Windows".to_string());
+        let fonts_dir = std::path::Path::new(&win_dir).join("Fonts");
+
+        let candidate_files: Vec<&str> = match fn_lower.as_str() {
+            "consolas" => vec!["consola.ttf", "consolab.ttf"],
+            "cascadia code" | "cascadia mono" => vec!["CascadiaCode.ttf", "CascadiaMono.ttf", "Cascadia.ttf"],
+            "courier new" => vec!["cour.ttf", "courbd.ttf"],
+            "fira code" => vec!["FiraCode-Regular.ttf", "FiraCode.ttf"],
+            "source code pro" => vec!["SourceCodePro-Regular.ttf"],
+            "hack" => vec!["Hack-Regular.ttf"],
+            "meslolgs nf" | "meslo" => vec!["MesloLGS NF Regular.ttf"],
+            _ => vec![],
+        };
+
+        for fname in candidate_files {
+            let p = fonts_dir.join(fname);
+            if let Ok(bytes) = std::fs::read(&p) {
+                return Some(bytes);
+            }
+        }
+
+        // 也检查用户字体目录: %LOCALAPPDATA%\Microsoft\Windows\Fonts
+        if let Ok(local_app_data) = std::env::var("LOCALAPPDATA") {
+            let user_fonts = std::path::Path::new(&local_app_data).join("Microsoft").join("Windows").join("Fonts");
+            if let Ok(entries) = std::fs::read_dir(user_fonts) {
+                let target_compact = fn_lower.replace(' ', "");
+                for entry in entries.flatten() {
+                    let name = entry.file_name().to_string_lossy().to_lowercase();
+                    if name.contains(&target_compact) && (name.ends_with(".ttf") || name.ends_with(".otf")) {
+                        if let Ok(bytes) = std::fs::read(entry.path()) {
+                            return Some(bytes);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // Fallback: 如果传的是文件完整路径
+    if std::path::Path::new(font_name).is_file() {
+        return std::fs::read(font_name).ok();
+    }
+
+    None
+}
+
 

@@ -4,6 +4,7 @@
 //! 全量加密备份导出、系统 ~/.ssh/config 自动化扫描导入与外部工具资产迁移。
 
 use std::path::{Path, PathBuf};
+use std::rc::Rc;
 
 use slint::ComponentHandle;
 use smagical_core::domain::host::{HostRecord, HostStatus};
@@ -246,6 +247,15 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         window.set_setting_cursor_blink(cfg.cursor_blink);
         window.set_setting_scrollback_lines(cfg.scrollback_lines as i32);
         window.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
+        window.set_setting_copy_on_select(cfg.copy_on_select);
+        window.set_setting_paste_on_right_click(cfg.paste_on_right_click);
+        window.set_setting_warn_multiline_paste(cfg.warn_on_multiline_paste);
+        window.set_setting_close_action(cfg.close_action.as_str().into());
+        window.set_setting_global_proxy_mode(cfg.global_proxy_mode.as_str().into());
+        window.set_setting_global_proxy_server(cfg.global_proxy_server.as_str().into());
+        window.set_setting_global_proxy_auth(cfg.global_proxy_auth);
+        window.set_setting_global_proxy_user(cfg.global_proxy_user.as_str().into());
+        window.set_setting_global_proxy_pass(cfg.global_proxy_pass.as_str().into());
     }
 
     let notif_font = ctx.notifications.clone();
@@ -319,6 +329,8 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_cursor = ctx.notifications.clone();
     let core_state_cursor = ctx.core_state.clone();
     let window_weak_cursor = window.as_weak();
+    let renderer_cursor = Rc::clone(&ctx.terminal_renderer);
+    let active_terminals_cursor = Rc::clone(&ctx.active_terminals);
     window.on_change_cursor_style(move |style| {
         let style_label = match style.as_str() {
             "beam" => "竖线 (|)",
@@ -330,6 +342,12 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             w.set_setting_cursor_style(style.as_str().into());
         }
         let s_owned = style.to_string();
+        if let Some(ref mut r) = *renderer_cursor.borrow_mut() {
+            r.set_cursor_style(&s_owned);
+        }
+        for instance in active_terminals_cursor.borrow_mut().values_mut() {
+            instance.parser.mark_dirty();
+        }
         let _ = core_state_cursor.storage().config().update(Box::new(move |c| {
             c.cursor_style = s_owned;
         }));
@@ -338,6 +356,8 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_blink = ctx.notifications.clone();
     let core_state_blink = ctx.core_state.clone();
     let window_weak_blink = window.as_weak();
+    let renderer_blink = Rc::clone(&ctx.terminal_renderer);
+    let active_terminals_blink = Rc::clone(&ctx.active_terminals);
     window.on_change_cursor_blink(move |blink| {
         if blink {
             notif_blink.info("光标闪烁已开启", "终端光标已启用周期呼吸闪烁");
@@ -346,6 +366,12 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         }
         if let Some(w) = window_weak_blink.upgrade() {
             w.set_setting_cursor_blink(blink);
+        }
+        if let Some(ref mut r) = *renderer_blink.borrow_mut() {
+            r.set_cursor_blink(blink);
+        }
+        for instance in active_terminals_blink.borrow_mut().values_mut() {
+            instance.parser.mark_dirty();
         }
         let _ = core_state_blink.storage().config().update(Box::new(move |c| {
             c.cursor_blink = blink;
@@ -381,6 +407,114 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         let b_owned = style.to_string();
         let _ = core_state_bell.storage().config().update(Box::new(move |c| {
             c.terminal_bell_style = b_owned;
+        }));
+    });
+
+    let notif_cos = ctx.notifications.clone();
+    let core_state_cos = ctx.core_state.clone();
+    let window_weak_cos = window.as_weak();
+    window.on_change_copy_on_select(move |enabled| {
+        if enabled {
+            notif_cos.info("划选自动复制已开启", "在终端中划选文字时将立即自动写入系统剪贴板");
+        } else {
+            notif_cos.info("划选自动复制已关闭", "划选文字后需手动按 Ctrl+Shift+C 复制");
+        }
+        if let Some(w) = window_weak_cos.upgrade() {
+            w.set_setting_copy_on_select(enabled);
+        }
+        let _ = core_state_cos.storage().config().update(Box::new(move |c| {
+            c.copy_on_select = enabled;
+        }));
+    });
+
+    let notif_porc = ctx.notifications.clone();
+    let core_state_porc = ctx.core_state.clone();
+    let window_weak_porc = window.as_weak();
+    window.on_change_paste_on_right_click(move |enabled| {
+        if enabled {
+            notif_porc.info("右键快速粘贴已开启", "在终端视口中右键单击将直接粘贴系统剪贴板内容");
+        } else {
+            notif_porc.info("右键快捷菜单已恢复", "在终端视口中右键单击将呼出操作上下文菜单");
+        }
+        if let Some(w) = window_weak_porc.upgrade() {
+            w.set_setting_paste_on_right_click(enabled);
+        }
+        let _ = core_state_porc.storage().config().update(Box::new(move |c| {
+            c.paste_on_right_click = enabled;
+        }));
+    });
+
+    let notif_wmp = ctx.notifications.clone();
+    let core_state_wmp = ctx.core_state.clone();
+    let window_weak_wmp = window.as_weak();
+    window.on_change_warn_multiline_paste(move |enabled| {
+        if enabled {
+            notif_wmp.info("多行粘贴告警已开启", "粘贴包含换行符的多行指令时将前置安全告警");
+        } else {
+            notif_wmp.info("多行粘贴告警已关闭", "粘贴多行命令时将直接执行无需告警");
+        }
+        if let Some(w) = window_weak_wmp.upgrade() {
+            w.set_setting_warn_multiline_paste(enabled);
+        }
+        let _ = core_state_wmp.storage().config().update(Box::new(move |c| {
+            c.warn_on_multiline_paste = enabled;
+        }));
+    });
+
+    let notif_ca = ctx.notifications.clone();
+    let core_state_ca = ctx.core_state.clone();
+    let window_weak_ca = window.as_weak();
+    window.on_change_close_action(move |action| {
+        let is_tray = action.as_str() == "tray";
+        if is_tray {
+            notif_ca.info("窗口关闭行为", "关闭主窗口时将最小化到系统托盘，保持会话持续在线");
+        } else {
+            notif_ca.info("窗口关闭行为", "关闭主窗口时将完全退出应用程序");
+        }
+        if let Some(w) = window_weak_ca.upgrade() {
+            w.set_setting_close_action(action.as_str().into());
+        }
+        let a_str = action.to_string();
+        let _ = core_state_ca.storage().config().update(Box::new(move |c| {
+            c.close_action = a_str;
+        }));
+    });
+
+    let notif_proxy = ctx.notifications.clone();
+    let core_state_proxy = ctx.core_state.clone();
+    let window_weak_proxy = window.as_weak();
+    window.on_change_global_proxy(move |mode, server, auth, user, pass| {
+        let m_str = mode.to_string();
+        let s_str = server.to_string();
+        let u_str = user.to_string();
+        let p_str = pass.to_string();
+
+        let label = match m_str.as_str() {
+            "direct" => "直连 (禁用代理)",
+            "system" => "跟随系统代理",
+            "custom" => "自定义代理",
+            _ => "直连",
+        };
+        notif_proxy.success("出站代理已同步", &format!("当前代理策略已设置为「{}」", label));
+
+        if let Some(w) = window_weak_proxy.upgrade() {
+            w.set_setting_global_proxy_mode(m_str.as_str().into());
+            w.set_setting_global_proxy_server(s_str.as_str().into());
+            w.set_setting_global_proxy_auth(auth);
+            w.set_setting_global_proxy_user(u_str.as_str().into());
+            w.set_setting_global_proxy_pass(p_str.as_str().into());
+        }
+
+        let m_save = m_str.clone();
+        let s_save = s_str.clone();
+        let u_save = u_str.clone();
+        let p_save = p_str.clone();
+        let _ = core_state_proxy.storage().config().update(Box::new(move |c| {
+            c.global_proxy_mode = m_save;
+            c.global_proxy_server = s_save;
+            c.global_proxy_auth = auth;
+            c.global_proxy_user = u_save;
+            c.global_proxy_pass = p_save;
         }));
     });
 
@@ -452,6 +586,26 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         list.push(rule);
         notif_add.success("已添加高亮规则", &format!("成功添加规则「{}」", p));
         if let Some(w) = window_weak_add.upgrade() {
+            w.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    // 注册编辑规则
+    let rules_state_edit = rules_state.clone();
+    let window_weak_edit = window.as_weak();
+    let notif_edit = ctx.notifications.clone();
+    window.on_update_keyword_rule(move |id, pattern, remark, color_hex| {
+        let p = pattern.as_str().trim();
+        if p.is_empty() { return; }
+        let mut list = rules_state_edit.borrow_mut();
+        if let Some(item) = list.iter_mut().find(|r| r.id == id) {
+            item.pattern = p.into();
+            item.remark = remark.clone();
+            item.color_hex = color_hex.clone();
+            item.rule_color = hex_to_slint_color(color_hex.as_str());
+            notif_edit.success("高亮规则已更新", &format!("成功更新规则「{}」", p));
+        }
+        if let Some(w) = window_weak_edit.upgrade() {
             w.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
         }
     });

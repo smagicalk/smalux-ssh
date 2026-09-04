@@ -369,9 +369,13 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // 3.4 退出时含活跃会话防呆确认设置
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
+    let core_state_confirm = ctx.core_state.clone();
     window.on_toggle_confirm_close_active(move |enabled| {
         if let Some(w) = window_weak.upgrade() {
             w.set_setting_confirm_close_active(enabled);
+            let _ = core_state_confirm.storage().config().update(Box::new(move |c| {
+                c.confirm_close_active = enabled;
+            }));
             tracing::info!(target: "smagical_ui::settings", "退出时活跃会话防呆确认设置为: {}", enabled);
         }
     });
@@ -569,12 +573,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             }));
 
             if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
-                let font_bytes = if std::path::Path::new(font_str).exists() {
-                    std::fs::read(font_str).ok()
-                } else {
-                    None
-                };
-
+                let font_bytes = crate::terminal::renderer::find_font_by_name(font_str);
                 if let Some(bytes) = font_bytes {
                     let _ = renderer.update_font(&bytes, size);
                 } else {

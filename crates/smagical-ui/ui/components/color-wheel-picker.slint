@@ -1,0 +1,294 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppButton } from "base/app-button.slint";
+
+/// 现代化色相环圆盘取色器 (Circular Color Wheel Picker Modal)
+///
+/// 独立抽取的通用取色器组件，支持 360° 色相 + 径向饱和度选取、明度滑块调节、Hex 实时输入与预设色块。
+export component ColorWheelPickerModal inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <string> title: @tr("色相圆盘取色器");
+    in-out property <string> hex-value: "#EF4444";
+    in property <brush> preview-brush: #EF4444;
+    in property <float> indicator-x: 90.0;
+    in property <float> indicator-y: 90.0;
+    in property <float> brightness: 1.0;
+    in property <brush> hue-brush: #ff0000;
+    in property <[{ hex: string, c: color }]> swatches: [
+        { hex: "#EF4444", c: #EF4444 },
+        { hex: "#F97316", c: #F97316 },
+        { hex: "#F59E0B", c: #F59E0B },
+        { hex: "#10B981", c: #10B981 },
+        { hex: "#06B6D4", c: #06B6D4 },
+        { hex: "#3B82F6", c: #3B82F6 },
+        { hex: "#8B5CF6", c: #8B5CF6 },
+        { hex: "#EC4899", c: #EC4899 }
+    ];
+
+    callback wheel-coord-picked(float, float);
+    callback wheel-brightness-picked(float);
+    callback hex-changed(string);
+    callback confirmed(string, brush);
+    callback close();
+
+    if root.is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6;
+        z: 1200;
+
+        // 遮罩点击关闭
+        TouchArea {
+            clicked => { root.close(); }
+        }
+
+        // 弹窗卡片本体
+        Rectangle {
+            width: 380px;
+            height: 440px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1.5px;
+            border-color: AppTheme.accent;
+            drop-shadow-blur: 28px;
+            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: 8px;
+
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 10px;
+                alignment: start;
+
+                // 1. 顶部标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: start;
+                        Text { text: "🎨"; font-size: 14px; vertical-alignment: center; }
+                        Text {
+                            text: root.title;
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 11px;
+                        background: p-cls.has-hover ? AppTheme.hover-background : transparent;
+                        p-cls := TouchArea {
+                            clicked => { root.close(); }
+                            mouse-cursor: pointer;
+                        }
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            colorize: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 2. 🌈 核心取色色轮圆盘 (180x180 px，支持全角度色相 + 径向饱和度选取)
+                HorizontalLayout {
+                    alignment: center;
+                    height: 180px;
+
+                    Rectangle {
+                        width: 180px;
+                        height: 180px;
+                        clip: false;
+
+                        Image {
+                            source: @image-url("../assets/color-wheel.png");
+                            width: 180px;
+                            height: 180px;
+                        }
+
+                        // 交互触摸区域 (支持点击与按住拖拽)
+                        wheel-touch := TouchArea {
+                            width: 180px;
+                            height: 180px;
+                            mouse-cursor: crosshair;
+
+                            moved => {
+                                if self.pressed {
+                                    root.wheel-coord-picked(
+                                        (self.mouse-x - 90px) / 90px,
+                                        (self.mouse-y - 90px) / 90px
+                                    );
+                                }
+                            }
+
+                            clicked => {
+                                root.wheel-coord-picked(
+                                    (self.mouse-x - 90px) / 90px,
+                                    (self.mouse-y - 90px) / 90px
+                                );
+                            }
+                        }
+
+                        // 🎯 动态指针圆环 (跟随取色位置精准移动)
+                        Rectangle {
+                            x: (root.indicator-x * 1px) - 7px;
+                            y: (root.indicator-y * 1px) - 7px;
+                            width: 14px;
+                            height: 14px;
+                            border-radius: 7px;
+                            border-width: 2px;
+                            border-color: #ffffff;
+                            background: root.preview-brush;
+                            drop-shadow-blur: 4px;
+                            drop-shadow-color: #000000bb;
+                        }
+                    }
+                }
+
+                // 3. 🌗 明度调节滑块 (Value / Brightness Slider)
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: center;
+                    height: 24px;
+
+                    Text {
+                        text: @tr("明度");
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        width: 260px;
+                        height: 14px;
+                        border-radius: 7px;
+                        background: @linear-gradient(90deg, #000000 0%, root.hue-brush 100%);
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        clip: false;
+
+                        TouchArea {
+                            mouse-cursor: pointer;
+                            moved => {
+                                if self.pressed {
+                                    root.wheel-brightness-picked(max(0.0, min(1.0, self.mouse-x / parent.width)));
+                                }
+                            }
+                            clicked => {
+                                root.wheel-brightness-picked(max(0.0, min(1.0, self.mouse-x / parent.width)));
+                            }
+                        }
+
+                        // 滑块手柄
+                        Rectangle {
+                            x: max(0px, min(parent.width - 16px, (root.brightness * (parent.width - 16px))));
+                            y: -1px;
+                            width: 16px;
+                            height: 16px;
+                            border-radius: 8px;
+                            border-width: 2px;
+                            border-color: #ffffff;
+                            background: root.preview-brush;
+                            drop-shadow-blur: 3px;
+                            drop-shadow-color: #00000080;
+                        }
+                    }
+                }
+
+                // 4. 当前颜色预览与 Hex 直接输入栏
+                Rectangle {
+                    height: 38px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 8px;
+                        alignment: space-between;
+
+                        Rectangle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 4px;
+                            border-width: 1px;
+                            border-color: #ffffff40;
+                            background: root.preview-brush;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            clip: true;
+
+                            pick-inp := TextInput {
+                                width: 100%;
+                                height: 100%;
+                                text <=> root.hex-value;
+                                font-size: 13px;
+                                font-family: "JetBrains Mono";
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                                edited => {
+                                    root.hex-changed(self.text);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 5. 常用预设快捷小色块
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: center;
+                    height: 24px;
+
+                    for s in root.swatches: Rectangle {
+                        width: 32px;
+                        height: 20px;
+                        border-radius: 3px;
+                        border-width: 1px;
+                        border-color: sw-chip.has-hover ? AppTheme.accent : #ffffff22;
+                        background: s.c;
+
+                        sw-chip := TouchArea {
+                            clicked => {
+                                root.hex-changed(s.hex);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+
+                // 6. 底部确认关闭
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 8px;
+
+                    AppButton {
+                        text: @tr("确定");
+                        variant: "primary";
+                        clicked => {
+                            root.confirmed(root.hex-value, root.preview-brush);
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

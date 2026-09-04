@@ -8,6 +8,7 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppIconButton } from "../components/base/app-icon-button.slint";
 import { AppButton } from "../components/base/app-button.slint";
+import { ColorWheelPickerModal } from "../components/color-wheel-picker.slint";
 import { ScrollView } from "std-widgets.slint";
 import { ThemeOption, ThemeRow } from "left_drawers/settings_drawer.slint";
 
@@ -148,6 +149,7 @@ component LanguageDropdown inherits Rectangle {
                         clicked => {
                             root.selected-lang = "zh-CN";
                             root.switch-language("zh-CN");
+                            lang-popup.close();
                         }
                         mouse-cursor: pointer;
                     }
@@ -183,6 +185,7 @@ component LanguageDropdown inherits Rectangle {
                         clicked => {
                             root.selected-lang = "en-US";
                             root.switch-language("en-US");
+                            lang-popup.close();
                         }
                         mouse-cursor: pointer;
                     }
@@ -216,7 +219,7 @@ component LanguageDropdown inherits Rectangle {
 component FontDropdown inherits Rectangle {
     in-out property <string> selected-font: "系统默认 (System Default)";
     in property <[string]> font-list: [];
-    in property <length> popup-max-height: 240px;
+    in property <length> popup-max-height: 280px;
     callback font-selected(string);
 
     width: 220px;
@@ -259,59 +262,57 @@ component FontDropdown inherits Rectangle {
     font-popup := PopupWindow {
         x: 0px;
         y: root.height + 4px;
-        width: Math.max(root.width, 240px);
+        width: root.width;
 
         Rectangle {
+            width: root.width;
             border-radius: AppTheme.radius-medium;
-            background: AppTheme.surface-background;
+            background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
-            drop-shadow-blur: 12px;
-            drop-shadow-color: #00000066;
-            drop-shadow-offset-y: 3px;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: 4px;
 
-            ScrollView {
-                height: Math.min(root.font-list.length * 30px + 8px, root.popup-max-height);
-                viewport-height: root.font-list.length * 30px + 8px;
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
 
-                VerticalLayout {
-                    padding: 4px;
-                    spacing: 2px;
+                for f in root.font-list: Rectangle {
+                    height: 28px;
+                    border-radius: AppTheme.radius-small;
+                    background: root.selected-font == f ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
 
-                    for f in root.font-list: Rectangle {
-                        height: 28px;
-                        border-radius: AppTheme.radius-small;
-                        background: root.selected-font == f ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
+                    f-opt := TouchArea {
+                        clicked => {
+                            root.selected-font = f;
+                            root.font-selected(f);
+                            font-popup.close();
+                        }
+                        mouse-cursor: pointer;
+                    }
 
-                        f-opt := TouchArea {
-                            clicked => {
-                                root.selected-font = f;
-                                root.font-selected(f);
-                            }
-                            mouse-cursor: pointer;
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+
+                        Text {
+                            text: f;
+                            font-size: 11px;
+                            font-family: f == "系统默认 (System Default)" ? "" : f;
+                            color: root.selected-font == f ? AppTheme.accent : AppTheme.foreground;
+                            font-weight: root.selected-font == f ? 700 : 400;
+                            vertical-alignment: center;
+                            overflow: elide;
                         }
 
-                        HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: 10px;
-                            alignment: space-between;
-
-                            Text {
-                                text: f;
-                                font-size: 11px;
-                                font-family: f == "系统默认 (System Default)" ? "" : f;
-                                color: root.selected-font == f ? AppTheme.accent : AppTheme.foreground;
-                                font-weight: root.selected-font == f ? 700 : 400;
-                                vertical-alignment: center;
-                            }
-
-                            if root.selected-font == f: Text {
-                                text: "✓";
-                                font-size: 11px;
-                                color: AppTheme.accent;
-                                font-weight: 700;
-                                vertical-alignment: center;
-                            }
+                        if root.selected-font == f: Text {
+                            text: "✓";
+                            font-size: 11px;
+                            color: AppTheme.accent;
+                            font-weight: 700;
+                            vertical-alignment: center;
                         }
                     }
                 }
@@ -825,7 +826,6 @@ component SettingsSectionCard inherits Rectangle {
     border-radius: 10px;
     border-width: 1px;
     border-color: AppTheme.border;
-    clip: true;
 
     VerticalLayout {
         alignment: start;
@@ -834,6 +834,8 @@ component SettingsSectionCard inherits Rectangle {
         // 二级卡片顶头标题栏 (内嵌于卡片顶部，带浅灰/深灰底色衬托与 1px 细分割线)
         if root.has-header: Rectangle {
             height: 42px;
+            border-top-left-radius: 9px;
+            border-top-right-radius: 9px;
             background: AppTheme.control-background.transparentize(50%);
 
             Rectangle {
@@ -1058,6 +1060,28 @@ export component SettingsCenterView inherits Rectangle {
     property <string> new-rule-remark: "";
     property <string> new-rule-color: "#EF4444";
     property <color> new-rule-slint-color: #EF4444;
+    property <bool> is-editing-keyword-rule: false;
+    property <string> editing-keyword-rule-id: "";
+    callback update-keyword-rule(string /* id */, string /* pattern */, string /* remark */, string /* color_hex */);
+    property <bool> is-add-keyword-modal-open: false;
+    property <bool> is-keyword-color-wheel-open: false;
+
+    // 色相圆盘取色器共享状态 (对接全局或 AppWindow 颜色计算)
+    in-out property <float> color-picker-indicator-x: 90.0;
+    in-out property <float> color-picker-indicator-y: 90.0;
+    in-out property <float> color-picker-brightness: 1.0;
+    in-out property <brush> color-picker-hue-brush: #ff0000;
+    in-out property <brush> color-picker-preview-brush: #EF4444;
+    in-out property <string> color-picker-hex: "#EF4444";
+
+    callback color-wheel-coord-picked(float, float);
+    callback color-wheel-brightness-picked(float);
+    callback color-picker-hex-changed(string);
+
+    function open-keyword-color-wheel() {
+        root.color-picker-hex-changed(root.new-rule-color);
+        root.is-keyword-color-wheel-open = true;
+    }
 
     callback add-keyword-rule(string /* pattern */, string /* remark */, string /* color_hex */);
     callback toggle-keyword-rule(string /* id */, bool /* enabled */);
@@ -1071,6 +1095,9 @@ export component SettingsCenterView inherits Rectangle {
     in-out property <string> setting-host-key-policy: "accept-new";
     in-out property <string> setting-global-proxy-mode: "direct";
     in-out property <string> setting-global-proxy-server: "127.0.0.1:7890";
+    in-out property <bool> setting-global-proxy-auth: false;
+    in-out property <string> setting-global-proxy-user: "";
+    in-out property <string> setting-global-proxy-pass: "";
     in-out property <bool> setting-tcp-nodelay: true;
     in-out property <bool> setting-compression: true;
     in-out property <bool> setting-legacy-ciphers: false;
@@ -1177,6 +1204,16 @@ export component SettingsCenterView inherits Rectangle {
     callback toggle-confirm-close-tab(bool /* enabled */);
     /// 关闭含活跃会话窗口时确认开关切换
     callback toggle-confirm-close-active(bool /* enabled */);
+    /// 划选自动复制开关切换
+    callback change-copy-on-select(bool /* enabled */);
+    /// 右键单击快速粘贴切换
+    callback change-paste-on-right-click(bool /* enabled */);
+    /// 粘贴多行时前置告警切换
+    callback change-warn-multiline-paste(bool /* enabled */);
+    /// 窗口关闭按钮行为切换
+    callback change-close-action(string /* action */);
+    /// 全局出站代理策略与凭据更新
+    callback change-global-proxy(string /* mode */, string /* server */, bool /* auth */, string /* user */, string /* pass */);
 
     // 备份与迁移回调
     /// 导出加密备份包
@@ -1437,7 +1474,15 @@ export component SettingsCenterView inherits Rectangle {
                                             subtitle: @tr("关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线");
                                             SettingsSwitch {
                                                 checked: root.setting-close-action == "tray";
-                                                toggled(c) => { root.setting-close-action = c ? "tray" : "exit"; }
+                                                toggled(c) => {
+                                                    if c {
+                                                        root.setting-close-action = "tray";
+                                                        root.change-close-action("tray");
+                                                    } else {
+                                                        root.setting-close-action = "exit";
+                                                        root.change-close-action("exit");
+                                                    }
+                                                }
                                             }
                                         }
 
@@ -2408,9 +2453,11 @@ export component SettingsCenterView inherits Rectangle {
                                         HorizontalLayout {
                                             spacing: 8px;
                                             alignment: center;
+                                            height: 28px;
 
                                             AppIconButton {
                                                 icon: @image-url("../assets/icons/arrow-left.svg");
+                                                y: (parent.height - self.height) / 2;
                                                 clicked => {
                                                     if root.setting-terminal-font-size > 8 {
                                                         root.setting-terminal-font-size -= 1;
@@ -2422,6 +2469,7 @@ export component SettingsCenterView inherits Rectangle {
                                             Rectangle {
                                                 width: 56px;
                                                 height: 28px;
+                                                y: (parent.height - self.height) / 2;
                                                 border-radius: AppTheme.radius-medium;
                                                 background: AppTheme.control-background;
                                                 border-width: 1px;
@@ -2458,10 +2506,12 @@ export component SettingsCenterView inherits Rectangle {
                                                 font-size: 11px;
                                                 color: AppTheme.secondary-foreground;
                                                 vertical-alignment: center;
+                                                y: (parent.height - self.height) / 2;
                                             }
 
                                             AppIconButton {
                                                 icon: @image-url("../assets/icons/arrow-right.svg");
+                                                y: (parent.height - self.height) / 2;
                                                 clicked => {
                                                     if root.setting-terminal-font-size < 36 {
                                                         root.setting-terminal-font-size += 1;
@@ -2484,7 +2534,10 @@ export component SettingsCenterView inherits Rectangle {
                                         subtitle: @tr("在终端视口中用鼠标选中文字时，立即自动复制，无需手动按快捷键");
                                         SettingsSwitch {
                                             checked: root.setting-copy-on-select;
-                                            toggled(c) => { root.setting-copy-on-select = c; }
+                                            toggled(c) => {
+                                                root.setting-copy-on-select = c;
+                                                root.change-copy-on-select(c);
+                                            }
                                         }
                                     }
 
@@ -2493,7 +2546,10 @@ export component SettingsCenterView inherits Rectangle {
                                         subtitle: @tr("在终端视口右击直接粘贴当前系统剪贴板文本");
                                         SettingsSwitch {
                                             checked: root.setting-paste-on-right-click;
-                                            toggled(c) => { root.setting-paste-on-right-click = c; }
+                                            toggled(c) => {
+                                                root.setting-paste-on-right-click = c;
+                                                root.change-paste-on-right-click(c);
+                                            }
                                         }
                                     }
 
@@ -2502,7 +2558,10 @@ export component SettingsCenterView inherits Rectangle {
                                         subtitle: @tr("防止意外在生产服务器直接执行复制进来的换行危险命令");
                                         SettingsSwitch {
                                             checked: root.setting-warn-multiline-paste;
-                                            toggled(c) => { root.setting-warn-multiline-paste = c; }
+                                            toggled(c) => {
+                                                root.setting-warn-multiline-paste = c;
+                                                root.change-warn-multiline-paste(c);
+                                            }
                                         }
                                     }
 
@@ -2575,7 +2634,7 @@ export component SettingsCenterView inherits Rectangle {
                                             VerticalLayout {
                                                 spacing: 0px;
 
-                                                // 表头 (占满整行，padding 匹配 18px 对齐)
+                                                // 表头 (最左端为正则表达式，最右端为删除操作，中间弹性填满)
                                                 Rectangle {
                                                     height: 34px;
                                                     background: AppTheme.hover-background;
@@ -2584,17 +2643,16 @@ export component SettingsCenterView inherits Rectangle {
                                                         padding-left: 18px;
                                                         padding-right: 18px;
                                                         spacing: 12px;
-                                                        alignment: start;
 
-                                                        Text { width: 230px; text: @tr("正则表达式 (Pattern)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
+                                                        Text { width: 220px; text: @tr("正则表达式 (Pattern)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
                                                         Text { horizontal-stretch: 1; text: @tr("规则备注说明"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
                                                         Text { width: 80px; text: @tr("高亮色彩"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
-                                                        Text { width: 50px; text: @tr("启用"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
-                                                        Text { width: 44px; text: @tr("删除"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                        Text { width: 60px; text: @tr("启用"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                        Text { width: 68px; text: @tr("操作"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
                                                     }
                                                 }
 
-                                                // 表格数据行 (占满整行，每行 hover 效果横贯全宽，左右 padding 18px 对齐)
+                                                // 表格数据行 (占满整行，最左端为正则表达式，最右端为删除操作，每行 hover 效果横贯全宽)
                                                 for rule[idx] in root.terminal-keyword-rules: VerticalLayout {
                                                     spacing: 0px;
                                                     Rectangle { height: 1px; background: AppTheme.border.transparentize(60%); }
@@ -2608,11 +2666,10 @@ export component SettingsCenterView inherits Rectangle {
                                                             padding-left: 18px;
                                                             padding-right: 18px;
                                                             spacing: 12px;
-                                                            alignment: start;
 
-                                                            // 列 1: 正则表达式 (严格左对齐)
+                                                            // 列 1: 正则表达式 (最左端，固定 220px)
                                                             HorizontalLayout {
-                                                                width: 230px;
+                                                                width: 220px;
                                                                 alignment: start;
 
                                                                 Rectangle {
@@ -2641,7 +2698,7 @@ export component SettingsCenterView inherits Rectangle {
                                                                 }
                                                             }
 
-                                                            // 列 2: 备注说明 (严格左对齐)
+                                                            // 列 2: 备注说明 (严格左对齐，弹性填满整个中间区域)
                                                             Text {
                                                                 horizontal-stretch: 1;
                                                                 text: rule.remark;
@@ -2652,7 +2709,7 @@ export component SettingsCenterView inherits Rectangle {
                                                                 overflow: elide;
                                                             }
 
-                                                            // 列 3: 高亮色彩 (纯正圆形色块选择指示器)
+                                                            // 列 3: 高亮色彩 (居中圆形色块选择指示器)
                                                             HorizontalLayout {
                                                                 width: 80px;
                                                                 alignment: center;
@@ -2671,7 +2728,7 @@ export component SettingsCenterView inherits Rectangle {
 
                                                             // 列 4: 开关 (居中对齐)
                                                             HorizontalLayout {
-                                                                width: 50px;
+                                                                width: 60px;
                                                                 alignment: center;
 
                                                                 SettingsSwitch {
@@ -2683,13 +2740,29 @@ export component SettingsCenterView inherits Rectangle {
                                                                 }
                                                             }
 
-                                                            // 列 5: 删除 (居中对齐)
+                                                            // 列 5: 操作按钮 (编辑 + 删除，最右端)
                                                             HorizontalLayout {
-                                                                width: 44px;
+                                                                width: 68px;
+                                                                spacing: 4px;
                                                                 alignment: center;
 
                                                                 AppIconButton {
+                                                                    icon: @image-url("../assets/icons/pencil.svg");
+                                                                    y: (parent.height - self.height) / 2;
+                                                                    clicked => {
+                                                                        root.is-editing-keyword-rule = true;
+                                                                        root.editing-keyword-rule-id = rule.id;
+                                                                        root.new-rule-pattern = rule.pattern;
+                                                                        root.new-rule-remark = rule.remark;
+                                                                        root.new-rule-color = rule.color-hex;
+                                                                        root.new-rule-slint-color = rule.rule-color;
+                                                                        root.is-add-keyword-modal-open = true;
+                                                                    }
+                                                                }
+
+                                                                AppIconButton {
                                                                     icon: @image-url("../assets/icons/trash.svg");
+                                                                    y: (parent.height - self.height) / 2;
                                                                     clicked => {
                                                                         root.delete-keyword-rule(rule.id);
                                                                     }
@@ -2701,10 +2774,10 @@ export component SettingsCenterView inherits Rectangle {
                                             }
                                         }
 
-                                        // 表格与添加栏之间的分割线
+                                        // 表格与底部操作栏之间的分割线
                                         Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
 
-                                        // 底部添加新规则输入栏 (占满整行全宽，左右 padding 18px 对齐)
+                                        // 底部操作栏：说明与打开添加弹窗按钮 (最右端)
                                         Rectangle {
                                             height: 48px;
                                             background: AppTheme.control-background;
@@ -2712,108 +2785,41 @@ export component SettingsCenterView inherits Rectangle {
                                             HorizontalLayout {
                                                 padding-left: 18px;
                                                 padding-right: 18px;
-                                                spacing: 10px;
-                                                alignment: center;
+                                                alignment: space-between;
 
-                                                // 正则表达式输入框
-                                                Rectangle {
-                                                    width: 230px;
-                                                    height: 28px;
-                                                    border-radius: AppTheme.radius-small;
-                                                    background: AppTheme.surface-background;
-                                                    border-width: 1px;
-                                                    border-color: add-pat.has-focus ? AppTheme.accent : AppTheme.border;
-
-                                                    HorizontalLayout {
-                                                        padding-left: 8px;
-                                                        padding-right: 8px;
-                                                        alignment: center;
-
-                                                        add-pat := TextInput {
-                                                            text <=> root.new-rule-pattern;
-                                                            font-size: 11px;
-                                                            font-family: "JetBrains Mono, monospace";
-                                                            color: AppTheme.foreground;
-                                                            single-line: true;
-                                                        }
-                                                        if root.new-rule-pattern == "": Text {
-                                                            text: @tr("输入正则表达式...");
-                                                            font-size: 10px;
-                                                            color: AppTheme.disabled-foreground;
-                                                            vertical-alignment: center;
-                                                        }
-                                                    }
-                                                }
-
-                                                // 备注说明输入框
-                                                Rectangle {
-                                                    horizontal-stretch: 1;
-                                                    height: 28px;
-                                                    border-radius: AppTheme.radius-small;
-                                                    background: AppTheme.surface-background;
-                                                    border-width: 1px;
-                                                    border-color: add-rem.has-focus ? AppTheme.accent : AppTheme.border;
-
-                                                    HorizontalLayout {
-                                                        padding-left: 8px;
-                                                        padding-right: 8px;
-                                                        alignment: center;
-
-                                                        add-rem := TextInput {
-                                                            text <=> root.new-rule-remark;
-                                                            font-size: 11px;
-                                                            color: AppTheme.foreground;
-                                                            single-line: true;
-                                                        }
-                                                        if root.new-rule-remark == "": Text {
-                                                            text: @tr("规则备注说明...");
-                                                            font-size: 10px;
-                                                            color: AppTheme.disabled-foreground;
-                                                            vertical-alignment: center;
-                                                        }
-                                                    }
-                                                }
-
-                                                // 颜色快捷选择胶囊 (6个圆形色块)
+                                                // 左侧提示说明
                                                 HorizontalLayout {
-                                                    spacing: 6px;
-                                                    alignment: center;
-
-                                                    for c in [
-                                                        { hex: "#EF4444", clr: #EF4444 },
-                                                        { hex: "#F59E0B", clr: #F59E0B },
-                                                        { hex: "#10B981", clr: #10B981 },
-                                                        { hex: "#3B82F6", clr: #3B82F6 },
-                                                        { hex: "#8B5CF6", clr: #8B5CF6 },
-                                                        { hex: "#EC4899", clr: #EC4899 }
-                                                    ]: Rectangle {
-                                                        width: 18px;
-                                                        height: 18px;
-                                                        border-radius: 9px;
-                                                        background: c.clr;
-                                                        border-width: root.new-rule-color == c.hex ? 2px : 1px;
-                                                        border-color: root.new-rule-color == c.hex ? #FFFFFF : #00000030;
-
-                                                        TouchArea {
-                                                            clicked => {
-                                                                root.new-rule-color = c.hex;
-                                                                root.new-rule-slint-color = c.clr;
-                                                            }
-                                                            mouse-cursor: pointer;
-                                                        }
+                                                    spacing: 8px;
+                                                    alignment: start;
+                                                    Image {
+                                                        source: @image-url("../assets/icons/sparkles.svg");
+                                                        width: 13px;
+                                                        height: 13px;
+                                                        colorize: AppTheme.accent;
+                                                        y: (parent.height - self.height) / 2;
+                                                    }
+                                                    Text {
+                                                        text: @tr("支持根据正则表达式对终端输出中的关键错误、告警与状态实时着色");
+                                                        font-size: 11px;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
                                                     }
                                                 }
 
-                                                // 添加按钮
+                                                // 右侧打开新建规则弹窗按钮
                                                 AppButton {
-                                                    text: @tr("+ 添加规则");
+                                                    text: @tr("+ 添加高亮规则");
+                                                    icon: @image-url("../assets/icons/plus.svg");
+                                                    has-icon: true;
                                                     variant: "primary";
                                                     clicked => {
-                                                        if root.new-rule-pattern != "" {
-                                                            root.add-keyword-rule(root.new-rule-pattern, root.new-rule-remark != "" ? root.new-rule-remark : @tr("自定义规则"), root.new-rule-color);
-                                                            root.new-rule-pattern = "";
-                                                            root.new-rule-remark = "";
-                                                        }
+                                                        root.is-editing-keyword-rule = false;
+                                                        root.editing-keyword-rule-id = "";
+                                                        root.new-rule-pattern = "";
+                                                        root.new-rule-remark = "";
+                                                        root.new-rule-color = "#EF4444";
+                                                        root.new-rule-slint-color = #EF4444;
+                                                        root.is-add-keyword-modal-open = true;
                                                     }
                                                 }
                                             }
@@ -3022,7 +3028,10 @@ export component SettingsCenterView inherits Rectangle {
                                                         animate background { duration: 120ms; }
 
                                                         pm-t := TouchArea {
-                                                            clicked => { root.setting-global-proxy-mode = pm.id; }
+                                                            clicked => {
+                                                                root.setting-global-proxy-mode = pm.id;
+                                                                root.change-global-proxy(pm.id, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
+                                                            }
                                                             mouse-cursor: pointer;
                                                         }
 
@@ -3065,6 +3074,80 @@ export component SettingsCenterView inherits Rectangle {
                                                         font-family: "JetBrains Mono, monospace";
                                                         color: AppTheme.foreground;
                                                         single-line: true;
+                                                        edited => {
+                                                            root.change-global-proxy(root.setting-global-proxy-mode, self.text, root.setting-global-proxy-auth, root.setting-global-proxy-user, root.setting-global-proxy-pass);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-global-proxy-mode == "custom": SettingsRow {
+                                            title: @tr("代理身份认证 (Proxy Authentication)");
+                                            subtitle: @tr("如果代理服务器需要用户名与密码凭据验证，请开启此项");
+
+                                            SettingsSwitch {
+                                                checked: root.setting-global-proxy-auth;
+                                                toggled(c) => {
+                                                    root.setting-global-proxy-auth = c;
+                                                    root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, c, root.setting-global-proxy-user, root.setting-global-proxy-pass);
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-global-proxy-mode == "custom" && root.setting-global-proxy-auth: SettingsRow {
+                                            title: @tr("代理用户名 (Proxy Username)");
+                                            subtitle: @tr("代理服务器身份认证用户名");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-small;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: pu-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    alignment: center;
+                                                    pu-inp := TextInput {
+                                                        text <=> root.setting-global-proxy-user;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        single-line: true;
+                                                        edited => {
+                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, self.text, root.setting-global-proxy-pass);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if root.setting-global-proxy-mode == "custom" && root.setting-global-proxy-auth: SettingsRow {
+                                            title: @tr("代理密码 (Proxy Password)");
+                                            subtitle: @tr("代理服务器身份认证访问密码");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-small;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: pp-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    alignment: center;
+                                                    pp-inp := TextInput {
+                                                        text <=> root.setting-global-proxy-pass;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        single-line: true;
+                                                        edited => {
+                                                            root.change-global-proxy(root.setting-global-proxy-mode, root.setting-global-proxy-server, root.setting-global-proxy-auth, root.setting-global-proxy-user, self.text);
+                                                        }
                                                     }
                                                 }
                                             }
@@ -3452,5 +3535,374 @@ export component SettingsCenterView inherits Rectangle {
                     }
                 }
             }
+        
+    // =========================================================================
+    // ✨ 关键词高亮新建规则弹窗 (Add Keyword Rule Modal)
+    // =========================================================================
+    if root.is-add-keyword-modal-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6;
+        z: 1000;
+
+        TouchArea {
+            clicked => { root.is-add-keyword-modal-open = false; }
         }
 
+        Rectangle {
+            width: 480px;
+            height: 420px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1.5px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 28px;
+            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: 8px;
+
+            TouchArea {}
+
+            VerticalLayout {
+                padding: 20px;
+                spacing: 14px;
+                alignment: space-between;
+
+                // 1. 顶部标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 28px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        Image {
+                            source: @image-url("../assets/icons/sparkles.svg");
+                            width: 16px;
+                            height: 16px;
+                            colorize: AppTheme.accent;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 1px;
+
+                            Text {
+                                text: root.is-editing-keyword-rule ? @tr("编辑诊断高亮规则") : @tr("新建诊断高亮规则");
+                                font-size: 14px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                            Text {
+                                text: root.is-editing-keyword-rule ? @tr("修改正则表达式与终端匹配文本的实时着色样式") : @tr("配置正则表达式与终端匹配文本的实时着色样式");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: ak-cls.has-hover ? AppTheme.hover-background : transparent;
+                        ak-cls := TouchArea {
+                            clicked => { root.is-add-keyword-modal-open = false; }
+                            mouse-cursor: pointer;
+                        }
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            colorize: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+
+                // 2. 表单内容区
+                VerticalLayout {
+                    spacing: 12px;
+                    horizontal-stretch: 1;
+
+                    // 字段 1: 正则表达式 (Pattern)
+                    VerticalLayout {
+                        spacing: 4px;
+
+                        HorizontalLayout {
+                            alignment: space-between;
+                            Text {
+                                text: @tr("正则表达式 (Pattern)");
+                                font-size: 11px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                            Text {
+                                text: @tr("必填 · 支持标准 ECMAScript 正则");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                            }
+                        }
+
+                        Rectangle {
+                            height: 32px;
+                            border-radius: AppTheme.radius-small;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: modal-pat.has-focus ? AppTheme.accent : AppTheme.border;
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                alignment: center;
+
+                                modal-pat := TextInput {
+                                    text <=> root.new-rule-pattern;
+                                    font-size: 11px;
+                                    font-family: "JetBrains Mono, monospace";
+                                    color: AppTheme.foreground;
+                                    single-line: true;
+                                }
+                                if root.new-rule-pattern == "": Text {
+                                    text: @tr("例如: \\b(ERROR|FATAL|CRITICAL)\\b");
+                                    font-size: 11px;
+                                    color: AppTheme.disabled-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // 快速填入常用预设
+                        HorizontalLayout {
+                            spacing: 6px;
+                            alignment: start;
+
+                            Text {
+                                text: @tr("快捷预设:");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+
+                            for p in [
+                                { label: "ERROR", pat: "\\b(ERROR|FATAL|Failed|Error)\\b", rem: @tr("致命错误"), clr_hex: "#EF4444", clr: #EF4444 },
+                                { label: "WARN", pat: "\\b(WARN|WARNING|Warning)\\b", rem: @tr("告警提示"), clr_hex: "#F59E0B", clr: #F59E0B },
+                                { label: "SUCCESS", pat: "\\b(SUCCESS|OK|Finished|Done)\\b", rem: @tr("执行成功"), clr_hex: "#10B981", clr: #10B981 },
+                                { label: "IP 地址", pat: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b", rem: @tr("IPv4 地址"), clr_hex: "#8B5CF6", clr: #8B5CF6 }
+                            ]: Rectangle {
+                                height: 20px;
+                                border-radius: 4px;
+                                background: q-chip.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                q-chip := TouchArea {
+                                    clicked => {
+                                        root.new-rule-pattern = p.pat;
+                                        root.new-rule-remark = p.rem;
+                                        root.new-rule-color = p.clr_hex;
+                                        root.new-rule-slint-color = p.clr;
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    alignment: center;
+                                    Text {
+                                        text: p.label;
+                                        font-size: 10px;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 字段 2: 规则备注说明 (Remark)
+                    VerticalLayout {
+                        spacing: 4px;
+
+                        Text {
+                            text: @tr("规则备注说明 (Remark)");
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+
+                        Rectangle {
+                            height: 32px;
+                            border-radius: AppTheme.radius-small;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: modal-rem.has-focus ? AppTheme.accent : AppTheme.border;
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 10px;
+                                alignment: center;
+
+                                modal-rem := TextInput {
+                                    text <=> root.new-rule-remark;
+                                    font-size: 11px;
+                                    color: AppTheme.foreground;
+                                    single-line: true;
+                                }
+                                if root.new-rule-remark == "": Text {
+                                    text: @tr("输入规则备注，例如: 关键业务日志告警");
+                                    font-size: 11px;
+                                    color: AppTheme.disabled-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // 字段 3: 高亮色彩设置 (Color)
+                    VerticalLayout {
+                        spacing: 6px;
+
+                        Text {
+                            text: @tr("高亮色彩 (Highlight Color)");
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 12px;
+                            alignment: start;
+
+                            // 当前选中色彩药丸胶囊 (点击打开色相圆盘取色器)
+                            Rectangle {
+                                height: 32px;
+                                border-radius: AppTheme.radius-small;
+                                background: clr-pill.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                clr-pill := TouchArea {
+                                    clicked => { root.open-keyword-color-wheel(); }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 12px;
+                                    spacing: 8px;
+                                    alignment: center;
+
+                                    // 纯圆形高亮颜色预览
+                                    Rectangle {
+                                        width: 18px;
+                                        height: 18px;
+                                        border-radius: 9px;
+                                        background: root.new-rule-slint-color;
+                                        border-width: 1.5px;
+                                        border-color: #FFFFFF80;
+                                        drop-shadow-blur: 3px;
+                                        drop-shadow-color: #00000040;
+                                    }
+
+                                    Text {
+                                        text: root.new-rule-color;
+                                        font-family: "JetBrains Mono";
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 调色盘取色器按钮 (打开色相圆盘取色器)
+                            AppButton {
+                                text: @tr("🎨 色相圆盘取色器...");
+                                variant: "secondary";
+                                clicked => { root.open-keyword-color-wheel(); }
+                            }
+                        }
+                    }
+                }
+
+                Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+
+                // 3. 底部操作栏
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 10px;
+
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        clicked => { root.is-add-keyword-modal-open = false; }
+                    }
+
+                    AppButton {
+                        text: root.is-editing-keyword-rule ? @tr("保存修改") : @tr("确认添加");
+                        variant: "primary";
+                        clicked => {
+                            if root.new-rule-pattern != "" {
+                                if root.is-editing-keyword-rule {
+                                    root.update-keyword-rule(
+                                        root.editing-keyword-rule-id,
+                                        root.new-rule-pattern,
+                                        root.new-rule-remark != "" ? root.new-rule-remark : @tr("自定义规则"),
+                                        root.new-rule-color
+                                    );
+                                } else {
+                                    root.add-keyword-rule(
+                                        root.new-rule-pattern,
+                                        root.new-rule-remark != "" ? root.new-rule-remark : @tr("自定义规则"),
+                                        root.new-rule-color
+                                    );
+                                }
+                                root.new-rule-pattern = "";
+                                root.new-rule-remark = "";
+                                root.is-add-keyword-modal-open = false;
+                                root.is-editing-keyword-rule = false;
+                                root.editing-keyword-rule-id = "";
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 🎨 共享色相圆盘取色器弹窗 (ColorWheelPickerModal)
+    // =========================================================================
+    ColorWheelPickerModal {
+        is-open: root.is-keyword-color-wheel-open;
+        title: @tr("高亮色彩取色器 · 色相圆盘");
+        hex-value: root.color-picker-hex;
+        preview-brush: root.color-picker-preview-brush;
+        indicator-x: root.color-picker-indicator-x;
+        indicator-y: root.color-picker-indicator-y;
+        brightness: root.color-picker-brightness;
+        hue-brush: root.color-picker-hue-brush;
+
+        wheel-coord-picked(x, y) => { root.color-wheel-coord-picked(x, y); }
+        wheel-brightness-picked(b) => { root.color-wheel-brightness-picked(b); }
+        hex-changed(h) => { root.color-picker-hex-changed(h); }
+
+        confirmed(hex, brush) => {
+            root.new-rule-color = hex;
+            root.new-rule-slint-color = brush;
+            root.is-keyword-color-wheel-open = false;
+        }
+
+        close => {
+            root.is-keyword-color-wheel-open = false;
+        }
+    }
+}

@@ -50,10 +50,14 @@ export component TerminalPaneView inherits Rectangle {
     in property <bool> is-dragging-tab: false;
     in property <string> drag-tab-source-pane: "";
     in property <int> drag-tab-from-index: -1;
+    /// 鼠标右键单击快速粘贴
+    in property <bool> paste-on-right-click: true;
 
     // -------------------------------------------------------------------------
     // 2. 交互回调接口
     // -------------------------------------------------------------------------
+    /// 快速粘贴剪贴板内容回调
+    callback paste-text();
     /// 点击选中当前窗格回调
     callback select();
     /// 选择指定 Tab 会话回调
@@ -362,7 +366,11 @@ export component TerminalPaneView inherits Rectangle {
                     if event.kind == PointerEventKind.down {
                         root.select();
                         if event.button == PointerEventButton.right {
-                            root.context-menu(self.mouse-x, self.mouse-y);
+                            if root.paste-on-right-click {
+                                root.paste-text();
+                            } else {
+                                root.context-menu(self.mouse-x, self.mouse-y);
+                            }
                         } else if event.button == PointerEventButton.left {
                             let start-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
                             let start-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));

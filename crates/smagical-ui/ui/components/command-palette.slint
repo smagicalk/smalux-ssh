@@ -23,7 +23,7 @@ export component CommandPalette inherits Rectangle {
     if is-open: Rectangle {
         width: 100%;
         height: 100%;
-        background: #00000088; // 半透明暗色背景
+        background: #000000a6; // 半透明暗色背景
 
         // 点击遮罩外部关闭
         TouchArea {
@@ -37,7 +37,7 @@ export component CommandPalette inherits Rectangle {
             x: (parent.width - self.width) / 2;
             y: 80px;
             border-radius: AppTheme.radius-large;
-            background: AppTheme.panel-background;
+            background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
 

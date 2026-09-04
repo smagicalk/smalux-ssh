@@ -258,9 +258,13 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 1.3 切换“关闭标签页时防误触确认”开关回调
     // -------------------------------------------------------------------------
     let window_weak_toggle = window.as_weak();
+    let core_state_toggle = ctx.core_state.clone();
     window.on_toggle_confirm_close_tab(move |enabled| {
         if let Some(w) = window_weak_toggle.upgrade() {
             w.set_setting_confirm_close_tab(enabled);
+            let _ = core_state_toggle.storage().config().update(Box::new(move |c| {
+                c.confirm_close_tab = enabled;
+            }));
             tracing::info!(target: "smagical_ui::settings", "关闭标签页时防误触确认设置为: {}", enabled);
         }
     });
@@ -784,6 +788,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_sel = Rc::clone(&ctx.pane_groups);
     let active_pane_id_sel = Rc::clone(&ctx.active_pane_id);
     let active_terminals_sel = Rc::clone(&ctx.active_terminals);
+    let core_state_sel = ctx.core_state.clone();
     window.on_terminal_selection_changed(move |sc, sr, ec, er, has_sel| {
         let active_pid = active_pane_id_sel.borrow().clone();
         let groups = pane_groups_sel.borrow();
@@ -794,6 +799,16 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
                 if has_sel && sc >= 0 && sr >= 0 && ec >= 0 && er >= 0 {
                     instance.parser.set_selection((sc as usize, sr as usize), (ec as usize, er as usize));
+                    if let Ok(cfg) = core_state_sel.storage().config().get() {
+                        if cfg.copy_on_select {
+                            let text = instance.parser.copy_selection_text();
+                            if !text.is_empty() {
+                                if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                    let _ = clipboard.set_text(text);
+                                }
+                            }
+                        }
+                    }
                 } else {
                     instance.parser.clear_selection();
                 }
@@ -807,6 +822,8 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_paste = Rc::clone(&ctx.pane_groups);
     let active_pane_id_paste = Rc::clone(&ctx.active_pane_id);
     let active_terminals_paste = Rc::clone(&ctx.active_terminals);
+    let core_state_paste = ctx.core_state.clone();
+    let notif_paste = ctx.notifications.clone();
     window.on_terminal_paste(move || {
         let active_pid = active_pane_id_paste.borrow().clone();
         let groups = pane_groups_paste.borrow();
@@ -814,6 +831,17 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             && let Some(active_sess) = g.get_active_session()
         {
             if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+                if let Ok(cfg) = core_state_paste.storage().config().get() {
+                    if cfg.warn_on_multiline_paste && (text.contains('\n') || text.contains('\r')) {
+                        let lines_count = text.lines().count();
+                        if lines_count > 1 {
+                            notif_paste.warning(
+                                "多行安全粘贴提示",
+                                &format!("已向终端安全写入包含 {} 行的命令/文本", lines_count),
+                            );
+                        }
+                    }
+                }
                 let mut terminals = active_terminals_paste.borrow_mut();
                 if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
                     let _ = instance.send_input(&text);

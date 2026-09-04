@@ -384,6 +384,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
     window.set_setting_start_on_boot(initial_config.start_on_boot);
     window.set_setting_confirm_close_tab(initial_config.confirm_close_tab);
     window.set_setting_confirm_close_active(initial_config.confirm_close_active);
+    window.set_setting_copy_on_select(initial_config.copy_on_select);
+    window.set_setting_paste_on_right_click(initial_config.paste_on_right_click);
+    window.set_setting_warn_multiline_paste(initial_config.warn_on_multiline_paste);
 
     window.set_current_theme_id(initial_config.theme_id.as_str().into());
     window.set_is_dark_mode(initial_config.is_dark_mode);
@@ -391,6 +394,13 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     window.set_terminal_font_family(initial_config.font_family.as_str().into());
     window.set_terminal_font_size(initial_config.font_size);
+    if let Some(ref mut r) = *terminal_renderer.borrow_mut() {
+        r.set_cursor_style(&initial_config.cursor_style);
+        r.set_cursor_blink(initial_config.cursor_blink);
+        if let Some(bytes) = terminal::renderer::find_font_by_name(&initial_config.font_family) {
+            let _ = r.update_font(&bytes, initial_config.font_size);
+        }
+    }
 
     window.set_is_debug_enabled(initial_config.debug_enabled);
     window.set_flag_desktop_notifications(initial_config.flag_desktop_notifications);

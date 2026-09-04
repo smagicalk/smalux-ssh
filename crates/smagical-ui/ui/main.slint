@@ -131,6 +131,7 @@ export component AppWindow inherits Window {
     min-height: 600px;
     background: AppTheme.window-background;
     no-frame: true; // 隐藏系统原生边框，采用自绘制无边框标题栏
+    default-font-family: (root.setting-ui-font == "系统默认 (System Default)" || root.setting-ui-font == "") ? "" : root.setting-ui-font;
 
     // -------------------------------------------------------------------------
     // 侧边栏与弹窗视口状态属性
@@ -551,6 +552,16 @@ export component AppWindow inherits Window {
         { id: "kw_ip", pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b", remark: @tr("IPv4 主机地址"), color-hex: "#8B5CF6", rule-color: #8B5CF6, enabled: true },
     ];
 
+    in-out property <string> setting-global-proxy-mode: "direct";
+    in-out property <string> setting-global-proxy-server: "127.0.0.1:7890";
+    in-out property <bool> setting-global-proxy-auth: false;
+    in-out property <string> setting-global-proxy-user: "";
+    in-out property <string> setting-global-proxy-pass: "";
+
+    in-out property <bool> setting-copy-on-select: false;
+    in-out property <bool> setting-paste-on-right-click: true;
+    in-out property <bool> setting-warn-multiline-paste: true;
+
     callback change-terminal-url-click(bool);
     callback change-terminal-highlight-keywords(bool);
     callback change-terminal-custom-keywords(string);
@@ -558,7 +569,13 @@ export component AppWindow inherits Window {
     callback change-cursor-blink(bool);
     callback change-scrollback-lines(int);
     callback change-bell-style(string);
+    callback change-copy-on-select(bool);
+    callback change-paste-on-right-click(bool);
+    callback change-warn-multiline-paste(bool);
+    callback change-close-action(string);
+    callback change-global-proxy(string, string, bool, string, string);
     callback add-keyword-rule(string /* pattern */, string /* remark */, string /* color_hex */);
+    callback update-keyword-rule(string /* id */, string /* pattern */, string /* remark */, string /* color_hex */);
     callback toggle-keyword-rule(string /* id */, bool /* enabled */);
     callback delete-keyword-rule(string /* id */);
 
@@ -1692,8 +1709,42 @@ export component AppWindow inherits Window {
 
                     terminal-keyword-rules <=> root.terminal-keyword-rules;
                     add-keyword-rule(p, r, c) => { root.add-keyword-rule(p, r, c); }
+                    update-keyword-rule(id, p, r, c) => { root.update-keyword-rule(id, p, r, c); }
                     toggle-keyword-rule(id, e) => { root.toggle-keyword-rule(id, e); }
                     delete-keyword-rule(id) => { root.delete-keyword-rule(id); }
+
+                    setting-global-proxy-mode <=> root.setting-global-proxy-mode;
+                    setting-global-proxy-server <=> root.setting-global-proxy-server;
+                    setting-global-proxy-auth <=> root.setting-global-proxy-auth;
+                    setting-global-proxy-user <=> root.setting-global-proxy-user;
+                    setting-global-proxy-pass <=> root.setting-global-proxy-pass;
+
+                    setting-terminal-font: root.terminal-font-family;
+                    setting-terminal-font-size: Math.round(root.terminal-font-size);
+
+                    setting-copy-on-select <=> root.setting-copy-on-select;
+                    setting-paste-on-right-click <=> root.setting-paste-on-right-click;
+                    setting-warn-multiline-paste <=> root.setting-warn-multiline-paste;
+
+                    change-copy-on-select(c) => { root.change-copy-on-select(c); }
+                    change-paste-on-right-click(c) => { root.change-paste-on-right-click(c); }
+                    change-warn-multiline-paste(c) => { root.change-warn-multiline-paste(c); }
+                    change-close-action(a) => { root.change-close-action(a); }
+                    change-global-proxy(m, s, a, u, p) => { root.change-global-proxy(m, s, a, u, p); }
+
+                    color-picker-indicator-x <=> root.theme-editor-wheel-indicator-x;
+                    color-picker-indicator-y <=> root.theme-editor-wheel-indicator-y;
+                    color-picker-brightness <=> root.theme-editor-wheel-brightness;
+                    color-picker-hue-brush: root.theme-editor-wheel-hue-brush;
+                    color-picker-preview-brush: root.theme-editor-picker-brush;
+                    color-picker-hex <=> root.theme-editor-picker-hex;
+
+                    color-wheel-coord-picked(x, y) => { root.theme-editor-wheel-coord-picked(x, y); }
+                    color-wheel-brightness-picked(b) => { root.theme-editor-wheel-brightness-picked(b); }
+                    color-picker-hex-changed(h) => {
+                        root.theme-editor-picker-target-key = "keyword_rule";
+                        root.theme-editor-picker-hex-changed(h);
+                    }
                 }
 
                 // 2.3.6 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
@@ -1704,6 +1755,7 @@ export component AppWindow inherits Window {
                     max-width: root.main-view == "terminal" ? 100000px : 0px;
 
                     has-active-session: root.has-active-session;
+                    paste-on-right-click: root.setting-paste-on-right-click;
 
                     tabs: root.tabs;
                     active-tab-id: root.active-session-tab;

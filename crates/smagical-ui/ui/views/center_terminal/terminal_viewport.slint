@@ -130,6 +130,8 @@ export component TerminalViewport inherits Rectangle {
     in-out property <length> context-menu-x: 0px;
     in-out property <length> context-menu-y: 0px;
     in-out property <bool> has-selection: false;
+    /// 鼠标右键单击快速粘贴
+    in property <bool> paste-on-right-click: true;
     /// 终端历史回滚总行数 (用于驱动滚动条与状态展示)
     in property <int> history-size: 0;
     /// 当前相对底部的向上回滚行偏移量 (0 表示在最底部最新行)
@@ -336,6 +338,8 @@ export component TerminalViewport inherits Rectangle {
                 total-panes: 1;
                 tabs: root.tabs;
                 active-tab-id: root.active-tab-id;
+                paste-on-right-click: root.paste-on-right-click;
+                paste-text => { root.paste-text(); }
 
                 is-dragging-tab: root.is-dragging-tab;
                 drag-tab-source-pane: root.drag-tab-source-pane;
@@ -435,6 +439,8 @@ export component TerminalViewport inherits Rectangle {
                     total-panes: pane.total-panes;
                     tabs: pane.tabs;
                     active-tab-id: pane.active-tab-id;
+                    paste-on-right-click: root.paste-on-right-click;
+                    paste-text => { root.paste-text(); }
 
                     is-dragging-tab: root.is-dragging-tab;
                     drag-tab-source-pane: root.drag-tab-source-pane;

@@ -83,6 +83,21 @@ pub struct AppConfigRecord {
     pub keepalive_count_max: u32,
     /// 主机公钥指纹安全检查严格程度 ("accept-new", "strict", "off")
     pub host_key_checking: String,
+    /// 全局代理模式 ("direct", "system", "custom")
+    #[serde(default = "default_proxy_mode")]
+    pub global_proxy_mode: String,
+    /// 全局代理服务器与端口
+    #[serde(default = "default_proxy_server")]
+    pub global_proxy_server: String,
+    /// 全局代理是否启用身份认证
+    #[serde(default)]
+    pub global_proxy_auth: bool,
+    /// 全局代理认证用户名
+    #[serde(default)]
+    pub global_proxy_user: String,
+    /// 全局代理认证密码
+    #[serde(default)]
+    pub global_proxy_pass: String,
 
     /// 开发者调试控制台启用开关 (F12)
     pub debug_enabled: bool,
@@ -143,6 +158,11 @@ impl Default for AppConfigRecord {
             keepalive_interval: 30,
             keepalive_count_max: 3,
             host_key_checking: "accept-new".to_string(),
+            global_proxy_mode: default_proxy_mode(),
+            global_proxy_server: default_proxy_server(),
+            global_proxy_auth: false,
+            global_proxy_user: String::new(),
+            global_proxy_pass: String::new(),
 
             // 调试与特性门控
             debug_enabled: true,
@@ -169,4 +189,12 @@ fn default_custom_keywords() -> String {
 
 fn default_bell_style() -> String {
     "visual".to_string()
+}
+
+fn default_proxy_mode() -> String {
+    "direct".to_string()
+}
+
+fn default_proxy_server() -> String {
+    "127.0.0.1:7890".to_string()
 }

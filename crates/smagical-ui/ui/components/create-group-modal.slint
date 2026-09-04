@@ -37,7 +37,7 @@ export component CreateGroupModal inherits Rectangle {
     if is-open: Rectangle {
         width: 100%;
         height: 100%;
-        background: #00000088; // 半透明暗色背景
+        background: #000000a6; // 半透明暗色背景
 
         // 仅拦截遮罩区域点击穿透，不触发关闭（防止用户误触导致输入内容丢失）
         TouchArea {
@@ -53,7 +53,7 @@ export component CreateGroupModal inherits Rectangle {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border-radius: AppTheme.radius-large;
-            background: AppTheme.panel-background;
+            background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
 
@@ -401,7 +401,7 @@ export component CreateGroupModal inherits Rectangle {
         if is-picker-open: Rectangle {
             width: 100%;
             height: 100%;
-            background: #00000066; // 遮罩叠层
+            background: #000000a6; // 遮罩叠层
 
             TouchArea {
                 // 拦截子遮罩
@@ -413,7 +413,7 @@ export component CreateGroupModal inherits Rectangle {
                 x: (parent.width - self.width) / 2;
                 y: (parent.height - self.height) / 2;
                 border-radius: AppTheme.radius-large;
-                background: AppTheme.panel-background;
+                background: AppTheme.modal-background;
                 border-width: 1px;
                 border-color: AppTheme.accent;
 

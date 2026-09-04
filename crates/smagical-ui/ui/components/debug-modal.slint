@@ -119,7 +119,7 @@ export component DebugModal inherits Rectangle {
     if is-open: Rectangle {
         width: 100%;
         height: 100%;
-        background: #00000088; // 半透明暗色背景遮罩
+        background: #000000a6; // 半透明暗色背景遮罩
 
         TouchArea {
             // 拦截遮罩点击，防止穿透底层
@@ -134,7 +134,7 @@ export component DebugModal inherits Rectangle {
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border-radius: AppTheme.radius-large;
-            background: AppTheme.panel-background;
+            background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
 
