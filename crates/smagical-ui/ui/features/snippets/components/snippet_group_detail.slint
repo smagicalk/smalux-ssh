@@ -1,0 +1,99 @@
+// =============================================================================
+// 文件名称: snippet_group_detail.slint
+// 模块功能: 代码片段分组详情面板 (Snippet Group Detail)
+// 包含文件夹名称、子项操作以及归类说明卡片
+// =============================================================================
+
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppButton } from "../../../components/base/app-button.slint";
+
+export component SnippetGroupDetail inherits Rectangle {
+    in property <string> edit_id: "";
+    in property <string> edit_title: "";
+
+    callback create_snippet;
+    callback delete_group(string /* id */);
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+        alignment: start;
+
+        // 1. 顶部操作栏
+        HorizontalLayout {
+            height: 32px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: center;
+
+                Image {
+                    source: @image-url("../../../assets/icons/folder.svg");
+                    width: 16px;
+                    height: 16px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.edit_title;
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                alignment: center;
+
+                AppButton {
+                    text: @tr("新建子片段");
+                    variant: "secondary";
+                    clicked => { root.create_snippet(); }
+                }
+
+                AppButton {
+                    text: @tr("删除文件夹");
+                    variant: "danger";
+                    clicked => { root.delete_group(root.edit_id); }
+                }
+            }
+        }
+
+        // 分割线
+        Rectangle {
+            height: 1px;
+            background: AppTheme.border;
+        }
+
+        // 2. 文件夹说明卡片
+        Rectangle {
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.control-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 16px;
+                spacing: 8px;
+
+                Text {
+                    text: @tr("文件夹分组信息");
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                }
+
+                Text {
+                    text: @tr("此文件夹可容纳多个脚本片段与子文件夹。您可从左侧树形列表中直接拖拽代码片段移入此文件夹进行归类。");
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground;
+                }
+            }
+        }
+    }
+}

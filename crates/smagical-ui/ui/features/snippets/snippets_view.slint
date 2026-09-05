@@ -1,0 +1,162 @@
+// =============================================================================
+// 文件名称: snippets_view.slint
+// 模块功能: 全屏代码片段与多层层级管理中心容器 (SnippetsCenterView)
+// 核心设计: 左侧多层文件夹树（支持拖拽） + 右侧沉浸式脚本编辑器与动态变量识别
+// =============================================================================
+
+import { AppTheme } from "../../themes/app-theme.slint";
+import { SnippetTreeNode, SnippetParamInputData } from "snippets_model.slint";
+import { SnippetTreePane } from "components/snippet_tree_pane.slint";
+import { SnippetGroupDetail } from "components/snippet_group_detail.slint";
+import { SnippetEditorPane } from "components/snippet_editor_pane.slint";
+
+export { SnippetTreeNode, SnippetParamInputData }
+
+/// 全屏代码片段与多层层级管理中心视图 (SnippetsCenterView)
+export component SnippetsCenterView inherits Rectangle {
+    background: AppTheme.window-background;
+
+    // 树数据源
+    in property <[SnippetTreeNode]> tree_nodes: [];
+    in-out property <string> search_query: "";
+    in-out property <string> selected_id: "";
+
+    // 详情编辑器数据绑定
+    in property <bool> has_selection: false;
+    in property <bool> is_selected_group: false;
+    in-out property <string> edit_id: "";
+    in-out property <string> edit_title: "";
+    in-out property <string> edit_category_name: "";
+    in-out property <string> edit_language: "bash";
+    in-out property <string> edit_content: "";
+    in-out property <bool> edit_auto_execute: true;
+    in-out property <string> edit_description: "";
+    in-out property <bool> edit_is_favorite: false;
+    in property <string> detected_variables_text: "";
+    in property <string> edit_updated_at: "";
+
+    // 拖拽交互状态
+    in-out property <bool> is_dragging: false;
+    in-out property <string> drag_source_id: "";
+    in-out property <string> drag_source_name: "";
+    in-out property <bool> drag_source_is_group: false;
+    in-out property <string> drop_target_id: "";
+    in-out property <string> drop_target_name: "";
+    in-out property <int> drop_target_index: -1;
+    in-out property <string> drop_position: "inside";
+    in-out property <bool> drop_target_valid: false;
+    in-out property <length> drag_x: 0px;
+    in-out property <length> drag_y: 0px;
+
+    // 回调事件
+    callback search_changed(string);
+    callback toggle_group_expanded(string /* group_id */);
+    callback select_node(string /* id */, bool /* is_group */);
+    callback toggle_favorite(string /* id */);
+    callback create_snippet;
+    callback create_group;
+    callback save_snippet;
+    callback delete_snippet(string /* id */);
+    callback delete_group(string /* id */);
+    callback copy_content(string /* id */);
+    callback execute_snippet(string /* id */);
+    callback move_node(string /* source_id */, string /* target_id */, string /* drop_position */);
+    callback request_drag_hover(string /* source_id */, int /* target_index */, float /* offset_in_row */);
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // ==========================================
+        // 1. 左侧：多层文件夹代码片段树导航栏
+        // ==========================================
+        SnippetTreePane {
+            tree_nodes: root.tree_nodes;
+            search_query <=> root.search_query;
+            selected_id <=> root.selected_id;
+            is_dragging <=> root.is_dragging;
+            drag_source_id <=> root.drag_source_id;
+            drag_source_name <=> root.drag_source_name;
+            drag_source_is_group <=> root.drag_source_is_group;
+            drop_target_id <=> root.drop_target_id;
+            drop_target_name <=> root.drop_target_name;
+            drop_target_index <=> root.drop_target_index;
+            drop_position <=> root.drop_position;
+            drop_target_valid <=> root.drop_target_valid;
+            drag_x <=> root.drag_x;
+            drag_y <=> root.drag_y;
+
+            search_changed(text) => { root.search_changed(text); }
+            toggle_group_expanded(id) => { root.toggle_group_expanded(id); }
+            select_node(id, is_g) => { root.select_node(id, is_g); }
+            toggle_favorite(id) => { root.toggle_favorite(id); }
+            create_snippet => { root.create_snippet(); }
+            create_group => { root.create_group(); }
+            move_node(src, target, pos) => { root.move_node(src, target, pos); }
+            request_drag_hover(src, idx, offset) => { root.request_drag_hover(src, idx, offset); }
+        }
+
+        // ==========================================
+        // 2. 右侧：代码片段详情与脚本编辑器
+        // ==========================================
+        Rectangle {
+            horizontal-stretch: 1;
+            background: AppTheme.window-background;
+
+            // 2.0 未选择状态提示
+            if !root.has_selection: Rectangle {
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/terminal.svg");
+                            width: 36px;
+                            height: 36px;
+                            image-fit: contain;
+                            colorize: AppTheme.secondary-foreground.transparentize(60%);
+                        }
+                    }
+
+                    Text {
+                        text: @tr("选择左侧代码片段进行查看或编辑");
+                        font-size: 13px;
+                        font-weight: 500;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                    }
+
+                    Text {
+                        text: @tr("支持拖拽调序、跨分组归类与参数化变量 {{var}}");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground.transparentize(50%);
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            // 2.1 选中的是文件夹分组
+            if root.has_selection && root.is_selected_group: SnippetGroupDetail {
+                edit_id: root.edit_id;
+                edit_title: root.edit_title;
+                create_snippet => { root.create_snippet(); }
+                delete_group(id) => { root.delete_group(id); }
+            }
+
+            // 2.2 选中的是代码片段
+            if root.has_selection && !root.is_selected_group: SnippetEditorPane {
+                edit_id <=> root.edit_id;
+                edit_title <=> root.edit_title;
+                edit_content <=> root.edit_content;
+                edit_auto_execute <=> root.edit_auto_execute;
+                edit_description <=> root.edit_description;
+                detected_variables_text: root.detected_variables_text;
+                copy_content(id) => { root.copy_content(id); }
+                save_snippet => { root.save_snippet(); }
+                delete_snippet(id) => { root.delete_snippet(id); }
+            }
+        }
+    }
+}

@@ -1,0 +1,27 @@
+// =============================================================================
+// 文件名称: snippets_model.slint
+// 模块功能: 代码片段领域模型 (Snippets Domain Models)
+// =============================================================================
+
+/// 代码片段树形节点视图模型
+export struct SnippetTreeNode {
+    id: string,
+    name: string,
+    parent_id: string,
+    level: int,
+    is_group: bool,          // true 为文件夹分组，false 为代码片段
+    is_expanded: bool,
+    has_children: bool,
+    item_count: int,         // 子项/脚本数量
+    language: string,        // 脚本语言 (Bash, Python 等)
+    auto_execute: bool,
+    is_favorite: bool,
+}
+
+/// 动态参数填报数据结构
+export struct SnippetParamInputData {
+    key: string,
+    label: string,
+    value: string,
+    default_val: string,
+}
