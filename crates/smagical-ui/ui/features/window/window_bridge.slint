@@ -1,0 +1,60 @@
+import { ActivityBarItemData } from "../../views/left_activity_bar.slint";
+import { LogEntryData } from "../../components/debug-modal.slint";
+import { LocalShellItemData } from "../../components/new-session-modal.slint";
+import { ToastItemData } from "../../components/toast.slint";
+
+export { ActivityBarItemData, LogEntryData, LocalShellItemData, ToastItemData }
+
+/// 应用窗口、布局导航与全局框架总线 (Window & Navigation Bridge)
+export global WindowBridge {
+    // 基础导航状态
+    in-out property <string> active-left-tab: "hosts";
+    in-out property <bool> is-left-drawer-open: true;
+    in-out property <string> active-right-tool: "monitor";
+    in-out property <bool> is-right-drawer-open: false;
+    in-out property <string> main-view: "terminal"; // "terminal" | "history" | "files" | "credentials" | "snippets" | "tunnels" | "settings"
+
+    // 窗口与系统控制
+    in-out property <bool> is-window-maximized: false;
+    in-out property <bool> is-dark-mode: true;
+    in-out property <string> current-theme-name: "Darcula";
+    in-out property <string> current-theme-id: "builtin.ui.darcula";
+    in-out property <string> current-language: "zh-CN";
+    in-out property <string> active-rendering-pipeline: "winit-skia";
+
+    // 模态弹窗状态
+    in-out property <bool> is-command-palette-open: false;
+    in-out property <bool> is-debug-modal-open: false;
+    in-out property <bool> is-new-session-modal-open: false;
+    in-out property <bool> is-debug-enabled: true;
+    in-out property <bool> is-log-capture-enabled: true;
+
+    // 动态菜单与启动器列表
+    in-out property <[ActivityBarItemData]> top-activity-items: [];
+    in-out property <[ActivityBarItemData]> bottom-activity-items: [];
+    in-out property <[LocalShellItemData]> launcher-local-items: [];
+    in-out property <[LogEntryData]> debug-logs: [];
+    in-out property <[ToastItemData]> toasts: [];
+
+    // 交互回调
+    callback switch-left-tab(string /* tab_id */);
+    callback toggle-left-drawer();
+    callback switch-right-tool(string /* tool_id */);
+    callback toggle-right-drawer();
+    callback switch-main-view(string /* view_id */);
+
+    callback open-command-palette();
+    callback close-command-palette();
+    callback open-debug-modal();
+    callback close-debug-modal();
+    callback open-new-session-modal();
+    callback close-new-session-modal();
+
+    callback minimize-window();
+    callback maximize-window();
+    callback close-window();
+    callback start-window-drag();
+    callback toggle-color-mode();
+    callback switch-language(string /* lang */);
+    callback close-toast(string /* id */);
+}

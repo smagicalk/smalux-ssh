@@ -1,0 +1,181 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+
+/// 统一通用 Tab 项数据模型
+export struct TabStripItem {
+    id: string,
+    title: string,
+    status: string,
+    is-active: bool,
+    is-closeable: bool,
+}
+
+/// 通用会话/页面多标签栏组件 (AppTabStrip)
+///
+/// 统合终端多会话与文件双盘标签页的核心交互规范。
+/// 核心特性：
+/// 1. 紧凑工业风 Tab 序列，支持长标题自动截断省略；
+/// 2. 独立状态指示灯（支持 online / warning / offline）；
+/// 3. 独立且物理防误触的 Tab 关闭按钮；
+/// 4. 最右侧固定快速新建按钮 (+)；
+/// 5. 激活项底部品牌指示光条与高亮边框；
+/// 6. 右键菜单呼出与横向滚轮交互。
+export component AppTabStrip inherits Rectangle {
+    in property <[TabStripItem]> tabs: [];
+    in-out property <string> active-tab-id: "";
+    in property <bool> show-add-button: true;
+    in property <bool> show-status: true;
+    in-out property <length> scroll-offset: 0px;
+
+    callback select-tab(string /* id */);
+    callback close-tab(string /* id */);
+    callback add-tab();
+    callback tab-context-menu(string /* id */, length /* x */, length /* y */);
+
+    height: 36px;
+    background: AppTheme.panel-background;
+
+    // 底部分割线
+    Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        width: 100%;
+        background: AppTheme.border;
+    }
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 4px;
+        alignment: start;
+
+        // 1. Tab 卡片序列
+        for tab in root.tabs: Rectangle {
+            min-width: tab.is-active ? 140px : 120px;
+            max-width: 180px;
+            height: 28px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 4px;
+
+            background: tab.is-active ? AppTheme.surface-background : tab-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background.transparentize(50%);
+            border-width: 1px;
+            border-color: tab.is-active ? AppTheme.accent : tab-touch.has-hover ? AppTheme.accent.transparentize(50%) : AppTheme.border;
+
+            animate background { duration: 150ms; }
+            animate border-color { duration: 150ms; }
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 6px;
+                spacing: 6px;
+                alignment: space-between;
+
+                // Tab 主体区域 (状态灯 + 标题)
+                HorizontalLayout {
+                    spacing: 6px;
+                    horizontal-stretch: 1;
+
+                    if root.show-status && tab.status != "": VerticalLayout {
+                        alignment: center;
+                        StatusDot {
+                            status: tab.status;
+                            dot-size: 5px;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        horizontal-stretch: 1;
+
+                        Text {
+                            text: tab.title;
+                            font-size: 11px;
+                            font-weight: tab.is-active ? 700 : 500;
+                            color: tab.is-active ? AppTheme.foreground : tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 独立关闭按钮
+                if tab.is-closeable: VerticalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 16px;
+                        height: 16px;
+                        border-radius: 3px;
+                        background: close-touch.has-hover ? #e7484833 : transparent;
+
+                        Image {
+                            source: @image-url("../../assets/icons/window-close.svg");
+                            width: 8px;
+                            height: 8px;
+                            image-fit: contain;
+                            colorize: close-touch.has-hover ? AppTheme.danger : tab.is-active ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        close-touch := TouchArea {
+                            clicked => { root.close-tab(tab.id); }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+
+            // Tab 触摸区域 (单击切换、右键呼出菜单)
+            tab-touch := TouchArea {
+                clicked => {
+                    root.active-tab-id = tab.id;
+                    root.select-tab(tab.id);
+                }
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                        root.tab-context-menu(tab.id, self.mouse-x, self.mouse-y);
+                    }
+                }
+                mouse-cursor: pointer;
+            }
+
+            // 激活底部指示条
+            if tab.is-active: Rectangle {
+                y: parent.height - 2px;
+                height: 2px;
+                width: parent.width - 12px;
+                x: 6px;
+                border-radius: 1px;
+                background: AppTheme.accent;
+            }
+        }
+
+        // 2. 快速新建按钮 (+)
+        if root.show-add-button: VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                width: 24px;
+                height: 24px;
+                border-radius: 4px;
+                background: add-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                Image {
+                    source: @image-url("../../assets/icons/plus.svg");
+                    width: 11px;
+                    height: 11px;
+                    image-fit: contain;
+                    colorize: add-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+
+                add-touch := TouchArea {
+                    clicked => { root.add-tab(); }
+                    mouse-cursor: pointer;
+                }
+            }
+        }
+    }
+}

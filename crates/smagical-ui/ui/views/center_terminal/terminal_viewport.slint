@@ -9,100 +9,55 @@ import { TabContextMenu } from "tab_context_menu.slint";
 import { TerminalPaneView } from "terminal_pane_view.slint";
 
 
-/// 单个动态终端窗格数据模型 (支持无限嵌套任意多分屏)
-export struct TerminalPaneData {
-    /// 窗格唯一标识 ID (如: "tab-1-pane-1")
-    pane-id: string,
-    /// 窗格顶部标题文本
-    title: string,
-    /// 相对终端中央视口左上角像素 X 坐标
-    x: length,
-    /// 相对终端中央视口左上角像素 Y 坐标
-    y: length,
-    /// 窗格像素宽度
-    width: length,
-    /// 窗格像素高度
-    height: length,
-    /// 窗格像素位图帧流
-    image: image,
-    /// 是否获得当前焦点
-    is-active: bool,
-    /// 窗格在当前分屏组内的序号 (1-indexed)
-    pane-index: int,
-    /// 当前分屏组内的窗格总数
-    total-panes: int,
-    /// 窗格当前是否处于临时最大化 (Zoom) 状态
-    is-zoomed: bool,
-    /// 窗格在线状态 ("online" | "warning" | "offline")
-    status: string,
-    /// 该窗格所属的 Tab 列表
-    tabs: [TabData],
-    /// 该窗格当前激活的 Tab ID
-    active-tab-id: string,
-}
+import { TabData, TerminalPaneData, TerminalSplitterData } from "../../features/terminal/terminal_model.slint";
+import { TerminalBridge } from "../../features/terminal/terminal_bridge.slint";
 
-
-
-/// 窗格间可拖拽分割条数据模型
-export struct TerminalSplitterData {
-    /// 分割条唯一标识 ID (对应二叉树分支节点 ID)
-    splitter-id: string,
-    /// 是否为垂直分割条 (true 为左右垂直拖拽条, false 为上下水平拖拽条)
-    is-vertical: bool,
-    /// 像素 X 坐标
-    x: length,
-    /// 像素 Y 坐标
-    y: length,
-    /// 像素宽度
-    width: length,
-    /// 像素高度
-    height: length,
-}
+export { TerminalPaneData, TerminalSplitterData }
 
 /// 终端屏幕与多会话光栅化像素视口 (Terminal Viewport)
 ///
 /// 承载终端位图光栅化渲染、键盘事件捕获转发、鼠标交互、多会话 Tab 调度、查找浮层与右键菜单。
 export component TerminalViewport inherits Rectangle {
     /// 当前是否存在处于连接状态的活跃终端会话
-    in property <bool> has-active-session: false;
+    in property <bool> has-active-session: TerminalBridge.has-active-session;
     /// 当前激活会话的展示名称 (如: "node-1 #1")
-    in property <string> session-name: "";
+    in property <string> session-name: TerminalBridge.active-session-name;
     /// 当前激活会话的连接地址 (如: "192.168.1.101:22" 或 "Local (pwsh.exe)")
-    in property <string> host-address: "";
+    in property <string> host-address: TerminalBridge.active-host-address;
     /// 当前主机的 ICMP 延迟毫秒数 (本地 Shell 为 0)
-    in property <int> ping-ms: 0;
+    in property <int> ping-ms: TerminalBridge.active-host-ping-ms;
     /// 是否开启多终端分屏模式
-    in-out property <bool> is-split: false;
+    in-out property <bool> is-split: TerminalBridge.is-split;
     /// 分屏排布方向 ("vertical" 左右垂直分屏 | "horizontal" 上下水平分屏)
-    in-out property <string> split-orientation: "vertical";
+    in-out property <string> split-orientation: TerminalBridge.split-orientation;
     /// 分屏窗格尺寸比例 (0.15 ~ 0.85, 默认 0.5)
-    in-out property <float> split-ratio: 0.5;
+    in-out property <float> split-ratio: TerminalBridge.split-ratio;
     /// 当前获得键盘焦点的窗格索引 (0: 主窗格, 1: 副窗格)
-    in-out property <int> active-pane-index: 0;
+    in-out property <int> active-pane-index: TerminalBridge.active-pane-index;
     /// 当前激活聚焦的窗格唯一 ID
-    in-out property <string> active-pane-id: "";
+    in-out property <string> active-pane-id: TerminalBridge.active-pane-id;
 
     /// 活跃 Tab 会话列表数据模型
-    in property <[TabData]> tabs: [];
+    in property <[TabData]> tabs: TerminalBridge.tabs;
     /// 当前被选中的 Tab 会话 ID
-    in-out property <string> active-tab-id: "";
+    in-out property <string> active-tab-id: TerminalBridge.active-session-tab;
     /// 顶部 Tab 栏鼠标滚轮水平滑动像素偏移量
     in-out property <length> tab-scroll-offset: 0px;
 
     /// 主窗格实时光栅化位图帧流
-    in property <image> terminal-screen-image;
+    in property <image> terminal-screen-image: TerminalBridge.terminal-screen-image;
     /// 副窗格 1 实时光栅化位图帧流 (分屏模式有效)
-    in property <image> terminal-split-image;
+    in property <image> terminal-split-image: TerminalBridge.terminal-split-image;
     /// 副窗格 2 实时光栅化位图帧流 (3/4 分屏有效)
-    in property <image> terminal-split2-image;
+    in property <image> terminal-split2-image: TerminalBridge.terminal-split2-image;
     /// 副窗格 3 实时光栅化位图帧流 (4 分屏有效)
-    in property <image> terminal-split3-image;
+    in property <image> terminal-split3-image: TerminalBridge.terminal-split3-image;
     /// 分屏窗格总数量
     in-out property <int> split-count: 1;
     /// 动态多窗格列表数据模型 (无限嵌套分屏)
-    in property <[TerminalPaneData]> terminal-panes: [];
+    in property <[TerminalPaneData]> terminal-panes: TerminalBridge.panes;
     /// 动态分割条列表数据模型
-    in property <[TerminalSplitterData]> terminal-splitters: [];
+    in property <[TerminalSplitterData]> terminal-splitters: TerminalBridge.splitters;
     /// 分割条拖拽持久状态 (保存在 root 组件上，绝不受模型更新重置影响)
     in-out property <bool> is-dragging-splitter: false;
     in-out property <string> dragging-splitter-id: "";

@@ -1,0 +1,38 @@
+import { HistoryGroupData, HistoryItemData } from "../../views/left_drawers/history_drawer.slint";
+
+export { HistoryGroupData, HistoryItemData }
+
+/// 连接历史记录领域全局状态总线 (History Bridge)
+export global HistoryBridge {
+    // 列表与分组
+    in-out property <[HistoryGroupData]> history-groups: [];
+    in-out property <int> total-count: 0;
+    in-out property <string> view-mode: "timeline"; // "timeline" | "hosts"
+    in-out property <string> search-query: "";
+
+    // 详情与快照模态窗口
+    in-out property <bool> is-detail-open: false;
+    in-out property <string> detail-id: "";
+    in-out property <string> detail-title: "";
+    in-out property <string> detail-address: "";
+    in-out property <string> detail-user: "";
+    in-out property <string> detail-type: "ssh";
+    in-out property <string> detail-connected-time: "";
+    in-out property <string> detail-disconnected-time: "";
+    in-out property <string> detail-duration: "";
+    in-out property <string> detail-exit-status: "success";
+    in-out property <string> detail-error-msg: "";
+    in-out property <string> detail-snapshot: "";
+    in-out property <int> detail-snapshot-lines: 0;
+
+    // 交互回调
+    callback reconnect(string /* id */);
+    callback show-detail(string /* id */);
+    callback delete-item(string /* id */);
+    callback clear-all();
+    callback toggle-pin(string /* id */);
+    callback toggle-group(string /* group_id */);
+    callback search-changed(string /* query */);
+    callback switch-view-mode(string /* mode */);
+    callback close-detail();
+}

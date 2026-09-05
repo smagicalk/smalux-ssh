@@ -6,53 +6,10 @@ import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { ScrollView } from "std-widgets.slint";
 
 
-/// 主机项数据结构 (Host Item Data)
-///
-/// 专用于卡片列表平铺视图模式的数据模型。
-export struct HostItemData {
-    /// 主机全局唯一标识符
-    id: string,
-    /// 主机名称 (如 "prod-server-01")
-    name: string,
-    /// 主机 IP 地址或可解析域名
-    address: string,
-    /// SSH 服务连接端口 (默认为 22)
-    port: int,
-    /// 所属分组的显示名称 (如 "生产集群")
-    group: string,
-    /// 主机运行健康状态 ("online": 在线, "warning": 告警, "error": 异常, "offline": 离线)
-    status: string,
-    /// 网络延迟测速结果 (单位毫秒)
-    ping-ms: int,
-}
+import { HostItemData, HostTreeNode } from "../../features/hosts/hosts_model.slint";
+import { HostsBridge } from "../../features/hosts/hosts_bridge.slint";
 
-/// 树形结构节点模型 (Host Tree Node)
-///
-/// 专用于树状层级折叠视图模式的数据模型，支持无限层级嵌套。
-export struct HostTreeNode {
-    /// 节点的唯一标识符
-    id: string,
-    /// 节点的显示名称 (如 "Kubernetes 集群" 或 "k8s-control-plane")
-    name: string,
-    /// 当前节点是否为分组文件夹 (true: 分组, false: 主机资产)
-    is-group: bool,
-    /// 父级分组的 ID (顶级根节点为空字符串 "")
-    parent-id: string,
-    /// 树形层级深度，用于计算左侧缩进 (缩进 = level * 14px)
-    level: int,
-    /// 当前分组是否处于展开状态 (仅 is-group 为 true 时有效)
-    is-expanded: bool,
-    /// 主机 IP 地址 (仅主机节点有效)
-    address: string,
-    /// 连接端口 (仅主机节点有效)
-    port: int,
-    /// 在线健康状态 ("online", "warning", "error", "offline")
-    status: string,
-    /// 网络延迟 (毫秒)
-    ping-ms: int,
-    /// 分组文件夹内包含的主机数量 (仅 is-group 为 true 时有效)
-    item-count: int,
-}
+export { HostItemData, HostTreeNode }
 
 /// 主机管理抽屉组件 (Hosts Drawer)
 ///
@@ -62,17 +19,17 @@ export component HostsDrawer inherits DrawerContainer {
     collapse-icon: "◀";
 
     /// 当前视图模式: "tree" (树形层级嵌套模式) | "card" (卡片列表平铺模式)
-    in-out property <string> view-mode: "tree";
+    in-out property <string> view-mode: HostsBridge.hosts-view-mode;
     /// 当前选中的高亮主机 ID
-    in-out property <string> selected-host-id: "1";
+    in-out property <string> selected-host-id: HostsBridge.selected-host-id;
     /// 当前树形内容的最大呈现宽度（根据节点长名称动态扩展，驱动自适应横向滚动）
-    in-out property <length> tree-content-width: 240px;
+    in-out property <length> tree-content-width: HostsBridge.tree-content-width;
 
     /// 树形层级嵌套数据源 (由 Rust 存储层提供唯一真相源)
-    in-out property <[HostTreeNode]> tree-nodes: [];
+    in-out property <[HostTreeNode]> tree-nodes: HostsBridge.tree-nodes;
 
     /// 卡片模式扁平列表数据源 (由 Rust 存储层提供唯一真相源)
-    in property <[HostItemData]> hosts: [];
+    in property <[HostItemData]> hosts: HostsBridge.hosts;
 
 
     /// 单击选中主机事件回调

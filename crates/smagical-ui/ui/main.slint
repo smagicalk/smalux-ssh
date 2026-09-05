@@ -17,9 +17,21 @@ export { ToastItemData } from "components/toast.slint";
 // 全局共享基础组件库模型与组件
 export { SegmentItemData } from "shared/base/app-segmented-control.slint";
 export { DropdownItemData } from "shared/base/app-dropdown.slint";
+export { ColorSwatchItem } from "shared/base/app-color-picker.slint";
+export { TabStripItem } from "shared/composite/app-tab-strip.slint";
+export { ContextMenuItemData } from "shared/composite/app-context-menu.slint";
+export { TableColumn } from "shared/composite/app-data-table.slint";
 
-// 领域状态单例总线
+// 领域状态单例总线 (Domain State Bridges)
 export { SettingsBridge } from "features/settings/settings_bridge.slint";
+export { HostsBridge } from "features/hosts/hosts_bridge.slint";
+export { TerminalBridge } from "features/terminal/terminal_bridge.slint";
+export { FilesBridge } from "features/file_explorer/file_explorer_bridge.slint";
+export { CredentialsBridge } from "features/credentials/credentials_bridge.slint";
+export { SnippetsBridge } from "features/snippets/snippets_bridge.slint";
+export { TunnelsBridge } from "features/tunnels/tunnels_bridge.slint";
+export { HistoryBridge } from "features/history/history_bridge.slint";
+export { WindowBridge } from "features/window/window_bridge.slint";
 import { SettingsGeneralTab } from "features/settings/tabs/general_tab.slint";
 import { SettingsNetworkTab } from "features/settings/tabs/network_tab.slint";
 import { SettingsFilesTab } from "features/settings/tabs/files_tab.slint";
@@ -1343,11 +1355,7 @@ export component AppWindow inherits Window {
                     if root.active-left-tab == "hosts" || root.active-left-tab == "files": HostsDrawer {
                         width: 100%;
                         height: 100%;
-                        view-mode <=> root.hosts-view-mode;
-                        tree-content-width: root.tree-content-width;
                         collapse => { root.is-left-drawer-open = false; }
-                        tree-nodes: root.tree-nodes;
-                        hosts: root.hosts;
                         is-dragging <=> root.is-dragging;
                         drag-source-id <=> root.drag-source-id;
                         drag-source-name <=> root.drag-source-name;
@@ -1477,11 +1485,6 @@ export component AppWindow inherits Window {
                 // 2.3.1 全屏历史中心页面 (当 main-view == "history" 时全屏展开，彻底隐藏终端与多栏)
                 if root.main-view == "history": HistoryCenterView {
                     horizontal-stretch: 1;
-                    history-groups: root.history-groups;
-                    total-count: root.history-total-count;
-                    has-active-terminal: root.has-active-session;
-                    search-query <=> root.history-search-query;
-
                     reconnect(id) => {
                         root.main-view = "terminal";
                         root.active-left-tab = "hosts";
@@ -1490,7 +1493,6 @@ export component AppWindow inherits Window {
                     }
                     show-detail(id) => { root.show-history-detail(id); }
                     delete-item(id) => { root.delete-history-item(id); }
-
                     clear-all => { root.clear-history(); }
                     toggle-pin(id) => { root.toggle-pin-history(id); }
                     toggle-group(id) => { root.toggle-history-group(id); }
@@ -1500,32 +1502,11 @@ export component AppWindow inherits Window {
                         root.active-left-tab = "hosts";
                         root.is-left-drawer-open = true;
                     }
-
                 }
 
-                // 2.3.2 全屏凭据管理中心 (当 main-view == "credentials" 时展开，左侧列表 + 右侧详情编辑，隐藏终端与右侧工具栏)
+                // 2.3.2 全屏凭据管理中心
                 if root.main-view == "credentials": CredentialsCenterView {
                     horizontal-stretch: 1;
-                    credentials: root.credentials;
-                    filter-category <=> root.credential-filter-category;
-                    search-query <=> root.credential-search-query;
-                    active-cred-id <=> root.active-credential-id;
-
-                    is-create-mode <=> root.is-credential-create-mode;
-                    is-editing <=> root.is-credential-editing;
-                    form-id <=> root.credential-form-id;
-                    form-name <=> root.credential-form-name;
-                    form-type <=> root.credential-form-type;
-                    form-algorithm <=> root.credential-form-algorithm;
-                    form-username <=> root.credential-form-username;
-                    form-secret-data <=> root.credential-form-secret-data;
-                    form-passphrase <=> root.credential-form-passphrase;
-                    form-public-key <=> root.credential-form-public-key;
-                    form-fingerprint <=> root.credential-form-fingerprint;
-                    form-notes <=> root.credential-form-notes;
-                    form-bound-host-count <=> root.credential-form-bound-host-count;
-                    form-updated-at <=> root.credential-form-updated-at;
-
                     select-cred(id) => { root.select-credential(id); }
                     start-create => { root.open-create-credential-modal(); }
                     cancel-create => { root.cancel-create-credential(); }
@@ -1548,25 +1529,9 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 2.3.3 全屏代码片段管理中心 (当 main-view == "snippets" 时展开，左侧树形分组 + 右侧沉浸式详情)
+                // 2.3.3 全屏代码片段管理中心
                 if root.main-view == "snippets": SnippetsCenterView {
                     horizontal-stretch: 1;
-                    tree_nodes: root.snippet-tree-nodes;
-                    search_query <=> root.snippet-search-query;
-                    selected_id <=> root.snippet-selected-id;
-                    has_selection: root.snippet-has-selection;
-                    is_selected_group: root.snippet-is-selected-group;
-                    edit_id <=> root.snippet-edit-id;
-                    edit_title <=> root.snippet-edit-title;
-                    edit_category_name <=> root.snippet-edit-category-name;
-                    edit_language <=> root.snippet-edit-language;
-                    edit_content <=> root.snippet-edit-content;
-                    edit_auto_execute <=> root.snippet-edit-auto-execute;
-                    edit_description <=> root.snippet-edit-description;
-                    edit_is_favorite <=> root.snippet-edit-is-favorite;
-                    detected_variables_text: root.snippet-detected-variables-text;
-                    edit_updated_at: root.snippet-edit-updated-at;
-
                     search_changed(q) => { root.filter-snippets-tree(q); }
                     toggle_group_expanded(id) => { root.toggle-snippet-group-expanded(id); }
                     select_node(id, is_grp) => { root.select-snippet-node(id, is_grp); }
@@ -1582,40 +1547,9 @@ export component AppWindow inherits Window {
                     request_drag_hover(src, idx, off) => { root.request-snippet-drag-hover(src, idx, off); }
                 }
 
-                // 2.3.4 全屏网络与隧道管理中心 (当 main-view == "tunnels" 时全屏展开)
+                // 2.3.4 全屏网络与隧道管理中心
                 if root.main-view == "tunnels": TunnelsCenterView {
                     horizontal-stretch: 1;
-                    tunnels: root.tunnels;
-                    filter-category <=> root.tunnel-filter-category;
-                    search-query <=> root.tunnel-search-query;
-                    active-tunnel-id <=> root.active-tunnel-id;
-
-                    is-create-mode <=> root.is-tunnel-create-mode;
-                    is-editing <=> root.is-tunnel-editing;
-                    form-id <=> root.tunnel-form-id;
-                    form-name <=> root.tunnel-form-name;
-                    form-type <=> root.tunnel-form-type;
-                    form-ssh-host-id <=> root.tunnel-form-ssh-host-id;
-                    form-ssh-host-name <=> root.tunnel-form-ssh-host-name;
-                    form-local-bind <=> root.tunnel-form-local-bind;
-                    form-local-port <=> root.tunnel-form-local-port;
-                    form-remote-host <=> root.tunnel-form-remote-host;
-                    form-remote-port <=> root.tunnel-form-remote-port;
-                    form-auto-start <=> root.tunnel-form-auto-start;
-                    form-auto-reconnect <=> root.tunnel-form-auto-reconnect;
-                    form-remote-dns <=> root.tunnel-form-remote-dns;
-                    form-compression <=> root.tunnel-form-compression;
-                    form-is-running <=> root.tunnel-form-is-running;
-                    form-active-connections <=> root.tunnel-form-active-connections;
-                    form-traffic-in <=> root.tunnel-form-traffic-in;
-                    form-traffic-out <=> root.tunnel-form-traffic-out;
-                    form-updated-at <=> root.tunnel-form-updated-at;
-                    form-ssh-command <=> root.tunnel-form-ssh-command;
-                    form-jump-chain <=> root.tunnel-form-jump-chain;
-                    form-proxy-proto <=> root.tunnel-form-proxy-proto;
-                    form-proxy-username <=> root.tunnel-form-proxy-username;
-                    form-proxy-password <=> root.tunnel-form-proxy-password;
-                    form-notes <=> root.tunnel-form-notes;
                     tree-nodes: root.tree-nodes;
                     toggle-group(id) => { root.toggle-tree-group(id); }
 
@@ -1639,11 +1573,9 @@ export component AppWindow inherits Window {
                     copy-ssh-command(id) => { root.copy-tunnel-ssh-command(id); }
                     copy-custom-text(text, title, msg) => { root.copy-custom-text(text, title, msg); }
                     search-changed(q) => {
-                        root.tunnel-search-query = q;
                         root.filter-tunnels(root.tunnel-filter-category, q);
                     }
                     filter-category-changed(cat) => {
-                        root.tunnel-filter-category = cat;
                         root.filter-tunnels(cat, root.tunnel-search-query);
                     }
                     back-to-terminal => {
@@ -1653,88 +1585,42 @@ export component AppWindow inherits Window {
                     }
                 }
 
-                // 2.3.5 全屏偏好设置中心 (当 main-view == "settings" 时全屏展开，含备份迁移、外观、终端排版)
+                // 2.3.5 全屏偏好设置中心
                 if root.main-view == "settings": SettingsCenterView {
                     horizontal-stretch: 1;
                     active-category <=> root.active-settings-category;
                     is-dark-mode <=> root.is-dark-mode;
-                    setting-debug-enabled <=> root.is-debug-enabled;
-                    setting-wallpaper-mode <=> root.wallpaper-mode;
-                    setting-wallpaper-opacity <=> root.global-wallpaper-opacity;
-                    setting-modal-opacity <=> root.setting-modal-opacity;
                     change-modal-opacity(op) => { root.change-modal-opacity(op); }
-
-                    setting-close-action <=> root.setting-close-action;
-                    setting-confirm-close-tab <=> root.setting-confirm-close-tab;
-                    setting-confirm-close-active <=> root.setting-confirm-close-active;
-                    setting-always-on-top <=> root.setting-always-on-top;
-                    setting-start-on-boot <=> root.setting-start-on-boot;
-                    active-rendering-pipeline <=> root.active-rendering-pipeline;
-
                     toggle-always-on-top(c) => { root.toggle-always-on-top(c); }
                     toggle-start-on-boot(c) => { root.toggle-start-on-boot(c); }
                     toggle-confirm-close-tab(c) => { root.toggle-confirm-close-tab(c); }
                     toggle-confirm-close-active(c) => { root.toggle-confirm-close-active(c); }
                     switch-rendering-pipeline(p) => { root.switch-rendering-pipeline(p); }
-
                     close-settings => {
                         root.main-view = "terminal";
                         root.active-left-tab = "hosts";
                         root.is-left-drawer-open = true;
                     }
-                    themes: root.themes;
-                    custom-themes: root.custom-themes;
-                    dark-themes: root.dark-themes;
-                    light-themes: root.light-themes;
-                    custom-theme-rows: root.custom-theme-rows;
-                    dark-theme-rows: root.dark-theme-rows;
-                    light-theme-rows: root.light-theme-rows;
-                    custom-themes-count: root.custom-themes-count;
-                    dark-themes-count: root.dark-themes-count;
-                    light-themes-count: root.light-themes-count;
-                    current-theme-id <=> root.current-theme-id;
                     switch-theme(id) => { root.switch-theme(id); }
                     import-theme => { root.import-theme(); }
                     export-current-theme => { root.export-current-theme(); }
                     create-custom-theme => { root.open-theme-editor(); }
                     delete-custom-theme(id) => { root.delete-custom-theme(id); }
-
-                    setting-wallpaper-list <=> root.wallpaper-list;
-                    setting-wallpaper-path <=> root.wallpaper-path;
-                    setting-wallpaper-active-index <=> root.wallpaper-active-index;
-                    setting-wallpaper-slideshow <=> root.wallpaper-slideshow-interval;
-                    setting-wallpaper-transition <=> root.wallpaper-transition-effect;
                     add-wallpaper => { root.add-wallpaper-image(); }
                     add-wallpaper-folder => { root.add-wallpaper-folder(); }
                     remove-wallpaper(idx) => { root.remove-wallpaper-image(idx); }
                     select-wallpaper(idx) => { root.select-wallpaper-image(idx); }
                     set-wallpaper-slideshow(interval, transition) => { root.set-wallpaper-slideshow(interval, transition); }
-
                     toggle-dark-mode => { root.toggle-color-mode(); }
                     toggle-debug-enabled(enabled) => { root.toggle-debug-enabled(enabled); }
                     change-terminal-font(font, size) => { root.set-terminal-font(font, size); }
                     change-wallpaper(mode, path, opacity) => { root.set-wallpaper(mode, path, opacity); }
-
                     export-backup-archive(inc_pass) => { root.export-backup-archive(inc_pass); }
                     scan-and-import-openssh => { root.scan-and-import-openssh(); }
                     import-external-file => { root.import-external-assets(); }
                     factory-reset-settings => { root.factory-reset-settings(); }
-
-                    setting-language <=> root.current-language;
                     switch-language(lang) => { root.switch-language(lang); }
-
-                    setting-ui-font <=> root.setting-ui-font;
-                    available-ui-fonts: root.available-ui-fonts;
                     change-ui-font(f) => { root.change-ui-font(f); }
-
-                    setting-terminal-url-click <=> root.setting-terminal-url-click;
-                    setting-terminal-highlight-keywords <=> root.setting-terminal-highlight-keywords;
-                    setting-terminal-custom-keywords <=> root.setting-terminal-custom-keywords;
-                    setting-cursor-style <=> root.setting-cursor-style;
-                    setting-cursor-blink <=> root.setting-cursor-blink;
-                    setting-scrollback-lines <=> root.setting-scrollback-lines;
-                    setting-bell-style <=> root.setting-bell-style;
-
                     change-terminal-url-click(c) => { root.change-terminal-url-click(c); }
                     change-terminal-highlight-keywords(c) => { root.change-terminal-highlight-keywords(c); }
                     change-terminal-custom-keywords(k) => { root.change-terminal-custom-keywords(k); }
@@ -1742,36 +1628,11 @@ export component AppWindow inherits Window {
                     change-cursor-blink(b) => { root.change-cursor-blink(b); }
                     change-scrollback-lines(l) => { root.change-scrollback-lines(l); }
                     change-bell-style(s) => { root.change-bell-style(s); }
-
-                    flag-terminal-crt-shader: root.flag-terminal-crt-shader;
-                    setting-terminal-crt <=> root.setting-terminal-crt;
                     toggle-terminal-crt(c) => { root.toggle-terminal-crt(c); }
-
-                    terminal-keyword-rules <=> root.terminal-keyword-rules;
                     add-keyword-rule(p, r, c) => { root.add-keyword-rule(p, r, c); }
                     update-keyword-rule(id, p, r, c) => { root.update-keyword-rule(id, p, r, c); }
                     toggle-keyword-rule(id, e) => { root.toggle-keyword-rule(id, e); }
                     delete-keyword-rule(id) => { root.delete-keyword-rule(id); }
-
-                    setting-global-proxy-mode <=> root.setting-global-proxy-mode;
-                    setting-global-proxy-server <=> root.setting-global-proxy-server;
-                    setting-global-proxy-auth <=> root.setting-global-proxy-auth;
-                    setting-global-proxy-user <=> root.setting-global-proxy-user;
-                    setting-global-proxy-pass <=> root.setting-global-proxy-pass;
-
-                    setting-connect-timeout <=> root.setting-connect-timeout;
-                    setting-keepalive-interval <=> root.setting-keepalive-interval;
-                    setting-keepalive-count-max <=> root.setting-keepalive-count-max;
-                    setting-host-key-policy <=> root.setting-host-key-policy;
-                    setting-tcp-nodelay <=> root.setting-tcp-nodelay;
-
-                    setting-terminal-font: root.terminal-font-family;
-                    setting-terminal-font-size: Math.round(root.terminal-font-size);
-
-                    setting-copy-on-select <=> root.setting-copy-on-select;
-                    setting-paste-on-right-click <=> root.setting-paste-on-right-click;
-                    setting-warn-multiline-paste <=> root.setting-warn-multiline-paste;
-
                     change-copy-on-select(c) => { root.change-copy-on-select(c); }
                     change-paste-on-right-click(c) => { root.change-paste-on-right-click(c); }
                     change-warn-multiline-paste(c) => { root.change-warn-multiline-paste(c); }
@@ -1780,14 +1641,6 @@ export component AppWindow inherits Window {
                     change-network-handshake(t, i, c) => { root.change-network-handshake(t, i, c); }
                     change-host-key-policy(p) => { root.change-host-key-policy(p); }
                     change-tcp-nodelay(c) => { root.change-tcp-nodelay(c); }
-
-                    color-picker-indicator-x <=> root.theme-editor-wheel-indicator-x;
-                    color-picker-indicator-y <=> root.theme-editor-wheel-indicator-y;
-                    color-picker-brightness <=> root.theme-editor-wheel-brightness;
-                    color-picker-hue-brush: root.theme-editor-wheel-hue-brush;
-                    color-picker-preview-brush: root.theme-editor-picker-brush;
-                    color-picker-hex <=> root.theme-editor-picker-hex;
-
                     color-wheel-coord-picked(x, y) => { root.theme-editor-wheel-coord-picked(x, y); }
                     color-wheel-brightness-picked(b) => { root.theme-editor-wheel-brightness-picked(b); }
                     color-picker-hex-changed(h) => {
@@ -1803,12 +1656,7 @@ export component AppWindow inherits Window {
                     min-width: 0px;
                     max-width: root.main-view == "terminal" ? 100000px : 0px;
 
-                    has-active-session: root.has-active-session;
                     paste-on-right-click: root.setting-paste-on-right-click;
-
-                    tabs: root.tabs;
-                    active-tab-id: root.active-session-tab;
-
 
                     select-tab(id) => { root.select-tab(id); }
                     close-tab(id) => { root.close-tab(id); }
@@ -1818,32 +1666,12 @@ export component AppWindow inherits Window {
                     close-other-tabs(pane_id, tab_id) => { root.close-other-tabs(pane_id, tab_id); }
                     new-tab => { root.is-new-session-modal-open = true; }
 
-
-                    session-name: root.active-session-name;
-                    host-address: root.active-host-address;
-                    ping-ms: root.active-host-ping-ms;
-                    terminal-screen-image: root.terminal-screen-image;
-                    terminal-split-image: root.terminal-split-image;
-                    terminal-split2-image: root.terminal-split2-image;
-                    terminal-split3-image: root.terminal-split3-image;
-                    is-split <=> root.is-split;
-                    split-count <=> root.split-count;
-                    split-orientation <=> root.split-orientation;
-                    split-ratio <=> root.split-ratio;
-                    active-pane-index <=> root.active-pane-index;
-                    active-pane-id <=> root.active-pane-id;
-                    terminal-panes: root.terminal-panes;
-                    terminal-splitters: root.terminal-splitters;
-                    split-session-name: root.split-session-name;
-                    split2-session-name: root.split2-session-name;
-                    split3-session-name: root.split3-session-name;
                     history-size: root.terminal-history-size;
                     scroll-offset: root.terminal-scroll-offset;
                     wallpaper-mode: root.wallpaper-mode;
                     terminal-wallpaper-image: root.terminal-wallpaper-image;
                     terminal-wallpaper-opacity: root.terminal-wallpaper-opacity;
                     terminal-key-input(text, is_ctrl, is_shift, is_alt) => { root.terminal-key-input(text, is_ctrl, is_shift, is_alt); }
-
 
                     terminal-scroll(delta) => { root.terminal-scroll(delta); }
                     terminal-selection-changed(sc, sr, ec, er, has_sel) => { root.terminal-selection-changed(sc, sr, ec, er, has_sel); }
@@ -1872,18 +1700,6 @@ export component AppWindow inherits Window {
                     min-width: 0px;
                     max-width: root.main-view == "files" ? 100000px : 0px;
 
-                    local-tabs: root.local-tabs;
-                    active-local-tab-id: root.active-local-tab-id;
-                    remote-tabs: root.remote-tabs;
-                    active-remote-tab-id: root.active-remote-tab-id;
-                    local-current-path: root.local-current-path;
-                    remote-current-path: root.remote-current-path;
-                    local-files: root.local-files;
-                    remote-files: root.remote-files;
-                    selected-local-id <=> root.selected-local-id;
-                    selected-remote-id <=> root.selected-remote-id;
-                    transfer-tasks: root.transfer-tasks;
-
                     select-local-tab(id) => { root.select-local-tab(id); }
                     close-local-tab(id) => { root.close-local-tab(id); }
                     new-local-tab => { root.new-local-tab(); }
@@ -1902,10 +1718,6 @@ export component AppWindow inherits Window {
                     open-remote-item(p, is_dir) => { root.open-remote-item(p, is_dir); }
                     toggle-local-expand(p) => { root.toggle-local-expand(p); }
                     toggle-remote-expand(p) => { root.toggle-remote-expand(p); }
-                    local-can-go-back: root.local-can-go-back;
-                    local-can-go-forward: root.local-can-go-forward;
-                    remote-can-go-back: root.remote-can-go-back;
-                    remote-can-go-forward: root.remote-can-go-forward;
 
                     navigate-local-back => { root.navigate-local-back(); }
                     navigate-local-forward => { root.navigate-local-forward(); }

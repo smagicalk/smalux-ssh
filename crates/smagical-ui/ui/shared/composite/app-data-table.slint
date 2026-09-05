@@ -1,0 +1,109 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 表格列定义数据结构
+export struct TableColumn {
+    id: string,
+    title: string,
+    width: length,
+    horizontal-stretch: int,
+    sortable: bool,
+}
+
+/// 通用数据表格骨架组件 (AppDataTable)
+///
+/// 统合文件浏览器、连接历史记录与网络隧道列表的双态表格。
+/// 核心特性：
+/// 1. 结构化表头与列宽自适应；
+/// 2. 空状态优雅提示占位卡片；
+/// 3. 悬浮高亮反馈与紧凑工业风边框。
+export component AppDataTable inherits Rectangle {
+    in property <[TableColumn]> columns: [];
+    in property <int> item-count: 0;
+    in property <string> empty-title: @tr("暂无数据");
+    in property <string> empty-subtitle: @tr("当前列表中未检索到任何记录");
+    in property <image> empty-icon;
+
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.surface-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    clip: true;
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // 1. 表格固定表头
+        header := Rectangle {
+            height: 28px;
+            background: AppTheme.panel-background;
+
+            // 表头底部分割线
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 8px;
+
+                for col in root.columns: Rectangle {
+                    width: col.width > 0px ? col.width : 80px;
+                    horizontal-stretch: col.horizontal-stretch;
+
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: start;
+
+                        Text {
+                            text: col.title;
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.disabled-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 表格数据工作区或空状态占位
+        body := Rectangle {
+            vertical-stretch: 1;
+
+            if root.item-count == 0: VerticalLayout {
+                alignment: center;
+                spacing: 8px;
+
+                if root.empty-icon.width > 0: HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: root.empty-icon;
+                        width: 32px;
+                        height: 32px;
+                        colorize: AppTheme.disabled-foreground.transparentize(50%);
+                    }
+                }
+
+                Text {
+                    text: root.empty-title;
+                    font-size: 12px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: root.empty-subtitle;
+                    font-size: 10px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+}

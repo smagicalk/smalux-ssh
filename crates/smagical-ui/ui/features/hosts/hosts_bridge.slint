@@ -1,0 +1,33 @@
+import { HostItemData, HostTreeNode } from "./hosts_model.slint";
+import { GroupOptionData } from "../../components/create-group-modal.slint";
+
+export { HostItemData, HostTreeNode }
+
+/// 主机与资产树领域全局状态总线 (Hosts & Assets Bridge)
+export global HostsBridge {
+    // 状态属性
+    in-out property <[HostTreeNode]> tree-nodes: [];
+    in-out property <[HostItemData]> hosts: [];
+    in-out property <string> hosts-view-mode: "tree";
+    in-out property <length> tree-content-width: 240px;
+    in-out property <string> selected-host-id: "";
+    in-out property <string> search-query: "";
+    in-out property <bool> is-create-group-open: false;
+    in-out property <string> create-group-default-parent: "root";
+    in-out property <[GroupOptionData]> group-options: [];
+    in-out property <length> left-drawer-width: 240px;
+
+    // 交互回调
+    callback select-host(string /* id */);
+    callback open-host(string /* id */);
+    callback toggle-group(string /* id */);
+    callback toggle-selector-group(string /* id */);
+    callback move-node(string /* source_id */, string /* target_id */, string /* drop_pos */);
+    callback create-group(string /* name */, string /* parent_id */);
+    callback delete-node(string /* id */, bool /* is_group */);
+    callback create-new-host();
+    callback create-new-group();
+    callback search-changed(string /* query */);
+    callback switch-view-mode(string /* mode */);
+    callback close-group-modal();
+}

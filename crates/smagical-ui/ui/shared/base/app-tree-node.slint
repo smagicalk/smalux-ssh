@@ -1,0 +1,162 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+
+/// 通用树节点组件 (AppTreeNode)
+///
+/// 统一主机资产树、代码片段树及选择器树节点的视觉结构与交互规范。
+/// 包含层级缩进、折叠指示三角、文件夹/文件图标、在线状态指示灯、标签名称、徽章计数与右键菜单。
+export component AppTreeNode inherits Rectangle {
+    in property <int> level: 0;
+    in property <string> title: "";
+    in property <image> icon;
+    in property <bool> is-folder: false;
+    in property <bool> has-children: false;
+    in property <bool> is-expanded: false;
+    in property <bool> is-selected: false;
+    in property <string> status: "";
+    in property <string> count-badge: "";
+    in property <string> details: "";
+    in property <bool> is-drop-target: false;
+
+    callback toggle-expand();
+    callback selected();
+    callback double-clicked();
+    callback context-menu(length /* x */, length /* y */);
+
+    height: 26px;
+    border-radius: 4px;
+    background: root.is-drop-target ? AppTheme.accent.transparentize(70%) : root.is-selected ? AppTheme.accent.transparentize(80%) : node-touch.has-hover ? AppTheme.hover-background : transparent;
+    border-width: (root.is-selected || root.is-drop-target) ? 1px : 0px;
+    border-color: (root.is-selected || root.is-drop-target) ? AppTheme.accent : transparent;
+
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: 6px + root.level * 14px;
+        padding-right: 8px;
+        spacing: 4px;
+        alignment: start;
+
+        // 1. 折叠展开指示三角 (仅在包含子节点或文件夹时展现)
+        if root.has-children || root.is-folder: Rectangle {
+            width: 16px;
+            height: 24px;
+            y: (parent.height - self.height) / 2;
+            border-radius: 3px;
+            background: chevron-touch.has-hover ? AppTheme.hover-background : transparent;
+
+            Image {
+                source: root.is-expanded ? @image-url("../../assets/icons/chevron-down.svg") : @image-url("../../assets/icons/chevron-right.svg");
+                width: 10px;
+                height: 10px;
+                image-fit: contain;
+                colorize: chevron-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+            }
+
+            chevron-touch := TouchArea {
+                clicked => { root.toggle-expand(); }
+                mouse-cursor: pointer;
+            }
+        }
+
+        if !root.has-children && !root.is-folder: Rectangle {
+            width: 16px;
+            height: 24px;
+        }
+
+        // 2. 状态指示灯 (主机/连接专用)
+        if root.status != "": VerticalLayout {
+            alignment: center;
+            StatusDot {
+                status: root.status;
+                dot-size: 6px;
+            }
+        }
+
+        // 3. 节点图标 (自定义或文件夹)
+        VerticalLayout {
+            alignment: center;
+
+            if root.icon.width > 0: Image {
+                source: root.icon;
+                width: 13px;
+                height: 13px;
+                image-fit: contain;
+                colorize: root.is-selected ? AppTheme.accent : AppTheme.secondary-foreground;
+            }
+
+            if root.icon.width == 0 && root.is-folder: Image {
+                source: root.is-expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg");
+                width: 13px;
+                height: 13px;
+                image-fit: contain;
+                colorize: root.is-selected ? AppTheme.accent : AppTheme.secondary-foreground;
+            }
+        }
+
+        // 4. 标题名称与附属详情
+        VerticalLayout {
+            alignment: center;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.title;
+                font-size: 11px;
+                font-weight: (root.is-folder || root.is-selected) ? 600 : 400;
+                color: root.is-selected ? AppTheme.foreground : AppTheme.secondary-foreground;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+        }
+
+        // 5. 附属描述
+        if root.details != "": VerticalLayout {
+            alignment: center;
+            Text {
+                text: root.details;
+                font-size: 9px;
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 6. 子项数量统计微章 (Count Badge)
+        if root.count-badge != "": VerticalLayout {
+            alignment: center;
+
+            Rectangle {
+                height: 16px;
+                border-radius: 8px;
+                background: AppTheme.control-background;
+
+                HorizontalLayout {
+                    padding-left: 5px;
+                    padding-right: 5px;
+
+                    Text {
+                        text: root.count-badge;
+                        font-size: 9px;
+                        font-weight: 600;
+                        color: AppTheme.disabled-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+
+    // 节点主体点击、双击与右键呼出交互
+    node-touch := TouchArea {
+        clicked => { root.selected(); }
+        double-clicked => { root.double-clicked(); }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                root.context-menu(self.mouse-x, self.mouse-y);
+            }
+        }
+        mouse-cursor: pointer;
+    }
+}

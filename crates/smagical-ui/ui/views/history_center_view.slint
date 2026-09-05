@@ -1,6 +1,7 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { ScrollView } from "std-widgets.slint";
 import { HistoryGroupData, HistoryItemData } from "left_drawers/history_drawer.slint";
+import { HistoryBridge } from "../features/history/history_bridge.slint";
 
 export { HistoryGroupData, HistoryItemData }
 
@@ -13,10 +14,10 @@ export { HistoryGroupData, HistoryItemData }
 /// 3. 四联统一操作图标组：[▶ 开始] [📄 详情] [⭐️ 收藏/置顶] [🗑 删除]；
 /// 4. 详情弹窗与会话恢复：支持查看完整的终端屏幕快照，一键发起重连。
 export component HistoryCenterView inherits Rectangle {
-    in property <[HistoryGroupData]> history-groups: [];
-    in property <int> total-count: 0;
+    in property <[HistoryGroupData]> history-groups: HistoryBridge.history-groups;
+    in property <int> total-count: HistoryBridge.total-count;
     in property <bool> has-active-terminal: false;
-    in-out property <string> search-query: "";
+    in-out property <string> search-query: HistoryBridge.search-query;
 
     callback reconnect(string /* id */);
     callback show-detail(string /* id */);

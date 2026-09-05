@@ -1,0 +1,128 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 通用极简工业风滑块组件 (AppSlider)
+///
+/// 专为透明度调节、字体大小缩放、音量或比率控制设计的通用控件。
+/// 核心特性：
+/// 1. 支持自定义最小值、最大值与步进步长 (minimum, maximum, step)；
+/// 2. 交互式触摸手柄 (支持点击跳转与平滑按住拖拽)；
+/// 3. 精准的填充轨道 (Filled Track) 与品牌色指示器；
+/// 4. 文本标签、当前数值格式化与单位指示。
+export component AppSlider inherits Rectangle {
+    in property <string> label: "";
+    in property <string> unit: "";
+    in property <float> minimum: 0.0;
+    in property <float> maximum: 1.0;
+    in property <float> step: 0.01;
+    in-out property <float> value: 0.5;
+    in property <bool> disabled: false;
+    in property <bool> show-value: true;
+
+    callback changed(float /* new_value */);
+
+    height: root.label != "" ? 44px : 26px;
+    opacity: root.disabled ? 0.45 : 1.0;
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 4px;
+        alignment: center;
+
+        // 1. 顶部标签与当前数值显示
+        if root.label != "" || root.show-value: HorizontalLayout {
+            alignment: space-between;
+            height: 16px;
+
+            if root.label != "": Text {
+                text: root.label;
+                font-size: 11px;
+                font-weight: 500;
+                color: AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+
+            if root.show-value: Text {
+                text: Math.round(root.value * 100) / 100 + root.unit;
+                font-size: 11px;
+                font-family: "JetBrains Mono";
+                font-weight: 600;
+                color: AppTheme.foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 2. 滑块轨道与手柄
+        track-container := Rectangle {
+            height: 20px;
+
+            // 底层未激活轨道
+            track := Rectangle {
+                y: (parent.height - self.height) / 2;
+                height: 4px;
+                border-radius: 2px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                // 激活高亮填充轨道
+                fill := Rectangle {
+                    x: 0px;
+                    y: 0px;
+                    height: 100%;
+                    width: Math.max(0px, Math.min(parent.width, (root.maximum > root.minimum ? ((root.value - root.minimum) / (root.maximum - root.minimum)) : 0.0) * parent.width));
+                    border-radius: 2px;
+                    background: AppTheme.accent;
+                }
+            }
+
+            // 拖拽手柄
+            thumb := Rectangle {
+                property <float> progress: root.maximum > root.minimum ? Math.max(0.0, Math.min(1.0, (root.value - root.minimum) / (root.maximum - root.minimum))) : 0.0;
+                x: Math.max(0px, Math.min(parent.width - self.width, self.progress * (parent.width - self.width)));
+                y: (parent.height - self.height) / 2;
+                width: 14px;
+                height: 14px;
+                border-radius: 7px;
+                background: thumb-touch.has-hover ? #ffffff : AppTheme.accent;
+                border-width: 2px;
+                border-color: AppTheme.accent;
+                drop-shadow-blur: 4px;
+                drop-shadow-color: #00000066;
+
+                animate background { duration: 120ms; }
+                animate border-color { duration: 120ms; }
+            }
+
+            // 交互热区
+            thumb-touch := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: root.disabled ? default : pointer;
+
+                moved => {
+                    if !root.disabled && self.pressed {
+                        let clamped-x = Math.max(0px, Math.min(self.width, self.mouse-x));
+                        let ratio: float = self.width > 0px ? ((clamped-x / 1px) / (self.width / 1px)) : 0.0;
+                        let raw-val = root.minimum + ratio * (root.maximum - root.minimum);
+                        let stepped = root.step > 0.0 ? (Math.round(raw-val / root.step) * root.step) : raw-val;
+                        let new-val = Math.max(root.minimum, Math.min(root.maximum, stepped));
+                        root.value = new-val;
+                        root.changed(new-val);
+                    }
+                }
+
+                clicked => {
+                    if !root.disabled {
+                        let clamped-x = Math.max(0px, Math.min(self.width, self.mouse-x));
+                        let ratio: float = self.width > 0px ? ((clamped-x / 1px) / (self.width / 1px)) : 0.0;
+                        let raw-val = root.minimum + ratio * (root.maximum - root.minimum);
+                        let stepped = root.step > 0.0 ? (Math.round(raw-val / root.step) * root.step) : raw-val;
+                        let new-val = Math.max(root.minimum, Math.min(root.maximum, stepped));
+                        root.value = new-val;
+                        root.changed(new-val);
+                    }
+                }
+            }
+        }
+    }
+}

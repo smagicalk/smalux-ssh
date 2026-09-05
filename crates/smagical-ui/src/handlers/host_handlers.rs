@@ -9,7 +9,7 @@ use smagical_core::event::{
 };
 use smagical_core::GroupRecord;
 
-use crate::generated::{AppWindow, HostItemData};
+use crate::generated::{AppWindow, GroupOptionData, HostItemData, HostTreeNode, HostsBridge};
 use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, TerminalSessionInfo};
 use crate::terminal::TerminalInstance;
@@ -17,6 +17,30 @@ use crate::tree_model::{
     build_group_options, build_search_tree_nodes, build_visible_tree_nodes,
     calculate_max_tree_width, move_and_reorder_raw_node, RawTreeNode,
 };
+
+fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
+    let hb = w.global::<HostsBridge>();
+    let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(nodes.to_vec())));
+    let width = calculate_max_tree_width(nodes);
+    w.set_tree_nodes(model.clone());
+    w.set_tree_content_width(width);
+    hb.set_tree_nodes(model);
+    hb.set_tree_content_width(width);
+}
+
+fn sync_hosts_bridge_cards(w: &AppWindow, cards: &[HostItemData]) {
+    let hb = w.global::<HostsBridge>();
+    let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(cards.to_vec())));
+    w.set_hosts(model.clone());
+    hb.set_hosts(model);
+}
+
+fn sync_hosts_bridge_options(w: &AppWindow, options: &[GroupOptionData]) {
+    let hb = w.global::<HostsBridge>();
+    let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
+    w.set_group_options(model.clone());
+    hb.set_group_options(model);
+}
 
 
 /// 注册主机资产管理相关交互回调。
@@ -45,7 +69,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             }
             let tree = master_tree_toggle_opt.borrow();
             let next_options = build_group_options(&tree, &set);
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_options))));
+            sync_hosts_bridge_options(&w, &next_options);
         }
     });
 
@@ -55,21 +79,25 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // 点击左侧主机树中的某个文件夹节点时触发，切换展开状态并同步持久化至 AppStorage。
     let window_weak = window.as_weak();
     let master_tree_toggle = Rc::clone(&ctx.master_tree);
-    let expanded_clone = Rc::clone(&ctx.expanded_groups);
+    let expanded_toggle = Rc::clone(&ctx.expanded_groups);
     let search_query_toggle = Rc::clone(&ctx.search_query);
     let core_state_toggle = Rc::clone(&ctx.core_state);
     window.on_toggle_tree_group(move |id| {
         if let Some(w) = window_weak.upgrade() {
-            let mut set = expanded_clone.borrow_mut();
+            let mut set = expanded_toggle.borrow_mut();
             let id_str = id.to_string();
-            let is_expanding = !set.contains(&id_str);
-            if set.contains(&id_str) {
+            let is_expanding = if set.contains(&id_str) {
                 set.remove(&id_str);
+                false
             } else {
                 set.insert(id_str.clone());
-            }
-            // 同步至存储层
+                true
+            };
+
+            // 同步持久化分组折叠/展开状态至存储层
             let _ = core_state_toggle.storage().groups().set_expanded(&id_str, is_expanding);
+
+            // 显式派发分组折叠/展开事件
             core_state_toggle.events().dispatch(&HostGroupToggledEvent {
                 group_id: id_str.clone(),
                 is_expanded: is_expanding,
@@ -83,8 +111,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            sync_hosts_bridge_tree(&w, &next_nodes);
 
             let gname = tree.iter().find(|n| n.id == id_str).map(|n| n.name.as_str()).unwrap_or(id_str.as_str());
             tracing::debug!(target: "smagical_ui::tree", "{}分组: {} (已同步存储层)", if is_expanding { "展开" } else { "折叠" }, gname);
@@ -144,7 +171,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                                 || h.group.to_lowercase().contains(&q)
                         }).cloned().collect()
                     };
-                    w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
+                    sync_hosts_bridge_cards(&w, &display_cards);
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
                     core_state_move.events().dispatch(&HostTreeReorderedEvent {
@@ -183,11 +210,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     } else {
                         build_search_tree_nodes(&tree, &q)
                     };
-                    w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-                    w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+                    sync_hosts_bridge_tree(&w, &next_nodes);
 
                     let next_options = build_group_options(&tree, &selector_expanded_move.borrow());
-                    w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_options))));
+                    sync_hosts_bridge_options(&w, &next_options);
 
                     // 同步树形结构迁移至存储层 (Host or Group)
                     if let Some(moved_node) = tree.iter().find(|n| n.id == src_str) {
@@ -229,7 +255,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                                 || h.group.to_lowercase().contains(&q)
                         }).cloned().collect()
                     };
-                    w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(display_cards))));
+                    sync_hosts_bridge_cards(&w, &display_cards);
 
                     tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已同步存储层)", src_name, pos_str, target_name);
                     core_state_move.events().dispatch(&HostTreeReorderedEvent {
@@ -440,7 +466,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             // 刷新弹窗中的上级分组列表选项
             let next_options = build_group_options(&tree, &selector_expanded_create.borrow());
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_options))));
+            sync_hosts_bridge_options(&w, &next_options);
 
             // 刷新主界面树形结构
             let q = search_query_create.borrow().clone();
@@ -449,8 +475,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            sync_hosts_bridge_tree(&w, &next_nodes);
 
             tracing::info!(target: "smagical_ui::tree", "创建新分组: {} (上级: {}, 已同步存储层)", g_name, if p_id.is_empty() { "根目录" } else { &p_id });
         }
@@ -478,8 +503,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            sync_hosts_bridge_tree(&w, &next_nodes);
 
             // 2. 动态过滤卡片列表 (基于当前 master_cards 列表及用户自定义排序)
             let cards = master_cards_filter.borrow();
@@ -496,7 +520,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 })
                 .cloned()
                 .collect();
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(filtered_cards.clone()))));
+            sync_hosts_bridge_cards(&w, &filtered_cards);
 
             core_state_filter.events().dispatch(&HostSearchFilteredEvent {
                 query: q.clone(),
@@ -654,6 +678,53 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
             crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx_open.core_state);
             tracing::info!(target: "smagical_ui::session", "成功打开终端会话 (Pane ID: {})", *active_pid);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 9. 领域总线 HostsBridge 回调双向绑定
+    // -------------------------------------------------------------------------
+    let hb = window.global::<HostsBridge>();
+
+    let w_bridge = window.as_weak();
+    hb.on_open_host(move |id| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_open_host(id);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    hb.on_toggle_group(move |id| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_toggle_tree_group(id);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    hb.on_toggle_selector_group(move |id| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_toggle_group_option(id);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    hb.on_move_node(move |s, t, p| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_move_tree_node(s, t, p);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    hb.on_create_group(move |n, p| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_create_group(p, n);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    hb.on_search_changed(move |q| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_filter_hosts(q);
         }
     });
 }

@@ -1,0 +1,73 @@
+import { SnippetTreeNode } from "./snippets_model.slint";
+import { SnippetParamFieldData } from "../../components/snippet-run-modal.slint";
+
+export { SnippetTreeNode, SnippetParamFieldData }
+
+/// 代码片段与多层脚本库领域全局状态总线 (Snippets Bridge)
+export global SnippetsBridge {
+    // 树形节点与视图
+    in-out property <[SnippetTreeNode]> tree-nodes: [];
+    in-out property <string> search-query: "";
+    in-out property <string> active-snippet-id: "";
+    in-out property <bool> is-active-group: false;
+
+    // 代码片段表单详情
+    in-out property <bool> is-editing: false;
+    in-out property <bool> is-create-mode: false;
+    in-out property <string> form-id: "";
+    in-out property <string> form-title: "";
+    in-out property <string> form-group-id: "";
+    in-out property <string> form-description: "";
+    in-out property <string> form-language: "Bash";
+    in-out property <string> form-code: "";
+    in-out property <bool> form-auto-execute: false;
+    in-out property <bool> form-is-favorite: false;
+
+    // 分组信息
+    in-out property <string> group-form-id: "";
+    in-out property <string> group-form-name: "";
+    in-out property <string> group-form-parent-id: "";
+
+    // 动态参数运行模态窗
+    in-out property <bool> is-run-modal-open: false;
+    in-out property <string> run-snippet-id: "";
+    in-out property <string> run-snippet-title: "";
+    in-out property <string> run-raw-command: "";
+    in-out property <string> run-rendered-command: "";
+    in-out property <[SnippetParamFieldData]> run-params-list: [];
+
+    // 新建分组模态窗
+    in-out property <bool> is-create-group-modal-open: false;
+    in-out property <string> default-parent-group-id: "";
+
+    // 交互回调
+    callback select-node(string /* id */, bool /* is_group */);
+    callback toggle-group-expanded(string /* group_id */);
+    callback search-changed(string /* query */);
+    callback toggle-favorite(string /* id */);
+
+    callback create-new-snippet();
+    callback create-new-group();
+    callback start-edit();
+    callback cancel-edit();
+    callback save-snippet(
+        string /* id */,
+        string /* title */,
+        string /* group_id */,
+        string /* description */,
+        string /* language */,
+        string /* code */,
+        bool /* auto_execute */
+    );
+    callback delete-snippet(string /* id */);
+    callback move-node(string /* source_id */, string /* target_id */, string /* drop_pos */);
+
+    callback save-group(string /* id */, string /* name */, string /* parent_id */);
+    callback delete-group(string /* id */);
+
+    callback request-run-snippet(string /* id */);
+    callback run-param-changed(int /* index */, string /* val */);
+    callback execute-run-modal();
+    callback cancel-run-modal();
+    callback close-create-group-modal();
+}

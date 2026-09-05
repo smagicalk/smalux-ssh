@@ -1,0 +1,51 @@
+import { TabData } from "../../views/center_terminal/tab_bar.slint";
+
+export { TabData }
+
+/// 单个动态终端窗格数据模型 (支持无限嵌套任意多分屏)
+export struct TerminalPaneData {
+    /// 窗格唯一标识 ID (如: "tab-1-pane-1")
+    pane-id: string,
+    /// 窗格顶部标题文本
+    title: string,
+    /// 相对终端中央视口左上角像素 X 坐标
+    x: length,
+    /// 相对终端中央视口左上角像素 Y 坐标
+    y: length,
+    /// 窗格像素宽度
+    width: length,
+    /// 窗格像素高度
+    height: length,
+    /// 窗格像素位图帧流
+    image: image,
+    /// 是否获得当前焦点
+    is-active: bool,
+    /// 窗格在当前分屏组内的序号 (1-indexed)
+    pane-index: int,
+    /// 当前分屏组内的窗格总数
+    total-panes: int,
+    /// 窗格当前是否处于临时最大化 (Zoom) 状态
+    is-zoomed: bool,
+    /// 窗格在线状态 ("online" | "warning" | "offline")
+    status: string,
+    /// 该窗格所属的 Tab 列表
+    tabs: [TabData],
+    /// 该窗格当前激活的 Tab ID
+    active-tab-id: string,
+}
+
+/// 窗格间可拖拽分割条数据模型
+export struct TerminalSplitterData {
+    /// 分割条唯一标识 ID (对应二叉树分支节点 ID)
+    splitter-id: string,
+    /// 是否为垂直分割条 (true 为左右垂直拖拽条, false 为上下水平拖拽条)
+    is-vertical: bool,
+    /// 像素 X 坐标
+    x: length,
+    /// 像素 Y 坐标
+    y: length,
+    /// 像素宽度
+    width: length,
+    /// 像素高度
+    height: length,
+}

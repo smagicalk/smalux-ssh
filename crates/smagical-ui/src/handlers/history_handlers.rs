@@ -8,7 +8,7 @@ use smagical_core::event::{
 };
 use smagical_core::HistoryRecord;
 
-use crate::generated::{AppWindow, HistoryGroupData, HistoryItemData};
+use crate::generated::{AppWindow, HistoryBridge, HistoryGroupData, HistoryItemData};
 use crate::handlers::AppContext;
 
 
@@ -276,7 +276,14 @@ pub(crate) fn sync_ui_history_from_state(
     };
 
     window.set_history_total_count(total_count);
-    window.set_history_groups(slint::ModelRc::from(Rc::new(slint::VecModel::from(groups))));
+    let group_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(groups)));
+    window.set_history_groups(group_model.clone());
+
+    let hb = window.global::<HistoryBridge>();
+    hb.set_total_count(total_count);
+    hb.set_history_groups(group_model);
+    hb.set_search_query(search_q.into());
+    hb.set_view_mode(view_mode.into());
 }
 
 /// 同步更新 Slint 历史抽屉数据与视图

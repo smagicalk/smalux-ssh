@@ -1,0 +1,191 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "./app-button.slint";
+
+export struct ColorSwatchItem {
+    hex: string,
+    c: color,
+}
+
+/// 通用取色器组件 (AppColorPicker)
+///
+/// 专为主题定制、终端高亮规则及标签配色设计的紧凑型颜色选择器。
+/// 包含颜色预览色块、Hex 文本标签、点击呼出调色板及内置快捷色板。
+export component AppColorPicker inherits Rectangle {
+    in property <string> label: "";
+    in-out property <string> color-hex: "#3B82F6";
+    in property <bool> disabled: false;
+
+    callback color-changed(string /* new_hex */);
+
+    property <bool> is-open: false;
+
+    in property <[ColorSwatchItem]> swatches: [
+        { hex: "#EF4444", c: #EF4444 },
+        { hex: "#F97316", c: #F97316 },
+        { hex: "#F59E0B", c: #F59E0B },
+        { hex: "#10B981", c: #10B981 },
+        { hex: "#06B6D4", c: #06B6D4 },
+        { hex: "#3B82F6", c: #3B82F6 },
+        { hex: "#8B5CF6", c: #8B5CF6 },
+        { hex: "#EC4899", c: #EC4899 },
+        { hex: "#6B7280", c: #6B7280 },
+        { hex: "#111827", c: #111827 },
+        { hex: "#FFFFFF", c: #FFFFFF },
+        { hex: "#FACC15", c: #FACC15 }
+    ];
+
+    height: 32px;
+    border-radius: AppTheme.radius-medium;
+    background: picker-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+    border-width: 1px;
+    border-color: root.is-open ? AppTheme.accent : AppTheme.border;
+    opacity: root.disabled ? 0.45 : 1.0;
+
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 8px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            spacing: 8px;
+            alignment: start;
+
+            // 1. 颜色指示色块
+            Rectangle {
+                width: 18px;
+                height: 18px;
+                y: (parent.height - self.height) / 2;
+                border-radius: 4px;
+                background: @linear-gradient(0deg, #888888 0%, #888888 100%);
+                border-width: 1px;
+                border-color: #ffffff33;
+
+                // 实际颜色层
+                Rectangle {
+                    width: 100%;
+                    height: 100%;
+                    border-radius: 3px;
+                    background: root.color-hex != "" ? @linear-gradient(0deg, #3B82F6 0%, #3B82F6 100%) : transparent;
+                }
+            }
+
+            // 2. Hex 文本标签
+            Text {
+                text: root.color-hex;
+                font-size: 11px;
+                font-family: "JetBrains Mono";
+                font-weight: 600;
+                color: AppTheme.foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 3. 下拉小三角指示
+        Image {
+            source: @image-url("../../assets/icons/chevron-down.svg");
+            width: 10px;
+            height: 10px;
+            image-fit: contain;
+            colorize: AppTheme.secondary-foreground;
+            y: (parent.height - self.height) / 2;
+        }
+    }
+
+    picker-touch := TouchArea {
+        clicked => {
+            if !root.disabled {
+                root.is-open = !root.is-open;
+            }
+        }
+        mouse-cursor: root.disabled ? default : pointer;
+    }
+
+    // 弹出快捷调色板浮层
+    popup := PopupWindow {
+        x: 0px;
+        y: parent.height + 4px;
+        width: 180px;
+        height: 110px;
+
+        Rectangle {
+            width: 100%;
+            height: 100%;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000088;
+            drop-shadow-offset-y: 4px;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 6px;
+
+                Text {
+                    text: @tr("选择颜色");
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                }
+
+                // 预设色板网格
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: center;
+
+                    for s in [
+                        root.swatches[0], root.swatches[1], root.swatches[2],
+                        root.swatches[3], root.swatches[4], root.swatches[5]
+                    ]: Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 4px;
+                        background: s.c;
+                        border-width: 1px;
+                        border-color: s-touch.has-hover ? AppTheme.foreground : #ffffff22;
+
+                        s-touch := TouchArea {
+                            clicked => {
+                                root.color-hex = s.hex;
+                                root.color-changed(s.hex);
+                                root.is-open = false;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: center;
+
+                    for s in [
+                        root.swatches[6], root.swatches[7], root.swatches[8],
+                        root.swatches[9], root.swatches[10], root.swatches[11]
+                    ]: Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 4px;
+                        background: s.c;
+                        border-width: 1px;
+                        border-color: s2-touch.has-hover ? AppTheme.foreground : #ffffff22;
+
+                        s2-touch := TouchArea {
+                            clicked => {
+                                root.color-hex = s.hex;
+                                root.color-changed(s.hex);
+                                root.is-open = false;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

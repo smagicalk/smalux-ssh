@@ -1,0 +1,53 @@
+import { TabData, TerminalPaneData, TerminalSplitterData } from "./terminal_model.slint";
+
+export { TabData, TerminalPaneData, TerminalSplitterData }
+
+/// 终端多会话与多分屏窗格领域全局状态总线 (Terminal Bridge)
+export global TerminalBridge {
+    // 会话基础属性
+    in-out property <bool> has-active-session: false;
+    in-out property <string> active-session-tab: "";
+    in-out property <string> active-session-name: "";
+    in-out property <string> active-host-id: "";
+    in-out property <string> active-host-name: "";
+    in-out property <string> active-host-address: "";
+    in-out property <int> active-host-ping-ms: 0;
+    in-out property <string> active-host-status: "online";
+    in-out property <[TabData]> tabs: [];
+
+    // 多分屏与窗格拓扑
+    in-out property <bool> is-split: false;
+    in-out property <string> split-orientation: "vertical";
+    in-out property <float> split-ratio: 0.5;
+    in-out property <int> active-pane-index: 0;
+    in-out property <string> active-pane-id: "";
+    in-out property <[TerminalPaneData]> panes: [];
+    in-out property <[TerminalSplitterData]> splitters: [];
+    in-out property <bool> is-zoomed: false;
+    in-out property <string> zoomed-pane-id: "";
+    in-out property <bool> is-broadcast-mode: false;
+
+    // 终端实时位图帧流
+    in-out property <image> terminal-screen-image;
+    in-out property <image> terminal-split-image;
+    in-out property <image> terminal-split2-image;
+    in-out property <image> terminal-split3-image;
+
+    // 交互回调
+    callback select-tab(string /* id */);
+    callback close-tab(string /* id */);
+    callback new-tab();
+    callback split-pane(string /* pane_id */, string /* direction */);
+    callback close-pane(string /* pane_id */);
+    callback select-pane(string /* pane_id */);
+    callback toggle-zoom(string /* pane_id */);
+    callback set-split-ratio(float /* ratio */);
+    callback resize-splitter(string /* splitter_id */, length /* offset_x */, length /* offset_y */);
+    callback toggle-broadcast(bool /* enabled */);
+    callback key-pressed(string /* key */);
+    callback text-input(string /* text */);
+    callback scroll-viewport(length /* delta_y */);
+    callback paste-text();
+    callback copy-selection();
+    callback tab-context-menu(string /* tab_id */, length /* x */, length /* y */);
+}

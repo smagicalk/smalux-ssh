@@ -9,7 +9,7 @@ use smagical_core::domain::snippet::{SnippetGroupRecord, SnippetRecord};
 use smagical_core::domain::terminal_context::TerminalAction;
 use smagical_core::event::{SnippetDeletedEvent, SnippetExecutedEvent, SnippetGroupDeletedEvent, SnippetGroupSavedEvent, SnippetSavedEvent};
 
-use crate::generated::{AppWindow, QuickCmdData, SnippetParamFieldData};
+use crate::generated::{AppWindow, QuickCmdData, SnippetParamFieldData, SnippetsBridge};
 use crate::handlers::AppContext;
 use crate::snippet_tree_model::{
     build_raw_snippet_tree_from_storage, build_search_snippet_tree_nodes,
@@ -65,7 +65,11 @@ pub(crate) fn sync_ui_snippets(window: &AppWindow, ctx: &AppContext) {
         build_search_snippet_tree_nodes(&master, &search_q)
     };
 
-    window.set_snippet_tree_nodes(ModelRc::new(VecModel::from(visible_nodes)));
+    let nodes_model = ModelRc::new(VecModel::from(visible_nodes));
+    window.set_snippet_tree_nodes(nodes_model.clone());
+    let bridge = window.global::<SnippetsBridge>();
+    bridge.set_tree_nodes(nodes_model);
+    bridge.set_search_query(search_q.into());
 
     // 分组下拉选项
     let options = build_snippet_group_options(ctx.core_state.storage().as_ref());

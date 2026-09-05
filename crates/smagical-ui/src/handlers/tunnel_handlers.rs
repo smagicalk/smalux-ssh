@@ -9,7 +9,7 @@ use smagical_core::event::{
     TunnelStateChangedEvent,
 };
 
-use crate::generated::{AppWindow, JumpHopData, TunnelItemData};
+use crate::generated::{AppWindow, JumpHopData, TunnelItemData, TunnelsBridge};
 use crate::handlers::AppContext;
 
 fn update_jump_command_preview(w: &AppWindow, hops: &[JumpHopData]) {
@@ -101,7 +101,13 @@ pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
 
     window.set_tunnel_filter_category(cat.clone().into());
     window.set_tunnel_search_query(query.clone().into());
-    window.set_tunnels(ModelRc::new(VecModel::from(filtered.clone())));
+    let t_model = ModelRc::new(VecModel::from(filtered.clone()));
+    window.set_tunnels(t_model.clone());
+
+    let tb = window.global::<TunnelsBridge>();
+    tb.set_filter_category(cat.into());
+    tb.set_search_query(query.into());
+    tb.set_tunnels(t_model);
 
     // 如果当前选中的规则不在当前过滤结果列表中，自动选中第一条有效规则并加载其表单详情
     let current_id = window.get_active_tunnel_id().to_string();

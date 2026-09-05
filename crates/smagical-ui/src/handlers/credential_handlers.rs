@@ -13,7 +13,7 @@ use smagical_core::event::{
 };
 use smagical_core::CoreState;
 
-use crate::generated::{AppWindow, CredentialItemData};
+use crate::generated::{AppWindow, CredentialItemData, CredentialsBridge};
 use crate::handlers::AppContext;
 
 /// 将单条凭据记录的数据回显载入至右侧表单属性 (默认进入受保护的只读查看模式)
@@ -38,6 +38,23 @@ pub(crate) fn load_credential_into_form(window: &AppWindow, cred: &CredentialRec
     window.set_credential_form_notes(cred.notes.clone().into());
     window.set_credential_form_bound_host_count(cred.bound_host_count as i32);
     window.set_credential_form_updated_at(cred.updated_at.clone().into());
+
+    let bridge = window.global::<CredentialsBridge>();
+    bridge.set_is_credential_create_mode(false);
+    bridge.set_is_credential_editing(false);
+    bridge.set_active_credential_id(cred.id.clone().into());
+    bridge.set_credential_form_id(cred.id.clone().into());
+    bridge.set_credential_form_name(cred.name.clone().into());
+    bridge.set_credential_form_type(cred.cred_type.as_str().into());
+    bridge.set_credential_form_algorithm(cred.algorithm.clone().into());
+    bridge.set_credential_form_username(cred.username.clone().unwrap_or_default().into());
+    bridge.set_credential_form_secret_data(cred.secret_data.clone().into());
+    bridge.set_credential_form_passphrase(cred.passphrase.clone().unwrap_or_default().into());
+    bridge.set_credential_form_public_key(cred.public_key.clone().unwrap_or_default().into());
+    bridge.set_credential_form_fingerprint(cred.fingerprint.clone().unwrap_or_default().into());
+    bridge.set_credential_form_notes(cred.notes.clone().into());
+    bridge.set_credential_form_bound_host_count(cred.bound_host_count as i32);
+    bridge.set_credential_form_updated_at(cred.updated_at.clone().into());
 }
 
 /// 清空右侧表单并置为新建模式
@@ -57,6 +74,22 @@ pub(crate) fn clear_form_for_create(window: &AppWindow) {
     window.set_credential_form_notes("".into());
     window.set_credential_form_bound_host_count(0);
     window.set_credential_form_updated_at("".into());
+
+    let bridge = window.global::<CredentialsBridge>();
+    bridge.set_is_credential_create_mode(true);
+    bridge.set_is_credential_editing(true);
+    bridge.set_credential_form_id("".into());
+    bridge.set_credential_form_name("".into());
+    bridge.set_credential_form_type("key".into());
+    bridge.set_credential_form_algorithm("Ed25519".into());
+    bridge.set_credential_form_username("root".into());
+    bridge.set_credential_form_secret_data("".into());
+    bridge.set_credential_form_passphrase("".into());
+    bridge.set_credential_form_public_key("".into());
+    bridge.set_credential_form_fingerprint("".into());
+    bridge.set_credential_form_notes("".into());
+    bridge.set_credential_form_bound_host_count(0);
+    bridge.set_credential_form_updated_at("".into());
 }
 
 /// 将存储层凭据数据同步更新至 Slint UI
@@ -136,7 +169,12 @@ pub(crate) fn sync_credentials_ui(
     }
 
     let model: ModelRc<CredentialItemData> = Rc::new(VecModel::from(ui_items)).into();
-    window.set_credentials(model);
+    window.set_credentials(model.clone());
+
+    let bridge = window.global::<CredentialsBridge>();
+    bridge.set_credentials(model);
+    bridge.set_credential_filter_category(filter_cat.into());
+    bridge.set_credential_search_query(search_q.into());
 }
 
 /// 注册所有凭据相关交互回调
@@ -489,6 +527,59 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             w.set_credential_filter_category(cat.clone());
             w.set_credential_search_query(query.clone());
             sync_credentials_ui(&w, &core_state_filter, &cat, &query);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 14. CredentialsBridge 专属 MVVM 绑定
+    // -------------------------------------------------------------------------
+    let bridge = window.global::<CredentialsBridge>();
+    let w_bridge = window.as_weak();
+    bridge.on_select_credential(move |id| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_select_credential(id);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    bridge.on_start_edit_credential(move || {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_start_edit_credential();
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    bridge.on_cancel_edit_credential(move || {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_cancel_edit_credential();
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    bridge.on_delete_credential(move |id| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_delete_credential(id);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    bridge.on_copy_secret_to_clipboard(move |id, _field| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_copy_credential_secret(id);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    bridge.on_generate_key_pair(move |algo| {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_generate_credential_key(algo);
+        }
+    });
+
+    let w_bridge = window.as_weak();
+    bridge.on_generate_strong_password(move || {
+        if let Some(w) = w_bridge.upgrade() {
+            w.invoke_generate_credential_password();
         }
     });
 }

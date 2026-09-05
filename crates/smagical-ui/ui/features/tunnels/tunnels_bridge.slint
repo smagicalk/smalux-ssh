@@ -1,0 +1,56 @@
+import { JumpHopData, TunnelItemData } from "./tunnels_model.slint";
+
+export { JumpHopData, TunnelItemData }
+
+/// 网络隧道、跳板机与代理池领域全局状态总线 (Tunnels Bridge)
+export global TunnelsBridge {
+    // 列表与过滤
+    in-out property <[TunnelItemData]> tunnels: [];
+    in-out property <string> filter-category: "all"; // "all" | "forward" | "jump" | "proxy"
+    in-out property <string> search-query: "";
+    in-out property <string> active-tunnel-id: "";
+
+    // 活跃统计指标
+    in-out property <int> active-count: 0;
+    in-out property <int> total-count: 0;
+    in-out property <string> total-traffic-in: "0 B";
+    in-out property <string> total-traffic-out: "0 B";
+
+    // 表单与编辑状态
+    in-out property <bool> is-editing: false;
+    in-out property <bool> is-create-mode: false;
+    in-out property <string> form-id: "";
+    in-out property <string> form-name: "";
+    in-out property <string> form-type: "Local";
+    in-out property <string> form-ssh-host-id: "";
+    in-out property <string> form-ssh-host-name: "";
+    in-out property <string> form-local-bind: "127.0.0.1";
+    in-out property <int> form-local-port: 8080;
+    in-out property <string> form-remote-host: "127.0.0.1";
+    in-out property <int> form-remote-port: 80;
+    in-out property <bool> form-auto-start: false;
+    in-out property <bool> form-auto-reconnect: true;
+    in-out property <bool> form-remote-dns: false;
+    in-out property <bool> form-compression: true;
+    in-out property <string> form-notes: "";
+
+    // 跳板机多跳列表
+    in-out property <[JumpHopData]> form-hops: [];
+
+    // 交互回调
+    callback select-tunnel(string /* id */);
+    callback filter-changed(string /* category */);
+    callback search-changed(string /* query */);
+    callback toggle-tunnel(string /* id */);
+    callback start-tunnel(string /* id */);
+    callback stop-tunnel(string /* id */);
+    callback create-new-tunnel(string /* tunnel_type */);
+    callback start-edit();
+    callback cancel-edit();
+    callback save-tunnel();
+    callback delete-tunnel(string /* id */);
+    callback copy-ssh-command(string /* id */);
+    callback add-jump-hop(string /* host_id */, string /* host_name */, string /* host_addr */, int /* host_port */);
+    callback remove-jump-hop(int /* index */);
+    callback toggle-jump-hop(int /* index */);
+}

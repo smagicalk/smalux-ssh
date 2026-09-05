@@ -1,0 +1,121 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 通用可调节分屏容器组件 (AppSplitPane)
+///
+/// 统合终端多分屏与文件双盘浏览器的切分交互。
+/// 核心特性：
+/// 1. 支持 "horizontal" (左右并排切分) 与 "vertical" (上下层叠切分)；
+/// 2. 平滑鼠标拖拽动态调节窗格权重比例 (split-ratio)；
+/// 3. 安全比例夹紧 (0.15 ~ 0.85)，防止窗格被压榨到不可用尺寸；
+/// 4. 4px 精致高亮悬浮拖拽热区。
+export component AppSplitPane inherits Rectangle {
+    in property <string> orientation: "horizontal"; // "horizontal" | "vertical"
+    in-out property <float> split-ratio: 0.5;
+    in property <bool> is-zoomed: false;
+    in property <int> zoomed-pane: 0; // 0: pane1, 1: pane2
+
+    callback ratio-changed(float /* new_ratio */);
+
+    property <bool> is-horizontal: root.orientation == "horizontal";
+    property <length> divider-size: 4px;
+
+    // 左右切分布局
+    if root.is-horizontal: HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+        width: 100%;
+        height: 100%;
+
+        // 左侧/第一窗格
+        pane1-box-h := Rectangle {
+            width: root.is-zoomed ? (root.zoomed-pane == 0 ? root.width : 0px) : ((root.width - root.divider-size) * root.split-ratio);
+            height: 100%;
+            visible: !root.is-zoomed || root.zoomed-pane == 0;
+            clip: true;
+        }
+
+        // 垂直分割线 (水平切分时的拖拽中线)
+        if !root.is-zoomed: divider-h := Rectangle {
+            width: root.divider-size;
+            height: 100%;
+            background: div-touch-h.has-hover || div-touch-h.pressed ? AppTheme.accent : AppTheme.border;
+
+            animate background { duration: 120ms; }
+
+            div-touch-h := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: col-resize;
+
+                moved => {
+                    if self.pressed {
+                        if root.width > 100px {
+                            let raw-ratio: float = ((pane1-box-h.width + self.mouse-x) / 1px) / (root.width / 1px);
+                            let clamped: float = Math.max(0.15, Math.min(0.85, raw-ratio));
+                            root.split-ratio = clamped;
+                            root.ratio-changed(clamped);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 右侧/第二窗格
+        pane2-box-h := Rectangle {
+            horizontal-stretch: 1;
+            height: 100%;
+            visible: !root.is-zoomed || root.zoomed-pane == 1;
+            clip: true;
+        }
+    }
+
+    // 上下切分布局
+    if !root.is-horizontal: VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+        width: 100%;
+        height: 100%;
+
+        // 顶部/第一窗格
+        pane1-box-v := Rectangle {
+            height: root.is-zoomed ? (root.zoomed-pane == 0 ? root.height : 0px) : ((root.height - root.divider-size) * root.split-ratio);
+            width: 100%;
+            visible: !root.is-zoomed || root.zoomed-pane == 0;
+            clip: true;
+        }
+
+        // 水平分割线 (上下切分时的拖拽中线)
+        if !root.is-zoomed: divider-v := Rectangle {
+            height: root.divider-size;
+            width: 100%;
+            background: div-touch-v.has-hover || div-touch-v.pressed ? AppTheme.accent : AppTheme.border;
+
+            animate background { duration: 120ms; }
+
+            div-touch-v := TouchArea {
+                width: 100%;
+                height: 100%;
+                mouse-cursor: row-resize;
+
+                moved => {
+                    if self.pressed {
+                        if root.height > 100px {
+                            let raw-ratio: float = ((pane1-box-v.height + self.mouse-y) / 1px) / (root.height / 1px);
+                            let clamped: float = Math.max(0.15, Math.min(0.85, raw-ratio));
+                            root.split-ratio = clamped;
+                            root.ratio-changed(clamped);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 底部/第二窗格
+        pane2-box-v := Rectangle {
+            vertical-stretch: 1;
+            width: 100%;
+            visible: !root.is-zoomed || root.zoomed-pane == 1;
+            clip: true;
+        }
+    }
+}

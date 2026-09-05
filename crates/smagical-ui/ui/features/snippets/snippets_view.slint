@@ -6,6 +6,7 @@
 
 import { AppTheme } from "../../themes/app-theme.slint";
 import { SnippetTreeNode, SnippetParamInputData } from "snippets_model.slint";
+import { SnippetsBridge } from "snippets_bridge.slint";
 import { SnippetTreePane } from "components/snippet_tree_pane.slint";
 import { SnippetGroupDetail } from "components/snippet_group_detail.slint";
 import { SnippetEditorPane } from "components/snippet_editor_pane.slint";
@@ -17,21 +18,21 @@ export component SnippetsCenterView inherits Rectangle {
     background: AppTheme.window-background;
 
     // 树数据源
-    in property <[SnippetTreeNode]> tree_nodes: [];
-    in-out property <string> search_query: "";
-    in-out property <string> selected_id: "";
+    in property <[SnippetTreeNode]> tree_nodes: SnippetsBridge.tree-nodes;
+    in-out property <string> search_query: SnippetsBridge.search-query;
+    in-out property <string> selected_id: SnippetsBridge.active-snippet-id;
 
     // 详情编辑器数据绑定
     in property <bool> has_selection: false;
-    in property <bool> is_selected_group: false;
-    in-out property <string> edit_id: "";
-    in-out property <string> edit_title: "";
+    in property <bool> is_selected_group: SnippetsBridge.is-active-group;
+    in-out property <string> edit_id: SnippetsBridge.form-id;
+    in-out property <string> edit_title: SnippetsBridge.form-title;
     in-out property <string> edit_category_name: "";
-    in-out property <string> edit_language: "bash";
-    in-out property <string> edit_content: "";
-    in-out property <bool> edit_auto_execute: true;
-    in-out property <string> edit_description: "";
-    in-out property <bool> edit_is_favorite: false;
+    in-out property <string> edit_language: SnippetsBridge.form-language;
+    in-out property <string> edit_content: SnippetsBridge.form-code;
+    in-out property <bool> edit_auto_execute: SnippetsBridge.form-auto-execute;
+    in-out property <string> edit_description: SnippetsBridge.form-description;
+    in-out property <bool> edit_is_favorite: SnippetsBridge.form-is-favorite;
     in property <string> detected_variables_text: "";
     in property <string> edit_updated_at: "";
 

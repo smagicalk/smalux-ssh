@@ -17,7 +17,7 @@ use smagical_core::{
 
 use crate::generated::{
     AppWindow, FileItemData as SlintFileItemData, FileTabData as SlintFileTabData,
-    HostItemData as SlintHostItemData, TransferItemData as SlintTransferItemData,
+    FilesBridge, HostItemData as SlintHostItemData, TransferItemData as SlintTransferItemData,
 };
 use crate::handlers::AppContext;
 
@@ -131,8 +131,12 @@ pub(crate) fn sync_local_tabs_only(window: &AppWindow, ctx: &AppContext) {
             }
         })
         .collect();
-    window.set_local_tabs(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_local_tabs))));
-    window.set_active_local_tab_id(active_local_id.into());
+    let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_local_tabs)));
+    window.set_local_tabs(model.clone());
+    window.set_active_local_tab_id(active_local_id.clone().into());
+    let fb = window.global::<FilesBridge>();
+    fb.set_local_tabs(model);
+    fb.set_active_local_tab_id(active_local_id.into());
 }
 
 /// 仅同步右侧远程 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
@@ -150,8 +154,12 @@ pub(crate) fn sync_remote_tabs_only(window: &AppWindow, ctx: &AppContext) {
             is_active: t.tab_id == active_remote_id,
         })
         .collect();
-    window.set_remote_tabs(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_remote_tabs))));
-    window.set_active_remote_tab_id(active_remote_id.into());
+    let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_remote_tabs)));
+    window.set_remote_tabs(model.clone());
+    window.set_active_remote_tab_id(active_remote_id.clone().into());
+    let fb = window.global::<FilesBridge>();
+    fb.set_remote_tabs(model);
+    fb.set_active_remote_tab_id(active_remote_id.into());
 }
 
 /// 同步当前激活文件会话的双盘数据到 Slint UI
@@ -165,8 +173,12 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
     // 3. 同步当前路径
     let local_path = ctx.local_current_path.borrow().clone();
     let remote_path = ctx.remote_current_path.borrow().clone();
-    window.set_local_current_path(local_path.into());
-    window.set_remote_current_path(remote_path.into());
+    window.set_local_current_path(local_path.clone().into());
+    window.set_remote_current_path(remote_path.clone().into());
+
+    let fb = window.global::<FilesBridge>();
+    fb.set_local_current_path(local_path.into());
+    fb.set_remote_current_path(remote_path.into());
 
     // 4. 同步文件列表
     let local_items: Vec<SlintFileItemData> = ctx
@@ -182,8 +194,12 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
         .map(map_file_item_to_ui)
         .collect();
 
-    window.set_local_files(slint::ModelRc::from(Rc::new(slint::VecModel::from(local_items))));
-    window.set_remote_files(slint::ModelRc::from(Rc::new(slint::VecModel::from(remote_items))));
+    let local_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(local_items)));
+    let remote_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(remote_items)));
+    window.set_local_files(local_model.clone());
+    window.set_remote_files(remote_model.clone());
+    fb.set_local_files(local_model);
+    fb.set_remote_files(remote_model);
 
     // 5. 同步历史导航前进/后退使能状态
     let local_can_back = {
@@ -212,6 +228,11 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
     window.set_remote_can_go_back(remote_can_back);
     window.set_remote_can_go_forward(remote_can_fwd);
 
+    fb.set_local_can_go_back(local_can_back);
+    fb.set_local_can_go_forward(local_can_fwd);
+    fb.set_remote_can_go_back(remote_can_back);
+    fb.set_remote_can_go_forward(remote_can_fwd);
+
     // 6. 同步文件选择弹窗主机列表
     let file_hosts = build_file_launcher_hosts(ctx, "");
     window.set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(file_hosts))));
@@ -235,7 +256,9 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
         })
         .map(map_transfer_task_to_ui)
         .collect();
-    window.set_transfer_tasks(slint::ModelRc::from(Rc::new(slint::VecModel::from(tasks))));
+    let task_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(tasks)));
+    window.set_transfer_tasks(task_model.clone());
+    fb.set_transfer_tasks(task_model);
 }
 
 

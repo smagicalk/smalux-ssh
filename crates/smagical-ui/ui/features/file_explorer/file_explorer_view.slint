@@ -5,6 +5,7 @@
 
 import { AppTheme } from "../../themes/app-theme.slint";
 import { FileItemData, FileTabData, TransferItemData } from "./file_explorer_model.slint";
+import { FilesBridge } from "./file_explorer_bridge.slint";
 import { FileBrowserPane } from "./components/file_browser_pane.slint";
 import { TransferQueueDrawer } from "./components/transfer_queue_drawer.slint";
 import { TransferContextMenu } from "./components/transfer_context_menu.slint";
@@ -22,27 +23,27 @@ export component FileExplorerView inherits Rectangle {
     // -------------------------------------------------------------------------
     // 左右分栏权重比例 (默认 0.5 平分，两边等宽)
     // -------------------------------------------------------------------------
-    in-out property <float> split-ratio: 0.5;
+    in-out property <float> split-ratio: FilesBridge.split-ratio;
 
     // -------------------------------------------------------------------------
     // 左右独立会话 Tab 列表与激活 ID
     // -------------------------------------------------------------------------
-    in property <[FileTabData]> local-tabs: [];
-    in-out property <string> active-local-tab-id: "";
+    in property <[FileTabData]> local-tabs: FilesBridge.local-tabs;
+    in-out property <string> active-local-tab-id: FilesBridge.active-local-tab-id;
 
-    in property <[FileTabData]> remote-tabs: [];
-    in-out property <string> active-remote-tab-id: "";
+    in property <[FileTabData]> remote-tabs: FilesBridge.remote-tabs;
+    in-out property <string> active-remote-tab-id: FilesBridge.active-remote-tab-id;
 
     // -------------------------------------------------------------------------
     // 当前工作路径与文件列表数据模型
     // -------------------------------------------------------------------------
-    in-out property <string> local-current-path: "";
-    in-out property <string> remote-current-path: "";
+    in-out property <string> local-current-path: FilesBridge.local-current-path;
+    in-out property <string> remote-current-path: FilesBridge.remote-current-path;
 
-    in property <[FileItemData]> local-files: [];
-    in property <[FileItemData]> remote-files: [];
-    in-out property <string> selected-local-id: "";
-    in-out property <string> selected-remote-id: "";
+    in property <[FileItemData]> local-files: FilesBridge.local-files;
+    in property <[FileItemData]> remote-files: FilesBridge.remote-files;
+    in-out property <string> selected-local-id: FilesBridge.selected-local-id;
+    in-out property <string> selected-remote-id: FilesBridge.selected-remote-id;
 
     // -------------------------------------------------------------------------
     // 跨盘拖拽交互与状态 (Drag & Drop Transfer)
@@ -90,16 +91,16 @@ export component FileExplorerView inherits Rectangle {
     // -------------------------------------------------------------------------
     // 传输队列状态
     // -------------------------------------------------------------------------
-    in property <[TransferItemData]> transfer-tasks: [];
-    in-out property <bool> is-transfer-queue-expanded: false;
+    in property <[TransferItemData]> transfer-tasks: FilesBridge.transfer-tasks;
+    in-out property <bool> is-transfer-queue-expanded: FilesBridge.is-transfer-queue-expanded;
 
     // -------------------------------------------------------------------------
     // 左右历史导航状态
     // -------------------------------------------------------------------------
-    in property <bool> local-can-go-back: false;
-    in property <bool> local-can-go-forward: false;
-    in property <bool> remote-can-go-back: false;
-    in property <bool> remote-can-go-forward: false;
+    in property <bool> local-can-go-back: FilesBridge.local-can-go-back;
+    in property <bool> local-can-go-forward: FilesBridge.local-can-go-forward;
+    in property <bool> remote-can-go-back: FilesBridge.remote-can-go-back;
+    in property <bool> remote-can-go-forward: FilesBridge.remote-can-go-forward;
 
     // -------------------------------------------------------------------------
     // 事件回调 (向后完全兼容现有 Rust Handlers 契约)

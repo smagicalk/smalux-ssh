@@ -1,0 +1,152 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 统一右键上下文菜单项数据结构
+export struct ContextMenuItemData {
+    id: string,
+    title: string,
+    icon: image,
+    shortcut: string,
+    is-danger: bool,
+    is-disabled: bool,
+    is-separator: bool,
+}
+
+/// 通用上下文菜单浮层组件 (AppContextMenu)
+///
+/// 统合终端、主机列表、双盘文件及历史记录各处的右键上下文菜单。
+/// 核心特性：
+/// 1. 数据驱动 (Model-Driven)：通过传入 [ContextMenuItemData] 数组动态渲染；
+/// 2. 自动边界检测与位置夹紧，防止超出父容器视口；
+/// 3. 分割线、快捷键提示、危险操作标红与禁用状态；
+/// 4. 点击外部自动遮罩拦截与关闭。
+export component AppContextMenu inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <length> menu-x: 0px;
+    in property <length> menu-y: 0px;
+    in property <[ContextMenuItemData]> items: [];
+
+    callback item-clicked(string /* id */);
+    callback close();
+
+    width: 100%;
+    height: 100%;
+    z: root.is-open ? 1500 : -1;
+    visible: root.is-open;
+
+    if root.is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: transparent;
+
+        // 外部透明遮罩捕获点击以关闭菜单
+        TouchArea {
+            clicked => { root.close(); }
+            pointer-event(event) => {
+                if event.kind == PointerEventKind.down {
+                    root.close();
+                }
+            }
+        }
+
+        // 菜单卡片主体
+        menu-card := Rectangle {
+            property <length> menu-width: 168px;
+            property <length> menu-height: max(30px, root.items.length * 26px + 12px);
+
+            // 智能防溢出定位计算
+            x: min(parent.width - self.menu-width - 8px, max(8px, root.menu-x));
+            y: min(parent.height - self.menu-height - 8px, max(8px, root.menu-y));
+            width: self.menu-width;
+            height: self.menu-height;
+
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000088;
+            drop-shadow-offset-y: 4px;
+
+            TouchArea {} // 阻止点击穿透到遮罩
+
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+                alignment: start;
+
+                for item in root.items: Rectangle {
+                    height: item.is-separator ? 7px : 24px;
+
+                    // 分割线
+                    if item.is-separator: Rectangle {
+                        width: 100%;
+                        height: 7px;
+                        Rectangle {
+                            x: 4px;
+                            y: 3px;
+                            width: parent.width - 8px;
+                            height: 1px;
+                            background: AppTheme.border;
+                        }
+                    }
+
+                    // 交互式菜单项
+                    if !item.is-separator: Rectangle {
+                        width: 100%;
+                        height: 100%;
+                        border-radius: 3px;
+                        background: (!item.is-disabled && itm-touch.has-hover) ? (item.is-danger ? #e7484822 : AppTheme.hover-background) : transparent;
+                        opacity: item.is-disabled ? 0.45 : 1.0;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+
+                            // 矢量图标
+                            if item.icon.width > 0: VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: item.icon;
+                                    width: 12px;
+                                    height: 12px;
+                                    image-fit: contain;
+                                    colorize: item.is-danger ? AppTheme.danger : (itm-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                }
+                            }
+
+                            // 标题
+                            Text {
+                                text: item.title;
+                                font-size: 11px;
+                                font-weight: 500;
+                                color: item.is-danger ? AppTheme.danger : (itm-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                            }
+
+                            // 快捷键提示
+                            if item.shortcut != "": Text {
+                                text: item.shortcut;
+                                font-size: 9px;
+                                font-family: "JetBrains Mono";
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        itm-touch := TouchArea {
+                            clicked => {
+                                if !item.is-disabled {
+                                    root.item-clicked(item.id);
+                                    root.close();
+                                }
+                            }
+                            mouse-cursor: item.is-disabled ? default : pointer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
