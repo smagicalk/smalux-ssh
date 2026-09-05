@@ -1,0 +1,122 @@
+// -----------------------------------------------------------------------------
+// 实时运行与流量度量指标栏 (Tunnel Metrics Bar)
+// 包含运行状态、活跃 TCP 会话、入站流量 (Rx) 与出站流量 (Tx) 四维看板
+// -----------------------------------------------------------------------------
+
+import { AppTheme } from "../../../themes/app-theme.slint";
+
+export component TunnelMetricsBar inherits HorizontalLayout {
+    in property <bool> form-is-running: false;
+    in property <int> form-active-connections: 0;
+    in property <string> form-traffic-in: "0 KB";
+    in property <string> form-traffic-out: "0 KB";
+
+    height: 60px;
+    spacing: 10px;
+
+    // 指标 1: 运行状态
+    Rectangle {
+        horizontal-stretch: 1;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.panel-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            padding-left: 12px;
+            Text {
+                text: @tr("当前状态");
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+            }
+            Text {
+                text: root.form-is-running ? @tr("活跃连接中") : @tr("已挂起 / 停止");
+                font-size: 13px;
+                font-weight: 700;
+                color: root.form-is-running ? AppTheme.success : AppTheme.secondary-foreground;
+            }
+        }
+    }
+
+    // 指标 2: 活跃连接
+    Rectangle {
+        horizontal-stretch: 1;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.panel-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            padding-left: 12px;
+            Text {
+                text: @tr("活跃客户端连接");
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+            }
+            Text {
+                text: root.form-active-connections + @tr(" 个 TCP 会话");
+                font-size: 13px;
+                font-weight: 700;
+                color: AppTheme.foreground;
+            }
+        }
+    }
+
+    // 指标 3: 入站流量
+    Rectangle {
+        horizontal-stretch: 1;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.panel-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            padding-left: 12px;
+            Text {
+                text: @tr("累计入站流量 (Rx)");
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+            }
+            Text {
+                text: root.form-traffic-in;
+                font-size: 13px;
+                font-weight: 700;
+                font-family: "Cascadia Code, Consolas, monospace";
+                color: AppTheme.accent;
+            }
+        }
+    }
+
+    // 指标 4: 出站流量
+    Rectangle {
+        horizontal-stretch: 1;
+        border-radius: AppTheme.radius-medium;
+        background: AppTheme.panel-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+            padding-left: 12px;
+            Text {
+                text: @tr("累计出站流量 (Tx)");
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+            }
+            Text {
+                text: root.form-traffic-out;
+                font-size: 13px;
+                font-weight: 700;
+                font-family: "Cascadia Code, Consolas, monospace";
+                color: #2ecc71;
+            }
+        }
+    }
+}

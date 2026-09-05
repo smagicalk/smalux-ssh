@@ -1,0 +1,277 @@
+// -----------------------------------------------------------------------------
+// 隧道流动流水线可视化拓扑卡片 (Visual Flow Pipeline Topology Card)
+// 动态展现 Node A (本地) -> Link 1 (SSH加密) -> Node B (宿主跳板) -> Link 2 (目标) -> Node C (远端)
+// -----------------------------------------------------------------------------
+
+import { AppTheme } from "../../../themes/app-theme.slint";
+
+export component TunnelTopologyCard inherits Rectangle {
+    in property <string> form-type: "Local";
+    in property <bool> form-is-running: false;
+    in property <string> form-local-bind: "127.0.0.1";
+    in property <string> form-local-port: "8080";
+    in property <string> form-ssh-host-name: "";
+    in property <string> form-remote-host: "";
+    in property <string> form-remote-port: "80";
+
+    height: 80px;
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.panel-background;
+    border-width: 1px;
+    border-color: root.form-is-running ? AppTheme.accent.transparentize(70%) : AppTheme.border;
+
+    HorizontalLayout {
+        padding-left: 16px;
+        padding-right: 16px;
+        spacing: 10px;
+
+        // 节点 A: 本地端 (左侧)
+        VerticalLayout {
+            horizontal-stretch: 3;
+            alignment: center;
+
+            Rectangle {
+                height: 50px;
+                border-radius: 6px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    Text {
+                        text: root.form-type == "Remote"
+                            ? @tr("本地目标服务 (内网端)")
+                            : (root.form-type == "ReverseDynamic" ? @tr("本地网络 / 出口网关") : @tr("本地端应用 / 客户端"));
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: root.form-type == "ReverseDynamic"
+                            ? @tr("本地网络出口")
+                            : (root.form-local-bind != "" ? (root.form-local-bind + ":" + root.form-local-port) : ("127.0.0.1:" + root.form-local-port));
+                        font-size: 11px;
+                        font-weight: 700;
+                        font-family: "Cascadia Code, Consolas, monospace";
+                        color: AppTheme.foreground;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+
+        // 连接箭头与指示线 1 (SSH 加密中继)
+        VerticalLayout {
+            horizontal-stretch: 2;
+            alignment: center;
+            spacing: 4px;
+
+            Text {
+                text: root.form-is-running
+                    ? (root.form-type == "Remote"
+                        ? @tr("● 反向解密穿透已连通")
+                        : (root.form-type == "ReverseDynamic" ? @tr("● 反向加密隧道已连通") : @tr("● SSH 加密已连通")))
+                    : @tr("○ SSH 待建立");
+                font-size: 9px;
+                color: root.form-is-running
+                    ? (root.form-type == "Remote"
+                        ? #e67e22
+                        : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                    : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                animate color { duration: 150ms; }
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 4px;
+
+                Rectangle {
+                    height: 2px;
+                    horizontal-stretch: 1;
+                    background: root.form-is-running
+                        ? (root.form-type == "Remote"
+                            ? #e67e22
+                            : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                        : AppTheme.border;
+                    animate background { duration: 150ms; }
+                    y: (parent.height - self.height) / 2;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: root.form-type == "Remote" || root.form-type == "ReverseDynamic"
+                            ? @image-url("../../../assets/icons/arrow-left.svg")
+                            : @image-url("../../../assets/icons/arrow-right.svg");
+                        width: 12px;
+                        height: 12px;
+                        colorize: root.form-is-running
+                            ? (root.form-type == "Remote"
+                                ? #e67e22
+                                : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                            : AppTheme.secondary-foreground;
+                        animate colorize { duration: 150ms; }
+                    }
+                }
+
+                Rectangle {
+                    height: 2px;
+                    horizontal-stretch: 1;
+                    background: root.form-is-running
+                        ? (root.form-type == "Remote"
+                            ? #e67e22
+                            : (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.success))
+                        : AppTheme.border;
+                    animate background { duration: 150ms; }
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+
+        // 节点 B: SSH 宿主 / 跳板机 (中间)
+        VerticalLayout {
+            horizontal-stretch: 3;
+            alignment: center;
+
+            Rectangle {
+                height: 50px;
+                border-radius: 6px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: root.form-is-running ? AppTheme.accent : AppTheme.border;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    Text {
+                        text: root.form-type == "ReverseDynamic" ? @tr("SSH 宿主 (SOCKS5 监听端)") : @tr("SSH 宿主服务器 / 跳板机");
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: root.form-ssh-host-name != "" ? root.form-ssh-host-name : @tr("直连网关");
+                        font-size: 11px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+
+        // 连接箭头与指示线 2 (目标直达 / 公网入口直通)
+        VerticalLayout {
+            horizontal-stretch: 2;
+            alignment: center;
+            spacing: 4px;
+
+            Text {
+                text: root.form-type == "Remote"
+                    ? (root.form-is-running ? @tr("● 公网入站流量直达") : @tr("○ 远端端口待监听"))
+                    : (root.form-type == "ReverseDynamic"
+                        ? (root.form-is-running ? @tr("● 远端 SOCKS5 监听就绪") : @tr("○ 远端网关待建立"))
+                        : @tr("内网转发直达"));
+                font-size: 9px;
+                color: root.form-is-running
+                    ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                    : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                animate color { duration: 150ms; }
+            }
+
+            HorizontalLayout {
+                alignment: center;
+                spacing: 4px;
+
+                Rectangle {
+                    height: 2px;
+                    horizontal-stretch: 1;
+                    background: root.form-is-running
+                        ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                        : AppTheme.border;
+                    animate background { duration: 150ms; }
+                    y: (parent.height - self.height) / 2;
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: root.form-type == "Remote" || root.form-type == "ReverseDynamic"
+                            ? @image-url("../../../assets/icons/arrow-left.svg")
+                            : @image-url("../../../assets/icons/arrow-right.svg");
+                        width: 12px;
+                        height: 12px;
+                        colorize: root.form-is-running
+                            ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                            : AppTheme.secondary-foreground;
+                        animate colorize { duration: 150ms; }
+                    }
+                }
+
+                Rectangle {
+                    height: 2px;
+                    horizontal-stretch: 1;
+                    background: root.form-is-running
+                        ? (root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.accent)
+                        : AppTheme.border;
+                    animate background { duration: 150ms; }
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+
+        // 节点 C: 目标远程服务 / 公网监听入口 (右侧)
+        VerticalLayout {
+            horizontal-stretch: 3;
+            alignment: center;
+
+            Rectangle {
+                height: 50px;
+                border-radius: 6px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    Text {
+                        text: root.form-type == "Remote"
+                            ? @tr("远程公网入口 (监听端)")
+                            : (root.form-type == "Dynamic"
+                                ? @tr("任意动态网络目标")
+                                : (root.form-type == "ReverseDynamic" ? @tr("远端应用 (SOCKS5 客户端)") : @tr("目标远程服务 / 机器")));
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                    }
+                    Text {
+                        text: root.form-type == "ReverseDynamic"
+                            ? (root.form-ssh-host-name != "" ? (root.form-ssh-host-name + ":" + root.form-remote-port) : (@tr("远端:") + root.form-remote-port))
+                            : (root.form-type == "Dynamic"
+                                ? @tr("任意动态网络目标")
+                                : (root.form-remote-host != "" ? (root.form-remote-host + ":" + root.form-remote-port) : @tr("未配置远端")));
+                        font-size: 11px;
+                        font-weight: 700;
+                        font-family: "Cascadia Code, Consolas, monospace";
+                        color: AppTheme.foreground;
+                        horizontal-alignment: center;
+                        overflow: elide;
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,199 @@
+// -----------------------------------------------------------------------------
+// 关联 SSH 宿主主机树形选择弹窗 (Tunnel Host Picker Modal)
+// 统一支持端口转发宿主选择与跳板机中继节点添加 (ProxyJump)
+// -----------------------------------------------------------------------------
+
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppButton } from "../../../components/base/app-button.slint";
+import { HostTreeSelector } from "../../../components/host-tree-selector.slint";
+import { HostTreeNode } from "../../../views/left_drawers/hosts_drawer.slint";
+
+export component TunnelHostPickerModal inherits Rectangle {
+    in-out property <bool> is-open: false;
+    in property <string> purpose: "host-select"; // "jump-add" | "host-select"
+    in property <[HostTreeNode]> tree-nodes: [];
+    in-out property <string> temp-selected-host-id: "";
+    in-out property <string> temp-selected-host-name: "";
+    in-out property <string> temp-selected-host-address: "";
+    in-out property <int> temp-selected-host-port: 22;
+
+    callback toggle-group(string /* group_id */);
+    callback confirmed(string /* purpose */, string /* id */, string /* name */, string /* addr */, int /* port */);
+    callback cancel();
+
+    x: 0;
+    y: 0;
+    width: 100%;
+    height: 100%;
+    z: 1000;
+
+    // 遮罩层
+    Rectangle {
+        background: #000000.transparentize(50%);
+        TouchArea {
+            // 阻断背景点击
+        }
+    }
+
+    // 弹窗本体
+    Rectangle {
+        width: 440px;
+        height: 380px;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.panel-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: #000000.transparentize(55%);
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 10px;
+            alignment: start;
+
+            // 1. 标题栏
+            HorizontalLayout {
+                alignment: space-between;
+                height: 24px;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../../assets/icons/server.svg");
+                            width: 15px;
+                            height: 15px;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+
+                    Text {
+                        text: root.purpose == "jump-add"
+                            ? @tr("添加跳板机中继节点")
+                            : @tr("选择关联 SSH 宿主主机");
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // 关闭选择弹窗
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 4px;
+                    background: host-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    host-close-touch := TouchArea {
+                        clicked => {
+                            root.is-open = false;
+                            root.cancel();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../../assets/icons/window-close.svg");
+                        width: 10px;
+                        height: 10px;
+                        colorize: host-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+
+            // 2. 提示说明
+            Text {
+                text: root.purpose == "jump-add"
+                    ? @tr("请在下方资产树中点选要加入跳板链路的中继主机：")
+                    : @tr("请在下方资产树中点选用于建立端口转发的 SSH 宿主主机：");
+                font-size: 11px;
+                color: AppTheme.secondary-foreground;
+            }
+
+            // 3. 树形选择器主体
+            HostTreeSelector {
+                options: root.tree-nodes;
+                selected-id <=> root.temp-selected-host-id;
+                selected-name <=> root.temp-selected-host-name;
+                selected-address <=> root.temp-selected-host-address;
+                selected-port <=> root.temp-selected-host-port;
+                toggle-group(id) => { root.toggle-group(id); }
+                confirmed => {
+                    root.confirmed(
+                        root.purpose,
+                        root.temp-selected-host-id,
+                        root.temp-selected-host-name,
+                        root.temp-selected-host-address,
+                        root.temp-selected-host-port
+                    );
+                    root.is-open = false;
+                }
+                height: 240px;
+            }
+
+            // 4. 底部操作栏
+            HorizontalLayout {
+                alignment: space-between;
+                height: 32px;
+
+                // 已选提示
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    horizontal-stretch: 1;
+
+                    Text {
+                        text: root.temp-selected-host-name != ""
+                            ? (@tr("已选: ") + root.temp-selected-host-name + (root.temp-selected-host-address != "" ? (" (" + root.temp-selected-host-address + ")") : ""))
+                            : @tr("尚未选择主机");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: root.temp-selected-host-name != "" ? AppTheme.accent : AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                        overflow: elide;
+                    }
+                }
+
+                // 按钮组
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    AppButton {
+                        text: @tr("取消");
+                        height: 28px;
+                        clicked => {
+                            root.is-open = false;
+                            root.cancel();
+                        }
+                    }
+
+                    AppButton {
+                        text: @tr("确定选定");
+                        variant: "primary";
+                        height: 28px;
+                        enabled: root.temp-selected-host-id != "";
+                        clicked => {
+                            root.confirmed(
+                                root.purpose,
+                                root.temp-selected-host-id,
+                                root.temp-selected-host-name,
+                                root.temp-selected-host-address,
+                                root.temp-selected-host-port
+                            );
+                            root.is-open = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,595 @@
+// =============================================================================
+// 文件名称: tunnels_view.slint
+// 模块功能: 网络与隧道中心全屏管理界面容器 (Tunnels & Network Hub)
+// 核心设计: 现代化暗黑极简设计，涵盖端口转发 (-L/-R/-D)、跳板堡垒 (-J) 与代理池，
+//          提供可视化拓扑链路流水图、实时连接与流量度量面板、原生 OpenSSH 命令一键生成。
+// =============================================================================
+
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "../../components/base/app-button.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+import { CreateTunnelTypeModal } from "../../components/create-tunnel-type-modal.slint";
+import { HostTreeNode } from "../../views/left_drawers/hosts_drawer.slint";
+import { ScrollView } from "std-widgets.slint";
+
+import { JumpHopData, TunnelItemData } from "tunnels_model.slint";
+import { TunnelMasterList } from "components/tunnel_master_list.slint";
+import { TunnelTopologyCard } from "components/tunnel_topology_card.slint";
+import { TunnelMetricsBar } from "components/tunnel_metrics_bar.slint";
+import { TunnelForwardForm } from "components/tunnel_forward_form.slint";
+import { TunnelBastionForm } from "components/tunnel_bastion_form.slint";
+import { TunnelProxyForm } from "components/tunnel_proxy_form.slint";
+import { TunnelHostPickerModal } from "modals/tunnel_host_picker_modal.slint";
+
+export { JumpHopData, TunnelItemData }
+
+/// 网络与隧道全屏管理中心组件 (TunnelsCenterView)
+export component TunnelsCenterView inherits Rectangle {
+    in property <[TunnelItemData]> tunnels: [];
+    in-out property <string> filter-category: "all"; // "all" | "forward" | "jump" | "proxy"
+    in-out property <string> search-query: "";
+    in-out property <string> active-tunnel-id: "";
+
+    // 模式状态机: 新建模式 / 查看模式 / 编辑模式
+    in-out property <bool> is-create-mode: false;
+    in-out property <bool> is-editing: false;
+    in-out property <bool> show-create-modal: false;
+
+    // 表单数据绑定
+    in-out property <string> form-id: "";
+    in-out property <string> form-name: "";
+    in-out property <string> form-type: "Local"; // "Local" | "Remote" | "Dynamic" | "JumpHost" | "ProxyServer"
+    in-out property <string> form-ssh-host-id: "";
+    in-out property <string> form-ssh-host-name: "";
+    in-out property <string> form-local-bind: "127.0.0.1";
+    in-out property <string> form-local-port: "3306";
+    in-out property <string> form-remote-host: "10.0.0.8";
+    in-out property <string> form-remote-port: "3306";
+    in-out property <bool> form-is-running: false;
+    in-out property <bool> form-auto-start: false;
+    in-out property <bool> form-auto-reconnect: true;
+    in-out property <bool> form-remote-dns: false;
+    in-out property <bool> form-compression: true;
+    in-out property <int> form-active-connections: 0;
+    in-out property <string> form-traffic-in: "0 B";
+    in-out property <string> form-traffic-out: "0 B";
+    in-out property <string> form-notes: "";
+    in-out property <string> form-updated-at: "";
+    in-out property <string> form-ssh-command: "";
+    in-out property <[JumpHopData]> form-jump-chain: [];
+    in-out property <string> form-proxy-proto: "SOCKS5";
+    in-out property <string> form-proxy-username: "";
+    in-out property <string> form-proxy-password: "";
+    in-out property <string> host-picker-purpose: "tunnel"; // "tunnel" | "jump-add"
+
+    // 主机树数据与弹窗选择器状态
+    in property <[HostTreeNode]> tree-nodes: [];
+    callback toggle-group(string /* id */);
+    in-out property <bool> is-host-picker-open: false;
+    in-out property <string> temp-selected-host-id: "";
+    in-out property <string> temp-selected-host-name: "";
+    in-out property <string> temp-selected-host-address: "";
+    in-out property <int> temp-selected-host-port: 22;
+
+    // 跳板链路节点操作回调
+    callback add-jump-hop(string /* id */, string /* name */, string /* address */, int /* port */);
+    callback remove-jump-hop(int /* index */);
+    callback move-jump-hop-up(int /* index */);
+    callback move-jump-hop-down(int /* index */);
+    callback toggle-jump-hop-enabled(int /* index */);
+
+    // 回调契约
+    callback select-tunnel(string /* id */);
+    callback toggle-tunnel-running(string /* id */);
+    callback start-create();
+    callback start-create-typed(string /* type */);
+    callback cancel-create();
+    callback start-edit();
+    callback cancel-edit();
+    callback save-tunnel(
+        string /* id */,
+        string /* name */,
+        string /* tunnel_type */,
+        string /* ssh_host_id */,
+        string /* ssh_host_name */,
+        string /* local_bind */,
+        int    /* local_port */,
+        string /* remote_host */,
+        int    /* remote_port */,
+        bool   /* auto_start */,
+        bool   /* auto_reconnect */,
+        bool   /* remote_dns */,
+        bool   /* compression */,
+        string /* notes */
+    );
+    callback delete-tunnel(string /* id */);
+    callback copy-ssh-command(string /* id */);
+    callback copy-custom-text(string /* text */, string /* title */, string /* msg */);
+    callback search-changed(string /* query */);
+    callback filter-category-changed(string /* category */);
+    callback back-to-terminal();
+
+    background: AppTheme.window-background;
+
+    property <bool> has-selection: root.active-tunnel-id != "" || root.is-create-mode;
+
+    HorizontalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // =====================================================================
+        // 1. 左侧 Master 规则列表栏 (320px 宽度)
+        // =====================================================================
+        TunnelMasterList {
+            tunnels: root.tunnels;
+            filter-category <=> root.filter-category;
+            search-query <=> root.search-query;
+            active-tunnel-id: root.active-tunnel-id;
+            is-create-mode: root.is-create-mode;
+            back-to-terminal => { root.back-to-terminal(); }
+            show-create-modal => { root.show-create-modal = true; }
+            search-changed(q) => { root.search-changed(q); }
+            filter-category-changed(c) => { root.filter-category-changed(c); }
+            select-tunnel(id) => { root.select-tunnel(id); }
+            toggle-tunnel-running(id) => { root.toggle-tunnel-running(id); }
+        }
+
+        // =====================================================================
+        // 2. 右侧 Detail: 沉浸式拓扑与详情监控面板
+        // =====================================================================
+        Rectangle {
+            horizontal-stretch: 1;
+            background: AppTheme.window-background;
+
+            // 未选择任何规则时的占位视口
+            if !root.has-selection: VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/tunnel.svg");
+                        width: 48px;
+                        height: 48px;
+                        colorize: AppTheme.secondary-foreground.transparentize(50%);
+                        horizontal-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: @tr("请从左侧选择网络规则，或点击 [+ 新建规则] 配置端口转发与跳板堡垒");
+                    font-size: 13px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                }
+            }
+
+            // 已选定规则或新建模式时的详情面板
+            if root.has-selection: VerticalLayout {
+                padding-top: 16px;
+                padding-bottom: 16px;
+                padding-left: 20px;
+                padding-right: 20px;
+                spacing: 14px;
+
+                // 2.1 顶部动作工具栏
+                HorizontalLayout {
+                    height: 36px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: start;
+
+                        // 状态指示点
+                        VerticalLayout {
+                            alignment: center;
+                            StatusDot {
+                                status: root.form-is-running ? "online" : "offline";
+                                dot-size: 10px;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 8px;
+
+                                Text {
+                                    text: root.is-create-mode ? (
+                                        root.form-type == "JumpHost" ? @tr("新建跳板机配置") : (
+                                            root.form-type == "ProxyServer" ? @tr("新建出网代理配置") : @tr("新建端口转发规则")
+                                        )
+                                    ) : (
+                                        root.is-editing ? (
+                                            root.form-type == "JumpHost" ? @tr("编辑跳板机配置") : (
+                                                root.form-type == "ProxyServer" ? @tr("编辑出网代理配置") : @tr("编辑端口转发规则")
+                                            )
+                                        ) : root.form-name
+                                    );
+                                    font-size: 15px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                }
+
+                                // 状态药丸
+                                Rectangle {
+                                    height: 18px;
+                                    border-radius: 9px;
+                                    background: (root.form-type == "JumpHost")
+                                        ? #e67e22.transparentize(85%)
+                                        : (root.form-type == "ProxyServer")
+                                            ? AppTheme.accent.transparentize(85%)
+                                            : (root.form-is-running ? AppTheme.success.transparentize(85%) : AppTheme.control-background);
+                                    border-width: 1px;
+                                    border-color: (root.form-type == "JumpHost")
+                                        ? #e67e22
+                                        : (root.form-type == "ProxyServer")
+                                            ? AppTheme.accent
+                                            : (root.form-is-running ? AppTheme.success : AppTheme.border);
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 6px;
+                                        Text {
+                                            text: (root.form-type == "JumpHost")
+                                                ? @tr("跳板中继资产 (供主机绑定)")
+                                                : (root.form-type == "ProxyServer")
+                                                    ? @tr("出网代理资产 (供主机绑定)")
+                                                    : (root.form-is-running ? @tr("运行中") : @tr("已停止"));
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: (root.form-type == "JumpHost")
+                                                ? #e67e22
+                                                : (root.form-type == "ProxyServer")
+                                                    ? AppTheme.accent
+                                                    : (root.form-is-running ? AppTheme.success : AppTheme.secondary-foreground);
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 右侧动作按钮组
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        if !root.is-create-mode && !root.is-editing && (root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic"): AppButton {
+                            text: root.form-is-running ? @tr("停止隧道") : @tr("启动隧道");
+                            variant: root.form-is-running ? "outline" : "primary";
+                            height: 28px;
+                            clicked => {
+                                root.form-is-running = !root.form-is-running;
+                                root.toggle-tunnel-running(root.form-id);
+                            }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing && (root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic"): AppButton {
+                            text: @tr("复制 SSH 命令");
+                            height: 28px;
+                            clicked => { root.copy-ssh-command(root.form-id); }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing && root.form-type == "JumpHost": AppButton {
+                            text: @tr("复制 ProxyJump 命令");
+                            height: 28px;
+                            clicked => {
+                                root.copy-custom-text(
+                                    "-J " + (root.form-ssh-host-name != "" ? (root.form-ssh-host-name + "@") : "") + root.form-remote-host + ":" + root.form-remote-port,
+                                    @tr("复制成功"),
+                                    @tr("已复制 OpenSSH ProxyJump 参数")
+                                );
+                            }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing && root.form-type == "ProxyServer": AppButton {
+                            text: @tr("复制代理连接串");
+                            height: 28px;
+                            clicked => {
+                                root.copy-custom-text(
+                                    (root.form-ssh-host-name != "" ? root.form-ssh-host-name.to-lowercase() : "socks5") + "://" + root.form-remote-host + ":" + root.form-remote-port,
+                                    @tr("复制成功"),
+                                    @tr("已复制出网代理连接串")
+                                );
+                            }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing: AppButton {
+                            text: @tr("编辑");
+                            height: 28px;
+                            clicked => { root.start-edit(); }
+                        }
+
+                        if !root.is-create-mode && !root.is-editing: AppButton {
+                            text: @tr("删除");
+                            variant: "danger";
+                            height: 28px;
+                            has-icon: true;
+                            icon: @image-url("../../assets/icons/trash.svg");
+                            clicked => { root.delete-tunnel(root.form-id); }
+                        }
+
+                        if root.is-create-mode || root.is-editing: AppButton {
+                            text: @tr("取消");
+                            height: 28px;
+                            clicked => {
+                                if root.is-create-mode {
+                                    root.cancel-create();
+                                } else {
+                                    root.cancel-edit();
+                                }
+                            }
+                        }
+
+                        if root.is-create-mode || root.is-editing: AppButton {
+                            text: @tr("保存配置");
+                            variant: "primary";
+                            height: 28px;
+                            clicked => {
+                                root.save-tunnel(
+                                    root.form-id,
+                                    root.form-name,
+                                    root.form-type,
+                                    root.form-ssh-host-id,
+                                    root.form-ssh-host-name,
+                                    root.form-local-bind,
+                                    root.form-local-port.to-float(),
+                                    root.form-remote-host,
+                                    root.form-remote-port.to-float(),
+                                    root.form-auto-start,
+                                    root.form-auto-reconnect,
+                                    root.form-remote-dns,
+                                    root.form-compression,
+                                    root.form-notes
+                                );
+                            }
+                        }
+                    }
+                }
+
+                // 2.2 可视化拓扑链路流动流水线 (仅端口转发展示)
+                if root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic": TunnelTopologyCard {
+                    form-type: root.form-type;
+                    form-is-running: root.form-is-running;
+                    form-local-bind: root.form-local-bind;
+                    form-local-port: root.form-local-port;
+                    form-ssh-host-name: root.form-ssh-host-name;
+                    form-remote-host: root.form-remote-host;
+                    form-remote-port: root.form-remote-port;
+                }
+
+                // 2.3 实时指标看板 (仅端口转发在非编辑态展示)
+                if !root.is-create-mode && !root.is-editing && (root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic"): TunnelMetricsBar {
+                    form-is-running: root.form-is-running;
+                    form-active-connections: root.form-active-connections;
+                    form-traffic-in: root.form-traffic-in;
+                    form-traffic-out: root.form-traffic-out;
+                }
+
+                // 2.4.A 跳板堡垒中继资产专属看板
+                if root.form-type == "JumpHost": Rectangle {
+                    height: 70px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.panel-background;
+                    border-width: 1px;
+                    border-color: #e67e22.transparentize(70%);
+
+                    HorizontalLayout {
+                        padding-left: 18px;
+                        padding-right: 18px;
+                        spacing: 14px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 40px;
+                                height: 40px;
+                                border-radius: 8px;
+                                background: #e67e22.transparentize(85%);
+
+                                Image {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    width: 20px;
+                                    height: 20px;
+                                    source: @image-url("../../assets/icons/shield.svg");
+                                    colorize: #e67e22;
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 4px;
+
+                            Text {
+                                text: @tr("OpenSSH ProxyJump (-J) 堡垒中继资产");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: #e67e22;
+                            }
+
+                            Text {
+                                text: @tr("纯静态中继资产。在主机配置中关联此跳板机后，SSH 会话将自动通过该跳板机穿透内网目标，支持密钥与密码透明跳板代理。");
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+                }
+
+                // 2.4.B 静态出网代理专属看板
+                if root.form-type == "ProxyServer": Rectangle {
+                    height: 70px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.panel-background;
+                    border-width: 1px;
+                    border-color: AppTheme.accent.transparentize(70%);
+
+                    HorizontalLayout {
+                        padding-left: 18px;
+                        padding-right: 18px;
+                        spacing: 14px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 40px;
+                                height: 40px;
+                                border-radius: 8px;
+                                background: AppTheme.accent.transparentize(85%);
+
+                                Image {
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                    width: 20px;
+                                    height: 20px;
+                                    source: @image-url("../../assets/icons/radio.svg");
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            horizontal-stretch: 1;
+                            alignment: center;
+                            spacing: 4px;
+
+                            Text {
+                                text: @tr("静态出网代理配置 (SOCKS5 / HTTP / HTTPS)");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: AppTheme.accent;
+                            }
+
+                            Text {
+                                text: @tr("统一出网代理资产。可在 SSH 会话建立、SFTP 文件传输或内网穿透时绑定该代理池节点，实现网络环境安全隔离与统一外发。");
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+                }
+
+                // 2.5 配置详情与表单编辑区
+                ScrollView {
+                    vertical-stretch: 1;
+
+                    VerticalLayout {
+                        alignment: start;
+                        spacing: 12px;
+
+                        // 表单 A: 端口转发专属表单 (本地/远程/动态网关/反向动态)
+                        if root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic": TunnelForwardForm {
+                            form-type <=> root.form-type;
+                            is-create-mode: root.is-create-mode;
+                            is-editing: root.is-editing;
+                            form-name <=> root.form-name;
+                            form-ssh-host-id <=> root.form-ssh-host-id;
+                            form-ssh-host-name <=> root.form-ssh-host-name;
+                            form-local-bind <=> root.form-local-bind;
+                            form-local-port <=> root.form-local-port;
+                            form-remote-host <=> root.form-remote-host;
+                            form-remote-port <=> root.form-remote-port;
+                            form-auto-start <=> root.form-auto-start;
+                            form-auto-reconnect <=> root.form-auto-reconnect;
+                            form-remote-dns <=> root.form-remote-dns;
+                            form-compression <=> root.form-compression;
+                            form-notes <=> root.form-notes;
+                            open-host-picker => {
+                                root.host-picker-purpose = "tunnel";
+                                root.temp-selected-host-id = root.form-ssh-host-id;
+                                root.temp-selected-host-name = root.form-ssh-host-name;
+                                root.temp-selected-host-address = root.form-remote-host;
+                                root.is-host-picker-open = true;
+                            }
+                        }
+
+                        // 表单 B: 跳板机堡垒多跳链路配置表单
+                        if root.form-type == "JumpHost": TunnelBastionForm {
+                            is-create-mode: root.is-create-mode;
+                            is-editing: root.is-editing;
+                            form-name <=> root.form-name;
+                            form-jump-chain <=> root.form-jump-chain;
+                            form-ssh-command <=> root.form-ssh-command;
+                            form-notes <=> root.form-notes;
+                            add-hop => {
+                                root.host-picker-purpose = "jump-add";
+                                root.temp-selected-host-id = "";
+                                root.temp-selected-host-name = "";
+                                root.temp-selected-host-address = "";
+                                root.is-host-picker-open = true;
+                            }
+                            remove-jump-hop(idx) => { root.remove-jump-hop(idx); }
+                            move-jump-hop-up(idx) => { root.move-jump-hop-up(idx); }
+                            move-jump-hop-down(idx) => { root.move-jump-hop-down(idx); }
+                            toggle-jump-hop-enabled(idx) => { root.toggle-jump-hop-enabled(idx); }
+                        }
+
+                        // 表单 C: 静态出网代理配置表单
+                        if root.form-type == "ProxyServer": TunnelProxyForm {
+                            is-create-mode: root.is-create-mode;
+                            is-editing: root.is-editing;
+                            form-proxy-proto <=> root.form-proxy-proto;
+                            form-name <=> root.form-name;
+                            form-remote-host <=> root.form-remote-host;
+                            form-remote-port <=> root.form-remote-port;
+                            form-proxy-username <=> root.form-proxy-username;
+                            form-proxy-password <=> root.form-proxy-password;
+                            form-ssh-command <=> root.form-ssh-command;
+                            form-notes <=> root.form-notes;
+                            copy-custom-text(txt, title, msg) => { root.copy-custom-text(txt, title, msg); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. 新建网络资产类型选择弹窗 (Create Tunnel Type Modal)
+    CreateTunnelTypeModal {
+        is-open <=> root.show-create-modal;
+        cancel => { root.show-create-modal = false; }
+        select-type(t) => {
+            root.show-create-modal = false;
+            root.form-type = t;
+            root.is-create-mode = true;
+            root.is-editing = true;
+            root.start-create-typed(t);
+        }
+    }
+
+    // 4. 关联 SSH 宿主主机树形选择弹窗 (Host Picker Modal)
+    if root.is-host-picker-open: TunnelHostPickerModal {
+        is-open <=> root.is-host-picker-open;
+        purpose: root.host-picker-purpose;
+        tree-nodes: root.tree-nodes;
+        temp-selected-host-id <=> root.temp-selected-host-id;
+        temp-selected-host-name <=> root.temp-selected-host-name;
+        temp-selected-host-address <=> root.temp-selected-host-address;
+        temp-selected-host-port <=> root.temp-selected-host-port;
+        toggle-group(id) => { root.toggle-group(id); }
+        cancel => { root.is-host-picker-open = false; }
+        confirmed(purpose, id, name, addr, port) => {
+            if purpose == "jump-add" {
+                root.add-jump-hop(id, name, addr, port);
+            } else {
+                root.form-ssh-host-id = id;
+                root.form-ssh-host-name = name;
+                if addr != "" {
+                    root.form-remote-host = addr;
+                }
+            }
+            root.is-host-picker-open = false;
+        }
+    }
+}
