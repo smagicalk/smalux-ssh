@@ -1,0 +1,131 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 标准统一模态弹窗脚手架 (App Modal Scaffold)
+/// 提供统管暗色背景遮罩、点击拦截、居中卡片容器、标题栏与右上角关闭按钮
+export component AppModalScaffold inherits Rectangle {
+    in-out property <bool> is-open: false;
+    in property <string> title: "";
+    in property <image> icon: @image-url("");
+    in property <bool> has-icon: false;
+    in property <color> icon-color: AppTheme.accent;
+    in property <length> modal-width: 480px;
+    in property <length> modal-height: 380px;
+    in property <bool> show-close-button: true;
+    in property <bool> close-on-backdrop-click: false;
+    
+    callback close();
+
+    // 当未打开时完全隐藏且不占用布局/事件响应
+    visible: root.is-open;
+    width: 100%;
+    height: 100%;
+    background: #000000a6; // 统一半透明暗色遮罩
+
+    // 遮罩点击拦截 (防穿透与背景关闭)
+    backdrop-touch := TouchArea {
+        clicked => {
+            if root.close-on-backdrop-click {
+                root.is-open = false;
+                root.close();
+            }
+        }
+    }
+
+    // 居中弹窗卡片本体
+    modal-card := Rectangle {
+        width: root.modal-width;
+        height: root.modal-height;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.modal-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000066;
+        clip: true;
+
+        // 拦截卡片内部点击，防止误触背景遮罩关闭
+        card-touch := TouchArea {
+            // 吃掉卡片内点击事件
+        }
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+
+            // 1. 标准标题栏
+            HorizontalLayout {
+                height: 28px;
+                alignment: space-between;
+
+                // 标题与图标
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    if root.has-icon: VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: root.icon;
+                            width: 16px;
+                            height: 16px;
+                            image-fit: contain;
+                            colorize: root.icon-color;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: root.title;
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 右上角关闭按钮
+                if root.show-close-button: Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: AppTheme.radius-small;
+                    background: close-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    close-btn-touch := TouchArea {
+                        clicked => {
+                            root.is-open = false;
+                            root.close();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/window-close.svg");
+                        width: 10px;
+                        height: 10px;
+                        image-fit: contain;
+                        colorize: close-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+
+            // 分割线
+            Rectangle {
+                height: 1px;
+                background: AppTheme.border;
+            }
+
+            // 2. 主体插槽区域
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+                @children
+            }
+        }
+    }
+}

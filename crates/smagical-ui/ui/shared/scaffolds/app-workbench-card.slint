@@ -1,0 +1,17 @@
+﻿import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 鎮诞宸ヤ綔鍙版爣鍑嗗崱鐗囧鍣?(App Workbench Card)
+/// 涓撲负澹佺焊浣撶郴涓庢殫鑹?浜壊涓婚娣卞害瀹氬埗锛?5% 鎵庡疄搴曡壊褰诲簳鏉滅粷婊氬姩鏂囧瓧鐪╂檿涓庤儗鏅潅闊?export component AppWorkbenchCard inherits Rectangle {
+    in property <length> card-padding: 14px;
+    in property <bool> has-shadow: true;
+
+    border-radius: AppTheme.radius-large;
+    background: AppTheme.surface-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    clip: true;
+
+    drop-shadow-blur: root.has-shadow ? 14px : 0px;
+    drop-shadow-color: root.has-shadow ? #00000020 : transparent;
+    drop-shadow-offset-y: root.has-shadow ? 3px : 0px;
+}

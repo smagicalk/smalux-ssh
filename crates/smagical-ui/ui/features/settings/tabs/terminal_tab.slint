@@ -1,0 +1,583 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge, KeywordHighlightRule } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+    FontDropdown,
+} from "../components/settings_widgets.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+
+                                export component SettingsTerminalTab inherits VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("终端首选项");
+                                        subtitle: @tr("配置 VT100 字符渲染等宽字体族、光标外观交互、高亮诊断规则与会话缓冲区");
+                                        icon: @image-url("../../../assets/icons/terminal.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("等宽字体与排版字号");
+                                        subtitle: @tr("VT100 字符渲染等宽字体与像素字模尺寸");
+                                        icon: @image-url("../../../assets/icons/type.svg");
+
+                                    SettingsRow {
+                                        title: @tr("等宽字体族 (Font Family)");
+                                        subtitle: @tr("选择终端光栅化渲染等宽字体 (建议预装 Nerd Font 图标字体)");
+
+                                        FontDropdown {
+                                            selected-font <=> SettingsBridge.setting-terminal-font;
+                                            font-list: ["JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas", "Courier New", "Source Code Pro", "MesloLGS NF", "Hack", "Monaco"];
+                                            font-selected(f) => {
+                                                SettingsBridge.setting-terminal-font = f;
+                                                SettingsBridge.change-terminal-font(f, SettingsBridge.setting-terminal-font-size);
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("终端字号大小 (Font Size)");
+                                        subtitle: @tr("字符像素栅格大小 (支持直接输入或步进微调，默认 13px)");
+
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            alignment: center;
+                                            height: 28px;
+
+                                            AppIconButton {
+                                                icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                y: (parent.height - self.height) / 2;
+                                                clicked => {
+                                                    if SettingsBridge.setting-terminal-font-size > 8 {
+                                                        SettingsBridge.setting-terminal-font-size -= 1;
+                                                        SettingsBridge.change-terminal-font(SettingsBridge.setting-terminal-font, SettingsBridge.setting-terminal-font-size);
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                width: 56px;
+                                                height: 28px;
+                                                y: (parent.height - self.height) / 2;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: fs-input.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding-left: 4px;
+                                                    padding-right: 4px;
+                                                    alignment: center;
+
+                                                    fs-input := TextInput {
+                                                        text: SettingsBridge.setting-terminal-font-size;
+                                                        font-size: 12px;
+                                                        font-weight: 700;
+                                                        color: AppTheme.accent;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                        single-line: true;
+                                                        accepted => {
+                                                            let parsed = self.text.to-float();
+                                                            if parsed >= 8 && parsed <= 36 {
+                                                                SettingsBridge.setting-terminal-font-size = Math.round(parsed);
+                                                                SettingsBridge.change-terminal-font(SettingsBridge.setting-terminal-font, SettingsBridge.setting-terminal-font-size);
+                                                            } else {
+                                                                self.text = SettingsBridge.setting-terminal-font-size;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                text: "px";
+                                                font-size: 11px;
+                                                color: AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                                y: (parent.height - self.height) / 2;
+                                            }
+
+                                            AppIconButton {
+                                                icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                y: (parent.height - self.height) / 2;
+                                                clicked => {
+                                                    if SettingsBridge.setting-terminal-font-size < 36 {
+                                                        SettingsBridge.setting-terminal-font-size += 1;
+                                                        SettingsBridge.change-terminal-font(SettingsBridge.setting-terminal-font, SettingsBridge.setting-terminal-font-size);
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("剪贴板与会话安全");
+                                        subtitle: @tr("鼠标便捷复制粘贴、高危多行告警与会话关闭防误触");
+                                        icon: @image-url("../../../assets/icons/clipboard.svg");
+
+                                    SettingsRow {
+                                        title: @tr("划词自动复制到剪贴板 (Copy on Select)");
+                                        subtitle: @tr("在终端视口中用鼠标选中文字时，立即自动复制，无需手动按快捷键");
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-copy-on-select;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-copy-on-select = c;
+                                                SettingsBridge.change-copy-on-select(c);
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("鼠标右键单击快速粘贴 (Paste on Right Click)");
+                                        subtitle: @tr("在终端视口右击直接粘贴当前系统剪贴板文本");
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-paste-on-right-click;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-paste-on-right-click = c;
+                                                SettingsBridge.change-paste-on-right-click(c);
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("粘贴多行或含回车命令时前置告警");
+                                        subtitle: @tr("防止意外在生产服务器直接执行复制进来的换行危险命令");
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-warn-multiline-paste;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-warn-multiline-paste = c;
+                                                SettingsBridge.change-warn-multiline-paste(c);
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("关闭会话标签页时二次确认 (Confirm Closing Tab)");
+                                        subtitle: @tr("关闭正在运行的远程 SSH 或本地终端标签页前弹出安全确认，防止手滑误断开");
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-confirm-close-tab;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-confirm-close-tab = c;
+                                                SettingsBridge.toggle-confirm-close-tab(c);
+                                            }
+                                        }
+                                    }
+
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("智能识别与运维诊断高亮规则");
+                                        subtitle: @tr("终端网页链接点击跳转与运维诊断关键字突出显示");
+                                        icon: @image-url("../../../assets/icons/search.svg");
+
+                                    SettingsRow {
+                                        title: @tr("智能检测 URL 并支持点击跳转 (Clickable URLs)");
+                                        subtitle: @tr("终端内识别到 http:// 与 https:// 链接时高亮下划线，点击自动调用系统默认浏览器打开");
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-terminal-url-click;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-terminal-url-click = c;
+                                                SettingsBridge.change-terminal-url-click(c);
+                                            }
+                                        }
+                                    }
+
+                                    // 终端关键字高亮总控设置项
+                                    SettingsRow {
+                                        title: @tr("运维诊断关键字与正则高亮 (Diagnostic Keywords & Regex Highlighting)");
+                                        subtitle: @tr("自动识别终端输出中的状态代码、IPv4 地址、URL 链接并按照正则表达式规则着色");
+                                        show-border: SettingsBridge.setting-terminal-highlight-keywords;
+
+                                        HorizontalLayout {
+                                            spacing: 8px;
+                                            alignment: center;
+
+                                            Text {
+                                                text: SettingsBridge.setting-terminal-highlight-keywords ? @tr("已启用") : @tr("已停用");
+                                                font-size: 11px;
+                                                color: SettingsBridge.setting-terminal-highlight-keywords ? AppTheme.accent : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+
+                                            SettingsSwitch {
+                                                checked: SettingsBridge.setting-terminal-highlight-keywords;
+                                                toggled(c) => {
+                                                    SettingsBridge.setting-terminal-highlight-keywords = c;
+                                                    SettingsBridge.change-terminal-highlight-keywords(c);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 2. 表格列表与添加区域 (占满整行全宽，左右不留空隙)
+                                    if SettingsBridge.setting-terminal-highlight-keywords: VerticalLayout {
+                                        spacing: 0px;
+
+                                        // 表格本体 (全宽占满整行，左右无任何缝隙)
+                                        Rectangle {
+                                            background: AppTheme.is-global-wallpaper ? AppTheme.control-background.transparentize(60%) : AppTheme.control-background;
+
+                                            VerticalLayout {
+                                                spacing: 0px;
+
+                                                // 表头 (最左端为正则表达式，最右端为删除操作，中间弹性填满)
+                                                Rectangle {
+                                                    height: 34px;
+                                                    background: AppTheme.hover-background;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 18px;
+                                                        padding-right: 18px;
+                                                        spacing: 12px;
+
+                                                        Text { width: 220px; text: @tr("正则表达式 (Pattern)"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
+                                                        Text { horizontal-stretch: 1; text: @tr("规则备注说明"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: left; }
+                                                        Text { width: 80px; text: @tr("高亮色彩"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                        Text { width: 60px; text: @tr("启用"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                        Text { width: 68px; text: @tr("操作"); font-size: 11px; font-weight: 700; color: AppTheme.foreground; vertical-alignment: center; horizontal-alignment: center; }
+                                                    }
+                                                }
+
+                                                // 表格数据行 (占满整行，最左端为正则表达式，最右端为删除操作，每行 hover 效果横贯全宽)
+                                                for rule[idx] in SettingsBridge.terminal-keyword-rules: VerticalLayout {
+                                                    spacing: 0px;
+                                                    Rectangle { height: 1px; background: AppTheme.border.transparentize(60%); }
+                                                    Rectangle {
+                                                        height: 38px;
+                                                        background: row-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
+
+                                                        row-touch := TouchArea {}
+
+                                                        HorizontalLayout {
+                                                            padding-left: 18px;
+                                                            padding-right: 18px;
+                                                            spacing: 12px;
+
+                                                            // 列 1: 正则表达式 (最左端，固定 220px)
+                                                            HorizontalLayout {
+                                                                width: 220px;
+                                                                alignment: start;
+
+                                                                Rectangle {
+                                                                    height: 24px;
+                                                                    border-radius: 4px;
+                                                                    background: AppTheme.surface-background;
+                                                                    border-width: 1px;
+                                                                    border-color: AppTheme.border;
+
+                                                                    HorizontalLayout {
+                                                                        padding-left: 8px;
+                                                                        padding-right: 8px;
+                                                                        alignment: start;
+
+                                                                        Text {
+                                                                            text: rule.pattern;
+                                                                            font-size: 11px;
+                                                                            font-family: "JetBrains Mono, monospace";
+                                                                            font-weight: 600;
+                                                                            color: AppTheme.accent;
+                                                                            vertical-alignment: center;
+                                                                            horizontal-alignment: left;
+                                                                            overflow: elide;
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // 列 2: 备注说明 (严格左对齐，弹性填满整个中间区域)
+                                                            Text {
+                                                                horizontal-stretch: 1;
+                                                                text: rule.remark;
+                                                                font-size: 11px;
+                                                                color: AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                                horizontal-alignment: left;
+                                                                overflow: elide;
+                                                            }
+
+                                                            // 列 3: 高亮色彩 (居中圆形色块选择指示器)
+                                                            HorizontalLayout {
+                                                                width: 80px;
+                                                                alignment: center;
+
+                                                                Rectangle {
+                                                                    width: 18px;
+                                                                    height: 18px;
+                                                                    y: (parent.height - self.height) / 2;
+                                                                    border-radius: 9px;
+                                                                    background: rule.rule-color;
+                                                                    border-width: 1.5px;
+                                                                    border-color: #FFFFFF60;
+                                                                    drop-shadow-blur: 2px;
+                                                                    drop-shadow-color: #00000030;
+                                                                }
+                                                            }
+
+                                                            // 列 4: 开关 (居中对齐)
+                                                            HorizontalLayout {
+                                                                width: 60px;
+                                                                alignment: center;
+
+                                                                SettingsSwitch {
+                                                                    checked: rule.enabled;
+                                                                    toggled(c) => {
+                                                                        rule.enabled = c;
+                                                                        SettingsBridge.toggle-keyword-rule(rule.id, c);
+                                                                    }
+                                                                }
+                                                            }
+
+                                                            // 列 5: 操作按钮 (编辑 + 删除，最右端)
+                                                            HorizontalLayout {
+                                                                width: 68px;
+                                                                spacing: 4px;
+                                                                alignment: center;
+
+                                                                AppIconButton {
+                                                                    icon: @image-url("../../../assets/icons/pencil.svg");
+                                                                    y: (parent.height - self.height) / 2;
+                                                                    clicked => {
+                                                                        SettingsBridge.is-editing-keyword-rule = true;
+                                                                        SettingsBridge.editing-keyword-rule-id = rule.id;
+                                                                        SettingsBridge.new-rule-pattern = rule.pattern;
+                                                                        SettingsBridge.new-rule-remark = rule.remark;
+                                                                        SettingsBridge.new-rule-color = rule.color-hex;
+                                                                        SettingsBridge.new-rule-slint-color = rule.rule-color;
+                                                                        SettingsBridge.is-add-keyword-modal-open = true;
+                                                                    }
+                                                                }
+
+                                                                AppIconButton {
+                                                                    icon: @image-url("../../../assets/icons/trash.svg");
+                                                                    y: (parent.height - self.height) / 2;
+                                                                    clicked => {
+                                                                        SettingsBridge.delete-keyword-rule(rule.id);
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 表格与底部操作栏之间的分割线
+                                        Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+
+                                        // 底部操作栏：说明与打开添加弹窗按钮 (最右端)
+                                        Rectangle {
+                                            height: 48px;
+                                            background: AppTheme.control-background;
+
+                                            HorizontalLayout {
+                                                padding-left: 18px;
+                                                padding-right: 18px;
+                                                alignment: space-between;
+
+                                                // 左侧提示说明 (垂直居中)
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    HorizontalLayout {
+                                                        spacing: 8px;
+                                                        alignment: start;
+                                                        Image {
+                                                            source: @image-url("../../../assets/icons/sparkles.svg");
+                                                            width: 13px;
+                                                            height: 13px;
+                                                            colorize: AppTheme.accent;
+                                                        }
+                                                        Text {
+                                                            text: @tr("支持根据正则表达式对终端输出中的关键错误、告警与状态实时着色");
+                                                            font-size: 11px;
+                                                            color: AppTheme.secondary-foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                // 右侧打开新建规则弹窗按钮 (垂直居中，单图标)
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    AppButton {
+                                                        text: @tr("添加高亮规则");
+                                                        icon: @image-url("../../../assets/icons/plus.svg");
+                                                        has-icon: true;
+                                                        variant: "primary";
+                                                        clicked => {
+                                                            SettingsBridge.is-editing-keyword-rule = false;
+                                                            SettingsBridge.editing-keyword-rule-id = "";
+                                                            SettingsBridge.new-rule-pattern = "";
+                                                            SettingsBridge.new-rule-remark = "";
+                                                            SettingsBridge.new-rule-color = "#EF4444";
+                                                            SettingsBridge.new-rule-slint-color = #EF4444;
+                                                            SettingsBridge.is-add-keyword-modal-open = true;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                                                    SettingsSectionCard {
+                                        title: @tr("光标交互、回滚与告警");
+                                        subtitle: @tr("光标视觉样式、历史输出回滚行数与终端蜂鸣提醒");
+                                        icon: @image-url("../../../assets/icons/sparkles.svg");
+
+                                    SettingsRow {
+                                        title: @tr("终端光标交互形态 (Cursor Style)");
+                                        subtitle: @tr("配置命令交互指示光标的视觉呈现样式");
+
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            for cs in [
+                                                { id: "block", name: @tr("方块 █") },
+                                                { id: "beam", name: @tr("竖线 |") },
+                                                { id: "underline", name: @tr("下划线 _") }
+                                            ]: Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: SettingsBridge.setting-cursor-style == cs.id ? AppTheme.selected-background : cs-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: SettingsBridge.setting-cursor-style == cs.id ? AppTheme.accent : AppTheme.border;
+
+                                                cs-t := TouchArea {
+                                                    clicked => {
+                                                        SettingsBridge.setting-cursor-style = cs.id;
+                                                        SettingsBridge.change-cursor-style(cs.id);
+                                                    }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                HorizontalLayout {
+                                                    padding-left: 10px;
+                                                    padding-right: 10px;
+                                                    alignment: center;
+                                                    Text {
+                                                        text: cs.name;
+                                                        font-size: 11px;
+                                                        font-weight: SettingsBridge.setting-cursor-style == cs.id ? 700 : 400;
+                                                        color: SettingsBridge.setting-cursor-style == cs.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("终端光标呼吸闪烁 (Cursor Blinking)");
+                                        subtitle: @tr("开启后光标将以 500ms 周期呼吸闪烁，提升视线捕捉辨识度");
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-cursor-blink;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-cursor-blink = c;
+                                                SettingsBridge.change-cursor-blink(c);
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("终端屏幕历史回滚行数 (Scrollback Buffer)");
+                                        subtitle: @tr("保留的终端屏幕历史输出最大行数 (超出上限将平滑舍弃最早输出)");
+
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            for sb in [
+                                                { lines: 2000, label: "2,000 " + @tr("行") },
+                                                { lines: 5000, label: "5,000 " + @tr("行") },
+                                                { lines: 10000, label: "10,000 " + @tr("行") },
+                                                { lines: 50000, label: "50,000 " + @tr("行") }
+                                            ]: Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: SettingsBridge.setting-scrollback-lines == sb.lines ? AppTheme.selected-background : sb-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: SettingsBridge.setting-scrollback-lines == sb.lines ? AppTheme.accent : AppTheme.border;
+
+                                                sb-t := TouchArea {
+                                                    clicked => {
+                                                        SettingsBridge.setting-scrollback-lines = sb.lines;
+                                                        SettingsBridge.change-scrollback-lines(sb.lines);
+                                                    }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                HorizontalLayout {
+                                                    padding-left: 10px;
+                                                    padding-right: 10px;
+                                                    alignment: center;
+                                                    Text {
+                                                        text: sb.label;
+                                                        font-size: 11px;
+                                                        font-weight: SettingsBridge.setting-scrollback-lines == sb.lines ? 700 : 400;
+                                                        color: SettingsBridge.setting-scrollback-lines == sb.lines ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SettingsRow {
+                                        title: @tr("终端蜂鸣报警模式 (Terminal Bell)");
+                                        subtitle: @tr("当终端接收到 ASCII Bell (\\a) 时的响应模式");
+                                        show-border: !SettingsBridge.flag-terminal-crt-shader;
+
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            for bl in [
+                                                { id: "visual", name: @tr("屏幕微闪 (Visual)") },
+                                                { id: "audible", name: @tr("系统蜂鸣 (Audible)") },
+                                                { id: "none", name: @tr("静音关闭 (None)") }
+                                            ]: Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: SettingsBridge.setting-bell-style == bl.id ? AppTheme.selected-background : bl-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: SettingsBridge.setting-bell-style == bl.id ? AppTheme.accent : AppTheme.border;
+
+                                                bl-t := TouchArea {
+                                                    clicked => {
+                                                        SettingsBridge.setting-bell-style = bl.id;
+                                                        SettingsBridge.change-bell-style(bl.id);
+                                                    }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                HorizontalLayout {
+                                                    padding-left: 10px;
+                                                    padding-right: 10px;
+                                                    alignment: center;
+                                                    Text {
+                                                        text: bl.name;
+                                                        font-size: 11px;
+                                                        font-weight: SettingsBridge.setting-bell-style == bl.id ? 700 : 400;
+                                                        color: SettingsBridge.setting-bell-style == bl.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 实验特性: 复古 CRT 扫描线显像管着色器 (由 Debug Feature Flags 门控控制显隐)
+                                    if SettingsBridge.flag-terminal-crt-shader: SettingsRow {
+                                        title: @tr("复古 CRT 扫描线显像管着色器 (Retro CRT Shader)");
+                                        subtitle: @tr("[实验特性] 为终端字符渲染叠加复古显像管微弯曲曲面与光栅扫描线特效");
+                                        show-border: false;
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-terminal-crt;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-terminal-crt = c;
+                                                SettingsBridge.toggle-terminal-crt(c);
+                                            }
+                                        }
+                                    }
+                                }
+                                }

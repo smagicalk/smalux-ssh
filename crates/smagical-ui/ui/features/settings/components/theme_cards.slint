@@ -1,0 +1,330 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { ThemeOption, ThemeRow } from "../../../views/left_drawers/settings_drawer.slint";
+
+export component ThemeCard inherits Rectangle {
+    in property <ThemeOption> theme-data;
+    in property <bool> is-active: false;
+    callback select();
+    callback delete();
+
+    width: 136px;
+    height: 48px;
+    border-radius: 6px;
+    background: root.is-active ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(80%) : AppTheme.surface-background) : card-touch.has-hover ? AppTheme.hover-background : (AppTheme.is-global-wallpaper ? AppTheme.control-background.transparentize(60%) : AppTheme.control-background);
+    border-width: root.is-active ? 1.5px : 1px;
+    border-color: root.is-active ? AppTheme.accent : card-touch.has-hover ? AppTheme.border.darker(15%) : AppTheme.border;
+    animate background { duration: 100ms; }
+    animate border-color { duration: 100ms; }
+
+    card-touch := TouchArea {
+        clicked => { root.select(); }
+        mouse-cursor: pointer;
+    }
+
+    VerticalLayout {
+        padding-top: 5px;
+        padding-bottom: 5px;
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 3px;
+        alignment: space-between;
+
+        // 顶部行：深浅色标识 + 主题名称 + 状态标识 (使用中 / 删除)
+        HorizontalLayout {
+            alignment: space-between;
+            spacing: 4px;
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                horizontal-stretch: 1;
+
+                // 深浅色小图标 (矢量 SVG 渲染，避免 Emoji 乱码或缺失)
+                Rectangle {
+                    width: 12px;
+                    height: 12px;
+                    y: (parent.height - self.height) / 2;
+
+                    Image {
+                        source: root.theme-data.is-dark ? @image-url("../../../assets/icons/moon.svg") : @image-url("../../../assets/icons/sun.svg");
+                        width: 10px;
+                        height: 10px;
+                        colorize: root.theme-data.is-dark ? #A78BFA : #F59E0B;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+
+                // 主题名称
+                Text {
+                    text: root.theme-data.name;
+                    font-size: 11px;
+                    font-weight: root.is-active ? 700 : 500;
+                    color: root.is-active ? AppTheme.accent : AppTheme.foreground;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 2px;
+                alignment: end;
+                min-width: 16px;
+
+                if root.is-active: Rectangle {
+                    width: 14px;
+                    height: 14px;
+                    y: (parent.height - self.height) / 2;
+
+                    Image {
+                        source: @image-url("../../../assets/icons/check.svg");
+                        width: 12px;
+                        height: 12px;
+                        colorize: AppTheme.accent;
+                        image-fit: contain;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+
+                if !root.is-active && !root.theme-data.is-builtin: Rectangle {
+                    width: 16px;
+                    height: 16px;
+                    border-radius: 3px;
+                    background: del-touch.has-hover ? AppTheme.danger.transparentize(80%) : transparent;
+
+                    del-touch := TouchArea {
+                        clicked => { root.delete(); }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../../assets/icons/trash.svg");
+                        width: 10px;
+                        height: 10px;
+                        colorize: del-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+        }
+
+        // 底部行：4 色圆点调色板预览 (背景色、前景色、强调色、色块预览) + 自定义标签
+        HorizontalLayout {
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+
+                // 背景色
+                Rectangle {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                    background: root.theme-data.bg-color;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+                }
+                // 前景色
+                Rectangle {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                    background: root.theme-data.fg-color;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+                }
+                // 强调色
+                Rectangle {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                    background: root.theme-data.accent-color;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+                }
+                // 表面/预览色
+                Rectangle {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                    background: root.theme-data.color-preview;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+                }
+            }
+
+            if !root.theme-data.is-builtin: Rectangle {
+                height: 12px;
+                border-radius: 2px;
+                background: AppTheme.success.transparentize(85%);
+
+                HorizontalLayout {
+                    padding-left: 3px;
+                    padding-right: 3px;
+                    alignment: center;
+
+                    Text {
+                        text: @tr("自定义");
+                        font-size: 8px;
+                        font-weight: 600;
+                        color: AppTheme.success;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 新建/导入专属主题占位虚线卡片 (精简紧凑型：48px 高度)
+export component CreateThemeDashedCard inherits Rectangle {
+    callback clicked();
+
+    width: 136px;
+    height: 48px;
+    border-radius: 6px;
+    border-width: 1px;
+    border-color: add-touch.has-hover ? AppTheme.accent : AppTheme.border;
+    background: add-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background.transparentize(60%);
+    animate background { duration: 100ms; }
+    animate border-color { duration: 100ms; }
+
+    add-touch := TouchArea {
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+
+    HorizontalLayout {
+        alignment: center;
+        spacing: 6px;
+
+        Text {
+            text: "➕";
+            font-size: 11px;
+            color: add-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: @tr("新建专属主题");
+            font-size: 11px;
+            font-weight: 500;
+            color: add-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+    }
+}
+
+/// 自适应流式主题栅格：根据当前可用容器宽度自动铺满一行，超出自动换行，且每张卡片保持完全一致的规格
+export component ThemeFlowGrid inherits Rectangle {
+    in property <[ThemeOption]> themes: [];
+    in property <string> current-theme-id: "";
+    callback switch-theme(string);
+    callback delete-theme(string);
+
+    property <length> card-spacing-x: 10px;
+    property <length> card-spacing-y: 8px;
+    property <length> min-card-width: 140px;
+    property <length> card-height: 48px;
+
+    // 动态计算当前可用宽度能容纳的最大列数 (至少 1 列)
+    property <int> cols: Math.max(1, Math.floor((self.width + root.card-spacing-x) / (root.min-card-width + root.card-spacing-x)));
+
+    // 动态计算单卡宽度，使每行卡片完全平铺撑满整个可用宽度，左右无任何残留空隙
+    property <length> actual-card-width: Math.max(root.min-card-width, (self.width - (root.cols - 1) * root.card-spacing-x) / root.cols);
+
+    // 动态计算总行数与整体所需高度
+    property <int> rows: root.themes.length > 0 ? Math.floor(((root.themes.length + root.cols - 1) * 1.0) / root.cols) : 0;
+    height: root.rows > 0 ? (root.rows * root.card-height + (root.rows - 1) * root.card-spacing-y) : 0px;
+
+    for t[idx] in root.themes: ThemeCard {
+        theme-data: t;
+        is-active: root.current-theme-id == t.id;
+        width: root.actual-card-width;
+        height: root.card-height;
+        x: Math.mod(idx, root.cols) * (root.actual-card-width + root.card-spacing-x);
+        y: Math.floor((idx * 1.0) / root.cols) * (root.card-height + root.card-spacing-y);
+        select => { root.switch-theme(t.id); }
+        delete => { root.delete-theme(t.id); }
+    }
+}
+
+/// 壁纸画廊中的单张壁纸卡片 (显示文件名/路径、激活标识与删除按钮)
+export component WallpaperItemCard inherits Rectangle {
+    in property <string> path: "";
+    in property <bool> is-active: false;
+    callback select();
+    callback remove();
+
+    width: 130px;
+    height: 56px;
+    border-radius: AppTheme.radius-medium;
+    background: root.is-active ? AppTheme.surface-background : wp-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+    border-width: root.is-active ? 2px : 1px;
+    border-color: root.is-active ? AppTheme.accent : AppTheme.border;
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    wp-touch := TouchArea {
+        clicked => { root.select(); }
+        mouse-cursor: pointer;
+    }
+
+    VerticalLayout {
+        padding: 6px;
+        spacing: 3px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            alignment: space-between;
+
+            // 图像小图标
+            Image {
+                source: @image-url("../../../assets/icons/sparkles.svg");
+                width: 12px;
+                height: 12px;
+                colorize: root.is-active ? AppTheme.accent : AppTheme.secondary-foreground;
+                y: (parent.height - self.height) / 2;
+            }
+
+            if root.is-active: Text {
+                text: "✓ " + @tr("生效中");
+                font-size: 9px;
+                font-weight: 700;
+                color: AppTheme.accent;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                width: 16px;
+                height: 16px;
+                border-radius: 3px;
+                background: del-wp.has-hover ? AppTheme.danger.transparentize(80%) : transparent;
+
+                del-wp := TouchArea {
+                    clicked => { root.remove(); }
+                    mouse-cursor: pointer;
+                }
+
+                Image {
+                    source: @image-url("../../../assets/icons/window-close.svg");
+                    width: 8px;
+                    height: 8px;
+                    colorize: del-wp.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+
+        Text {
+            text: root.path;
+            font-size: 10px;
+            color: root.is-active ? AppTheme.foreground : AppTheme.secondary-foreground;
+            overflow: elide;
+        }
+    }
+}

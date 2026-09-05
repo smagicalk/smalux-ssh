@@ -1,0 +1,228 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+
+    export component MasterPasswordModal inherits Rectangle {
+    visible: SettingsBridge.is-master-pwd-modal-open;
+        width: 100%;
+        height: 100%;
+        background: #000000a6;
+        z: 1500;
+
+        TouchArea {
+            clicked => { SettingsBridge.is-master-pwd-modal-open = false; }
+        }
+
+        Rectangle {
+            width: 460px;
+            height: SettingsBridge.setting-master-password-enabled ? 370px : 320px;
+            background: AppTheme.modal-background;
+            border-radius: AppTheme.radius-large;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: 8px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+
+            TouchArea { /* 阻止冒泡关闭 */ }
+
+            VerticalLayout {
+                padding: 22px;
+                spacing: 14px;
+
+                // 标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../../assets/icons/shield.svg");
+                            width: 18px;
+                            height: 18px;
+                            colorize: AppTheme.accent;
+                        }
+                        Text {
+                            text: SettingsBridge.setting-master-password-enabled ? @tr("修改主密码 (Change Master Password)") : @tr("启用并设置主密码 (Set Master Password)");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: close-pwd-t.has-hover ? AppTheme.hover-background : transparent;
+                        close-pwd-t := TouchArea {
+                            clicked => { SettingsBridge.is-master-pwd-modal-open = false; }
+                            mouse-cursor: pointer;
+                        }
+                        Text {
+                            text: "✕";
+                            font-size: 12px;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                            horizontal-alignment: center;
+                        }
+                    }
+                }
+
+                // 说明文本
+                Text {
+                    text: @tr("主密码用于生成 Argon2id 派生密钥，对存储在本地的所有 SSH 私钥、主机登录凭据进行全量 AES-256 加密。应用不存储明文且不支持找回，请务必妥善牢记！");
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                    wrap: word-wrap;
+                }
+
+                // 输入表单
+                VerticalLayout {
+                    spacing: 10px;
+
+                    // 若已开启，需输入旧密码
+                    if SettingsBridge.setting-master-password-enabled: HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Text {
+                            text: @tr("当前旧密码:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                text <=> SettingsBridge.master-pwd-old;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+        }
+    }
+                        }
+                    }
+
+                    // 新密码
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Text {
+                            text: @tr("新主密码:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                text <=> SettingsBridge.master-pwd-new;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+        }
+    }
+                        }
+                    }
+
+                    // 确认新密码
+                    HorizontalLayout {
+                        spacing: 10px;
+                        alignment: center;
+                        Text {
+                            text: @tr("确认新密码:");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            width: 90px;
+                            vertical-alignment: center;
+                        }
+                        Rectangle {
+                            height: 28px;
+                            horizontal-stretch: 1;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                text <=> SettingsBridge.master-pwd-confirm;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+        }
+    }
+                        }
+                    }
+
+                    // 错误提示
+                    if SettingsBridge.master-pwd-error-msg != "": Text {
+                        text: SettingsBridge.master-pwd-error-msg;
+                        font-size: 10px;
+                        color: #EF4444;
+                        font-weight: 600;
+                    }
+                }
+
+                // 底部操作按钮
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 10px;
+
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        clicked => {
+                            SettingsBridge.is-master-pwd-modal-open = false;
+                        }
+                    }
+
+                    AppButton {
+                        text: @tr("确认保存主密码");
+                        variant: "primary";
+                        clicked => {
+                            if SettingsBridge.master-pwd-new == "" {
+                                SettingsBridge.master-pwd-error-msg = @tr("新密码不能为空！");
+                            } else if SettingsBridge.master-pwd-new != SettingsBridge.master-pwd-confirm {
+                                SettingsBridge.master-pwd-error-msg = @tr("两次输入的新密码不一致！");
+                            } else if SettingsBridge.master-pwd-new.character-count < 6 {
+                                SettingsBridge.master-pwd-error-msg = @tr("主密码长度至少需为 6 位！");
+                            } else {
+                                SettingsBridge.setting-master-password-enabled = true;
+                                SettingsBridge.master-pwd-error-msg = "";
+                                SettingsBridge.is-master-pwd-modal-open = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }

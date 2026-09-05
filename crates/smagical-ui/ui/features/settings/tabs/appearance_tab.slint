@@ -1,0 +1,1064 @@
+import { ScrollView } from "std-widgets.slint";
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+    FontDropdown,
+} from "../components/settings_widgets.slint";
+import {
+    ThemeCard,
+    CreateThemeDashedCard,
+    ThemeFlowGrid,
+    WallpaperItemCard,
+} from "../components/theme_cards.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+
+                                export component SettingsAppearanceTab inherits VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("外观视效与主题定制");
+                                        subtitle: @tr("个性化定制客户端主视觉、配色方案、界面全局字体与背景毛玻璃壁纸");
+                                        icon: @image-url("../../../assets/icons/sun.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("配色主题方案与调色板");
+                                        subtitle: @tr("支持自定义创建、导入、导出与一键实时无损热切换");
+                                        icon: @image-url("../../../assets/icons/sun.svg");
+
+                                        // 顶部操作栏与分类筛选胶囊 (标题在上，边距舒适与其它设置项完全对齐)
+                                        VerticalLayout {
+                                            spacing: 12px;
+                                            padding-top: 6px;
+                                            padding-bottom: 16px;
+                                            padding-left: 24px;
+                                            padding-right: 32px;
+
+                                            // 顶部行：左侧分类胶囊，右侧操作按钮组
+                                            HorizontalLayout {
+                                                alignment: space-between;
+
+                                                // 左侧分类胶囊
+                                                HorizontalLayout {
+                                                    spacing: 6px;
+                                                    alignment: start;
+
+                                                    // [全部]
+                                                    Rectangle {
+                                                        height: 26px;
+                                                        border-radius: 13px;
+                                                        background: SettingsBridge.theme-filter-category == "all" ? AppTheme.accent : AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: SettingsBridge.theme-filter-category == "all" ? AppTheme.accent : AppTheme.border;
+
+                                                        TouchArea {
+                                                            clicked => { SettingsBridge.theme-filter-category = "all"; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: @tr("全部") + " (" + (SettingsBridge.custom-themes-count + SettingsBridge.dark-themes-count + SettingsBridge.light-themes-count) + ")";
+                                                                font-size: 11px;
+                                                                font-weight: SettingsBridge.theme-filter-category == "all" ? 700 : 500;
+                                                                color: SettingsBridge.theme-filter-category == "all" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // [🎨 自定义]
+                                                    Rectangle {
+                                                        height: 26px;
+                                                        border-radius: 13px;
+                                                        background: SettingsBridge.theme-filter-category == "custom" ? AppTheme.accent : AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: SettingsBridge.theme-filter-category == "custom" ? AppTheme.accent : AppTheme.border;
+
+                                                        TouchArea {
+                                                            clicked => { SettingsBridge.theme-filter-category = "custom"; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: @tr("🎨 自定义") + " (" + SettingsBridge.custom-themes-count + ")";
+                                                                font-size: 11px;
+                                                                font-weight: SettingsBridge.theme-filter-category == "custom" ? 700 : 500;
+                                                                color: SettingsBridge.theme-filter-category == "custom" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // [🌙 深色]
+                                                    Rectangle {
+                                                        height: 26px;
+                                                        border-radius: 13px;
+                                                        background: SettingsBridge.theme-filter-category == "dark" ? AppTheme.accent : AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: SettingsBridge.theme-filter-category == "dark" ? AppTheme.accent : AppTheme.border;
+
+                                                        TouchArea {
+                                                            clicked => { SettingsBridge.theme-filter-category = "dark"; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            spacing: 4px;
+                                                            alignment: center;
+
+                                                            Image {
+                                                                source: @image-url("../../../assets/icons/moon.svg");
+                                                                width: 11px;
+                                                                height: 11px;
+                                                                colorize: SettingsBridge.theme-filter-category == "dark" ? AppTheme.selected-foreground : #A78BFA;
+                                                                y: (parent.height - self.height) / 2;
+                                                            }
+
+                                                            Text {
+                                                                text: @tr("深色") + " (" + SettingsBridge.dark-themes-count + ")";
+                                                                font-size: 11px;
+                                                                font-weight: SettingsBridge.theme-filter-category == "dark" ? 700 : 500;
+                                                                color: SettingsBridge.theme-filter-category == "dark" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // [☀️ 浅色]
+                                                    Rectangle {
+                                                        height: 26px;
+                                                        border-radius: 13px;
+                                                        background: SettingsBridge.theme-filter-category == "light" ? AppTheme.accent : AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: SettingsBridge.theme-filter-category == "light" ? AppTheme.accent : AppTheme.border;
+
+                                                        TouchArea {
+                                                            clicked => { SettingsBridge.theme-filter-category = "light"; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            spacing: 4px;
+                                                            alignment: center;
+
+                                                            Image {
+                                                                source: @image-url("../../../assets/icons/sun.svg");
+                                                                width: 11px;
+                                                                height: 11px;
+                                                                colorize: SettingsBridge.theme-filter-category == "light" ? AppTheme.selected-foreground : #F59E0B;
+                                                                y: (parent.height - self.height) / 2;
+                                                            }
+
+                                                            Text {
+                                                                text: @tr("浅色") + " (" + SettingsBridge.light-themes-count + ")";
+                                                                font-size: 11px;
+                                                                font-weight: SettingsBridge.theme-filter-category == "light" ? 700 : 500;
+                                                                color: SettingsBridge.theme-filter-category == "light" ? AppTheme.selected-foreground : AppTheme.secondary-foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // 右侧操作按钮组
+                                                HorizontalLayout {
+                                                    spacing: 8px;
+                                                    alignment: end;
+
+                                                    AppButton {
+                                                        text: @tr("新建主题");
+                                                        icon: @image-url("../../../assets/icons/plus.svg");
+                                                        has-icon: true;
+                                                        variant: "primary";
+                                                        clicked => { SettingsBridge.create-custom-theme(); }
+                                                    }
+
+                                                    AppButton {
+                                                        text: @tr("导入主题");
+                                                        icon: @image-url("../../../assets/icons/folder-open.svg");
+                                                        has-icon: true;
+                                                        variant: "secondary";
+                                                        clicked => { SettingsBridge.import-theme(); }
+                                                    }
+
+                                                    AppButton {
+                                                        text: @tr("导出当前");
+                                                        icon: @image-url("../../../assets/icons/archive.svg");
+                                                        has-icon: true;
+                                                        variant: "secondary";
+                                                        clicked => { SettingsBridge.export-current-theme(); }
+                                                    }
+                                                }
+                                            }
+
+                                            // 分割细线
+                                            Rectangle {
+                                                height: 1px;
+                                                background: AppTheme.border.transparentize(50%);
+                                            }
+
+                                            // 2. 主题分区平铺内容流
+                                            VerticalLayout {
+                                                spacing: 16px;
+
+                                                // 分区一：我的自定义主题 (Custom Themes) - 置顶呈现
+                                                if SettingsBridge.theme-filter-category == "all" || SettingsBridge.theme-filter-category == "custom": VerticalLayout {
+                                                    spacing: 8px;
+
+                                                    HorizontalLayout {
+                                                        alignment: space-between;
+
+                                                        HorizontalLayout {
+                                                            spacing: 6px;
+                                                            Text {
+                                                                text: "🎨 " + @tr("我的自定义主题 (My Custom Themes)");
+                                                                font-size: 12px;
+                                                                font-weight: 700;
+                                                                color: AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // 自定义主题卡片列表
+                                                    VerticalLayout {
+                                                        spacing: 8px;
+
+                                                        if SettingsBridge.custom-themes-count > 0: ThemeFlowGrid {
+                                                            themes: SettingsBridge.custom-themes;
+                                                            current-theme-id: SettingsBridge.current-theme-id;
+                                                            switch-theme(id) => {
+                                                                SettingsBridge.current-theme-id = id;
+                                                                SettingsBridge.switch-theme(id);
+                                                            }
+                                                            delete-theme(id) => {
+                                                                SettingsBridge.delete-custom-theme(id);
+                                                            }
+                                                        }
+
+                                                        // 如果尚无自定义主题，显示空状态引导卡片
+                                                        if SettingsBridge.custom-themes-count == 0: HorizontalLayout {
+                                                            spacing: 10px;
+                                                            alignment: start;
+                                                            CreateThemeDashedCard {
+                                                                clicked => { SettingsBridge.create-custom-theme(); }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // 分区二：官方深色夜间主题 (Dark Themes)
+                                                if SettingsBridge.theme-filter-category == "all" || SettingsBridge.theme-filter-category == "dark": VerticalLayout {
+                                                    spacing: 8px;
+
+                                                    HorizontalLayout {
+                                                        spacing: 6px;
+                                                        Image {
+                                                             source: @image-url("../../../assets/icons/moon.svg");
+                                                             width: 13px;
+                                                             height: 13px;
+                                                             colorize: #A78BFA;
+                                                             y: (parent.height - self.height) / 2;
+                                                        }
+                                                        Text {
+                                                            text: @tr("官方深色夜间主题 (Dark Night Themes)");
+                                                            font-size: 12px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+
+                                                    ThemeFlowGrid {
+                                                        themes: SettingsBridge.dark-themes;
+                                                        current-theme-id: SettingsBridge.current-theme-id;
+                                                        switch-theme(id) => {
+                                                            SettingsBridge.current-theme-id = id;
+                                                            SettingsBridge.switch-theme(id);
+                                                        }
+                                                        delete-theme(id) => {
+                                                            SettingsBridge.delete-custom-theme(id);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 分区三：官方浅色日间主题 (Light Themes)
+                                                if SettingsBridge.theme-filter-category == "all" || SettingsBridge.theme-filter-category == "light": VerticalLayout {
+                                                    spacing: 8px;
+
+                                                    HorizontalLayout {
+                                                        spacing: 6px;
+                                                        Image {
+                                                             source: @image-url("../../../assets/icons/sun.svg");
+                                                             width: 13px;
+                                                             height: 13px;
+                                                             colorize: #F59E0B;
+                                                             y: (parent.height - self.height) / 2;
+                                                        }
+                                                        Text {
+                                                            text: @tr("官方浅色日间主题 (Light Day Themes)");
+                                                            font-size: 12px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+
+                                                    ThemeFlowGrid {
+                                                        themes: SettingsBridge.light-themes;
+                                                        current-theme-id: SettingsBridge.current-theme-id;
+                                                        switch-theme(id) => {
+                                                            SettingsBridge.current-theme-id = id;
+                                                            SettingsBridge.switch-theme(id);
+                                                        }
+                                                        delete-theme(id) => {
+                                                            SettingsBridge.delete-custom-theme(id);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("界面排版与全局字体");
+                                        subtitle: @tr("切换客户端界面排版字体，默认查找扫描系统字体与内置高品质设计字体");
+                                        icon: @image-url("../../../assets/icons/type.svg");
+
+                                        SettingsRow {
+                                            title: @tr("界面全局字体族 (UI Font Family)");
+                                            subtitle: @tr("设置客户端界面的全局排版字体（自动发现已安装系统字体与预置高品质字体）");
+                                            show-border: false;
+
+                                            FontDropdown {
+                                                selected-font <=> SettingsBridge.setting-ui-font;
+                                                font-list: SettingsBridge.available-ui-fonts;
+                                                font-selected(f) => {
+                                                    SettingsBridge.setting-ui-font = f;
+                                                    SettingsBridge.change-ui-font(f);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("背景壁纸与滚动轮播");
+                                        subtitle: @tr("设置客户端毛玻璃底衬与壁纸图库，支持多图定时轮播与平滑淡入淡出");
+                                        icon: @image-url("../../../assets/icons/sparkles.svg");
+
+                                        // 透底模式
+                                        SettingsRow {
+                                            title: @tr("透底显示模式 (Display Mode)");
+                                            subtitle: @tr("选择纯色无壁纸、仅终端视口透底或全局亚克力毛玻璃磨砂");
+
+                                            Rectangle {
+                                                height: 30px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 3px;
+                                                    spacing: 0px;
+
+                                                    for m[idx] in [
+                                                    { id: "none", name: @tr("纯色无壁纸") },
+                                                    { id: "terminal", name: @tr("仅终端透底") },
+                                                    { id: "global", name: @tr("全局毛玻璃磨砂") }
+                                                ]: HorizontalLayout {
+                                                    spacing: 0px;
+                                                    if idx > 0: Rectangle { width: 1px; height: 14px; background: AppTheme.border; opacity: 0.6; y: (parent.height - self.height) / 2; }
+                                                    Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-wallpaper-mode == m.id ? AppTheme.accent : wm-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        wm-t := TouchArea {
+                                                            clicked => {
+                                                                SettingsBridge.setting-wallpaper-mode = m.id;
+                                                                let eff_path = SettingsBridge.setting-wallpaper-path != "" ? SettingsBridge.setting-wallpaper-path : (SettingsBridge.setting-wallpaper-list.length > SettingsBridge.setting-wallpaper-active-index && SettingsBridge.setting-wallpaper-active-index >= 0 ? SettingsBridge.setting-wallpaper-list[SettingsBridge.setting-wallpaper-active-index] : "");
+                                                                SettingsBridge.change-wallpaper(m.id, eff_path, SettingsBridge.setting-wallpaper-opacity);
+                                                            }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: m.name;
+                                                                font-size: 11px;
+                                                                font-weight: SettingsBridge.setting-wallpaper-mode == m.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-wallpaper-mode == m.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 不透明度调节 (支持鼠标任意拖动/点击 + 直接输入数字百分比 + 微调步进)
+                                        SettingsRow {
+                                            title: @tr("壁纸磨砂不透明度 (Opacity)");
+                                            subtitle: @tr("调节背景壁纸透光度 (支持鼠标滑块任意拖动、直接键入数值或步进微调)");
+
+                                            HorizontalLayout {
+                                                spacing: 10px;
+                                                alignment: center;
+
+                                                // 步进减小按钮 -
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                    clicked => {
+                                                        if SettingsBridge.setting-wallpaper-opacity > 0.05 {
+                                                            SettingsBridge.setting-wallpaper-opacity = Math.round((SettingsBridge.setting-wallpaper-opacity - 0.05) * 100) / 100;
+                                                            SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 鼠标可直接点击与自由按住拖动的滑动槽轨
+                                                slider-box := Rectangle {
+                                                    width: 180px;
+                                                    height: 24px;
+                                                    background: transparent;
+
+                                                    // 槽轨底色
+                                                    Rectangle {
+                                                        y: (parent.height - self.height) / 2;
+                                                        width: parent.width;
+                                                        height: 6px;
+                                                        border-radius: 3px;
+                                                        background: AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: AppTheme.border;
+
+                                                        // 进度填充层
+                                                        Rectangle {
+                                                            x: 0px;
+                                                            width: Math.max(0px, Math.min(parent.width, parent.width * SettingsBridge.setting-wallpaper-opacity));
+                                                            height: 100%;
+                                                            border-radius: 3px;
+                                                            background: AppTheme.accent;
+                                                        }
+                                                    }
+
+                                                    // 滑动手柄圆形浮块 (Thumb Handle)
+                                                    Rectangle {
+                                                        x: Math.max(0px, Math.min(parent.width - self.width, parent.width * SettingsBridge.setting-wallpaper-opacity - self.width / 2));
+                                                        y: (parent.height - self.height) / 2;
+                                                        width: 14px;
+                                                        height: 14px;
+                                                        border-radius: 7px;
+                                                        background: #ffffff;
+                                                        border-width: 2.5px;
+                                                        border-color: AppTheme.accent;
+                                                        drop-shadow-blur: 4px;
+                                                        drop-shadow-color: #00000030;
+                                                    }
+
+                                                    // 交互拦截层：鼠标按下/点击/拖动平滑控制
+                                                    TouchArea {
+                                                        mouse-cursor: pointer;
+                                                        pointer-event(event) => {
+                                                            if event.kind == PointerEventKind.down {
+                                                                let raw_pct: float = self.mouse-x / self.width;
+                                                                let clamped: float = Math.max(0.01, Math.min(1.0, raw_pct));
+                                                                SettingsBridge.setting-wallpaper-opacity = Math.round(clamped * 100) / 100;
+                                                                SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
+                                                            }
+                                                        }
+                                                        moved => {
+                                                            if self.pressed {
+                                                                let raw_pct: float = self.mouse-x / self.width;
+                                                                let clamped: float = Math.max(0.01, Math.min(1.0, raw_pct));
+                                                                SettingsBridge.setting-wallpaper-opacity = Math.round(clamped * 100) / 100;
+                                                                SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // 步进增加按钮 +
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                    clicked => {
+                                                        if SettingsBridge.setting-wallpaper-opacity < 1.0 {
+                                                            SettingsBridge.setting-wallpaper-opacity = Math.min(1.0, Math.round((SettingsBridge.setting-wallpaper-opacity + 0.05) * 100) / 100);
+                                                            SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 直接数字输入框 (支持直接键入 1~100 或 0.1~1.0)
+                                                Rectangle {
+                                                    width: 58px;
+                                                    height: 24px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: op-input.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 6px;
+                                                        padding-right: 6px;
+                                                        spacing: 2px;
+                                                        alignment: center;
+
+                                                        op-input := TextInput {
+                                                            text: Math.round(SettingsBridge.setting-wallpaper-opacity * 100);
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.accent;
+                                                            horizontal-alignment: center;
+                                                            vertical-alignment: center;
+                                                            single-line: true;
+                                                            accepted => {
+                                                                let raw_val = self.text.to-float();
+                                                                let val = raw_val > 1.0 ? raw_val / 100.0 : raw_val;
+                                                                let clamped = Math.max(0.01, Math.min(1.0, val));
+                                                                SettingsBridge.setting-wallpaper-opacity = Math.round(clamped * 100) / 100;
+                                                                SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            text: "%";
+                                                            font-size: 10px;
+                                                            color: AppTheme.secondary-foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 模态弹窗不透明度调节 (实验特性，支持鼠标任意拖动/点击 + 直接输入数字百分比 + 微调步进)
+                                        SettingsRow {
+                                            title: @tr("弹窗底板不透明度 (Modal Opacity)");
+                                            subtitle: @tr("[实验特性] 调节壁纸模式下弹出窗口与菜单的不透明度 (默认 100% 纯色遮挡防重叠，支持 60%~100% 微调)");
+
+                                            HorizontalLayout {
+                                                spacing: 10px;
+                                                alignment: center;
+
+                                                // 步进减小按钮 -
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                    clicked => {
+                                                        if SettingsBridge.setting-modal-opacity > 0.60 {
+                                                            SettingsBridge.setting-modal-opacity = Math.round((SettingsBridge.setting-modal-opacity - 0.05) * 100) / 100;
+                                                            SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 鼠标可直接点击与自由按住拖动的滑动槽轨
+                                                Rectangle {
+                                                    width: 180px;
+                                                    height: 24px;
+                                                    background: transparent;
+
+                                                    // 槽轨底色
+                                                    Rectangle {
+                                                        y: (parent.height - self.height) / 2;
+                                                        width: parent.width;
+                                                        height: 6px;
+                                                        border-radius: 3px;
+                                                        background: AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: AppTheme.border;
+
+                                                        // 进度填充层
+                                                        Rectangle {
+                                                            x: 0px;
+                                                            width: Math.max(0px, Math.min(parent.width, parent.width * SettingsBridge.setting-modal-opacity));
+                                                            height: 100%;
+                                                            border-radius: 3px;
+                                                            background: AppTheme.accent;
+                                                        }
+                                                    }
+
+                                                    // 滑动手柄圆形浮块 (Thumb Handle)
+                                                    Rectangle {
+                                                        x: Math.max(0px, Math.min(parent.width - self.width, parent.width * SettingsBridge.setting-modal-opacity - self.width / 2));
+                                                        y: (parent.height - self.height) / 2;
+                                                        width: 14px;
+                                                        height: 14px;
+                                                        border-radius: 7px;
+                                                        background: #ffffff;
+                                                        border-width: 2.5px;
+                                                        border-color: AppTheme.accent;
+                                                        drop-shadow-blur: 4px;
+                                                        drop-shadow-color: #00000030;
+                                                    }
+
+                                                    // 交互拦截层：鼠标按下/点击/拖动平滑控制
+                                                    TouchArea {
+                                                        mouse-cursor: pointer;
+                                                        pointer-event(event) => {
+                                                            if event.kind == PointerEventKind.down {
+                                                                let raw_pct: float = self.mouse-x / self.width;
+                                                                let clamped: float = Math.max(0.60, Math.min(1.0, raw_pct));
+                                                                SettingsBridge.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                                                SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
+                                                            }
+                                                        }
+                                                        moved => {
+                                                            if self.pressed {
+                                                                let raw_pct: float = self.mouse-x / self.width;
+                                                                let clamped: float = Math.max(0.60, Math.min(1.0, raw_pct));
+                                                                SettingsBridge.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                                                SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // 步进增加按钮 +
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                    clicked => {
+                                                        if SettingsBridge.setting-modal-opacity < 1.0 {
+                                                            SettingsBridge.setting-modal-opacity = Math.min(1.0, Math.round((SettingsBridge.setting-modal-opacity + 0.05) * 100) / 100);
+                                                            SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
+                                                        }
+                                                    }
+                                                }
+
+                                                // 直接数字输入框 (支持直接键入 60~100 或 0.6~1.0)
+                                                Rectangle {
+                                                    width: 58px;
+                                                    height: 24px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: modal-op-input.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 6px;
+                                                        padding-right: 6px;
+                                                        spacing: 2px;
+                                                        alignment: center;
+
+                                                        modal-op-input := TextInput {
+                                                            text: Math.round(SettingsBridge.setting-modal-opacity * 100);
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.accent;
+                                                            horizontal-alignment: center;
+                                                            vertical-alignment: center;
+                                                            single-line: true;
+                                                            accepted => {
+                                                                let raw_val = self.text.to-float();
+                                                                let val = raw_val > 1.0 ? raw_val / 100.0 : raw_val;
+                                                                let clamped = Math.max(0.60, Math.min(1.0, val));
+                                                                SettingsBridge.setting-modal-opacity = Math.round(clamped * 100) / 100;
+                                                                SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
+                                                            }
+                                                        }
+
+                                                        Text {
+                                                            text: "%";
+                                                            font-size: 10px;
+                                                            color: AppTheme.secondary-foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 壁纸图库画廊 (上面标题 下面列表)
+                                        SettingsRow {
+                                            title: @tr("壁纸图库画廊 (Wallpaper Gallery)");
+                                            subtitle: @tr("支持添加单张或直接导入整个文件夹中的图片，点击条目即选即换，支持自动轮播");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: end;
+
+                                                AppButton {
+                                                    text: @tr("添加单张图片");
+                                                    icon: @image-url("../../../assets/icons/plus.svg");
+                                                    has-icon: true;
+                                                    variant: "secondary";
+                                                    clicked => { SettingsBridge.add-wallpaper(); }
+                                                }
+
+                                                AppButton {
+                                                    text: @tr("导入整个文件夹");
+                                                    icon: @image-url("../../../assets/icons/folder.svg");
+                                                    has-icon: true;
+                                                    variant: "primary";
+                                                    clicked => { SettingsBridge.add-wallpaper-folder(); }
+                                                }
+                                            }
+                                        }
+
+                                        // 下方垂直路径列表 (整行占满，左右不留空隙)
+                                        VerticalLayout {
+                                            padding-left: 0px;
+                                            padding-right: 0px;
+                                            padding-bottom: 0px;
+
+                                            Rectangle {
+                                                height: 180px;
+                                                background: AppTheme.is-global-wallpaper ? AppTheme.control-background.transparentize(60%) : AppTheme.control-background;
+                                                clip: true;
+
+                                                if SettingsBridge.setting-wallpaper-list.length == 0: Rectangle {
+                                                    height: 180px;
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: @tr("暂无已导入的壁纸，请点击上方按钮添加单张图片或导入整个文件夹");
+                                                            font-size: 11px;
+                                                            color: AppTheme.disabled-foreground;
+                                                            horizontal-alignment: center;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                if SettingsBridge.setting-wallpaper-list.length > 0: ScrollView {
+                                                    VerticalLayout {
+                                                        padding-left: 18px;
+                                                        padding-right: 18px;
+                                                        padding-top: 6px;
+                                                        padding-bottom: 6px;
+                                                        spacing: 4px;
+
+                                                        for wp[idx] in SettingsBridge.setting-wallpaper-list: Rectangle {
+                                                            height: 34px;
+                                                            border-radius: AppTheme.radius-small;
+                                                            background: idx == SettingsBridge.setting-wallpaper-active-index ?
+                                                                (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(80%) : AppTheme.accent.transparentize(88%)) :
+                                                                (row-t.has-hover ? AppTheme.hover-background : transparent);
+                                                            border-width: idx == SettingsBridge.setting-wallpaper-active-index ? 1px : 0px;
+                                                            border-color: AppTheme.accent;
+
+                                                            row-t := TouchArea {
+                                                                clicked => {
+                                                                    SettingsBridge.setting-wallpaper-path = wp;
+                                                                    SettingsBridge.select-wallpaper(idx);
+                                                                }
+                                                                mouse-cursor: pointer;
+                                                            }
+
+                                                            HorizontalLayout {
+                                                                padding-left: 12px;
+                                                                padding-right: 12px;
+                                                                spacing: 10px;
+                                                                alignment: space-between;
+
+                                                                // 左端内容：图标 + 激活徽章 + 路径文本 (文字从左端开始，超长省略)
+                                                                HorizontalLayout {
+                                                                    horizontal-stretch: 1;
+                                                                    spacing: 8px;
+                                                                    alignment: start;
+
+                                                                    VerticalLayout {
+                                                                        alignment: center;
+                                                                        Image {
+                                                                            source: @image-url("../../../assets/icons/sparkles.svg");
+                                                                            width: 14px;
+                                                                            height: 14px;
+                                                                            colorize: idx == SettingsBridge.setting-wallpaper-active-index ? AppTheme.accent : AppTheme.secondary-foreground;
+                                                                        }
+                                                                    }
+
+                                                                    if idx == SettingsBridge.setting-wallpaper-active-index: Rectangle {
+                                                                        height: 18px;
+                                                                        border-radius: 9px;
+                                                                        background: AppTheme.accent;
+                                                                        y: (parent.height - self.height) / 2;
+
+                                                                        HorizontalLayout {
+                                                                            padding-left: 6px;
+                                                                            padding-right: 6px;
+                                                                            alignment: center;
+                                                                            Text {
+                                                                                text: @tr("生效中");
+                                                                                font-size: 9px;
+                                                                                font-weight: 700;
+                                                                                color: AppTheme.selected-foreground;
+                                                                                vertical-alignment: center;
+                                                                            }
+                                                                        }
+                                                                    }
+
+                                                                    Text {
+                                                                        text: wp;
+                                                                        font-family: "JetBrains Mono";
+                                                                        font-size: 11px;
+                                                                        font-weight: idx == SettingsBridge.setting-wallpaper-active-index ? 700 : 400;
+                                                                        color: idx == SettingsBridge.setting-wallpaper-active-index ? AppTheme.accent : AppTheme.foreground;
+                                                                        horizontal-alignment: left;
+                                                                        vertical-alignment: center;
+                                                                        overflow: elide;
+                                                                    }
+                                                                }
+
+                                                                // 右边固定删除图标 (垂直居中对齐)
+                                                                VerticalLayout {
+                                                                    alignment: center;
+                                                                    Rectangle {
+                                                                        width: 24px;
+                                                                        height: 24px;
+                                                                        border-radius: 4px;
+                                                                        background: del-t.has-hover ? AppTheme.danger.transparentize(80%) : transparent;
+
+                                                                        del-t := TouchArea {
+                                                                            clicked => { SettingsBridge.remove-wallpaper(idx); }
+                                                                            mouse-cursor: pointer;
+                                                                        }
+
+                                                                        Image {
+                                                                            x: (parent.width - self.width) / 2;
+                                                                            y: (parent.height - self.height) / 2;
+                                                                            source: @image-url("../../../assets/icons/trash.svg");
+                                                                            width: 13px;
+                                                                            height: 13px;
+                                                                            colorize: del-t.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle { height: 1px; background: AppTheme.border; opacity: 0.5; }
+                                        }
+
+                                        // 轮播策略 (支持两个框：数字+单位直接输入，并提供常用快捷预设按钮点击自动填充)
+                                        SettingsRow {
+                                            title: @tr("壁纸轮播切换策略 (Rotation Interval)");
+                                            subtitle: @tr("按间隔时间自动切换下一张壁纸，支持键入数字与单位或快捷选择");
+                                            min-height: 72px;
+
+                                            VerticalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+
+                                                // 第一排：直接输入 [数字框] + [单位选择框]
+                                                HorizontalLayout {
+                                                    spacing: 8px;
+                                                    alignment: start;
+
+                                                    Text {
+                                                        text: @tr("轮播间隔:");
+                                                        font-size: 11px;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+
+                                                    // 数字输入框
+                                                    Rectangle {
+                                                        width: 52px;
+                                                        height: 26px;
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: rot-num-in.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                        rot-num-in := TextInput {
+                                                            text <=> SettingsBridge.slideshow-number-input;
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            horizontal-alignment: center;
+                                                            vertical-alignment: center;
+                                                            single-line: true;
+                                                            accepted => {
+                                                                if SettingsBridge.slideshow-unit-input != "off" {
+                                                                    SettingsBridge.setting-wallpaper-slideshow = self.text + SettingsBridge.slideshow-unit-input;
+                                                                    SettingsBridge.set-wallpaper-slideshow(SettingsBridge.setting-wallpaper-slideshow, SettingsBridge.setting-wallpaper-transition);
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+
+                                                    // 单位选择栏
+                                                    Rectangle {
+                                                        height: 26px;
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: AppTheme.border;
+
+                                                        HorizontalLayout {
+                                                            padding: 2px;
+                                                            spacing: 0px;
+
+                                                            for u[uidx] in [
+                                                                { id: "s", name: @tr("秒") },
+                                                                { id: "m", name: @tr("分") },
+                                                                { id: "h", name: @tr("时") },
+                                                                { id: "off", name: @tr("关闭") }
+                                                            ]: Rectangle {
+                                                                border-radius: 2px;
+                                                                background: SettingsBridge.slideshow-unit-input == u.id ? AppTheme.accent : u-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                                                u-touch := TouchArea {
+                                                                    clicked => {
+                                                                        SettingsBridge.slideshow-unit-input = u.id;
+                                                                        if u.id == "off" {
+                                                                            SettingsBridge.setting-wallpaper-slideshow = "none";
+                                                                        } else {
+                                                                            SettingsBridge.setting-wallpaper-slideshow = SettingsBridge.slideshow-number-input + u.id;
+                                                                        }
+                                                                        SettingsBridge.set-wallpaper-slideshow(SettingsBridge.setting-wallpaper-slideshow, SettingsBridge.setting-wallpaper-transition);
+                                                                    }
+                                                                    mouse-cursor: pointer;
+                                                                }
+
+                                                                HorizontalLayout {
+                                                                    padding-left: 8px;
+                                                                    padding-right: 8px;
+                                                                    alignment: center;
+                                                                    Text {
+                                                                        text: u.name;
+                                                                        font-size: 10px;
+                                                                        font-weight: SettingsBridge.slideshow-unit-input == u.id ? 700 : 400;
+                                                                        color: SettingsBridge.slideshow-unit-input == u.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                        vertical-alignment: center;
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+
+                                                // 第二排：常用固定快捷时间按钮 (点击后输入框与单位直接自动同步变化)
+                                                HorizontalLayout {
+                                                    spacing: 6px;
+                                                    alignment: start;
+
+                                                    Text {
+                                                        text: @tr("常用预设:");
+                                                        font-size: 10px;
+                                                        color: AppTheme.disabled-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+
+                                                    for preset in [
+                                                        { label: @tr("关闭"), num: "0", unit: "off", code: "none" },
+                                                        { label: "30 " + @tr("秒"), num: "30", unit: "s", code: "30s" },
+                                                        { label: "1 " + @tr("分钟"), num: "1", unit: "m", code: "1m" },
+                                                        { label: "5 " + @tr("分钟"), num: "5", unit: "m", code: "5m" },
+                                                        { label: "15 " + @tr("分钟"), num: "15", unit: "m", code: "15m" },
+                                                        { label: "1 " + @tr("小时"), num: "1", unit: "h", code: "1h" }
+                                                    ]: Rectangle {
+                                                        height: 22px;
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-wallpaper-slideshow == preset.code ? AppTheme.accent : p-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                                        border-width: 1px;
+                                                        border-color: SettingsBridge.setting-wallpaper-slideshow == preset.code ? AppTheme.accent : AppTheme.border;
+
+                                                        p-touch := TouchArea {
+                                                            clicked => {
+                                                                SettingsBridge.slideshow-number-input = preset.num;
+                                                                SettingsBridge.slideshow-unit-input = preset.unit;
+                                                                SettingsBridge.setting-wallpaper-slideshow = preset.code;
+                                                                SettingsBridge.set-wallpaper-slideshow(preset.code, SettingsBridge.setting-wallpaper-transition);
+                                                            }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: preset.label;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-wallpaper-slideshow == preset.code ? 700 : 400;
+                                                                color: SettingsBridge.setting-wallpaper-slideshow == preset.code ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 过渡动效
+                                        SettingsRow {
+                                            title: @tr("壁纸切换动效 (Transition Effect)");
+                                            subtitle: @tr("选择轮播壁纸更替时的视效动画");
+                                            show-border: false;
+
+                                            Rectangle {
+                                                height: 30px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 3px;
+                                                    spacing: 0px;
+
+                                                    for ef[idx] in [
+                                                        { id: "fade", name: @tr("平滑淡入淡出 (Cross-fade)") },
+                                                        { id: "slide", name: @tr("水平视差滚动 (Slide)") }
+                                                    ]: HorizontalLayout {
+                                                        spacing: 0px;
+                                                        if idx > 0: Rectangle { width: 1px; height: 14px; background: AppTheme.border; opacity: 0.6; y: (parent.height - self.height) / 2; }
+                                                        Rectangle {
+                                                            border-radius: AppTheme.radius-small;
+                                                            background: SettingsBridge.setting-wallpaper-transition == ef.id ? AppTheme.accent : e-t.has-hover ? AppTheme.hover-background : transparent;
+                                                            animate background { duration: 120ms; }
+
+                                                            e-t := TouchArea {
+                                                                clicked => {
+                                                                    SettingsBridge.setting-wallpaper-transition = ef.id;
+                                                                    SettingsBridge.set-wallpaper-slideshow(SettingsBridge.setting-wallpaper-slideshow, ef.id);
+                                                                }
+                                                                mouse-cursor: pointer;
+                                                            }
+
+                                                            HorizontalLayout {
+                                                                padding-left: 12px;
+                                                                padding-right: 12px;
+                                                                alignment: center;
+                                                                Text {
+                                                                    text: ef.name;
+                                                                    font-size: 11px;
+                                                                    font-weight: SettingsBridge.setting-wallpaper-transition == ef.id ? 700 : 500;
+                                                                    color: SettingsBridge.setting-wallpaper-transition == ef.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                    vertical-alignment: center;
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                }

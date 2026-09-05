@@ -17,6 +17,32 @@
 | **07** | **事件分发与生命周期** | [07_events_and_lifecycle.md](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md) | 泛型事件分发总线 (`EventDispatcher`)、多作用域管理器 (`EventManager`) 与生命周期守卫 |
 | **08** | **凭据保管库与安全认证** | [08_credentials_vault.md](file:///F:/code/rust/smalux-ssh/docs/ui/08_credentials_vault.md) | SSH 密钥/口令安全保管、多算法密钥生成器、随机密码生成器与机密提取审计 |
 | **09** | **代码片段与层级脚本中心** | [09_code_snippets.md](file:///F:/code/rust/smalux-ssh/docs/ui/09_code_snippets.md) | 多层文件夹嵌套树、参数化模板引擎 `{{key:default}}`、全屏中心与双侧边抽屉 |
+| **10** | **偏好设置中心与多端云同步** | [10_settings_center.md](file:///F:/code/rust/smalux-ssh/docs/ui/10_settings_center.md) | 8 大分类、外观壁纸轮播、终端排版 (CRT/关键字高亮)、网络代理、S3/WebDAV/Gist 云同步与主密码机制 |
+| **11** | **网络隧道、跳板机与出网代理** | [11_network_tunnels.md](file:///F:/code/rust/smalux-ssh/docs/ui/11_network_tunnels.md) | 本地/远程/动态端口转发、多跳跳板机堡垒链路、静态出网代理节点与拓扑速率波形图 |
+| **12** | **特性内聚与组件模块化重构指南** | [12_architecture_refactor_guide.md](file:///F:/code/rust/smalux-ssh/docs/ui/12_architecture_refactor_guide.md) | 特性内聚目录结构 (`shared/` + `features/`)、Slint 领域桥接单例 (`Domain Bridge`) 与 4 级原子设计系统 |
+
+---
+
+## 🏗️ 现代工程布局规范 (Feature-First Directory Topology)
+
+工程采用 **“共享基础组件集中 (`ui/shared/`) + 页面与专属模块同目录聚合 (`ui/features/<module>/`)”** 拓扑，实现高内聚低耦合：
+
+```text
+crates/smagical-ui/ui/
+├── shared/                     # 🧱 全工程通用共享组件库 (严禁依赖任何具体业务逻辑)
+│   ├── base/                   # 原子控件 (按钮、输入框、开关、下拉框、分段器)
+│   ├── scaffolds/              # 结构脚手架 (AppModalScaffold, AppMasterDetailScaffold, AppFormRow)
+│   └── feedback/               # 交互反馈 (ToastContainer, MessageDialog, ContextMenuContainer)
+├── features/                   # 📦 按业务特性高度内聚的领域包 (自包含页面、表单、专属弹窗与 Bridge)
+│   ├── settings/               # 设置主页、8 大分类 Tab、SettingsBridge
+│   ├── file_manager/           # 双盘主页、FileBrowserPane 泛型单盘、传输抽屉
+│   ├── tunnels/                # 隧道主页、转发/跳板/代理专属表单、拓扑卡片
+│   ├── credentials/            # 凭据主页、密钥/密码专属表单、专属抽屉
+│   ├── snippets/               # 脚本片段主页、参数执行弹窗、专属抽屉
+│   ├── terminal/               # 终端视口、标签栏、状态栏、新建会话弹窗
+│   └── hosts/                  # 主机抽屉、树选择器、新建分组弹窗
+└── main.slint                  # 🚀 顶层极简主窗口路由器 (约 550 行，只负责主视口切换调度)
+```
 
 ---
 

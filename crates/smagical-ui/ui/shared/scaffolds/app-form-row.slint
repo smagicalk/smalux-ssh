@@ -1,0 +1,60 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 标准统一表单行 (App Form Row)
+/// 规范 Label (定宽) + 控件插槽 + 辅助提示
+export component AppFormRow inherits Rectangle {
+    in property <string> label: "";
+    in property <string> description: "";
+    in property <length> label-width: 160px;
+    in property <bool> required: false;
+    in property <length> row-min-height: 36px;
+
+    min-height: root.row-min-height;
+
+    HorizontalLayout {
+        alignment: space-between;
+        spacing: 16px;
+
+        // 左侧标签与辅助说明
+        VerticalLayout {
+            width: root.label-width;
+            alignment: center;
+            spacing: 2px;
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+
+                Text {
+                    text: root.label;
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+
+                if root.required: Text {
+                    text: "*";
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: AppTheme.danger;
+                    vertical-alignment: center;
+                }
+            }
+
+            if root.description != "": Text {
+                text: root.description;
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+                wrap: word-wrap;
+            }
+        }
+
+        // 右侧控件插槽
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: false;
+            @children
+        }
+    }
+}

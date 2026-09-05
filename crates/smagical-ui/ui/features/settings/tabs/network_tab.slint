@@ -1,0 +1,493 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+} from "../components/settings_widgets.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+
+                                export component SettingsNetworkTab inherits VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("网络连接与代理");
+                                        subtitle: @tr("配置默认出站网络代理、SSH 握手超时、Keepalive 心跳保活与数据流压缩");
+                                        icon: @image-url("../../../assets/icons/tunnel.svg");
+                                    }
+
+                                    // 卡片 1: 全局网络代理与出站策略
+                                    SettingsSectionCard {
+                                        title: @tr("全局出站代理与路由");
+                                        subtitle: @tr("设置默认网络出站通道；单个主机高级设置中可单独配置并覆盖此项");
+                                        icon: @image-url("../../../assets/icons/tunnel.svg");
+
+                                        SettingsRow {
+                                            title: @tr("默认出站代理模式 (Proxy Mode)");
+                                            subtitle: @tr("选择直连、跟随操作系统系统代理或指定全局 SOCKS5 / HTTP 代理");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for pm in [
+                                                        { id: "direct", name: @tr("直连 (禁用代理)") },
+                                                        { id: "system", name: @tr("跟随系统代理") },
+                                                        { id: "custom", name: @tr("自定义代理") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-global-proxy-mode == pm.id ? AppTheme.accent : pm-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        pm-t := TouchArea {
+                                                            clicked => {
+                                                                SettingsBridge.setting-global-proxy-mode = pm.id;
+                                                                SettingsBridge.change-global-proxy(pm.id, SettingsBridge.setting-global-proxy-server, SettingsBridge.setting-global-proxy-auth, SettingsBridge.setting-global-proxy-user, SettingsBridge.setting-global-proxy-pass);
+                                                            }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 10px;
+                                                            padding-right: 10px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: pm.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-global-proxy-mode == pm.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-global-proxy-mode == pm.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if SettingsBridge.setting-global-proxy-mode == "custom": SettingsRow {
+                                            title: @tr("自定义代理服务器与端口 (Proxy Server)");
+                                            subtitle: @tr("格式支持 socks5://127.0.0.1:7890 或 http://127.0.0.1:7890");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-small;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: proxy-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                TouchArea {
+                                                    clicked => { proxy-inp.focus(); }
+                                                    mouse-cursor: text;
+                                                }
+
+                                                HorizontalLayout {
+                                                    height: 100%;
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    proxy-inp := TextInput {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        vertical-alignment: center;
+                                                        text <=> SettingsBridge.setting-global-proxy-server;
+                                                        font-size: 11px;
+                                                        font-family: "JetBrains Mono, monospace";
+                                                        color: AppTheme.foreground;
+                                                        single-line: true;
+                                                        accepted => {
+                                                            SettingsBridge.change-global-proxy(SettingsBridge.setting-global-proxy-mode, SettingsBridge.setting-global-proxy-server, SettingsBridge.setting-global-proxy-auth, SettingsBridge.setting-global-proxy-user, SettingsBridge.setting-global-proxy-pass);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if SettingsBridge.setting-global-proxy-mode == "custom": SettingsRow {
+                                            title: @tr("代理身份认证 (Proxy Authentication)");
+                                            subtitle: @tr("如果代理服务器需要用户名与密码凭据验证，请开启此项");
+
+                                            SettingsSwitch {
+                                                checked: SettingsBridge.setting-global-proxy-auth;
+                                                toggled(c) => {
+                                                    SettingsBridge.setting-global-proxy-auth = c;
+                                                }
+                                            }
+                                        }
+
+                                        if SettingsBridge.setting-global-proxy-mode == "custom" && SettingsBridge.setting-global-proxy-auth: SettingsRow {
+                                            title: @tr("代理用户名 (Proxy Username)");
+                                            subtitle: @tr("代理服务器身份认证用户名");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-small;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: pu-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                TouchArea {
+                                                    clicked => { pu-inp.focus(); }
+                                                    mouse-cursor: text;
+                                                }
+
+                                                HorizontalLayout {
+                                                    height: 100%;
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    pu-inp := TextInput {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        vertical-alignment: center;
+                                                        text <=> SettingsBridge.setting-global-proxy-user;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        single-line: true;
+                                                        accepted => {
+                                                            SettingsBridge.change-global-proxy(SettingsBridge.setting-global-proxy-mode, SettingsBridge.setting-global-proxy-server, SettingsBridge.setting-global-proxy-auth, SettingsBridge.setting-global-proxy-user, SettingsBridge.setting-global-proxy-pass);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if SettingsBridge.setting-global-proxy-mode == "custom" && SettingsBridge.setting-global-proxy-auth: SettingsRow {
+                                            title: @tr("代理密码 (Proxy Password)");
+                                            subtitle: @tr("代理服务器身份认证访问密码");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-small;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: pp-inp.has-focus ? AppTheme.accent : AppTheme.border;
+
+                                                TouchArea {
+                                                    clicked => { pp-inp.focus(); }
+                                                    mouse-cursor: text;
+                                                }
+
+                                                HorizontalLayout {
+                                                    height: 100%;
+                                                    padding-left: 8px;
+                                                    padding-right: 8px;
+                                                    pp-inp := TextInput {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        vertical-alignment: center;
+                                                        text <=> SettingsBridge.setting-global-proxy-pass;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        single-line: true;
+                                                        accepted => {
+                                                            SettingsBridge.change-global-proxy(SettingsBridge.setting-global-proxy-mode, SettingsBridge.setting-global-proxy-server, SettingsBridge.setting-global-proxy-auth, SettingsBridge.setting-global-proxy-user, SettingsBridge.setting-global-proxy-pass);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if SettingsBridge.setting-global-proxy-mode == "custom": SettingsRow {
+                                            title: @tr("应用代理设置 (Apply Proxy Settings)");
+                                            subtitle: @tr("保存并立即应用自定义代理配置 (亦可在输入框直接按回车保存)");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("保存代理配置");
+                                                icon: @image-url("../../../assets/icons/check.svg");
+                                                has-icon: true;
+                                                variant: "primary";
+                                                clicked => {
+                                                    SettingsBridge.change-global-proxy(SettingsBridge.setting-global-proxy-mode, SettingsBridge.setting-global-proxy-server, SettingsBridge.setting-global-proxy-auth, SettingsBridge.setting-global-proxy-user, SettingsBridge.setting-global-proxy-pass);
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("跳板机 / 堡垒机全局链 (Default Jump Host)");
+                                            subtitle: @tr("针对无公网 IP 的隔离内网，配置全局统一前置跳板节点 (支持多级 ProxyJump 链)");
+                                            show-border: false;
+                                            Text { text: @tr("可在主机配置中单独绑定"); font-size: 11px; color: AppTheme.secondary-foreground; }
+                                        }
+                                    }
+
+                                    // 卡片 2: 连接握手与链路心跳保活
+                                    SettingsSectionCard {
+                                        title: @tr("连接超时与心跳保活探测");
+                                        subtitle: @tr("TCP 握手时限、定期 Keepalive 心跳探测包与防空闲断开");
+                                        icon: @image-url("../../../assets/icons/clock.svg");
+
+                                        SettingsRow {
+                                            title: @tr("SSH 连接超时时间 (Connection Timeout)");
+                                            subtitle: @tr("在发起 SSH 握手或 TCP 套接字建立时的最大等待时限 (秒)");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-connect-timeout > 5 {
+                                                            SettingsBridge.setting-connect-timeout -= 5;
+                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 68px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: SettingsBridge.setting-connect-timeout + " " + @tr("秒");
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-connect-timeout < 300 {
+                                                            SettingsBridge.setting-connect-timeout += 5;
+                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("TCP 心跳保活探测间隔 (ServerAliveInterval)");
+                                            subtitle: @tr("向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开 (0 为禁用)");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-keepalive-interval >= 5 {
+                                                            SettingsBridge.setting-keepalive-interval -= 5;
+                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 78px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: SettingsBridge.setting-keepalive-interval == 0 ? @tr("已禁用") : (SettingsBridge.setting-keepalive-interval + " " + @tr("秒"));
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: SettingsBridge.setting-keepalive-interval == 0 ? AppTheme.secondary-foreground : AppTheme.accent;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-keepalive-interval < 300 {
+                                                            SettingsBridge.setting-keepalive-interval += 5;
+                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("心跳保活最大丢失阈值 (ServerAliveCountMax)");
+                                            subtitle: @tr("若连续发送心跳探测均未得到服务器响应，判定链路断开的连续重试次数");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-keepalive-count-max > 1 {
+                                                            SettingsBridge.setting-keepalive-count-max -= 1;
+                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 58px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: SettingsBridge.setting-keepalive-count-max + " " + @tr("次");
+                                                            font-size: 11px;
+                                                            font-weight: 700;
+                                                            color: AppTheme.foreground;
+                                                            vertical-alignment: center;
+                                                        }
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-keepalive-count-max < 20 {
+                                                            SettingsBridge.setting-keepalive-count-max += 1;
+                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("禁用 Nagle 延迟算法 (TCP_NODELAY)");
+                                            subtitle: @tr("立即发出每个键盘击键字符包，减少终端光标与字符回显微延迟");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: SettingsBridge.setting-tcp-nodelay;
+                                                toggled(c) => {
+                                                    SettingsBridge.setting-tcp-nodelay = c;
+                                                    SettingsBridge.change-tcp-nodelay(c);
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 协议安全与传输优化
+                                    SettingsSectionCard {
+                                        title: @tr("协议安全策略与数据流压缩");
+                                        subtitle: @tr("主机密钥指纹检查、链路层实时压缩与老旧算法兼容");
+                                        icon: @image-url("../../../assets/icons/shield.svg");
+
+                                        SettingsRow {
+                                            title: @tr("主机密钥防篡改验证策略 (StrictHostKeyChecking)");
+                                            subtitle: @tr("防止针对 SSH 连接的中间人嗅探攻击 (MITM)；未知或指纹变更的主机将触发安全警告");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for hk in [
+                                                        { id: "accept-new", name: @tr("首次自动信任 (accept-new)") },
+                                                        { id: "ask", name: @tr("严格每次询问 (ask)") },
+                                                        { id: "yes", name: @tr("仅限已知主机 (yes)") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-host-key-policy == hk.id ? AppTheme.accent : hk-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        hk-t := TouchArea {
+                                                            clicked => {
+                                                                SettingsBridge.setting-host-key-policy = hk.id;
+                                                                SettingsBridge.change-host-key-policy(hk.id);
+                                                            }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: hk.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-host-key-policy == hk.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-host-key-policy == hk.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("启用链路层 gzip 数据流压缩 (ssh -C)");
+                                            subtitle: @tr("压缩所有终端文本输出与 SFTP 传输数据流，显著提升跨国网络与低带宽连接速度");
+                                            SettingsSwitch {
+                                                checked: SettingsBridge.setting-compression;
+                                                toggled(c) => { SettingsBridge.setting-compression = c; }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("兼容遗留设备老旧加密算法 (Legacy Ciphers Fallback)");
+                                            subtitle: @tr("允许协商 3DES、Diffie-Hellman Group 1 等已弃用算法（仅建议调试陈旧网络设备时开启）");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: SettingsBridge.setting-legacy-ciphers;
+                                                toggled(c) => { SettingsBridge.setting-legacy-ciphers = c; }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 4: 异常断线恢复与自动重试
+                                    SettingsSectionCard {
+                                        title: @tr("异常断线恢复与自动重试");
+                                        subtitle: @tr("网络闪断、Wi-Fi 切换或休眠恢复后使用指数退避算法自动静默恢复连接");
+                                        icon: @image-url("../../../assets/icons/refresh.svg");
+
+                                        SettingsRow {
+                                            title: @tr("网络异常断线自动重连 (Auto Reconnect)");
+                                            subtitle: @tr("当网络闪断或链路重置时，自动以指数退避算法 (1s, 2s, 4s, 8s...) 尝试静默重连");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked: SettingsBridge.setting-auto-reconnect;
+                                                toggled(c) => { SettingsBridge.setting-auto-reconnect = c; }
+                                            }
+                                        }
+                                    }
+                                }

@@ -13,6 +13,10 @@
 - 🐚 **跨平台本地 Shell 动态探测**：启动时自动扫描并缓存当前系统的 PowerShell 7、Windows PowerShell、WSL、Git Bash、CMD、Bash、Zsh、Fish、Nushell 等终端环境，支持一键新建本地会话；
 - 🏛️ **工业级终端渲染引擎**：基于 `alacritty_terminal` 状态机内核与像素位图双缓冲光栅化管线，支持 10 万行回滚、智能 Reflow、24-bit TrueColor 与全屏 TUI 应用；
 - 🛠️ **开发者调试工作台 (Debug Workbench)**：内置 `smagical-debug` crate，提供全系统 Tracing 实时滚动日志抽屉、海量资产批量生成引擎、场景预设（K8s 集群/微服务/大规模压测）一键注入与快速状态模拟；
+- ⚙️ **全能偏好设置中心 (Settings Center)**：提供常规启动/窗口、外观与壁纸轮播、终端排版 (光标/回滚/CRT滤镜/关键字高亮规则矩阵)、网络代理与超时、多端云同步矩阵 (本地快照/S3/WebDAV/Gist)、主密码安全加解密防护以及快捷键绑定矩阵等 8 大核心维度；
+- 🌐 **现代化网络隧道工作台 (Tunnels & Proxy)**：原生集成端口转发（本地/远程/动态 SOCKS5 网关）、多跳跳板机堡垒链路以及静态出网代理节点，支持可视化拓扑连接与实时速率波形监测；
+- 🔐 **安全凭据保管库 (Credentials Vault)**：全屏与抽屉双模式管理 SSH 私钥/证书、口令与 Agent 凭据，内置 Ed25519/RSA 密钥生成器与敏感凭据防窥遮蔽；
+- 📜 **层级脚本与代码片段中心 (Snippets Center)**：支持多层文件夹嵌套树、参数化模板引擎 `{{key:default}}` 动态表单解析、一键插入终端与后台批量执行；
 - 📂 **高复用独立组件库**：抽离 `GroupTreeSelector`（树形选择器）、`CreateGroupModal`（新建分组弹窗）、`CommandPalette`（全局指令面板）等组件；
 - 🎨 **专业动态主题系统**：内置 15+ 套经典配色预设（Darcula, Catppuccin, Monokai, Nord, One Dark, Dracula, GitHub 等），支持深色/浅色一键平滑无缝热切换与 Windows Terminal 配色导入；
 - 🌐 **多语言国际化 (i18n)**：全界面文案采用 Slint `@tr(...)` 与 gettext `.po` 体系管理；
@@ -34,6 +38,9 @@
 - 🌐 **[07. 泛型事件分发与生命周期协同 (07_events_and_lifecycle.md)](file:///F:/code/rust/smalux-ssh/docs/ui/07_events_and_lifecycle.md)**
 - 🔐 **[08. 凭据保险库与安全认证中心 (08_credentials_vault.md)](file:///F:/code/rust/smalux-ssh/docs/ui/08_credentials_vault.md)**
 - 📜 **[09. 代码片段与层级脚本中心 (09_code_snippets.md)](file:///F:/code/rust/smalux-ssh/docs/ui/09_code_snippets.md)**
+- ⚙️ **[10. 偏好设置中心与多端云同步矩阵 (10_settings_center.md)](file:///F:/code/rust/smalux-ssh/docs/ui/10_settings_center.md)**
+- 🌐 **[11. 网络隧道、跳板机与出网代理 (11_network_tunnels.md)](file:///F:/code/rust/smalux-ssh/docs/ui/11_network_tunnels.md)**
+- 🏗️ **[12. 特性内聚与组件模块化重构全景指南 (12_architecture_refactor_guide.md)](file:///F:/code/rust/smalux-ssh/docs/ui/12_architecture_refactor_guide.md)**
 
 ---
 
@@ -63,20 +70,15 @@ smalux-ssh/
 │   │
 │   └── smagical-ui/            # 桌面 UI 展示与交互装配层 (基于 Slint UI)
 │       ├── src/
-│       │   ├── lib.rs          # 桌面应用入口、事件总线与 Slint 回调路由
-│       │   ├── main.rs         # 客户端可执行二进制启动入口
-│       │   ├── tree_model.rs   # 树形视图纯函数操作层 (RawTreeNode, 排序, 拖拽, 搜索过滤)
-│       │   ├── session.rs      # 终端会话管理与 Slint UI 状态同步
-│       │   ├── debug_ui.rs     # Tracing 日志面板数据桥接
-│       │   ├── local_shells.rs # 跨平台本地 Shell 环境探测与缓存引擎
+│       │   ├── lib.rs          # 桌面应用入口与顶层视口挂载
+│       │   ├── handlers/       # 1:1 镜像领域交互服务集群 (settings, files, tunnels, credentials...)
+│       │   ├── terminal/       # 终端 PTY 进程驱动、光栅化渲染器与分屏树
 │       │   └── theme/          # 运行时主题动态注入与样式令牌绑定
 │       ├── ui/
-│       │   ├── main.slint      # 顶层主窗口组件 (AppWindow)
-│       │   ├── components/     # 通用原子 UI 组件库
-│       │   ├── themes/         # 主题样式规范与 TOML 预设配置
-│       │   └── views/          # 活动栏、抽屉、终端视口、状态栏等业务视图
-│       ├── extract-translations.ps1 # i18n 多语言提取脚本
-│       ├── messages.po         # 国际化翻译文件
+│       │   ├── main.slint      # 顶层极简主窗口路由器 (AppWindow)
+│       │   ├── shared/         # 全工程通用共享组件库 (base 原子控件, scaffolds 脚手架, feedback)
+│       │   ├── features/       # 特性优先独立领域包 (settings, file_manager, tunnels, credentials...)
+│       │   └── themes/         # 主题样式规范与设计 Token 资产
 │       └── Cargo.toml
 └── README.md
 ```

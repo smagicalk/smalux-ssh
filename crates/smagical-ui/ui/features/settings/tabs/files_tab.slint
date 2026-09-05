@@ -1,0 +1,415 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+} from "../components/settings_widgets.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+
+                                export component SettingsFilesTab inherits VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("传输与文件管理");
+                                        subtitle: @tr("管理远程 SFTP 浏览器下载路径、文件传输冲突策略、并发协程与外部编辑器");
+                                        icon: @image-url("../../../assets/icons/folder.svg");
+                                    }
+
+                                    // 卡片 1: 路径与文件浏览器视口
+                                    SettingsSectionCard {
+                                        title: @tr("路径导航与文件浏览器视口");
+                                        subtitle: @tr("本地下载存储位置、远程初始目录与隐藏文件显隐过滤");
+                                        icon: @image-url("../../../assets/icons/folder.svg");
+
+                                        SettingsRow {
+                                            title: @tr("默认本地下载目录 (Default Download Dir)");
+                                            subtitle: @tr("从远程 SFTP 下载文件时默认保存的本地文件夹路径");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                Text {
+                                                    text: SettingsBridge.setting-sftp-default-local;
+                                                    font-size: 11px;
+                                                    font-weight: 600;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                                AppButton {
+                                                    text: @tr("浏览选择...");
+                                                    variant: "secondary";
+                                                    clicked => { }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("默认远程初始工作目录 (Default Remote Dir)");
+                                            subtitle: @tr("建立 SFTP 会话时初始打开的远程路径 (如 ~ 用户主目录或 / 根路径)");
+
+                                            Rectangle {
+                                                width: 160px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> SettingsBridge.setting-sftp-default-remote;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("显示隐藏文件与点文件 (Show Hidden Files)");
+                                            subtitle: @tr("在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc, .env)");
+                                            SettingsSwitch {
+                                                checked <=> SettingsBridge.setting-sftp-show-hidden;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("删除远程文件二次安全确认 (Confirm Deletion)");
+                                            subtitle: @tr("在远程服务器上删除文件或目录前弹出模态弹窗二次核验，防止误操作");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked <=> SettingsBridge.setting-sftp-confirm-delete;
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 2: 传输引擎与冲突策略
+                                    SettingsSectionCard {
+                                        title: @tr("传输引擎与冲突策略");
+                                        subtitle: @tr("同名文件传输冲突解决、大文件断点续传与 POSIX 权限保留");
+                                        icon: @image-url("../../../assets/icons/refresh.svg");
+
+                                        SettingsRow {
+                                            title: @tr("文件存在重名冲突策略 (Conflict Resolution)");
+                                            subtitle: @tr("当目标目录已存在同名文件时的默认处理规则");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for pol in [
+                                                        { id: "ask", name: @tr("每次询问 (ask)") },
+                                                        { id: "overwrite", name: @tr("覆盖 (overwrite)") },
+                                                        { id: "skip", name: @tr("跳过 (skip)") },
+                                                        { id: "rename", name: @tr("自动重命名 (rename)") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-sftp-conflict-policy == pol.id ? AppTheme.accent : pol-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        pol-t := TouchArea {
+                                                            clicked => { SettingsBridge.setting-sftp-conflict-policy = pol.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: pol.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-sftp-conflict-policy == pol.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-sftp-conflict-policy == pol.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("大文件断点续传支持 (Resume Interrupted Transfers)");
+                                            subtitle: @tr("网络中断或任务暂停后自动从断点位置恢复传输，避免大文件重传");
+                                            SettingsSwitch {
+                                                checked <=> SettingsBridge.setting-sftp-resume;
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("保留原始文件属性 (Preserve Attributes & Timestamps)");
+                                            subtitle: @tr("传输时尽可能保留文件的原始 POSIX 读写执行权限与修改时间戳 (mtime/atime)");
+                                            show-border: false;
+                                            SettingsSwitch {
+                                                checked <=> SettingsBridge.setting-sftp-preserve-attributes;
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 并发与带宽流量控制
+                                    SettingsSectionCard {
+                                        title: @tr("并发性能与带宽流量控制");
+                                        subtitle: @tr("多任务并行工作协程数与单任务上下行传输速率限制");
+                                        icon: @image-url("../../../assets/icons/settings.svg");
+
+                                        SettingsRow {
+                                            title: @tr("SFTP 最大并发传输连接数 (Transfer Concurrency)");
+                                            subtitle: @tr("多文件批量上传与下载时的并行工作协程数 (范围 1 ~ 16，默认 4)");
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: center;
+                                                height: 28px;
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-sftp-concurrency > 1 {
+                                                            SettingsBridge.setting-sftp-concurrency = SettingsBridge.setting-sftp-concurrency - 1;
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    width: 48px;
+                                                    height: 26px;
+                                                    border-radius: AppTheme.radius-small;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    Text {
+                                                        text: SettingsBridge.setting-sftp-concurrency;
+                                                        font-size: 12px;
+                                                        font-weight: 700;
+                                                        color: AppTheme.foreground;
+                                                        horizontal-alignment: center;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+
+                                                AppIconButton {
+                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
+                                                    y: (parent.height - self.height) / 2;
+                                                    clicked => {
+                                                        if SettingsBridge.setting-sftp-concurrency < 16 {
+                                                            SettingsBridge.setting-sftp-concurrency = SettingsBridge.setting-sftp-concurrency + 1;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("单任务上传速率限制 (Upload Speed Limit)");
+                                            subtitle: @tr("限制单任务上传带宽，避免占满网络上行导致其他终端交互卡顿");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for lim in [
+                                                        { id: "unlimited", name: @tr("不限速") },
+                                                        { id: "1mb", name: "1 MB/s" },
+                                                        { id: "5mb", name: "5 MB/s" },
+                                                        { id: "10mb", name: "10 MB/s" }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-sftp-upload-limit == lim.id ? AppTheme.accent : ul-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        ul-t := TouchArea {
+                                                            clicked => { SettingsBridge.setting-sftp-upload-limit = lim.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: lim.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-sftp-upload-limit == lim.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-sftp-upload-limit == lim.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("单任务下载速率限制 (Download Speed Limit)");
+                                            subtitle: @tr("限制单任务下载带宽，保证网络均衡");
+                                            show-border: false;
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for lim in [
+                                                        { id: "unlimited", name: @tr("不限速") },
+                                                        { id: "2mb", name: "2 MB/s" },
+                                                        { id: "10mb", name: "10 MB/s" },
+                                                        { id: "20mb", name: "20 MB/s" }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-sftp-download-limit == lim.id ? AppTheme.accent : dl-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        dl-t := TouchArea {
+                                                            clicked => { SettingsBridge.setting-sftp-download-limit = lim.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: lim.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-sftp-download-limit == lim.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-sftp-download-limit == lim.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 4: 外部编辑器与传输排除规则
+                                    SettingsSectionCard {
+                                        title: @tr("外部编辑器与过滤排除规则");
+                                        subtitle: @tr("远程文件双击打开方式、外部自定义编辑器与同步忽略规则黑名单");
+                                        icon: @image-url("../../../assets/icons/file-text.svg");
+
+                                        SettingsRow {
+                                            title: @tr("远程文件双击打开方式 (Remote File Editor)");
+                                            subtitle: @tr("选择使用客户端内置轻量编辑器、系统默认程序关联或外部命令行程序");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for ed in [
+                                                        { id: "builtin", name: @tr("内置编辑器") },
+                                                        { id: "system", name: @tr("系统默认程序") },
+                                                        { id: "custom", name: @tr("自定义程序") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-sftp-editor-mode == ed.id ? AppTheme.accent : ed-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        ed-t := TouchArea {
+                                                            clicked => { SettingsBridge.setting-sftp-editor-mode = ed.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: ed.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-sftp-editor-mode == ed.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-sftp-editor-mode == ed.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        if SettingsBridge.setting-sftp-editor-mode == "custom": SettingsRow {
+                                            title: @tr("自定义外部编辑器程序路径 (Editor Executable)");
+                                            subtitle: @tr("输入外部程序执行命令 (如 code, notepad++, subl 或完整路径)");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> SettingsBridge.setting-sftp-custom-editor;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("传输忽略规则黑名单 (Exclusion Patterns)");
+                                            subtitle: @tr("目录传输时忽略的文件或文件夹 (逗号分隔，如 .git, node_modules, *.tmp)");
+                                            show-border: false;
+
+                                            Rectangle {
+                                                width: 320px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> SettingsBridge.setting-sftp-exclude-patterns;
+                                                    font-size: 10px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
+                                        }
+                                    }
+                                }

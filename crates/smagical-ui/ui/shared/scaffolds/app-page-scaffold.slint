@@ -1,0 +1,79 @@
+﻿import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 鍏ㄦ櫙鍗曟爮/娴佸紡宸ヤ綔鍙伴€氱敤鑴氭墜鏋?(App Page Scaffold)
+/// 鍏ㄨ嚜鍔ㄩ€傞厤鍏ㄥ眬澹佺焊閫忓厜涓庤嚜閫傚簲甯冨眬锛屼换浣曟湭鏉ユ柊澧為〉闈㈠彲鐩存帴濂楃敤
+export component AppPageScaffold inherits Rectangle {
+    in property <string> page-title: "";
+    in property <string> page-subtitle: "";
+    in property <image> page-icon;
+    in property <bool> has-page-icon: false;
+    in property <bool> show-header: true;
+    in property <length> outer-padding: 14px;
+    in property <length> content-spacing: 12px;
+
+    // 鑷€傚簲澹佺焊閫忓厜锛氬湪 global 澹佺焊涓嬭嚜鍔ㄩ€忓簳
+    background: AppTheme.window-background;
+
+    VerticalLayout {
+        padding: root.outer-padding;
+        spacing: root.content-spacing;
+
+        // 1. 椤堕儴 Header 鎮诞鎿嶄綔鏍?        if root.show-header: Rectangle {
+            height: 48px;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+
+            HorizontalLayout {
+                padding-left: 16px;
+                padding-right: 16px;
+                alignment: space-between;
+
+                // 宸︿晶鏍囬鍖?                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: start;
+
+                    if root.has-page-icon: Rectangle {
+                        width: 20px;
+                        height: 20px;
+                        y: (parent.height - self.height) / 2;
+                        Image {
+                            source: root.page-icon;
+                            width: 100%;
+                            height: 100%;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+
+                        Text {
+                            text: root.page-title;
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+
+                        if root.page-subtitle != "": Text {
+                            text: root.page-subtitle;
+                            font-size: 10px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 涓ぎ涓诲伐浣滃彴鍖哄煙
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+            background: transparent;
+        }
+    }
+}

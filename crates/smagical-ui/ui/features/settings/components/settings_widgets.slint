@@ -1,0 +1,684 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { ScrollView } from "std-widgets.slint";
+import { AppSwitch } from "../../../shared/base/app-switch.slint";
+
+/// 标准扁平开关组件 (重定向至 AppSwitch)
+export component SettingsSwitch inherits AppSwitch {}
+
+/// 设置页面分类导航按钮 (Category Nav Button)
+export component CategoryNavButton inherits Rectangle {
+    in property <string> text: "";
+    in property <image> icon;
+    in property <bool> is-active: false;
+    in property <string> badge-text: "";
+    in property <bool> show-dot: false;
+    callback clicked();
+
+    height: 38px;
+    border-radius: 8px;
+    background: root.is-active ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(25%) : AppTheme.accent) :
+                btn-touch.has-hover ? (AppTheme.is-global-wallpaper ? AppTheme.hover-background.transparentize(30%) : AppTheme.hover-background) : transparent;
+
+    animate background { duration: 120ms; }
+
+    btn-touch := TouchArea {
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+
+    HorizontalLayout {
+        padding-left: 14px;
+        padding-right: 14px;
+        spacing: 12px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            spacing: 10px;
+            alignment: start;
+
+            VerticalLayout {
+                alignment: center;
+                width: 16px;
+                Image {
+                    source: root.icon;
+                    width: 16px;
+                    height: 16px;
+                    image-fit: contain;
+                    colorize: root.is-active ? #ffffff :
+                              btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.text;
+                    font-size: 13px;
+                    font-weight: root.is-active ? 600 : 500;
+                    color: root.is-active ? #ffffff :
+                           btn-touch.has-hover ? AppTheme.foreground : AppTheme.foreground.transparentize(15%);
+                }
+            }
+        }
+
+        if root.badge-text != "": VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 18px;
+                border-radius: 9px;
+                background: root.is-active ? #ffffff30 : AppTheme.hover-background;
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    alignment: center;
+
+                    Text {
+                        text: root.badge-text;
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: root.is-active ? #ffffff : AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        if root.show-dot && root.badge-text == "": VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: root.is-active ? #ffffff : AppTheme.accent;
+            }
+        }
+    }
+}
+
+/// 标准单行设置项容器
+export component SettingsRow inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <bool> show-border: true;
+    in property <image> icon;
+    in property <bool> has-icon: false;
+
+    min-height: 48px;
+    background: transparent;
+
+    HorizontalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 18px;
+        padding-right: 18px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            alignment: start;
+            spacing: 10px;
+            horizontal-stretch: 1;
+
+            if root.has-icon || root.icon.width > 0: VerticalLayout {
+                alignment: center;
+                width: 16px;
+                Image {
+                    source: root.icon;
+                    width: 16px;
+                    height: 16px;
+                    image-fit: contain;
+                    colorize: AppTheme.accent;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 2px;
+                horizontal-stretch: 1;
+
+                Text {
+                    text: root.title;
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: AppTheme.foreground;
+                }
+
+                if root.subtitle != "": Text {
+                    text: root.subtitle;
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            @children
+        }
+    }
+
+    if root.show-border: Rectangle {
+        y: parent.height - 1px;
+        height: 1px;
+        width: 100%;
+        background: AppTheme.border.transparentize(65%);
+    }
+}
+
+/// 设置一级页面大标题
+export component SettingsPageHeader inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <image> icon;
+
+    background: transparent;
+
+    HorizontalLayout {
+        padding-top: 8px;
+        padding-bottom: 6px;
+        padding-left: 4px;
+        padding-right: 4px;
+        spacing: 12px;
+        alignment: start;
+
+        if root.icon.width > 0: VerticalLayout {
+            alignment: center;
+            width: 22px;
+
+            Image {
+                source: root.icon;
+                width: 22px;
+                height: 22px;
+                colorize: AppTheme.accent;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            spacing: 2px;
+
+            Text {
+                text: root.title;
+                font-size: 16px;
+                font-weight: 700;
+                color: AppTheme.foreground;
+            }
+            if root.subtitle != "": Text {
+                text: root.subtitle;
+                font-size: 11px;
+                color: AppTheme.secondary-foreground;
+            }
+        }
+    }
+}
+
+/// 设置二级业务包裹卡片
+export component SettingsSectionCard inherits Rectangle {
+    in property <string> title: "";
+    in property <string> subtitle: "";
+    in property <image> icon;
+    in property <bool> has-header: true;
+
+    background: AppTheme.is-global-wallpaper ? AppTheme.surface-background.transparentize(40%) : AppTheme.surface-background;
+    border-radius: 10px;
+    border-width: 1px;
+    border-color: AppTheme.border;
+
+    VerticalLayout {
+        alignment: start;
+        spacing: 0px;
+
+        if root.has-header: Rectangle {
+            height: 42px;
+            border-top-left-radius: 9px;
+            border-top-right-radius: 9px;
+            background: AppTheme.control-background.transparentize(50%);
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border.transparentize(60%);
+            }
+
+            HorizontalLayout {
+                padding-left: 18px;
+                padding-right: 18px;
+                spacing: 10px;
+                alignment: start;
+
+                if root.icon.width > 0: VerticalLayout {
+                    alignment: center;
+                    width: 15px;
+
+                    Image {
+                        source: root.icon;
+                        width: 15px;
+                        height: 15px;
+                        colorize: AppTheme.accent;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+
+                    Text {
+                        text: root.title;
+                        font-size: 13px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                    }
+                    if root.subtitle != "": Text {
+                        text: root.subtitle;
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                }
+            }
+        }
+
+        VerticalLayout {
+            padding: 0px;
+            spacing: 0px;
+            @children
+        }
+    }
+}
+
+/// 快捷键徽章组件 (Key Badge)
+export component KeyBadge inherits Rectangle {
+    in property <string> key-text: "";
+    in property <bool> is-highlight: false;
+
+    height: 22px;
+    min-width: 24px;
+    border-radius: 4px;
+    background: root.is-highlight ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+    border-width: 1px;
+    border-color: root.is-highlight ? AppTheme.accent : AppTheme.border;
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        alignment: center;
+        Text {
+            text: root.key-text;
+            font-size: 11px;
+            font-weight: 600;
+            color: root.is-highlight ? AppTheme.accent : AppTheme.foreground;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+}
+
+/// 语言下拉选择框组件
+export component LanguageDropdown inherits Rectangle {
+    in-out property <string> selected-lang: "zh-CN";
+    callback switch-language(string);
+
+    width: 140px;
+    height: 28px;
+    border-radius: AppTheme.radius-medium;
+    background: lang-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+    border-width: 1px;
+    border-color: lang-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        alignment: space-between;
+
+        Text {
+            text: root.selected-lang == "en-US" ? "English" : "简体中文";
+            font-size: 11px;
+            font-weight: 500;
+            color: AppTheme.foreground;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: "▼";
+            font-size: 8px;
+            color: AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+    }
+
+    lang-touch := TouchArea {
+        clicked => {
+            lang-popup.show();
+        }
+        mouse-cursor: pointer;
+    }
+
+    lang-popup := PopupWindow {
+        x: 0px;
+        y: root.height + 4px;
+        width: root.width;
+
+        Rectangle {
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 10px;
+            drop-shadow-color: #00000066;
+            drop-shadow-offset-y: 3px;
+
+            VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+
+                Rectangle {
+                    height: 26px;
+                    border-radius: AppTheme.radius-small;
+                    background: root.selected-lang == "zh-CN" ? AppTheme.accent.transparentize(80%) : (zh-opt.has-hover ? AppTheme.hover-background : transparent);
+
+                    zh-opt := TouchArea {
+                        clicked => {
+                            root.selected-lang = "zh-CN";
+                            root.switch-language("zh-CN");
+                            lang-popup.close();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: space-between;
+
+                        Text {
+                            text: "简体中文";
+                            font-size: 11px;
+                            color: root.selected-lang == "zh-CN" ? AppTheme.accent : AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+
+                        if root.selected-lang == "zh-CN": Text {
+                            text: "✓";
+                            font-size: 11px;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                Rectangle {
+                    height: 26px;
+                    border-radius: AppTheme.radius-small;
+                    background: root.selected-lang == "en-US" ? AppTheme.accent.transparentize(80%) : (en-opt.has-hover ? AppTheme.hover-background : transparent);
+
+                    en-opt := TouchArea {
+                        clicked => {
+                            root.selected-lang = "en-US";
+                            root.switch-language("en-US");
+                            lang-popup.close();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: space-between;
+
+                        Text {
+                            text: "English";
+                            font-size: 11px;
+                            color: root.selected-lang == "en-US" ? AppTheme.accent : AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+
+                        if root.selected-lang == "en-US": Text {
+                            text: "✓";
+                            font-size: 11px;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 渲染管线胶囊分段器
+export component PipelineSegmentedControl inherits Rectangle {
+    in-out property <string> selected-pipe: "winit-skia";
+    callback pipe-selected(string);
+
+    height: 30px;
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.control-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+
+    HorizontalLayout {
+        padding: 2px;
+        spacing: 2px;
+
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: AppTheme.radius-small;
+            background: root.selected-pipe == "winit-skia" ? AppTheme.surface-background : transparent;
+            border-width: root.selected-pipe == "winit-skia" ? 1px : 0px;
+            border-color: root.selected-pipe == "winit-skia" ? AppTheme.border : transparent;
+
+            TouchArea {
+                clicked => {
+                    root.selected-pipe = "winit-skia";
+                    root.pipe-selected("winit-skia");
+                }
+                mouse-cursor: pointer;
+            }
+
+            Text {
+                text: "Skia (GPU)";
+                font-size: 10px;
+                font-weight: root.selected-pipe == "winit-skia" ? 600 : 400;
+                color: root.selected-pipe == "winit-skia" ? AppTheme.foreground : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: AppTheme.radius-small;
+            background: root.selected-pipe == "winit-skia-opengl" ? AppTheme.surface-background : transparent;
+            border-width: root.selected-pipe == "winit-skia-opengl" ? 1px : 0px;
+            border-color: root.selected-pipe == "winit-skia-opengl" ? AppTheme.border : transparent;
+
+            TouchArea {
+                clicked => {
+                    root.selected-pipe = "winit-skia-opengl";
+                    root.pipe-selected("winit-skia-opengl");
+                }
+                mouse-cursor: pointer;
+            }
+
+            Text {
+                text: "OpenGL";
+                font-size: 10px;
+                font-weight: root.selected-pipe == "winit-skia-opengl" ? 600 : 400;
+                color: root.selected-pipe == "winit-skia-opengl" ? AppTheme.foreground : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: AppTheme.radius-small;
+            background: root.selected-pipe == "winit-femtovg" ? AppTheme.surface-background : transparent;
+            border-width: root.selected-pipe == "winit-femtovg" ? 1px : 0px;
+            border-color: root.selected-pipe == "winit-femtovg" ? AppTheme.border : transparent;
+
+            TouchArea {
+                clicked => {
+                    root.selected-pipe = "winit-femtovg";
+                    root.pipe-selected("winit-femtovg");
+                }
+                mouse-cursor: pointer;
+            }
+
+            Text {
+                text: "FemtoVG";
+                font-size: 10px;
+                font-weight: root.selected-pipe == "winit-femtovg" ? 600 : 400;
+                color: root.selected-pipe == "winit-femtovg" ? AppTheme.foreground : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+
+export component FontDropdown inherits Rectangle {
+    in-out property <string> selected-font: "系统默认 (System Default)";
+    in property <[string]> font-list: [];
+    in property <length> popup-max-height: 180px;
+    callback font-selected(string);
+
+    pure function is-font-selected(sel: string, cur: string) -> bool {
+        if sel == cur {
+            return true;
+        }
+        if (sel == "" || sel == "系统默认" || sel == "System Default" || sel == "default" || sel == "系统默认 (System Default)") &&
+           (cur == "" || cur == "系统默认" || cur == "System Default" || cur == "default" || cur == "系统默认 (System Default)") {
+            return true;
+        }
+        return false;
+    }
+
+    width: 220px;
+    height: 28px;
+    border-radius: AppTheme.radius-medium;
+    background: font-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+    border-width: 1px;
+    border-color: font-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        alignment: space-between;
+
+        Text {
+            text: (root.selected-font == "" || root.selected-font == "系统默认" || root.selected-font == "default") ? "系统默认 (System Default)" : root.selected-font;
+            font-size: 11px;
+            font-family: (root.selected-font == "系统默认 (System Default)" || root.selected-font == "系统默认" || root.selected-font == "") ? "" : root.selected-font;
+            font-weight: 500;
+            color: AppTheme.foreground;
+            vertical-alignment: center;
+            overflow: elide;
+            horizontal-stretch: 1;
+        }
+
+        Rectangle {
+            width: 12px;
+            Text {
+                text: "▼";
+                font-size: 8px;
+                color: AppTheme.secondary-foreground;
+                vertical-alignment: center;
+                horizontal-alignment: center;
+            }
+        }
+    }
+
+    font-touch := TouchArea {
+        clicked => {
+            font-popup.show();
+        }
+        mouse-cursor: pointer;
+    }
+
+    font-popup := PopupWindow {
+        x: 0px;
+        y: root.height + 4px;
+        width: root.width;
+        height: Math.min(180px, root.font-list.length * 30px + 10px);
+        close-policy: close-on-click-outside;
+
+        Rectangle {
+            width: root.width;
+            height: parent.height;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000099;
+            drop-shadow-offset-y: 4px;
+            clip: true;
+
+            ScrollView {
+                width: 100%;
+                height: 100%;
+
+                VerticalLayout {
+                    alignment: start;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    padding-left: 4px;
+                    padding-right: 12px;
+                    spacing: 2px;
+
+                    for f in root.font-list: Rectangle {
+                        height: 28px;
+                        border-radius: AppTheme.radius-small;
+                        background: is-font-selected(root.selected-font, f) ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
+
+                        f-opt := TouchArea {
+                            scroll-event(event) => {
+                                reject
+                            }
+                            clicked => {
+                                root.selected-font = f;
+                                root.font-selected(f);
+                                font-popup.close();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: space-between;
+
+                            Text {
+                                text: f;
+                                font-size: 11px;
+                                font-family: (f == "系统默认 (System Default)" || f == "系统默认") ? "" : f;
+                                color: is-font-selected(root.selected-font, f) ? AppTheme.accent : AppTheme.foreground;
+                                font-weight: is-font-selected(root.selected-font, f) ? 700 : 400;
+                                vertical-alignment: center;
+                                overflow: elide;
+                                horizontal-stretch: 1;
+                            }
+
+                            if is-font-selected(root.selected-font, f): Rectangle {
+                                width: 14px;
+                                Image {
+                                    source: @image-url("../../../assets/icons/check.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.accent;
+                                    image-fit: contain;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+

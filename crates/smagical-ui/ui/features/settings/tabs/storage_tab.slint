@@ -1,0 +1,656 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge, SettingSnapshotItem } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+} from "../components/settings_widgets.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+
+                                export component SettingsStorageTab inherits VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("数据备份、跨工具迁移与多端云同步");
+                                        subtitle: @tr("本地全量加密备份/还原、多端云同步 (WebDAV / Amazon S3 / GitHub Gist / 自建服务器) 与配置快照历史");
+                                        icon: @image-url("../../../assets/icons/archive.svg");
+                                    }
+
+                                    // 卡片 1: 本地全量加密备份与恢复
+                                    SettingsSectionCard {
+                                        title: @tr("本地全量加密备份与快速还原");
+                                        subtitle: @tr("导出或导入所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则");
+                                        icon: @image-url("../../../assets/icons/archive.svg");
+
+                                        SettingsRow {
+                                            title: @tr("⤓ 导出全量加密备份文件 (.smalux / .json)");
+                                            subtitle: @tr("打包所有资产与偏好设置，数据经客户端端到端高强度加密保护");
+
+                                            AppButton {
+                                                text: @tr("⤓ 立即导出备份包");
+                                                variant: "primary";
+                                                clicked => { SettingsBridge.export-backup-archive(true); }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("⤒ 从本地加密备份包还原资产 (Restore Backup)");
+                                            subtitle: @tr("选择本机已导出的 .smalux 备份文件，输入解密口令无损恢复全部资产");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("⤒ 选择文件还原...");
+                                                variant: "secondary";
+                                                clicked => { SettingsBridge.import-external-file(); }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 2: 多端多协议云同步矩阵 (WebDAV / S3 / Gist / 自建服务器)
+                                    SettingsSectionCard {
+                                        title: @tr("多端多协议云同步矩阵 (Cloud Sync Matrix)");
+                                        subtitle: @tr("支持 WebDAV (坚果云/NAS)、Amazon S3 兼容对象存储、GitHub Gist 以及自建同步服务");
+                                        icon: @image-url("../../../assets/icons/server.svg");
+
+                                        // 协议切换选择器
+                                        SettingsRow {
+                                            title: @tr("云同步后端协议 (Cloud Sync Backend)");
+                                            subtitle: @tr("选择用于存储和同步资产数据的远端提供商或自建服务");
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for bk in [
+                                                        { id: "off", name: @tr("关闭云同步") },
+                                                        { id: "webdav", name: "WebDAV" },
+                                                        { id: "s3", name: "Amazon S3" },
+                                                        { id: "gist", name: "GitHub Gist" },
+                                                        { id: "custom", name: @tr("自建备份服务 ★") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-cloud-sync-backend == bk.id ? AppTheme.accent : bk-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        bk-t := TouchArea {
+                                                            clicked => { SettingsBridge.setting-cloud-sync-backend = bk.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: bk.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-cloud-sync-backend == bk.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-cloud-sync-backend == bk.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // WebDAV 配置项
+                                        if SettingsBridge.setting-cloud-sync-backend == "webdav": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("WebDAV 服务器地址 (Server URL)");
+                                                subtitle: @tr("如 https://dav.jianguoyun.com/dav/ 或群晖 NAS WebDAV 端点");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-webdav-url;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("WebDAV 账户名 (Username)");
+                                                subtitle: @tr("登录 WebDAV 服务的用户名或邮箱");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-webdav-user;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("WebDAV 访问密码 / 应用令牌 (App Password)");
+                                                subtitle: @tr("建议使用应用专用独立密码 (App Specific Password)");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-webdav-pass;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("远程备份子目录 (Remote Directory)");
+                                                subtitle: @tr("在 WebDAV 根目录下存放备份的文件夹 (默认 /smalux_backup)");
+                                                Rectangle {
+                                                    width: 200px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-webdav-dir;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // S3 配置项
+                                        if SettingsBridge.setting-cloud-sync-backend == "s3": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("S3 Endpoint 节点地址 (Custom Endpoint)");
+                                                subtitle: @tr("留空为 AWS 标准 S3；MinIO / Cloudflare R2 / 阿里云 OSS 请填对应完整 URL");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-s3-endpoint;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("S3 存储桶名称 (Bucket Name)");
+                                                subtitle: @tr("用于存放加密备份的 S3 Bucket 名称");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-s3-bucket;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("Access Key ID");
+                                                subtitle: @tr("S3 访问密钥 ID");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-s3-key-id;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("Secret Access Key");
+                                                subtitle: @tr("S3 私密访问密钥");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-s3-access-key;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("存储区域 Region");
+                                                subtitle: @tr("S3 Bucket 所在地域 (如 us-east-1, auto, ap-northeast-1)");
+                                                Rectangle {
+                                                    width: 160px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-s3-region;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // GitHub Gist 配置项
+                                        if SettingsBridge.setting-cloud-sync-backend == "gist": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("GitHub 个人访问令牌 (Personal Access Token)");
+                                                subtitle: @tr("需具备 gist 权限的 GitHub PAT 访问令牌 (ghp_xxx)");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-gist-token;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("Gist ID (可选)");
+                                                subtitle: @tr("已有私有 Gist 的哈希 ID；留空将在首次同步时自动创建专用私有 Gist");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-gist-id;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // 自建备份服务接口配置项 ★
+                                        if SettingsBridge.setting-cloud-sync-backend == "custom": VerticalLayout {
+                                            spacing: 10px;
+                                            padding-top: 6px;
+                                            padding-bottom: 6px;
+
+                                            SettingsRow {
+                                                title: @tr("自建备份服务器 API 端点 (Server Endpoint URL)");
+                                                subtitle: @tr("兼容 Smalux Backup API 标准 REST 端点 (如 https://api.smalux.internal/v1/sync)");
+                                                Rectangle {
+                                                    width: 320px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-custom-sync-url;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("认证令牌 (Bearer Auth Token / API Key)");
+                                                subtitle: @tr("自建备份服务端用于鉴权与租户隔离的 Bearer Token");
+                                                Rectangle {
+                                                    width: 240px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-custom-sync-token;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+
+                                            SettingsRow {
+                                                title: @tr("设备客户端标识 (Client Identifier)");
+                                                subtitle: @tr("当前设备的唯一标识符，用于服务端多端冲突检测 (如 desktop-win-01)");
+                                                Rectangle {
+                                                    width: 200px;
+                                                    height: 28px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+                                                    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                        text <=> SettingsBridge.setting-custom-sync-client-id;
+                                                        font-size: 11px;
+                                                        color: AppTheme.foreground;
+                                                        vertical-alignment: center;
+                                                    }
+        }
+    }
+                                                }
+                                            }
+                                        }
+
+                                        // 云同步操作按钮组
+                                        if SettingsBridge.setting-cloud-sync-backend != "off": SettingsRow {
+                                            title: @tr("云端同步操作与连通性检测");
+                                            subtitle: @tr("测试远端连接、立即双向同步或从云端拉取覆盖本地");
+                                            show-border: false;
+
+                                            HorizontalLayout {
+                                                spacing: 8px;
+                                                alignment: end;
+
+                                                AppButton {
+                                                    text: @tr("⚡ 测试连通性");
+                                                    variant: "secondary";
+                                                    clicked => { }
+                                                }
+
+                                                AppButton {
+                                                    text: @tr("☁️ 立即同步");
+                                                    variant: "primary";
+                                                    clicked => { }
+                                                }
+
+                                                AppButton {
+                                                    text: @tr("⬇️ 从云端拉取覆盖");
+                                                    variant: "secondary";
+                                                    clicked => { }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 3: 云同步安全与自动同步计划
+                                    if SettingsBridge.setting-cloud-sync-backend != "off": SettingsSectionCard {
+                                        title: @tr("端到端加密与自动同步策略");
+                                        subtitle: @tr("客户端全量加密主密钥 (E2EE) 与自动化定时增量同步");
+                                        icon: @image-url("../../../assets/icons/shield.svg");
+
+                                        SettingsRow {
+                                            title: @tr("端到端客户端加密口令 (E2EE Master Key)");
+                                            subtitle: @tr("数据在离开本地前全量 AES-256 加密，第三方对象存储或 Gist 无法读取明文");
+
+                                            Rectangle {
+                                                width: 240px;
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+                                                HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        TextInput {TextInput {
+                                                    text <=> SettingsBridge.setting-cloud-e2ee-pass;
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+        }
+    }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("自动同步调度频率 (Sync Schedule)");
+                                            subtitle: @tr("设置自动化定时后台增量同步计划");
+                                            show-border: false;
+
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: AppTheme.radius-medium;
+                                                background: AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding: 2px;
+                                                    spacing: 2px;
+
+                                                    for iv in [
+                                                        { id: "manual", name: @tr("手动同步") },
+                                                        { id: "startup", name: @tr("启动与关闭时") },
+                                                        { id: "1h", name: @tr("每小时") },
+                                                        { id: "daily", name: @tr("每天") }
+                                                    ]: Rectangle {
+                                                        border-radius: AppTheme.radius-small;
+                                                        background: SettingsBridge.setting-cloud-sync-interval == iv.id ? AppTheme.accent : iv-t.has-hover ? AppTheme.hover-background : transparent;
+                                                        animate background { duration: 120ms; }
+
+                                                        iv-t := TouchArea {
+                                                            clicked => { SettingsBridge.setting-cloud-sync-interval = iv.id; }
+                                                            mouse-cursor: pointer;
+                                                        }
+
+                                                        HorizontalLayout {
+                                                            padding-left: 8px;
+                                                            padding-right: 8px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: iv.name;
+                                                                font-size: 10px;
+                                                                font-weight: SettingsBridge.setting-cloud-sync-interval == iv.id ? 700 : 500;
+                                                                color: SettingsBridge.setting-cloud-sync-interval == iv.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 4: 外部配置资产导入与迁移
+                                    SettingsSectionCard {
+                                        title: @tr("外部配置资产导入与迁移");
+                                        subtitle: @tr("从本机系统 OpenSSH 或其他桌面终端软件批量导入资产");
+                                        icon: @image-url("../../../assets/icons/folder.svg");
+
+                                        SettingsRow {
+                                            title: @tr("📥 一键扫描并导入本机 ~/.ssh/config");
+                                            subtitle: @tr("自动解析本地 OpenSSH 配置文件，识别 Host 别名、IP 地址、端口与私钥 IdentityFile");
+
+                                            AppButton {
+                                                text: @tr("🔍 扫描并预览主机清单");
+                                                variant: "secondary";
+                                                clicked => { SettingsBridge.scan-and-import-openssh(); }
+                                            }
+                                        }
+
+                                        SettingsRow {
+                                            title: @tr("📥 从外部工具一键迁移 (Termius / Xshell / MobaXterm)");
+                                            subtitle: @tr("支持解析并批量导入从其他桌面终端软件导出的 .json、.tsv 或会话配置文件");
+                                            show-border: false;
+
+                                            AppButton {
+                                                text: @tr("📂 选择文件导入...");
+                                                variant: "secondary";
+                                                clicked => { SettingsBridge.import-external-file(); }
+                                            }
+                                        }
+                                    }
+
+                                    // 卡片 5: 本地配置自动快照历史
+                                    SettingsSectionCard {
+                                        title: @tr("本地配置自动快照历史");
+                                        subtitle: @tr("应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚");
+                                        icon: @image-url("../../../assets/icons/clock.svg");
+
+                                        SettingsRow {
+                                            title: @tr("🕒 本地最近自动配置快照");
+                                            subtitle: @tr("应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚");
+                                            show-border: false;
+
+                                            VerticalLayout {
+                                                width: 480px;
+                                                spacing: 6px;
+
+                                                for snap in SettingsBridge.snapshot-history: Rectangle {
+                                                    height: 34px;
+                                                    border-radius: AppTheme.radius-medium;
+                                                    background: AppTheme.control-background;
+                                                    border-width: 1px;
+                                                    border-color: AppTheme.border;
+
+                                                    HorizontalLayout {
+                                                        padding-left: 10px;
+                                                        padding-right: 10px;
+                                                        spacing: 12px;
+                                                        alignment: space-between;
+
+                                                        HorizontalLayout {
+                                                            spacing: 8px;
+                                                            alignment: center;
+                                                            Text { text: "• " + snap.timestamp; font-size: 10px; font-weight: 600; color: AppTheme.accent; }
+                                                            Text { text: snap.description; font-size: 10px; color: AppTheme.foreground; }
+                                                            Text { text: "(" + snap.host-count + " " + @tr("主机") + ", " + snap.cred-count + " " + @tr("凭据") + ")"; font-size: 9px; color: AppTheme.secondary-foreground; }
+                                                        }
+
+                                                        AppButton {
+                                                            text: @tr("↺ 回滚");
+                                                            variant: "secondary";
+                                                            clicked => { SettingsBridge.rollback-snapshot(snap.id); }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }

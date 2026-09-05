@@ -14,6 +14,26 @@ export { SnippetParamFieldData } from "components/snippet-run-modal.slint";
 export { QuickCmdData } from "views/right_drawers/snippet_tool_drawer.slint";
 export { ToastItemData } from "components/toast.slint";
 
+// 全局共享基础组件库模型与组件
+export { SegmentItemData } from "shared/base/app-segmented-control.slint";
+export { DropdownItemData } from "shared/base/app-dropdown.slint";
+
+// 领域状态单例总线
+export { SettingsBridge } from "features/settings/settings_bridge.slint";
+import { SettingsGeneralTab } from "features/settings/tabs/general_tab.slint";
+import { SettingsNetworkTab } from "features/settings/tabs/network_tab.slint";
+import { SettingsFilesTab } from "features/settings/tabs/files_tab.slint";
+import { SettingsKeybindingsTab } from "features/settings/tabs/keybindings_tab.slint";
+import { SettingsStorageTab } from "features/settings/tabs/storage_tab.slint";
+import { SettingsSecurityTab } from "features/settings/tabs/security_tab.slint";
+import { SettingsTerminalTab } from "features/settings/tabs/terminal_tab.slint";
+import { SettingsAppearanceTab } from "features/settings/tabs/appearance_tab.slint";
+
+import { AppModalScaffold } from "shared/scaffolds/app-modal-scaffold.slint";
+import { AppSwitch } from "shared/base/app-switch.slint";
+import { AppFormRow } from "shared/scaffolds/app-form-row.slint";
+import { AppSegmentedControl } from "shared/base/app-segmented-control.slint";
+import { AppDropdown } from "shared/base/app-dropdown.slint";
 
 // 基础组件
 import {

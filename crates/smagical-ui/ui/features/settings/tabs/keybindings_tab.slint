@@ -1,0 +1,36 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    KeyBadge,
+} from "../components/settings_widgets.slint";
+
+                                export component SettingsKeybindingsTab inherits VerticalLayout {
+                                    spacing: 16px;
+
+                                    SettingsPageHeader {
+                                        title: @tr("快捷键与全局键位映射");
+                                        subtitle: @tr("查看并自定义高频终端操作、多窗格分屏与命令面板的快捷操作");
+                                        icon: @image-url("../../../assets/icons/key.svg");
+                                    }
+
+                                    SettingsSectionCard {
+                                        title: @tr("全局快捷操作清单");
+                                        subtitle: @tr("常用会话切换、多窗格分屏、复制粘贴与开发者调试快捷键");
+                                        icon: @image-url("../../../assets/icons/key.svg");
+
+                                        for item in SettingsBridge.keybindings: SettingsRow {
+                                            title: item.action-name;
+                                            subtitle: item.category + " " + @tr("操作分类");
+
+                                            HorizontalLayout {
+                                                spacing: 6px;
+                                                KeyBadge { key-text: item.primary-key; }
+                                                if item.secondary-key != "": Text { text: "/"; font-size: 10px; color: AppTheme.disabled-foreground; vertical-alignment: center; }
+                                                if item.secondary-key != "": KeyBadge { key-text: item.secondary-key; }
+                                            }
+                                        }
+                                    }
+                                }

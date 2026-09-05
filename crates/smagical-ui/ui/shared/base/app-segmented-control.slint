@@ -1,0 +1,53 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+export struct SegmentItemData {
+    id: string,
+    label: string,
+}
+
+/// 标准统一滑动胶囊分段器 (App Segmented Control)
+export component AppSegmentedControl inherits Rectangle {
+    in property <[SegmentItemData]> items: [];
+    in-out property <string> active-id: "";
+    callback selected(string);
+
+    height: 32px;
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.control-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+    padding: 3px;
+
+    HorizontalLayout {
+        spacing: 3px;
+
+        for item[idx] in root.items: Rectangle {
+            horizontal-stretch: 1;
+            border-radius: AppTheme.radius-small;
+            background: root.active-id == item.id ? AppTheme.surface-background :
+                item-touch.has-hover ? AppTheme.hover-background : transparent;
+            border-width: root.active-id == item.id ? 1px : 0px;
+            border-color: root.active-id == item.id ? AppTheme.border : transparent;
+
+            animate background { duration: 120ms; }
+
+            item-touch := TouchArea {
+                clicked => {
+                    root.active-id = item.id;
+                    root.selected(item.id);
+                }
+                mouse-cursor: pointer;
+            }
+
+            Text {
+                text: item.label;
+                font-size: 11px;
+                font-weight: root.active-id == item.id ? 600 : 400;
+                color: root.active-id == item.id ? AppTheme.foreground :
+                    item-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

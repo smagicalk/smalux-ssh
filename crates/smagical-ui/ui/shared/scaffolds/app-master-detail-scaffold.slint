@@ -1,0 +1,38 @@
+﻿import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 鍙屾爮涓讳粠宸ヤ綔鍙伴€氱敤鑴氭墜鏋?(App Master-Detail Scaffold)
+/// 宸︿晶 Zone A 15% 浜氬厠鍔涘鑸?+ 鍙充晶 Zone B 95% 鎵庡疄鎮诞宸ヤ綔鍙?/// 浠讳綍鏈潵鏂板鐨勫弻鏍忕鐞嗕腑蹇冿紙濡傚鍣ㄣ€佹暟鎹簱銆佹彃浠跺競鍦猴級鍧囧彲寮€绠卞嵆鐢?export component AppMasterDetailScaffold inherits Rectangle {
+    in property <length> master-width: 300px;
+    in property <length> outer-padding: 10px;
+    in property <length> column-spacing: 10px;
+
+    // 鑷€傚簲澹佺焊閫忓厜锛氬湪 global 澹佺焊涓嬭嚜鍔ㄩ€忓簳
+    background: AppTheme.window-background;
+
+    HorizontalLayout {
+        padding: root.outer-padding;
+        spacing: root.column-spacing;
+
+        // 1. 宸︿晶 Master 瀵艰埅鍖?(Zone A: 15% 浜氬厠鍔涘井閫忓厜 + 浼橀泤鍦嗚)
+        Rectangle {
+            width: root.master-width;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+        }
+
+        // 2. 鍙充晶 Detail 鎮诞鎿嶄綔鍖?(Zone B: 95% 鎵庡疄闃茬湬鍏夐槻闇囧簳鑹?
+        Rectangle {
+            horizontal-stretch: 1;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000018;
+        }
+    }
+}

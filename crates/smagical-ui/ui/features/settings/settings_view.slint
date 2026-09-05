@@ -1,0 +1,351 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { ScrollView } from "std-widgets.slint";
+import { ThemeOption, ThemeRow } from "../../views/left_drawers/settings_drawer.slint";
+import {
+    SettingsBridge,
+    KeywordHighlightRule,
+    SettingKeybindingItem,
+    SettingSnapshotItem,
+} from "./settings_bridge.slint";
+
+import { CategoryNavButton } from "./components/settings_widgets.slint";
+import { KeywordRuleModal } from "./components/keyword_rule_modal.slint";
+import { MasterPasswordModal } from "./components/master_pwd_modal.slint";
+
+import { SettingsGeneralTab } from "./tabs/general_tab.slint";
+import { SettingsAppearanceTab } from "./tabs/appearance_tab.slint";
+import { SettingsTerminalTab } from "./tabs/terminal_tab.slint";
+import { SettingsNetworkTab } from "./tabs/network_tab.slint";
+import { SettingsFilesTab } from "./tabs/files_tab.slint";
+import { SettingsKeybindingsTab } from "./tabs/keybindings_tab.slint";
+import { SettingsStorageTab } from "./tabs/storage_tab.slint";
+import { SettingsSecurityTab } from "./tabs/security_tab.slint";
+
+export { SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule }
+export { ThemeOption, ThemeRow }
+
+/// 全屏偏好设置中心视图 (SettingsCenterView)
+/// 彻底轻量化容器：仅管理顶部操作栏、左侧分类导航与多态内容路由
+export component SettingsCenterView inherits Rectangle {
+    // -------------------------------------------------------------------------
+    // 向后兼容双向属性绑定 (直接与 SettingsBridge 单例对齐)
+    // -------------------------------------------------------------------------
+    in-out property <string> active-category: SettingsBridge.active-category;
+    in-out property <bool> is-dark-mode: true;
+    in-out property <bool> setting-debug-enabled: false;
+    in-out property <string> setting-wallpaper-mode: "none";
+    in-out property <float> setting-wallpaper-opacity: 0.2;
+    in-out property <float> setting-modal-opacity: 1.0;
+    in-out property <string> setting-close-action: "tray";
+    in-out property <bool> setting-confirm-close-tab: true;
+    in-out property <bool> setting-confirm-close-active: true;
+    in-out property <bool> setting-always-on-top: false;
+    in-out property <bool> setting-start-on-boot: false;
+    in-out property <string> active-rendering-pipeline: "winit-skia";
+    in-out property <string> current-theme-id: "builtin.ui.darcula";
+    in-out property <[string]> setting-wallpaper-list: [];
+    in-out property <string> setting-wallpaper-path: "";
+    in-out property <int> setting-wallpaper-active-index: 0;
+    in-out property <string> setting-wallpaper-slideshow: "none";
+    in-out property <string> setting-wallpaper-transition: "fade";
+    in-out property <string> setting-language: "zh-CN";
+    in-out property <string> setting-ui-font: "";
+    in-out property <string> setting-terminal-font: "JetBrains Mono";
+    in-out property <int> setting-terminal-font-size: 13;
+    in-out property <string> setting-cursor-style: "block";
+    in-out property <bool> setting-cursor-blink: true;
+    in-out property <int> setting-scrollback-lines: 10000;
+    in-out property <bool> setting-copy-on-select: false;
+    in-out property <bool> setting-paste-on-right-click: true;
+    in-out property <bool> setting-warn-multiline-paste: true;
+    in-out property <string> setting-bell-style: "visual";
+    in-out property <bool> setting-terminal-url-click: true;
+    in-out property <bool> setting-terminal-highlight-keywords: true;
+    in-out property <string> setting-terminal-custom-keywords: "";
+    in-out property <bool> flag-terminal-crt-shader: SettingsBridge.flag-terminal-crt-shader;
+    in-out property <bool> setting-terminal-crt: false;
+    in-out property <[KeywordHighlightRule]> terminal-keyword-rules: [];
+
+    in-out property <string> setting-global-proxy-mode: "direct";
+    in-out property <string> setting-global-proxy-server: "";
+    in-out property <bool> setting-global-proxy-auth: false;
+    in-out property <string> setting-global-proxy-user: "";
+    in-out property <string> setting-global-proxy-pass: "";
+    in-out property <int> setting-connect-timeout: 10;
+    in-out property <int> setting-keepalive-interval: 30;
+    in-out property <int> setting-keepalive-count-max: 3;
+    in-out property <string> setting-host-key-policy: "ask";
+    in-out property <bool> setting-tcp-nodelay: true;
+
+    in property <[ThemeOption]> themes: SettingsBridge.themes;
+    in property <[ThemeOption]> custom-themes: SettingsBridge.custom-themes;
+    in property <[ThemeOption]> dark-themes: SettingsBridge.dark-themes;
+    in property <[ThemeOption]> light-themes: SettingsBridge.light-themes;
+    in property <[ThemeRow]> custom-theme-rows: SettingsBridge.custom-theme-rows;
+    in property <[ThemeRow]> dark-theme-rows: SettingsBridge.dark-theme-rows;
+    in property <[ThemeRow]> light-theme-rows: SettingsBridge.light-theme-rows;
+    in property <int> custom-themes-count: SettingsBridge.custom-themes-count;
+    in property <int> dark-themes-count: SettingsBridge.dark-themes-count;
+    in property <int> light-themes-count: SettingsBridge.light-themes-count;
+    in property <[string]> available-ui-fonts: SettingsBridge.available-ui-fonts;
+
+    in-out property <float> color-picker-indicator-x: 90.0;
+    in-out property <float> color-picker-indicator-y: 90.0;
+    in-out property <float> color-picker-brightness: 1.0;
+    in property <brush> color-picker-hue-brush: SettingsBridge.color-picker-hue-brush;
+    in property <brush> color-picker-preview-brush: SettingsBridge.color-picker-preview-brush;
+    in-out property <string> color-picker-hex: "#EF4444";
+
+    // -------------------------------------------------------------------------
+    // 交互回调 (Callbacks)
+    // -------------------------------------------------------------------------
+    callback close-settings();
+    callback change-modal-opacity(float);
+    callback toggle-always-on-top(bool);
+    callback toggle-start-on-boot(bool);
+    callback toggle-confirm-close-tab(bool);
+    callback toggle-confirm-close-active(bool);
+    callback switch-rendering-pipeline(string);
+    callback switch-theme(string);
+    callback import-theme();
+    callback export-current-theme();
+    callback create-custom-theme();
+    callback delete-custom-theme(string);
+    callback add-wallpaper();
+    callback add-wallpaper-folder();
+    callback remove-wallpaper(int);
+    callback select-wallpaper(int);
+    callback set-wallpaper-slideshow(string, string);
+    callback toggle-dark-mode();
+    callback toggle-debug-enabled(bool);
+    callback change-terminal-font(string, int);
+    callback change-wallpaper(string, string, float);
+    callback export-backup-archive(bool);
+    callback scan-and-import-openssh();
+    callback import-external-file();
+    callback factory-reset-settings();
+    callback switch-language(string);
+    callback change-ui-font(string);
+    callback change-terminal-url-click(bool);
+    callback change-terminal-highlight-keywords(bool);
+    callback change-terminal-custom-keywords(string);
+    callback change-cursor-style(string);
+    callback change-cursor-blink(bool);
+    callback change-scrollback-lines(int);
+    callback change-bell-style(string);
+    callback toggle-terminal-crt(bool);
+    callback add-keyword-rule(string, string, string);
+    callback update-keyword-rule(string, string, string, string);
+    callback toggle-keyword-rule(string, bool);
+    callback delete-keyword-rule(string);
+    callback change-copy-on-select(bool);
+    callback change-paste-on-right-click(bool);
+    callback change-warn-multiline-paste(bool);
+    callback change-close-action(string);
+    callback change-global-proxy(string, string, bool, string, string);
+    callback change-network-handshake(int, int, int);
+    callback change-host-key-policy(string);
+    callback change-tcp-nodelay(bool);
+    callback color-wheel-coord-picked(float, float);
+    callback color-wheel-brightness-picked(float);
+    callback color-picker-hex-changed(string);
+    callback select-category(string);
+
+    // -------------------------------------------------------------------------
+    // 界面结构渲染 (Layout)
+    // -------------------------------------------------------------------------
+    background: AppTheme.window-background;
+
+    VerticalLayout {
+        spacing: 0px;
+
+        // 1. 顶部 Header 导航条 (54px)
+        Rectangle {
+            height: 54px;
+            background: AppTheme.panel-background;
+
+            HorizontalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                spacing: 16px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: center;
+
+                    Image {
+                        source: @image-url("../../assets/icons/settings.svg");
+                        width: 20px;
+                        height: 20px;
+                        colorize: AppTheme.accent;
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 1px;
+
+                        Text {
+                            text: @tr("偏好设置");
+                            font-size: 15px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+                        Text {
+                            text: @tr("自定义终端外观、网络连接、快捷键与全量数据备份策略");
+                            font-size: 10px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                    }
+                }
+
+                // 右侧关闭按钮
+                Rectangle {
+                    width: 32px;
+                    height: 32px;
+                    border-radius: 6px;
+                    background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    close-touch := TouchArea {
+                        clicked => {
+                            root.close-settings();
+                            SettingsBridge.close-settings();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/window-close.svg");
+                        width: 16px;
+                        height: 16px;
+                        colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+        }
+
+        // 2. 主体双栏区域
+        HorizontalLayout {
+            spacing: 0px;
+
+            // 2.1 左侧分类导航菜单栏 (220px)
+            Rectangle {
+                width: 220px;
+                background: AppTheme.panel-background;
+
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    height: 100%;
+                    background: AppTheme.border;
+                }
+
+                ScrollView {
+                    VerticalLayout {
+                        padding-top: 12px;
+                        padding-bottom: 12px;
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 3px;
+
+                        CategoryNavButton {
+                            text: @tr("通用与窗口");
+                            icon: @image-url("../../assets/icons/home.svg");
+                            is-active: SettingsBridge.active-category == "general";
+                            clicked => { SettingsBridge.active-category = "general"; root.select-category("general"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("外观与视效");
+                            icon: @image-url("../../assets/icons/sun.svg");
+                            is-active: SettingsBridge.active-category == "appearance";
+                            clicked => { SettingsBridge.active-category = "appearance"; root.select-category("appearance"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("终端首选项");
+                            icon: @image-url("../../assets/icons/terminal.svg");
+                            is-active: SettingsBridge.active-category == "terminal";
+                            clicked => { SettingsBridge.active-category = "terminal"; root.select-category("terminal"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("网络连接与代理");
+                            icon: @image-url("../../assets/icons/tunnel.svg");
+                            is-active: SettingsBridge.active-category == "network";
+                            clicked => { SettingsBridge.active-category = "network"; root.select-category("network"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("传输与文件管理");
+                            icon: @image-url("../../assets/icons/folder.svg");
+                            is-active: SettingsBridge.active-category == "files";
+                            clicked => { SettingsBridge.active-category = "files"; root.select-category("files"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("快捷键绑定");
+                            icon: @image-url("../../assets/icons/key.svg");
+                            is-active: SettingsBridge.active-category == "shortcuts";
+                            clicked => { SettingsBridge.active-category = "shortcuts"; root.select-category("shortcuts"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("数据备份与同步");
+                            icon: @image-url("../../assets/icons/archive.svg");
+                            is-active: SettingsBridge.active-category == "backup";
+                            show-dot: true;
+                            clicked => { SettingsBridge.active-category = "backup"; root.select-category("backup"); }
+                        }
+
+                        CategoryNavButton {
+                            text: @tr("安全与高级诊断");
+                            icon: @image-url("../../assets/icons/shield.svg");
+                            is-active: SettingsBridge.active-category == "security";
+                            clicked => { SettingsBridge.active-category = "security"; root.select-category("security"); }
+                        }
+                    }
+                }
+            }
+
+            // 2.2 右侧设置内容流 (100% 占满)
+            Rectangle {
+                horizontal-stretch: 1;
+                background: transparent;
+
+                ScrollView {
+                    VerticalLayout {
+                        alignment: start;
+                        padding-top: 14px;
+                        padding-bottom: 32px;
+                        padding-left: 24px;
+                        padding-right: 28px;
+                        spacing: 0px;
+
+                        if SettingsBridge.active-category == "general": SettingsGeneralTab {}
+                        if SettingsBridge.active-category == "appearance": SettingsAppearanceTab {}
+                        if SettingsBridge.active-category == "terminal": SettingsTerminalTab {}
+                        if SettingsBridge.active-category == "network": SettingsNetworkTab {}
+                        if SettingsBridge.active-category == "files": SettingsFilesTab {}
+                        if SettingsBridge.active-category == "shortcuts": SettingsKeybindingsTab {}
+                        if SettingsBridge.active-category == "backup": SettingsStorageTab {}
+                        if SettingsBridge.active-category == "security": SettingsSecurityTab {}
+                    }
+                }
+            }
+        }
+    }
+
+    // 3. 全屏模态弹窗 (Modals)
+    KeywordRuleModal {}
+    MasterPasswordModal {}
+}

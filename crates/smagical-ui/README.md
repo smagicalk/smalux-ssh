@@ -4,7 +4,7 @@
 
 ---
 
-## 📁 目录与模块架构
+## 📁 目录与模块架构 (特性内聚 Feature-First 架构)
 
 ```text
 crates/smagical-ui/
@@ -13,41 +13,63 @@ crates/smagical-ui/
 ├── extract-translations.ps1    # i18n 提取脚本
 ├── messages.po                 # gettext 多语言文案目录
 ├── src/
-│   ├── lib.rs                  # 桌面应用入口 (run) 与 Slint 全局回调路由
+│   ├── lib.rs                  # 桌面应用入口 (run) 与顶层装配
 │   ├── main.rs                 # 可执行二进制启动入口
 │   ├── tree_model.rs           # 树形视图纯函数操作层 (RawTreeNode, 排序, 拖拽迁移, 搜索过滤)
 │   ├── session.rs              # 终端会话管理与 Slint UI 状态同步
 │   ├── debug_ui.rs             # Tracing 日志面板数据桥接
 │   ├── local_shells.rs         # 跨平台本地 Shell 环境探测与缓存引擎
-│   ├── right_panel_service.rs  # 右侧工具抽屉服务
-│   ├── handlers/               # 领域交互回调分离模块
-│   │   ├── mod.rs              # AppContext 共享上下文定义
-│   │   ├── file_handlers.rs    # 双盘文件管理与 SFTP 传输交互处理器
-│   │   ├── history_handlers.rs # 历史中心交互处理器
-│   │   ├── host_handlers.rs    # 主机管理交互处理器
-│   │   ├── session_handlers.rs # 终端会话交互处理器
-│   │   └── window_handlers.rs  # 窗口生命周期与抽屉交互处理器
+│   ├── terminal/               # 终端渲染引擎与分屏模型 (renderer, pty, split_tree)
+│   ├── handlers/               # 1:1 镜像领域服务集群 (无污染解耦绑定)
+│   │   ├── settings/           # 偏好设置、壁纸轮播、终端排版与多端云同步
+│   │   ├── files/              # 本地磁盘 IO、远程 SFTP 与异步传输队列
+│   │   ├── tunnels/            # 端口转发、Bastion 跳板与代理节点健康监控
+│   │   ├── credentials/        # SSH 密钥对生成、金库加密存取与密码生成
+│   │   ├── snippets/           # 脚本层级树与参数化模板动态执行
+│   │   ├── session_handlers.rs # 终端会话生命周期
+│   │   ├── host_handlers.rs    # 主机与分组资产
+│   │   ├── history_handlers.rs # 连接历史记录与快照
+│   │   ├── theme_handlers.rs   # 动态主题切换与主题设计工坊
+│   │   └── window_handlers.rs  # 无边框窗口与托盘
 │   └── theme/                  # Slint 主题注册、内置资源加载与动态应用
 └── ui/
-    ├── main.slint              # 顶层主窗口组件 (AppWindow)
-    ├── assets/                 # 统一风格 SVG 矢量图标库
-    ├── components/             # 通用基础原子 UI 组件库 (context-menu, modals, tree)
-    ├── themes/                 # 主题样式规范与 TOML 预设配置
-    └── views/                  # 各区域业务视图组件 (file_explorer_view, history, terminal)
+    ├── main.slint              # 顶层主窗口路由器 (仅 ~550 行，调度主视口)
+    ├── assets/                 # 统一风格 SVG 矢量图标与字体资源
+    ├── themes/                 # 全局设计 Token 与调色板单例 (AppTheme)
+    ├── shared/                 # 🧱 全工程通用共享组件库 (严禁包含业务逻辑)
+    │   ├── base/               # 原子控件 (AppButton, AppFormInput, AppSwitch, AppDropdown, AppSegmentedControl)
+    │   ├── scaffolds/          # 通用脚手架 (AppModalScaffold, AppMasterDetailScaffold, AppFormRow)
+    │   └── feedback/           # 全局反馈 (ToastContainer, MessageDialog, ContextMenuContainer)
+    └── features/               # 📦 按业务特性严格内聚的领域包 (自包含页面、专属表单、专属弹窗与桥接单例)
+        ├── settings/           # 设置中心 (settings_view.slint, settings_bridge.slint, 8 大独立 Tab)
+        ├── file_manager/       # 文件管理 (双盘容器, 统一单盘 FileBrowserPane, 传输队列抽屉, 专属弹窗)
+        ├── tunnels/            # 网络隧道 (隧道主页, 转发/跳板/代理多态表单, 拓扑卡片, 专属弹窗)
+        ├── credentials/        # 安全凭据 (凭据主页, 密钥/密码表单, 专属抽屉)
+        ├── snippets/           # 代码片段 (片段主页, 参数运行弹窗, 专属抽屉)
+        ├── terminal/           # 终端视口 (网格视口, TabBar, 状态栏, 新建会话弹窗)
+        └── hosts/              # 主机资产 (主机树抽屉, 树选择器, 新建分组弹窗)
 ```
 
 ---
 
-## 🧩 Rust 端核心模块解耦设计
+## 🧩 架构核心：领域桥接单例 (Slint Domain Bridge)
 
-| 模块 | 核心职责 | 特性与设计说明 |
-| :--- | :--- | :--- |
-| [`lib.rs`](src/lib.rs) | 组装层与事件路由 | 负责 Slint 窗口实例化、状态机装配与 UI 事件分发，代码保持高度轻量与可读。 |
-| [`tree_model.rs`](src/tree_model.rs) | 树形纯函数模型 | 定义 UI 专用内部模型 `RawTreeNode`。包含 `build_raw_tree_from_storage`（直属子项计数）、`move_and_reorder_raw_node`（防循环引用与四模式调序）、`build_visible_tree_nodes` 等无副作用纯函数。 |
-| [`session.rs`](src/session.rs) | 会话与 Tab 状态同步 | 管理 `TerminalSessionInfo`，负责多终端 Tab 的创建、激活、切换与关闭状态同步。 |
-| [`handlers/file_handlers.rs`](src/handlers/file_handlers.rs) | 双盘文件与传输调度 | 负责双栏 Tab 调度、本地磁盘遍历与文件操作、轻量 Tab 重排同步 (`sync_local_tabs_only` / `sync_remote_tabs_only`)、右键上下文操作与拖拽传输任务构建。 |
-| [`debug_ui.rs`](src/debug_ui.rs) | 调试日志同步 | 桥接 `smagical-debug` 内存环形缓冲区至 Slint 调试抽屉模型。 |
-| [`local_shells.rs`](src/local_shells.rs) | 跨平台本地 Shell 探测 | 启动时一次性扫描系统中的 PowerShell、WSL、Git Bash、CMD、Bash、Zsh 等终端并全局缓存，杜绝重复磁盘 I/O。 |
+为了彻底解决 Slint 中由属性跨层传递导致的“属性穿透爆炸 (Props Drilling)”，全工程引入领域桥接单例模式：
+
+```slint
+// ui/features/settings/settings_bridge.slint
+export global SettingsBridge {
+    in-out property <string> active-category: "general";
+    in-out property <string> setting-ui-font: "";
+    in-out property <int> setting-scrollback-lines: 10000;
+    // ...各领域专属状态
+    callback switch-theme(string);
+    callback export-backup-archive(bool);
+}
+```
+
+- **UI 内部解耦**：子 Tab 与表单组件直接访问 `SettingsBridge`，主视图无需传递数十个属性，`main.slint` 彻底消除穿透绑定；
+- **Rust 后端解耦**：Handler 闭包通过 `window.global::<SettingsBridge>().on_switch_theme(...)` 挂载，与 `AppWindow` 解耦。
 
 ---
 
