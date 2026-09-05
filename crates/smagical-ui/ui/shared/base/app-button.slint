@@ -9,16 +9,20 @@ export component AppButton inherits Rectangle {
     in property <length> icon-size: 11px;
     /// 按钮变体类型: "primary" | "secondary" | "outline" | "ghost" | "danger"
     in property <string> variant: "secondary";
+    /// 按钮尺寸: "sm" | "md" | "lg"
+    in property <string> size: "md";
     in property <bool> enabled: true;
-    in property <length> font-size: 11px;
+    in property <length> font-size: root.size == "sm" ? 10px : root.size == "lg" ? 12px : 11px;
 
     callback clicked();
 
-    min-width: 64px;
-    height: 30px;
+    min-width: root.size == "sm" ? 48px : root.size == "lg" ? 80px : 64px;
+    height: root.size == "sm" ? 24px : root.size == "lg" ? 36px : 30px;
     border-radius: AppTheme.radius-medium;
     border-width: (root.variant == "outline" || root.variant == "secondary") ? 1px : 0px;
-    border-color: (root.variant == "outline" || root.variant == "secondary") ? AppTheme.border : transparent;
+    border-color: !root.enabled ? transparent :
+        (root.variant == "outline" || root.variant == "secondary") ?
+            (btn-touch.has-hover ? AppTheme.accent : AppTheme.border) : transparent;
 
     background: !root.enabled ? AppTheme.control-background.transparentize(50%) :
         root.variant == "primary" ? (btn-touch.pressed ? AppTheme.accent.darker(15%) : btn-touch.has-hover ? AppTheme.accent.darker(8%) : (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(15%) : AppTheme.accent)) :
@@ -27,8 +31,8 @@ export component AppButton inherits Rectangle {
         root.variant == "ghost" ? (btn-touch.pressed ? AppTheme.hover-background.darker(10%) : btn-touch.has-hover ? AppTheme.hover-background : transparent) :
         (btn-touch.pressed ? AppTheme.hover-background.darker(10%) : btn-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background);
 
-
     animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
 
     btn-touch := TouchArea {
         enabled: root.enabled;
@@ -39,16 +43,16 @@ export component AppButton inherits Rectangle {
     HorizontalLayout {
         alignment: center;
         spacing: 6px;
-        padding-left: 10px;
-        padding-right: 10px;
+        padding-left: root.size == "sm" ? 6px : root.size == "lg" ? 14px : 10px;
+        padding-right: root.size == "sm" ? 6px : root.size == "lg" ? 14px : 10px;
 
         if root.has-icon: Image {
             source: root.icon;
-            width: root.icon-size;
-            height: root.icon-size;
+            width: root.size == "sm" ? 10px : root.icon-size;
+            height: root.size == "sm" ? 10px : root.icon-size;
             image-fit: contain;
             colorize: (root.variant == "primary" || root.variant == "danger") ? AppTheme.selected-foreground :
-                btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                btn-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
             y: (parent.height - self.height) / 2;
         }
 
@@ -58,7 +62,7 @@ export component AppButton inherits Rectangle {
             font-weight: (root.variant == "primary" || root.variant == "danger") ? 600 : 500;
             color: !root.enabled ? AppTheme.disabled-foreground :
                 (root.variant == "primary" || root.variant == "danger") ? AppTheme.selected-foreground :
-                btn-touch.has-hover ? AppTheme.foreground : AppTheme.foreground;
+                btn-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
             vertical-alignment: center;
         }
     }

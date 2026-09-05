@@ -605,7 +605,7 @@ export component FontDropdown inherits Rectangle {
         height: Math.min(180px, root.font-list.length * 30px + 10px);
         close-policy: close-on-click-outside;
 
-        Rectangle {
+        font-box := Rectangle {
             width: root.width;
             height: parent.height;
             border-radius: AppTheme.radius-medium;
@@ -617,68 +617,86 @@ export component FontDropdown inherits Rectangle {
             drop-shadow-offset-y: 4px;
             clip: true;
 
-            ScrollView {
-                width: 100%;
-                height: 100%;
+            property <length> total-height: root.font-list.length * 30px + 8px;
+            property <length> min-scroll: Math.min(0px, self.height - total-height);
+            property <length> scroll-offset: 0px;
 
-                VerticalLayout {
-                    alignment: start;
-                    padding-top: 4px;
-                    padding-bottom: 4px;
-                    padding-left: 4px;
-                    padding-right: 12px;
-                    spacing: 2px;
+            // 背景滚轮捕获与冒泡拦截
+            TouchArea {
+                scroll-event(event) => {
+                    font-box.scroll-offset = Math.min(0px, Math.max(font-box.min-scroll, font-box.scroll-offset + event.delta-y));
+                    accept
+                }
+            }
 
-                    for f in root.font-list: Rectangle {
-                        height: 28px;
-                        border-radius: AppTheme.radius-small;
-                        background: is-font-selected(root.selected-font, f) ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
+            VerticalLayout {
+                y: font-box.scroll-offset;
+                alignment: start;
+                padding-top: 4px;
+                padding-bottom: 4px;
+                padding-left: 4px;
+                padding-right: 6px;
+                spacing: 2px;
 
-                        f-opt := TouchArea {
-                            scroll-event(event) => {
-                                reject
-                            }
-                            clicked => {
-                                root.selected-font = f;
-                                root.font-selected(f);
-                                font-popup.close();
-                            }
-                            mouse-cursor: pointer;
+                for f in root.font-list: Rectangle {
+                    height: 28px;
+                    border-radius: AppTheme.radius-small;
+                    background: is-font-selected(root.selected-font, f) ? AppTheme.accent.transparentize(80%) : (f-opt.has-hover ? AppTheme.hover-background : transparent);
+
+                    f-opt := TouchArea {
+                        scroll-event(event) => {
+                            font-box.scroll-offset = Math.min(0px, Math.max(font-box.min-scroll, font-box.scroll-offset + event.delta-y));
+                            accept
+                        }
+                        clicked => {
+                            root.selected-font = f;
+                            root.font-selected(f);
+                            font-popup.close();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: space-between;
+
+                        Text {
+                            text: f;
+                            font-size: 11px;
+                            font-family: (f == "系统默认 (System Default)" || f == "系统默认") ? "" : f;
+                            color: is-font-selected(root.selected-font, f) ? AppTheme.accent : AppTheme.foreground;
+                            font-weight: is-font-selected(root.selected-font, f) ? 700 : 400;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
                         }
 
-                        HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            alignment: space-between;
-
-                            Text {
-                                text: f;
-                                font-size: 11px;
-                                font-family: (f == "系统默认 (System Default)" || f == "系统默认") ? "" : f;
-                                color: is-font-selected(root.selected-font, f) ? AppTheme.accent : AppTheme.foreground;
-                                font-weight: is-font-selected(root.selected-font, f) ? 700 : 400;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
-                            }
-
-                            if is-font-selected(root.selected-font, f): Rectangle {
-                                width: 14px;
-                                Image {
-                                    source: @image-url("../../../assets/icons/check.svg");
-                                    width: 12px;
-                                    height: 12px;
-                                    colorize: AppTheme.accent;
-                                    image-fit: contain;
-                                    x: (parent.width - self.width) / 2;
-                                    y: (parent.height - self.height) / 2;
-                                }
+                        if is-font-selected(root.selected-font, f): Rectangle {
+                            width: 14px;
+                            Image {
+                                source: @image-url("../../../assets/icons/check.svg");
+                                width: 12px;
+                                height: 12px;
+                                colorize: AppTheme.accent;
+                                image-fit: contain;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
                             }
                         }
                     }
                 }
             }
+
+            // 紧凑滚动条指示器
+            if font-box.total-height > font-box.height: Rectangle {
+                x: parent.width - 4px;
+                y: (-font-box.scroll-offset / font-box.total-height) * font-box.height;
+                width: 3px;
+                height: Math.max(16px, (font-box.height / font-box.total-height) * font-box.height);
+                border-radius: 1.5px;
+                background: AppTheme.border;
+            }
         }
     }
 }
-

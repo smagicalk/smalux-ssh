@@ -10,7 +10,7 @@ use slint::ComponentHandle;
 use smagical_core::domain::host::{HostRecord, HostStatus};
 use smagical_core::event::types::HostAssetChangedEvent;
 
-use crate::generated::{AppTheme, AppWindow, KeywordHighlightRule};
+use crate::generated::{AppTheme, AppWindow, KeywordHighlightRule, SettingsBridge};
 use crate::handlers::AppContext;
 
 /// 注册偏好设置中心与全量数据备份/迁移交互回调
@@ -234,11 +234,46 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 3. 界面字体系统与内置字体检测 (UI Font Discovery & Switching)
     // -------------------------------------------------------------------------
+    let bridge = window.global::<SettingsBridge>();
     let available_fonts = detect_system_and_builtin_fonts();
     let font_slint_list: Vec<slint::SharedString> = available_fonts.iter().map(|f| f.as_str().into()).collect();
+    bridge.set_available_ui_fonts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(font_slint_list.clone()))));
     window.set_available_ui_fonts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(font_slint_list))));
 
     if let Ok(cfg) = ctx.core_state.storage().config().get() {
+        bridge.set_setting_ui_font(cfg.ui_font.as_str().into());
+        bridge.set_setting_terminal_url_click(cfg.terminal_url_click);
+        bridge.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
+        bridge.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
+        bridge.set_setting_cursor_style(cfg.cursor_style.as_str().into());
+        bridge.set_setting_cursor_blink(cfg.cursor_blink);
+        bridge.set_setting_scrollback_lines(cfg.scrollback_lines as i32);
+        bridge.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
+        bridge.set_setting_copy_on_select(cfg.copy_on_select);
+        bridge.set_setting_paste_on_right_click(cfg.paste_on_right_click);
+        bridge.set_setting_warn_multiline_paste(cfg.warn_on_multiline_paste);
+        bridge.set_setting_close_action(cfg.close_action.as_str().into());
+        bridge.set_setting_global_proxy_mode(cfg.global_proxy_mode.as_str().into());
+        bridge.set_setting_global_proxy_server(cfg.global_proxy_server.as_str().into());
+        bridge.set_setting_global_proxy_auth(cfg.global_proxy_auth);
+        bridge.set_setting_global_proxy_user(cfg.global_proxy_user.as_str().into());
+        bridge.set_setting_global_proxy_pass(cfg.global_proxy_pass.as_str().into());
+        bridge.set_setting_connect_timeout(cfg.ssh_timeout_seconds as i32);
+        bridge.set_setting_keepalive_interval(cfg.keepalive_interval as i32);
+        bridge.set_setting_keepalive_count_max(cfg.keepalive_count_max as i32);
+        bridge.set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
+        bridge.set_setting_tcp_nodelay(cfg.tcp_nodelay);
+        bridge.set_setting_modal_opacity(cfg.modal_opacity);
+        bridge.set_current_theme_id(cfg.theme_id.as_str().into());
+        bridge.set_setting_language(cfg.language.as_str().into());
+        bridge.set_setting_always_on_top(false);
+        bridge.set_setting_start_on_boot(cfg.start_on_boot);
+        bridge.set_setting_confirm_close_tab(cfg.confirm_close_tab);
+        bridge.set_setting_confirm_close_active(cfg.confirm_close_active);
+        bridge.set_setting_wallpaper_mode(cfg.wallpaper_mode.as_str().into());
+        bridge.set_setting_wallpaper_path(cfg.wallpaper_path.as_str().into());
+        bridge.set_setting_wallpaper_opacity(cfg.wallpaper_opacity);
+
         window.set_setting_ui_font(cfg.ui_font.as_str().into());
         window.set_setting_terminal_url_click(cfg.terminal_url_click);
         window.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
@@ -270,6 +305,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         let op = opacity.clamp(0.5, 1.0);
         if let Some(w) = window_weak_mo.upgrade() {
             w.set_setting_modal_opacity(op);
+            w.global::<SettingsBridge>().set_setting_modal_opacity(op);
             let theme_global = w.global::<AppTheme>();
             theme_global.set_modal_opacity(op);
         }
@@ -287,6 +323,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         notif_font.info("界面字体已切换", &format!("当前全局字体已设置为「{}」", f));
         if let Some(w) = window_weak_font.upgrade() {
             w.set_setting_ui_font(f.into());
+            w.global::<SettingsBridge>().set_setting_ui_font(f.into());
         }
         let f_owned = f.to_string();
         let _ = core_state_font.storage().config().update(Box::new(move |c| {
@@ -651,6 +688,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         },
     ];
     let rules_state = std::rc::Rc::new(std::cell::RefCell::new(initial_rules.clone()));
+    bridge.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_rules.clone()))));
     window.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_rules))));
 
     // 注册添加规则
@@ -673,7 +711,9 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         list.push(rule);
         notif_add.success("已添加高亮规则", &format!("成功添加规则「{}」", p));
         if let Some(w) = window_weak_add.upgrade() {
-            w.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+            let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
+            w.set_terminal_keyword_rules(model);
         }
     });
 
@@ -693,7 +733,9 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             notif_edit.success("高亮规则已更新", &format!("成功更新规则「{}」", p));
         }
         if let Some(w) = window_weak_edit.upgrade() {
-            w.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+            let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
+            w.set_terminal_keyword_rules(model);
         }
     });
 
@@ -706,7 +748,9 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             item.enabled = enabled;
         }
         if let Some(w) = window_weak_toggle.upgrade() {
-            w.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+            let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
+            w.set_terminal_keyword_rules(model);
         }
     });
 
@@ -719,7 +763,404 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         list.retain(|r| r.id != id);
         notif_del.info("规则已移除", "已成功删除该条终端高亮规则");
         if let Some(w) = window_weak_del.upgrade() {
-            w.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+            let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
+            w.set_terminal_keyword_rules(model);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 6. SettingsBridge 完整双向回调与操作代理挂载 (打通设置中心全部 Tab 交互)
+    // -------------------------------------------------------------------------
+    let w_b = window.as_weak();
+    bridge.on_change_ui_font({
+        let w_b = w_b.clone();
+        move |font_name| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_ui_font(font_name);
+            }
+        }
+    });
+
+    bridge.on_switch_language({
+        let w_b = w_b.clone();
+        move |lang| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_switch_language(lang);
+            }
+        }
+    });
+
+    bridge.on_change_modal_opacity({
+        let w_b = w_b.clone();
+        move |opacity| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_modal_opacity(opacity);
+            }
+        }
+    });
+
+    bridge.on_change_close_action({
+        let w_b = w_b.clone();
+        move |action| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_close_action(action);
+            }
+        }
+    });
+
+    bridge.on_toggle_always_on_top({
+        let w_b = w_b.clone();
+        move |val| {
+            if let Some(w) = w_b.upgrade() {
+                let bridge = w.global::<SettingsBridge>();
+                bridge.set_setting_always_on_top(val);
+                w.set_setting_always_on_top(val);
+            }
+        }
+    });
+
+    bridge.on_toggle_start_on_boot({
+        let w_b = w_b.clone();
+        let core_state = ctx.core_state.clone();
+        move |val| {
+            let _ = core_state.storage().config().update(Box::new(move |c| {
+                c.start_on_boot = val;
+            }));
+            if let Some(w) = w_b.upgrade() {
+                let bridge = w.global::<SettingsBridge>();
+                bridge.set_setting_start_on_boot(val);
+                w.set_setting_start_on_boot(val);
+            }
+        }
+    });
+
+    bridge.on_toggle_confirm_close_tab({
+        let w_b = w_b.clone();
+        let core_state = ctx.core_state.clone();
+        move |val| {
+            let _ = core_state.storage().config().update(Box::new(move |c| {
+                c.confirm_close_tab = val;
+            }));
+            if let Some(w) = w_b.upgrade() {
+                let bridge = w.global::<SettingsBridge>();
+                bridge.set_setting_confirm_close_tab(val);
+                w.set_setting_confirm_close_tab(val);
+            }
+        }
+    });
+
+    bridge.on_toggle_confirm_close_active({
+        let w_b = w_b.clone();
+        let core_state = ctx.core_state.clone();
+        move |val| {
+            let _ = core_state.storage().config().update(Box::new(move |c| {
+                c.confirm_close_active = val;
+            }));
+            if let Some(w) = w_b.upgrade() {
+                let bridge = w.global::<SettingsBridge>();
+                bridge.set_setting_confirm_close_active(val);
+                w.set_setting_confirm_close_active(val);
+            }
+        }
+    });
+
+    bridge.on_create_custom_theme({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_create_custom_theme();
+            }
+        }
+    });
+
+    bridge.on_import_theme({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_import_theme();
+            }
+        }
+    });
+
+    bridge.on_export_current_theme({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_export_current_theme();
+            }
+        }
+    });
+
+    bridge.on_switch_theme({
+        let w_b = w_b.clone();
+        move |theme_id| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_switch_theme(theme_id);
+            }
+        }
+    });
+
+    bridge.on_delete_custom_theme({
+        let w_b = w_b.clone();
+        move |theme_id| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_delete_custom_theme(theme_id);
+            }
+        }
+    });
+
+    bridge.on_change_wallpaper({
+        let w_b = w_b.clone();
+        move |mode, path, opacity| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_set_wallpaper(mode, path, opacity);
+            }
+        }
+    });
+
+    bridge.on_add_wallpaper({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_add_wallpaper_image();
+            }
+        }
+    });
+
+    bridge.on_add_wallpaper_folder({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_add_wallpaper_folder();
+            }
+        }
+    });
+
+    bridge.on_remove_wallpaper({
+        let w_b = w_b.clone();
+        move |idx| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_remove_wallpaper_image(idx);
+            }
+        }
+    });
+
+    bridge.on_select_wallpaper({
+        let w_b = w_b.clone();
+        move |idx| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_select_wallpaper_image(idx);
+            }
+        }
+    });
+
+    bridge.on_set_wallpaper_slideshow({
+        let w_b = w_b.clone();
+        move |interval, transition| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_set_wallpaper_slideshow(interval, transition);
+            }
+        }
+    });
+
+    bridge.on_change_terminal_font({
+        let w_b = w_b.clone();
+        move |font, size| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_set_terminal_font(font, size as f32);
+            }
+        }
+    });
+
+    bridge.on_change_cursor_style({
+        let w_b = w_b.clone();
+        move |style| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_cursor_style(style);
+            }
+        }
+    });
+
+    bridge.on_change_cursor_blink({
+        let w_b = w_b.clone();
+        move |blink| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_cursor_blink(blink);
+            }
+        }
+    });
+
+    bridge.on_change_scrollback_lines({
+        let w_b = w_b.clone();
+        move |lines| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_scrollback_lines(lines);
+            }
+        }
+    });
+
+    bridge.on_change_copy_on_select({
+        let w_b = w_b.clone();
+        move |enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_copy_on_select(enabled);
+            }
+        }
+    });
+
+    bridge.on_change_paste_on_right_click({
+        let w_b = w_b.clone();
+        move |enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_paste_on_right_click(enabled);
+            }
+        }
+    });
+
+    bridge.on_change_warn_multiline_paste({
+        let w_b = w_b.clone();
+        move |enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_warn_multiline_paste(enabled);
+            }
+        }
+    });
+
+    bridge.on_change_bell_style({
+        let w_b = w_b.clone();
+        move |style| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_bell_style(style);
+            }
+        }
+    });
+
+    bridge.on_change_terminal_url_click({
+        let w_b = w_b.clone();
+        move |enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_terminal_url_click(enabled);
+            }
+        }
+    });
+
+    bridge.on_change_terminal_highlight_keywords({
+        let w_b = w_b.clone();
+        move |enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_terminal_highlight_keywords(enabled);
+            }
+        }
+    });
+
+    bridge.on_add_keyword_rule({
+        let w_b = w_b.clone();
+        move |pattern, remark, color_hex| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_add_keyword_rule(pattern, remark, color_hex);
+            }
+        }
+    });
+
+    bridge.on_update_keyword_rule({
+        let w_b = w_b.clone();
+        move |id, pattern, remark, color_hex| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_update_keyword_rule(id, pattern, remark, color_hex);
+            }
+        }
+    });
+
+    bridge.on_delete_keyword_rule({
+        let w_b = w_b.clone();
+        move |id| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_delete_keyword_rule(id);
+            }
+        }
+    });
+
+    bridge.on_toggle_keyword_rule({
+        let w_b = w_b.clone();
+        move |id, enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_toggle_keyword_rule(id, enabled);
+            }
+        }
+    });
+
+    bridge.on_change_global_proxy({
+        let w_b = w_b.clone();
+        move |mode, server, auth, user, pass| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_global_proxy(mode, server, auth, user, pass);
+            }
+        }
+    });
+
+    bridge.on_change_network_handshake({
+        let w_b = w_b.clone();
+        move |timeout, interval, count_max| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_network_handshake(timeout, interval, count_max);
+            }
+        }
+    });
+
+    bridge.on_change_host_key_policy({
+        let w_b = w_b.clone();
+        move |policy| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_host_key_policy(policy);
+            }
+        }
+    });
+
+    bridge.on_change_tcp_nodelay({
+        let w_b = w_b.clone();
+        move |enabled| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_change_tcp_nodelay(enabled);
+            }
+        }
+    });
+
+    bridge.on_export_backup_archive({
+        let w_b = w_b.clone();
+        move |include_passwords| {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_export_backup_archive(include_passwords);
+            }
+        }
+    });
+
+    bridge.on_scan_and_import_openssh({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_scan_and_import_openssh();
+            }
+        }
+    });
+
+    bridge.on_factory_reset_settings({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.invoke_factory_reset_settings();
+            }
+        }
+    });
+
+    bridge.on_close_settings({
+        let w_b = w_b.clone();
+        move || {
+            if let Some(w) = w_b.upgrade() {
+                w.set_main_view("terminal".into());
+                let bridge = w.global::<SettingsBridge>();
+                bridge.set_active_category("general".into());
+            }
         }
     });
 }

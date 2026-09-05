@@ -69,7 +69,7 @@ export component AppDropdown inherits Rectangle {
         height: Math.min(root.popup-max-height, root.items.length * 30px + 10px);
         close-policy: close-on-click-outside;
 
-        Rectangle {
+        dd-box := Rectangle {
             width: root.width;
             height: parent.height;
             border-radius: AppTheme.radius-medium;
@@ -81,63 +81,81 @@ export component AppDropdown inherits Rectangle {
             drop-shadow-offset-y: 4px;
             clip: true;
 
-            ScrollView {
-                width: 100%;
-                height: 100%;
+            property <length> total-height: root.items.length * 30px + 8px;
+            property <length> min-scroll: Math.min(0px, self.height - total-height);
+            property <length> scroll-offset: 0px;
 
-                VerticalLayout {
-                    alignment: start;
-                    padding-top: 4px;
-                    padding-bottom: 4px;
-                    padding-left: 4px;
-                    padding-right: 12px;
-                    spacing: 2px;
+            // 背景滚轮捕获与冒泡拦截
+            TouchArea {
+                scroll-event(event) => {
+                    dd-box.scroll-offset = Math.min(0px, Math.max(dd-box.min-scroll, dd-box.scroll-offset + event.delta-y));
+                    accept
+                }
+            }
 
-                    for item in root.items: Rectangle {
-                        height: 28px;
-                        border-radius: AppTheme.radius-small;
-                        background: root.active-id == item.id ? AppTheme.accent.transparentize(80%) : (opt-touch.has-hover ? AppTheme.hover-background : transparent);
+            VerticalLayout {
+                y: dd-box.scroll-offset;
+                alignment: start;
+                padding-top: 4px;
+                padding-bottom: 4px;
+                padding-left: 4px;
+                padding-right: 6px;
+                spacing: 2px;
 
-                        opt-touch := TouchArea {
-                            // 拒绝滚轮事件，让其冒泡给上层 ScrollView 滚动
-                            scroll-event(event) => {
-                                reject
-                            }
-                            clicked => {
-                                root.active-id = item.id;
-                                root.active-label = item.label;
-                                root.selected(item.id, item.label);
-                                dd-popup.close();
-                            }
-                            mouse-cursor: pointer;
+                for item in root.items: Rectangle {
+                    height: 28px;
+                    border-radius: AppTheme.radius-small;
+                    background: root.active-id == item.id ? AppTheme.accent.transparentize(80%) : (opt-touch.has-hover ? AppTheme.hover-background : transparent);
+
+                    opt-touch := TouchArea {
+                        scroll-event(event) => {
+                            dd-box.scroll-offset = Math.min(0px, Math.max(dd-box.min-scroll, dd-box.scroll-offset + event.delta-y));
+                            accept
+                        }
+                        clicked => {
+                            root.active-id = item.id;
+                            root.active-label = item.label;
+                            root.selected(item.id, item.label);
+                            dd-popup.close();
+                        }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        alignment: space-between;
+
+                        Text {
+                            text: item.label;
+                            font-size: 11px;
+                            font-weight: root.active-id == item.id ? 600 : 400;
+                            color: root.active-id == item.id ? AppTheme.accent :
+                                opt-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                            overflow: elide;
+                            horizontal-stretch: 1;
                         }
 
-                        HorizontalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            alignment: space-between;
-
-                            Text {
-                                text: item.label;
-                                font-size: 11px;
-                                font-weight: root.active-id == item.id ? 600 : 400;
-                                color: root.active-id == item.id ? AppTheme.accent :
-                                    opt-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                                vertical-alignment: center;
-                                overflow: elide;
-                                horizontal-stretch: 1;
-                            }
-
-                            if root.active-id == item.id: Text {
-                                text: "✓";
-                                font-size: 11px;
-                                font-weight: 700;
-                                color: AppTheme.accent;
-                                vertical-alignment: center;
-                            }
+                        if root.active-id == item.id: Text {
+                            text: "✓";
+                            font-size: 11px;
+                            font-weight: 700;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
                         }
                     }
                 }
+            }
+
+            // 紧凑滚动条指示器
+            if dd-box.total-height > dd-box.height: Rectangle {
+                x: parent.width - 4px;
+                y: (-dd-box.scroll-offset / dd-box.total-height) * dd-box.height;
+                width: 3px;
+                height: Math.max(16px, (dd-box.height / dd-box.total-height) * dd-box.height);
+                border-radius: 1.5px;
+                background: AppTheme.border;
             }
         }
     }

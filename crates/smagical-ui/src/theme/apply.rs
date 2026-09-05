@@ -63,6 +63,10 @@ pub fn apply_theme_by_id(
 ) -> Result<(), ThemeError> {
     let theme = service.resolve_ui(theme_id)?;
     apply_ui_theme(window, &theme);
+    let bridge = window.global::<crate::generated::SettingsBridge>();
+    bridge.set_current_theme_id(theme.metadata.id.as_ref().into());
+    let is_dark = theme.metadata.period.map(|p| p == smagical_core::theme::ThemePeriod::Night).unwrap_or(true);
+    bridge.set_is_dark_mode(is_dark);
     Ok(())
 }
 
@@ -127,11 +131,26 @@ pub fn sync_ui_themes(window: &AppWindow, service: &ThemeService) {
     window.set_dark_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(dark_themes.clone()))));
     window.set_light_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(light_themes.clone()))));
 
-    window.set_custom_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(custom_themes)))));
-    window.set_dark_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(dark_themes)))));
-    window.set_light_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(light_themes)))));
+    window.set_custom_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(custom_themes.clone())))));
+    window.set_dark_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(dark_themes.clone())))));
+    window.set_light_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(light_themes.clone())))));
 
-    window.set_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_options))));
+    window.set_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_options.clone()))));
+
+    let bridge = window.global::<crate::generated::SettingsBridge>();
+    bridge.set_custom_themes_count(custom_themes.len() as i32);
+    bridge.set_dark_themes_count(dark_themes.len() as i32);
+    bridge.set_light_themes_count(light_themes.len() as i32);
+
+    bridge.set_custom_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(custom_themes.clone()))));
+    bridge.set_dark_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(dark_themes.clone()))));
+    bridge.set_light_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(light_themes.clone()))));
+
+    bridge.set_custom_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(custom_themes)))));
+    bridge.set_dark_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(dark_themes)))));
+    bridge.set_light_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(light_themes)))));
+
+    bridge.set_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_options))));
 }
 
 fn parse_color(value: &str) -> Color {
