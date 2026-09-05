@@ -2,7 +2,6 @@
 members = [
     "crates/smagical-core",
     "crates/smagical-ui",
-    "crates/smagical-debug",
 ]
 resolver = "3"
 

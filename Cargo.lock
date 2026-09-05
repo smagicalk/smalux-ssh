@@ -4516,20 +4516,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smagical-debug"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "directories",
- "serde",
- "serde_json",
- "tracing",
- "tracing-appender",
- "tracing-subscriber",
- "uuid",
-]
-
-[[package]]
 name = "smagical-ui"
 version = "0.1.0"
 dependencies = [
@@ -4540,12 +4526,14 @@ dependencies = [
  "fontdue",
  "image",
  "portable-pty",
+ "serde",
  "serde_json",
  "slint",
  "slint-build",
  "smagical-core",
- "smagical-debug",
  "tracing",
+ "tracing-appender",
+ "tracing-subscriber",
  "uuid",
  "vt100",
  "winit",

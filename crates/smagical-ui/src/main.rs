@@ -4,7 +4,7 @@
 
 fn main() -> anyhow::Result<()> {
     // 初始化日志跟踪系统
-    let _tracing_guard = smagical_debug::init_tracing("smalux", None)?;
+    let _tracing_guard = smagical_ui::debug::init_tracing("smalux", None)?;
     // 启动 Slint UI 桌面主窗口
     smagical_ui::run()?;
     Ok(())

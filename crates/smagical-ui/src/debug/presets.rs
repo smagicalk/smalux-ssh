@@ -1,6 +1,6 @@
 //! 场景模拟预设生成器 (Mock Presets Injector)
 
-use crate::models::{DebugHostCard, DebugRawNode};
+use super::models::{DebugHostCard, DebugRawNode};
 
 /// 预设场景类别
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

@@ -26,6 +26,10 @@ pub(crate) mod debug_ui;
 /// UI 事件回调与业务路由层。
 pub(crate) mod handlers;
 
+/// 开发者调试控制面板、场景预设与 Tracing 全局日志模块。
+pub mod debug;
+pub use debug::*;
+
 /// 终端引擎核心层 (PTY 进程托管与 VT100 状态机)。
 pub mod terminal;
 
@@ -80,7 +84,7 @@ pub use generated::{
 pub fn run() -> Result<(), slint::PlatformError> {
 
     // 初始化全局 tracing 日志持久化与内存环形缓冲
-    let _tracing_guard = smagical_debug::init_tracing("smalux", None);
+    let _tracing_guard = crate::debug::init_tracing("smalux", None);
 
     let window = AppWindow::new()?;
 
@@ -124,7 +128,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let core_state = Rc::new(CoreState::new_mock());
 
     // 同步 Debug 开启状态与侧边栏动态注册菜单项到 Slint 界面
-    let is_dbg = smagical_debug::is_debug_enabled();
+    let is_dbg = crate::debug::is_debug_enabled();
     window.set_is_debug_enabled(is_dbg);
     core_state.activity_bar().set_visible("debug", is_dbg);
     activity_bar_service::sync_activity_bar_ui(&window, &core_state);

@@ -4,7 +4,7 @@
 
 use std::collections::HashSet;
 use smagical_core::{AppStorage, GroupRecord, HostRecord};
-use smagical_debug::{calculate_node_width, DebugRawNode};
+use crate::debug::{calculate_node_width, DebugRawNode};
 
 use crate::generated::{GroupOptionData, HostTreeNode};
 

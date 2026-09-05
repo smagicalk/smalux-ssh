@@ -18,9 +18,11 @@ arboard.workspace = true
 vt100.workspace = true
 directories.workspace = true
 uuid.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
+tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "time", "json"] }
+tracing-appender.workspace = true
 smagical-core = { path = "../smagical-core" }
-smagical-debug = { path = "../smagical-debug" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 winit = { version = "0.30", default-features = false }
 

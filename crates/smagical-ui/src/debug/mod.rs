@@ -1,8 +1,4 @@
-//! `smagical-debug`
-//!
-//! smalux-ssh 专用的开发者调试控制面板、场景模拟预设生成器、批量数据生成/修改器、tracing 全局日志系统（控制台+文件滚动+UI捕获）与运行时探针工具库。
-
-#![deny(missing_docs)]
+//! 开发者调试控制面板、场景模拟预设生成器、批量数据生成/修改器、tracing 全局日志系统与运行时探针工具库。
 
 pub mod batch;
 pub mod inspector;

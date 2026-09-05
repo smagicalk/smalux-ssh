@@ -1,7 +1,7 @@
 //! 开发者实时事件日志管理服务 (Log Buffer Manager)
 
 use std::collections::VecDeque;
-use crate::models::DebugLogEntry;
+use super::models::DebugLogEntry;
 
 /// 获取当前时间字符串 (格式: "HH:mm:ss", UTC+8 偏移)
 pub fn get_current_timestamp() -> String {

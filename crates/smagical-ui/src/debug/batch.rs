@@ -1,6 +1,6 @@
 //! 批量数据生成与批量修改引擎 (Batch Generator & Modifier)
 
-use crate::models::{DebugHostCard, DebugRawNode};
+use super::models::{DebugHostCard, DebugRawNode};
 
 /// 批量生成主机参数模型
 #[derive(Clone, Debug)]

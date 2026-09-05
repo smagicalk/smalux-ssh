@@ -7,7 +7,7 @@ use std::rc::Rc;
 use slint::{ComponentHandle, Model};
 use smagical_core::event::ConfigChangedEvent;
 use smagical_core::AppStorage;
-use smagical_debug::{
+use crate::debug::{
     generate_batch_hosts, get_preset_by_id, BatchGenerateConfig,
 };
 
@@ -27,7 +27,7 @@ use crate::tree_model::{
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
-    window.set_is_log_capture_enabled(smagical_debug::is_log_capture_enabled());
+    window.set_is_log_capture_enabled(crate::debug::is_log_capture_enabled());
 
     // -------------------------------------------------------------------------
     // 0.1 批量生成主机资产
@@ -532,7 +532,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     window.on_debug_clear_logs(move || {
         if let Some(w) = window_weak.upgrade() {
-            if let Ok(mut buf) = smagical_debug::get_global_log_buffer().lock() {
+            if let Ok(mut buf) = crate::debug::get_global_log_buffer().lock() {
                 buf.clear();
             }
             w.set_debug_logs(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::new()))));
@@ -664,7 +664,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_log = ctx.notifications.clone();
     let window_weak_log = window.as_weak();
     window.on_toggle_log_capture(move |enabled| {
-        smagical_debug::set_log_capture_enabled(enabled);
+        crate::debug::set_log_capture_enabled(enabled);
         if let Some(w) = window_weak_log.upgrade() {
             w.set_is_log_capture_enabled(enabled);
             if enabled {

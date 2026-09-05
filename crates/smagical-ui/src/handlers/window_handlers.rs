@@ -177,7 +177,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let core_state_debug = ctx.core_state.clone();
     window.on_toggle_debug_enabled(move |enabled| {
-        smagical_debug::set_debug_enabled(enabled);
+        crate::debug::set_debug_enabled(enabled);
         core_state_debug.activity_bar().set_visible("debug", enabled);
         if let Some(w) = window_weak.upgrade() {
             w.set_is_debug_enabled(enabled);
