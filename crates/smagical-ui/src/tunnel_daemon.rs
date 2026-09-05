@@ -11,8 +11,9 @@ use smagical_core::event::{
     TunnelStateChangedEvent,
 };
 use smagical_core::AppStorage;
+use slint::ComponentHandle;
 
-use crate::generated::AppWindow;
+use crate::generated::{AppWindow, TerminalBridge, TunnelsBridge};
 
 /// 网络隧道与代理全局后台守护服务
 pub struct TunnelDaemonService {
@@ -101,7 +102,7 @@ impl TunnelDaemonService {
                 // 异步刷新主窗口 UI 模型与抽屉状态
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = window_weak.upgrade() {
-                        w.invoke_sync_host_tunnels();
+                        w.global::<TunnelsBridge>().invoke_sync_host_tunnels();
                     }
                 });
             })
@@ -223,8 +224,8 @@ impl TunnelDaemonService {
 
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w) = window_weak.upgrade() {
-                w.set_active_host_id(h_id.into());
-                w.invoke_sync_host_tunnels();
+                w.global::<TerminalBridge>().set_active_host_id(h_id.into());
+                w.global::<TunnelsBridge>().invoke_sync_host_tunnels();
             }
         });
     }
@@ -237,11 +238,12 @@ impl TunnelDaemonService {
 
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w) = window_weak.upgrade() {
-                let active_id = w.get_active_tunnel_id().to_string();
+                let tb = w.global::<TunnelsBridge>();
+                let active_id = tb.get_active_tunnel_id().to_string();
                 if active_id == tun_id {
-                    w.set_tunnel_form_is_running(is_running);
+                    tb.set_form_is_running(is_running);
                 }
-                w.invoke_sync_host_tunnels();
+                tb.invoke_sync_host_tunnels();
             }
         });
     }

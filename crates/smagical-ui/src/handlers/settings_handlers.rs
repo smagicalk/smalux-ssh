@@ -10,17 +10,19 @@ use slint::ComponentHandle;
 use smagical_core::domain::host::{HostRecord, HostStatus};
 use smagical_core::event::types::HostAssetChangedEvent;
 
-use crate::generated::{AppTheme, AppWindow, KeywordHighlightRule, SettingsBridge};
+use crate::generated::{AppTheme, AppWindow, HostsBridge, KeywordHighlightRule, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 
 /// 注册偏好设置中心与全量数据备份/迁移交互回调
 pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
+    let bridge = window.global::<SettingsBridge>();
+
     // -------------------------------------------------------------------------
     // 1. 全量加密备份包导出 (Export Backup Archive)
     // -------------------------------------------------------------------------
     let core_state_export = ctx.core_state.clone();
     let notif_export = ctx.notifications.clone();
-    window.on_export_backup_archive(move |include_passwords| {
+    bridge.on_export_backup_archive(move |include_passwords| {
         let storage_export = core_state_export.storage();
         let hosts = storage_export.hosts().list_all().unwrap_or_default();
         let groups = storage_export.groups().list_all().unwrap_or_default();
@@ -91,7 +93,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_ssh = ctx.core_state.clone();
     let notif_import_ssh = ctx.notifications.clone();
     let window_weak_ssh = window.as_weak();
-    window.on_scan_and_import_openssh(move || {
+    bridge.on_scan_and_import_openssh(move || {
         let storage_import_ssh = core_state_ssh.storage();
         let events_import_ssh = core_state_ssh.events();
         let ssh_config_path = get_ssh_config_path();
@@ -133,7 +135,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
                         let window_weak = window_weak_ssh.clone();
                         move || {
                             if let Some(w) = window_weak.upgrade() {
-                                w.invoke_filter_hosts("".into());
+                                w.global::<HostsBridge>().invoke_search_changed("".into());
                             }
                         }
                     });
@@ -161,7 +163,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     // 3. 导入外部第三方终端资产 (Termius / Xshell 占位与演示)
     // -------------------------------------------------------------------------
     let notif_external = ctx.notifications.clone();
-    window.on_import_external_assets(move || {
+    bridge.on_import_external_assets(move || {
         notif_external.info(
             "第三方资产导入",
             "已开启外部格式解析监听器。请将导出的 Termius JSON 或 Xshell 资产拖入应用目录即可自动完成归一化导入。",
@@ -174,17 +176,18 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_reset = window.as_weak();
     let notif_reset = ctx.notifications.clone();
     let core_state_reset = ctx.core_state.clone();
-    window.on_factory_reset_settings(move || {
+    bridge.on_factory_reset_settings(move || {
         let _ = core_state_reset.storage().config().reset_to_default();
         if let Some(w) = window_weak_reset.upgrade() {
             // 恢复默认外观
-            w.invoke_switch_theme("builtin.ui.darcula".into());
-            w.set_wallpaper_mode("none".into());
-            w.invoke_set_wallpaper("none".into(), "".into(), 0.20);
-            w.set_global_wallpaper_opacity(0.20);
+            let wb = w.global::<WindowBridge>();
+            wb.invoke_switch_theme("builtin.ui.darcula".into());
+            wb.set_wallpaper_mode("none".into());
+            wb.invoke_set_wallpaper("none".into(), "".into(), 0.20);
+            wb.set_global_wallpaper_opacity(0.20);
 
             // 恢复默认终端字体字号
-            w.invoke_set_terminal_font("JetBrains Mono".into(), 13.0);
+            wb.invoke_set_terminal_font("JetBrains Mono".into(), 13.0);
 
             notif_reset.success(
                 "偏好设置已重置",
@@ -199,7 +202,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_lang = window.as_weak();
     let notif_lang = ctx.notifications.clone();
     let ctx_lang = ctx.clone();
-    window.on_switch_language(move |lang| {
+    bridge.on_switch_language(move |lang| {
         let code = match lang.as_str() {
             "en-US" | "en" => "en",
             _ => "", // 默认语言为中文源码
@@ -225,7 +228,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             let _ = ctx_lang.core_state.storage().config().update(Box::new(move |c| {
                 c.language = current_lang_str;
             }));
-            w.set_current_language(current_lang.into());
+            w.global::<WindowBridge>().set_current_language(current_lang.into());
             crate::handlers::file_handlers::sync_file_explorer_ui(&w, &ctx_lang);
             crate::handlers::history_handlers::sync_ui_history(&w, &ctx_lang);
         }
@@ -238,7 +241,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let available_fonts = detect_system_and_builtin_fonts();
     let font_slint_list: Vec<slint::SharedString> = available_fonts.iter().map(|f| f.as_str().into()).collect();
     bridge.set_available_ui_fonts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(font_slint_list.clone()))));
-    window.set_available_ui_fonts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(font_slint_list))));
+    window.global::<SettingsBridge>().set_available_ui_fonts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(font_slint_list))));
 
     if let Ok(cfg) = ctx.core_state.storage().config().get() {
         bridge.set_setting_ui_font(cfg.ui_font.as_str().into());
@@ -274,37 +277,37 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         bridge.set_setting_wallpaper_path(cfg.wallpaper_path.as_str().into());
         bridge.set_setting_wallpaper_opacity(cfg.wallpaper_opacity);
 
-        window.set_setting_ui_font(cfg.ui_font.as_str().into());
-        window.set_setting_terminal_url_click(cfg.terminal_url_click);
-        window.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
-        window.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
-        window.set_setting_cursor_style(cfg.cursor_style.as_str().into());
-        window.set_setting_cursor_blink(cfg.cursor_blink);
-        window.set_setting_scrollback_lines(cfg.scrollback_lines as i32);
-        window.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
-        window.set_setting_copy_on_select(cfg.copy_on_select);
-        window.set_setting_paste_on_right_click(cfg.paste_on_right_click);
-        window.set_setting_warn_multiline_paste(cfg.warn_on_multiline_paste);
-        window.set_setting_close_action(cfg.close_action.as_str().into());
-        window.set_setting_global_proxy_mode(cfg.global_proxy_mode.as_str().into());
-        window.set_setting_global_proxy_server(cfg.global_proxy_server.as_str().into());
-        window.set_setting_global_proxy_auth(cfg.global_proxy_auth);
-        window.set_setting_global_proxy_user(cfg.global_proxy_user.as_str().into());
-        window.set_setting_global_proxy_pass(cfg.global_proxy_pass.as_str().into());
-        window.set_setting_connect_timeout(cfg.ssh_timeout_seconds as i32);
-        window.set_setting_keepalive_interval(cfg.keepalive_interval as i32);
-        window.set_setting_keepalive_count_max(cfg.keepalive_count_max as i32);
-        window.set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
-        window.set_setting_tcp_nodelay(cfg.tcp_nodelay);
-        window.set_setting_modal_opacity(cfg.modal_opacity);
+        window.global::<SettingsBridge>().set_setting_ui_font(cfg.ui_font.as_str().into());
+        window.global::<SettingsBridge>().set_setting_terminal_url_click(cfg.terminal_url_click);
+        window.global::<SettingsBridge>().set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
+        window.global::<SettingsBridge>().set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
+        window.global::<SettingsBridge>().set_setting_cursor_style(cfg.cursor_style.as_str().into());
+        window.global::<SettingsBridge>().set_setting_cursor_blink(cfg.cursor_blink);
+        window.global::<SettingsBridge>().set_setting_scrollback_lines(cfg.scrollback_lines as i32);
+        window.global::<SettingsBridge>().set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
+        window.global::<SettingsBridge>().set_setting_copy_on_select(cfg.copy_on_select);
+        window.global::<SettingsBridge>().set_setting_paste_on_right_click(cfg.paste_on_right_click);
+        window.global::<SettingsBridge>().set_setting_warn_multiline_paste(cfg.warn_on_multiline_paste);
+        window.global::<SettingsBridge>().set_setting_close_action(cfg.close_action.as_str().into());
+        window.global::<SettingsBridge>().set_setting_global_proxy_mode(cfg.global_proxy_mode.as_str().into());
+        window.global::<SettingsBridge>().set_setting_global_proxy_server(cfg.global_proxy_server.as_str().into());
+        window.global::<SettingsBridge>().set_setting_global_proxy_auth(cfg.global_proxy_auth);
+        window.global::<SettingsBridge>().set_setting_global_proxy_user(cfg.global_proxy_user.as_str().into());
+        window.global::<SettingsBridge>().set_setting_global_proxy_pass(cfg.global_proxy_pass.as_str().into());
+        window.global::<SettingsBridge>().set_setting_connect_timeout(cfg.ssh_timeout_seconds as i32);
+        window.global::<SettingsBridge>().set_setting_keepalive_interval(cfg.keepalive_interval as i32);
+        window.global::<SettingsBridge>().set_setting_keepalive_count_max(cfg.keepalive_count_max as i32);
+        window.global::<SettingsBridge>().set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
+        window.global::<SettingsBridge>().set_setting_tcp_nodelay(cfg.tcp_nodelay);
+        window.global::<SettingsBridge>().set_setting_modal_opacity(cfg.modal_opacity);
     }
 
     let core_state_mo = ctx.core_state.clone();
     let window_weak_mo = window.as_weak();
-    window.on_change_modal_opacity(move |opacity| {
+    bridge.on_change_modal_opacity(move |opacity| {
         let op = opacity.clamp(0.5, 1.0);
         if let Some(w) = window_weak_mo.upgrade() {
-            w.set_setting_modal_opacity(op);
+            w.global::<SettingsBridge>().set_setting_modal_opacity(op);
             w.global::<SettingsBridge>().set_setting_modal_opacity(op);
             let theme_global = w.global::<AppTheme>();
             theme_global.set_modal_opacity(op);
@@ -317,12 +320,12 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_font = ctx.notifications.clone();
     let core_state_font = ctx.core_state.clone();
     let window_weak_font = window.as_weak();
-    window.on_change_ui_font(move |font_name| {
+    bridge.on_change_ui_font(move |font_name| {
         let f = font_name.as_str();
         tracing::info!(target: "smagical_ui::settings", "切换界面全局字体为: {}", f);
         notif_font.info("界面字体已切换", &format!("当前全局字体已设置为「{}」", f));
         if let Some(w) = window_weak_font.upgrade() {
-            w.set_setting_ui_font(f.into());
+            w.global::<SettingsBridge>().set_setting_ui_font(f.into());
             w.global::<SettingsBridge>().set_setting_ui_font(f.into());
         }
         let f_owned = f.to_string();
@@ -337,14 +340,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_url = ctx.notifications.clone();
     let core_state_url = ctx.core_state.clone();
     let window_weak_url = window.as_weak();
-    window.on_change_terminal_url_click(move |enabled| {
+    bridge.on_change_terminal_url_click(move |enabled| {
         if enabled {
             notif_url.info("URL 识别已开启", "终端中检测到网页链接时将支持点击直接调用默认浏览器打开");
         } else {
             notif_url.info("URL 识别已关闭", "已关闭终端网页超链接点击识别");
         }
         if let Some(w) = window_weak_url.upgrade() {
-            w.set_setting_terminal_url_click(enabled);
+            w.global::<SettingsBridge>().set_setting_terminal_url_click(enabled);
         }
         let _ = core_state_url.storage().config().update(Box::new(move |c| {
             c.terminal_url_click = enabled;
@@ -354,14 +357,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_kw = ctx.notifications.clone();
     let core_state_kw = ctx.core_state.clone();
     let window_weak_kw = window.as_weak();
-    window.on_change_terminal_highlight_keywords(move |enabled| {
+    bridge.on_change_terminal_highlight_keywords(move |enabled| {
         if enabled {
             notif_kw.info("关键字高亮已开启", "已启用运维关键状态词与 IP/URL 智能高亮渲染");
         } else {
             notif_kw.info("关键字高亮已关闭", "已关闭终端语法与状态词高亮");
         }
         if let Some(w) = window_weak_kw.upgrade() {
-            w.set_setting_terminal_highlight_keywords(enabled);
+            w.global::<SettingsBridge>().set_setting_terminal_highlight_keywords(enabled);
         }
         let _ = core_state_kw.storage().config().update(Box::new(move |c| {
             c.terminal_highlight_keywords = enabled;
@@ -371,11 +374,11 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_custom_kw = ctx.notifications.clone();
     let core_state_custom_kw = ctx.core_state.clone();
     let window_weak_custom_kw = window.as_weak();
-    window.on_change_terminal_custom_keywords(move |keywords| {
+    bridge.on_change_terminal_custom_keywords(move |keywords| {
         let kw_str = keywords.as_str();
         notif_custom_kw.success("高亮规则已更新", &format!("已同步自定义高亮关键字: {}", kw_str));
         if let Some(w) = window_weak_custom_kw.upgrade() {
-            w.set_setting_terminal_custom_keywords(kw_str.into());
+            w.global::<SettingsBridge>().set_setting_terminal_custom_keywords(kw_str.into());
         }
         let kw_owned = kw_str.to_string();
         let _ = core_state_custom_kw.storage().config().update(Box::new(move |c| {
@@ -388,7 +391,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_cursor = window.as_weak();
     let renderer_cursor = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_cursor = Rc::clone(&ctx.active_terminals);
-    window.on_change_cursor_style(move |style| {
+    bridge.on_change_cursor_style(move |style| {
         let style_label = match style.as_str() {
             "beam" => "竖线 (|)",
             "underline" => "下划线 (_)",
@@ -396,7 +399,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         };
         notif_cursor.info("光标形态已更新", &format!("终端光标已切换为「{}」", style_label));
         if let Some(w) = window_weak_cursor.upgrade() {
-            w.set_setting_cursor_style(style.as_str().into());
+            w.global::<SettingsBridge>().set_setting_cursor_style(style.as_str().into());
         }
         let s_owned = style.to_string();
         if let Some(ref mut r) = *renderer_cursor.borrow_mut() {
@@ -415,14 +418,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_blink = window.as_weak();
     let renderer_blink = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_blink = Rc::clone(&ctx.active_terminals);
-    window.on_change_cursor_blink(move |blink| {
+    bridge.on_change_cursor_blink(move |blink| {
         if blink {
             notif_blink.info("光标闪烁已开启", "终端光标已启用周期呼吸闪烁");
         } else {
             notif_blink.info("光标闪烁已关闭", "终端光标已切换为静态长亮形态");
         }
         if let Some(w) = window_weak_blink.upgrade() {
-            w.set_setting_cursor_blink(blink);
+            w.global::<SettingsBridge>().set_setting_cursor_blink(blink);
         }
         if let Some(ref mut r) = *renderer_blink.borrow_mut() {
             r.set_cursor_blink(blink);
@@ -438,10 +441,10 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_scroll = ctx.notifications.clone();
     let core_state_scroll = ctx.core_state.clone();
     let window_weak_scroll = window.as_weak();
-    window.on_change_scrollback_lines(move |lines| {
+    bridge.on_change_scrollback_lines(move |lines| {
         notif_scroll.info("回滚缓冲已调整", &format!("终端最大回滚行数已调整为 {} 行", lines));
         if let Some(w) = window_weak_scroll.upgrade() {
-            w.set_setting_scrollback_lines(lines);
+            w.global::<SettingsBridge>().set_setting_scrollback_lines(lines);
         }
         let _ = core_state_scroll.storage().config().update(Box::new(move |c| {
             c.scrollback_lines = lines.max(100) as usize;
@@ -451,7 +454,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_bell = ctx.notifications.clone();
     let core_state_bell = ctx.core_state.clone();
     let window_weak_bell = window.as_weak();
-    window.on_change_bell_style(move |style| {
+    bridge.on_change_bell_style(move |style| {
         let mode_label = match style.as_str() {
             "audible" => "系统蜂鸣声音",
             "none" => "完全静音",
@@ -459,7 +462,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         };
         notif_bell.info("蜂鸣模式已设置", &format!("终端蜂鸣告警已设置为「{}」", mode_label));
         if let Some(w) = window_weak_bell.upgrade() {
-            w.set_setting_bell_style(style.as_str().into());
+            w.global::<SettingsBridge>().set_setting_bell_style(style.as_str().into());
         }
         let b_owned = style.to_string();
         let _ = core_state_bell.storage().config().update(Box::new(move |c| {
@@ -470,14 +473,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_cos = ctx.notifications.clone();
     let core_state_cos = ctx.core_state.clone();
     let window_weak_cos = window.as_weak();
-    window.on_change_copy_on_select(move |enabled| {
+    bridge.on_change_copy_on_select(move |enabled| {
         if enabled {
             notif_cos.info("划选自动复制已开启", "在终端中划选文字时将立即自动写入系统剪贴板");
         } else {
             notif_cos.info("划选自动复制已关闭", "划选文字后需手动按 Ctrl+Shift+C 复制");
         }
         if let Some(w) = window_weak_cos.upgrade() {
-            w.set_setting_copy_on_select(enabled);
+            w.global::<SettingsBridge>().set_setting_copy_on_select(enabled);
         }
         let _ = core_state_cos.storage().config().update(Box::new(move |c| {
             c.copy_on_select = enabled;
@@ -487,14 +490,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_porc = ctx.notifications.clone();
     let core_state_porc = ctx.core_state.clone();
     let window_weak_porc = window.as_weak();
-    window.on_change_paste_on_right_click(move |enabled| {
+    bridge.on_change_paste_on_right_click(move |enabled| {
         if enabled {
             notif_porc.info("右键快速粘贴已开启", "在终端视口中右键单击将直接粘贴系统剪贴板内容");
         } else {
             notif_porc.info("右键快捷菜单已恢复", "在终端视口中右键单击将呼出操作上下文菜单");
         }
         if let Some(w) = window_weak_porc.upgrade() {
-            w.set_setting_paste_on_right_click(enabled);
+            w.global::<SettingsBridge>().set_setting_paste_on_right_click(enabled);
         }
         let _ = core_state_porc.storage().config().update(Box::new(move |c| {
             c.paste_on_right_click = enabled;
@@ -504,14 +507,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_wmp = ctx.notifications.clone();
     let core_state_wmp = ctx.core_state.clone();
     let window_weak_wmp = window.as_weak();
-    window.on_change_warn_multiline_paste(move |enabled| {
+    bridge.on_change_warn_multiline_paste(move |enabled| {
         if enabled {
             notif_wmp.info("多行粘贴告警已开启", "粘贴包含换行符的多行指令时将前置安全告警");
         } else {
             notif_wmp.info("多行粘贴告警已关闭", "粘贴多行命令时将直接执行无需告警");
         }
         if let Some(w) = window_weak_wmp.upgrade() {
-            w.set_setting_warn_multiline_paste(enabled);
+            w.global::<SettingsBridge>().set_setting_warn_multiline_paste(enabled);
         }
         let _ = core_state_wmp.storage().config().update(Box::new(move |c| {
             c.warn_on_multiline_paste = enabled;
@@ -521,7 +524,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_ca = ctx.notifications.clone();
     let core_state_ca = ctx.core_state.clone();
     let window_weak_ca = window.as_weak();
-    window.on_change_close_action(move |action| {
+    bridge.on_change_close_action(move |action| {
         let is_tray = action.as_str() == "tray";
         if is_tray {
             notif_ca.info("窗口关闭行为", "关闭主窗口时将最小化到系统托盘，保持会话持续在线");
@@ -529,7 +532,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             notif_ca.info("窗口关闭行为", "关闭主窗口时将完全退出应用程序");
         }
         if let Some(w) = window_weak_ca.upgrade() {
-            w.set_setting_close_action(action.as_str().into());
+            w.global::<SettingsBridge>().set_setting_close_action(action.as_str().into());
         }
         let a_str = action.to_string();
         let _ = core_state_ca.storage().config().update(Box::new(move |c| {
@@ -540,7 +543,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_proxy = ctx.notifications.clone();
     let core_state_proxy = ctx.core_state.clone();
     let window_weak_proxy = window.as_weak();
-    window.on_change_global_proxy(move |mode, server, auth, user, pass| {
+    bridge.on_change_global_proxy(move |mode, server, auth, user, pass| {
         let m_str = mode.to_string();
         let s_str = server.to_string();
         let u_str = user.to_string();
@@ -555,11 +558,11 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         notif_proxy.success("出站代理已同步", &format!("当前代理策略已设置为「{}」", label));
 
         if let Some(w) = window_weak_proxy.upgrade() {
-            w.set_setting_global_proxy_mode(m_str.as_str().into());
-            w.set_setting_global_proxy_server(s_str.as_str().into());
-            w.set_setting_global_proxy_auth(auth);
-            w.set_setting_global_proxy_user(u_str.as_str().into());
-            w.set_setting_global_proxy_pass(p_str.as_str().into());
+            w.global::<SettingsBridge>().set_setting_global_proxy_mode(m_str.as_str().into());
+            w.global::<SettingsBridge>().set_setting_global_proxy_server(s_str.as_str().into());
+            w.global::<SettingsBridge>().set_setting_global_proxy_auth(auth);
+            w.global::<SettingsBridge>().set_setting_global_proxy_user(u_str.as_str().into());
+            w.global::<SettingsBridge>().set_setting_global_proxy_pass(p_str.as_str().into());
         }
 
         let m_save = m_str.clone();
@@ -578,15 +581,15 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_handshake = ctx.notifications.clone();
     let core_state_handshake = ctx.core_state.clone();
     let window_weak_handshake = window.as_weak();
-    window.on_change_network_handshake(move |timeout, interval, count_max| {
+    bridge.on_change_network_handshake(move |timeout, interval, count_max| {
         let t_val = timeout.clamp(5, 300) as u32;
         let i_val = interval.clamp(0, 300) as u32;
         let c_val = count_max.clamp(1, 20) as u32;
 
         if let Some(w) = window_weak_handshake.upgrade() {
-            w.set_setting_connect_timeout(t_val as i32);
-            w.set_setting_keepalive_interval(i_val as i32);
-            w.set_setting_keepalive_count_max(c_val as i32);
+            w.global::<SettingsBridge>().set_setting_connect_timeout(t_val as i32);
+            w.global::<SettingsBridge>().set_setting_keepalive_interval(i_val as i32);
+            w.global::<SettingsBridge>().set_setting_keepalive_count_max(c_val as i32);
         }
 
         let _ = core_state_handshake.storage().config().update(Box::new(move |c| {
@@ -614,10 +617,10 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_hk = ctx.notifications.clone();
     let core_state_hk = ctx.core_state.clone();
     let window_weak_hk = window.as_weak();
-    window.on_change_host_key_policy(move |policy| {
+    bridge.on_change_host_key_policy(move |policy| {
         let p_str = policy.to_string();
         if let Some(w) = window_weak_hk.upgrade() {
-            w.set_setting_host_key_policy(p_str.clone().into());
+            w.global::<SettingsBridge>().set_setting_host_key_policy(p_str.clone().into());
         }
         let p_save = p_str.clone();
         let _ = core_state_hk.storage().config().update(Box::new(move |c| {
@@ -629,9 +632,9 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_tcp = ctx.notifications.clone();
     let core_state_tcp = ctx.core_state.clone();
     let window_weak_tcp = window.as_weak();
-    window.on_change_tcp_nodelay(move |enabled| {
+    bridge.on_change_tcp_nodelay(move |enabled| {
         if let Some(w) = window_weak_tcp.upgrade() {
-            w.set_setting_tcp_nodelay(enabled);
+            w.global::<SettingsBridge>().set_setting_tcp_nodelay(enabled);
         }
         let _ = core_state_tcp.storage().config().update(Box::new(move |c| {
             c.tcp_nodelay = enabled;
@@ -689,13 +692,13 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     ];
     let rules_state = std::rc::Rc::new(std::cell::RefCell::new(initial_rules.clone()));
     bridge.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_rules.clone()))));
-    window.set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_rules))));
+    window.global::<SettingsBridge>().set_terminal_keyword_rules(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(initial_rules))));
 
     // 注册添加规则
     let rules_state_add = rules_state.clone();
     let window_weak_add = window.as_weak();
     let notif_add = ctx.notifications.clone();
-    window.on_add_keyword_rule(move |pattern, remark, color_hex| {
+    bridge.on_add_keyword_rule(move |pattern, remark, color_hex| {
         let p = pattern.as_str().trim();
         if p.is_empty() { return; }
         let mut list = rules_state_add.borrow_mut();
@@ -713,7 +716,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak_add.upgrade() {
             let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
-            w.set_terminal_keyword_rules(model);
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
     });
 
@@ -721,7 +724,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let rules_state_edit = rules_state.clone();
     let window_weak_edit = window.as_weak();
     let notif_edit = ctx.notifications.clone();
-    window.on_update_keyword_rule(move |id, pattern, remark, color_hex| {
+    bridge.on_update_keyword_rule(move |id, pattern, remark, color_hex| {
         let p = pattern.as_str().trim();
         if p.is_empty() { return; }
         let mut list = rules_state_edit.borrow_mut();
@@ -735,14 +738,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak_edit.upgrade() {
             let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
-            w.set_terminal_keyword_rules(model);
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
     });
 
     // 注册开关规则
     let rules_state_toggle = rules_state.clone();
     let window_weak_toggle = window.as_weak();
-    window.on_toggle_keyword_rule(move |id, enabled| {
+    bridge.on_toggle_keyword_rule(move |id, enabled| {
         let mut list = rules_state_toggle.borrow_mut();
         if let Some(item) = list.iter_mut().find(|r| r.id == id) {
             item.enabled = enabled;
@@ -750,7 +753,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak_toggle.upgrade() {
             let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
-            w.set_terminal_keyword_rules(model);
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
     });
 
@@ -758,409 +761,50 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let rules_state_del = rules_state.clone();
     let window_weak_del = window.as_weak();
     let notif_del = ctx.notifications.clone();
-    window.on_delete_keyword_rule(move |id| {
+    bridge.on_delete_keyword_rule(move |id| {
         let mut list = rules_state_del.borrow_mut();
         list.retain(|r| r.id != id);
         notif_del.info("规则已移除", "已成功删除该条终端高亮规则");
         if let Some(w) = window_weak_del.upgrade() {
             let model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone())));
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
-            w.set_terminal_keyword_rules(model);
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
     });
 
     // -------------------------------------------------------------------------
-    // 6. SettingsBridge 完整双向回调与操作代理挂载 (打通设置中心全部 Tab 交互)
+    
     // -------------------------------------------------------------------------
+    // 5. 窗口交互与生命周期设置回调
+    // -------------------------------------------------------------------------
+
+
+
+
     let w_b = window.as_weak();
-    bridge.on_change_ui_font({
-        let w_b = w_b.clone();
-        move |font_name| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_ui_font(font_name);
-            }
-        }
-    });
-
-    bridge.on_switch_language({
-        let w_b = w_b.clone();
-        move |lang| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_switch_language(lang);
-            }
-        }
-    });
-
-    bridge.on_change_modal_opacity({
-        let w_b = w_b.clone();
-        move |opacity| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_modal_opacity(opacity);
-            }
-        }
-    });
-
-    bridge.on_change_close_action({
-        let w_b = w_b.clone();
-        move |action| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_close_action(action);
-            }
-        }
-    });
-
-    bridge.on_toggle_always_on_top({
-        let w_b = w_b.clone();
-        move |val| {
-            if let Some(w) = w_b.upgrade() {
-                let bridge = w.global::<SettingsBridge>();
-                bridge.set_setting_always_on_top(val);
-                w.set_setting_always_on_top(val);
-            }
-        }
-    });
-
-    bridge.on_toggle_start_on_boot({
-        let w_b = w_b.clone();
-        let core_state = ctx.core_state.clone();
-        move |val| {
-            let _ = core_state.storage().config().update(Box::new(move |c| {
-                c.start_on_boot = val;
-            }));
-            if let Some(w) = w_b.upgrade() {
-                let bridge = w.global::<SettingsBridge>();
-                bridge.set_setting_start_on_boot(val);
-                w.set_setting_start_on_boot(val);
-            }
-        }
-    });
-
+    let core_state = ctx.core_state.clone();
     bridge.on_toggle_confirm_close_tab({
         let w_b = w_b.clone();
-        let core_state = ctx.core_state.clone();
         move |val| {
             let _ = core_state.storage().config().update(Box::new(move |c| {
                 c.confirm_close_tab = val;
             }));
             if let Some(w) = w_b.upgrade() {
-                let bridge = w.global::<SettingsBridge>();
-                bridge.set_setting_confirm_close_tab(val);
-                w.set_setting_confirm_close_tab(val);
+                w.global::<SettingsBridge>().set_setting_confirm_close_tab(val);
             }
         }
     });
 
-    bridge.on_toggle_confirm_close_active({
-        let w_b = w_b.clone();
-        let core_state = ctx.core_state.clone();
-        move |val| {
-            let _ = core_state.storage().config().update(Box::new(move |c| {
-                c.confirm_close_active = val;
-            }));
-            if let Some(w) = w_b.upgrade() {
-                let bridge = w.global::<SettingsBridge>();
-                bridge.set_setting_confirm_close_active(val);
-                w.set_setting_confirm_close_active(val);
-            }
-        }
-    });
 
-    bridge.on_create_custom_theme({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_create_custom_theme();
-            }
-        }
-    });
 
-    bridge.on_import_theme({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_import_theme();
-            }
-        }
-    });
-
-    bridge.on_export_current_theme({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_export_current_theme();
-            }
-        }
-    });
-
-    bridge.on_switch_theme({
-        let w_b = w_b.clone();
-        move |theme_id| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_switch_theme(theme_id);
-            }
-        }
-    });
-
-    bridge.on_delete_custom_theme({
-        let w_b = w_b.clone();
-        move |theme_id| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_delete_custom_theme(theme_id);
-            }
-        }
-    });
-
-    bridge.on_change_wallpaper({
-        let w_b = w_b.clone();
-        move |mode, path, opacity| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_set_wallpaper(mode, path, opacity);
-            }
-        }
-    });
-
-    bridge.on_add_wallpaper({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_add_wallpaper_image();
-            }
-        }
-    });
-
-    bridge.on_add_wallpaper_folder({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_add_wallpaper_folder();
-            }
-        }
-    });
-
-    bridge.on_remove_wallpaper({
-        let w_b = w_b.clone();
-        move |idx| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_remove_wallpaper_image(idx);
-            }
-        }
-    });
-
-    bridge.on_select_wallpaper({
-        let w_b = w_b.clone();
-        move |idx| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_select_wallpaper_image(idx);
-            }
-        }
-    });
-
-    bridge.on_set_wallpaper_slideshow({
-        let w_b = w_b.clone();
-        move |interval, transition| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_set_wallpaper_slideshow(interval, transition);
-            }
-        }
-    });
-
-    bridge.on_change_terminal_font({
-        let w_b = w_b.clone();
-        move |font, size| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_set_terminal_font(font, size as f32);
-            }
-        }
-    });
-
-    bridge.on_change_cursor_style({
-        let w_b = w_b.clone();
-        move |style| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_cursor_style(style);
-            }
-        }
-    });
-
-    bridge.on_change_cursor_blink({
-        let w_b = w_b.clone();
-        move |blink| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_cursor_blink(blink);
-            }
-        }
-    });
-
-    bridge.on_change_scrollback_lines({
-        let w_b = w_b.clone();
-        move |lines| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_scrollback_lines(lines);
-            }
-        }
-    });
-
-    bridge.on_change_copy_on_select({
-        let w_b = w_b.clone();
-        move |enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_copy_on_select(enabled);
-            }
-        }
-    });
-
-    bridge.on_change_paste_on_right_click({
-        let w_b = w_b.clone();
-        move |enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_paste_on_right_click(enabled);
-            }
-        }
-    });
-
-    bridge.on_change_warn_multiline_paste({
-        let w_b = w_b.clone();
-        move |enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_warn_multiline_paste(enabled);
-            }
-        }
-    });
-
-    bridge.on_change_bell_style({
-        let w_b = w_b.clone();
-        move |style| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_bell_style(style);
-            }
-        }
-    });
-
-    bridge.on_change_terminal_url_click({
-        let w_b = w_b.clone();
-        move |enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_terminal_url_click(enabled);
-            }
-        }
-    });
-
-    bridge.on_change_terminal_highlight_keywords({
-        let w_b = w_b.clone();
-        move |enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_terminal_highlight_keywords(enabled);
-            }
-        }
-    });
-
-    bridge.on_add_keyword_rule({
-        let w_b = w_b.clone();
-        move |pattern, remark, color_hex| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_add_keyword_rule(pattern, remark, color_hex);
-            }
-        }
-    });
-
-    bridge.on_update_keyword_rule({
-        let w_b = w_b.clone();
-        move |id, pattern, remark, color_hex| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_update_keyword_rule(id, pattern, remark, color_hex);
-            }
-        }
-    });
-
-    bridge.on_delete_keyword_rule({
-        let w_b = w_b.clone();
-        move |id| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_delete_keyword_rule(id);
-            }
-        }
-    });
-
-    bridge.on_toggle_keyword_rule({
-        let w_b = w_b.clone();
-        move |id, enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_toggle_keyword_rule(id, enabled);
-            }
-        }
-    });
-
-    bridge.on_change_global_proxy({
-        let w_b = w_b.clone();
-        move |mode, server, auth, user, pass| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_global_proxy(mode, server, auth, user, pass);
-            }
-        }
-    });
-
-    bridge.on_change_network_handshake({
-        let w_b = w_b.clone();
-        move |timeout, interval, count_max| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_network_handshake(timeout, interval, count_max);
-            }
-        }
-    });
-
-    bridge.on_change_host_key_policy({
-        let w_b = w_b.clone();
-        move |policy| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_host_key_policy(policy);
-            }
-        }
-    });
-
-    bridge.on_change_tcp_nodelay({
-        let w_b = w_b.clone();
-        move |enabled| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_change_tcp_nodelay(enabled);
-            }
-        }
-    });
-
-    bridge.on_export_backup_archive({
-        let w_b = w_b.clone();
-        move |include_passwords| {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_export_backup_archive(include_passwords);
-            }
-        }
-    });
-
-    bridge.on_scan_and_import_openssh({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_scan_and_import_openssh();
-            }
-        }
-    });
-
-    bridge.on_factory_reset_settings({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.invoke_factory_reset_settings();
-            }
-        }
-    });
-
-    bridge.on_close_settings({
-        let w_b = w_b.clone();
-        move || {
-            if let Some(w) = w_b.upgrade() {
-                w.set_main_view("terminal".into());
-                let bridge = w.global::<SettingsBridge>();
-                bridge.set_active_category("general".into());
-            }
+    let w_b = window.as_weak();
+    bridge.on_close_settings(move || {
+        if let Some(w) = w_b.upgrade() {
+            let wb = w.global::<WindowBridge>();
+            wb.set_main_view("terminal".into());
+            wb.set_active_left_tab("hosts".into());
+            wb.set_is_left_drawer_open(true);
+            w.global::<SettingsBridge>().set_active_category("general".into());
         }
     });
 }

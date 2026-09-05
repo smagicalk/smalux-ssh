@@ -17,6 +17,7 @@ export global TerminalBridge {
 
     // 多分屏与窗格拓扑
     in-out property <bool> is-split: false;
+    in-out property <int> split-count: 1;
     in-out property <string> split-orientation: "vertical";
     in-out property <float> split-ratio: 0.5;
     in-out property <int> active-pane-index: 0;
@@ -33,21 +34,51 @@ export global TerminalBridge {
     in-out property <image> terminal-split2-image;
     in-out property <image> terminal-split3-image;
 
-    // 交互回调
+    // 终端历史与回滚
+    in-out property <int> history-size: 0;
+    in-out property <int> scroll-offset: 0;
+
+    // 终端动态尺寸 (自适应计算字符列数与行数，由视口同步给 Rust 后台 PTY)
+    in-out property <int> terminal-cols: 80;
+    in-out property <int> terminal-rows: 24;
+    in-out property <float> canvas-width: 800;
+    in-out property <float> canvas-height: 600;
+
+    // 标签页关闭二次防误触确认弹窗状态与回调
+    in-out property <bool> is-tab-close-confirm-open: false;
+    in-out property <string> tab-close-confirm-title: "";
+    in-out property <string> tab-close-confirm-message: "";
+    callback confirm-close-tab();
+    callback cancel-close-tab();
+
+    // 会话与 Tab 交互回调
     callback select-tab(string /* id */);
     callback close-tab(string /* id */);
     callback new-tab();
-    callback split-pane(string /* pane_id */, string /* direction */);
-    callback close-pane(string /* pane_id */);
-    callback select-pane(string /* pane_id */);
-    callback toggle-zoom(string /* pane_id */);
-    callback set-split-ratio(float /* ratio */);
-    callback resize-splitter(string /* splitter_id */, length /* offset_x */, length /* offset_y */);
-    callback toggle-broadcast(bool /* enabled */);
-    callback key-pressed(string /* key */);
-    callback text-input(string /* text */);
-    callback scroll-viewport(length /* delta_y */);
-    callback paste-text();
-    callback copy-selection();
-    callback tab-context-menu(string /* tab_id */, length /* x */, length /* y */);
+    callback select-pane-tab(string /* pane_id */, string /* tab_id */);
+    callback close-pane-tab(string /* pane_id */, string /* tab_id */);
+    callback copy-tab-ip(string /* tab_id */);
+    callback close-other-tabs(string /* pane_id */, string /* tab_id */);
+    callback move-terminal-tab(string /* from_pane_id */, int /* from_index */, length /* drop_x */, length /* drop_y */);
+    callback send-snippet(string /* cmd */);
+
+    // 分屏窗格调度回调
+    callback split-terminal(string /* orientation */);
+    callback close-split();
+    callback close-pane-by-id(string /* pane_id */);
+    callback close-pane-by-index(int /* index */);
+    callback select-pane(int /* index */);
+    callback select-pane-by-id(string /* pane_id */);
+    callback toggle-pane-zoom(string /* pane_id */);
+    callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
+
+    // 终端核心底层交互回调
+    callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
+    callback terminal-scroll(length /* delta */);
+    callback terminal-selection-changed(int /* start_col */, int /* start_row */, int /* end_col */, int /* end_row */, bool /* has_selection */);
+    callback terminal-copy();
+    callback terminal-paste();
+    callback terminal-clear();
+    callback search-terminal(string /* query */, bool /* match_case */);
+    callback terminal-resize(int /* cols */, int /* rows */);
 }

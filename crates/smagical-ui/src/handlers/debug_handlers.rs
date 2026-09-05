@@ -12,7 +12,7 @@ use crate::debug::{
 };
 
 use crate::debug_ui::sync_ui_debug_logs;
-use crate::generated::{AppWindow, HostItemData};
+use crate::generated::{AppTheme, AppWindow, CredentialsBridge, DebugBridge, HostItemData, HostsBridge, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use crate::tree_model::{
     build_group_options, build_search_tree_nodes, build_visible_tree_nodes,
@@ -27,7 +27,8 @@ use crate::tree_model::{
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
-    window.set_is_log_capture_enabled(crate::debug::is_log_capture_enabled());
+    let db = window.global::<DebugBridge>();
+    db.set_is_log_capture_enabled(crate::debug::is_log_capture_enabled());
 
     // -------------------------------------------------------------------------
     // 0.1 批量生成主机资产
@@ -38,7 +39,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_bg = Rc::clone(&ctx.expanded_groups);
     let selector_bg = Rc::clone(&ctx.selector_expanded_groups);
     let search_bg = Rc::clone(&ctx.search_query);
-    window.on_debug_batch_generate(move |prefix, count_str, ip_prefix, start_ip_str, port_str, group, status_mode, overwrite| {
+    db.on_batch_generate(move |prefix, count_str, ip_prefix, start_ip_str, port_str, group, status_mode, overwrite| {
 
         if let Some(w) = window_weak.upgrade() {
             let p_str = prefix.to_string();
@@ -77,7 +78,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
 
             if overwrite {
                 *master_tree_bg.borrow_mut() = new_tree.clone();
-                w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
+                w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
             } else {
                 let mut current_tree = master_tree_bg.borrow_mut();
                 let (leaf_gid, leaf_lvl, _leaf_name) = ensure_raw_group_hierarchy(&mut current_tree, &grp_str);
@@ -92,10 +93,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                     }
                 }
 
-                let hosts = w.get_hosts();
+                let hosts = w.global::<HostsBridge>().get_hosts();
                 let mut host_list: Vec<HostItemData> = (0..hosts.row_count()).filter_map(|i| hosts.row_data(i)).collect();
                 host_list.extend(new_cards);
-                w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+                w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
             }
 
             // 展开新增的分组
@@ -108,7 +109,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let tree = master_tree_bg.borrow();
             let opts = build_group_options(&tree, &selector_bg.borrow());
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
             let q = search_bg.borrow().clone();
             let next_nodes = if q.is_empty() {
@@ -116,8 +117,8 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_debug::batch", "批量生成主机资产完成 (共 {} 台, 挂载分组: {})", cnt, grp_str);
             sync_ui_debug_logs(&w);
@@ -133,7 +134,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_bs = Rc::clone(&ctx.expanded_groups);
     let search_bs = Rc::clone(&ctx.search_query);
     let core_state_bs = Rc::clone(&ctx.core_state);
-    window.on_debug_batch_update_status(move |status_mode| {
+    db.on_batch_update_status(move |status_mode| {
         if let Some(w) = window_weak.upgrade() {
             let st = status_mode.as_str();
             let mut tree = master_tree_bs.borrow_mut();
@@ -158,7 +159,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-            let hosts = w.get_hosts();
+            let hosts = w.global::<HostsBridge>().get_hosts();
             let mut host_list: Vec<HostItemData> = (0..hosts.row_count()).filter_map(|i| hosts.row_data(i)).collect();
             for (i, card) in host_list.iter_mut().enumerate() {
                 let (s, ping) = match st {
@@ -178,7 +179,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 card.status = s.into();
                 card.ping_ms = ping;
             }
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
             // 同步批量状态更新至存储层
             if let Ok(stored_hosts) = core_state_bs.storage().hosts().list_all() {
@@ -201,8 +202,8 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_debug::batch", "批量变更全量主机状态为: {}", st);
             sync_ui_debug_logs(&w);
@@ -217,7 +218,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let master_tree_bp = Rc::clone(&ctx.master_tree);
     let expanded_bp = Rc::clone(&ctx.expanded_groups);
     let search_bp = Rc::clone(&ctx.search_query);
-    window.on_debug_batch_update_port(move |new_port_str| {
+    db.on_batch_update_port(move |new_port_str| {
         if let Some(w) = window_weak.upgrade() {
             let new_port = new_port_str.as_str().parse::<i32>().unwrap_or(22);
             let mut tree = master_tree_bp.borrow_mut();
@@ -227,12 +228,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-            let hosts = w.get_hosts();
+            let hosts = w.global::<HostsBridge>().get_hosts();
             let mut host_list: Vec<HostItemData> = (0..hosts.row_count()).filter_map(|i| hosts.row_data(i)).collect();
             for card in host_list.iter_mut() {
                 card.port = new_port;
             }
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
             let q = search_bp.borrow().clone();
             let next_nodes = if q.is_empty() {
@@ -240,8 +241,8 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_debug::batch", "批量修改全量主机 SSH 端口为: {}", new_port);
             sync_ui_debug_logs(&w);
@@ -257,7 +258,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_inj = Rc::clone(&ctx.expanded_groups);
     let selector_inj = Rc::clone(&ctx.selector_expanded_groups);
     let search_inj = Rc::clone(&ctx.search_query);
-    window.on_debug_inject_preset(move |preset_id| {
+    db.on_inject_preset(move |preset_id| {
 
         if let Some(w) = window_weak.upgrade() {
             let p_id = preset_id.as_str();
@@ -277,7 +278,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 .collect();
 
             *master_tree_inj.borrow_mut() = new_tree.clone();
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
+            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
 
             // 预设注入后展开所有顶级及二级分组
             let mut exp = expanded_inj.borrow_mut();
@@ -292,7 +293,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let opts = build_group_options(&new_tree, &sel);
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
             let q = search_inj.borrow().clone();
             let next_nodes = if q.is_empty() {
@@ -300,8 +301,8 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&new_tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_debug::preset", "已成功注入调试场景预设: [{}] (共 {} 个节点)", p_id, new_tree.len());
             sync_ui_debug_logs(&w);
@@ -319,7 +320,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let search_qh = Rc::clone(&ctx.search_query);
     let core_state_qh = Rc::clone(&ctx.core_state);
     let next_hid = Rc::new(RefCell::new(100));
-    window.on_debug_quick_add_host(move |name, ip, port_str, group| {
+    db.on_quick_add_host(move |name, ip, port_str, group| {
         if let Some(w) = window_weak.upgrade() {
             let h_name = name.trim().to_string();
             let h_ip = ip.trim().to_string();
@@ -377,7 +378,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             let _ = core_state_qh.storage().hosts().save(&host_rec);
 
             let opts = build_group_options(&tree, &selector_qh.borrow());
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
             let q = search_qh.borrow().clone();
             let next_nodes = if q.is_empty() {
@@ -385,8 +386,8 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             let card = HostItemData {
                 id: new_id.into(),
@@ -397,10 +398,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 status: "online".into(),
                 ping_ms: 22,
             };
-            let hosts = w.get_hosts();
+            let hosts = w.global::<HostsBridge>().get_hosts();
             let mut host_list: Vec<HostItemData> = (0..hosts.row_count()).filter_map(|i| hosts.row_data(i)).collect();
             host_list.push(card);
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
             tracing::info!(target: "smagical_debug::data", "快速添加主机: {} ({}:{})", h_name, h_ip, port);
             sync_ui_debug_logs(&w);
@@ -416,7 +417,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_qg = Rc::clone(&ctx.expanded_groups);
     let selector_qg = Rc::clone(&ctx.selector_expanded_groups);
     let search_qg = Rc::clone(&ctx.search_query);
-    window.on_debug_quick_add_group(move |name, _parent| {
+    db.on_quick_add_group(move |name, _parent| {
         if let Some(w) = window_weak.upgrade() {
             let g_name = name.trim().to_string();
             if g_name.is_empty() { return; }
@@ -432,7 +433,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let opts = build_group_options(&tree, &selector_qg.borrow());
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
             let q = search_qg.borrow().clone();
             let next_nodes = if q.is_empty() {
@@ -440,8 +441,8 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_debug::data", "快速创建嵌套分组: {}", g_name);
             sync_ui_debug_logs(&w);
@@ -455,13 +456,13 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let master_tree_clr = Rc::clone(&ctx.master_tree);
     let core_state_clr = Rc::clone(&ctx.core_state);
-    window.on_debug_clear_data(move || {
+    db.on_clear_all_data(move || {
         if let Some(w) = window_weak.upgrade() {
             master_tree_clr.borrow_mut().clear();
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostTreeNode>::new()))));
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostItemData>::new()))));
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::GroupOptionData>::new()))));
-            w.set_tree_content_width(240.0_f32);
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostTreeNode>::new()))));
+            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostItemData>::new()))));
+            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::GroupOptionData>::new()))));
+            w.global::<HostsBridge>().set_tree_content_width(240.0_f32);
             // 同步清空存储层
             if let Ok(hosts) = core_state_clr.storage().hosts().list_all() {
                 for h in &hosts { let _ = core_state_clr.storage().hosts().delete(&h.id); }
@@ -482,7 +483,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let master_tree_rst = Rc::clone(&ctx.master_tree);
     let expanded_rst = Rc::clone(&ctx.expanded_groups);
     let selector_rst = Rc::clone(&ctx.selector_expanded_groups);
-    window.on_debug_reset_default_data(move || {
+    db.on_reset_default_data(move || {
         if let Some(w) = window_weak.upgrade() {
             let (def_tree_raw, def_cards_raw) = get_preset_by_id("minimal");
             let def_tree: Vec<RawTreeNode> = def_tree_raw.into_iter().map(RawTreeNode::from).collect();
@@ -500,7 +501,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 .collect();
 
             *master_tree_rst.borrow_mut() = def_tree.clone();
-            w.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(def_cards))));
+            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(def_cards))));
 
             let mut exp = expanded_rst.borrow_mut();
             let mut sel = selector_rst.borrow_mut();
@@ -514,11 +515,11 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let opts = build_group_options(&def_tree, &sel);
-            w.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
             let next_nodes = build_visible_tree_nodes(&def_tree, &exp);
-            w.set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
+            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
 
             tracing::info!(target: "smagical_debug::data", "已重置恢复至默认精简数据集 (Minimal)");
             sync_ui_debug_logs(&w);
@@ -530,12 +531,11 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 清空全局内存 Tracing 日志缓冲区与 Slint 前端日志列表。
     let window_weak = window.as_weak();
-    window.on_debug_clear_logs(move || {
+    db.on_clear_logs(move || {
         if let Some(w) = window_weak.upgrade() {
             if let Ok(mut buf) = crate::debug::get_global_log_buffer().lock() {
                 buf.clear();
             }
-            w.set_debug_logs(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::new()))));
             tracing::info!(target: "smagical_debug::log", "调试日志已清空");
             sync_ui_debug_logs(&w);
         }
@@ -546,7 +546,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 一键向 Tracing 日志流注入 INFO / WARN / ERROR 三种级别的模拟诊断日志。
     let window_weak = window.as_weak();
-    window.on_debug_emit_test_log(move |_level| {
+    db.on_emit_test_log(move |_level| {
         if let Some(w) = window_weak.upgrade() {
             tracing::info!(target: "smagical_debug::mock", "这是一条 INFO 测试诊断日志");
             tracing::warn!(target: "smagical_debug::mock", "这是一条 WARN 警告诊断日志");
@@ -559,7 +559,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 8. 强制全屏重绘 (Force Repaint)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    window.on_debug_force_repaint(move || {
+    db.on_force_repaint(move || {
         if let Some(w) = window_weak.upgrade() {
             w.window().request_redraw();
             tracing::info!(target: "smagical_debug::render", "已触发 GPU 全屏强制重绘 (Force Repaint)");
@@ -573,7 +573,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let pane_groups_bm = Rc::clone(&ctx.pane_groups);
     let active_terminals_bm = Rc::clone(&ctx.active_terminals);
-    window.on_debug_run_benchmark(move || {
+    db.on_run_benchmark(move || {
         if let Some(w) = window_weak.upgrade() {
             let groups = pane_groups_bm.borrow();
             if let Some(active_sess) = groups.first().and_then(|g| g.get_active_session()) {
@@ -593,14 +593,14 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_pipe = ctx.core_state.clone();
-    window.on_debug_switch_pipeline(move |pipe_id| {
+    db.on_switch_pipeline(move |pipe_id| {
         let p_str = pipe_id.to_string();
         // Safety: 设置环境变量以在下次启动或测试时生效
         unsafe {
             std::env::set_var("SLINT_BACKEND", &p_str);
         }
         if let Some(w) = window_weak.upgrade() {
-            w.set_active_rendering_pipeline(p_str.clone().into());
+            w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
             core_state_pipe.events().dispatch(&ConfigChangedEvent {
                 key: "rendering.pipeline".into(),
                 old_val: "".into(),
@@ -616,9 +616,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 11. 保存管线配置并生效 (Apply Pipeline)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    window.on_debug_apply_pipeline(move || {
+    db.on_save_pipeline(move || {
         if let Some(w) = window_weak.upgrade() {
-            let cur = w.get_active_rendering_pipeline().to_string();
+            let cur = w.global::<WindowBridge>().get_active_rendering_pipeline().to_string();
             // Safety: 设置环境变量以持久化渲染后端配置
             unsafe {
                 std::env::set_var("SLINT_BACKEND", &cur);
@@ -634,9 +634,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let persistence_guard = ctx.persistence_guard.clone();
-    window.on_debug_restart_app(move || {
+    db.on_restart_app(move || {
         if let Some(w) = window_weak.upgrade() {
-            let cur = w.get_active_rendering_pipeline().to_string();
+            let cur = w.global::<WindowBridge>().get_active_rendering_pipeline().to_string();
             unsafe {
                 std::env::set_var("SLINT_BACKEND", &cur);
             }
@@ -663,10 +663,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let notif_log = ctx.notifications.clone();
     let window_weak_log = window.as_weak();
-    window.on_toggle_log_capture(move |enabled| {
+    db.on_toggle_log_capture(move |enabled| {
         crate::debug::set_log_capture_enabled(enabled);
         if let Some(w) = window_weak_log.upgrade() {
-            w.set_is_log_capture_enabled(enabled);
+            w.global::<DebugBridge>().set_is_log_capture_enabled(enabled);
             if enabled {
                 sync_ui_debug_logs(&w);
             }
@@ -687,7 +687,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         slint::TimerMode::Repeated,
         std::time::Duration::from_millis(500),
         move || {
-            if let Some(w) = window_weak.upgrade().filter(|w| w.get_is_debug_modal_open()) {
+            if let Some(w) = window_weak.upgrade().filter(|w| w.global::<DebugBridge>().get_is_open()) {
                 sync_ui_debug_logs(&w);
             }
         },
@@ -699,7 +699,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let core_state_bg_cred = ctx.core_state.clone();
     let notif_bg_cred = ctx.notifications.clone();
-    window.on_debug_batch_generate_credentials(move |count_str, mode_str, overwrite| {
+    db.on_batch_generate_credentials(move |count_str, mode_str, overwrite| {
         if let Some(w) = window_weak.upgrade() {
             let count = count_str.as_str().parse::<usize>().unwrap_or(10).max(1);
             let mode = mode_str.to_string();
@@ -777,8 +777,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let _ = core_state_bg_cred.storage().credentials().save_batch(&batch_records);
-            let cat = w.get_credential_filter_category().to_string();
-            let q = w.get_credential_search_query().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let cat = bridge.get_credential_filter_category().to_string();
+            let q = bridge.get_credential_search_query().to_string();
             crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_bg_cred, &cat, &q);
             notif_bg_cred.success("批量凭据生成完成", &format!("成功注入 {} 条测试凭据数据", count));
         }
@@ -790,7 +791,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let core_state_qa_cred = ctx.core_state.clone();
     let notif_qa_cred = ctx.notifications.clone();
-    window.on_debug_quick_add_credential(move |ctype, name, data| {
+    db.on_quick_add_credential(move |ctype, name, data| {
         if let Some(w) = window_weak.upgrade() {
             let id = format!("cred-quick-{}", uuid::Uuid::new_v4().to_string().chars().take(8).collect::<String>());
             let c_name = name.to_string();
@@ -855,8 +856,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             };
 
             let _ = core_state_qa_cred.storage().credentials().save(&rec);
-            let cat = w.get_credential_filter_category().to_string();
-            let q = w.get_credential_search_query().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let cat = bridge.get_credential_filter_category().to_string();
+            let q = bridge.get_credential_search_query().to_string();
             crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_qa_cred, &cat, &q);
             notif_qa_cred.success("凭据添加成功", &format!("已成功注入: {}", c_name));
         }
@@ -868,7 +870,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let core_state_rst_cred = ctx.core_state.clone();
     let notif_rst_cred = ctx.notifications.clone();
-    window.on_debug_reset_default_credentials(move || {
+    db.on_reset_default_credentials(move || {
         if let Some(w) = window_weak.upgrade() {
             if let Ok(existing) = core_state_rst_cred.storage().credentials().list_all() {
                 for c in existing {
@@ -970,8 +972,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             ];
 
             let _ = core_state_rst_cred.storage().credentials().save_batch(&default_creds);
-            let cat = w.get_credential_filter_category().to_string();
-            let q = w.get_credential_search_query().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let cat = bridge.get_credential_filter_category().to_string();
+            let q = bridge.get_credential_search_query().to_string();
             crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_rst_cred, &cat, &q);
             notif_rst_cred.success("预设恢复完成", "已重新载入 6 项精选预设凭据");
         }
@@ -983,7 +986,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let core_state_clr_cred = ctx.core_state.clone();
     let notif_clr_cred = ctx.notifications.clone();
-    window.on_debug_clear_credentials(move || {
+    db.on_clear_credentials(move || {
         if let Some(w) = window_weak.upgrade() {
             if let Ok(existing) = core_state_clr_cred.storage().credentials().list_all() {
                 for c in existing {
@@ -991,8 +994,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-            let cat = w.get_credential_filter_category().to_string();
-            let q = w.get_credential_search_query().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let cat = bridge.get_credential_filter_category().to_string();
+            let q = bridge.get_credential_search_query().to_string();
             crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_clr_cred, &cat, &q);
             notif_clr_cred.info("凭据已清空", "所有凭据数据已从存储层完全清除");
         }
@@ -1004,7 +1008,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let ctx = ctx.clone();
-        window.on_debug_batch_generate_snippets(move |count_str, overwrite| {
+        db.on_batch_generate_snippets(move |count_str, overwrite| {
             if let Some(w) = window_weak.upgrade() {
                 let count = count_str.as_str().parse::<usize>().unwrap_or(10).min(100);
                 if overwrite {
@@ -1046,7 +1050,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let ctx = ctx.clone();
-        window.on_debug_quick_add_snippet(move |title, lang, cmd| {
+        db.on_quick_add_snippet(move |title, lang, cmd| {
             if let Some(w) = window_weak.upgrade() {
                 let new_id = format!("snip-quick-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
                 let snip = smagical_core::SnippetRecord {
@@ -1076,7 +1080,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let ctx = ctx.clone();
-        window.on_debug_reset_default_snippets(move || {
+        db.on_reset_default_snippets(move || {
             if let Some(w) = window_weak.upgrade() {
                 let default_storage = smagical_core::MockStorage::new_seeded();
                 if let Ok(groups) = default_storage.snippets().list_groups() {
@@ -1099,7 +1103,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let ctx = ctx.clone();
-        window.on_debug_clear_snippets(move || {
+        db.on_clear_snippets(move || {
             if let Some(w) = window_weak.upgrade() {
                 if let Ok(existing) = ctx.core_state.storage().snippets().list_all() {
                     for s in existing {
@@ -1119,7 +1123,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
         let core_state_flag = ctx.core_state.clone();
-        window.on_toggle_feature_flag(move |flag_name, enabled| {
+        db.on_toggle_feature_flag(move |flag_name, enabled| {
             let f = flag_name.as_str();
             let label = match f {
                 "desktop_notifications" => "系统级桌面托盘气泡通知",
@@ -1151,10 +1155,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }));
             if let Some(w) = window_weak.upgrade() {
                 match f {
-                    "desktop_notifications" => w.set_flag_desktop_notifications(enabled),
-                    "terminal_crt_shader" => w.set_flag_terminal_crt_shader(enabled),
-                    "cloud_sync" => w.set_flag_cloud_sync(enabled),
-                    "terminal_scratchpad" => w.set_flag_terminal_scratchpad(enabled),
+                    "desktop_notifications" => w.global::<DebugBridge>().set_flag_desktop_notifications(enabled),
+                    "terminal_crt_shader" => w.global::<DebugBridge>().set_flag_terminal_crt_shader(enabled),
+                    "cloud_sync" => w.global::<DebugBridge>().set_flag_cloud_sync(enabled),
+                    "terminal_scratchpad" => w.global::<DebugBridge>().set_flag_terminal_scratchpad(enabled),
                     _ => {}
                 }
             }
@@ -1168,10 +1172,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
         let core_state_mock = ctx.core_state.clone();
-        window.on_toggle_mock_storage(move |enabled| {
+        db.on_toggle_mock_storage(move |enabled| {
             core_state_mock.set_mock_storage(enabled);
             if let Some(w) = window_weak.upgrade() {
-                w.set_use_mock_storage(enabled);
+                w.global::<DebugBridge>().set_use_mock_storage(enabled);
             }
             if enabled {
                 notif.success("数据层切换成功", "已切换至 [Mock 数据层] 内存种子存储模式");
@@ -1187,43 +1191,43 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
-        window.on_apply_config_preset(move |preset_name| {
+        db.on_apply_config_preset(move |preset_name| {
             let p = preset_name.as_str();
             if let Some(w) = window_weak.upgrade() {
                 match p {
                     "flags_all_on" => {
-                        w.set_flag_desktop_notifications(true);
-                        w.set_flag_terminal_crt_shader(true);
-                        w.set_flag_cloud_sync(true);
-                        w.set_flag_terminal_scratchpad(true);
+                        w.global::<DebugBridge>().set_flag_desktop_notifications(true);
+                        w.global::<DebugBridge>().set_flag_terminal_crt_shader(true);
+                        w.global::<DebugBridge>().set_flag_cloud_sync(true);
+                        w.global::<DebugBridge>().set_flag_terminal_scratchpad(true);
                         notif.success("全部实验特性已开启", "所有实验室特性门控已开启，已在设置中全量显现");
                     }
                     "flags_all_off" => {
-                        w.set_flag_desktop_notifications(false);
-                        w.set_flag_terminal_crt_shader(false);
-                        w.set_flag_cloud_sync(false);
-                        w.set_flag_terminal_scratchpad(false);
+                        w.global::<DebugBridge>().set_flag_desktop_notifications(false);
+                        w.global::<DebugBridge>().set_flag_terminal_crt_shader(false);
+                        w.global::<DebugBridge>().set_flag_cloud_sync(false);
+                        w.global::<DebugBridge>().set_flag_terminal_scratchpad(false);
                         notif.info("全部实验特性已关闭", "已静默隐藏所有未定或实验阶段的功能选项");
                     }
                     "geek" => {
-                        w.set_flag_desktop_notifications(true);
-                        w.set_flag_terminal_crt_shader(true);
-                        w.set_flag_cloud_sync(true);
-                        w.set_flag_terminal_scratchpad(true);
-                        w.set_setting_confirm_close_tab(false);
-                        w.set_setting_confirm_close_active(false);
-                        w.set_active_rendering_pipeline("winit-skia".into());
+                        w.global::<DebugBridge>().set_flag_desktop_notifications(true);
+                        w.global::<DebugBridge>().set_flag_terminal_crt_shader(true);
+                        w.global::<DebugBridge>().set_flag_cloud_sync(true);
+                        w.global::<DebugBridge>().set_flag_terminal_scratchpad(true);
+                        w.global::<SettingsBridge>().set_setting_confirm_close_tab(false);
+                        w.global::<SettingsBridge>().set_setting_confirm_close_active(false);
+                        w.global::<WindowBridge>().set_active_rendering_pipeline("winit-skia".into());
                         notif.success("极客全开模式", "已启用所有实验特性与高速无确认流模式");
                     }
                     "minimal" => {
-                        w.set_flag_desktop_notifications(false);
-                        w.set_flag_terminal_crt_shader(false);
-                        w.set_flag_cloud_sync(false);
-                        w.set_flag_terminal_scratchpad(false);
-                        w.set_wallpaper_mode("none".into());
-                        w.invoke_set_wallpaper("none".into(), "".into(), 0.20);
-                        w.set_setting_confirm_close_tab(true);
-                        w.set_setting_confirm_close_active(true);
+                        w.global::<DebugBridge>().set_flag_desktop_notifications(false);
+                        w.global::<DebugBridge>().set_flag_terminal_crt_shader(false);
+                        w.global::<DebugBridge>().set_flag_cloud_sync(false);
+                        w.global::<DebugBridge>().set_flag_terminal_scratchpad(false);
+                        w.global::<WindowBridge>().set_wallpaper_mode("none".into());
+                        w.global::<WindowBridge>().invoke_set_wallpaper("none".into(), "".into(), 0.20);
+                        w.global::<SettingsBridge>().set_setting_confirm_close_tab(true);
+                        w.global::<SettingsBridge>().set_setting_confirm_close_active(true);
                         notif.info("极简轻量模式", "已关闭壁纸、隐藏实验特性并恢复安全拦截");
                     }
                     _ => {}
@@ -1239,22 +1243,21 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
         let core_state_reset = ctx.core_state.clone();
-        window.on_reset_all_settings(move || {
+        db.on_reset_all_settings(move || {
             let _ = core_state_reset.storage().config().reset_to_default();
             if let Some(w) = window_weak.upgrade() {
-                w.set_flag_desktop_notifications(false);
-                w.set_flag_terminal_crt_shader(false);
-                w.set_flag_cloud_sync(false);
-                w.set_flag_terminal_scratchpad(false);
-                w.set_setting_desktop_notification(false);
-                w.set_setting_terminal_crt(false);
-                w.set_setting_always_on_top(false);
-                w.set_setting_start_on_boot(false);
-                w.set_setting_confirm_close_tab(true);
-                w.set_setting_confirm_close_active(true);
-                w.set_wallpaper_mode("none".into());
-                w.invoke_set_wallpaper("none".into(), "".into(), 0.20);
-                w.invoke_switch_theme("builtin.ui.darcula".into());
+                w.global::<DebugBridge>().set_flag_desktop_notifications(false);
+                w.global::<DebugBridge>().set_flag_terminal_crt_shader(false);
+                w.global::<DebugBridge>().set_flag_cloud_sync(false);
+                w.global::<DebugBridge>().set_flag_terminal_scratchpad(false);
+                w.global::<SettingsBridge>().set_setting_terminal_crt(false);
+                w.global::<SettingsBridge>().set_setting_always_on_top(false);
+                w.global::<SettingsBridge>().set_setting_start_on_boot(false);
+                w.global::<SettingsBridge>().set_setting_confirm_close_tab(true);
+                w.global::<SettingsBridge>().set_setting_confirm_close_active(true);
+                w.global::<WindowBridge>().set_wallpaper_mode("none".into());
+                w.global::<WindowBridge>().invoke_set_wallpaper("none".into(), "".into(), 0.20);
+                w.global::<WindowBridge>().invoke_switch_theme("builtin.ui.darcula".into());
                 notif.success("恢复出厂设置成功", "所有应用偏好配置与实验特性已重置回初始状态");
             }
         });
@@ -1265,7 +1268,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let notif = ctx.notifications.clone();
-        window.on_toggle_desktop_notification(move |enabled| {
+        db.on_toggle_desktop_notification(move |enabled| {
             if enabled {
                 notif.success("系统级桌面通知", "已开启系统级桌面托盘气泡通知推送");
             } else {
@@ -1279,7 +1282,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let notif = ctx.notifications.clone();
-        window.on_toggle_terminal_crt(move |enabled| {
+        db.on_toggle_terminal_crt(move |enabled| {
             if enabled {
                 notif.success("终端复古 CRT 特效", "已开启复古显像管微弯曲曲面与荧光扫描线滤镜");
             } else {
@@ -1287,10 +1290,56 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
         });
     }
+
+    // -------------------------------------------------------------------------
+    // 27. 弹窗控制、主题切换与全屏导航快捷桥接
+    // -------------------------------------------------------------------------
+    {
+        let window_weak = window.as_weak();
+        db.on_close(move || {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<DebugBridge>().set_is_open(false);
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        db.on_switch_theme(move |id| {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<WindowBridge>().invoke_switch_theme(id);
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        db.on_toggle_color_mode(move || {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<WindowBridge>().invoke_toggle_color_mode();
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        db.on_navigate_to_settings(move |cat| {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<WindowBridge>().set_main_view("settings".into());
+                w.global::<SettingsBridge>().set_active_category(cat);
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        let core_state_opacity = ctx.core_state.clone();
+        db.on_change_modal_opacity(move |op| {
+            let clamped = op.clamp(0.20, 1.0);
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<SettingsBridge>().set_setting_modal_opacity(clamped);
+                let theme_global = w.global::<AppTheme>();
+                theme_global.set_modal_opacity(clamped);
+            }
+            let _ = core_state_opacity.storage().config().update(Box::new(move |c| {
+                c.modal_opacity = clamped;
+            }));
+        });
+    }
 }
-
-
-
-
-
-

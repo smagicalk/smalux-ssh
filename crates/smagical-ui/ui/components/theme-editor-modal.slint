@@ -1,3 +1,4 @@
+import { ThemeEditorBridge } from "../features/theme_editor/theme_editor_bridge.slint";
 import { ColorWheelPickerModal } from "color-wheel-picker.slint";
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppCard } from "base/app-card.slint";
@@ -174,79 +175,79 @@ component MetricFieldInput inherits VerticalLayout {
 
 /// 主题设计与定制工坊弹窗 (Theme Studio Modal)
 export component ThemeEditorModal inherits Rectangle {
-    in-out property <bool> is-open: false;
+    in-out property <bool> is-open <=> ThemeEditorBridge.is-open;
 
-    // 表单状态属性
-    in-out property <string> theme-name: "My Custom Theme";
-    in-out property <string> theme-author: "User";
-    in-out property <string> theme-base: "builtin.ui.darcula";
-    in-out property <string> theme-period: "night";
+    // 表单状态属性 (直通 ThemeEditorBridge)
+    in-out property <string> theme-name <=> ThemeEditorBridge.name;
+    in-out property <string> theme-author <=> ThemeEditorBridge.author;
+    in-out property <string> theme-base <=> ThemeEditorBridge.base;
+    in-out property <string> theme-period <=> ThemeEditorBridge.period;
 
     // 18 个全量颜色文本字段
-    in-out property <string> color-window-bg: "#1e1e2e";
-    in-out property <string> color-panel-bg: "#181825";
-    in-out property <string> color-surface-bg: "#313244";
-    in-out property <string> color-control-bg: "#383a4c";
-    in-out property <string> color-foreground: "#cdd6f4";
-    in-out property <string> color-secondary-fg: "#a6adc8";
-    in-out property <string> color-disabled-fg: "#6c7086";
-    in-out property <string> color-accent: "#cba6f7";
-    in-out property <string> color-hover-bg: "#45475a";
-    in-out property <string> color-pressed-bg: "#585b70";
-    in-out property <string> color-selected-bg: "#cba6f7";
-    in-out property <string> color-selected-fg: "#ffffff";
-    in-out property <string> color-border: "#45475a";
-    in-out property <string> color-focus-border: "#cba6f7";
-    in-out property <string> color-success: "#a6e3a1";
-    in-out property <string> color-warning: "#f9e2af";
-    in-out property <string> color-danger: "#f38ba8";
-    in-out property <string> color-info: "#89b4fa";
+    in-out property <string> color-window-bg <=> ThemeEditorBridge.window-bg;
+    in-out property <string> color-panel-bg <=> ThemeEditorBridge.panel-bg;
+    in-out property <string> color-surface-bg <=> ThemeEditorBridge.surface-bg;
+    in-out property <string> color-control-bg <=> ThemeEditorBridge.control-bg;
+    in-out property <string> color-foreground <=> ThemeEditorBridge.foreground;
+    in-out property <string> color-secondary-fg <=> ThemeEditorBridge.secondary-fg;
+    in-out property <string> color-disabled-fg <=> ThemeEditorBridge.disabled-fg;
+    in-out property <string> color-accent <=> ThemeEditorBridge.accent;
+    in-out property <string> color-hover-bg <=> ThemeEditorBridge.hover-bg;
+    in-out property <string> color-pressed-bg <=> ThemeEditorBridge.pressed-bg;
+    in-out property <string> color-selected-bg <=> ThemeEditorBridge.selected-bg;
+    in-out property <string> color-selected-fg <=> ThemeEditorBridge.selected-fg;
+    in-out property <string> color-border <=> ThemeEditorBridge.border;
+    in-out property <string> color-focus-border <=> ThemeEditorBridge.focus-border;
+    in-out property <string> color-success <=> ThemeEditorBridge.success;
+    in-out property <string> color-warning <=> ThemeEditorBridge.warning;
+    in-out property <string> color-danger <=> ThemeEditorBridge.danger;
+    in-out property <string> color-info <=> ThemeEditorBridge.info;
 
     // 18 个全量预览笔刷 (由 Rust 同步更新)
-    in property <brush> preview-window-bg: #1e1e2e;
-    in property <brush> preview-panel-bg: #181825;
-    in property <brush> preview-surface-bg: #313244;
-    in property <brush> preview-control-bg: #383a4c;
-    in property <brush> preview-foreground: #cdd6f4;
-    in property <brush> preview-secondary-fg: #a6adc8;
-    in property <brush> preview-disabled-fg: #6c7086;
-    in property <brush> preview-accent: #cba6f7;
-    in property <brush> preview-hover-bg: #45475a;
-    in property <brush> preview-pressed-bg: #585b70;
-    in property <brush> preview-selected-bg: #cba6f7;
-    in property <brush> preview-selected-fg: #ffffff;
-    in property <brush> preview-border: #45475a;
-    in property <brush> preview-focus-border: #cba6f7;
-    in property <brush> preview-success: #a6e3a1;
-    in property <brush> preview-warning: #f9e2af;
-    in property <brush> preview-danger: #f38ba8;
-    in property <brush> preview-info: #89b4fa;
+    in property <brush> preview-window-bg: ThemeEditorBridge.preview-window-bg;
+    in property <brush> preview-panel-bg: ThemeEditorBridge.preview-panel-bg;
+    in property <brush> preview-surface-bg: ThemeEditorBridge.preview-surface-bg;
+    in property <brush> preview-control-bg: ThemeEditorBridge.preview-control-bg;
+    in property <brush> preview-foreground: ThemeEditorBridge.preview-foreground;
+    in property <brush> preview-secondary-fg: ThemeEditorBridge.preview-secondary-fg;
+    in property <brush> preview-disabled-fg: ThemeEditorBridge.preview-disabled-fg;
+    in property <brush> preview-accent: ThemeEditorBridge.preview-accent;
+    in property <brush> preview-hover-bg: ThemeEditorBridge.preview-hover-bg;
+    in property <brush> preview-pressed-bg: ThemeEditorBridge.preview-pressed-bg;
+    in property <brush> preview-selected-bg: ThemeEditorBridge.preview-selected-bg;
+    in property <brush> preview-selected-fg: ThemeEditorBridge.preview-selected-fg;
+    in property <brush> preview-border: ThemeEditorBridge.preview-border;
+    in property <brush> preview-focus-border: ThemeEditorBridge.preview-focus-border;
+    in property <brush> preview-success: ThemeEditorBridge.preview-success;
+    in property <brush> preview-warning: ThemeEditorBridge.preview-warning;
+    in property <brush> preview-danger: ThemeEditorBridge.preview-danger;
+    in property <brush> preview-info: ThemeEditorBridge.preview-info;
 
     // 9 个全量几何尺寸排版数值
-    in-out property <string> metric-radius-small: "2";
-    in-out property <string> metric-radius-medium: "4";
-    in-out property <string> metric-radius-large: "8";
-    in-out property <string> metric-spacing-small: "4";
-    in-out property <string> metric-spacing-medium: "8";
-    in-out property <string> metric-spacing-large: "16";
-    in-out property <string> metric-border-width: "1";
-    in-out property <string> metric-control-height: "32";
-    in-out property <string> metric-icon-size: "16";
+    in-out property <string> metric-radius-small <=> ThemeEditorBridge.metric-radius-small;
+    in-out property <string> metric-radius-medium <=> ThemeEditorBridge.metric-radius-medium;
+    in-out property <string> metric-radius-large <=> ThemeEditorBridge.metric-radius-large;
+    in-out property <string> metric-spacing-small <=> ThemeEditorBridge.metric-spacing-small;
+    in-out property <string> metric-spacing-medium <=> ThemeEditorBridge.metric-spacing-medium;
+    in-out property <string> metric-spacing-large <=> ThemeEditorBridge.metric-spacing-large;
+    in-out property <string> metric-border-width <=> ThemeEditorBridge.metric-border-width;
+    in-out property <string> metric-control-height <=> ThemeEditorBridge.metric-control-height;
+    in-out property <string> metric-icon-size <=> ThemeEditorBridge.metric-icon-size;
 
     // TOML 源码文本
-    in-out property <string> theme-toml: "";
+    in-out property <string> theme-toml <=> ThemeEditorBridge.toml;
 
     // 弹窗式色盘圆盘取色器状态
-    in-out property <bool> is-picker-open: false;
-    in-out property <string> picker-target-key: "";
-    in-out property <string> picker-target-label: "";
-    in-out property <string> picker-hex-value: "#1e1e2e";
-    in-out property <brush> picker-preview-brush: #1e1e2e;
+    in-out property <bool> is-picker-open <=> ThemeEditorBridge.is-picker-open;
+    in-out property <string> picker-target-key <=> ThemeEditorBridge.picker-target-key;
+    in-out property <string> picker-target-label <=> ThemeEditorBridge.picker-target-label;
+    in-out property <string> picker-hex-value <=> ThemeEditorBridge.picker-hex-value;
+    in-out property <brush> picker-preview-brush <=> ThemeEditorBridge.picker-preview-brush;
 
-    in-out property <float> wheel-indicator-x: 90.0;
-    in-out property <float> wheel-indicator-y: 90.0;
-    in-out property <float> wheel-brightness: 1.0;
-    in-out property <brush> wheel-hue-brush: #ff0000;
+    in-out property <float> wheel-indicator-x <=> ThemeEditorBridge.wheel-indicator-x;
+    in-out property <float> wheel-indicator-y <=> ThemeEditorBridge.wheel-indicator-y;
+    in-out property <float> wheel-brightness <=> ThemeEditorBridge.wheel-brightness;
+    in-out property <brush> wheel-hue-brush <=> ThemeEditorBridge.wheel-hue-brush;
 
     property <[PaletteSwatch]> swatches-base: [
         { hex: "#0d1117", c: #0d1117 },
@@ -286,51 +287,38 @@ export component ThemeEditorModal inherits Rectangle {
         root.picker-target-label = label;
         root.picker-hex-value = current-hex;
         root.picker-preview-brush = current-brush;
-        root.picker-hex-changed(current-hex);
+        ThemeEditorBridge.picker-hex-changed(current-hex);
         root.is-picker-open = true;
     }
 
     function select-preset-color(hex: string, c: color) {
         root.picker-hex-value = hex;
         root.picker-preview-brush = c;
-        root.picker-hex-changed(hex);
+        ThemeEditorBridge.picker-hex-changed(hex);
     }
 
     function commit-picker-color(hex: string) {
-        if root.picker-target-key == "window_bg" { root.color-window-bg = hex; root.color-field-changed("window_bg", hex); }
-        if root.picker-target-key == "panel_bg" { root.color-panel-bg = hex; root.color-field-changed("panel_bg", hex); }
-        if root.picker-target-key == "surface_bg" { root.color-surface-bg = hex; root.color-field-changed("surface_bg", hex); }
-        if root.picker-target-key == "control_bg" { root.color-control-bg = hex; root.color-field-changed("control_bg", hex); }
-        if root.picker-target-key == "foreground" { root.color-foreground = hex; root.color-field-changed("foreground", hex); }
-        if root.picker-target-key == "secondary_fg" { root.color-secondary-fg = hex; root.color-field-changed("secondary_fg", hex); }
-        if root.picker-target-key == "disabled_fg" { root.color-disabled-fg = hex; root.color-field-changed("disabled_fg", hex); }
-        if root.picker-target-key == "accent" { root.color-accent = hex; root.color-field-changed("accent", hex); }
-        if root.picker-target-key == "hover_bg" { root.color-hover-bg = hex; root.color-field-changed("hover_bg", hex); }
-        if root.picker-target-key == "pressed_bg" { root.color-pressed-bg = hex; root.color-field-changed("pressed_bg", hex); }
-        if root.picker-target-key == "selected_bg" { root.color-selected-bg = hex; root.color-field-changed("selected_bg", hex); }
-        if root.picker-target-key == "selected_fg" { root.color-selected-fg = hex; root.color-field-changed("selected_fg", hex); }
-        if root.picker-target-key == "border" { root.color-border = hex; root.color-field-changed("border", hex); }
-        if root.picker-target-key == "focus_border" { root.color-focus-border = hex; root.color-field-changed("focus_border", hex); }
-        if root.picker-target-key == "success" { root.color-success = hex; root.color-field-changed("success", hex); }
-        if root.picker-target-key == "warning" { root.color-warning = hex; root.color-field-changed("warning", hex); }
-        if root.picker-target-key == "danger" { root.color-danger = hex; root.color-field-changed("danger", hex); }
-        if root.picker-target-key == "info" { root.color-info = hex; root.color-field-changed("info", hex); }
+        if root.picker-target-key == "window_bg" { root.color-window-bg = hex; ThemeEditorBridge.color-field-changed("window_bg", hex); }
+        if root.picker-target-key == "panel_bg" { root.color-panel-bg = hex; ThemeEditorBridge.color-field-changed("panel_bg", hex); }
+        if root.picker-target-key == "surface_bg" { root.color-surface-bg = hex; ThemeEditorBridge.color-field-changed("surface_bg", hex); }
+        if root.picker-target-key == "control_bg" { root.color-control-bg = hex; ThemeEditorBridge.color-field-changed("control_bg", hex); }
+        if root.picker-target-key == "foreground" { root.color-foreground = hex; ThemeEditorBridge.color-field-changed("foreground", hex); }
+        if root.picker-target-key == "secondary_fg" { root.color-secondary-fg = hex; ThemeEditorBridge.color-field-changed("secondary_fg", hex); }
+        if root.picker-target-key == "disabled_fg" { root.color-disabled-fg = hex; ThemeEditorBridge.color-field-changed("disabled_fg", hex); }
+        if root.picker-target-key == "accent" { root.color-accent = hex; ThemeEditorBridge.color-field-changed("accent", hex); }
+        if root.picker-target-key == "hover_bg" { root.color-hover-bg = hex; ThemeEditorBridge.color-field-changed("hover_bg", hex); }
+        if root.picker-target-key == "pressed_bg" { root.color-pressed-bg = hex; ThemeEditorBridge.color-field-changed("pressed_bg", hex); }
+        if root.picker-target-key == "selected_bg" { root.color-selected-bg = hex; ThemeEditorBridge.color-field-changed("selected_bg", hex); }
+        if root.picker-target-key == "selected_fg" { root.color-selected-fg = hex; ThemeEditorBridge.color-field-changed("selected_fg", hex); }
+        if root.picker-target-key == "border" { root.color-border = hex; ThemeEditorBridge.color-field-changed("border", hex); }
+        if root.picker-target-key == "focus_border" { root.color-focus-border = hex; ThemeEditorBridge.color-field-changed("focus_border", hex); }
+        if root.picker-target-key == "success" { root.color-success = hex; ThemeEditorBridge.color-field-changed("success", hex); }
+        if root.picker-target-key == "warning" { root.color-warning = hex; ThemeEditorBridge.color-field-changed("warning", hex); }
+        if root.picker-target-key == "danger" { root.color-danger = hex; ThemeEditorBridge.color-field-changed("danger", hex); }
+        if root.picker-target-key == "info" { root.color-info = hex; ThemeEditorBridge.color-field-changed("info", hex); }
     }
 
     // 回调事件
-    callback close();
-    callback apply-preset(string);
-    callback color-field-changed(string, string);
-    callback metric-field-changed(string, string);
-    callback meta-field-changed(string, string);
-    callback parse-and-sync-from-toml(string);
-    callback copy-toml(string);
-    callback save-and-activate();
-
-    // 色轮取色器回调
-    callback wheel-coord-picked(float, float);
-    callback wheel-brightness-picked(float);
-    callback picker-hex-changed(string);
 
     if is-open: Rectangle {
         width: 100%;
@@ -403,7 +391,7 @@ export component ThemeEditorModal inherits Rectangle {
                         border-radius: 12px;
                         background: btn-cls.has-hover ? AppTheme.hover-background : transparent;
                         btn-cls := TouchArea {
-                            clicked => { root.close(); }
+                            clicked => { ThemeEditorBridge.close(); }
                             mouse-cursor: pointer;
                         }
                         Image {
@@ -470,7 +458,7 @@ export component ThemeEditorModal inherits Rectangle {
                                                     color: AppTheme.foreground;
                                                     selection-background-color: AppTheme.selected-background;
                                                     vertical-alignment: center;
-                                                    edited => { root.meta-field-changed("name", self.text); }
+                                                    edited => { ThemeEditorBridge.meta-field-changed("name", self.text); }
                                                 }
                                             }
                                         }
@@ -493,7 +481,7 @@ export component ThemeEditorModal inherits Rectangle {
                                                     color: AppTheme.foreground;
                                                     selection-background-color: AppTheme.selected-background;
                                                     vertical-alignment: center;
-                                                    edited => { root.meta-field-changed("author", self.text); }
+                                                    edited => { ThemeEditorBridge.meta-field-changed("author", self.text); }
                                                 }
                                             }
                                         }
@@ -522,7 +510,7 @@ export component ThemeEditorModal inherits Rectangle {
                                                     color: AppTheme.foreground;
                                                     selection-background-color: AppTheme.selected-background;
                                                     vertical-alignment: center;
-                                                    edited => { root.meta-field-changed("base", self.text); }
+                                                    edited => { ThemeEditorBridge.meta-field-changed("base", self.text); }
                                                 }
                                             }
                                         }
@@ -539,13 +527,13 @@ export component ThemeEditorModal inherits Rectangle {
                                                 Rectangle {
                                                     horizontal-stretch: 1; border-radius: 3px;
                                                     background: root.theme-period == "night" ? AppTheme.accent : transparent;
-                                                    TouchArea { clicked => { root.theme-period = "night"; root.meta-field-changed("period", "night"); } mouse-cursor: pointer; }
+                                                    TouchArea { clicked => { root.theme-period = "night"; ThemeEditorBridge.meta-field-changed("period", "night"); } mouse-cursor: pointer; }
                                                     Text { text: @tr("深色 (Night)"); font-size: 9px; font-weight: 600; color: root.theme-period == "night" ? AppTheme.selected-foreground : AppTheme.secondary-foreground; horizontal-alignment: center; vertical-alignment: center; }
                                                 }
                                                 Rectangle {
                                                     horizontal-stretch: 1; border-radius: 3px;
                                                     background: root.theme-period == "day" ? AppTheme.accent : transparent;
-                                                    TouchArea { clicked => { root.theme-period = "day"; root.meta-field-changed("period", "day"); } mouse-cursor: pointer; }
+                                                    TouchArea { clicked => { root.theme-period = "day"; ThemeEditorBridge.meta-field-changed("period", "day"); } mouse-cursor: pointer; }
                                                     Text { text: @tr("浅色 (Day)"); font-size: 9px; font-weight: 600; color: root.theme-period == "day" ? AppTheme.selected-foreground : AppTheme.secondary-foreground; horizontal-alignment: center; vertical-alignment: center; }
                                                 }
                                             }
@@ -567,31 +555,31 @@ export component ThemeEditorModal inherits Rectangle {
 
                                     Rectangle {
                                         border-radius: 3px; background: p-dar.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
-                                        p-dar := TouchArea { clicked => { root.apply-preset("darcula"); } mouse-cursor: pointer; }
+                                        p-dar := TouchArea { clicked => { ThemeEditorBridge.apply-preset("darcula"); } mouse-cursor: pointer; }
                                         HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "Darcula"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
                                     }
 
                                     Rectangle {
                                         border-radius: 3px; background: p-od.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
-                                        p-od := TouchArea { clicked => { root.apply-preset("onedark"); } mouse-cursor: pointer; }
+                                        p-od := TouchArea { clicked => { ThemeEditorBridge.apply-preset("onedark"); } mouse-cursor: pointer; }
                                         HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "One Dark"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
                                     }
 
                                     Rectangle {
                                         border-radius: 3px; background: p-tok.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
-                                        p-tok := TouchArea { clicked => { root.apply-preset("tokyo"); } mouse-cursor: pointer; }
+                                        p-tok := TouchArea { clicked => { ThemeEditorBridge.apply-preset("tokyo"); } mouse-cursor: pointer; }
                                         HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "Tokyo Night"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
                                     }
 
                                     Rectangle {
                                         border-radius: 3px; background: p-nord.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
-                                        p-nord := TouchArea { clicked => { root.apply-preset("nord"); } mouse-cursor: pointer; }
+                                        p-nord := TouchArea { clicked => { ThemeEditorBridge.apply-preset("nord"); } mouse-cursor: pointer; }
                                         HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "Nord"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
                                     }
 
                                     Rectangle {
                                         border-radius: 3px; background: p-gh.has-hover ? AppTheme.hover-background : AppTheme.control-background; border-width: 1px; border-color: AppTheme.border;
-                                        p-gh := TouchArea { clicked => { root.apply-preset("github-light"); } mouse-cursor: pointer; }
+                                        p-gh := TouchArea { clicked => { ThemeEditorBridge.apply-preset("github-light"); } mouse-cursor: pointer; }
                                         HorizontalLayout { padding-left: 6px; padding-right: 6px; Text { text: "GitHub Light"; font-size: 9px; color: AppTheme.foreground; vertical-alignment: center; } }
                                     }
                                 }
@@ -620,7 +608,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("主窗口底色 (window-background)");
                                             hex-value <=> root.color-window-bg;
                                             preview-brush: root.preview-window-bg;
-                                            changed(v) => { root.color-field-changed("window_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("window_bg", v); }
                                             pick-color => { root.open-color-picker("window_bg", @tr("主窗口底色"), root.color-window-bg, root.preview-window-bg); }
                                         }
                                         ColorFieldInput {
@@ -628,7 +616,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("侧栏面板底色 (panel-background)");
                                             hex-value <=> root.color-panel-bg;
                                             preview-brush: root.preview-panel-bg;
-                                            changed(v) => { root.color-field-changed("panel_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("panel_bg", v); }
                                             pick-color => { root.open-color-picker("panel_bg", @tr("侧栏面板底色"), root.color-panel-bg, root.preview-panel-bg); }
                                         }
                                     }
@@ -639,7 +627,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("卡片表面底色 (surface-background)");
                                             hex-value <=> root.color-surface-bg;
                                             preview-brush: root.preview-surface-bg;
-                                            changed(v) => { root.color-field-changed("surface_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("surface_bg", v); }
                                             pick-color => { root.open-color-picker("surface_bg", @tr("卡片表面底色"), root.color-surface-bg, root.preview-surface-bg); }
                                         }
                                         ColorFieldInput {
@@ -647,7 +635,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("输入控件底色 (control-background)");
                                             hex-value <=> root.color-control-bg;
                                             preview-brush: root.preview-control-bg;
-                                            changed(v) => { root.color-field-changed("control_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("control_bg", v); }
                                             pick-color => { root.open-color-picker("control_bg", @tr("输入控件底色"), root.color-control-bg, root.preview-control-bg); }
                                         }
                                     }
@@ -677,7 +665,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("核心主前景色 (foreground)");
                                             hex-value <=> root.color-foreground;
                                             preview-brush: root.preview-foreground;
-                                            changed(v) => { root.color-field-changed("foreground", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("foreground", v); }
                                             pick-color => { root.open-color-picker("foreground", @tr("核心主前景色"), root.color-foreground, root.preview-foreground); }
                                         }
                                         ColorFieldInput {
@@ -685,7 +673,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("次要文本颜色 (secondary-foreground)");
                                             hex-value <=> root.color-secondary-fg;
                                             preview-brush: root.preview-secondary-fg;
-                                            changed(v) => { root.color-field-changed("secondary_fg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("secondary_fg", v); }
                                             pick-color => { root.open-color-picker("secondary_fg", @tr("次要文本颜色"), root.color-secondary-fg, root.preview-secondary-fg); }
                                         }
                                     }
@@ -696,7 +684,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("禁用弱化文本 (disabled-foreground)");
                                             hex-value <=> root.color-disabled-fg;
                                             preview-brush: root.preview-disabled-fg;
-                                            changed(v) => { root.color-field-changed("disabled_fg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("disabled_fg", v); }
                                             pick-color => { root.open-color-picker("disabled_fg", @tr("禁用弱化文本"), root.color-disabled-fg, root.preview-disabled-fg); }
                                         }
                                         ColorFieldInput {
@@ -704,7 +692,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("品牌主题强调色 (accent)");
                                             hex-value <=> root.color-accent;
                                             preview-brush: root.preview-accent;
-                                            changed(v) => { root.color-field-changed("accent", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("accent", v); }
                                             pick-color => { root.open-color-picker("accent", @tr("品牌主题强调色"), root.color-accent, root.preview-accent); }
                                         }
                                     }
@@ -715,7 +703,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("指针悬停微亮底色 (hover-background)");
                                             hex-value <=> root.color-hover-bg;
                                             preview-brush: root.preview-hover-bg;
-                                            changed(v) => { root.color-field-changed("hover_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("hover_bg", v); }
                                             pick-color => { root.open-color-picker("hover_bg", @tr("指针悬停微亮底色"), root.color-hover-bg, root.preview-hover-bg); }
                                         }
                                         ColorFieldInput {
@@ -723,7 +711,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("按钮按下激活底色 (pressed-background)");
                                             hex-value <=> root.color-pressed-bg;
                                             preview-brush: root.preview-pressed-bg;
-                                            changed(v) => { root.color-field-changed("pressed_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("pressed_bg", v); }
                                             pick-color => { root.open-color-picker("pressed_bg", @tr("按钮按下激活底色"), root.color-pressed-bg, root.preview-pressed-bg); }
                                         }
                                     }
@@ -734,7 +722,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("选中项目底色 (selected-background)");
                                             hex-value <=> root.color-selected-bg;
                                             preview-brush: root.preview-selected-bg;
-                                            changed(v) => { root.color-field-changed("selected_bg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("selected_bg", v); }
                                             pick-color => { root.open-color-picker("selected_bg", @tr("选中项目底色"), root.color-selected-bg, root.preview-selected-bg); }
                                         }
                                         ColorFieldInput {
@@ -742,7 +730,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("选中项前景色 (selected-foreground)");
                                             hex-value <=> root.color-selected-fg;
                                             preview-brush: root.preview-selected-fg;
-                                            changed(v) => { root.color-field-changed("selected_fg", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("selected_fg", v); }
                                             pick-color => { root.open-color-picker("selected_fg", @tr("选中项前景色"), root.color-selected-fg, root.preview-selected-fg); }
                                         }
                                     }
@@ -772,7 +760,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("通用分割描边 (border)");
                                             hex-value <=> root.color-border;
                                             preview-brush: root.preview-border;
-                                            changed(v) => { root.color-field-changed("border", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("border", v); }
                                             pick-color => { root.open-color-picker("border", @tr("通用分割描边"), root.color-border, root.preview-border); }
                                         }
                                         ColorFieldInput {
@@ -780,7 +768,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("聚焦高亮边框 (focus-border)");
                                             hex-value <=> root.color-focus-border;
                                             preview-brush: root.preview-focus-border;
-                                            changed(v) => { root.color-field-changed("focus_border", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("focus_border", v); }
                                             pick-color => { root.open-color-picker("focus_border", @tr("聚焦高亮边框"), root.color-focus-border, root.preview-focus-border); }
                                         }
                                     }
@@ -791,7 +779,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("成功/在线状态色 (success)");
                                             hex-value <=> root.color-success;
                                             preview-brush: root.preview-success;
-                                            changed(v) => { root.color-field-changed("success", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("success", v); }
                                             pick-color => { root.open-color-picker("success", @tr("成功/在线状态色"), root.color-success, root.preview-success); }
                                         }
                                         ColorFieldInput {
@@ -799,7 +787,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("警告提示状态色 (warning)");
                                             hex-value <=> root.color-warning;
                                             preview-brush: root.preview-warning;
-                                            changed(v) => { root.color-field-changed("warning", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("warning", v); }
                                             pick-color => { root.open-color-picker("warning", @tr("警告提示状态色"), root.color-warning, root.preview-warning); }
                                         }
                                     }
@@ -810,7 +798,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("错误/危险状态色 (danger)");
                                             hex-value <=> root.color-danger;
                                             preview-brush: root.preview-danger;
-                                            changed(v) => { root.color-field-changed("danger", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("danger", v); }
                                             pick-color => { root.open-color-picker("danger", @tr("错误/危险状态色"), root.color-danger, root.preview-danger); }
                                         }
                                         ColorFieldInput {
@@ -818,7 +806,7 @@ export component ThemeEditorModal inherits Rectangle {
                                             label: @tr("通知信息状态色 (info)");
                                             hex-value <=> root.color-info;
                                             preview-brush: root.preview-info;
-                                            changed(v) => { root.color-field-changed("info", v); }
+                                            changed(v) => { ThemeEditorBridge.color-field-changed("info", v); }
                                             pick-color => { root.open-color-picker("info", @tr("通知信息状态色"), root.color-info, root.preview-info); }
                                         }
                                     }
@@ -847,19 +835,19 @@ export component ThemeEditorModal inherits Rectangle {
                                             horizontal-stretch: 1;
                                             label: @tr("紧凑微圆角 (radius-small)");
                                             value-text <=> root.metric-radius-small;
-                                            changed(v) => { root.metric-field-changed("radius_small", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("radius_small", v); }
                                         }
                                         MetricFieldInput {
                                             horizontal-stretch: 1;
                                             label: @tr("标准中圆角 (radius-medium)");
                                             value-text <=> root.metric-radius-medium;
-                                            changed(v) => { root.metric-field-changed("radius_medium", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("radius_medium", v); }
                                         }
                                         MetricFieldInput {
                                             horizontal-stretch: 1;
                                             label: @tr("大圆角 (radius-large)");
                                             value-text <=> root.metric-radius-large;
-                                            changed(v) => { root.metric-field-changed("radius_large", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("radius_large", v); }
                                         }
                                     }
 
@@ -868,19 +856,19 @@ export component ThemeEditorModal inherits Rectangle {
                                             horizontal-stretch: 1;
                                             label: @tr("紧凑间距 (spacing-small)");
                                             value-text <=> root.metric-spacing-small;
-                                            changed(v) => { root.metric-field-changed("spacing_small", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("spacing_small", v); }
                                         }
                                         MetricFieldInput {
                                             horizontal-stretch: 1;
                                             label: @tr("标准间距 (spacing-medium)");
                                             value-text <=> root.metric-spacing-medium;
-                                            changed(v) => { root.metric-field-changed("spacing_medium", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("spacing_medium", v); }
                                         }
                                         MetricFieldInput {
                                             horizontal-stretch: 1;
                                             label: @tr("大版块间距 (spacing-large)");
                                             value-text <=> root.metric-spacing-large;
-                                            changed(v) => { root.metric-field-changed("spacing_large", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("spacing_large", v); }
                                         }
                                     }
 
@@ -889,19 +877,19 @@ export component ThemeEditorModal inherits Rectangle {
                                             horizontal-stretch: 1;
                                             label: @tr("基础描边线宽 (border-width)");
                                             value-text <=> root.metric-border-width;
-                                            changed(v) => { root.metric-field-changed("border_width", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("border_width", v); }
                                         }
                                         MetricFieldInput {
                                             horizontal-stretch: 1;
                                             label: @tr("控件基准高度 (control-height)");
                                             value-text <=> root.metric-control-height;
-                                            changed(v) => { root.metric-field-changed("control_height", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("control_height", v); }
                                         }
                                         MetricFieldInput {
                                             horizontal-stretch: 1;
                                             label: @tr("图标物理规格 (icon-size)");
                                             value-text <=> root.metric-icon-size;
-                                            changed(v) => { root.metric-field-changed("icon_size", v); }
+                                            changed(v) => { ThemeEditorBridge.metric-field-changed("icon_size", v); }
                                         }
                                     }
                                 }
@@ -1176,7 +1164,7 @@ export component ThemeEditorModal inherits Rectangle {
                                 border-width: 1px;
                                 border-color: AppTheme.border;
                                 btn-cp := TouchArea {
-                                    clicked => { root.copy-toml(root.theme-toml); }
+                                    clicked => { ThemeEditorBridge.copy-toml(root.theme-toml); }
                                     mouse-cursor: pointer;
                                 }
                                 HorizontalLayout {
@@ -1193,7 +1181,7 @@ export component ThemeEditorModal inherits Rectangle {
                                 border-width: 1px;
                                 border-color: AppTheme.accent;
                                 btn-sy := TouchArea {
-                                    clicked => { root.parse-and-sync-from-toml(root.theme-toml); }
+                                    clicked => { ThemeEditorBridge.parse-and-sync-from-toml(root.theme-toml); }
                                     mouse-cursor: pointer;
                                 }
                                 HorizontalLayout {
@@ -1293,7 +1281,7 @@ export component ThemeEditorModal inherits Rectangle {
                             border-width: 1px;
                             border-color: AppTheme.border;
                             b-cancel := TouchArea {
-                                clicked => { root.close(); }
+                                clicked => { ThemeEditorBridge.close(); }
                                 mouse-cursor: pointer;
                             }
                             Text { text: @tr("取消"); font-size: 11px; font-weight: 600; color: AppTheme.foreground; horizontal-alignment: center; vertical-alignment: center; }
@@ -1307,7 +1295,7 @@ export component ThemeEditorModal inherits Rectangle {
                             background: b-save.has-hover ? AppTheme.accent.brighter(10%) : AppTheme.accent;
                             b-save := TouchArea {
                                 clicked => {
-                                    root.save-and-activate();
+                                    ThemeEditorBridge.save-and-activate();
                                 }
                                 mouse-cursor: pointer;
                             }
@@ -1336,9 +1324,9 @@ export component ThemeEditorModal inherits Rectangle {
                 brightness: root.wheel-brightness;
                 hue-brush: root.wheel-hue-brush;
 
-                wheel-coord-picked(x, y) => { root.wheel-coord-picked(x, y); }
-                wheel-brightness-picked(b) => { root.wheel-brightness-picked(b); }
-                hex-changed(h) => { root.picker-hex-changed(h); }
+                wheel-coord-picked(x, y) => { ThemeEditorBridge.wheel-coord-picked(x, y); }
+                wheel-brightness-picked(b) => { ThemeEditorBridge.wheel-brightness-picked(b); }
+                hex-changed(h) => { ThemeEditorBridge.picker-hex-changed(h); }
                 confirmed(hex, brush) => { root.is-picker-open = false; }
                 close => { root.is-picker-open = false; }
             }

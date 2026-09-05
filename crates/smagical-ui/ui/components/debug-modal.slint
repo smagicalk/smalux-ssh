@@ -7,121 +7,53 @@ import { DebugSettingsTab } from "debug_workbench/debug-settings-tab.slint";
 import { DebugLogsTab, LogEntryData } from "debug_workbench/debug-logs-tab.slint";
 import { DebugRenderingTab } from "debug_workbench/debug-rendering-tab.slint";
 
+import { DebugBridge } from "../features/debug/debug_bridge.slint";
+import { WindowBridge } from "../features/window/window_bridge.slint";
+import { SettingsBridge } from "../features/settings/settings_bridge.slint";
+import { HostsBridge } from "../features/hosts/hosts_bridge.slint";
+import { CredentialsBridge } from "../features/credentials/credentials_bridge.slint";
+import { SnippetsBridge } from "../features/snippets/snippets_bridge.slint";
+
+
 export { LogEntryData }
 
 /// 开发者全功能独立调试与批量数据生成模态弹窗 (Debug Modal)
 export component DebugModal inherits Rectangle {
-    /// 弹窗显隐状态
-    in-out property <bool> is-open: false;
+    /// 弹窗显隐状态直通 DebugBridge
+    in-out property <bool> is-open <=> DebugBridge.is-open;
 
-    /// 日志条目列表
-    in property <[LogEntryData]> logs: [];
-    /// 全量节点数
-    in property <int> total-nodes-count: 0;
-    /// 可见节点数
-    in property <int> visible-nodes-count: 0;
-    /// 卡片总数
-    in property <int> host-cards-count: 0;
-    /// 凭据总数
-    in property <int> credential-count: 0;
-    /// 代码片段总数
-    in property <int> snippet-count: 0;
-    /// 代码片段分组总数
-    in property <int> snippet-group-count: 0;
-    /// 树形视口计算宽度
-    in property <length> tree-viewport-width: 240px;
-    /// 当前主题名称
-    in property <string> current-theme-name: "Darcula";
-    /// 是否为深色模式
-    in property <bool> is-dark-mode: true;
+    /// 实时日志与各领域实时探针直通 Bridges
+    in property <[LogEntryData]> logs: DebugBridge.logs;
+    in property <int> total-nodes-count: HostsBridge.tree-nodes.length;
+    in property <int> visible-nodes-count: HostsBridge.tree-nodes.length;
+    in property <int> host-cards-count: HostsBridge.hosts.length;
+    in property <int> credential-count: CredentialsBridge.credentials.length;
+    in property <int> snippet-count: SnippetsBridge.tree-nodes.length;
+    in property <int> snippet-group-count: SnippetsBridge.parent-options.length;
+    in property <length> tree-viewport-width: HostsBridge.tree-content-width;
+    in property <string> current-theme-name: WindowBridge.current-theme-name;
+    in property <bool> is-dark-mode: WindowBridge.is-dark-mode;
 
-    /// 实验特性门控
-    in-out property <bool> flag-desktop-notifications: false;
-    in-out property <bool> flag-terminal-crt-shader: false;
-    in-out property <bool> flag-cloud-sync: false;
-    in-out property <bool> flag-terminal-scratchpad: false;
+    /// 实验特性门控直通 DebugBridge
+    in-out property <bool> flag-desktop-notifications <=> DebugBridge.flag-desktop-notifications;
+    in-out property <bool> flag-terminal-crt-shader <=> DebugBridge.flag-terminal-crt-shader;
+    in-out property <bool> flag-cloud-sync <=> DebugBridge.flag-cloud-sync;
+    in-out property <bool> flag-terminal-scratchpad <=> DebugBridge.flag-terminal-scratchpad;
+    in-out property <bool> use-mock-storage <=> DebugBridge.use-mock-storage;
+    in-out property <bool> is-log-capture-enabled <=> DebugBridge.is-log-capture-enabled;
 
     /// 核心设置状态实时探针
-    in property <bool> setting-always-on-top: false;
-    in property <bool> setting-confirm-close-tab: true;
-    in property <bool> setting-confirm-close-active: true;
+    in property <bool> setting-always-on-top: SettingsBridge.setting-always-on-top;
+    in property <bool> setting-confirm-close-tab: SettingsBridge.setting-confirm-close-tab;
+    in property <bool> setting-confirm-close-active: SettingsBridge.setting-confirm-close-active;
     in property <string> wallpaper-mode: "none";
-    in property <string> wallpaper-slideshow-interval: "none";
-    in property <int> wallpaper-count: 0;
-    in-out property <float> setting-modal-opacity: 1.0;
-
-    in-out property <bool> use-mock-storage: true;
-
-    /// 设置调试相关回调
-    callback toggle-feature-flag(string, bool);
-    callback toggle-mock-storage(bool);
-    callback apply-config-preset(string);
-    callback reset-all-settings();
-    callback change-modal-opacity(float);
+    in property <string> wallpaper-slideshow-interval: SettingsBridge.setting-wallpaper-slideshow;
+    in property <int> wallpaper-count: SettingsBridge.setting-wallpaper-list.length;
+    in-out property <float> setting-modal-opacity <=> SettingsBridge.setting-modal-opacity;
+    in property <string> active-pipeline: WindowBridge.active-rendering-pipeline;
 
     // 当前激活的子面板: "hosts" | "credentials" | "snippets" | "settings" | "logs" | "rendering"
     property <string> active-subtab: "hosts";
-
-    // --- 回调事件 ---
-    callback close();
-    /// 批量生成主机 (prefix, count_str, ip_prefix, start_ip_str, port_str, group, status_mode, overwrite)
-    callback batch-generate(string, string, string, string, string, string, string, bool);
-    /// 批量更新状态 (status_mode: "all_online", "all_warning", "all_offline", "random")
-    callback batch-update-status(string);
-    /// 批量更新端口 (new_port_str)
-    callback batch-update-port(string);
-    /// 注入预设
-    callback inject-preset(string);
-    /// 快速新增主机
-    callback quick-add-host(string, string, string, string);
-    /// 快速新增分组
-    callback quick-add-group(string, string);
-    /// 清空全量数据
-    callback clear-all-data();
-    /// 恢复默认数据
-    callback reset-default-data();
-    /// 批量生成凭据 (count_str, mode, overwrite)
-    callback debug-batch-generate-credentials(string, string, bool);
-    /// 快速新增凭据 (cred_type, name, data)
-    callback debug-quick-add-credential(string, string, string);
-    /// 恢复默认凭据
-    callback debug-reset-default-credentials();
-    /// 清空所有凭据
-    callback debug-clear-credentials();
-    /// 批量生成代码片段 (count_str, overwrite)
-    callback debug-batch-generate-snippets(string, bool);
-    /// 快速新增代码片段 (title, lang, cmd)
-    callback debug-quick-add-snippet(string, string, string);
-    /// 恢复默认代码片段
-    callback debug-reset-default-snippets();
-    /// 清空所有代码片段
-    callback debug-clear-snippets();
-    /// 清空日志
-    callback clear-logs();
-    /// 模拟测试日志
-    callback emit-test-log(string);
-    /// 切换配色主题
-    callback switch-theme(string);
-    /// 切换深浅色
-    callback toggle-color-mode();
-    /// 强制全屏重绘
-    callback force-repaint();
-    /// 终端 120Hz 吞吐基准压测
-    callback run-benchmark();
-    /// 日志捕获通道开关
-    callback toggle-log-capture(bool);
-    in-out property <bool> is-log-capture-enabled: true;
-    /// 跳转偏好设置分类
-    callback navigate-to-settings(string);
-    /// 切换图形渲染管线
-    callback switch-pipeline(string);
-    /// 保存管线配置 (下次生效)
-    callback save-pipeline();
-    /// 保存管线并立即重启
-    callback restart-app();
-
-    /// 当前激活的管线 ID
-    in property <string> active-pipeline: "winit-skia";
 
     if is-open: Rectangle {
         width: 100%;
@@ -206,7 +138,7 @@ export component DebugModal inherits Rectangle {
                     // 关闭按钮
                     AppIconButton {
                         icon: @image-url("../assets/icons/window-close.svg");
-                        clicked => { root.close(); }
+                        clicked => { DebugBridge.close(); root.is-open = false; }
                     }
                 }
 
@@ -473,33 +405,33 @@ export component DebugModal inherits Rectangle {
                         visible-nodes-count: root.visible-nodes-count;
                         host-cards-count: root.host-cards-count;
                         tree-viewport-width: root.tree-viewport-width;
-                        batch-generate(p, cnt, ip_p, s_ip, port, grp, st, ovr) => { root.batch-generate(p, cnt, ip_p, s_ip, port, grp, st, ovr); }
-                        batch-update-status(st) => { root.batch-update-status(st); }
-                        batch-update-port(p) => { root.batch-update-port(p); }
-                        inject-preset(id) => { root.inject-preset(id); }
-                        quick-add-host(n, ip, p, g) => { root.quick-add-host(n, ip, p, g); }
-                        quick-add-group(n, p) => { root.quick-add-group(n, p); }
-                        reset-default-data => { root.reset-default-data(); }
-                        clear-all-data => { root.clear-all-data(); }
+                        batch-generate(p, cnt, ip_p, s_ip, port, grp, st, ovr) => { DebugBridge.batch-generate(p, cnt, ip_p, s_ip, port, grp, st, ovr); }
+                        batch-update-status(st) => { DebugBridge.batch-update-status(st); }
+                        batch-update-port(p) => { DebugBridge.batch-update-port(p); }
+                        inject-preset(id) => { DebugBridge.inject-preset(id); }
+                        quick-add-host(n, ip, p, g) => { DebugBridge.quick-add-host(n, ip, p, g); }
+                        quick-add-group(n, p) => { DebugBridge.quick-add-group(n, p); }
+                        reset-default-data => { DebugBridge.reset-default-data(); }
+                        clear-all-data => { DebugBridge.clear-all-data(); }
                     }
 
                     // 2. 凭据密钥调试
                     if root.active-subtab == "credentials": DebugCredentialsTab {
                         credential-count: root.credential-count;
-                        batch-generate-credentials(cnt, mode, ovr) => { root.debug-batch-generate-credentials(cnt, mode, ovr); }
-                        quick-add-credential(ctype, n, d) => { root.debug-quick-add-credential(ctype, n, d); }
-                        reset-default-credentials => { root.debug-reset-default-credentials(); }
-                        clear-all-credentials => { root.debug-clear-credentials(); }
+                        batch-generate-credentials(cnt, mode, ovr) => { DebugBridge.batch-generate-credentials(cnt, mode, ovr); }
+                        quick-add-credential(ctype, n, d) => { DebugBridge.quick-add-credential(ctype, n, d); }
+                        reset-default-credentials => { DebugBridge.reset-default-credentials(); }
+                        clear-all-credentials => { DebugBridge.clear-credentials(); }
                     }
 
                     // 3. 代码片段与脚本调试
                     if root.active-subtab == "snippets": DebugSnippetsTab {
                         snippet-count: root.snippet-count;
                         group-count: root.snippet-group-count;
-                        batch-generate-snippets(cnt, ovr) => { root.debug-batch-generate-snippets(cnt, ovr); }
-                        quick-add-snippet(t, l, c) => { root.debug-quick-add-snippet(t, l, c); }
-                        reset-default-snippets => { root.debug-reset-default-snippets(); }
-                        clear-all-snippets => { root.debug-clear-snippets(); }
+                        batch-generate-snippets(cnt, ovr) => { DebugBridge.batch-generate-snippets(cnt, ovr); }
+                        quick-add-snippet(t, l, c) => { DebugBridge.quick-add-snippet(t, l, c); }
+                        reset-default-snippets => { DebugBridge.reset-default-snippets(); }
+                        clear-all-snippets => { DebugBridge.clear-snippets(); }
                     }
 
                     // 4. 设置偏好调试 (实验特性门控、预设配置注入与主题快切)
@@ -513,22 +445,22 @@ export component DebugModal inherits Rectangle {
                         is-dark-mode: root.is-dark-mode;
                         setting-modal-opacity <=> root.setting-modal-opacity;
 
-                        toggle-feature-flag(f, e) => { root.toggle-feature-flag(f, e); }
-                        toggle-mock-storage(e) => { root.toggle-mock-storage(e); }
-                        apply-config-preset(p) => { root.apply-config-preset(p); }
-                        reset-all-settings => { root.reset-all-settings(); }
-                        switch-theme(id) => { root.switch-theme(id); }
-                        toggle-color-mode => { root.toggle-color-mode(); }
-                        change-modal-opacity(op) => { root.change-modal-opacity(op); }
+                        toggle-feature-flag(f, e) => { DebugBridge.toggle-feature-flag(f, e); }
+                        toggle-mock-storage(e) => { DebugBridge.toggle-mock-storage(e); }
+                        apply-config-preset(p) => { DebugBridge.apply-config-preset(p); }
+                        reset-all-settings => { DebugBridge.reset-all-settings(); }
+                        switch-theme(id) => { DebugBridge.switch-theme(id); }
+                        toggle-color-mode => { DebugBridge.toggle-color-mode(); }
+                        change-modal-opacity(op) => { DebugBridge.change-modal-opacity(op); }
                     }
 
                     // 5. 实时日志流
                     if root.active-subtab == "logs": DebugLogsTab {
                         logs: root.logs;
                         is-log-capture-enabled <=> root.is-log-capture-enabled;
-                        toggle-log-capture(e) => { root.toggle-log-capture(e); }
-                        clear-logs => { root.clear-logs(); }
-                        emit-test-log(lvl) => { root.emit-test-log(lvl); }
+                        toggle-log-capture(e) => { DebugBridge.toggle-log-capture(e); }
+                        clear-logs => { DebugBridge.clear-logs(); }
+                        emit-test-log(lvl) => { DebugBridge.emit-test-log(lvl); }
                     }
 
                     // 6. 图形渲染运行时监控看板
@@ -541,12 +473,12 @@ export component DebugModal inherits Rectangle {
                         wallpaper-mode: root.wallpaper-mode;
                         setting-modal-opacity: root.setting-modal-opacity;
 
-                        switch-pipeline(id) => { root.switch-pipeline(id); }
-                        save-pipeline => { root.save-pipeline(); }
-                        apply-and-restart => { root.restart-app(); }
-                        force-repaint => { root.force-repaint(); }
-                        run-benchmark => { root.run-benchmark(); }
-                        navigate-to-settings(cat) => { root.close(); root.navigate-to-settings(cat); }
+                        switch-pipeline(id) => { DebugBridge.switch-pipeline(id); }
+                        save-pipeline => { DebugBridge.save-pipeline(); }
+                        apply-and-restart => { DebugBridge.restart-app(); }
+                        force-repaint => { DebugBridge.force-repaint(); }
+                        run-benchmark => { DebugBridge.run-benchmark(); }
+                        navigate-to-settings(cat) => { root.is-open = false; DebugBridge.navigate-to-settings(cat); }
                     }
                 }
             }

@@ -1,6 +1,7 @@
 import { FileItemData, FileTabData, TransferItemData } from "./file_explorer_model.slint";
+import { HostItemData } from "../hosts/hosts_model.slint";
 
-export { FileItemData, FileTabData, TransferItemData }
+export { FileItemData, FileTabData, TransferItemData, HostItemData }
 
 /// 双盘文件管理与 SFTP 传输领域全局状态总线 (Files Bridge)
 export global FilesBridge {
@@ -31,6 +32,10 @@ export global FilesBridge {
     in-out property <bool> remote-can-go-back: false;
     in-out property <bool> remote-can-go-forward: false;
 
+    // 文件主机选择弹窗 (FileHostModal) 状态
+    in-out property <bool> is-file-host-modal-open: false;
+    in-out property <[HostItemData]> file-launcher-host-items: [];
+
     // 交互回调
     callback select-local-tab(string /* tab_id */);
     callback close-local-tab(string /* tab_id */);
@@ -57,10 +62,18 @@ export global FilesBridge {
     callback toggle-local-expand(string /* path */);
     callback toggle-remote-expand(string /* path */);
 
+    callback upload-file();
+    callback download-file();
+
     callback start-transfer-task(string /* direction */, string /* source_path */, string /* filename */, bool /* is_dir */, string /* target_path */);
     callback toggle-transfer-expand(string /* task_id */);
     callback clear-completed-transfers();
     callback transfer-action(string /* action */, string /* task_id */);
     callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
     callback copy-to-clipboard(string /* text */);
+
+    // 会话与弹窗交互
+    callback filter-file-launcher(string /* query */);
+    callback open-file-host(string /* host_id */);
+    callback open-host-files(string /* host_id */);
 }

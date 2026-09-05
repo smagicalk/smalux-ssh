@@ -1,27 +1,27 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppButton } from "base/app-button.slint";
 import { ScrollView } from "std-widgets.slint";
+import { HistoryBridge } from "../features/history/history_bridge.slint";
 
 /// 会话历史详情与终端屏幕快照弹窗 (History Session Detail & Snapshot Modal)
 export component HistoryDetailModal inherits Rectangle {
-    in property <bool> is-open: false;
-    in property <string> history-id: "";
-    in property <string> session-title: "";
-    in property <string> session-address: "";
-    in property <string> session-user: "";
-    in property <string> session-type: "ssh";
-    in property <string> connected-time: "";
-    in property <string> disconnected-time: "";
-    in property <string> duration-text: "";
-    in property <string> exit-status: "success";
-    in property <string> error-msg: "";
-    in property <string> snapshot-content: "";
-    in property <int> snapshot-lines: 0;
+    in-out property <bool> is-open: HistoryBridge.is-detail-open;
+    in property <string> history-id: HistoryBridge.detail-id;
+    in property <string> session-title: HistoryBridge.detail-title;
+    in property <string> session-address: HistoryBridge.detail-address;
+    in property <string> session-user: HistoryBridge.detail-user;
+    in property <string> session-type: HistoryBridge.detail-type;
+    in property <string> connected-time: HistoryBridge.detail-connected-time;
+    in property <string> disconnected-time: HistoryBridge.detail-disconnected-time;
+    in property <string> duration-text: HistoryBridge.detail-duration;
+    in property <string> exit-status: HistoryBridge.detail-exit-status;
+    in property <string> error-msg: HistoryBridge.detail-error-msg;
+    in property <string> snapshot-content: HistoryBridge.detail-snapshot;
+    in property <int> snapshot-lines: HistoryBridge.detail-snapshot-lines;
     in-out property <bool> copy-success: false;
 
     callback close();
     callback reconnect(string /* history_id */);
-    callback copy-log(string /* content */);
 
     if is-open: Rectangle {
         width: 100%;
@@ -283,7 +283,7 @@ export component HistoryDetailModal inherits Rectangle {
 
                             copy-touch := TouchArea {
                                 clicked => {
-                                    root.copy-log(root.snapshot-content);
+                                    HistoryBridge.copy-log(root.snapshot-content);
                                     root.copy-success = true;
                                 }
                                 mouse-cursor: pointer;

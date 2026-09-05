@@ -22,7 +22,8 @@ use smagical_core::theme::ThemeService;
 use smagical_core::{CoreState, FileItemData};
 
 
-use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
+use slint::ComponentHandle;
+use crate::generated::{AppWindow, HostItemData, LocalShellItemData, WindowBridge};
 use crate::terminal::TerminalInstance;
 use crate::tree_model::RawTreeNode;
 
@@ -154,7 +155,7 @@ impl AppContext {
 pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     // 0. 挂载全局气泡通知关闭回调
     let notif_mgr = ctx.notifications.clone();
-    window.on_close_toast(move |id| {
+    window.global::<WindowBridge>().on_close_toast(move |id: slint::SharedString| {
         notif_mgr.close(&id);
     });
 

@@ -23,15 +23,31 @@ export { ContextMenuItemData } from "shared/composite/app-context-menu.slint";
 export { TableColumn } from "shared/composite/app-data-table.slint";
 
 // 领域状态单例总线 (Domain State Bridges)
-export { SettingsBridge } from "features/settings/settings_bridge.slint";
-export { HostsBridge } from "features/hosts/hosts_bridge.slint";
-export { TerminalBridge } from "features/terminal/terminal_bridge.slint";
-export { FilesBridge } from "features/file_explorer/file_explorer_bridge.slint";
-export { CredentialsBridge } from "features/credentials/credentials_bridge.slint";
-export { SnippetsBridge } from "features/snippets/snippets_bridge.slint";
-export { TunnelsBridge } from "features/tunnels/tunnels_bridge.slint";
-export { HistoryBridge } from "features/history/history_bridge.slint";
-export { WindowBridge } from "features/window/window_bridge.slint";
+import { SettingsBridge } from "features/settings/settings_bridge.slint";
+import { ThemeEditorBridge } from "features/theme_editor/theme_editor_bridge.slint";
+import { DebugBridge } from "features/debug/debug_bridge.slint";
+import { HostsBridge } from "features/hosts/hosts_bridge.slint";
+import { TerminalBridge } from "features/terminal/terminal_bridge.slint";
+import { FilesBridge } from "features/file_explorer/file_explorer_bridge.slint";
+import { CredentialsBridge } from "features/credentials/credentials_bridge.slint";
+import { SnippetsBridge } from "features/snippets/snippets_bridge.slint";
+import { TunnelsBridge } from "features/tunnels/tunnels_bridge.slint";
+import { HistoryBridge } from "features/history/history_bridge.slint";
+import { WindowBridge } from "features/window/window_bridge.slint";
+
+export {
+    SettingsBridge,
+    ThemeEditorBridge,
+    DebugBridge,
+    HostsBridge,
+    TerminalBridge,
+    FilesBridge,
+    CredentialsBridge,
+    SnippetsBridge,
+    TunnelsBridge,
+    HistoryBridge,
+    WindowBridge,
+}
 import { SettingsGeneralTab } from "features/settings/tabs/general_tab.slint";
 import { SettingsNetworkTab } from "features/settings/tabs/network_tab.slint";
 import { SettingsFilesTab } from "features/settings/tabs/files_tab.slint";
@@ -163,588 +179,9 @@ export component AppWindow inherits Window {
     min-height: 600px;
     background: AppTheme.window-background;
     no-frame: true; // 隐藏系统原生边框，采用自绘制无边框标题栏
-    default-font-family: (root.setting-ui-font == "系统默认 (System Default)" || root.setting-ui-font == "") ? "" : root.setting-ui-font;
+    default-font-family: (SettingsBridge.setting-ui-font == "系统默认 (System Default)" || SettingsBridge.setting-ui-font == "") ? "" : SettingsBridge.setting-ui-font;
 
-    // -------------------------------------------------------------------------
-    // 侧边栏与弹窗视口状态属性
-    // -------------------------------------------------------------------------
-    /// 左侧活动栏当前激活的 Tab 标识 ("hosts", "history", "files", "credentials", "snippets", "tunnels", "backup", "settings")
-    in-out property <string> active-left-tab: "hosts";
-    /// 左侧功能抽屉是否处于展开状态
-    in-out property <bool> is-left-drawer-open: true;
-    /// 右侧辅助工具栏当前激活的工具标识 ("monitor", "snippet", "sftp", "notes", "ai")
-    in-out property <string> active-right-tool: "monitor";
-    /// 右侧辅助工具抽屉是否处于展开状态 (默认关闭，点击右侧工具栏图标时展开)
-    in-out property <bool> is-right-drawer-open: false;
-
-    /// Ctrl+K 命令调色板是否处于打开状态
-    in-out property <bool> is-command-palette-open: false;
-    /// F12 开发者调试诊断控制台模态弹窗是否打开
-    in-out property <bool> is-debug-modal-open: false;
-    /// 全局开发者调试功能开关 (默认开启 true，关闭则隐藏侧边栏图标并停止日志收集)
-    in-out property <bool> is-debug-enabled: true;
-    /// 全局 UI 日志捕获独立开关 (默认开启 true，可独立于 debug 开关控制内存捕获)
-    in-out property <bool> is-log-capture-enabled: true;
-    /// 全屏偏好设置中心当前激活的分类 ("general", "appearance", "terminal", "network", "sync", "about")
-    in-out property <string> active-settings-category: "general";
-    /// 动态左侧活动栏主功能菜单项列表
-    in-out property <[ActivityBarItemData]> top-activity-items: [];
-    /// 动态左侧活动栏底部系统菜单项列表
-    in-out property <[ActivityBarItemData]> bottom-activity-items: [];
-    /// 多终端群发广播模式是否开启
-
-
-    in-out property <bool> is-broadcast-mode: false;
-    /// 主窗口当前是否处于系统最大化状态
-    in-out property <bool> is-window-maximized: false;
-    /// 当前是否处于深色模式
-    in-out property <bool> is-dark-mode: true;
-    /// 当前生效的配色主题展示名称 (如: "Darcula", "GitHub Light")
-    in-out property <string> current-theme-name: "Darcula";
-    /// 当前生效的配色主题唯一稳定标识 ID
-    in-out property <string> current-theme-id: "builtin.ui.darcula";
-    /// 当前生效的底层图形渲染管线 (如: "winit-skia", "winit-skia-opengl", "winit-skia-vulkan", "winit-femtovg")
-    in-out property <string> active-rendering-pipeline: "winit-skia";
-    /// 当前生效的界面语言 ("zh-CN" / "en-US")
-    in-out property <string> current-language: "zh-CN";
-    /// 语言切换回调
-    callback switch-language(string /* "zh-CN" or "en-US" */);
-
-
-    // -------------------------------------------------------------------------
-    // 终端多会话状态属性
-    // -------------------------------------------------------------------------
-    /// 当前聚焦激活的会话 Tab 标识 ID (如 "sess-1")
-    in-out property <string> active-session-tab: "";
-    /// 当前是否存在已连接的活跃终端会话
-    in-out property <bool> has-active-session: false;
-    /// 当前激活会话的展示标题
-    in-out property <string> active-session-name: "";
-    /// 当前激活会话对应的主机资产 ID
-    in-out property <string> active-host-id: "";
-    /// 当前激活会话的主机资产名称
-    in-out property <string> active-host-name: "";
-    /// 当前激活会话的目标主机地址 (如 "192.168.1.101:22")
-    in-out property <string> active-host-address: "";
-    /// 当前激活会话的网络延迟 (ms)
-    in-out property <int> active-host-ping-ms: 0;
-    /// 当前激活会话的在线状态 ("online", "warning", "offline")
-    in-out property <string> active-host-status: "online";
-    /// 顶部 Tab 栏所有会话标签列表数据
-    in-out property <[TabData]> tabs: [];
-
-    // -------------------------------------------------------------------------
-    // 主机与分组资产数据模型
-    // -------------------------------------------------------------------------
-    /// 左侧主机抽屉树形视图可见节点列表
-    in-out property <[HostTreeNode]> tree-nodes: [];
-    /// 左侧主机抽屉卡片视图可见主机列表
-    in-out property <[HostItemData]> hosts: [];
-    /// 主机管理视图模式 ("tree" 树形模式 | "card" 列表卡片模式)
-    in-out property <string> hosts-view-mode: "tree";
-    /// 当前树形内容最宽尺寸（动态驱动左右平滑横向滚动）
-    in-out property <length> tree-content-width: 240px;
-    /// 新建分组模态对话框是否显示
-    in-out property <bool> is-create-group-open: false;
-    /// 新建分组默认选中的父级 ID
-    in-out property <string> create-group-default-parent: "root";
-    /// 新建分组/主机弹窗中“上级分组选择器”下拉树形数据模型
-    in-out property <[GroupOptionData]> group-options: [];
-
-    /// 左侧抽屉自适应宽度 (支持鼠标拖拽调节)
-    in-out property <length> left-drawer-width: 240px;
-    /// 右侧抽屉自适应宽度 (支持鼠标拖拽调节)
-    in-out property <length> right-drawer-width: 240px;
-    /// 开发者调试控制台实时事件日志列表
-    in-out property <[LogEntryData]> debug-logs: [];
-
-    /// 快速新建终端会话弹窗状态与数据
-    in-out property <bool> is-new-session-modal-open: false;
-    /// 快速启动器本地 Shell 环境探测列表
-    in-out property <[LocalShellItemData]> launcher-local-items: [];
-    /// 快速启动器远程主机资产列表
-    in-out property <[HostItemData]> launcher-host-items: root.hosts;
-    /// 主工作区展示视图 ("terminal" 终端视口 | "history" 历史连接中心 | "files" 双盘文件管理)
-    in-out property <string> main-view: "terminal";
-
-    // -------------------------------------------------------------------------
-    // 双盘文件管理与 SFTP 传输数据模型与状态 (左右独立 Tab 体系)
-    // -------------------------------------------------------------------------
-    /// 本地文件浏览器 Tab 列表
-    in-out property <[FileTabData]> local-tabs: [];
-    /// 当前激活的本地文件 Tab ID
-    in-out property <string> active-local-tab-id: "";
-    /// 远程 SFTP 文件传输 Tab 列表
-    in-out property <[FileTabData]> remote-tabs: [];
-    /// 当前激活的远程 SFTP Tab ID
-    in-out property <string> active-remote-tab-id: "";
-    /// 本地当前工作目录路径
-    in-out property <string> local-current-path: "";
-    /// 远程当前工作目录路径
-    in-out property <string> remote-current-path: "";
-    /// 本地文件系统可见条目列表
-    in-out property <[FileItemData]> local-files: [];
-    /// 远程 SFTP 文件系统可见条目列表
-    in-out property <[FileItemData]> remote-files: [];
-    /// 当前选中的本地文件 ID
-    in-out property <string> selected-local-id: "";
-    /// 当前选中的远程文件 ID
-    in-out property <string> selected-remote-id: "";
-    /// 异步文件传输任务队列
-    in-out property <[TransferItemData]> transfer-tasks: [];
-
-
-
-
-    // -------------------------------------------------------------------------
-    // 历史会话数据模型与状态
-    // -------------------------------------------------------------------------
-
-    /// 历史抽屉分组数据模型
-    in-out property <[HistoryGroupData]> history-groups: [];
-    /// 历史记录总条数
-    in-out property <int> history-total-count: 0;
-    /// 历史抽屉视图模式 ("timeline" 时间流 | "hosts" 按主机聚合)
-    in-out property <string> history-view-mode: "timeline";
-    /// 历史抽屉搜索过滤关键词
-    in-out property <string> history-search-query: "";
-
-    // -------------------------------------------------------------------------
-    // 历史会话详情与快照弹窗状态
-    // -------------------------------------------------------------------------
-    /// 会话详情与快照弹窗显隐开关
-    in-out property <bool> is-history-detail-open: false;
-    /// 会话详情弹窗数据
-    in-out property <string> history-detail-id: "";
-    in-out property <string> history-detail-title: "";
-    in-out property <string> history-detail-address: "";
-    in-out property <string> history-detail-user: "";
-    in-out property <string> history-detail-type: "ssh";
-    in-out property <string> history-detail-connected-time: "";
-    in-out property <string> history-detail-disconnected-time: "";
-    in-out property <string> history-detail-duration: "";
-    in-out property <string> history-detail-exit-status: "success";
-    in-out property <string> history-detail-error-msg: "";
-    in-out property <string> history-detail-snapshot: "";
-    in-out property <int> history-detail-snapshot-lines: 0;
-
-    // -------------------------------------------------------------------------
-    // 凭据保管与密钥管理状态 (Master-Detail 全屏视图)
-    // -------------------------------------------------------------------------
-    /// 全量凭据资产列表
-    in property <[CredentialItemData]> credentials: [];
-    /// 凭据分类过滤 ("all" | "key" | "password" | "agent")
-    in-out property <string> credential-filter-category: "all";
-    /// 凭据搜索过滤词
-    in-out property <string> credential-search-query: "";
-    /// 当前选中凭据 ID
-    in-out property <string> active-credential-id: "";
-
-    /// 右侧详情与编辑表单状态
-    in-out property <bool> is-credential-create-mode: false;
-    in-out property <bool> is-credential-editing: false;
-    in-out property <string> credential-form-id: "";
-    in-out property <string> credential-form-name: "";
-    in-out property <string> credential-form-type: "key";
-    in-out property <string> credential-form-algorithm: "Ed25519";
-    in-out property <string> credential-form-username: "root";
-    in-out property <string> credential-form-secret-data: "";
-    in-out property <string> credential-form-passphrase: "";
-    in-out property <string> credential-form-public-key: "";
-    in-out property <string> credential-form-fingerprint: "";
-    in-out property <string> credential-form-notes: "";
-    in-out property <int> credential-form-bound-host-count: 0;
-    in-out property <string> credential-form-updated-at: "";
-
-    // -------------------------------------------------------------------------
-    // 代码片段与多层层级管理状态 (Master-Detail 树形与沉浸式编辑)
-    // -------------------------------------------------------------------------
-    /// 代码片段树形节点视图数据
-    in property <[SnippetTreeNode]> snippet-tree-nodes: [];
-    /// 代码片段搜索关键词
-    in-out property <string> snippet-search-query: "";
-    /// 当前选中的代码片段或分组 ID
-    in-out property <string> snippet-selected-id: "";
-    /// 是否有选中的节点
-    in-out property <bool> snippet-has-selection: false;
-    /// 选中的是否为文件夹分组
-    in-out property <bool> snippet-is-selected-group: false;
-
-    /// 代码片段详情编辑表单绑定
-    in-out property <string> snippet-edit-id: "";
-    in-out property <string> snippet-edit-title: "";
-    in-out property <string> snippet-edit-category-name: "";
-    in-out property <string> snippet-edit-language: "bash";
-    in-out property <string> snippet-edit-content: "";
-    in-out property <bool> snippet-edit-auto-execute: true;
-    in-out property <string> snippet-edit-description: "";
-    in-out property <bool> snippet-edit-is-favorite: false;
-    in property <string> snippet-detected-variables-text: "";
-    in property <string> snippet-edit-updated-at: "";
-
-    /// 新建文件夹弹窗状态
-    in property <[GroupOptionData]> snippet-parent-options: [];
-    in-out property <bool> is-create-snippet-group-open: false;
-    in-out property <string> new-snippet-group-name: "";
-    in-out property <string> new-snippet-group-parent-id: "root";
-
-    /// 动态参数填报执行弹窗状态
-    in-out property <bool> is-snippet-run-modal-open: false;
-    in-out property <string> snippet-run-modal-id: "";
-    in-out property <string> snippet-run-modal-title: "";
-    in-out property <string> snippet-run-modal-rendered-command: "";
-    in-out property <[SnippetParamFieldData]> snippet-run-params-list: [];
-
-    /// 右侧伴生工具栏数据源
-    in property <[QuickCmdData]> quick-cmds: [];
-    in-out property <string> quick-cmds-search-query: "";
-
-    // -------------------------------------------------------------------------
-    // 网络隧道、跳板堡垒与代理池状态 (Tunnels & Network Hub)
-    // -------------------------------------------------------------------------
-    /// 全量隧道与网络规则列表
-    in property <[TunnelItemData]> tunnels: [];
-    /// 规则分类过滤 ("all" | "forward" | "jump" | "proxy")
-    in-out property <string> tunnel-filter-category: "all";
-    /// 规则搜索过滤词
-    in-out property <string> tunnel-search-query: "";
-    /// 当前选中隧道 ID
-    in-out property <string> active-tunnel-id: "";
-
-    /// 右侧详情与编辑表单状态
-    in-out property <bool> is-tunnel-create-mode: false;
-    in-out property <bool> is-tunnel-editing: false;
-    in-out property <string> tunnel-form-id: "";
-    in-out property <string> tunnel-form-name: "";
-    in-out property <string> tunnel-form-type: "Local";
-    in-out property <string> tunnel-form-ssh-host-id: "";
-    in-out property <string> tunnel-form-ssh-host-name: "";
-    in-out property <string> tunnel-form-local-bind: "127.0.0.1";
-    in-out property <string> tunnel-form-local-port: "3306";
-    in-out property <string> tunnel-form-remote-host: "10.0.0.8";
-    in-out property <string> tunnel-form-remote-port: "3306";
-    in-out property <bool> tunnel-form-is-running: false;
-    in-out property <bool> tunnel-form-auto-start: false;
-    in-out property <bool> tunnel-form-auto-reconnect: true;
-    in-out property <bool> tunnel-form-remote-dns: false;
-    in-out property <bool> tunnel-form-compression: true;
-    in-out property <int> tunnel-form-active-connections: 0;
-    in-out property <string> tunnel-form-traffic-in: "0 B";
-    in-out property <string> tunnel-form-traffic-out: "0 B";
-    in-out property <string> tunnel-form-notes: "";
-    in-out property <string> tunnel-form-updated-at: "";
-    in-out property <string> tunnel-form-ssh-command: "";
-    /// 跳板机中继链路节点列表
-    in-out property <[JumpHopData]> tunnel-form-jump-chain: [];
-    /// 出网代理协议与认证信息
-    in-out property <string> tunnel-form-proxy-proto: "SOCKS5";
-    in-out property <string> tunnel-form-proxy-username: "";
-    in-out property <string> tunnel-form-proxy-password: "";
-    /// 跳板链路节点操作回调
-    callback add-tunnel-jump-hop(string /* id */, string /* name */, string /* address */, int /* port */);
-    callback remove-tunnel-jump-hop(int /* index */);
-    callback move-tunnel-jump-hop-up(int /* index */);
-    callback move-tunnel-jump-hop-down(int /* index */);
-    callback toggle-tunnel-jump-hop-enabled(int /* index */);
-    /// 当前聚焦终端主机专属的端口转发规则列表
-    in-out property <[TunnelItemData]> host-tunnels: [];
-    /// 请求重新同步当前主机的专属隧道数据
-    callback sync-host-tunnels();
-
-    // -------------------------------------------------------------------------
-    // 拖拽调序交互状态机
-    // -------------------------------------------------------------------------
-    /// 是否正在进行鼠标拖拽操作
-    in-out property <bool> is-dragging: false;
-    /// 被拖拽源节点 ID
-    in-out property <string> drag-source-id: "";
-    /// 被拖拽源节点显示名称
-    in-out property <string> drag-source-name: "";
-    /// 被拖拽源节点是否为文件夹分组
-    in-out property <bool> drag-source-is-group: false;
-    /// 当前悬停命中的目标放置节点 ID
-    in-out property <string> drop-target-id: "";
-    /// 当前悬停命中的目标放置节点名称
-    in-out property <string> drop-target-name: "";
-    /// 当前悬停命中的目标放置节点下标
-    in-out property <int> drop-target-index: -1;
-    /// 放置落点模式 ("before" 前插 | "inside" 移入分组 | "after" 后插 | "root" 顶级 | "none" 无效)
-    in-out property <string> drop-position: "inside";
-    /// 当前拖拽目标落点是否合法
-    in-out property <bool> drop-target-valid: true;
-    /// 鼠标当前全局拖拽 X 坐标
-    in-out property <length> drag-x: 0px;
-    /// 鼠标当前全局拖拽 Y 坐标
-    in-out property <length> drag-y: 0px;
-
-    /// 终端主窗格像素位图帧流 (由 Rust 终端引擎光栅化渲染后推送)
-    in-out property <image> terminal-screen-image;
-    /// 终端副窗格像素位图帧流 (分屏模式有效)
-    in-out property <image> terminal-split-image;
-    /// 终端第 3 窗格像素位图帧流 (三分屏/四分屏有效)
-    in-out property <image> terminal-split2-image;
-    /// 终端第 4 窗格像素位图帧流 (四分屏有效)
-    in-out property <image> terminal-split3-image;
-    /// 是否开启多终端分屏模式
-    in-out property <bool> is-split: false;
-    /// 分屏窗格总数量 (1: 单屏, 2: 双分屏, 3: 三分屏, 4: 四分屏)
-    in-out property <int> split-count: 1;
-    /// 分屏排布方向 ("vertical" 垂直左右 | "horizontal" 水平上下)
-    in-out property <string> split-orientation: "vertical";
-    /// 分屏窗格尺寸比例
-    in-out property <float> split-ratio: 0.5;
-    /// 当前获得键盘焦点的窗格索引 (0: 主窗格, 1: 副窗格 1, 2: 副窗格 2, 3: 副窗格 3)
-    in-out property <int> active-pane-index: 0;
-    /// 副窗格展示标题
-    in-out property <string> split-session-name: "";
-    /// 第 3 窗格展示标题
-    in-out property <string> split2-session-name: "";
-    /// 第 4 窗格展示标题
-    in-out property <string> split3-session-name: "";
-    /// 动态多窗格列表模型 (无限嵌套分屏)
-
-    in-out property <[TerminalPaneData]> terminal-panes: [];
-    /// 动态分割条列表模型
-    in-out property <[TerminalSplitterData]> terminal-splitters: [];
-    /// 当前获得键盘焦点的窗格 ID
-    in-out property <string> active-pane-id: "";
-    /// 终端实际物理像素渲染画布宽高
-    out property <float> terminal-canvas-width: viewport.canvas-width;
-    out property <float> terminal-canvas-height: viewport.canvas-height;
-    /// 终端动态网格列数 (由中央视口根据实际像素宽度自适应换算)
-    out property <int> terminal-cols: viewport.terminal-cols;
-    /// 终端动态网格行数 (由中央视口根据实际像素高度自适应换算)
-    out property <int> terminal-rows: viewport.terminal-rows;
-
-    /// 当前终端历史回滚总行数
-    in-out property <int> terminal-history-size: 0;
-
-    /// 当前相对底部的向上回滚行偏移量
-    in-out property <int> terminal-scroll-offset: 0;
-
-
-    /// 壁纸展示模式 ("none" 无壁纸 | "global" 全局磨砂壁纸 | "terminal" 仅终端视口壁纸)
-    in-out property <string> wallpaper-mode: "none";
-    /// 当前选中的壁纸文件绝对路径
-    in-out property <string> wallpaper-path: "";
-    /// 全局磨砂背景壁纸位图
-    in-out property <image> global-wallpaper-image;
-    /// 全局背景壁纸不透明度 (0.0 ~ 1.0)
-    in-out property <float> global-wallpaper-opacity: 0.15;
-    /// 终端专属背景壁纸位图
-    in-out property <image> terminal-wallpaper-image;
-    /// 终端专属背景壁纸不透明度 (0.0 ~ 1.0)
-    in-out property <float> terminal-wallpaper-opacity: 0.20;
-    /// 实验特性：壁纸模式下模态弹窗与下拉面板不透明度 (0.50 ~ 1.0，默认为 1.0 完全纯色遮挡防重叠)
-    in-out property <float> setting-modal-opacity: 1.0;
-    /// 终端字体名称 (如 "JetBrains Mono" / "Consolas")
-    in-out property <string> terminal-font-family: "JetBrains Mono";
-    /// 终端字体字号 (默认 14.0 px)
-    in-out property <float> terminal-font-size: 14.0;
-
-
-    // -------------------------------------------------------------------------
-    // 窗口通用设置属性与交互状态
-    // -------------------------------------------------------------------------
-    /// 窗口关闭按钮行为 ("tray" | "exit")
-    in-out property <string> setting-close-action: "tray";
-    /// 关闭会话标签页时防误触确认开关
-    in-out property <bool> setting-confirm-close-tab: true;
-    /// 退出时含活跃会话防呆确认开关
-    in-out property <bool> setting-confirm-close-active: true;
-    /// 窗口始终置顶开关
-    in-out property <bool> setting-always-on-top: false;
-    /// 开机自启开关
-    in-out property <bool> setting-start-on-boot: false;
-    /// 退出应用确认二次弹窗显隐开关
-    in-out property <bool> is-exit-confirm-open: false;
-    /// 关闭单标签页确认二次弹窗显隐开关
-    in-out property <bool> is-tab-close-confirm-open: false;
-    /// 关闭单标签页确认弹窗标题
-    in-out property <string> tab-close-confirm-title: "";
-    /// 关闭单标签页确认弹窗详细文本
-    in-out property <string> tab-close-confirm-message: "";
-    /// 切换渲染引擎重启确认弹窗显隐开关
-    in-out property <bool> is-restart-confirm-open: false;
-    /// 切换渲染引擎重启确认弹窗文本
-    in-out property <string> restart-confirm-message: "";
-
-    /// 界面全局字体
-    in-out property <string> setting-ui-font: "系统默认 (System Default)";
-    in property <[string]> available-ui-fonts: ["系统默认 (System Default)", "Microsoft YaHei UI", "Segoe UI", "PingFang SC", "Inter", "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas"];
-    callback change-ui-font(string /* font_name */);
-
-    /// 终端高级首选项
-    in-out property <bool> setting-terminal-url-click: true;
-    in-out property <bool> setting-terminal-highlight-keywords: true;
-    in-out property <string> setting-terminal-custom-keywords: "error,failed,fatal,warning,warn,success,ok,done";
-    in-out property <string> setting-cursor-style: "block";
-    in-out property <bool> setting-cursor-blink: true;
-    in-out property <int> setting-scrollback-lines: 10000;
-    in-out property <string> setting-bell-style: "visual";
-    in-out property <[KeywordHighlightRule]> terminal-keyword-rules: [
-        { id: "kw_err", pattern: "\\b(ERROR|FATAL|CRITICAL|Failed|Error)\\b", remark: @tr("致命错误与失败"), color-hex: "#EF4444", rule-color: #EF4444, enabled: true },
-        { id: "kw_warn", pattern: "\\b(WARN|WARNING|Warning|Warn)\\b", remark: @tr("告警提示与注意"), color-hex: "#F59E0B", rule-color: #F59E0B, enabled: true },
-        { id: "kw_ok", pattern: "\\b(SUCCESS|OK|Finished|Done)\\b", remark: @tr("执行成功与确认"), color-hex: "#10B981", rule-color: #10B981, enabled: true },
-        { id: "kw_url", pattern: "https?://[^\\s/$.?#].[^\\s]*", remark: @tr("网络超链接 URL"), color-hex: "#3B82F6", rule-color: #3B82F6, enabled: true },
-        { id: "kw_ip", pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b", remark: @tr("IPv4 主机地址"), color-hex: "#8B5CF6", rule-color: #8B5CF6, enabled: true },
-    ];
-
-    in-out property <string> setting-global-proxy-mode: "direct";
-    in-out property <string> setting-global-proxy-server: "127.0.0.1:7890";
-    in-out property <bool> setting-global-proxy-auth: false;
-    in-out property <string> setting-global-proxy-user: "";
-    in-out property <string> setting-global-proxy-pass: "";
-
-    in-out property <int> setting-connect-timeout: 30;
-    in-out property <int> setting-keepalive-interval: 30;
-    in-out property <int> setting-keepalive-count-max: 3;
-    in-out property <string> setting-host-key-policy: "accept-new";
-    in-out property <bool> setting-tcp-nodelay: true;
-
-    in-out property <bool> setting-copy-on-select: false;
-    in-out property <bool> setting-paste-on-right-click: true;
-    in-out property <bool> setting-warn-multiline-paste: true;
-
-    callback change-terminal-url-click(bool);
-    callback change-terminal-highlight-keywords(bool);
-    callback change-terminal-custom-keywords(string);
-    callback change-cursor-style(string);
-    callback change-cursor-blink(bool);
-    callback change-scrollback-lines(int);
-    callback change-bell-style(string);
-    callback change-copy-on-select(bool);
-    callback change-paste-on-right-click(bool);
-    callback change-warn-multiline-paste(bool);
-    callback change-close-action(string);
-    callback change-global-proxy(string, string, bool, string, string);
-    callback change-network-handshake(int, int, int);
-    callback change-host-key-policy(string);
-    callback change-tcp-nodelay(bool);
-    callback toggle-log-capture(bool);
-    callback add-keyword-rule(string /* pattern */, string /* remark */, string /* color_hex */);
-    callback update-keyword-rule(string /* id */, string /* pattern */, string /* remark */, string /* color_hex */);
-    callback toggle-keyword-rule(string /* id */, bool /* enabled */);
-    callback delete-keyword-rule(string /* id */);
-
-    // -------------------------------------------------------------------------
-    // 窗口与业务路由回调
-    // -------------------------------------------------------------------------
-    /// 动态设置终端字体与字号
-    callback set-terminal-font(string /* font_name_or_path */, float /* font_size */);
-    /// 动态设置终端色彩主题
-    callback set-terminal-theme(string /* theme_id */);
-    /// 动态设置壁纸背景
-    callback set-wallpaper(string /* mode: "none"|"global"|"terminal" */, string /* image_path */, float /* opacity */);
-    /// 呼出全局命令面板回调
-    callback trigger-command-palette();
-    /// 切换配色主题回调
-    callback switch-theme(string /* theme_id */);
-    /// 切换深色/浅色外观模式回调
-    callback toggle-color-mode();
-    /// 切换窗口始终置顶回调
-    callback toggle-always-on-top(bool);
-    /// 切换开机自启动回调
-    callback toggle-start-on-boot(bool);
-    /// 切换关闭会话标签页前确认回调
-    callback toggle-confirm-close-tab(bool);
-    /// 切换关闭含活跃会话窗口前确认回调
-    callback toggle-confirm-close-active(bool);
-    /// 确认关闭单个标签页回调
-    callback confirm-close-tab();
-    /// 切换底层图形渲染管线首选项
-    callback switch-rendering-pipeline(string);
-    /// 确认立即重启生效渲染管线
-    callback confirm-restart-pipeline();
-    /// 稍后重启生效渲染管线
-    callback cancel-restart-pipeline();
-
-    // -------------------------------------------------------------------------
-    // 主题管理与壁纸画廊属性与回调
-    // -------------------------------------------------------------------------
-    in property <[ThemeOption]> themes: [];
-    in property <[ThemeOption]> custom-themes: [];
-    in property <[ThemeOption]> dark-themes: [];
-    in property <[ThemeOption]> light-themes: [];
-    in property <[ThemeRow]> custom-theme-rows: [];
-    in property <[ThemeRow]> dark-theme-rows: [];
-    in property <[ThemeRow]> light-theme-rows: [];
-    in property <int> custom-themes-count: 0;
-    in property <int> dark-themes-count: 0;
-    in property <int> light-themes-count: 0;
-    in-out property <[string]> wallpaper-list: [];
-    in-out property <int> wallpaper-active-index: 0;
-    in-out property <string> wallpaper-slideshow-interval: "none";
-    in-out property <string> wallpaper-transition-effect: "fade";
-    in-out property <image> prev-wallpaper-image;
-    in-out property <float> wallpaper-crossfade: 1.0;
-    animate wallpaper-crossfade { duration: 350ms; easing: ease-in-out; }
-
-    /// 导入外部配色主题
-    callback import-theme();
-    /// 导出当前配色主题
-    callback export-current-theme();
-    /// 创建新的自定义主题
-    callback create-custom-theme();
-    /// 删除指定的自定义主题
-    callback delete-custom-theme(string /* theme_id */);
-    /// 添加壁纸图片
-    callback add-wallpaper-image();
-    /// 添加壁纸文件夹 (批量扫描并导入其中全部图片)
-    callback add-wallpaper-folder();
-    /// 移除指定索引壁纸
-    callback remove-wallpaper-image(int /* index */);
-    /// 选中指定索引壁纸
-    callback select-wallpaper-image(int /* index */);
-    /// 设置壁纸轮播配置
-    callback set-wallpaper-slideshow(string /* interval */, string /* transition */);
-
-    // -------------------------------------------------------------------------
-    // 偏好设置与备份数据管理回调
-    // -------------------------------------------------------------------------
-    /// 导出全量加密备份包
-    callback export-backup-archive(bool /* include_passwords */);
-    /// 扫描并导入系统 ~/.ssh/config 资产
-    callback scan-and-import-openssh();
-    /// 导入外部第三方终端软件资产 (Termius / Xshell)
-    callback import-external-assets();
-    /// 恢复出厂设置回调
-    callback factory-reset-settings();
-
-    /// 树形视图分组折叠/展开回调
-    callback toggle-tree-group(string /* group-id */);
-    /// 拖拽释放节点移动与调序回调
-    callback move-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
-    /// 拖拽悬停动态命中计算回调
-    callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
-    /// 侧边栏主机资产实时搜索过滤回调
-    callback filter-hosts(string /* query */);
-    /// 快速启动器弹窗实时搜索过滤回调
-    callback filter-launcher(string /* query */);
-    /// 快速启动器上级分组动态折叠展开回调
-    callback toggle-group-option(string /* id */);
-    /// 确认新建分组回调
-    callback create-group(string /* parent_id */, string /* name */);
-    /// 双击主机或本地 Shell 发起终端连接回调
-    callback open-host(string /* id */);
-    /// 激活选中的终端会话 Tab 回调
-    callback select-tab(string /* id */);
-    /// 关闭指定终端会话 Tab 回调
-    callback close-tab(string /* id */);
-    /// 点击加号呼出新建终端会话弹窗回调
-    callback new-tab();
-    /// 选择指定分屏窗格内的指定 Tab 回调
-    callback select-pane-tab(string /* pane_id */, string /* tab_id */);
-    /// 关闭指定分屏窗格内的指定 Tab 回调
-    callback close-pane-tab(string /* pane_id */, string /* tab_id */);
-    /// 复制指定 Tab 会话所对应主机的 IP / 连接地址回调
-    callback copy-tab-ip(string /* tab_id */);
-    /// 关闭指定分屏窗格内除目标 Tab 以外的其他会话回调
-    callback close-other-tabs(string /* pane_id */, string /* tab_id */);
-    /// 向当前终端发送指令片段回调
-    callback send-snippet(string /* cmd */);
-
-    /// 原生窗口最小化回调
+        /// 原生窗口最小化回调
     callback minimize-window();
     /// 原生窗口最大化/还原回调
     callback maximize-window();
@@ -757,464 +194,26 @@ export component AppWindow inherits Window {
     /// 原生无边框窗口 8 方向边缘拖拽调整尺寸回调
     callback start-window-resize(string);
 
-    // -------------------------------------------------------------------------
-    // 终端核心底层交互回调
-    // -------------------------------------------------------------------------
-    /// 终端键盘按键字符/转义序列输入回调
-    callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
-    /// 终端鼠标滚轮视口滚动回调
-    callback terminal-scroll(length /* delta */);
-    /// 终端鼠标划选选区变更回调
-    callback terminal-selection-changed(int /* start_col */, int /* start_row */, int /* end_col */, int /* end_row */, bool /* has_selection */);
-    /// 终端选区复制到剪贴板回调
-    callback terminal-copy();
-    /// 剪贴板文本粘贴到终端回调
-    callback terminal-paste();
-    /// 终端视口清屏回调
-    callback terminal-clear();
-
-    /// 终端多窗格分屏回调
-    callback split-terminal(string /* orientation */);
-    /// 关闭当前终端分屏窗格回调
-    callback close-split();
-    /// 按窗格下标关闭指定分屏窗格回调
-    callback close-pane-by-index(int /* index */);
-    /// 按窗格 ID 关闭指定分屏窗格回调
-    callback close-pane-by-id(string /* pane_id */);
-    /// 选择并聚焦指定分屏窗格回调
-    callback select-pane(int /* index */);
-    /// 按窗格 ID 选择并聚焦指定窗格回调
-    callback select-pane-by-id(string /* pane_id */);
-    /// 切换单窗格临时最大化 (Zoom) 与还原回调
-    callback toggle-pane-zoom(string /* pane_id */);
-    /// 动态拖拽调节分割条比例回调
-    callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
-
-    /// 终端缓冲区文本检索回调
-    callback search-terminal(string /* query */, bool /* match_case */);
-    /// 终端动态几何网格尺寸变更回调
-    callback terminal-resize(int /* cols */, int /* rows */);
-    /// 终端 Tab 拖拽移动与跨分屏移动回调
-    callback move-terminal-tab(string /* from_pane_id */, int /* from_index */, length /* drop_x */, length /* drop_y */);
-
-    // -------------------------------------------------------------------------
-    // 历史会话抽屉交互回调
-    // -------------------------------------------------------------------------
-    /// 重连指定历史会话 (在当前焦点窗格中打开)
-    callback reconnect-history(string /* id */);
-    /// 重连指定历史会话 (向右分屏打开)
-    callback reconnect-history-split(string /* id */);
-    /// 删除单条历史记录
-    callback delete-history-item(string /* id */);
-    /// 清空全部历史记录
-    callback clear-history();
-    /// 切换单条历史记录置顶标星状态
-    callback toggle-pin-history(string /* id */);
-    /// 切换历史时间分组折叠展开状态
-    callback toggle-history-group(string /* group_id */);
-    /// 历史记录搜索关键词过滤回调
-    callback filter-history(string /* query */);
-    /// 切换历史抽屉视图模式回调 ("timeline" | "hosts")
-    callback switch-history-view-mode(string /* mode */);
-    /// 呼出会话详情与终端快照弹窗回调
-    callback show-history-detail(string /* id */);
-    /// 复制快照日志到剪贴板回调
-    callback copy-history-log(string /* content */);
-
-    // -------------------------------------------------------------------------
-    // 凭据保管全屏中心交互回调
-    // -------------------------------------------------------------------------
-    /// 选中指定凭据
-    callback select-credential(string /* id */);
-    /// 开启新建凭据模式
-    callback open-create-credential-modal();
-    /// 取消新建凭据模式
-    callback cancel-create-credential();
-    /// 开启编辑当前凭据模式
-    callback start-edit-credential();
-    /// 取消编辑当前凭据模式
-    callback cancel-edit-credential();
-    /// 保存凭据记录 (新增或修改)
-    callback save-credential(string /* id */, string /* name */, string /* cred_type */, string /* algorithm */, string /* username */, string /* secret_data */, string /* passphrase */, string /* public_key */, string /* fingerprint */, string /* notes */);
-    /// 删除指定凭据
-    callback delete-credential(string /* id */);
-    /// 复制凭据核心机密 (公钥或密码)
-    callback copy-credential-secret(string /* id */);
-    /// 复制任意自定义文本至剪贴板
-    callback copy-custom-text(string /* text */, string /* title */, string /* msg */);
-    /// 一键生成 SSH 密钥对
-    callback generate-credential-key(string /* algorithm */);
-    /// 一键生成随机强密码
-    callback generate-credential-password();
-    /// 凭据分类与搜索过滤
-    callback filter-credentials(string /* category */, string /* query */);
-
-    // -------------------------------------------------------------------------
-    // 代码片段与层级分组管理交互回调
-    // -------------------------------------------------------------------------
-    /// 树形搜索过滤
-    callback filter-snippets-tree(string /* query */);
-    /// 展开/折叠分组
-    callback toggle-snippet-group-expanded(string /* group_id */);
-    /// 选中树节点 (片段或分组)
-    callback select-snippet-node(string /* id */, bool /* is_group */);
-    /// 切换片段星标置顶
-    callback toggle-snippet-favorite(string /* id */);
-    /// 开启新建片段
-    callback open-create-snippet();
-    /// 开启新建分组弹窗
-    callback open-create-snippet-group();
-    /// 取消新建分组弹窗
-    callback cancel-create-snippet-group();
-    /// 提交新建分组
-    callback submit-create-snippet-group();
-    /// 弹窗内选择上级父分组
-    callback select-snippet-group-parent(string /* id */);
-    /// 在中心保存当前正在编辑的代码片段
-    callback save-snippet-from-center();
-    /// 删除指定代码片段
-    callback delete-snippet-node(string /* id */);
-    /// 删除指定分组
-    callback delete-snippet-group-node(string /* id */);
-    /// 复制片段代码到系统剪贴板
-    callback copy-snippet-text(string /* id */);
-    /// 触发执行代码片段 (判断是否需要弹窗输入参数)
-    callback execute-snippet-from-center(string /* id */);
-    /// 参数填报弹窗中输入参数修改
-    callback run-snippet-param-changed(int /* index */, string /* val */);
-    /// 取消执行弹窗
-    callback cancel-snippet-run();
-    /// 提交执行弹窗 (渲染命令并注入终端)
-    callback submit-snippet-run();
-    /// 右侧伴生工具栏搜索过滤
-    callback filter-quick-cmds(string /* query */);
-    /// 拖拽移动/调序代码片段或文件夹节点 (source-id, target-id, drop-position)
-    callback move-snippet-tree-node(string /* source-id */, string /* target-id */, string /* drop-position */);
-    /// 拖拽悬停计算事件回调 (source-id, target-index, offset-in-row)
-    callback request-snippet-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
-
-    // -------------------------------------------------------------------------
-    // 网络隧道、跳板堡垒与代理池管理回调
-    // -------------------------------------------------------------------------
-    callback select-tunnel(string /* id */);
-    callback toggle-tunnel-running(string /* id */);
-    callback start-create-tunnel();
-    callback start-create-typed-tunnel(string /* type */);
-    callback cancel-create-tunnel();
-    callback start-edit-tunnel();
-    callback cancel-edit-tunnel();
-    callback save-tunnel(
-        string /* id */,
-        string /* name */,
-        string /* tunnel_type */,
-        string /* ssh_host_id */,
-        string /* ssh_host_name */,
-        string /* local_bind */,
-        int    /* local_port */,
-        string /* remote_host */,
-        int    /* remote_port */,
-        bool   /* auto_start */,
-        bool   /* auto_reconnect */,
-        bool   /* remote_dns */,
-        bool   /* compression */,
-        string /* notes */
-    );
-    callback delete-tunnel(string /* id */);
-    callback copy-tunnel-ssh-command(string /* id */);
-    callback filter-tunnels(string /* category */, string /* query */);
-    callback open-tunnels-hub();
-
-    // -------------------------------------------------------------------------
-    // 开发者 F12 调试控制台专用回调
-    // -------------------------------------------------------------------------
-
-    /// 批量生成主机测试数据
-    callback debug-batch-generate(string /* prefix */, string /* count_str */, string /* ip_prefix */, string /* start_ip_str */, string /* port_str */, string /* group */, string /* status_mode */, bool /* overwrite */);
-    /// 批量更新主机状态模拟
-    callback debug-batch-update-status(string /* status_mode */);
-    /// 批量修改主机端口
-    callback debug-batch-update-port(string /* new_port_str */);
-    /// 注入标准场景测试预设
-    callback debug-inject-preset(string /* preset_id */);
-    /// 快速新增主机
-    callback debug-quick-add-host(string /* name */, string /* ip */, string /* port_str */, string /* group */);
-    /// 快速新增分组
-    callback debug-quick-add-group(string /* name */, string /* parent_id */);
-    /// 清空全量内存与存储层数据
-    callback debug-clear-data();
-    /// 恢复系统默认精简数据集
-    callback debug-reset-default-data();
-    /// 批量生成凭据测试数据
-    callback debug-batch-generate-credentials(string /* count_str */, string /* mode */, bool /* overwrite */);
-    /// 快捷添加单条测试凭据
-    callback debug-quick-add-credential(string /* cred_type */, string /* name */, string /* data */);
-    /// 恢复默认精选凭据预设
-    callback debug-reset-default-credentials();
-    /// 清空所有凭据数据
-    callback debug-clear-credentials();
-    /// 批量生成代码片段测试数据
-    callback debug-batch-generate-snippets(string /* count_str */, bool /* overwrite */);
-    /// 快捷添加单条测试代码片段
-    callback debug-quick-add-snippet(string /* title */, string /* lang */, string /* cmd */);
-    /// 恢复默认精选代码片段预设
-    callback debug-reset-default-snippets();
-    /// 清空所有代码片段数据
-    callback debug-clear-snippets();
-    /// 清空诊断日志
-    callback debug-clear-logs();
-    /// 模拟触发测试诊断日志
-    callback debug-emit-test-log(string /* level */);
-    /// 强制全屏重绘测试
-
-    callback debug-force-repaint();
-    /// 终端 120Hz 高频吞吐基准压测
-    callback debug-run-benchmark();
-    /// 切换图形渲染管线首选项
-    callback debug-switch-pipeline(string /* pipeline_id */);
-    /// 保存管线配置 (下次生效)
-    callback debug-apply-pipeline();
-    /// 保存管线并立即重启客户端
-    callback debug-restart-app();
-    /// 开发者调试功能开关切换回调
-    callback toggle-debug-enabled(bool /* enabled */);
-
-    /// 全局统一路由跳转请求回调
-    callback navigate-to(string /* target_tab */, string /* section */);
-    /// 侧边栏/主视图活动页签切换
-    callback activity-tab-switched(string /* tab_id */);
-
-    // -------------------------------------------------------------------------
-    // 双盘文件管理交互回调 (左右独立 Tab 体系)
-    // -------------------------------------------------------------------------
-    /// 本地文件 Tab 切换
-    callback select-local-tab(string /* tab_id */);
-    /// 本地文件 Tab 关闭
-    callback close-local-tab(string /* tab_id */);
-    /// 新建本地文件 Tab
-    callback new-local-tab();
-    /// 远程文件 Tab 切换
-    callback select-remote-tab(string /* tab_id */);
-    /// 远程文件 Tab 关闭
-    callback close-remote-tab(string /* tab_id */);
-    /// 新建远程文件 Tab
-    callback new-remote-tab();
-    /// 导航本地路径
-    callback navigate-local-path(string /* path */);
-    /// 导航远程路径
-    callback navigate-remote-path(string /* path */);
-    /// 导航本地历史后退 / 前进
-    callback navigate-local-back();
-    callback navigate-local-forward();
-    /// 导航远程历史后退 / 前进
-    callback navigate-remote-back();
-    callback navigate-remote-forward();
-    /// 导航本地上级目录
-    callback navigate-local-up();
-    /// 导航远程上级目录
-    callback navigate-remote-up();
-
-    /// 打开本地文件/目录
-
-    callback open-local-item(string /* path */, bool /* is_dir */);
-    /// 打开远程文件/目录
-    callback open-remote-item(string /* path */, bool /* is_dir */);
-    /// 展开/折叠本地目录树
-    callback toggle-local-expand(string /* path */);
-    /// 展开/折叠远程目录树
-    callback toggle-remote-expand(string /* path */);
-    /// 刷新本地文件列表
-    callback refresh-local-files();
-    /// 刷新远程文件列表
-    callback refresh-remote-files();
-    /// 上传选中本地文件到远程
-    callback upload-file();
-    /// 下载选中远程文件到本地
-    callback download-file();
-    /// 清空已完成的传输任务
-    callback clear-completed-transfers();
-    /// 触发文件/目录拖拽传输任务 (支持单文件与多层级文件夹树)
-    callback start-transfer-task(string /* direction */, string /* source_path */, string /* filename */, bool /* is_dir */, string /* target_path */);
-    /// 展开/折叠传输队列中的文件夹任务
-    callback toggle-transfer-expand(string /* task_id */);
-    /// 在文件页面从左侧双击主机打开远程文件会话
-    callback open-host-files(string /* host_id */);
-    /// 传输任务右键快捷操作 ("pause" | "resume" | "stop" | "retry" | "remove")
-    callback transfer-action(string /* action */, string /* task_id */);
-    /// 文件/目录右键快捷操作 ("open" | "transfer" | "create_folder" | "create_file" | "delete" | "refresh")
-    callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
-    /// 复制文本到系统剪贴板
-    callback copy-to-clipboard(string /* text */);
-    /// 文件夹 Tab 拖拽调整顺序回调 (仅在同栏内生效)
-    callback reorder-local-tab(int /* from_index */, int /* to_index */);
-    callback reorder-remote-tab(int /* from_index */, int /* to_index */);
-
-    // -------------------------------------------------------------------------
-    // 全局气泡通知 (Toast) 状态与回调
-    // -------------------------------------------------------------------------
-    in property <[ToastItemData]> active-toasts: [];
-    in property <string> toast-position: "top-right";
-    callback close-toast(string /* id */);
-
-    // -------------------------------------------------------------------------
-    // 统一错误与消息提示弹窗状态
-    // -------------------------------------------------------------------------
-    /// 提示弹窗显隐开关
-    in-out property <bool> is-dialog-open: false;
-    /// 提示弹窗标题
-    in-out property <string> dialog-title: @tr("提示");
-    /// 提示详情文本
-    in-out property <string> dialog-message: "";
-    /// 提示类型 ("error" | "warning" | "info")
-    in-out property <string> dialog-type: "error";
-
-    /// 左右双盘历史记录前进/后退使能状态
-    in property <bool> local-can-go-back: false;
-    in property <bool> local-can-go-forward: false;
-    in property <bool> remote-can-go-back: false;
-    in property <bool> remote-can-go-forward: false;
-    /// 传输队列面板展开/折叠状态
-    in-out property <bool> is-transfer-queue-expanded: false;
-
-    // -------------------------------------------------------------------------
-    // 文件会话选择弹窗 (FileHostModal) 状态与交互
-    // -------------------------------------------------------------------------
-    in-out property <bool> is-file-host-modal-open: false;
-    in property <[HostItemData]> file-launcher-host-items: [];
-    callback filter-file-launcher(string /* query */);
-    callback open-file-host(string /* host_id */);
-
-    // -------------------------------------------------------------------------
-    // 实验室特性门控与设置调试 (Feature Flags & Settings Debug)
-    // -------------------------------------------------------------------------
-    in-out property <bool> flag-desktop-notifications: false;
-    in-out property <bool> flag-terminal-crt-shader: false;
-    in-out property <bool> flag-cloud-sync: false;
-    in-out property <bool> flag-terminal-scratchpad: false;
-    in-out property <bool> use-mock-storage: true;
-
-    in-out property <bool> setting-desktop-notification: false;
-    in-out property <bool> setting-terminal-crt: false;
-
-    callback toggle-feature-flag(string, bool);
-    callback toggle-mock-storage(bool);
-    callback apply-config-preset(string);
-    callback reset-all-settings();
-    callback toggle-desktop-notification(bool);
-    callback toggle-terminal-crt(bool);
-    callback change-modal-opacity(float /* opacity */);
-
-    // -------------------------------------------------------------------------
-    // 主题定制与设计工坊 (Theme Studio Modal)
-    // -------------------------------------------------------------------------
-    in-out property <bool> is-theme-editor-open: false;
-    in-out property <string> theme-editor-name: "My Custom Theme";
-    in-out property <string> theme-editor-author: "User";
-    in-out property <string> theme-editor-base: "builtin.ui.darcula";
-    in-out property <string> theme-editor-period: "night";
-
-    in-out property <string> theme-editor-window-bg: "#1e1e2e";
-    in-out property <string> theme-editor-panel-bg: "#181825";
-    in-out property <string> theme-editor-surface-bg: "#313244";
-    in-out property <string> theme-editor-control-bg: "#383a4c";
-    in-out property <string> theme-editor-foreground: "#cdd6f4";
-    in-out property <string> theme-editor-secondary-fg: "#a6adc8";
-    in-out property <string> theme-editor-disabled-fg: "#6c7086";
-    in-out property <string> theme-editor-accent: "#cba6f7";
-    in-out property <string> theme-editor-hover-bg: "#45475a";
-    in-out property <string> theme-editor-pressed-bg: "#585b70";
-    in-out property <string> theme-editor-selected-bg: "#cba6f7";
-    in-out property <string> theme-editor-selected-fg: "#ffffff";
-    in-out property <string> theme-editor-border: "#45475a";
-    in-out property <string> theme-editor-focus-border: "#cba6f7";
-    in-out property <string> theme-editor-success: "#a6e3a1";
-    in-out property <string> theme-editor-warning: "#f9e2af";
-    in-out property <string> theme-editor-danger: "#f38ba8";
-    in-out property <string> theme-editor-info: "#89b4fa";
-
-    in property <brush> theme-editor-preview-window-bg: #1e1e2e;
-    in property <brush> theme-editor-preview-panel-bg: #181825;
-    in property <brush> theme-editor-preview-surface-bg: #313244;
-    in property <brush> theme-editor-preview-control-bg: #383a4c;
-    in property <brush> theme-editor-preview-foreground: #cdd6f4;
-    in property <brush> theme-editor-preview-secondary-fg: #a6adc8;
-    in property <brush> theme-editor-preview-disabled-fg: #6c7086;
-    in property <brush> theme-editor-preview-accent: #cba6f7;
-    in property <brush> theme-editor-preview-hover-bg: #45475a;
-    in property <brush> theme-editor-preview-pressed-bg: #585b70;
-    in property <brush> theme-editor-preview-selected-bg: #cba6f7;
-    in property <brush> theme-editor-preview-selected-fg: #ffffff;
-    in property <brush> theme-editor-preview-border: #45475a;
-    in property <brush> theme-editor-preview-focus-border: #cba6f7;
-    in property <brush> theme-editor-preview-success: #a6e3a1;
-    in property <brush> theme-editor-preview-warning: #f9e2af;
-    in property <brush> theme-editor-preview-danger: #f38ba8;
-    in property <brush> theme-editor-preview-info: #89b4fa;
-
-    in-out property <string> theme-editor-metric-radius-small: "2";
-    in-out property <string> theme-editor-metric-radius-medium: "4";
-    in-out property <string> theme-editor-metric-radius-large: "8";
-    in-out property <string> theme-editor-metric-spacing-small: "4";
-    in-out property <string> theme-editor-metric-spacing-medium: "8";
-    in-out property <string> theme-editor-metric-spacing-large: "16";
-    in-out property <string> theme-editor-metric-border-width: "1";
-    in-out property <string> theme-editor-metric-control-height: "32";
-    in-out property <string> theme-editor-metric-icon-size: "16";
-
-    in-out property <string> theme-editor-toml: "";
-
-    // 色轮取色器属性与回调
-    in-out property <float> theme-editor-wheel-indicator-x: 90.0;
-    in-out property <float> theme-editor-wheel-indicator-y: 90.0;
-    in-out property <float> theme-editor-wheel-brightness: 1.0;
-    in-out property <brush> theme-editor-wheel-hue-brush: #ff0000;
-    in-out property <brush> theme-editor-picker-brush: #1e1e2e;
-    in-out property <string> theme-editor-picker-hex: "#1e1e2e";
-    in-out property <string> theme-editor-picker-target-key: "window_bg";
-    in-out property <string> theme-editor-picker-target-label: "窗口底色";
-
-    callback open-theme-editor();
-    callback theme-editor-color-changed(string, string);
-    callback theme-editor-metric-changed(string, string);
-    callback theme-editor-meta-changed(string, string);
-    callback theme-editor-parse-toml(string);
-    callback theme-editor-copy-toml(string);
-    callback theme-editor-apply-preset(string);
-    callback theme-editor-save-and-activate();
-
-    callback theme-editor-wheel-coord-picked(float, float);
-    callback theme-editor-wheel-brightness-picked(float);
-    callback theme-editor-picker-hex-changed(string);
-
-
-
-
-
-
-
-
-
-
-
     // 全局快捷键拦截 (支持 F12 或 Ctrl+Shift+D 随时呼出调试弹窗)
     forward-focus: main-focus;
     main-focus := FocusScope {
         key-pressed(event) => {
             if event.modifiers.control && (event.text == "k" || event.text == "K" || event.text == "p" || event.text == "P") {
-                root.is-command-palette-open = !root.is-command-palette-open;
+                WindowBridge.is-command-palette-open = !WindowBridge.is-command-palette-open;
                 accept
-            } else if (event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D"))) && root.is-debug-enabled {
-                root.is-debug-modal-open = !root.is-debug-modal-open;
+            } else if (event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D"))) && WindowBridge.is-debug-enabled {
+                DebugBridge.is-open = !DebugBridge.is-open;
                 accept
             } else if event.text == Key.Escape {
 
-                if root.is-command-palette-open {
-                    root.is-command-palette-open = false;
+                if WindowBridge.is-command-palette-open {
+                    WindowBridge.is-command-palette-open = false;
                     accept
-                } else if root.is-debug-modal-open {
-                    root.is-debug-modal-open = false;
+                } else if DebugBridge.is-open {
+                    DebugBridge.is-open = false;
                     accept
-                } else if root.is-create-group-open {
-                    root.is-create-group-open = false;
+                } else if HostsBridge.is-create-group-open {
+                    HostsBridge.is-create-group-open = false;
                     accept
                 } else {
                     reject
@@ -1227,6 +226,8 @@ export component AppWindow inherits Window {
 
     // 顶层主容器 (外层带边框圆角与固态底基)
     Rectangle {
+        width: 100%;
+        height: 100%;
         border-radius: 8px;
         border-width: 1px;
         border-color: AppTheme.border;
@@ -1234,41 +235,44 @@ export component AppWindow inherits Window {
         clip: true;
 
         // 全局壁纸层 (双缓冲淡入淡出，平滑过渡，绝不卡顿)
-        if root.wallpaper-mode == "global" && root.prev-wallpaper-image.width > 0 && root.wallpaper-crossfade < 1.0: Image {
-            source: root.prev-wallpaper-image;
+        if WindowBridge.wallpaper-mode == "global" && WindowBridge.prev-wallpaper-image.width > 0 && WindowBridge.wallpaper-crossfade < 1.0: Image {
+            source: WindowBridge.prev-wallpaper-image;
             width: 100%;
             height: 100%;
             image-fit: cover;
-            opacity: root.global-wallpaper-opacity * (1.0 - root.wallpaper-crossfade);
+            opacity: WindowBridge.global-wallpaper-opacity * (1.0 - WindowBridge.wallpaper-crossfade);
         }
 
-        if root.wallpaper-mode == "global" && root.global-wallpaper-image.width > 0: Image {
-            source: root.global-wallpaper-image;
+        if WindowBridge.wallpaper-mode == "global" && WindowBridge.global-wallpaper-image.width > 0: Image {
+            source: WindowBridge.global-wallpaper-image;
             width: 100%;
             height: 100%;
             image-fit: cover;
-            opacity: root.global-wallpaper-opacity * root.wallpaper-crossfade;
+            opacity: WindowBridge.global-wallpaper-opacity * WindowBridge.wallpaper-crossfade;
         }
 
         VerticalLayout {
+            width: 100%;
+            height: 100%;
             padding: 0px;
             spacing: 0px;
 
 
             // 1. 顶层全宽控制栏 (TabBar + 纯净系统窗口控制)
             TabBar {
-                is-maximized: root.is-window-maximized;
-                is-dark-mode: root.is-dark-mode;
-                active-tab-id: root.active-session-tab;
-                tabs: root.tabs;
+                is-maximized: WindowBridge.is-window-maximized;
+                is-dark-mode: WindowBridge.is-dark-mode;
+                active-tab-id: TerminalBridge.active-session-tab;
+                tabs: TerminalBridge.tabs;
                 select-tab(id) => {
-                    root.main-view = "terminal";
-                    root.select-tab(id);
+                    WindowBridge.main-view = "terminal";
+                    TerminalBridge.select-tab(id);
                 }
-                close-tab(id) => { root.close-tab(id); }
+                close-tab(id) => { TerminalBridge.close-tab(id); }
                 new-tab => {
-                    root.main-view = "terminal";
-                    root.new-tab();
+                    WindowBridge.main-view = "terminal";
+                    TerminalBridge.new-tab();
+                    WindowBridge.is-new-session-modal-open = true;
                 }
                 minimize-window => { root.minimize-window(); }
                 maximize-window => {
@@ -1281,174 +285,134 @@ export component AppWindow inherits Window {
             // 2. 中间五栏主工作区 (整齐划一平铺)
             HorizontalLayout {
                 vertical-stretch: 1;
+                width: 100%;
                 padding: 0px;
                 spacing: 0px;
 
                 // 2.1 最左侧 48px 动态数据驱动活动图标栏
                 LeftActivityBar {
-                    active-tab: root.active-left-tab;
-                    top-items: root.top-activity-items;
-                    bottom-items: root.bottom-activity-items;
-                    is-dark-mode: root.is-dark-mode;
-                    toggle-color-mode => { root.toggle-color-mode(); }
+                    active-tab: WindowBridge.active-left-tab;
+                    top-items: WindowBridge.top-activity-items;
+                    bottom-items: WindowBridge.bottom-activity-items;
+                    is-dark-mode: WindowBridge.is-dark-mode;
+                    toggle-color-mode => { WindowBridge.toggle-color-mode(); }
                     tab-clicked(id) => {
-                        root.activity-tab-switched(id);
+                        WindowBridge.switch-left-tab(id);
                         if id == "debug" {
                             // 点击调试图标直接唤起全局独立浮动弹窗
-                            root.is-debug-modal-open = !root.is-debug-modal-open;
+                            DebugBridge.is-open = !DebugBridge.is-open;
                         } else if id == "history" {
                             // 切换至独立全屏历史中心大页面 (无终端视口干扰)
-                            root.active-left-tab = "history";
-                            root.main-view = "history";
-                            root.is-left-drawer-open = false;
-                            root.navigate-to("history", "");
+                            WindowBridge.active-left-tab = "history";
+                            WindowBridge.main-view = "history";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.navigate-to("history", "");
                         } else if id == "credentials" {
                             // 切换至独立全屏凭据中心大页面 (左侧列表 + 右侧详情编辑，无右侧工具栏)
-                            root.active-left-tab = "credentials";
-                            root.main-view = "credentials";
-                            root.is-left-drawer-open = false;
-                            root.navigate-to("credentials", "");
+                            WindowBridge.active-left-tab = "credentials";
+                            WindowBridge.main-view = "credentials";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.navigate-to("credentials", "");
                         } else if id == "snippets" {
                             // 切换至独立全屏代码片段中心大页面 (左侧多层树形 + 右侧沉浸式编辑器)
-                            root.active-left-tab = "snippets";
-                            root.main-view = "snippets";
-                            root.is-left-drawer-open = false;
-                            root.navigate-to("snippets", "");
+                            WindowBridge.active-left-tab = "snippets";
+                            WindowBridge.main-view = "snippets";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.navigate-to("snippets", "");
                         } else if id == "tunnels" {
                             // 切换至独立全屏网络与隧道中心大页面 (左侧规则列表 + 右侧拓扑与指标详情)
-                            root.active-left-tab = "tunnels";
-                            root.main-view = "tunnels";
-                            root.is-left-drawer-open = false;
-                            root.navigate-to("tunnels", "");
+                            WindowBridge.active-left-tab = "tunnels";
+                            WindowBridge.main-view = "tunnels";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.navigate-to("tunnels", "");
                         } else if id == "files" {
                             // 切换至文件管理页面：左侧展示主机树抽屉，中央展示双盘文件管理器
-                            root.active-left-tab = "files";
-                            root.main-view = "files";
-                            root.is-left-drawer-open = true;
-                            root.navigate-to("files", "");
+                            WindowBridge.active-left-tab = "files";
+                            WindowBridge.main-view = "files";
+                            WindowBridge.is-left-drawer-open = true;
+                            WindowBridge.navigate-to("files", "");
                         } else if id == "settings" {
                             // 切换至独立全屏偏好设置中心大页面 (含外观、终端、网络、快捷键与数据备份)
-                            root.active-left-tab = "settings";
-                            root.main-view = "settings";
-                            root.is-left-drawer-open = false;
-                            root.navigate-to("settings", "");
+                            WindowBridge.active-left-tab = "settings";
+                            WindowBridge.main-view = "settings";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.navigate-to("settings", "");
                         } else {
                             // 资产与设置抽屉：切回终端工作区 + 展开对应抽屉
-                            root.main-view = "terminal";
-                            if root.active-left-tab == id && root.is-left-drawer-open {
-                                root.is-left-drawer-open = false;
+                            WindowBridge.main-view = "terminal";
+                            if WindowBridge.active-left-tab == id && WindowBridge.is-left-drawer-open {
+                                WindowBridge.is-left-drawer-open = false;
                             } else {
-                                root.active-left-tab = id;
-                                root.is-left-drawer-open = true;
+                                WindowBridge.active-left-tab = id;
+                                WindowBridge.is-left-drawer-open = true;
                             }
-                            root.navigate-to(id, "");
+                            WindowBridge.navigate-to(id, "");
                         }
                     }
                 }
 
 
                 // 2.2 左侧可伸缩二级抽屉
-                if root.is-left-drawer-open: Rectangle {
-                    width: root.left-drawer-width;
+                if WindowBridge.is-left-drawer-open: Rectangle {
+                    width: WindowBridge.left-drawer-width;
                     clip: true;
 
-                    if root.active-left-tab == "hosts" || root.active-left-tab == "files": HostsDrawer {
+                    if WindowBridge.active-left-tab == "hosts" || WindowBridge.active-left-tab == "files": HostsDrawer {
                         width: 100%;
                         height: 100%;
-                        collapse => { root.is-left-drawer-open = false; }
-                        is-dragging <=> root.is-dragging;
-                        drag-source-id <=> root.drag-source-id;
-                        drag-source-name <=> root.drag-source-name;
-                        drag-source-is-group <=> root.drag-source-is-group;
-                        drop-target-id <=> root.drop-target-id;
-                        drop-target-name <=> root.drop-target-name;
-                        drop-target-index <=> root.drop-target-index;
-                        drop-position <=> root.drop-position;
-                        drop-target-valid <=> root.drop-target-valid;
-                        drag-x <=> root.drag-x;
-                        drag-y <=> root.drag-y;
-                        toggle-group(id) => { root.toggle-tree-group(id); }
-                        move-node(src, target, pos) => { root.move-tree-node(src, target, pos); }
-                        request-drag-hover(src, idx, offset) => { root.request-drag-hover(src, idx, offset); }
-                        search-changed(query) => { root.filter-hosts(query); }
-                        create-new-group => { root.is-create-group-open = true; }
+                        collapse => { WindowBridge.is-left-drawer-open = false; }
                         host-double-clicked(id) => {
-                            if root.main-view == "files" {
-                                root.open-host-files(id);
+                            if WindowBridge.main-view == "files" {
+                                FilesBridge.open-host-files(id);
                             } else {
-                                root.open-host(id);
+                                HostsBridge.open-host(id);
                             }
                         }
-                        open-local-shell(type) => { root.open-host("local-" + type); }
+                        open-local-shell(type) => { HostsBridge.open-host("local-" + type); }
                     }
 
-                    if root.active-left-tab == "credentials": CredentialsDrawer {
+                    if WindowBridge.active-left-tab == "credentials": CredentialsDrawer {
                         width: 100%;
                         height: 100%;
-                        collapse => { root.is-left-drawer-open = false; }
-                        credentials: root.credentials;
-                        filter-category <=> root.credential-filter-category;
-                        search-query <=> root.credential-search-query;
-                        active-cred-id <=> root.active-credential-id;
-
-                        select-cred(id) => { root.select-credential(id); }
-                        open-create-modal => { root.open-create-credential-modal(); }
-                        edit-cred(id) => { root.select-credential(id); }
-                        delete-cred(id) => { root.delete-credential(id); }
-                        copy-secret(id) => { root.copy-credential-secret(id); }
-                        search-changed(q) => { root.filter-credentials(root.credential-filter-category, q); }
-                        filter-category-changed(cat) => { root.filter-credentials(cat, root.credential-search-query); }
+                        collapse => { WindowBridge.is-left-drawer-open = false; }
                     }
 
 
-                    if root.active-left-tab == "snippets": SnippetsDrawer {
+                    if WindowBridge.active-left-tab == "snippets": SnippetsDrawer {
                         width: 100%;
                         height: 100%;
-                        collapse => { root.is-left-drawer-open = false; }
-                        tree-nodes: root.snippet-tree-nodes;
-                        search-query <=> root.snippet-search-query;
-                        selected-id <=> root.snippet-selected-id;
-                        search-changed(q) => { root.filter-snippets-tree(q); }
-                        toggle-group(id) => { root.toggle-snippet-group-expanded(id); }
-                        select-node(id, is_grp) => { root.select-snippet-node(id, is_grp); }
-                        create-new-group => { root.open-create-snippet-group(); }
-                        create-new-snippet => { root.open-create-snippet(); }
-                        execute-snippet(id) => { root.execute-snippet-from-center(id); }
-                        move-node(src, tgt, pos) => { root.move-snippet-tree-node(src, tgt, pos); }
-                        request-drag-hover(src, idx, off) => { root.request-snippet-drag-hover(src, idx, off); }
+                        collapse => { WindowBridge.is-left-drawer-open = false; }
                     }
 
-                    if root.active-left-tab == "tunnels": TunnelsDrawer {
+                    if WindowBridge.active-left-tab == "tunnels": TunnelsDrawer {
                         width: 100%;
                         height: 100%;
-                        collapse => { root.is-left-drawer-open = false; }
-                        tunnels: root.tunnels;
-                        toggle-tunnel(id) => { root.toggle-tunnel-running(id); }
+                        collapse => { WindowBridge.is-left-drawer-open = false; }
                         open-hub => {
-                            root.main-view = "tunnels";
-                            root.is-left-drawer-open = false;
+                            WindowBridge.main-view = "tunnels";
+                            WindowBridge.is-left-drawer-open = false;
                         }
                     }
 
-                    if root.active-left-tab == "backup": BackupDrawer {
+                    if WindowBridge.active-left-tab == "backup": BackupDrawer {
                         width: 100%;
                         height: 100%;
-                        collapse => { root.is-left-drawer-open = false; }
+                        collapse => { WindowBridge.is-left-drawer-open = false; }
                     }
 
-                    if root.active-left-tab == "settings": SettingsDrawer {
+                    if WindowBridge.active-left-tab == "settings": SettingsDrawer {
                         width: 100%;
                         height: 100%;
-                        is-debug-enabled <=> root.is-debug-enabled;
-                        collapse => { root.is-left-drawer-open = false; }
-                        switch-theme(id) => { root.switch-theme(id); }
-                        toggle-debug-enabled(enabled) => { root.toggle-debug-enabled(enabled); }
+                        is-debug-enabled <=> WindowBridge.is-debug-enabled;
+                        collapse => { WindowBridge.is-left-drawer-open = false; }
+                        switch-theme(id) => { WindowBridge.switch-theme(id); }
+                        toggle-debug-enabled(enabled) => { WindowBridge.toggle-debug-enabled(enabled); }
                     }
                 }
 
 
                 // 2.2.1 左侧可拖拽调宽分割条 (可见实体竖条，带左右 1px 边框，与侧栏同色)
-                if root.is-left-drawer-open: Rectangle {
+                if WindowBridge.is-left-drawer-open: Rectangle {
                     width: 5px;
                     background: left-split-touch.has-hover || left-split-touch.pressed ? AppTheme.accent : AppTheme.panel-background;
                     animate background { duration: 120ms; }
@@ -1473,268 +437,69 @@ export component AppWindow inherits Window {
                         mouse-cursor: col-resize;
                         moved => {
                             if self.pressed {
-                                root.left-drawer-width = Math.max(160px, Math.min(520px, root.left-drawer-width + self.mouse-x - self.pressed-x));
+                                WindowBridge.left-drawer-width = Math.max(160px, Math.min(520px, WindowBridge.left-drawer-width + self.mouse-x - self.pressed-x));
                             }
                         }
                         double-clicked => {
-                            root.left-drawer-width = 240px;
+                            WindowBridge.left-drawer-width = 240px;
                         }
                     }
                 }
 
                 // 2.3.1 全屏历史中心页面 (当 main-view == "history" 时全屏展开，彻底隐藏终端与多栏)
-                if root.main-view == "history": HistoryCenterView {
+                if WindowBridge.main-view == "history": HistoryCenterView {
                     horizontal-stretch: 1;
                     reconnect(id) => {
-                        root.main-view = "terminal";
-                        root.active-left-tab = "hosts";
-                        root.is-left-drawer-open = true;
-                        root.reconnect-history(id);
+                        WindowBridge.main-view = "terminal";
+                        WindowBridge.active-left-tab = "hosts";
+                        WindowBridge.is-left-drawer-open = true;
+                        HistoryBridge.reconnect(id);
                     }
-                    show-detail(id) => { root.show-history-detail(id); }
-                    delete-item(id) => { root.delete-history-item(id); }
-                    clear-all => { root.clear-history(); }
-                    toggle-pin(id) => { root.toggle-pin-history(id); }
-                    toggle-group(id) => { root.toggle-history-group(id); }
-                    search-changed(q) => { root.filter-history(q); }
                     switch-to-terminal => {
-                        root.main-view = "terminal";
-                        root.active-left-tab = "hosts";
-                        root.is-left-drawer-open = true;
+                        WindowBridge.main-view = "terminal";
+                        WindowBridge.active-left-tab = "hosts";
+                        WindowBridge.is-left-drawer-open = true;
                     }
                 }
 
                 // 2.3.2 全屏凭据管理中心
-                if root.main-view == "credentials": CredentialsCenterView {
+                if WindowBridge.main-view == "credentials": CredentialsCenterView {
                     horizontal-stretch: 1;
-                    select-cred(id) => { root.select-credential(id); }
-                    start-create => { root.open-create-credential-modal(); }
-                    cancel-create => { root.cancel-create-credential(); }
-                    start-edit => { root.start-edit-credential(); }
-                    cancel-edit => { root.cancel-edit-credential(); }
-                    save-cred(id, name, cred_type, algo, user, secret, pass, pub, fp, notes) => {
-                        root.save-credential(id, name, cred_type, algo, user, secret, pass, pub, fp, notes);
-                    }
-                    delete-cred(id) => { root.delete-credential(id); }
-                    copy-secret(id) => { root.copy-credential-secret(id); }
-                    copy-text(text, title, msg) => { root.copy-custom-text(text, title, msg); }
-                    generate-key(algo) => { root.generate-credential-key(algo); }
-                    generate-password => { root.generate-credential-password(); }
-                    search-changed(q) => { root.filter-credentials(root.credential-filter-category, q); }
-                    filter-category-changed(cat) => { root.filter-credentials(cat, root.credential-search-query); }
                     back-to-terminal => {
-                        root.main-view = "terminal";
-                        root.active-left-tab = "hosts";
-                        root.is-left-drawer-open = true;
+                        WindowBridge.main-view = "terminal";
+                        WindowBridge.active-left-tab = "hosts";
+                        WindowBridge.is-left-drawer-open = true;
                     }
                 }
 
                 // 2.3.3 全屏代码片段管理中心
-                if root.main-view == "snippets": SnippetsCenterView {
+                if WindowBridge.main-view == "snippets": SnippetsCenterView {
                     horizontal-stretch: 1;
-                    search_changed(q) => { root.filter-snippets-tree(q); }
-                    toggle_group_expanded(id) => { root.toggle-snippet-group-expanded(id); }
-                    select_node(id, is_grp) => { root.select-snippet-node(id, is_grp); }
-                    toggle_favorite(id) => { root.toggle-snippet-favorite(id); }
-                    create_snippet => { root.open-create-snippet(); }
-                    create_group => { root.open-create-snippet-group(); }
-                    save_snippet => { root.save-snippet-from-center(); }
-                    delete_snippet(id) => { root.delete-snippet-node(id); }
-                    delete_group(id) => { root.delete-snippet-group-node(id); }
-                    copy_content(id) => { root.copy-snippet-text(id); }
-                    execute_snippet(id) => { root.execute-snippet-from-center(id); }
-                    move_node(src, tgt, pos) => { root.move-snippet-tree-node(src, tgt, pos); }
-                    request_drag_hover(src, idx, off) => { root.request-snippet-drag-hover(src, idx, off); }
                 }
 
                 // 2.3.4 全屏网络与隧道管理中心
-                if root.main-view == "tunnels": TunnelsCenterView {
+                if WindowBridge.main-view == "tunnels": TunnelsCenterView {
                     horizontal-stretch: 1;
-                    tree-nodes: root.tree-nodes;
-                    toggle-group(id) => { root.toggle-tree-group(id); }
-
-                    add-jump-hop(id, name, addr, port) => { root.add-tunnel-jump-hop(id, name, addr, port); }
-                    remove-jump-hop(idx) => { root.remove-tunnel-jump-hop(idx); }
-                    move-jump-hop-up(idx) => { root.move-tunnel-jump-hop-up(idx); }
-                    move-jump-hop-down(idx) => { root.move-tunnel-jump-hop-down(idx); }
-                    toggle-jump-hop-enabled(idx) => { root.toggle-tunnel-jump-hop-enabled(idx); }
-
-                    select-tunnel(id) => { root.select-tunnel(id); }
-                    toggle-tunnel-running(id) => { root.toggle-tunnel-running(id); }
-                    start-create => { root.start-create-tunnel(); }
-                    start-create-typed(t) => { root.start-create-typed-tunnel(t); }
-                    cancel-create => { root.cancel-create-tunnel(); }
-                    start-edit => { root.start-edit-tunnel(); }
-                    cancel-edit => { root.cancel-edit-tunnel(); }
-                    save-tunnel(id, name, t_type, h_id, h_name, l_bind, l_port, r_host, r_port, auto_s, auto_r, r_dns, comp, notes) => {
-                        root.save-tunnel(id, name, t_type, h_id, h_name, l_bind, l_port, r_host, r_port, auto_s, auto_r, r_dns, comp, notes);
-                    }
-                    delete-tunnel(id) => { root.delete-tunnel(id); }
-                    copy-ssh-command(id) => { root.copy-tunnel-ssh-command(id); }
-                    copy-custom-text(text, title, msg) => { root.copy-custom-text(text, title, msg); }
-                    search-changed(q) => {
-                        root.filter-tunnels(root.tunnel-filter-category, q);
-                    }
-                    filter-category-changed(cat) => {
-                        root.filter-tunnels(cat, root.tunnel-search-query);
-                    }
                     back-to-terminal => {
-                        root.main-view = "terminal";
-                        root.active-left-tab = "hosts";
-                        root.is-left-drawer-open = true;
+                        WindowBridge.main-view = "terminal";
+                        WindowBridge.active-left-tab = "hosts";
+                        WindowBridge.is-left-drawer-open = true;
                     }
                 }
 
                 // 2.3.5 全屏偏好设置中心
-                if root.main-view == "settings": SettingsCenterView {
+                if WindowBridge.main-view == "settings": SettingsCenterView {
                     horizontal-stretch: 1;
-                    active-category <=> root.active-settings-category;
-                    is-dark-mode <=> root.is-dark-mode;
-                    change-modal-opacity(op) => { root.change-modal-opacity(op); }
-                    toggle-always-on-top(c) => { root.toggle-always-on-top(c); }
-                    toggle-start-on-boot(c) => { root.toggle-start-on-boot(c); }
-                    toggle-confirm-close-tab(c) => { root.toggle-confirm-close-tab(c); }
-                    toggle-confirm-close-active(c) => { root.toggle-confirm-close-active(c); }
-                    switch-rendering-pipeline(p) => { root.switch-rendering-pipeline(p); }
-                    close-settings => {
-                        root.main-view = "terminal";
-                        root.active-left-tab = "hosts";
-                        root.is-left-drawer-open = true;
-                    }
-                    switch-theme(id) => { root.switch-theme(id); }
-                    import-theme => { root.import-theme(); }
-                    export-current-theme => { root.export-current-theme(); }
-                    create-custom-theme => { root.open-theme-editor(); }
-                    delete-custom-theme(id) => { root.delete-custom-theme(id); }
-                    add-wallpaper => { root.add-wallpaper-image(); }
-                    add-wallpaper-folder => { root.add-wallpaper-folder(); }
-                    remove-wallpaper(idx) => { root.remove-wallpaper-image(idx); }
-                    select-wallpaper(idx) => { root.select-wallpaper-image(idx); }
-                    set-wallpaper-slideshow(interval, transition) => { root.set-wallpaper-slideshow(interval, transition); }
-                    toggle-dark-mode => { root.toggle-color-mode(); }
-                    toggle-debug-enabled(enabled) => { root.toggle-debug-enabled(enabled); }
-                    change-terminal-font(font, size) => { root.set-terminal-font(font, size); }
-                    change-wallpaper(mode, path, opacity) => { root.set-wallpaper(mode, path, opacity); }
-                    export-backup-archive(inc_pass) => { root.export-backup-archive(inc_pass); }
-                    scan-and-import-openssh => { root.scan-and-import-openssh(); }
-                    import-external-file => { root.import-external-assets(); }
-                    factory-reset-settings => { root.factory-reset-settings(); }
-                    switch-language(lang) => { root.switch-language(lang); }
-                    change-ui-font(f) => { root.change-ui-font(f); }
-                    change-terminal-url-click(c) => { root.change-terminal-url-click(c); }
-                    change-terminal-highlight-keywords(c) => { root.change-terminal-highlight-keywords(c); }
-                    change-terminal-custom-keywords(k) => { root.change-terminal-custom-keywords(k); }
-                    change-cursor-style(s) => { root.change-cursor-style(s); }
-                    change-cursor-blink(b) => { root.change-cursor-blink(b); }
-                    change-scrollback-lines(l) => { root.change-scrollback-lines(l); }
-                    change-bell-style(s) => { root.change-bell-style(s); }
-                    toggle-terminal-crt(c) => { root.toggle-terminal-crt(c); }
-                    add-keyword-rule(p, r, c) => { root.add-keyword-rule(p, r, c); }
-                    update-keyword-rule(id, p, r, c) => { root.update-keyword-rule(id, p, r, c); }
-                    toggle-keyword-rule(id, e) => { root.toggle-keyword-rule(id, e); }
-                    delete-keyword-rule(id) => { root.delete-keyword-rule(id); }
-                    change-copy-on-select(c) => { root.change-copy-on-select(c); }
-                    change-paste-on-right-click(c) => { root.change-paste-on-right-click(c); }
-                    change-warn-multiline-paste(c) => { root.change-warn-multiline-paste(c); }
-                    change-close-action(a) => { root.change-close-action(a); }
-                    change-global-proxy(m, s, a, u, p) => { root.change-global-proxy(m, s, a, u, p); }
-                    change-network-handshake(t, i, c) => { root.change-network-handshake(t, i, c); }
-                    change-host-key-policy(p) => { root.change-host-key-policy(p); }
-                    change-tcp-nodelay(c) => { root.change-tcp-nodelay(c); }
-                    color-wheel-coord-picked(x, y) => { root.theme-editor-wheel-coord-picked(x, y); }
-                    color-wheel-brightness-picked(b) => { root.theme-editor-wheel-brightness-picked(b); }
-                    color-picker-hex-changed(h) => {
-                        root.theme-editor-picker-target-key = "keyword_rule";
-                        root.theme-editor-picker-hex-changed(h);
-                    }
                 }
 
                 // 2.3.6 中央终端视口 (内置终端多会话 Tab 栏，随抽屉伸缩自适应拉满全部剩余空间)
-                viewport := TerminalViewport {
-                    visible: root.main-view == "terminal";
-                    horizontal-stretch: root.main-view == "terminal" ? 1 : 0;
-                    min-width: 0px;
-                    max-width: root.main-view == "terminal" ? 100000px : 0px;
-
-                    paste-on-right-click: root.setting-paste-on-right-click;
-
-                    select-tab(id) => { root.select-tab(id); }
-                    close-tab(id) => { root.close-tab(id); }
-                    select-pane-tab(pane_id, tab_id) => { root.select-pane-tab(pane_id, tab_id); }
-                    close-pane-tab(pane_id, tab_id) => { root.close-pane-tab(pane_id, tab_id); }
-                    copy-tab-ip(tab_id) => { root.copy-tab-ip(tab_id); }
-                    close-other-tabs(pane_id, tab_id) => { root.close-other-tabs(pane_id, tab_id); }
-                    new-tab => { root.is-new-session-modal-open = true; }
-
-                    history-size: root.terminal-history-size;
-                    scroll-offset: root.terminal-scroll-offset;
-                    wallpaper-mode: root.wallpaper-mode;
-                    terminal-wallpaper-image: root.terminal-wallpaper-image;
-                    terminal-wallpaper-opacity: root.terminal-wallpaper-opacity;
-                    terminal-key-input(text, is_ctrl, is_shift, is_alt) => { root.terminal-key-input(text, is_ctrl, is_shift, is_alt); }
-
-                    terminal-scroll(delta) => { root.terminal-scroll(delta); }
-                    terminal-selection-changed(sc, sr, ec, er, has_sel) => { root.terminal-selection-changed(sc, sr, ec, er, has_sel); }
-                    copy-text => { root.terminal-copy(); }
-                    paste-text => { root.terminal-paste(); }
-
-                    clear-screen => { root.terminal-clear(); }
-                    split-terminal(orient) => { root.split-terminal(orient); }
-                    close-split => { root.close-split(); }
-                    close-pane-by-index(idx) => { root.close-pane-by-index(idx); }
-                    close-pane-by-id(id) => { root.close-pane-by-id(id); }
-                    select-pane(idx) => { root.select-pane(idx); }
-                    select-pane-by-id(id) => { root.select-pane-by-id(id); }
-                    toggle-pane-zoom(id) => { root.toggle-pane-zoom(id); }
-                    adjust-splitter(id, delta) => { root.adjust-splitter(id, delta); }
-
-                    search-terminal(q, c) => { root.search-terminal(q, c); }
-                    terminal-resize(cols, rows) => { root.terminal-resize(cols, rows); }
-                    move-terminal-tab(from_pid, from_idx, drop_x, drop_y) => { root.move-terminal-tab(from_pid, from_idx, drop_x, drop_y); }
+                if WindowBridge.main-view == "terminal": TerminalViewport {
+                    horizontal-stretch: 1;
                 }
 
-                // 2.3.3 双盘文件管理与 SFTP 传输视图 (当 main-view == "files" 时展开)
-                file_explorer := FileExplorerView {
-                    visible: root.main-view == "files";
-                    horizontal-stretch: root.main-view == "files" ? 1 : 0;
-                    min-width: 0px;
-                    max-width: root.main-view == "files" ? 100000px : 0px;
-
-                    select-local-tab(id) => { root.select-local-tab(id); }
-                    close-local-tab(id) => { root.close-local-tab(id); }
-                    new-local-tab => { root.new-local-tab(); }
-                    select-remote-tab(id) => { root.select-remote-tab(id); }
-                    close-remote-tab(id) => { root.close-remote-tab(id); }
-                    new-remote-tab => {
-                        root.filter-file-launcher("");
-                        root.is-file-host-modal-open = true;
-                    }
-
-                    navigate-local-path(p) => { root.navigate-local-path(p); }
-                    navigate-remote-path(p) => { root.navigate-remote-path(p); }
-                    navigate-local-up => { root.navigate-local-up(); }
-                    navigate-remote-up => { root.navigate-remote-up(); }
-                    open-local-item(p, is_dir) => { root.open-local-item(p, is_dir); }
-                    open-remote-item(p, is_dir) => { root.open-remote-item(p, is_dir); }
-                    toggle-local-expand(p) => { root.toggle-local-expand(p); }
-                    toggle-remote-expand(p) => { root.toggle-remote-expand(p); }
-
-                    navigate-local-back => { root.navigate-local-back(); }
-                    navigate-local-forward => { root.navigate-local-forward(); }
-                    navigate-remote-back => { root.navigate-remote-back(); }
-                    navigate-remote-forward => { root.navigate-remote-forward(); }
-
-                    refresh-local => { root.refresh-local-files(); }
-                    refresh-remote => { root.refresh-remote-files(); }
-                    clear-completed-transfers => { root.clear-completed-transfers(); }
-                    start-transfer-task(dir, src, name, is_dir, target) => { root.start-transfer-task(dir, src, name, is_dir, target); }
-                    toggle-transfer-expand(id) => { root.toggle-transfer-expand(id); }
-                    transfer-action(act, tid) => { root.transfer-action(act, tid); }
-                    file-action(act, rem, p, name, is_dir) => { root.file-action(act, rem, p, name, is_dir); }
-                    copy-to-clipboard(text) => { root.copy-to-clipboard(text); }
-                    reorder-local-tab(from, to) => { root.reorder-local-tab(from, to); }
-                    reorder-remote-tab(from, to) => { root.reorder-remote-tab(from, to); }
-                    is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
+                // 2.3.7 双盘文件管理与 SFTP 传输视图 (当 main-view == "files" 时展开)
+                if WindowBridge.main-view == "files": FileExplorerView {
+                    horizontal-stretch: 1;
                 }
 
 
@@ -1748,7 +513,7 @@ export component AppWindow inherits Window {
 
 
                 // 2.3.1 右侧可拖拽调宽分割条 (仅在终端工作区展开右侧抽屉时展示)
-                if root.is-right-drawer-open && root.main-view == "terminal": Rectangle {
+                if WindowBridge.is-right-drawer-open && WindowBridge.main-view == "terminal": Rectangle {
                     width: 5px;
                     background: right-split-touch.has-hover || right-split-touch.pressed ? AppTheme.accent : AppTheme.panel-background;
                     animate background { duration: 120ms; }
@@ -1773,79 +538,72 @@ export component AppWindow inherits Window {
                         mouse-cursor: col-resize;
                         moved => {
                             if self.pressed {
-                                root.right-drawer-width = Math.max(180px, Math.min(520px, root.right-drawer-width - (self.mouse-x - self.pressed-x)));
+                                WindowBridge.right-drawer-width = Math.max(180px, Math.min(520px, WindowBridge.right-drawer-width - (self.mouse-x - self.pressed-x)));
                             }
                         }
                         double-clicked => {
-                            root.right-drawer-width = 240px;
+                            WindowBridge.right-drawer-width = 240px;
                         }
                     }
                 }
 
                 // 2.4 右侧可伸缩工具抽屉 (仅在终端工作区展开时展示)
-                if root.is-right-drawer-open && root.main-view == "terminal": Rectangle {
-                    width: root.right-drawer-width;
+                if WindowBridge.is-right-drawer-open && WindowBridge.main-view == "terminal": Rectangle {
+                    width: WindowBridge.right-drawer-width;
                     clip: true;
 
-                    if root.active-right-tool == "monitor": MonitorDrawer {
-                        collapse => { root.is-right-drawer-open = false; }
+                    if WindowBridge.active-right-tool == "monitor": MonitorDrawer {
+                        collapse => { WindowBridge.is-right-drawer-open = false; }
                     }
 
-                    if root.active-right-tool == "tunnel": TunnelToolDrawer {
-                        collapse => { root.is-right-drawer-open = false; }
-                        active-host-name: root.active-host-name != "" ? root.active-host-name : root.active-session-name;
-                        tunnels: root.host-tunnels;
-                        toggle-tunnel-running(id) => { root.toggle-tunnel-running(id); }
+                    if WindowBridge.active-right-tool == "tunnel": TunnelToolDrawer {
+                        collapse => { WindowBridge.is-right-drawer-open = false; }
                         open-tunnels-hub => {
-                            root.active-left-tab = "tunnels";
-                            root.main-view = "tunnels";
-                            root.is-left-drawer-open = false;
-                            root.is-right-drawer-open = false;
-                            root.navigate-to("tunnels", "");
+                            WindowBridge.active-left-tab = "tunnels";
+                            WindowBridge.main-view = "tunnels";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.is-right-drawer-open = false;
+                            WindowBridge.navigate-to("tunnels", "");
                         }
                         start-create-tunnel => {
-                            root.active-left-tab = "tunnels";
-                            root.main-view = "tunnels";
-                            root.is-left-drawer-open = false;
-                            root.is-right-drawer-open = false;
-                            root.start-create-tunnel();
-                            root.navigate-to("tunnels", "");
+                            WindowBridge.active-left-tab = "tunnels";
+                            WindowBridge.main-view = "tunnels";
+                            WindowBridge.is-left-drawer-open = false;
+                            WindowBridge.is-right-drawer-open = false;
+                            TunnelsBridge.start-create();
+                            WindowBridge.navigate-to("tunnels", "");
                         }
                     }
 
-                    if root.active-right-tool == "snippets": SnippetToolDrawer {
-                        collapse => { root.is-right-drawer-open = false; }
-                        quick-cmds: root.quick-cmds;
-                        search_query <=> root.quick-cmds-search-query;
-                        search_changed(q) => { root.filter-quick-cmds(q); }
-                        send-to-terminal(id) => { root.execute-snippet-from-center(id); }
+                    if WindowBridge.active-right-tool == "snippets": SnippetToolDrawer {
+                        collapse => { WindowBridge.is-right-drawer-open = false; }
                     }
 
-                    if root.active-right-tool == "sftp": SftpToolDrawer {
-                        collapse => { root.is-right-drawer-open = false; }
+                    if WindowBridge.active-right-tool == "sftp": SftpToolDrawer {
+                        collapse => { WindowBridge.is-right-drawer-open = false; }
                     }
 
-                    if root.active-right-tool == "notes": NotesToolDrawer {
-                        collapse => { root.is-right-drawer-open = false; }
+                    if WindowBridge.active-right-tool == "notes": NotesToolDrawer {
+                        collapse => { WindowBridge.is-right-drawer-open = false; }
                     }
 
-                    if root.active-right-tool == "ai": AiToolDrawer {
-                        collapse => { root.is-right-drawer-open = false; }
-                        apply-suggested-cmd(cmd) => { root.send-snippet(cmd); }
+                    if WindowBridge.active-right-tool == "ai": AiToolDrawer {
+                        collapse => { WindowBridge.is-right-drawer-open = false; }
+                        apply-suggested-cmd(cmd) => { TerminalBridge.send-snippet(cmd); }
                     }
                 }
 
                 // 2.5 最右侧 48px 工具图标栏 (仅在终端工作区展示)
-                if root.main-view == "terminal": RightToolBar {
-                    active-tool: root.active-right-tool;
+                if WindowBridge.main-view == "terminal": RightToolBar {
+                    active-tool: WindowBridge.active-right-tool;
                     tool-clicked(id) => {
-                        if root.active-right-tool == id && root.is-right-drawer-open {
-                            root.is-right-drawer-open = false;
+                        if WindowBridge.active-right-tool == id && WindowBridge.is-right-drawer-open {
+                            WindowBridge.is-right-drawer-open = false;
                         } else {
-                            root.active-right-tool = id;
-                            root.is-right-drawer-open = true;
+                            WindowBridge.active-right-tool = id;
+                            WindowBridge.is-right-drawer-open = true;
                             if id == "tunnel" {
-                                root.sync-host-tunnels();
+                                TunnelsBridge.sync-host-tunnels();
                             }
                         }
                     }
@@ -1855,10 +613,10 @@ export component AppWindow inherits Window {
 
             // 3. 底层全宽状态栏
             StatusBar {
-                current-theme-name: root.current-theme-name;
-                is-debug-open: root.is-debug-modal-open;
+                current-theme-name: WindowBridge.current-theme-name;
+                is-debug-open: DebugBridge.is-open;
                 toggle-debug-panel => {
-                    root.is-debug-modal-open = !root.is-debug-modal-open;
+                    DebugBridge.is-open = !DebugBridge.is-open;
                 }
             }
         }
@@ -1866,338 +624,176 @@ export component AppWindow inherits Window {
 
     // 浮动 Ctrl+K 指令面板
     CommandPalette {
-        is-open: root.is-command-palette-open;
-        close => { root.is-command-palette-open = false; }
+        is-open: WindowBridge.is-command-palette-open;
+        close => { WindowBridge.is-command-palette-open = false; }
         item-selected(id) => {
             if id == "5" {
-                root.switch-theme("builtin.ui.darcula");
+                WindowBridge.switch-theme("builtin.ui.darcula");
             } else if id == "6" {
-                root.switch-theme("builtin.ui.monokai");
+                WindowBridge.switch-theme("builtin.ui.monokai");
             } else {
-                root.open-host(id);
+                HostsBridge.open-host(id);
             }
         }
     }
 
     // 新建主机分组弹窗 (支持树状层级上级选择与名称输入)
     CreateGroupModal {
-        is-open: root.is-create-group-open;
-        default-parent-id: root.create-group-default-parent;
-        group-options: root.group-options;
-        toggle-group(id) => { root.toggle-group-option(id); }
-        close => { root.is-create-group-open = false; }
+        is-open: HostsBridge.is-create-group-open;
+        default-parent-id: HostsBridge.create-group-default-parent;
+        group-options: HostsBridge.group-options;
+        toggle-group(id) => { HostsBridge.toggle-selector-group(id); }
+        close => { HostsBridge.is-create-group-open = false; }
         confirm(parent-id, name) => {
-            root.create-group(parent-id, name);
-            root.is-create-group-open = false;
+            HostsBridge.create-group(parent-id, name);
+            HostsBridge.is-create-group-open = false;
         }
     }
 
     // 独立浮动开发者调试与批量数据控制弹窗 (全页面任意时刻可呼出)
-    DebugModal {
-        is-open: root.is-debug-modal-open;
-        total-nodes-count: root.tree-nodes.length;
-        visible-nodes-count: root.tree-nodes.length;
-        host-cards-count: root.hosts.length;
-        credential-count: root.credentials.length;
-        snippet-count: root.snippet-tree-nodes.length;
-        snippet-group-count: root.snippet-parent-options.length;
-        tree-viewport-width: root.tree-content-width;
-        current-theme-name: root.current-theme-name;
-        is-dark-mode: root.is-dark-mode;
-        logs: root.debug-logs;
-        close => { root.is-debug-modal-open = false; }
-        batch-generate(prefix, count, ip-prefix, start-ip, port, group, status-mode, overwrite) => {
-            root.debug-batch-generate(prefix, count, ip-prefix, start-ip, port, group, status-mode, overwrite);
-        }
-        batch-update-status(status-mode) => {
-            root.debug-batch-update-status(status-mode);
-        }
-        batch-update-port(port) => {
-            root.debug-batch-update-port(port);
-        }
-        inject-preset(id) => { root.debug-inject-preset(id); }
-        quick-add-host(name, ip, port, group) => { root.debug-quick-add-host(name, ip, port, group); }
-        quick-add-group(name, parent-id) => { root.debug-quick-add-group(name, parent-id); }
-        clear-all-data => { root.debug-clear-data(); }
-        reset-default-data => { root.debug-reset-default-data(); }
-        debug-batch-generate-credentials(cnt, mode, ovr) => { root.debug-batch-generate-credentials(cnt, mode, ovr); }
-        debug-quick-add-credential(ctype, n, d) => { root.debug-quick-add-credential(ctype, n, d); }
-        debug-reset-default-credentials => { root.debug-reset-default-credentials(); }
-        debug-clear-credentials => { root.debug-clear-credentials(); }
-        debug-batch-generate-snippets(cnt, ovr) => { root.debug-batch-generate-snippets(cnt, ovr); }
-        debug-quick-add-snippet(t, l, c) => { root.debug-quick-add-snippet(t, l, c); }
-        debug-reset-default-snippets => { root.debug-reset-default-snippets(); }
-        debug-clear-snippets => { root.debug-clear-snippets(); }
-        clear-logs => { root.debug-clear-logs(); }
-        emit-test-log(level) => { root.debug-emit-test-log(level); }
-        switch-theme(id) => { root.switch-theme(id); }
-        toggle-color-mode => { root.toggle-color-mode(); }
-        active-pipeline: root.active-rendering-pipeline;
-        switch-pipeline(id) => { root.debug-switch-pipeline(id); }
-        save-pipeline => { root.debug-apply-pipeline(); }
-        restart-app => { root.debug-restart-app(); }
-        force-repaint => { root.debug-force-repaint(); }
-        run-benchmark => { root.debug-run-benchmark(); }
-
-        flag-desktop-notifications <=> root.flag-desktop-notifications;
-        flag-terminal-crt-shader <=> root.flag-terminal-crt-shader;
-        flag-cloud-sync <=> root.flag-cloud-sync;
-        flag-terminal-scratchpad <=> root.flag-terminal-scratchpad;
-        use-mock-storage <=> root.use-mock-storage;
-        setting-always-on-top: root.setting-always-on-top;
-        setting-confirm-close-tab: root.setting-confirm-close-tab;
-        setting-confirm-close-active: root.setting-confirm-close-active;
-        wallpaper-mode: root.wallpaper-mode;
-        wallpaper-slideshow-interval: root.wallpaper-slideshow-interval;
-        wallpaper-count: root.wallpaper-list.length;
-        setting-modal-opacity <=> root.setting-modal-opacity;
-        is-log-capture-enabled <=> root.is-log-capture-enabled;
-        toggle-log-capture(e) => { root.toggle-log-capture(e); }
-        navigate-to-settings(cat) => {
-            root.main-view = "settings";
-            root.active-settings-category = cat;
-        }
-        toggle-feature-flag(f, e) => { root.toggle-feature-flag(f, e); }
-        toggle-mock-storage(e) => { root.toggle-mock-storage(e); }
-        apply-config-preset(p) => { root.apply-config-preset(p); }
-        reset-all-settings => { root.reset-all-settings(); }
-        change-modal-opacity(op) => { root.change-modal-opacity(op); }
-    }
+    DebugModal { }
 
     // 主题设计与定制工坊弹窗 (可视化表单、微型沙盒视窗与 TOML 双向代码编辑器)
-    ThemeEditorModal {
-        is-open: root.is-theme-editor-open;
-        theme-name <=> root.theme-editor-name;
-        theme-author <=> root.theme-editor-author;
-        theme-base <=> root.theme-editor-base;
-        theme-period <=> root.theme-editor-period;
-
-        color-window-bg <=> root.theme-editor-window-bg;
-        color-panel-bg <=> root.theme-editor-panel-bg;
-        color-surface-bg <=> root.theme-editor-surface-bg;
-        color-control-bg <=> root.theme-editor-control-bg;
-        color-foreground <=> root.theme-editor-foreground;
-        color-secondary-fg <=> root.theme-editor-secondary-fg;
-        color-disabled-fg <=> root.theme-editor-disabled-fg;
-        color-accent <=> root.theme-editor-accent;
-        color-hover-bg <=> root.theme-editor-hover-bg;
-        color-pressed-bg <=> root.theme-editor-pressed-bg;
-        color-selected-bg <=> root.theme-editor-selected-bg;
-        color-selected-fg <=> root.theme-editor-selected-fg;
-        color-border <=> root.theme-editor-border;
-        color-focus-border <=> root.theme-editor-focus-border;
-        color-success <=> root.theme-editor-success;
-        color-warning <=> root.theme-editor-warning;
-        color-danger <=> root.theme-editor-danger;
-        color-info <=> root.theme-editor-info;
-
-        preview-window-bg: root.theme-editor-preview-window-bg;
-        preview-panel-bg: root.theme-editor-preview-panel-bg;
-        preview-surface-bg: root.theme-editor-preview-surface-bg;
-        preview-control-bg: root.theme-editor-preview-control-bg;
-        preview-foreground: root.theme-editor-preview-foreground;
-        preview-secondary-fg: root.theme-editor-preview-secondary-fg;
-        preview-disabled-fg: root.theme-editor-preview-disabled-fg;
-        preview-accent: root.theme-editor-preview-accent;
-        preview-hover-bg: root.theme-editor-preview-hover-bg;
-        preview-pressed-bg: root.theme-editor-preview-pressed-bg;
-        preview-selected-bg: root.theme-editor-preview-selected-bg;
-        preview-selected-fg: root.theme-editor-preview-selected-fg;
-        preview-border: root.theme-editor-preview-border;
-        preview-focus-border: root.theme-editor-preview-focus-border;
-        preview-success: root.theme-editor-preview-success;
-        preview-warning: root.theme-editor-preview-warning;
-        preview-danger: root.theme-editor-preview-danger;
-        preview-info: root.theme-editor-preview-info;
-
-        metric-radius-small <=> root.theme-editor-metric-radius-small;
-        metric-radius-medium <=> root.theme-editor-metric-radius-medium;
-        metric-radius-large <=> root.theme-editor-metric-radius-large;
-        metric-spacing-small <=> root.theme-editor-metric-spacing-small;
-        metric-spacing-medium <=> root.theme-editor-metric-spacing-medium;
-        metric-spacing-large <=> root.theme-editor-metric-spacing-large;
-        metric-border-width <=> root.theme-editor-metric-border-width;
-        metric-control-height <=> root.theme-editor-metric-control-height;
-        metric-icon-size <=> root.theme-editor-metric-icon-size;
-
-        theme-toml <=> root.theme-editor-toml;
-
-        wheel-indicator-x <=> root.theme-editor-wheel-indicator-x;
-        wheel-indicator-y <=> root.theme-editor-wheel-indicator-y;
-        wheel-brightness <=> root.theme-editor-wheel-brightness;
-        wheel-hue-brush: root.theme-editor-wheel-hue-brush;
-        picker-preview-brush: root.theme-editor-picker-brush;
-        picker-hex-value <=> root.theme-editor-picker-hex;
-        picker-target-key <=> root.theme-editor-picker-target-key;
-        picker-target-label <=> root.theme-editor-picker-target-label;
-
-        close => { root.is-theme-editor-open = false; }
-        apply-preset(p) => { root.theme-editor-apply-preset(p); }
-        color-field-changed(f, v) => { root.theme-editor-color-changed(f, v); }
-        metric-field-changed(f, v) => { root.theme-editor-metric-changed(f, v); }
-        meta-field-changed(f, v) => { root.theme-editor-meta-changed(f, v); }
-        parse-and-sync-from-toml(s) => { root.theme-editor-parse-toml(s); }
-        copy-toml(s) => { root.theme-editor-copy-toml(s); }
-        save-and-activate => { root.theme-editor-save-and-activate(); }
-
-        wheel-coord-picked(x, y) => { root.theme-editor-wheel-coord-picked(x, y); }
-        wheel-brightness-picked(b) => { root.theme-editor-wheel-brightness-picked(b); }
-        picker-hex-changed(h) => { root.theme-editor-picker-hex-changed(h); }
-    }
+    ThemeEditorModal { }
 
     // 快速新建终端会话居中卡片弹窗
     NewSessionModal {
-        is-open: root.is-new-session-modal-open;
-        local-items: root.launcher-local-items;
-        host-items: root.launcher-host-items;
-        close => { root.is-new-session-modal-open = false; }
-        search-changed(q) => { root.filter-launcher(q); }
+        is-open: WindowBridge.is-new-session-modal-open;
+        local-items: WindowBridge.launcher-local-items;
+        host-items: HostsBridge.hosts;
+        close => { WindowBridge.is-new-session-modal-open = false; }
+        search-changed(q) => { WindowBridge.filter-launcher(q); }
         item-selected(id) => {
-            root.is-new-session-modal-open = false;
-            root.open-host(id);
+            WindowBridge.is-new-session-modal-open = false;
+            HostsBridge.open-host(id);
         }
     }
 
     // 会话历史详情与终端屏幕快照弹窗
     HistoryDetailModal {
-        is-open: root.is-history-detail-open;
-        history-id: root.history-detail-id;
-        session-title: root.history-detail-title;
-        session-address: root.history-detail-address;
-        session-user: root.history-detail-user;
-        session-type: root.history-detail-type;
-        connected-time: root.history-detail-connected-time;
-        disconnected-time: root.history-detail-disconnected-time;
-        duration-text: root.history-detail-duration;
-        exit-status: root.history-detail-exit-status;
-        error-msg: root.history-detail-error-msg;
-        snapshot-content: root.history-detail-snapshot;
-        snapshot-lines: root.history-detail-snapshot-lines;
-        close => { root.is-history-detail-open = false; }
+        close => { HistoryBridge.is-detail-open = false; }
         reconnect(id) => {
-            root.is-history-detail-open = false;
-            root.main-view = "terminal";
-            root.active-left-tab = "hosts";
-            root.is-left-drawer-open = true;
-            root.reconnect-history(id);
+            HistoryBridge.is-detail-open = false;
+            WindowBridge.main-view = "terminal";
+            WindowBridge.active-left-tab = "hosts";
+            WindowBridge.is-left-drawer-open = true;
+            HistoryBridge.reconnect(id);
         }
-
-        copy-log(text) => { root.copy-history-log(text); }
     }
 
     // 通用消息与错误提示模态弹窗
     MessageDialog {
-        is-open <=> root.is-dialog-open;
-        title: root.dialog-title;
-        message: root.dialog-message;
-        dialog-type: root.dialog-type;
-        close => { root.is-dialog-open = false; }
+        is-open <=> WindowBridge.is-dialog-open;
+        title: WindowBridge.dialog-title;
+        message: WindowBridge.dialog-message;
+        dialog-type: WindowBridge.dialog-type;
+        close => { WindowBridge.is-dialog-open = false; }
     }
 
     // 关闭窗口含活跃会话二次防呆确认弹窗
     MessageDialog {
-        is-open <=> root.is-exit-confirm-open;
+        is-open <=> WindowBridge.is-exit-confirm-open;
         title: @tr("确认退出应用程序");
         message: @tr("当前仍有活跃的终端或 SSH 会话正在运行。强行退出将导致远程任务与网络隧道中断，确定要退出吗？");
         dialog-type: "warning";
         show-cancel: true;
         confirm-text: @tr("强行退出");
         cancel-text: @tr("继续使用");
-        close => { root.is-exit-confirm-open = false; }
+        close => { WindowBridge.is-exit-confirm-open = false; }
         confirmed => {
-            root.is-exit-confirm-open = false;
+            WindowBridge.is-exit-confirm-open = false;
             root.force-close-window();
         }
     }
 
     // 关闭单个终端会话标签页防误触确认弹窗
     MessageDialog {
-        is-open <=> root.is-tab-close-confirm-open;
-        title: root.tab-close-confirm-title != "" ? root.tab-close-confirm-title : @tr("确认关闭终端会话");
-        message: root.tab-close-confirm-message != "" ? root.tab-close-confirm-message : @tr("确定要断开并关闭此会话吗？远程正在运行的任务将被中断。");
+        is-open <=> TerminalBridge.is-tab-close-confirm-open;
+        title: TerminalBridge.tab-close-confirm-title != "" ? TerminalBridge.tab-close-confirm-title : @tr("确认关闭终端会话");
+        message: TerminalBridge.tab-close-confirm-message != "" ? TerminalBridge.tab-close-confirm-message : @tr("确定要断开并关闭此会话吗？远程正在运行的任务将被中断。");
         dialog-type: "warning";
         show-cancel: true;
         confirm-text: @tr("断开并关闭");
         cancel-text: @tr("取消");
-        close => { root.is-tab-close-confirm-open = false; }
+        close => { TerminalBridge.is-tab-close-confirm-open = false; }
         confirmed => {
-            root.is-tab-close-confirm-open = false;
-            root.confirm-close-tab();
+            TerminalBridge.is-tab-close-confirm-open = false;
+            TerminalBridge.confirm-close-tab();
         }
     }
 
     // 切换渲染引擎重启确认弹窗
     MessageDialog {
-        is-open <=> root.is-restart-confirm-open;
+        is-open <=> WindowBridge.is-restart-confirm-open;
         title: @tr("切换图形渲染引擎");
-        message: root.restart-confirm-message != "" ? root.restart-confirm-message : @tr("切换图形渲染引擎需要重启客户端以重新初始化底层 GPU 显卡管线，是否立即重启？");
+        message: WindowBridge.restart-confirm-message != "" ? WindowBridge.restart-confirm-message : @tr("切换图形渲染引擎需要重启客户端以重新初始化底层 GPU 显卡管线，是否立即重启？");
         dialog-type: "warning";
         show-cancel: true;
         confirm-text: @tr("立即重启");
         cancel-text: @tr("稍后重启");
         close => {
-            root.is-restart-confirm-open = false;
-            root.cancel-restart-pipeline();
+            WindowBridge.is-restart-confirm-open = false;
+            WindowBridge.cancel-restart-pipeline();
         }
         confirmed => {
-            root.is-restart-confirm-open = false;
-            root.confirm-restart-pipeline();
+            WindowBridge.is-restart-confirm-open = false;
+            WindowBridge.confirm-restart-pipeline();
         }
     }
 
     // 文件管理会话选择居中卡片弹窗 (单一本地域 + 远程全部主机，点击自动连接 SFTP)
     FileHostModal {
-        is-open: root.is-file-host-modal-open;
-        host-items: root.file-launcher-host-items;
-        close => { root.is-file-host-modal-open = false; }
-        search-changed(q) => { root.filter-file-launcher(q); }
+        is-open: FilesBridge.is-file-host-modal-open;
+        host-items: FilesBridge.file-launcher-host-items;
+        close => { FilesBridge.is-file-host-modal-open = false; }
+        search-changed(q) => { FilesBridge.filter-file-launcher(q); }
         local-selected => {
-            root.is-file-host-modal-open = false;
-            root.open-file-host("local");
+            FilesBridge.is-file-host-modal-open = false;
+            FilesBridge.open-file-host("local");
         }
 
         host-selected(id) => {
-            root.is-file-host-modal-open = false;
-            root.open-file-host(id);
+            FilesBridge.is-file-host-modal-open = false;
+            FilesBridge.open-file-host(id);
         }
     }
 
     // 新建代码片段文件夹弹窗
     CreateSnippetGroupModal {
-        is_open <=> root.is-create-snippet-group-open;
-        group_name <=> root.new-snippet-group-name;
-        selected_parent_id <=> root.new-snippet-group-parent-id;
-        parent_options: root.snippet-parent-options;
-        cancel => { root.cancel-create-snippet-group(); }
-        submit => { root.submit-create-snippet-group(); }
-        select_parent(id) => { root.select-snippet-group-parent(id); }
+        is_open <=> SnippetsBridge.is-create-group-modal-open;
+        group_name <=> SnippetsBridge.new-group-name;
+        selected_parent_id <=> SnippetsBridge.new-group-parent-id;
+        parent_options: SnippetsBridge.parent-options;
+        cancel => { SnippetsBridge.close-create-group-modal(); }
+        submit => { SnippetsBridge.submit-create-group(); }
+        select_parent(id) => { SnippetsBridge.new-group-parent-id = id; }
     }
 
     // 代码片段动态参数填报执行弹窗
     SnippetRunModal {
-        is_open <=> root.is-snippet-run-modal-open;
-        snippet_id: root.snippet-run-modal-id;
-        snippet_title: root.snippet-run-modal-title;
-        rendered_command <=> root.snippet-run-modal-rendered-command;
-        params_list <=> root.snippet-run-params-list;
-        cancel => { root.cancel-snippet-run(); }
-        submit => { root.submit-snippet-run(); }
-        param_changed(idx, val) => { root.run-snippet-param-changed(idx, val); }
+        is_open <=> SnippetsBridge.is-run-modal-open;
+        snippet_id: SnippetsBridge.run-snippet-id;
+        snippet_title: SnippetsBridge.run-snippet-title;
+        rendered_command <=> SnippetsBridge.run-rendered-command;
+        params_list <=> SnippetsBridge.run-params-list;
+        cancel => { SnippetsBridge.cancel-run-modal(); }
+        submit => { SnippetsBridge.execute-run-modal(); }
+        param_changed(idx, val) => { SnippetsBridge.run-param-changed(idx, val); }
     }
 
     // 全局气泡通知浮层 (z: 1000 最高层级)
     ToastContainer {
         z: 1000;
-        toasts: root.active-toasts;
-        position: root.toast-position;
-        close-toast(id) => { root.close-toast(id); }
+        toasts: WindowBridge.toasts;
+        position: WindowBridge.toast-position;
+        close-toast(id) => { WindowBridge.close-toast(id); }
     }
 
     // -------------------------------------------------------------------------
     // 边缘拖动改变窗口大小 (Window Edge & Corner Resize Handles)
     // 仅在非最大化状态下启用，8 个方向原生无缝拖拽缩放
     // -------------------------------------------------------------------------
-    if !root.is-window-maximized: Rectangle {
+    if !WindowBridge.is-window-maximized: Rectangle {
         width: 100%;
         height: 100%;
         background: transparent;

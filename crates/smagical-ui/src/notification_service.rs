@@ -6,7 +6,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::time::Duration;
 
-use crate::generated::{AppWindow, ToastItemData};
+use slint::ComponentHandle;
+use crate::generated::{AppWindow, ToastItemData, WindowBridge};
 
 /// 气泡通知业务项
 #[derive(Debug, Clone)]
@@ -49,7 +50,7 @@ impl NotificationManager {
     pub fn set_position(&self, position: &str) {
         *self.position.borrow_mut() = position.to_string();
         if let Some(w) = self.window.upgrade() {
-            w.set_toast_position(position.into());
+            w.global::<WindowBridge>().set_toast_position(position.into());
         }
     }
 
@@ -171,7 +172,7 @@ impl NotificationManager {
                     closable: t.closable,
                 })
                 .collect();
-            w.set_active_toasts(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_toasts))));
+            w.global::<WindowBridge>().set_toasts(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_toasts))));
         }
     }
 }

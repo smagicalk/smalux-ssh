@@ -4,6 +4,7 @@ import { StatusDot } from "../../components/status-dot.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { ScrollView } from "std-widgets.slint";
 import { TunnelItemData } from "../tunnels_view.slint";
+import { TunnelsBridge } from "../../features/tunnels/tunnels_bridge.slint";
 export { TunnelItemData }
 
 /// 网络隧道抽屉 (Tunnels Drawer)
@@ -11,7 +12,7 @@ export component TunnelsDrawer inherits DrawerContainer {
     title: @tr("网络隧道");
     collapse-icon: "◀";
 
-    in property <[TunnelItemData]> tunnels: [];
+    in property <[TunnelItemData]> tunnels: TunnelsBridge.tunnels;
 
     callback toggle-tunnel(string /* id */);
     callback open-hub();
@@ -75,7 +76,10 @@ export component TunnelsDrawer inherits DrawerContainer {
                     background: tun-touch.has-hover ? AppTheme.hover-background : transparent;
 
                     tun-touch := TouchArea {
-                        clicked => { root.toggle-tunnel(tun.id); }
+                        clicked => {
+                            TunnelsBridge.toggle-tunnel(tun.id);
+                            root.toggle-tunnel(tun.id);
+                        }
                         mouse-cursor: pointer;
                     }
 
@@ -151,7 +155,10 @@ export component TunnelsDrawer inherits DrawerContainer {
                             }
 
                             sw-touch := TouchArea {
-                                clicked => { root.toggle-tunnel(tun.id); }
+                                clicked => {
+                                    TunnelsBridge.toggle-tunnel(tun.id);
+                                    root.toggle-tunnel(tun.id);
+                                }
                                 mouse-cursor: pointer;
                             }
                         }

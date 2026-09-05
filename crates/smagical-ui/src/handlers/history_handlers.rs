@@ -8,7 +8,7 @@ use smagical_core::event::{
 };
 use smagical_core::HistoryRecord;
 
-use crate::generated::{AppWindow, HistoryBridge, HistoryGroupData, HistoryItemData};
+use crate::generated::{AppWindow, HistoryBridge, HistoryGroupData, HistoryItemData, HostsBridge, TerminalBridge, WindowBridge};
 use crate::handlers::AppContext;
 
 
@@ -142,7 +142,7 @@ pub(crate) fn sync_ui_history_from_state(
     view_mode: &str,
     collapsed_set: &std::collections::HashSet<String>,
 ) {
-    let is_en = window.get_current_language() == "en-US";
+    let is_en = window.global::<WindowBridge>().get_current_language() == "en-US";
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())
@@ -275,10 +275,7 @@ pub(crate) fn sync_ui_history_from_state(
         result_groups
     };
 
-    window.set_history_total_count(total_count);
     let group_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(groups)));
-    window.set_history_groups(group_model.clone());
-
     let hb = window.global::<HistoryBridge>();
     hb.set_total_count(total_count);
     hb.set_history_groups(group_model);
@@ -301,12 +298,14 @@ pub(crate) fn sync_ui_history(window: &AppWindow, ctx: &AppContext) {
 }
 
 
-/// 注册历史会话抽屉交互回调
+///// 注册历史会话交互回调 (纯 MVVM 直连 HistoryBridge)
 pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
+    let hb = window.global::<HistoryBridge>();
+
     // 1. 重连历史会话 (在当前焦点窗格中打开)
     let window_weak = window.as_weak();
     let ctx_recon = ctx.clone();
-    window.on_reconnect_history(move |hist_id| {
+    hb.on_reconnect(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let hist_opt = ctx_recon.core_state.storage().history().get_by_id(&hist_id).unwrap_or_default();
             if let Some(mut h) = hist_opt {
@@ -328,7 +327,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 sync_ui_history(&w, &ctx_recon);
 
                 // 发起连接
-                w.invoke_open_host(target_id.into());
+                w.global::<HostsBridge>().invoke_open_host(target_id.into());
             }
         }
     });
@@ -336,14 +335,14 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 2. 重连历史会话并在右侧垂直分屏打开
     let window_weak = window.as_weak();
     let ctx_recon_split = ctx.clone();
-    window.on_reconnect_history_split(move |hist_id| {
+    hb.on_reconnect_split(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let hist_opt = ctx_recon_split.core_state.storage().history().get_by_id(&hist_id).unwrap_or_default();
             if let Some(mut h) = hist_opt {
                 let target_id = h.host_id.clone().unwrap_or_else(|| h.id.clone());
 
                 // 先执行垂直分屏
-                w.invoke_split_terminal("vertical".into());
+                w.global::<TerminalBridge>().invoke_split_terminal("vertical".into());
 
                 // 更新历史记录
                 h.connected_at = std::time::SystemTime::now()
@@ -361,7 +360,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 sync_ui_history(&w, &ctx_recon_split);
 
                 // 在新分屏中打开
-                w.invoke_open_host(target_id.into());
+                w.global::<HostsBridge>().invoke_open_host(target_id.into());
             }
         }
     });
@@ -369,7 +368,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 3. 删除单条历史记录
     let window_weak = window.as_weak();
     let ctx_del = ctx.clone();
-    window.on_delete_history_item(move |hist_id| {
+    hb.on_delete_item(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_del.core_state.storage().history().delete(&hist_id);
             ctx_del.core_state.events().dispatch(&HistoryItemDeletedEvent {
@@ -383,7 +382,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4. 清空全部历史记录 (保留置顶项)
     let window_weak = window.as_weak();
     let ctx_clr = ctx.clone();
-    window.on_clear_history(move || {
+    hb.on_clear_all(move || {
         if let Some(w) = window_weak.upgrade() {
             let _ = ctx_clr.core_state.storage().history().clear_all(true);
             ctx_clr.core_state.events().dispatch(&HistoryClearedEvent);
@@ -395,7 +394,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 5. 切换单条历史置顶标星
     let window_weak = window.as_weak();
     let ctx_pin = ctx.clone();
-    window.on_toggle_pin_history(move |hist_id| {
+    hb.on_toggle_pin(move |hist_id| {
         if let Some(w) = window_weak.upgrade() {
             let is_pinned = ctx_pin.core_state.storage().history().toggle_pin(&hist_id).unwrap_or_default();
             ctx_pin.core_state.events().dispatch(&HistoryPinToggledEvent {
@@ -407,12 +406,10 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
-
-
     // 6. 切换时间分组折叠展开
     let window_weak = window.as_weak();
     let ctx_grp = ctx.clone();
-    window.on_toggle_history_group(move |group_id| {
+    hb.on_toggle_group(move |group_id| {
         if let Some(w) = window_weak.upgrade() {
             let mut set = ctx_grp.collapsed_history_groups.borrow_mut();
             let gid = group_id.to_string();
@@ -432,7 +429,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 7. 历史记录实时搜索过滤
     let window_weak = window.as_weak();
     let ctx_search = ctx.clone();
-    window.on_filter_history(move |query| {
+    hb.on_search_changed(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_string();
             *ctx_search.history_search_query.borrow_mut() = q.clone();
@@ -446,7 +443,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 8. 切换历史抽屉视图模式 (时间流 / 按主机)
     let window_weak = window.as_weak();
     let ctx_mode = ctx.clone();
-    window.on_switch_history_view_mode(move |mode| {
+    hb.on_switch_view_mode(move |mode| {
         if let Some(w) = window_weak.upgrade() {
             *ctx_mode.history_view_mode.borrow_mut() = mode.to_string();
             tracing::debug!(target: "smagical_ui::history", "切换历史视图模式: {}", mode);
@@ -457,7 +454,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     // 9. 打开历史详情与终端快照弹窗
     let window_weak = window.as_weak();
     let ctx_detail = ctx.clone();
-    window.on_show_history_detail(move |hist_id| {
+    hb.on_show_detail(move |hist_id| {
         if let Some(w) = window_weak.upgrade()
             && let Ok(Some(hist)) = ctx_detail.core_state.storage().history().get_by_id(&hist_id)
         {
@@ -473,26 +470,27 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             };
             let dur = format_duration(hist.duration_secs);
 
-            w.set_history_detail_id(hist.id.clone().into());
-            w.set_history_detail_title(hist.title.clone().into());
-            w.set_history_detail_address(format!("{}:{}", hist.address, hist.port).into());
-            w.set_history_detail_user(hist.username.clone().into());
-            w.set_history_detail_type(hist.session_type.into());
-            w.set_history_detail_connected_time(conn_dt.into());
-            w.set_history_detail_disconnected_time(disc_dt.into());
-            w.set_history_detail_duration(dur.into());
-            w.set_history_detail_exit_status(hist.exit_status.into());
-            w.set_history_detail_error_msg(hist.error_msg.unwrap_or_default().into());
-            w.set_history_detail_snapshot(snapshot.into());
-            w.set_history_detail_snapshot_lines(snapshot_lines);
-            w.set_is_history_detail_open(true);
+            let hb = w.global::<HistoryBridge>();
+            hb.set_detail_id(hist.id.clone().into());
+            hb.set_detail_title(hist.title.clone().into());
+            hb.set_detail_address(format!("{}:{}", hist.address, hist.port).into());
+            hb.set_detail_user(hist.username.clone().into());
+            hb.set_detail_type(hist.session_type.into());
+            hb.set_detail_connected_time(conn_dt.into());
+            hb.set_detail_disconnected_time(disc_dt.into());
+            hb.set_detail_duration(dur.into());
+            hb.set_detail_exit_status(hist.exit_status.into());
+            hb.set_detail_error_msg(hist.error_msg.unwrap_or_default().into());
+            hb.set_detail_snapshot(snapshot.into());
+            hb.set_detail_snapshot_lines(snapshot_lines);
+            hb.set_is_detail_open(true);
 
             tracing::info!(target: "smagical_ui::history", "查看历史会话详情与快照: {} (用户: {}, 地址: {}, 快照: {} 行)", hist.title, hist.username, hist.address, snapshot_lines);
         }
     });
 
     // 10. 复制历史终端快照日志到剪贴板
-    window.on_copy_history_log(move |content| {
+    hb.on_copy_log(move |content| {
         let chars = content.chars().count();
         let lines = content.lines().count();
         if let Ok(mut cb) = arboard::Clipboard::new() {
@@ -501,17 +499,25 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
-    // 11. 活动栏视图切换导航日志与事件广播
+    // 11. 关闭历史详情弹窗
+    let window_weak = window.as_weak();
+    hb.on_close_detail(move || {
+        if let Some(w) = window_weak.upgrade() {
+            w.global::<HistoryBridge>().set_is_detail_open(false);
+        }
+    });
+
+    // 12. 活动栏视图切换导航日志与事件广播
     let core_state_nav = ctx.core_state.clone();
     let window_weak = window.as_weak();
-    window.on_activity_tab_switched(move |tab_id| {
+    window.global::<WindowBridge>().on_switch_left_tab(move |tab_id| {
         core_state_nav.events().dispatch(&NavigationTabClickedEvent {
             tab_id: tab_id.to_string(),
             query: "".into(),
         });
         tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
 
-        if let Some(w) = window_weak.upgrade().filter(|w| tab_id == "debug" || w.get_is_debug_modal_open()) {
+        if let Some(w) = window_weak.upgrade().filter(|w| tab_id == "debug" || w.global::<crate::generated::DebugBridge>().get_is_open()) {
             crate::debug_ui::sync_ui_debug_logs(&w);
         }
     });

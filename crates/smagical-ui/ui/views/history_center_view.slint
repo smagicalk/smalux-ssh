@@ -20,17 +20,13 @@ export component HistoryCenterView inherits Rectangle {
     in-out property <string> search-query: HistoryBridge.search-query;
 
     callback reconnect(string /* id */);
-    callback show-detail(string /* id */);
-    callback delete-item(string /* id */);
-    callback clear-all();
-    callback toggle-pin(string /* id */);
-    callback toggle-group(string /* group-id */);
-    callback search-changed(string /* query */);
     callback switch-to-terminal();
 
     background: AppTheme.window-background;
 
     VerticalLayout {
+        width: 100%;
+        height: 100%;
         padding-top: 16px;
         padding-bottom: 16px;
         padding-left: 24px;
@@ -41,6 +37,7 @@ export component HistoryCenterView inherits Rectangle {
         // 1. 顶部 Header 区域 (标题 + 描述 + 搜索框 + 操作按钮)
         // ---------------------------------------------------------------------
         HorizontalLayout {
+            width: 100%;
             spacing: 16px;
             alignment: space-between;
 
@@ -131,7 +128,7 @@ export component HistoryCenterView inherits Rectangle {
                         color: AppTheme.foreground;
                         vertical-alignment: center;
                         single-line: true;
-                        edited => { root.search-changed(self.text); }
+                        edited => { HistoryBridge.search-changed(self.text); }
                     }
 
                     if root.search-query != "": Rectangle {
@@ -153,7 +150,7 @@ export component HistoryCenterView inherits Rectangle {
                         clear-search-touch := TouchArea {
                             clicked => {
                                 root.search-query = "";
-                                root.search-changed("");
+                                HistoryBridge.search-changed("");
                             }
                             mouse-cursor: pointer;
                         }
@@ -169,7 +166,7 @@ export component HistoryCenterView inherits Rectangle {
                     border-color: AppTheme.border;
 
                     clear-btn-touch := TouchArea {
-                        clicked => { root.clear-all(); }
+                        clicked => { HistoryBridge.clear-all(); }
                         mouse-cursor: pointer;
                     }
 
@@ -282,7 +279,7 @@ export component HistoryCenterView inherits Rectangle {
                         background: grp-touch.has-hover ? AppTheme.hover-background : transparent;
 
                         grp-touch := TouchArea {
-                            clicked => { root.toggle-group(group.group-id); }
+                            clicked => { HistoryBridge.toggle-group(group.group-id); }
                             mouse-cursor: pointer;
                         }
 
@@ -476,7 +473,7 @@ export component HistoryCenterView inherits Rectangle {
                                     background: detail-touch.has-hover ? AppTheme.hover-background : transparent;
 
                                     detail-touch := TouchArea {
-                                        clicked => { root.show-detail(item.id); }
+                                        clicked => { HistoryBridge.show-detail(item.id); }
                                         mouse-cursor: pointer;
                                     }
 
@@ -501,7 +498,7 @@ export component HistoryCenterView inherits Rectangle {
                                     background: pin-touch.has-hover ? AppTheme.hover-background : transparent;
 
                                     pin-touch := TouchArea {
-                                        clicked => { root.toggle-pin(item.id); }
+                                        clicked => { HistoryBridge.toggle-pin(item.id); }
                                         mouse-cursor: pointer;
                                     }
 
@@ -526,7 +523,7 @@ export component HistoryCenterView inherits Rectangle {
                                     background: del-touch.has-hover ? AppTheme.hover-background : transparent;
 
                                     del-touch := TouchArea {
-                                        clicked => { root.delete-item(item.id); }
+                                        clicked => { HistoryBridge.delete-item(item.id); }
                                         mouse-cursor: pointer;
                                     }
 

@@ -19,9 +19,9 @@ export component HostsDrawer inherits DrawerContainer {
     collapse-icon: "◀";
 
     /// 当前视图模式: "tree" (树形层级嵌套模式) | "card" (卡片列表平铺模式)
-    in-out property <string> view-mode: HostsBridge.hosts-view-mode;
+    in-out property <string> view-mode <=> HostsBridge.hosts-view-mode;
     /// 当前选中的高亮主机 ID
-    in-out property <string> selected-host-id: HostsBridge.selected-host-id;
+    in-out property <string> selected-host-id <=> HostsBridge.selected-host-id;
     /// 当前树形内容的最大呈现宽度（根据节点长名称动态扩展，驱动自适应横向滚动）
     in-out property <length> tree-content-width: HostsBridge.tree-content-width;
 
@@ -31,36 +31,21 @@ export component HostsDrawer inherits DrawerContainer {
     /// 卡片模式扁平列表数据源 (由 Rust 存储层提供唯一真相源)
     in property <[HostItemData]> hosts: HostsBridge.hosts;
 
-
-    /// 单击选中主机事件回调
-    callback host-selected(string /* id */);
     /// 双击打开主机终端连接事件回调
     callback host-double-clicked(string /* id */);
-    /// 折叠或展开指定分组事件回调
-    callback toggle-group(string /* group-id */);
-    /// 移动节点事件回调 (source-id, target-id, drop-position)
-    callback move-node(string /* source-id */, string /* target-id */, string /* drop-position */);
-    /// 拖拽悬停计算事件回调 (source-id, target-index, offset-in-row)
-    callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
-    /// 搜索框输入变更事件回调
-    callback search-changed(string /* query */);
     /// 打开本地 Shell 事件回调
     callback open-local-shell(string /* type */);
-    /// 点击新建主机按钮事件回调
-    callback create-new-host();
-    /// 点击新建分组按钮事件回调
-    callback create-new-group();
 
     /// 拖拽交互状态
     in-out property <bool> is-dragging: false;
     in-out property <string> drag-source-id: "";
     in-out property <string> drag-source-name: "";
     in-out property <bool> drag-source-is-group: false;
-    in-out property <string> drop-target-id: "";
+    in-out property <string> drop-target-id <=> HostsBridge.drop-target-id;
     in-out property <string> drop-target-name: "";
-    in-out property <int> drop-target-index: -1;
-    in-out property <string> drop-position: "inside"; // "before" | "inside" | "after" | "root" | ""
-    in-out property <bool> drop-target-valid: true;
+    in-out property <int> drop-target-index <=> HostsBridge.drop-target-index;
+    in-out property <string> drop-position <=> HostsBridge.drop-position;
+    in-out property <bool> drop-target-valid <=> HostsBridge.drop-target-valid;
     in-out property <length> drag-x: 0px;
     in-out property <length> drag-y: 0px;
 
@@ -79,8 +64,8 @@ export component HostsDrawer inherits DrawerContainer {
             SearchInput {
                 placeholder: @tr("搜索主机、IP或分组...");
                 horizontal-stretch: 1;
-                changed(query) => { root.search-changed(query); }
-                clear => { root.search-changed(""); }
+                changed(query) => { HostsBridge.search-changed(query); }
+                clear => { HostsBridge.search-changed(""); }
             }
 
             // 视图模式切换胶囊 (树形 vs 卡片)
@@ -197,12 +182,12 @@ export component HostsDrawer inherits DrawerContainer {
 
                 AppIconButton {
                     icon: @image-url("../../assets/icons/folder-plus.svg");
-                    clicked => { root.create-new-group(); }
+                    clicked => { HostsBridge.is-create-group-open = true; }
                 }
 
                 AppIconButton {
                     icon: @image-url("../../assets/icons/plus.svg");
-                    clicked => { root.create-new-host(); }
+                    clicked => { HostsBridge.create-new-host(); }
                 }
             }
 
@@ -294,9 +279,9 @@ export component HostsDrawer inherits DrawerContainer {
                                 if event.kind == PointerEventKind.up {
                                     if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
                                         if root.drop-target-id == "root" {
-                                            root.move-node(root.drag-source-id, "root", "root");
+                                            HostsBridge.move-node(root.drag-source-id, "root", "root");
                                         } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
-                                            root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                            HostsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
                                         }
                                     }
                                     root.is-dragging = false;
@@ -333,12 +318,12 @@ export component HostsDrawer inherits DrawerContainer {
                                             root.drop-target-id = "root";
                                             root.drop-position = "root";
                                             root.drop-target-valid = true;
-                                            root.request-drag-hover(root.drag-source-id, -1, 0.0);
+                                            HostsBridge.request-drag-hover(root.drag-source-id, -1, 0.0);
                                         } else {
                                             let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
                                             root.drop-target-index = target_idx;
                                             root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
-                                            root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                                            HostsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
                                         }
                                     }
                                 }
@@ -346,10 +331,10 @@ export component HostsDrawer inherits DrawerContainer {
                             clicked => {
                                 if !root.is-dragging {
                                     if node.is-group {
-                                        root.toggle-group(node.id);
+                                        HostsBridge.toggle-group(node.id);
                                     } else {
                                         root.selected-host-id = node.id;
-                                        root.host-selected(node.id);
+                                        HostsBridge.select-host(node.id);
                                     }
                                 }
                             }
@@ -517,7 +502,7 @@ export component HostsDrawer inherits DrawerContainer {
                                 }
                                 if event.kind == PointerEventKind.up {
                                     if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" && root.drop-target-id != root.drag-source-id {
-                                        root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                        HostsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
                                     }
                                     root.is-dragging = false;
                                     root.drag-source-id = "";
@@ -549,7 +534,7 @@ export component HostsDrawer inherits DrawerContainer {
                                         let target_idx = Math.max(0, Math.min(root.hosts.length - 1, Math.floor((total_y + 24px) / 56px)));
                                         root.drop-target-index = target_idx;
                                         root.drop-target-valid = (target_idx != idx || root.hosts[target_idx].id != host.id);
-                                        root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                                        HostsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
 
                                     }
                                 }
@@ -557,7 +542,7 @@ export component HostsDrawer inherits DrawerContainer {
                             clicked => {
                                 if !root.is-dragging {
                                     root.selected-host-id = host.id;
-                                    root.host-selected(host.id);
+                                    HostsBridge.select-host(host.id);
                                 }
                             }
                             double-clicked => {

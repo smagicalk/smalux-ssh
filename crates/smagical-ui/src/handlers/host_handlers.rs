@@ -22,8 +22,6 @@ fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(nodes.to_vec())));
     let width = calculate_max_tree_width(nodes);
-    w.set_tree_nodes(model.clone());
-    w.set_tree_content_width(width);
     hb.set_tree_nodes(model);
     hb.set_tree_content_width(width);
 }
@@ -31,14 +29,12 @@ fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
 fn sync_hosts_bridge_cards(w: &AppWindow, cards: &[HostItemData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(cards.to_vec())));
-    w.set_hosts(model.clone());
     hb.set_hosts(model);
 }
 
 fn sync_hosts_bridge_options(w: &AppWindow, options: &[GroupOptionData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
-    w.set_group_options(model.clone());
     hb.set_group_options(model);
 }
 
@@ -51,6 +47,7 @@ fn sync_hosts_bridge_options(w: &AppWindow, options: &[GroupOptionData]) {
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
+    let hb = window.global::<HostsBridge>();
     // -------------------------------------------------------------------------
     // 1. 新建/编辑主机弹窗中“上级分组选择器”折叠 / 展开回调
     // -------------------------------------------------------------------------
@@ -58,7 +55,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let master_tree_toggle_opt = Rc::clone(&ctx.master_tree);
     let selector_expanded_clone = Rc::clone(&ctx.selector_expanded_groups);
-    window.on_toggle_group_option(move |id| {
+    hb.on_toggle_selector_group(move |id| {
         if let Some(w) = window_weak.upgrade() {
             let mut set = selector_expanded_clone.borrow_mut();
             let id_str = id.to_string();
@@ -82,7 +79,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_toggle = Rc::clone(&ctx.expanded_groups);
     let search_query_toggle = Rc::clone(&ctx.search_query);
     let core_state_toggle = Rc::clone(&ctx.core_state);
-    window.on_toggle_tree_group(move |id| {
+    hb.on_toggle_group(move |id| {
         if let Some(w) = window_weak.upgrade() {
             let mut set = expanded_toggle.borrow_mut();
             let id_str = id.to_string();
@@ -129,12 +126,12 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let selector_expanded_move = Rc::clone(&ctx.selector_expanded_groups);
     let search_query_move = Rc::clone(&ctx.search_query);
     let core_state_move = Rc::clone(&ctx.core_state);
-    window.on_move_tree_node(move |src_id, target_id, drop_position| {
+    hb.on_move_node(move |src_id, target_id, drop_position| {
         if let Some(w) = window_weak.upgrade() {
             let src_str = src_id.to_string();
             let target_str = target_id.to_string();
             let pos_str = drop_position.to_string();
-            let view_mode = w.get_hosts_view_mode().to_string();
+            let view_mode = w.global::<HostsBridge>().get_hosts_view_mode().to_string();
 
 
             // 1. 卡片平铺列表模式 (Card View Mode): 纯视觉显示排序调整，绝对锁定所属分组 (parent_id/group) 不变
@@ -281,10 +278,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let master_cards_hover = Rc::clone(&ctx.master_cards);
     let expanded_hover = Rc::clone(&ctx.expanded_groups);
     let search_hover = Rc::clone(&ctx.search_query);
-    window.on_request_drag_hover(move |src_id, target_idx, _offset_in_row| {
+    hb.on_request_drag_hover(move |src_id, target_idx, _offset_in_row| {
         if let Some(w) = window_weak.upgrade() {
+            let hb = w.global::<HostsBridge>();
             let src_str = src_id.to_string();
-            let view_mode = w.get_hosts_view_mode().to_string();
+            let view_mode = hb.get_hosts_view_mode().to_string();
 
             // 1. 卡片模式悬停判定
             if view_mode == "card" {
@@ -293,21 +291,21 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 if idx < cards.len() {
                     let tgt_id = cards[idx].id.to_string();
                     if tgt_id != src_str {
-                        w.set_drop_target_id(tgt_id.into());
-                        w.set_drop_position("after".into());
-                        w.set_drop_target_valid(true);
-                        w.set_drop_target_index(target_idx);
+                        hb.set_drop_target_id(tgt_id.into());
+                        hb.set_drop_position("after".into());
+                        hb.set_drop_target_valid(true);
+                        hb.set_drop_target_index(target_idx);
                     } else {
-                        w.set_drop_target_id("".into());
-                        w.set_drop_position("none".into());
-                        w.set_drop_target_valid(false);
-                        w.set_drop_target_index(-1);
+                        hb.set_drop_target_id("".into());
+                        hb.set_drop_position("none".into());
+                        hb.set_drop_target_valid(false);
+                        hb.set_drop_target_index(-1);
                     }
                 } else {
-                    w.set_drop_target_id("".into());
-                    w.set_drop_position("none".into());
-                    w.set_drop_target_valid(false);
-                    w.set_drop_target_index(-1);
+                    hb.set_drop_target_id("".into());
+                    hb.set_drop_position("none".into());
+                    hb.set_drop_target_valid(false);
+                    hb.set_drop_target_index(-1);
                 }
                 return;
             }
@@ -323,19 +321,19 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             // 拖拽至顶部“移至根目录 (未分组)”区域判定
             if target_idx < 0 {
-                w.set_drop_target_id("root".into());
-                w.set_drop_position("root".into());
-                w.set_drop_target_valid(true);
-                w.set_drop_target_index(-1);
+                hb.set_drop_target_id("root".into());
+                hb.set_drop_position("root".into());
+                hb.set_drop_target_valid(true);
+                hb.set_drop_target_index(-1);
                 return;
             }
 
             let idx = target_idx as usize;
             if idx >= visible_nodes.len() {
-                w.set_drop_target_id("".into());
-                w.set_drop_position("none".into());
-                w.set_drop_target_valid(false);
-                w.set_drop_target_index(-1);
+                hb.set_drop_target_id("".into());
+                hb.set_drop_position("none".into());
+                hb.set_drop_target_valid(false);
+                hb.set_drop_target_index(-1);
                 return;
             }
 
@@ -344,10 +342,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             // 防呆规则 1: 禁止拖拽放置到自身节点
             if tgt_id == src_str {
-                w.set_drop_target_id("".into());
-                w.set_drop_position("none".into());
-                w.set_drop_target_valid(false);
-                w.set_drop_target_index(-1);
+                hb.set_drop_target_id("".into());
+                hb.set_drop_position("none".into());
+                hb.set_drop_target_valid(false);
+                hb.set_drop_target_index(-1);
                 return;
             }
 
@@ -366,21 +364,21 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
             if is_descendant {
-                w.set_drop_target_id("".into());
-                w.set_drop_position("none".into());
-                w.set_drop_target_valid(false);
-                w.set_drop_target_index(-1);
+                hb.set_drop_target_id("".into());
+                hb.set_drop_position("none".into());
+                hb.set_drop_target_valid(false);
+                hb.set_drop_target_index(-1);
                 return;
             }
 
             // 规则 3: 确定悬停有效落点 (文件夹高亮内部放置，主机高亮下插线)
-            w.set_drop_target_id(tgt_id.into());
-            w.set_drop_target_index(target_idx);
-            w.set_drop_target_valid(true);
+            hb.set_drop_target_id(tgt_id.into());
+            hb.set_drop_target_index(target_idx);
+            hb.set_drop_target_valid(true);
             if target_node.is_group {
-                w.set_drop_position("inside".into());
+                hb.set_drop_position("inside".into());
             } else {
-                w.set_drop_position("after".into());
+                hb.set_drop_position("after".into());
             }
 
         }
@@ -397,7 +395,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let search_query_create = Rc::clone(&ctx.search_query);
     let next_group_id = Rc::clone(&ctx.next_session_num);
     let core_state_create = Rc::clone(&ctx.core_state);
-    window.on_create_group(move |parent_id, name| {
+    hb.on_create_group(move |parent_id, name| {
         if let Some(w) = window_weak.upgrade() {
             let g_name = name.trim().to_string();
             let p_id = parent_id.trim().to_string();
@@ -491,7 +489,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_clone = Rc::clone(&ctx.expanded_groups);
     let search_query_filter = Rc::clone(&ctx.search_query);
     let core_state_filter = Rc::clone(&ctx.core_state);
-    window.on_filter_hosts(move |query| {
+    hb.on_search_changed(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_lowercase();
             *search_query_filter.borrow_mut() = q.clone();
@@ -551,7 +549,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     let cached_shells_open = std::sync::Arc::clone(&ctx.cached_shells);
 
     let ctx_open = ctx.clone();
-    window.on_open_host(move |host_id| {
+    hb.on_open_host(move |host_id| {
 
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
@@ -682,55 +680,38 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 9. 领域总线 HostsBridge 回调双向绑定
+    // 9. 领域总线 HostsBridge 基础状态响应
     // -------------------------------------------------------------------------
-    let hb = window.global::<HostsBridge>();
-
-    let w_bridge = window.as_weak();
-    hb.on_open_host(move |id| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_open_host(id);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    hb.on_toggle_group(move |id| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_toggle_tree_group(id);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    hb.on_toggle_selector_group(move |id| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_toggle_group_option(id);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    hb.on_move_node(move |s, t, p| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_move_tree_node(s, t, p);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    hb.on_create_group(move |n, p| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_create_group(p, n);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    hb.on_search_changed(move |q| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_filter_hosts(q);
-        }
-    });
+    {
+        let window_weak = window.as_weak();
+        hb.on_select_host(move |id| {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<HostsBridge>().set_selected_host_id(id);
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        hb.on_switch_view_mode(move |mode| {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<HostsBridge>().set_hosts_view_mode(mode);
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        hb.on_close_group_modal(move || {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<HostsBridge>().set_is_create_group_open(false);
+            }
+        });
+    }
+    {
+        let window_weak = window.as_weak();
+        hb.on_create_new_group(move || {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<HostsBridge>().set_is_create_group_open(true);
+            }
+        });
+    }
 }
-
-
-
-
-
-

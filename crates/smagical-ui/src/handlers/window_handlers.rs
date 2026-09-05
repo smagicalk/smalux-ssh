@@ -11,7 +11,7 @@ use smagical_core::event::{
 };
 use theme::apply_theme_by_id;
 
-use crate::generated::AppWindow;
+use crate::generated::{AppWindow, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use crate::{theme, AppTheme};
 
@@ -59,6 +59,7 @@ fn set_autostart_enabled(_enabled: bool) -> std::io::Result<()> {
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
+    let wb = window.global::<WindowBridge>();
     // -------------------------------------------------------------------------
     // 1. 切换主题配色方案回调
     // -------------------------------------------------------------------------
@@ -66,7 +67,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let themes_clone = Rc::clone(&ctx.themes);
     let core_state_theme = ctx.core_state.clone();
-    window.on_switch_theme(move |theme_id| {
+    wb.on_switch_theme(move |theme_id| {
 
         if let Some(w) = window_weak.upgrade() {
             let id_str = theme_id.as_str();
@@ -104,10 +105,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
 
             match apply_theme_by_id(&w, &*themes_clone.borrow(), normalized_id) {
                 Ok(()) => {
-                    w.set_current_theme_id(normalized_id.into());
-                    w.set_current_theme_name(name.into());
+                    w.global::<WindowBridge>().set_current_theme_id(normalized_id.into());
+                    w.global::<WindowBridge>().set_current_theme_name(name.into());
                     let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
-                    w.set_is_dark_mode(!is_light);
+                    w.global::<WindowBridge>().set_is_dark_mode(!is_light);
                     core_state_theme.events().dispatch(&ThemeChangedEvent {
                         theme_id: normalized_id.to_string(),
                         is_dark: !is_light,
@@ -140,21 +141,21 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let themes_clone = Rc::clone(&ctx.themes);
     let core_state_color_mode = ctx.core_state.clone();
-    window.on_toggle_color_mode(move || {
+    wb.on_toggle_color_mode(move || {
         if let Some(w) = window_weak.upgrade() {
-            let is_dark = w.get_is_dark_mode();
+            let is_dark = w.global::<WindowBridge>().get_is_dark_mode();
             let next_dark = !is_dark;
 
             if next_dark {
                 let _ = apply_theme_by_id(&w, &*themes_clone.borrow(), "builtin.ui.darcula");
-                w.set_current_theme_id("builtin.ui.darcula".into());
-                w.set_current_theme_name("Darcula".into());
-                w.set_is_dark_mode(true);
+                w.global::<WindowBridge>().set_current_theme_id("builtin.ui.darcula".into());
+                w.global::<WindowBridge>().set_current_theme_name("Darcula".into());
+                w.global::<WindowBridge>().set_is_dark_mode(true);
             } else {
                 let _ = apply_theme_by_id(&w, &*themes_clone.borrow(), "builtin.ui.github-light");
-                w.set_current_theme_id("builtin.ui.github-light".into());
-                w.set_current_theme_name("GitHub Light".into());
-                w.set_is_dark_mode(false);
+                w.global::<WindowBridge>().set_current_theme_id("builtin.ui.github-light".into());
+                w.global::<WindowBridge>().set_current_theme_name("GitHub Light".into());
+                w.global::<WindowBridge>().set_is_dark_mode(false);
             }
 
             core_state_color_mode.events().dispatch(&ThemeModeToggledEvent {
@@ -176,16 +177,16 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_debug = ctx.core_state.clone();
-    window.on_toggle_debug_enabled(move |enabled| {
+    wb.on_toggle_debug_enabled(move |enabled| {
         crate::debug::set_debug_enabled(enabled);
         core_state_debug.activity_bar().set_visible("debug", enabled);
         if let Some(w) = window_weak.upgrade() {
-            w.set_is_debug_enabled(enabled);
+            w.global::<WindowBridge>().set_is_debug_enabled(enabled);
             crate::activity_bar_service::sync_activity_bar_ui(&w, &core_state_debug);
             if !enabled {
-                w.set_is_debug_modal_open(false);
-                if w.get_active_left_tab() == "debug" {
-                    w.set_active_left_tab("hosts".into());
+                w.global::<crate::generated::DebugBridge>().set_is_open(false);
+                if w.global::<WindowBridge>().get_active_left_tab() == "debug" {
+                    w.global::<WindowBridge>().set_active_left_tab("hosts".into());
                 }
             } else {
                 crate::debug_ui::sync_ui_debug_logs(&w);
@@ -207,7 +208,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // 2.2 全局统一路由跳转导航回调 (Navigation Router)
     // -------------------------------------------------------------------------
     let core_state_nav = ctx.core_state.clone();
-    window.on_navigate_to(move |target_tab, section| {
+    wb.on_navigate_to(move |target_tab, section| {
         let t_str = target_tab.as_str();
         let s_str = section.as_str();
         let mut req = smagical_core::NavigationRequest::target(t_str);
@@ -220,7 +221,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
 
 
     // 同步初始化系统开机自启状态
-    window.set_setting_start_on_boot(is_autostart_enabled());
+    window.global::<SettingsBridge>().set_setting_start_on_boot(is_autostart_enabled());
 
     // -------------------------------------------------------------------------
     // 3. 窗口控制: 关闭应用 (带活跃会话前置拦截、托盘保护与退出归档)
@@ -247,8 +248,8 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             let active_count = remote_count + local_count;
 
             // A. 如果开启了活跃会话防呆确认，且当前有活跃会话（优先拦截弹窗）
-            if active_count > 0 && w.get_setting_confirm_close_active() {
-                w.set_is_exit_confirm_open(true);
+            if active_count > 0 && w.global::<SettingsBridge>().get_setting_confirm_close_active() {
+                w.global::<WindowBridge>().set_is_exit_confirm_open(true);
                 tracing::info!(
                     target: "smagical_ui::window",
                     "检测到 {} 个远程 SSH 会话和 {} 个本地终端正在运行，拦截关闭并弹出二次确认",
@@ -258,7 +259,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             // B. 如果设置关闭时最小化到系统托盘 (tray)
-            if w.get_setting_close_action() == "tray" {
+            if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
                 w.window().set_minimized(true);
                 notif_close.info("已最小化到后台", "网络隧道与 SSH 会话在后台持续保持连接中");
                 tracing::info!(target: "smagical_ui::window", "窗口关闭动作已转为托盘后台运行");
@@ -290,11 +291,11 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     window.window().on_close_requested(move || -> slint::CloseRequestResponse {
         if let Some(w) = window_weak_req.upgrade() {
             let active_count: usize = pane_groups_req.borrow().iter().map(|g| g.tabs.len()).sum();
-            if active_count > 0 && w.get_setting_confirm_close_active() {
-                w.set_is_exit_confirm_open(true);
+            if active_count > 0 && w.global::<SettingsBridge>().get_setting_confirm_close_active() {
+                w.global::<WindowBridge>().set_is_exit_confirm_open(true);
                 return slint::CloseRequestResponse::KeepWindowShown;
             }
-            if w.get_setting_close_action() == "tray" {
+            if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
                 w.window().set_minimized(true);
                 return slint::CloseRequestResponse::KeepWindowShown;
             }
@@ -318,9 +319,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let notif_top = ctx.notifications.clone();
-    window.on_toggle_always_on_top(move |always_on_top| {
+    window.global::<SettingsBridge>().on_toggle_always_on_top(move |always_on_top| {
         if let Some(w) = window_weak.upgrade() {
-            w.set_setting_always_on_top(always_on_top);
+            w.global::<SettingsBridge>().set_setting_always_on_top(always_on_top);
             w.window().with_winit_window(|winit_window| {
                 let level = if always_on_top {
                     slint::winit_030::winit::window::WindowLevel::AlwaysOnTop
@@ -344,9 +345,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let notif_boot = ctx.notifications.clone();
     let core_state_boot = ctx.core_state.clone();
-    window.on_toggle_start_on_boot(move |enabled| {
+    window.global::<SettingsBridge>().on_toggle_start_on_boot(move |enabled| {
         if let Some(w) = window_weak.upgrade() {
-            w.set_setting_start_on_boot(enabled);
+            w.global::<SettingsBridge>().set_setting_start_on_boot(enabled);
             let _ = core_state_boot.storage().config().update(Box::new(move |c| {
                 c.start_on_boot = enabled;
             }));
@@ -372,9 +373,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_confirm = ctx.core_state.clone();
-    window.on_toggle_confirm_close_active(move |enabled| {
+    window.global::<SettingsBridge>().on_toggle_confirm_close_active(move |enabled| {
         if let Some(w) = window_weak.upgrade() {
-            w.set_setting_confirm_close_active(enabled);
+            w.global::<SettingsBridge>().set_setting_confirm_close_active(enabled);
             let _ = core_state_confirm.storage().config().update(Box::new(move |c| {
                 c.confirm_close_active = enabled;
             }));
@@ -389,10 +390,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
 
     let window_weak_pipe = window.as_weak();
     let pending_pipe_for_switch = Rc::clone(&pending_pipeline_restart);
-    window.on_switch_rendering_pipeline(move |pipe_id| {
+    window.global::<SettingsBridge>().on_switch_rendering_pipeline(move |pipe_id| {
         if let Some(w) = window_weak_pipe.upgrade() {
             let p_str = pipe_id.to_string();
-            let cur = w.get_active_rendering_pipeline().to_string();
+            let cur = w.global::<WindowBridge>().get_active_rendering_pipeline().to_string();
             if cur == p_str {
                 return;
             }
@@ -406,10 +407,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             };
 
             *pending_pipe_for_switch.borrow_mut() = Some(p_str.clone());
-            w.set_restart_confirm_message(
+            w.global::<WindowBridge>().set_restart_confirm_message(
                 format!("切换渲染引擎为 [{}] 需要重启客户端以完成底层 GPU 显卡管线重新绑定。是否立即重启？", pipe_name).into()
             );
-            w.set_is_restart_confirm_open(true);
+            w.global::<WindowBridge>().set_is_restart_confirm_open(true);
             tracing::info!(target: "smagical_ui::settings", "请求切换渲染引擎为: {}，已唤起重启确认弹窗", p_str);
         }
     });
@@ -417,10 +418,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_restart = window.as_weak();
     let pending_pipe_for_restart = Rc::clone(&pending_pipeline_restart);
     let persistence_guard_restart = std::sync::Arc::clone(&ctx.persistence_guard);
-    window.on_confirm_restart_pipeline(move || {
+    wb.on_confirm_restart_pipeline(move || {
         if let Some(w) = window_weak_restart.upgrade() {
             if let Some(p_str) = pending_pipe_for_restart.borrow_mut().take() {
-                w.set_active_rendering_pipeline(p_str.clone().into());
+                w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
                 unsafe {
                     std::env::set_var("SLINT_BACKEND", &p_str);
                 }
@@ -444,10 +445,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_cancel = window.as_weak();
     let pending_pipe_for_cancel = Rc::clone(&pending_pipeline_restart);
     let notif_pipe_cancel = ctx.notifications.clone();
-    window.on_cancel_restart_pipeline(move || {
+    wb.on_cancel_restart_pipeline(move || {
         if let Some(w) = window_weak_cancel.upgrade() {
             if let Some(p_str) = pending_pipe_for_cancel.borrow_mut().take() {
-                w.set_active_rendering_pipeline(p_str.clone().into());
+                w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
                 unsafe {
                     std::env::set_var("SLINT_BACKEND", &p_str);
                 }
@@ -480,11 +481,11 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_max = ctx.core_state.clone();
     window.on_maximize_window(move || {
         if let Some(w) = window_weak.upgrade() {
-            let is_max = w.get_is_window_maximized();
+            let is_max = w.global::<WindowBridge>().get_is_window_maximized();
             core_state_max.events().dispatch(&WindowStateChangedEvent {
                 state: if !is_max { "maximized".into() } else { "restored".into() },
             });
-            w.set_is_window_maximized(!is_max);
+            w.global::<WindowBridge>().set_is_window_maximized(!is_max);
             w.window().set_maximized(!is_max);
         }
     });
@@ -502,8 +503,8 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             });
             // 拖拽过程中或结束后如果窗口最大化状态发生变动，同步 UI 状态
             let is_max = w.window().is_maximized();
-            if w.get_is_window_maximized() != is_max {
-                w.set_is_window_maximized(is_max);
+            if w.global::<WindowBridge>().get_is_window_maximized() != is_max {
+                w.global::<WindowBridge>().set_is_window_maximized(is_max);
             }
         }
     });
@@ -514,7 +515,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_resize = window.as_weak();
     window.on_start_window_resize(move |dir_str| {
         if let Some(w) = window_weak_resize.upgrade() {
-            if w.get_is_window_maximized() {
+            if w.global::<WindowBridge>().get_is_window_maximized() {
                 return;
             }
             let dir = match dir_str.as_str() {
@@ -547,8 +548,8 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
         move || {
             if let Some(w) = window_weak_sync.upgrade() {
                 let is_max = w.window().is_maximized();
-                if w.get_is_window_maximized() != is_max {
-                    w.set_is_window_maximized(is_max);
+                if w.global::<WindowBridge>().get_is_window_maximized() != is_max {
+                    w.global::<WindowBridge>().set_is_window_maximized(is_max);
                 }
             }
         },
@@ -562,12 +563,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let renderer_clone = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_clone = Rc::clone(&ctx.active_terminals);
     let core_state_font = ctx.core_state.clone();
-    window.on_set_terminal_font(move |font_name_or_path, font_size| {
+    wb.on_set_terminal_font(move |font_name_or_path, font_size| {
         if let Some(w) = window_weak.upgrade() {
             let font_str = font_name_or_path.as_str();
             let size = if font_size <= 0.0 { 14.0 } else { font_size };
-            w.set_terminal_font_family(font_str.into());
-            w.set_terminal_font_size(size);
+            w.global::<WindowBridge>().set_terminal_font_family(font_str.into());
+            w.global::<WindowBridge>().set_terminal_font_size(size);
             let font_for_cfg = font_str.to_string();
             let _ = core_state_font.storage().config().update(Box::new(move |c| {
                 c.font_family = font_for_cfg;
@@ -598,7 +599,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let renderer_clone = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_clone = Rc::clone(&ctx.active_terminals);
-    window.on_set_terminal_theme(move |theme_id| {
+    wb.on_set_terminal_theme(move |theme_id| {
         if let Some(_w) = window_weak.upgrade() {
             let id_str = theme_id.as_str();
             if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
@@ -631,7 +632,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let wallpaper_preload_timer_ref = Rc::clone(&ctx.wallpaper_preload_timer);
     let wallpapers_ref = Rc::clone(&ctx.wallpapers);
     let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
-    window.on_set_wallpaper(move |mode, image_path, opacity| {
+    wb.on_set_wallpaper(move |mode, image_path, opacity| {
         if let Some(w) = window_weak.upgrade() {
             let mode_str = mode.as_str();
             let mut path_str = image_path.as_str().to_string();
@@ -648,7 +649,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-            w.set_wallpaper_mode(mode_str.into());
+            w.global::<WindowBridge>().set_wallpaper_mode(mode_str.into());
             let theme_global = w.global::<AppTheme>();
             theme_global.set_wallpaper_mode(mode_str.into());
             theme_global.set_wallpaper_opacity(op);
@@ -691,21 +692,21 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 match m_str {
                     "global" => {
                         // 平滑双缓冲淡入淡出（Cross-fade）
-                        let prev_img = w.get_global_wallpaper_image();
+                        let prev_img = w.global::<WindowBridge>().get_global_wallpaper_image();
                         if prev_img.size().width > 0 {
-                            w.set_prev_wallpaper_image(prev_img);
-                            w.set_wallpaper_crossfade(0.0);
+                            w.global::<WindowBridge>().set_prev_wallpaper_image(prev_img);
+                            w.global::<WindowBridge>().set_wallpaper_crossfade(0.0);
                         } else {
-                            w.set_wallpaper_crossfade(1.0);
+                            w.global::<WindowBridge>().set_wallpaper_crossfade(1.0);
                         }
-                        w.set_global_wallpaper_image(img.clone());
-                        w.set_global_wallpaper_opacity(opacity_val);
-                        w.set_terminal_wallpaper_image(img);
-                        w.set_terminal_wallpaper_opacity(opacity_val);
+                        w.global::<WindowBridge>().set_global_wallpaper_image(img.clone());
+                        w.global::<WindowBridge>().set_global_wallpaper_opacity(opacity_val);
+                        w.global::<WindowBridge>().set_terminal_wallpaper_image(img);
+                        w.global::<WindowBridge>().set_terminal_wallpaper_opacity(opacity_val);
                     }
                     "terminal" => {
-                        w.set_terminal_wallpaper_image(img);
-                        w.set_terminal_wallpaper_opacity(opacity_val);
+                        w.global::<WindowBridge>().set_terminal_wallpaper_image(img);
+                        w.global::<WindowBridge>().set_terminal_wallpaper_opacity(opacity_val);
                     }
                     _ => {}
                 }
@@ -726,21 +727,21 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                                 let img = slint::Image::from_rgba8(pixel_buffer);
                                 match mode_bg.as_str() {
                                     "global" => {
-                                        let prev_img = w.get_global_wallpaper_image();
+                                        let prev_img = w.global::<WindowBridge>().get_global_wallpaper_image();
                                         if prev_img.size().width > 0 {
-                                            w.set_prev_wallpaper_image(prev_img);
-                                            w.set_wallpaper_crossfade(0.0);
+                                            w.global::<WindowBridge>().set_prev_wallpaper_image(prev_img);
+                                            w.global::<WindowBridge>().set_wallpaper_crossfade(0.0);
                                         } else {
-                                            w.set_wallpaper_crossfade(1.0);
+                                            w.global::<WindowBridge>().set_wallpaper_crossfade(1.0);
                                         }
-                                        w.set_global_wallpaper_image(img.clone());
-                                        w.set_global_wallpaper_opacity(op);
-                                        w.set_terminal_wallpaper_image(img);
-                                        w.set_terminal_wallpaper_opacity(op);
+                                        w.global::<WindowBridge>().set_global_wallpaper_image(img.clone());
+                                        w.global::<WindowBridge>().set_global_wallpaper_opacity(op);
+                                        w.global::<WindowBridge>().set_terminal_wallpaper_image(img);
+                                        w.global::<WindowBridge>().set_terminal_wallpaper_opacity(op);
                                     }
                                     "terminal" => {
-                                        w.set_terminal_wallpaper_image(img);
-                                        w.set_terminal_wallpaper_opacity(op);
+                                        w.global::<WindowBridge>().set_terminal_wallpaper_image(img);
+                                        w.global::<WindowBridge>().set_terminal_wallpaper_opacity(op);
                                     }
                                     _ => {}
                                 }

@@ -4,6 +4,7 @@ import { SearchInput } from "../../components/search-input.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { ScrollView } from "std-widgets.slint";
 import { SnippetTreeNode } from "../../features/snippets/snippets_model.slint";
+import { SnippetsBridge } from "../../features/snippets/snippets_bridge.slint";
 
 export { SnippetTreeNode }
 
@@ -15,11 +16,11 @@ export component SnippetsDrawer inherits DrawerContainer {
     collapse-icon: "◀";
 
     /// 树形数据源
-    in property <[SnippetTreeNode]> tree-nodes: [];
+    in property <[SnippetTreeNode]> tree-nodes: SnippetsBridge.tree-nodes;
     /// 搜索过滤关键词
-    in-out property <string> search-query: "";
+    in-out property <string> search-query: SnippetsBridge.search-query;
     /// 当前选中的节点 ID
-    in-out property <string> selected-id: "";
+    in-out property <string> selected-id: SnippetsBridge.active-snippet-id;
 
     /// 拖拽交互状态
     in-out property <bool> is-dragging: false;
@@ -34,16 +35,6 @@ export component SnippetsDrawer inherits DrawerContainer {
     in-out property <length> drag-x: 0px;
     in-out property <length> drag-y: 0px;
 
-    /// 回调事件
-    callback search-changed(string /* query */);
-    callback toggle-group(string /* group-id */);
-    callback select-node(string /* id */, bool /* is-group */);
-    callback create-new-group();
-    callback create-new-snippet();
-    callback execute-snippet(string /* id */);
-    callback move-node(string /* source-id */, string /* target-id */, string /* drop-position */);
-    callback request-drag-hover(string /* source-id */, int /* target-index */, float /* offset-in-row */);
-
     VerticalLayout {
         padding: 8px;
         spacing: 8px;
@@ -52,7 +43,7 @@ export component SnippetsDrawer inherits DrawerContainer {
         SearchInput {
             text <=> root.search-query;
             placeholder: @tr("搜索代码片段、脚本或分组...");
-            changed(text) => { root.search-changed(text); }
+            changed(text) => { SnippetsBridge.search-changed(text); }
         }
 
         // 2. 栏目标题与操作栏
@@ -101,12 +92,12 @@ export component SnippetsDrawer inherits DrawerContainer {
 
                 AppIconButton {
                     icon: @image-url("../../assets/icons/folder-plus.svg");
-                    clicked => { root.create-new-group(); }
+                    clicked => { SnippetsBridge.create-new-group(); }
                 }
 
                 AppIconButton {
                     icon: @image-url("../../assets/icons/plus.svg");
-                    clicked => { root.create-new-snippet(); }
+                    clicked => { SnippetsBridge.create-new-snippet(); }
                 }
             }
         }
@@ -194,9 +185,9 @@ export component SnippetsDrawer inherits DrawerContainer {
                                 if event.kind == PointerEventKind.up {
                                     if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
                                         if root.drop-target-id == "root" {
-                                            root.move-node(root.drag-source-id, "root", "root");
+                                            SnippetsBridge.move-node(root.drag-source-id, "root", "root");
                                         } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
-                                            root.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                            SnippetsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
                                         }
                                     }
                                     root.is-dragging = false;
@@ -232,12 +223,12 @@ export component SnippetsDrawer inherits DrawerContainer {
                                             root.drop-target-id = "root";
                                             root.drop-position = "root";
                                             root.drop-target-valid = true;
-                                            root.request-drag-hover(root.drag-source-id, -1, 0.0);
+                                            SnippetsBridge.request-drag-hover(root.drag-source-id, -1, 0.0);
                                         } else {
                                             let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
                                             root.drop-target-index = target_idx;
                                             root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
-                                            root.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                                            SnippetsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
                                         }
                                     }
                                 }
@@ -245,15 +236,15 @@ export component SnippetsDrawer inherits DrawerContainer {
                             clicked => {
                                 if !root.is-dragging {
                                     if node.is-group {
-                                        root.toggle-group(node.id);
+                                        SnippetsBridge.toggle-group-expanded(node.id);
                                     }
                                     root.selected-id = node.id;
-                                    root.select-node(node.id, node.is_group);
+                                    SnippetsBridge.select-node(node.id, node.is-group);
                                 }
                             }
                             double-clicked => {
                                 if !node.is-group && !root.is-dragging {
-                                    root.execute-snippet(node.id);
+                                    SnippetsBridge.request-run-snippet(node.id);
                                 }
                             }
                             mouse-cursor: root.is-dragging ? copy : pointer;

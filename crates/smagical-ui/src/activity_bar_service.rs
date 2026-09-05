@@ -4,7 +4,8 @@ use std::rc::Rc;
 use smagical_core::CoreState;
 
 
-use crate::generated::{ActivityBarItemData, AppWindow};
+use slint::ComponentHandle;
+use crate::generated::{ActivityBarItemData, AppWindow, WindowBridge};
 
 /// 将 CoreState 中的动态侧边栏注册项同步推送到 Slint UI。
 pub fn sync_activity_bar_ui(window: &AppWindow, core_state: &CoreState) {
@@ -34,6 +35,7 @@ pub fn sync_activity_bar_ui(window: &AppWindow, core_state: &CoreState) {
         })
         .collect();
 
-    window.set_top_activity_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(top_items))));
-    window.set_bottom_activity_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(bottom_items))));
+    let wb = window.global::<WindowBridge>();
+    wb.set_top_activity_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(top_items))));
+    wb.set_bottom_activity_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(bottom_items))));
 }

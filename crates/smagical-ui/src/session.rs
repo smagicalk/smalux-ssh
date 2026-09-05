@@ -106,18 +106,6 @@ pub(crate) fn sync_active_session_ui(
 ) {
     let tb = w.global::<TerminalBridge>();
     if pane_groups.is_empty() {
-        w.set_tabs(slint::ModelRc::default());
-        w.set_active_session_tab("".into());
-        w.set_has_active_session(false);
-        w.set_active_session_name("".into());
-        w.set_active_host_id("".into());
-        w.set_active_host_name("".into());
-        w.set_active_host_address("".into());
-        w.set_active_host_ping_ms(0);
-        w.set_active_host_status("offline".into());
-        w.set_is_split(false);
-        w.set_split_count(1);
-
         tb.set_tabs(slint::ModelRc::default());
         tb.set_active_session_tab("".into());
         tb.set_has_active_session(false);
@@ -128,6 +116,7 @@ pub(crate) fn sync_active_session_ui(
         tb.set_active_host_ping_ms(0);
         tb.set_active_host_status("offline".into());
         tb.set_is_split(false);
+        tb.set_split_count(1);
     } else {
         let active_group = pane_groups
             .iter()
@@ -137,16 +126,6 @@ pub(crate) fn sync_active_session_ui(
 
         if let Some(active_sess) = active_group.get_active_session() {
             let tab_model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(active_group.to_tab_data_list())));
-            w.set_tabs(tab_model.clone());
-            w.set_active_session_tab(active_sess.session_id.clone().into());
-            w.set_has_active_session(true);
-            w.set_active_session_name(active_sess.display_title.clone().into());
-            w.set_active_host_id(active_sess.host_id.clone().into());
-            w.set_active_host_name(active_sess.host_name.clone().into());
-            w.set_active_host_address(active_sess.host_address.clone().into());
-            w.set_active_host_ping_ms(active_sess.ping_ms);
-            w.set_active_host_status(active_sess.host_status.clone().into());
-
             tb.set_tabs(tab_model);
             tb.set_active_session_tab(active_sess.session_id.clone().into());
             tb.set_has_active_session(true);
@@ -157,12 +136,9 @@ pub(crate) fn sync_active_session_ui(
             tb.set_active_host_ping_ms(active_sess.ping_ms);
             tb.set_active_host_status(active_sess.host_status.clone().into());
         }
-        w.set_active_pane_id(active_group.pane_id.clone().into());
-        w.set_is_split(is_split);
-        w.set_split_count(pane_groups.len() as i32);
-
         tb.set_active_pane_id(active_group.pane_id.clone().into());
         tb.set_is_split(is_split);
+        tb.set_split_count(pane_groups.len() as i32);
     }
 }
 

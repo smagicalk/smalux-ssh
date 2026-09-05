@@ -3,6 +3,7 @@
 //! 将内存 RingBuffer 中的实时结构化诊断日志映射为 Slint 数据模型并推送到前端界面。
 
 use std::rc::Rc;
+use slint::ComponentHandle;
 use crate::generated::{AppWindow, LogEntryData};
 
 /// 同步全局 Tracing 实时事件日志到 Slint UI 调试抽屉。
@@ -24,7 +25,9 @@ pub(crate) fn sync_ui_debug_logs(w: &AppWindow) {
                 message: e.message.into(),
             })
             .collect();
-        w.set_debug_logs(slint::ModelRc::from(Rc::new(slint::VecModel::from(slint_entries))));
+        let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(slint_entries)));
+        w.global::<crate::generated::DebugBridge>().set_logs(model.clone());
+        w.global::<crate::generated::WindowBridge>().set_debug_logs(model);
     }
 }
 

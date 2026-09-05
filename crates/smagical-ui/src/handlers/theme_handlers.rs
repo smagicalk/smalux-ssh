@@ -6,7 +6,7 @@ use smagical_core::theme::{
     ThemeId, ThemeKind, ThemeMetadata, ThemePeriod, ThemeRepository, ThemeService,
     UiThemeDefinition, UiThemeMetrics, UiThemeMetricsPatch, UiThemeTokens, UiThemeTokensPatch, THEME_SCHEMA_VERSION,
 };
-use crate::generated::AppWindow;
+use crate::generated::{AppWindow, SettingsBridge, ThemeEditorBridge, WindowBridge};
 use super::AppContext;
 
 /// Parse hex string into a Slint Brush
@@ -47,7 +47,7 @@ fn normalize_hex(value: &str, fallback: &str) -> String {
 
 /// Helper to generate pretty and 100% valid TOML representation of theme definition from AppWindow state
 fn generate_theme_toml_from_window(w: &AppWindow) -> String {
-    let raw_name = w.get_theme_editor_name();
+    let raw_name = w.global::<ThemeEditorBridge>().get_name();
     let clean_name = raw_name.trim();
     let display_name = if clean_name.is_empty() { "Custom Theme" } else { clean_name };
 
@@ -64,10 +64,10 @@ fn generate_theme_toml_from_window(w: &AppWindow) -> String {
         ascii_id
     };
 
-    let p_clean = if w.get_theme_editor_period() == "day" { "day" } else { "night" };
+    let p_clean = if w.global::<ThemeEditorBridge>().get_period() == "day" { "day" } else { "night" };
     let scheme = if p_clean == "day" { "light" } else { "dark" };
 
-    let b_raw = w.get_theme_editor_base();
+    let b_raw = w.global::<ThemeEditorBridge>().get_base();
     let b_clean = b_raw.trim();
     let base_line = if b_clean.is_empty() {
         String::new()
@@ -75,7 +75,7 @@ fn generate_theme_toml_from_window(w: &AppWindow) -> String {
         format!("base = \"{}\"\n", b_clean)
     };
 
-    let a_raw = w.get_theme_editor_author();
+    let a_raw = w.global::<ThemeEditorBridge>().get_author();
     let a_clean = a_raw.trim();
     let author_line = if a_clean.is_empty() {
         "author = \"User\"\n".to_string()
@@ -83,34 +83,34 @@ fn generate_theme_toml_from_window(w: &AppWindow) -> String {
         format!("author = \"{}\"\n", a_clean)
     };
 
-    let norm_window_bg = normalize_hex(&w.get_theme_editor_window_bg(), if p_clean == "day" { "#ffffff" } else { "#1e1e2e" });
-    let norm_panel_bg = normalize_hex(&w.get_theme_editor_panel_bg(), if p_clean == "day" { "#f6f8fa" } else { "#181825" });
-    let norm_surface_bg = normalize_hex(&w.get_theme_editor_surface_bg(), if p_clean == "day" { "#eaeef2" } else { "#313244" });
-    let norm_control_bg = normalize_hex(&w.get_theme_editor_control_bg(), if p_clean == "day" { "#ffffff" } else { "#383a4c" });
-    let norm_foreground = normalize_hex(&w.get_theme_editor_foreground(), if p_clean == "day" { "#24292e" } else { "#cdd6f4" });
-    let norm_secondary_fg = normalize_hex(&w.get_theme_editor_secondary_fg(), if p_clean == "day" { "#586069" } else { "#a6adc8" });
-    let norm_disabled_fg = normalize_hex(&w.get_theme_editor_disabled_fg(), if p_clean == "day" { "#8c959f" } else { "#6c7086" });
-    let norm_accent = normalize_hex(&w.get_theme_editor_accent(), if p_clean == "day" { "#0366d6" } else { "#cba6f7" });
-    let norm_hover_bg = normalize_hex(&w.get_theme_editor_hover_bg(), if p_clean == "day" { "#e1e4e8" } else { "#45475a" });
-    let norm_pressed_bg = normalize_hex(&w.get_theme_editor_pressed_bg(), if p_clean == "day" { "#d0d7de" } else { "#585b70" });
-    let norm_selected_bg = normalize_hex(&w.get_theme_editor_selected_bg(), norm_accent.as_str());
-    let norm_selected_fg = normalize_hex(&w.get_theme_editor_selected_fg(), "#ffffff");
-    let norm_border = normalize_hex(&w.get_theme_editor_border(), if p_clean == "day" { "#d1d5da" } else { "#45475a" });
-    let norm_focus_border = normalize_hex(&w.get_theme_editor_focus_border(), norm_accent.as_str());
-    let norm_success = normalize_hex(&w.get_theme_editor_success(), if p_clean == "day" { "#1a7f37" } else { "#a6e3a1" });
-    let norm_warning = normalize_hex(&w.get_theme_editor_warning(), if p_clean == "day" { "#9a6700" } else { "#f9e2af" });
-    let norm_danger = normalize_hex(&w.get_theme_editor_danger(), if p_clean == "day" { "#cf222e" } else { "#f38ba8" });
-    let norm_info = normalize_hex(&w.get_theme_editor_info(), if p_clean == "day" { "#0969da" } else { "#89b4fa" });
+    let norm_window_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_window_bg(), if p_clean == "day" { "#ffffff" } else { "#1e1e2e" });
+    let norm_panel_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_panel_bg(), if p_clean == "day" { "#f6f8fa" } else { "#181825" });
+    let norm_surface_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_surface_bg(), if p_clean == "day" { "#eaeef2" } else { "#313244" });
+    let norm_control_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_control_bg(), if p_clean == "day" { "#ffffff" } else { "#383a4c" });
+    let norm_foreground = normalize_hex(&w.global::<ThemeEditorBridge>().get_foreground(), if p_clean == "day" { "#24292e" } else { "#cdd6f4" });
+    let norm_secondary_fg = normalize_hex(&w.global::<ThemeEditorBridge>().get_secondary_fg(), if p_clean == "day" { "#586069" } else { "#a6adc8" });
+    let norm_disabled_fg = normalize_hex(&w.global::<ThemeEditorBridge>().get_disabled_fg(), if p_clean == "day" { "#8c959f" } else { "#6c7086" });
+    let norm_accent = normalize_hex(&w.global::<ThemeEditorBridge>().get_accent(), if p_clean == "day" { "#0366d6" } else { "#cba6f7" });
+    let norm_hover_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_hover_bg(), if p_clean == "day" { "#e1e4e8" } else { "#45475a" });
+    let norm_pressed_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_pressed_bg(), if p_clean == "day" { "#d0d7de" } else { "#585b70" });
+    let norm_selected_bg = normalize_hex(&w.global::<ThemeEditorBridge>().get_selected_bg(), norm_accent.as_str());
+    let norm_selected_fg = normalize_hex(&w.global::<ThemeEditorBridge>().get_selected_fg(), "#ffffff");
+    let norm_border = normalize_hex(&w.global::<ThemeEditorBridge>().get_border(), if p_clean == "day" { "#d1d5da" } else { "#45475a" });
+    let norm_focus_border = normalize_hex(&w.global::<ThemeEditorBridge>().get_focus_border(), norm_accent.as_str());
+    let norm_success = normalize_hex(&w.global::<ThemeEditorBridge>().get_success(), if p_clean == "day" { "#1a7f37" } else { "#a6e3a1" });
+    let norm_warning = normalize_hex(&w.global::<ThemeEditorBridge>().get_warning(), if p_clean == "day" { "#9a6700" } else { "#f9e2af" });
+    let norm_danger = normalize_hex(&w.global::<ThemeEditorBridge>().get_danger(), if p_clean == "day" { "#cf222e" } else { "#f38ba8" });
+    let norm_info = normalize_hex(&w.global::<ThemeEditorBridge>().get_info(), if p_clean == "day" { "#0969da" } else { "#89b4fa" });
 
-    let r_s = w.get_theme_editor_metric_radius_small().trim().parse::<u32>().unwrap_or(2);
-    let r_m = w.get_theme_editor_metric_radius_medium().trim().parse::<u32>().unwrap_or(4);
-    let r_l = w.get_theme_editor_metric_radius_large().trim().parse::<u32>().unwrap_or(8);
-    let sp_s = w.get_theme_editor_metric_spacing_small().trim().parse::<u32>().unwrap_or(4);
-    let sp_m = w.get_theme_editor_metric_spacing_medium().trim().parse::<u32>().unwrap_or(8);
-    let sp_l = w.get_theme_editor_metric_spacing_large().trim().parse::<u32>().unwrap_or(16);
-    let bw = w.get_theme_editor_metric_border_width().trim().parse::<u32>().unwrap_or(1);
-    let ch = w.get_theme_editor_metric_control_height().trim().parse::<u32>().unwrap_or(32);
-    let isz = w.get_theme_editor_metric_icon_size().trim().parse::<u32>().unwrap_or(16);
+    let r_s = w.global::<ThemeEditorBridge>().get_metric_radius_small().trim().parse::<u32>().unwrap_or(2);
+    let r_m = w.global::<ThemeEditorBridge>().get_metric_radius_medium().trim().parse::<u32>().unwrap_or(4);
+    let r_l = w.global::<ThemeEditorBridge>().get_metric_radius_large().trim().parse::<u32>().unwrap_or(8);
+    let sp_s = w.global::<ThemeEditorBridge>().get_metric_spacing_small().trim().parse::<u32>().unwrap_or(4);
+    let sp_m = w.global::<ThemeEditorBridge>().get_metric_spacing_medium().trim().parse::<u32>().unwrap_or(8);
+    let sp_l = w.global::<ThemeEditorBridge>().get_metric_spacing_large().trim().parse::<u32>().unwrap_or(16);
+    let bw = w.global::<ThemeEditorBridge>().get_metric_border_width().trim().parse::<u32>().unwrap_or(1);
+    let ch = w.global::<ThemeEditorBridge>().get_metric_control_height().trim().parse::<u32>().unwrap_or(32);
+    let isz = w.global::<ThemeEditorBridge>().get_metric_icon_size().trim().parse::<u32>().unwrap_or(16);
 
     format!(
 r#"schema-version = 1
@@ -504,46 +504,46 @@ fn parse_hex_to_rgb(hex: &str) -> Option<(u8, u8, u8)> {
 /// Update theme color field and refresh TOML
 fn update_theme_field(w: &AppWindow, f: &str, v: &str, brush: slint::Brush) {
     match f {
-        "window_bg" => { w.set_theme_editor_window_bg(v.into()); w.set_theme_editor_preview_window_bg(brush); }
-        "panel_bg" => { w.set_theme_editor_panel_bg(v.into()); w.set_theme_editor_preview_panel_bg(brush); }
-        "surface_bg" => { w.set_theme_editor_surface_bg(v.into()); w.set_theme_editor_preview_surface_bg(brush); }
-        "control_bg" => { w.set_theme_editor_control_bg(v.into()); w.set_theme_editor_preview_control_bg(brush); }
-        "foreground" => { w.set_theme_editor_foreground(v.into()); w.set_theme_editor_preview_foreground(brush); }
-        "secondary_fg" => { w.set_theme_editor_secondary_fg(v.into()); w.set_theme_editor_preview_secondary_fg(brush); }
-        "disabled_fg" => { w.set_theme_editor_disabled_fg(v.into()); w.set_theme_editor_preview_disabled_fg(brush); }
-        "accent" => { w.set_theme_editor_accent(v.into()); w.set_theme_editor_preview_accent(brush); }
-        "hover_bg" => { w.set_theme_editor_hover_bg(v.into()); w.set_theme_editor_preview_hover_bg(brush); }
-        "pressed_bg" => { w.set_theme_editor_pressed_bg(v.into()); w.set_theme_editor_preview_pressed_bg(brush); }
-        "selected_bg" => { w.set_theme_editor_selected_bg(v.into()); w.set_theme_editor_preview_selected_bg(brush); }
-        "selected_fg" => { w.set_theme_editor_selected_fg(v.into()); w.set_theme_editor_preview_selected_fg(brush); }
-        "border" => { w.set_theme_editor_border(v.into()); w.set_theme_editor_preview_border(brush); }
-        "focus_border" => { w.set_theme_editor_focus_border(v.into()); w.set_theme_editor_preview_focus_border(brush); }
-        "success" => { w.set_theme_editor_success(v.into()); w.set_theme_editor_preview_success(brush); }
-        "warning" => { w.set_theme_editor_warning(v.into()); w.set_theme_editor_preview_warning(brush); }
-        "danger" => { w.set_theme_editor_danger(v.into()); w.set_theme_editor_preview_danger(brush); }
-        "info" => { w.set_theme_editor_info(v.into()); w.set_theme_editor_preview_info(brush); }
+        "window_bg" => { w.global::<ThemeEditorBridge>().set_window_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_window_bg(brush); }
+        "panel_bg" => { w.global::<ThemeEditorBridge>().set_panel_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_panel_bg(brush); }
+        "surface_bg" => { w.global::<ThemeEditorBridge>().set_surface_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_surface_bg(brush); }
+        "control_bg" => { w.global::<ThemeEditorBridge>().set_control_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_control_bg(brush); }
+        "foreground" => { w.global::<ThemeEditorBridge>().set_foreground(v.into()); w.global::<ThemeEditorBridge>().set_preview_foreground(brush); }
+        "secondary_fg" => { w.global::<ThemeEditorBridge>().set_secondary_fg(v.into()); w.global::<ThemeEditorBridge>().set_preview_secondary_fg(brush); }
+        "disabled_fg" => { w.global::<ThemeEditorBridge>().set_disabled_fg(v.into()); w.global::<ThemeEditorBridge>().set_preview_disabled_fg(brush); }
+        "accent" => { w.global::<ThemeEditorBridge>().set_accent(v.into()); w.global::<ThemeEditorBridge>().set_preview_accent(brush); }
+        "hover_bg" => { w.global::<ThemeEditorBridge>().set_hover_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_hover_bg(brush); }
+        "pressed_bg" => { w.global::<ThemeEditorBridge>().set_pressed_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_pressed_bg(brush); }
+        "selected_bg" => { w.global::<ThemeEditorBridge>().set_selected_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_selected_bg(brush); }
+        "selected_fg" => { w.global::<ThemeEditorBridge>().set_selected_fg(v.into()); w.global::<ThemeEditorBridge>().set_preview_selected_fg(brush); }
+        "border" => { w.global::<ThemeEditorBridge>().set_border(v.into()); w.global::<ThemeEditorBridge>().set_preview_border(brush); }
+        "focus_border" => { w.global::<ThemeEditorBridge>().set_focus_border(v.into()); w.global::<ThemeEditorBridge>().set_preview_focus_border(brush); }
+        "success" => { w.global::<ThemeEditorBridge>().set_success(v.into()); w.global::<ThemeEditorBridge>().set_preview_success(brush); }
+        "warning" => { w.global::<ThemeEditorBridge>().set_warning(v.into()); w.global::<ThemeEditorBridge>().set_preview_warning(brush); }
+        "danger" => { w.global::<ThemeEditorBridge>().set_danger(v.into()); w.global::<ThemeEditorBridge>().set_preview_danger(brush); }
+        "info" => { w.global::<ThemeEditorBridge>().set_info(v.into()); w.global::<ThemeEditorBridge>().set_preview_info(brush); }
         _ => {}
     }
     let toml_str = generate_theme_toml_from_window(w);
-    w.set_theme_editor_toml(toml_str.as_str().into());
+    w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
 }
 
 /// Update theme metric field and refresh TOML
 fn update_metric_field(w: &AppWindow, f: &str, v: &str) {
     match f {
-        "radius_small" => w.set_theme_editor_metric_radius_small(v.into()),
-        "radius_medium" => w.set_theme_editor_metric_radius_medium(v.into()),
-        "radius_large" => w.set_theme_editor_metric_radius_large(v.into()),
-        "spacing_small" => w.set_theme_editor_metric_spacing_small(v.into()),
-        "spacing_medium" => w.set_theme_editor_metric_spacing_medium(v.into()),
-        "spacing_large" => w.set_theme_editor_metric_spacing_large(v.into()),
-        "border_width" => w.set_theme_editor_metric_border_width(v.into()),
-        "control_height" => w.set_theme_editor_metric_control_height(v.into()),
-        "icon_size" => w.set_theme_editor_metric_icon_size(v.into()),
+        "radius_small" => w.global::<ThemeEditorBridge>().set_metric_radius_small(v.into()),
+        "radius_medium" => w.global::<ThemeEditorBridge>().set_metric_radius_medium(v.into()),
+        "radius_large" => w.global::<ThemeEditorBridge>().set_metric_radius_large(v.into()),
+        "spacing_small" => w.global::<ThemeEditorBridge>().set_metric_spacing_small(v.into()),
+        "spacing_medium" => w.global::<ThemeEditorBridge>().set_metric_spacing_medium(v.into()),
+        "spacing_large" => w.global::<ThemeEditorBridge>().set_metric_spacing_large(v.into()),
+        "border_width" => w.global::<ThemeEditorBridge>().set_metric_border_width(v.into()),
+        "control_height" => w.global::<ThemeEditorBridge>().set_metric_control_height(v.into()),
+        "icon_size" => w.global::<ThemeEditorBridge>().set_metric_icon_size(v.into()),
         _ => {}
     }
     let toml_str = generate_theme_toml_from_window(w);
-    w.set_theme_editor_toml(toml_str.as_str().into());
+    w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
 }
 
 /// Apply tokens and metrics to studio window
@@ -556,80 +556,80 @@ fn apply_tokens_and_metrics_to_studio(
     tokens: &UiThemeTokens,
     metrics: &UiThemeMetrics,
 ) {
-    w.set_theme_editor_name(name.into());
-    w.set_theme_editor_author(author.into());
-    w.set_theme_editor_base(base.into());
-    w.set_theme_editor_period(period.into());
+    w.global::<ThemeEditorBridge>().set_name(name.into());
+    w.global::<ThemeEditorBridge>().set_author(author.into());
+    w.global::<ThemeEditorBridge>().set_base(base.into());
+    w.global::<ThemeEditorBridge>().set_period(period.into());
 
-    w.set_theme_editor_window_bg(tokens.window_background.as_str().into());
-    w.set_theme_editor_panel_bg(tokens.panel_background.as_str().into());
-    w.set_theme_editor_surface_bg(tokens.surface_background.as_str().into());
-    w.set_theme_editor_control_bg(tokens.control_background.as_str().into());
-    w.set_theme_editor_foreground(tokens.foreground.as_str().into());
-    w.set_theme_editor_secondary_fg(tokens.secondary_foreground.as_str().into());
-    w.set_theme_editor_disabled_fg(tokens.disabled_foreground.as_str().into());
-    w.set_theme_editor_accent(tokens.accent.as_str().into());
-    w.set_theme_editor_hover_bg(tokens.hover_background.as_str().into());
-    w.set_theme_editor_pressed_bg(tokens.pressed_background.as_str().into());
-    w.set_theme_editor_selected_bg(tokens.selected_background.as_str().into());
-    w.set_theme_editor_selected_fg(tokens.selected_foreground.as_str().into());
-    w.set_theme_editor_border(tokens.border.as_str().into());
-    w.set_theme_editor_focus_border(tokens.focus_border.as_str().into());
-    w.set_theme_editor_success(tokens.success.as_str().into());
-    w.set_theme_editor_warning(tokens.warning.as_str().into());
-    w.set_theme_editor_danger(tokens.danger.as_str().into());
-    w.set_theme_editor_info(tokens.info.as_str().into());
+    w.global::<ThemeEditorBridge>().set_window_bg(tokens.window_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_panel_bg(tokens.panel_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_surface_bg(tokens.surface_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_control_bg(tokens.control_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_foreground(tokens.foreground.as_str().into());
+    w.global::<ThemeEditorBridge>().set_secondary_fg(tokens.secondary_foreground.as_str().into());
+    w.global::<ThemeEditorBridge>().set_disabled_fg(tokens.disabled_foreground.as_str().into());
+    w.global::<ThemeEditorBridge>().set_accent(tokens.accent.as_str().into());
+    w.global::<ThemeEditorBridge>().set_hover_bg(tokens.hover_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_pressed_bg(tokens.pressed_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_selected_bg(tokens.selected_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_selected_fg(tokens.selected_foreground.as_str().into());
+    w.global::<ThemeEditorBridge>().set_border(tokens.border.as_str().into());
+    w.global::<ThemeEditorBridge>().set_focus_border(tokens.focus_border.as_str().into());
+    w.global::<ThemeEditorBridge>().set_success(tokens.success.as_str().into());
+    w.global::<ThemeEditorBridge>().set_warning(tokens.warning.as_str().into());
+    w.global::<ThemeEditorBridge>().set_danger(tokens.danger.as_str().into());
+    w.global::<ThemeEditorBridge>().set_info(tokens.info.as_str().into());
 
-    if let Some(b) = parse_brush(&tokens.window_background) { w.set_theme_editor_preview_window_bg(b); }
-    if let Some(b) = parse_brush(&tokens.panel_background) { w.set_theme_editor_preview_panel_bg(b); }
-    if let Some(b) = parse_brush(&tokens.surface_background) { w.set_theme_editor_preview_surface_bg(b); }
-    if let Some(b) = parse_brush(&tokens.control_background) { w.set_theme_editor_preview_control_bg(b); }
-    if let Some(b) = parse_brush(&tokens.foreground) { w.set_theme_editor_preview_foreground(b); }
-    if let Some(b) = parse_brush(&tokens.secondary_foreground) { w.set_theme_editor_preview_secondary_fg(b); }
-    if let Some(b) = parse_brush(&tokens.disabled_foreground) { w.set_theme_editor_preview_disabled_fg(b); }
-    if let Some(b) = parse_brush(&tokens.accent) { w.set_theme_editor_preview_accent(b); }
-    if let Some(b) = parse_brush(&tokens.hover_background) { w.set_theme_editor_preview_hover_bg(b); }
-    if let Some(b) = parse_brush(&tokens.pressed_background) { w.set_theme_editor_preview_pressed_bg(b); }
-    if let Some(b) = parse_brush(&tokens.selected_background) { w.set_theme_editor_preview_selected_bg(b); }
-    if let Some(b) = parse_brush(&tokens.selected_foreground) { w.set_theme_editor_preview_selected_fg(b); }
-    if let Some(b) = parse_brush(&tokens.border) { w.set_theme_editor_preview_border(b); }
-    if let Some(b) = parse_brush(&tokens.focus_border) { w.set_theme_editor_preview_focus_border(b); }
-    if let Some(b) = parse_brush(&tokens.success) { w.set_theme_editor_preview_success(b); }
-    if let Some(b) = parse_brush(&tokens.warning) { w.set_theme_editor_preview_warning(b); }
-    if let Some(b) = parse_brush(&tokens.danger) { w.set_theme_editor_preview_danger(b); }
-    if let Some(b) = parse_brush(&tokens.info) { w.set_theme_editor_preview_info(b); }
+    if let Some(b) = parse_brush(&tokens.window_background) { w.global::<ThemeEditorBridge>().set_preview_window_bg(b); }
+    if let Some(b) = parse_brush(&tokens.panel_background) { w.global::<ThemeEditorBridge>().set_preview_panel_bg(b); }
+    if let Some(b) = parse_brush(&tokens.surface_background) { w.global::<ThemeEditorBridge>().set_preview_surface_bg(b); }
+    if let Some(b) = parse_brush(&tokens.control_background) { w.global::<ThemeEditorBridge>().set_preview_control_bg(b); }
+    if let Some(b) = parse_brush(&tokens.foreground) { w.global::<ThemeEditorBridge>().set_preview_foreground(b); }
+    if let Some(b) = parse_brush(&tokens.secondary_foreground) { w.global::<ThemeEditorBridge>().set_preview_secondary_fg(b); }
+    if let Some(b) = parse_brush(&tokens.disabled_foreground) { w.global::<ThemeEditorBridge>().set_preview_disabled_fg(b); }
+    if let Some(b) = parse_brush(&tokens.accent) { w.global::<ThemeEditorBridge>().set_preview_accent(b); }
+    if let Some(b) = parse_brush(&tokens.hover_background) { w.global::<ThemeEditorBridge>().set_preview_hover_bg(b); }
+    if let Some(b) = parse_brush(&tokens.pressed_background) { w.global::<ThemeEditorBridge>().set_preview_pressed_bg(b); }
+    if let Some(b) = parse_brush(&tokens.selected_background) { w.global::<ThemeEditorBridge>().set_preview_selected_bg(b); }
+    if let Some(b) = parse_brush(&tokens.selected_foreground) { w.global::<ThemeEditorBridge>().set_preview_selected_fg(b); }
+    if let Some(b) = parse_brush(&tokens.border) { w.global::<ThemeEditorBridge>().set_preview_border(b); }
+    if let Some(b) = parse_brush(&tokens.focus_border) { w.global::<ThemeEditorBridge>().set_preview_focus_border(b); }
+    if let Some(b) = parse_brush(&tokens.success) { w.global::<ThemeEditorBridge>().set_preview_success(b); }
+    if let Some(b) = parse_brush(&tokens.warning) { w.global::<ThemeEditorBridge>().set_preview_warning(b); }
+    if let Some(b) = parse_brush(&tokens.danger) { w.global::<ThemeEditorBridge>().set_preview_danger(b); }
+    if let Some(b) = parse_brush(&tokens.info) { w.global::<ThemeEditorBridge>().set_preview_info(b); }
 
-    w.set_theme_editor_metric_radius_small(format!("{}", metrics.radius_small as u32).into());
-    w.set_theme_editor_metric_radius_medium(format!("{}", metrics.radius_medium as u32).into());
-    w.set_theme_editor_metric_radius_large(format!("{}", metrics.radius_large as u32).into());
-    w.set_theme_editor_metric_spacing_small(format!("{}", metrics.spacing_small as u32).into());
-    w.set_theme_editor_metric_spacing_medium(format!("{}", metrics.spacing_medium as u32).into());
-    w.set_theme_editor_metric_spacing_large(format!("{}", metrics.spacing_large as u32).into());
-    w.set_theme_editor_metric_border_width(format!("{}", metrics.border_width as u32).into());
-    w.set_theme_editor_metric_control_height(format!("{}", metrics.control_height as u32).into());
-    w.set_theme_editor_metric_icon_size(format!("{}", metrics.icon_size as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_radius_small(format!("{}", metrics.radius_small as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_radius_medium(format!("{}", metrics.radius_medium as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_radius_large(format!("{}", metrics.radius_large as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_spacing_small(format!("{}", metrics.spacing_small as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_spacing_medium(format!("{}", metrics.spacing_medium as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_spacing_large(format!("{}", metrics.spacing_large as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_border_width(format!("{}", metrics.border_width as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_control_height(format!("{}", metrics.control_height as u32).into());
+    w.global::<ThemeEditorBridge>().set_metric_icon_size(format!("{}", metrics.icon_size as u32).into());
 
     let (h_deg, s, v) = parse_hex_to_rgb(&tokens.window_background).map(|(r, g, b)| rgb_to_hsv(r, g, b)).unwrap_or((0.0, 0.0, 1.0));
     let angle_rad = h_deg.to_radians();
     let ind_x = 90.0 + s * angle_rad.cos() * 88.0;
     let ind_y = 90.0 + s * angle_rad.sin() * 88.0;
     let (hr, hg, hb) = hsv_to_rgb(h_deg, 1.0, 1.0);
-    w.set_theme_editor_wheel_indicator_x(ind_x);
-    w.set_theme_editor_wheel_indicator_y(ind_y);
-    w.set_theme_editor_wheel_brightness(v);
-    w.set_theme_editor_wheel_hue_brush(slint::Brush::SolidColor(slint::Color::from_rgb_u8(hr, hg, hb)));
-    w.set_theme_editor_picker_hex(tokens.window_background.as_str().into());
+    w.global::<ThemeEditorBridge>().set_wheel_indicator_x(ind_x);
+    w.global::<ThemeEditorBridge>().set_wheel_indicator_y(ind_y);
+    w.global::<ThemeEditorBridge>().set_wheel_brightness(v);
+    w.global::<ThemeEditorBridge>().set_wheel_hue_brush(slint::Brush::SolidColor(slint::Color::from_rgb_u8(hr, hg, hb)));
+    w.global::<ThemeEditorBridge>().set_picker_hex_value(tokens.window_background.as_str().into());
     if let Some(b) = parse_brush(&tokens.window_background) {
-        w.set_theme_editor_picker_brush(b);
+        w.global::<ThemeEditorBridge>().set_picker_preview_brush(b);
     }
 
     let toml_str = generate_theme_toml_from_window(w);
-    w.set_theme_editor_toml(toml_str.as_str().into());
+    w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
 }
 
 /// Populate theme studio modal fields from currently active theme
 fn populate_theme_studio_from_active(w: &AppWindow, service: &ThemeService) {
-    let active_id = w.get_current_theme_id().to_string();
+    let active_id = w.global::<WindowBridge>().get_current_theme_id().to_string();
     let base_id = if active_id.is_empty() { "builtin.ui.darcula".to_string() } else { active_id.clone() };
     let custom_count = service.list_ui().iter().filter(|t| !t.metadata.id.as_ref().starts_with("builtin.")).count() + 1;
     let new_name = format!("Custom Theme #{}", custom_count);
@@ -642,17 +642,27 @@ fn populate_theme_studio_from_active(w: &AppWindow, service: &ThemeService) {
         }).unwrap_or("night");
         apply_tokens_and_metrics_to_studio(w, &new_name, &author, &base_id, period, &resolved.tokens, &resolved.metrics);
     }
-    w.set_is_theme_editor_open(true);
+    w.global::<ThemeEditorBridge>().set_is_open(true);
 }
 
 /// Register theme and wallpaper handlers
 pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &AppContext) {
+    let sb = window.global::<SettingsBridge>();
+    let tb = window.global::<ThemeEditorBridge>();
+
+    let w_close = window.as_weak();
+    tb.on_close(move || {
+        if let Some(w) = w_close.upgrade() {
+            w.global::<ThemeEditorBridge>().set_is_open(false);
+        }
+    });
+
     // -------------------------------------------------------------------------
     // 1. Open Theme Studio Modal (Create Custom Theme)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let themes_ref = Rc::clone(&ctx.themes);
-    window.on_open_theme_editor(move || {
+    tb.on_open_theme_editor(move || {
         if let Some(w) = window_weak.upgrade() {
             let service = themes_ref.borrow();
             populate_theme_studio_from_active(&w, &service);
@@ -661,7 +671,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
     let window_weak = window.as_weak();
     let themes_ref = Rc::clone(&ctx.themes);
-    window.on_create_custom_theme(move || {
+    sb.on_create_custom_theme(move || {
         if let Some(w) = window_weak.upgrade() {
             let service = themes_ref.borrow();
             populate_theme_studio_from_active(&w, &service);
@@ -673,7 +683,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let themes_ref = Rc::clone(&ctx.themes);
-    window.on_theme_editor_apply_preset(move |preset_name| {
+    tb.on_apply_preset(move |preset_name| {
         if let Some(w) = window_weak.upgrade() {
             let (preset_name_display, base_id) = match preset_name.as_str() {
                 "darcula" => ("Darcula Dark", "builtin.ui.darcula"),
@@ -698,7 +708,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     // 3. Theme Studio Field Changed (Color, Metric & Metadata)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    window.on_theme_editor_color_changed(move |field, val| {
+    tb.on_color_field_changed(move |field, val| {
         if let Some(w) = window_weak.upgrade() {
             let f = field.as_str();
             let v = val.as_str();
@@ -708,7 +718,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     });
 
     let window_weak = window.as_weak();
-    window.on_theme_editor_metric_changed(move |field, val| {
+    tb.on_metric_field_changed(move |field, val| {
         if let Some(w) = window_weak.upgrade() {
             update_metric_field(&w, field.as_str(), val.as_str());
         }
@@ -721,7 +731,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
     let window_weak = window.as_weak();
     let hsv_clone = Rc::clone(&cur_hsv);
-    window.on_theme_editor_wheel_coord_picked(move |rel_x, rel_y| {
+    tb.on_wheel_coord_picked(move |rel_x, rel_y| {
         if let Some(w) = window_weak.upgrade() {
             let dist = (rel_x * rel_x + rel_y * rel_y).sqrt().min(1.0);
             let angle = rel_y.atan2(rel_x).to_degrees();
@@ -739,20 +749,20 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
             let norm_dx = if dist > 0.0 { rel_x / dist * dist.min(1.0) } else { 0.0 };
             let norm_dy = if dist > 0.0 { rel_y / dist * dist.min(1.0) } else { 0.0 };
-            w.set_theme_editor_wheel_indicator_x(90.0 + norm_dx * 88.0);
-            w.set_theme_editor_wheel_indicator_y(90.0 + norm_dy * 88.0);
-            w.set_theme_editor_picker_hex(hex.as_str().into());
-            w.set_theme_editor_picker_brush(cur_brush.clone());
-            w.set_theme_editor_wheel_hue_brush(hue_brush);
+            w.global::<ThemeEditorBridge>().set_wheel_indicator_x(90.0 + norm_dx * 88.0);
+            w.global::<ThemeEditorBridge>().set_wheel_indicator_y(90.0 + norm_dy * 88.0);
+            w.global::<ThemeEditorBridge>().set_picker_hex_value(hex.as_str().into());
+            w.global::<ThemeEditorBridge>().set_picker_preview_brush(cur_brush.clone());
+            w.global::<ThemeEditorBridge>().set_wheel_hue_brush(hue_brush);
 
-            let target_key = w.get_theme_editor_picker_target_key();
+            let target_key = w.global::<ThemeEditorBridge>().get_picker_target_key();
             update_theme_field(&w, target_key.as_str(), hex.as_str(), cur_brush);
         }
     });
 
     let window_weak = window.as_weak();
     let hsv_clone2 = Rc::clone(&cur_hsv);
-    window.on_theme_editor_wheel_brightness_picked(move |brightness| {
+    tb.on_wheel_brightness_picked(move |brightness| {
         if let Some(w) = window_weak.upgrade() {
             let val = brightness.clamp(0.0, 1.0);
             let mut hsv = hsv_clone2.borrow_mut();
@@ -761,18 +771,18 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
             let hex = format!("#{:02x}{:02x}{:02x}", r, g, b);
             let cur_brush = slint::Brush::SolidColor(slint::Color::from_rgb_u8(r, g, b));
 
-            w.set_theme_editor_wheel_brightness(val);
-            w.set_theme_editor_picker_hex(hex.as_str().into());
-            w.set_theme_editor_picker_brush(cur_brush.clone());
+            w.global::<ThemeEditorBridge>().set_wheel_brightness(val);
+            w.global::<ThemeEditorBridge>().set_picker_hex_value(hex.as_str().into());
+            w.global::<ThemeEditorBridge>().set_picker_preview_brush(cur_brush.clone());
 
-            let target_key = w.get_theme_editor_picker_target_key();
+            let target_key = w.global::<ThemeEditorBridge>().get_picker_target_key();
             update_theme_field(&w, target_key.as_str(), hex.as_str(), cur_brush);
         }
     });
 
     let window_weak = window.as_weak();
     let hsv_clone3 = Rc::clone(&cur_hsv);
-    window.on_theme_editor_picker_hex_changed(move |hex_val| {
+    tb.on_picker_hex_changed(move |hex_val| {
         if let Some(w) = window_weak.upgrade() {
             let hex_str = hex_val.to_string();
             if let Some((r, g, b)) = parse_hex_to_rgb(&hex_str) {
@@ -789,33 +799,33 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 let hue_brush = slint::Brush::SolidColor(slint::Color::from_rgb_u8(hr, hg, hb));
                 let cur_brush = slint::Brush::SolidColor(slint::Color::from_rgb_u8(r, g, b));
 
-                w.set_theme_editor_wheel_indicator_x(ind_x);
-                w.set_theme_editor_wheel_indicator_y(ind_y);
-                w.set_theme_editor_wheel_brightness(v);
-                w.set_theme_editor_wheel_hue_brush(hue_brush);
-                w.set_theme_editor_picker_brush(cur_brush.clone());
-                w.set_theme_editor_picker_hex(hex_str.clone().as_str().into());
+                w.global::<ThemeEditorBridge>().set_wheel_indicator_x(ind_x);
+                w.global::<ThemeEditorBridge>().set_wheel_indicator_y(ind_y);
+                w.global::<ThemeEditorBridge>().set_wheel_brightness(v);
+                w.global::<ThemeEditorBridge>().set_wheel_hue_brush(hue_brush);
+                w.global::<ThemeEditorBridge>().set_picker_preview_brush(cur_brush.clone());
+                w.global::<ThemeEditorBridge>().set_picker_hex_value(hex_str.clone().as_str().into());
 
-                let target_key = w.get_theme_editor_picker_target_key();
+                let target_key = w.global::<ThemeEditorBridge>().get_picker_target_key();
                 update_theme_field(&w, target_key.as_str(), hex_str.as_str(), cur_brush);
             }
         }
     });
 
     let window_weak = window.as_weak();
-    window.on_theme_editor_meta_changed(move |field, val| {
+    tb.on_meta_field_changed(move |field, val| {
         if let Some(w) = window_weak.upgrade() {
             let f = field.as_str();
             let v = val.as_str();
             match f {
-                "name" => w.set_theme_editor_name(v.into()),
-                "author" => w.set_theme_editor_author(v.into()),
-                "base" => w.set_theme_editor_base(v.into()),
-                "period" => w.set_theme_editor_period(v.into()),
+                "name" => w.global::<ThemeEditorBridge>().set_name(v.into()),
+                "author" => w.global::<ThemeEditorBridge>().set_author(v.into()),
+                "base" => w.global::<ThemeEditorBridge>().set_base(v.into()),
+                "period" => w.global::<ThemeEditorBridge>().set_period(v.into()),
                 _ => {}
             }
             let toml_str = generate_theme_toml_from_window(&w);
-            w.set_theme_editor_toml(toml_str.as_str().into());
+            w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
         }
     });
 
@@ -825,102 +835,102 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let window_weak = window.as_weak();
     let themes_ref = Rc::clone(&ctx.themes);
     let notif = ctx.notifications.clone();
-    window.on_theme_editor_parse_toml(move |toml_input| {
+    tb.on_parse_and_sync_from_toml(move |toml_input| {
         if let Some(w) = window_weak.upgrade() {
             let service = themes_ref.borrow();
             match service.import_ui_toml(toml_input.as_str()) {
                 Ok(def) => {
-                    w.set_theme_editor_name(def.metadata.name.as_str().into());
-                    w.set_theme_editor_author(def.metadata.author.as_deref().unwrap_or("User").into());
+                    w.global::<ThemeEditorBridge>().set_name(def.metadata.name.as_str().into());
+                    w.global::<ThemeEditorBridge>().set_author(def.metadata.author.as_deref().unwrap_or("User").into());
                     let base_id = def.metadata.base.as_ref().map(|b| b.as_ref()).unwrap_or("builtin.ui.darcula");
-                    w.set_theme_editor_base(base_id.into());
+                    w.global::<ThemeEditorBridge>().set_base(base_id.into());
                     let period_str = def.metadata.period.map(|p| match p {
                         ThemePeriod::Day => "day",
                         ThemePeriod::Night => "night",
                     }).unwrap_or("night");
-                    w.set_theme_editor_period(period_str.into());
+                    w.global::<ThemeEditorBridge>().set_period(period_str.into());
 
                     if let Some(ref bg) = def.ui.window_background {
-                        w.set_theme_editor_window_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_window_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_window_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_window_bg(b); }
                     }
                     if let Some(ref bg) = def.ui.panel_background {
-                        w.set_theme_editor_panel_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_panel_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_panel_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_panel_bg(b); }
                     }
                     if let Some(ref bg) = def.ui.surface_background {
-                        w.set_theme_editor_surface_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_surface_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_surface_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_surface_bg(b); }
                     }
                     if let Some(ref bg) = def.ui.control_background {
-                        w.set_theme_editor_control_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_control_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_control_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_control_bg(b); }
                     }
                     if let Some(ref fg) = def.ui.foreground {
-                        w.set_theme_editor_foreground(fg.as_str().into());
-                        if let Some(b) = parse_brush(fg) { w.set_theme_editor_preview_foreground(b); }
+                        w.global::<ThemeEditorBridge>().set_foreground(fg.as_str().into());
+                        if let Some(b) = parse_brush(fg) { w.global::<ThemeEditorBridge>().set_preview_foreground(b); }
                     }
                     if let Some(ref fg) = def.ui.secondary_foreground {
-                        w.set_theme_editor_secondary_fg(fg.as_str().into());
-                        if let Some(b) = parse_brush(fg) { w.set_theme_editor_preview_secondary_fg(b); }
+                        w.global::<ThemeEditorBridge>().set_secondary_fg(fg.as_str().into());
+                        if let Some(b) = parse_brush(fg) { w.global::<ThemeEditorBridge>().set_preview_secondary_fg(b); }
                     }
                     if let Some(ref fg) = def.ui.disabled_foreground {
-                        w.set_theme_editor_disabled_fg(fg.as_str().into());
-                        if let Some(b) = parse_brush(fg) { w.set_theme_editor_preview_disabled_fg(b); }
+                        w.global::<ThemeEditorBridge>().set_disabled_fg(fg.as_str().into());
+                        if let Some(b) = parse_brush(fg) { w.global::<ThemeEditorBridge>().set_preview_disabled_fg(b); }
                     }
                     if let Some(ref ac) = def.ui.accent {
-                        w.set_theme_editor_accent(ac.as_str().into());
-                        if let Some(b) = parse_brush(ac) { w.set_theme_editor_preview_accent(b); }
+                        w.global::<ThemeEditorBridge>().set_accent(ac.as_str().into());
+                        if let Some(b) = parse_brush(ac) { w.global::<ThemeEditorBridge>().set_preview_accent(b); }
                     }
                     if let Some(ref bg) = def.ui.hover_background {
-                        w.set_theme_editor_hover_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_hover_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_hover_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_hover_bg(b); }
                     }
                     if let Some(ref bg) = def.ui.pressed_background {
-                        w.set_theme_editor_pressed_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_pressed_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_pressed_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_pressed_bg(b); }
                     }
                     if let Some(ref bg) = def.ui.selected_background {
-                        w.set_theme_editor_selected_bg(bg.as_str().into());
-                        if let Some(b) = parse_brush(bg) { w.set_theme_editor_preview_selected_bg(b); }
+                        w.global::<ThemeEditorBridge>().set_selected_bg(bg.as_str().into());
+                        if let Some(b) = parse_brush(bg) { w.global::<ThemeEditorBridge>().set_preview_selected_bg(b); }
                     }
                     if let Some(ref fg) = def.ui.selected_foreground {
-                        w.set_theme_editor_selected_fg(fg.as_str().into());
-                        if let Some(b) = parse_brush(fg) { w.set_theme_editor_preview_selected_fg(b); }
+                        w.global::<ThemeEditorBridge>().set_selected_fg(fg.as_str().into());
+                        if let Some(b) = parse_brush(fg) { w.global::<ThemeEditorBridge>().set_preview_selected_fg(b); }
                     }
                     if let Some(ref bd) = def.ui.border {
-                        w.set_theme_editor_border(bd.as_str().into());
-                        if let Some(b) = parse_brush(bd) { w.set_theme_editor_preview_border(b); }
+                        w.global::<ThemeEditorBridge>().set_border(bd.as_str().into());
+                        if let Some(b) = parse_brush(bd) { w.global::<ThemeEditorBridge>().set_preview_border(b); }
                     }
                     if let Some(ref bd) = def.ui.focus_border {
-                        w.set_theme_editor_focus_border(bd.as_str().into());
-                        if let Some(b) = parse_brush(bd) { w.set_theme_editor_preview_focus_border(b); }
+                        w.global::<ThemeEditorBridge>().set_focus_border(bd.as_str().into());
+                        if let Some(b) = parse_brush(bd) { w.global::<ThemeEditorBridge>().set_preview_focus_border(b); }
                     }
                     if let Some(ref st) = def.ui.success {
-                        w.set_theme_editor_success(st.as_str().into());
-                        if let Some(b) = parse_brush(st) { w.set_theme_editor_preview_success(b); }
+                        w.global::<ThemeEditorBridge>().set_success(st.as_str().into());
+                        if let Some(b) = parse_brush(st) { w.global::<ThemeEditorBridge>().set_preview_success(b); }
                     }
                     if let Some(ref st) = def.ui.warning {
-                        w.set_theme_editor_warning(st.as_str().into());
-                        if let Some(b) = parse_brush(st) { w.set_theme_editor_preview_warning(b); }
+                        w.global::<ThemeEditorBridge>().set_warning(st.as_str().into());
+                        if let Some(b) = parse_brush(st) { w.global::<ThemeEditorBridge>().set_preview_warning(b); }
                     }
                     if let Some(ref st) = def.ui.danger {
-                        w.set_theme_editor_danger(st.as_str().into());
-                        if let Some(b) = parse_brush(st) { w.set_theme_editor_preview_danger(b); }
+                        w.global::<ThemeEditorBridge>().set_danger(st.as_str().into());
+                        if let Some(b) = parse_brush(st) { w.global::<ThemeEditorBridge>().set_preview_danger(b); }
                     }
                     if let Some(ref st) = def.ui.info {
-                        w.set_theme_editor_info(st.as_str().into());
-                        if let Some(b) = parse_brush(st) { w.set_theme_editor_preview_info(b); }
+                        w.global::<ThemeEditorBridge>().set_info(st.as_str().into());
+                        if let Some(b) = parse_brush(st) { w.global::<ThemeEditorBridge>().set_preview_info(b); }
                     }
-                    if let Some(v) = def.metrics.radius_small { w.set_theme_editor_metric_radius_small(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.radius_medium { w.set_theme_editor_metric_radius_medium(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.radius_large { w.set_theme_editor_metric_radius_large(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.spacing_small { w.set_theme_editor_metric_spacing_small(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.spacing_medium { w.set_theme_editor_metric_spacing_medium(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.spacing_large { w.set_theme_editor_metric_spacing_large(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.border_width { w.set_theme_editor_metric_border_width(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.control_height { w.set_theme_editor_metric_control_height(format!("{}", v as u32).into()); }
-                    if let Some(v) = def.metrics.icon_size { w.set_theme_editor_metric_icon_size(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.radius_small { w.global::<ThemeEditorBridge>().set_metric_radius_small(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.radius_medium { w.global::<ThemeEditorBridge>().set_metric_radius_medium(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.radius_large { w.global::<ThemeEditorBridge>().set_metric_radius_large(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.spacing_small { w.global::<ThemeEditorBridge>().set_metric_spacing_small(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.spacing_medium { w.global::<ThemeEditorBridge>().set_metric_spacing_medium(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.spacing_large { w.global::<ThemeEditorBridge>().set_metric_spacing_large(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.border_width { w.global::<ThemeEditorBridge>().set_metric_border_width(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.control_height { w.global::<ThemeEditorBridge>().set_metric_control_height(format!("{}", v as u32).into()); }
+                    if let Some(v) = def.metrics.icon_size { w.global::<ThemeEditorBridge>().set_metric_icon_size(format!("{}", v as u32).into()); }
                     notif.success("TOML 解析成功", "已将配置代码解析并实时同步到表单与预览视窗！");
                 }
                 Err(e) => {
@@ -934,7 +944,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     // 5. Theme Studio: Copy TOML
     // -------------------------------------------------------------------------
     let notif = ctx.notifications.clone();
-    window.on_theme_editor_copy_toml(move |toml_content| {
+    tb.on_copy_toml(move |toml_content| {
         if let Ok(mut cb) = arboard::Clipboard::new() {
             let _ = cb.set_text(toml_content.to_string());
             notif.info("已复制到剪贴板", "TOML 主题配置已成功复制到系统剪贴板");
@@ -950,9 +960,9 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let themes_ref = Rc::clone(&ctx.themes);
     let repo_ref = ctx.theme_repo.clone();
     let notif = ctx.notifications.clone();
-    window.on_theme_editor_save_and_activate(move || {
+    tb.on_save_and_activate(move || {
         if let Some(w) = window_weak.upgrade() {
-            let toml_str = w.get_theme_editor_toml().to_string();
+            let toml_str = w.global::<ThemeEditorBridge>().get_toml().to_string();
             let switch_target = {
                 let mut service = themes_ref.borrow_mut();
                 match service.import_ui_toml(&toml_str) {
@@ -982,8 +992,8 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
             };
 
             if let Some((theme_id, theme_name)) = switch_target {
-                w.invoke_switch_theme(theme_id.as_ref().into());
-                w.set_is_theme_editor_open(false);
+                w.global::<WindowBridge>().invoke_switch_theme(theme_id.as_ref().into());
+                w.global::<ThemeEditorBridge>().set_is_open(false);
                 notif.success("主题已保存并激活", &format!("主题「{}」已成功保存并立即生效！", theme_name));
             }
         }
@@ -996,7 +1006,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let repo_ref = ctx.theme_repo.clone();
     let notif = ctx.notifications.clone();
     let core_state_import = ctx.core_state.clone();
-    window.on_import_theme(move || {
+    sb.on_import_theme(move || {
         if let Some(path) = pick_theme_file() {
             match std::fs::read_to_string(&path) {
                 Ok(content) => {
@@ -1066,7 +1076,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
                     if let Some((theme_id, theme_name)) = switch_target {
                         if let Some(w) = window_weak.upgrade() {
-                            w.invoke_switch_theme(theme_id.as_ref().into());
+                            w.global::<WindowBridge>().invoke_switch_theme(theme_id.as_ref().into());
                             if is_en(&core_state_import) {
                                 notif.success("Theme Imported", &format!("Theme '{}' activated!", theme_name));
                             } else {
@@ -1093,9 +1103,9 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let themes_ref = Rc::clone(&ctx.themes);
     let notif = ctx.notifications.clone();
     let core_state_export = ctx.core_state.clone();
-    window.on_export_current_theme(move || {
+    sb.on_export_current_theme(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active_id = w.get_current_theme_id().to_string();
+            let active_id = w.global::<WindowBridge>().get_current_theme_id().to_string();
             let service = themes_ref.borrow();
             let theme_id_obj = ThemeId::new(&active_id);
             if let Some(def) = service.get_ui(&theme_id_obj) {
@@ -1154,10 +1164,10 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let repo_ref = ctx.theme_repo.clone();
     let notif = ctx.notifications.clone();
     let core_state_del = ctx.core_state.clone();
-    window.on_delete_custom_theme(move |id| {
+    sb.on_delete_custom_theme(move |id| {
         let id_str = id.as_str();
         if let Some(w) = window_weak.upgrade() {
-            let active_id = w.get_current_theme_id().to_string();
+            let active_id = w.global::<WindowBridge>().get_current_theme_id().to_string();
             let should_switch = active_id == id_str;
 
             let theme_id_obj = ThemeId::new(id_str);
@@ -1171,7 +1181,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
             }
 
             if should_switch {
-                w.invoke_switch_theme("builtin.ui.darcula".into());
+                w.global::<WindowBridge>().invoke_switch_theme("builtin.ui.darcula".into());
             }
 
             if is_en(&core_state_del) {
@@ -1190,7 +1200,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
     let notif = ctx.notifications.clone();
     let core_state_wp_add = ctx.core_state.clone();
-    window.on_add_wallpaper_image(move || {
+    sb.on_add_wallpaper(move || {
         if let Some(path) = pick_image_file() {
             let path_str = path.to_string_lossy().to_string();
             if let Some(w) = window_weak.upgrade() {
@@ -1211,14 +1221,16 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     c.wallpaper_active_index = new_idx;
                 }));
 
-                w.set_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
-                w.set_wallpaper_active_index(new_idx as i32);
+                w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(new_idx as i32);
 
-                let cur_mode = w.get_wallpaper_mode().to_string();
+                let cur_mode = w.global::<WindowBridge>().get_wallpaper_mode().to_string();
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
-                w.set_wallpaper_mode(apply_mode.into());
-                w.set_wallpaper_path(path_str.as_str().into());
-                w.invoke_set_wallpaper(apply_mode.into(), path_str.clone().into(), w.get_global_wallpaper_opacity());
+                let wb = w.global::<WindowBridge>();
+                wb.set_wallpaper_mode(apply_mode.into());
+                wb.set_wallpaper_path(path_str.as_str().into());
+                let op = wb.get_global_wallpaper_opacity();
+                wb.invoke_set_wallpaper(apply_mode.into(), path_str.clone().into(), op);
 
                 if is_en(&core_state_wp_add) {
                     notif.success("Wallpaper Added", "Successfully loaded image to wallpaper gallery!");
@@ -1237,7 +1249,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
     let notif = ctx.notifications.clone();
     let core_state_wp_folder = ctx.core_state.clone();
-    window.on_add_wallpaper_folder(move || {
+    sb.on_add_wallpaper_folder(move || {
         if let Some(folder_path) = pick_folder() {
             let found_images = scan_images_in_folder(&folder_path);
             if found_images.is_empty() {
@@ -1283,15 +1295,17 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     c.wallpaper_active_index = effective_idx;
                 }));
 
-                w.set_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
-                w.set_wallpaper_active_index(effective_idx as i32);
-                w.set_wallpaper_path(folder_str.as_str().into());
+                w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(effective_idx as i32);
+                let wb = w.global::<WindowBridge>();
+                wb.set_wallpaper_path(folder_str.as_str().into());
 
-                let cur_mode = w.get_wallpaper_mode().to_string();
+                let cur_mode = wb.get_wallpaper_mode().to_string();
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
-                w.set_wallpaper_mode(apply_mode.into());
+                wb.set_wallpaper_mode(apply_mode.into());
                 if !first_image_path.is_empty() {
-                    w.invoke_set_wallpaper(apply_mode.into(), first_image_path.as_str().into(), w.get_global_wallpaper_opacity());
+                    let op = wb.get_global_wallpaper_opacity();
+                    wb.invoke_set_wallpaper(apply_mode.into(), first_image_path.as_str().into(), op);
                 }
 
                 if is_en(&core_state_wp_folder) {
@@ -1311,7 +1325,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
     let notif = ctx.notifications.clone();
     let core_state_wp_rm = ctx.core_state.clone();
-    window.on_remove_wallpaper_image(move |idx| {
+    sb.on_remove_wallpaper(move |idx| {
         if let Some(w) = window_weak.upgrade() {
             let u_idx = idx as usize;
             let remove_result = {
@@ -1343,15 +1357,17 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     c.wallpaper_active_index = next_active;
                 }));
 
-                w.set_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
-                w.set_wallpaper_active_index(next_active as i32);
+                w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(next_active as i32);
 
+                let wb = w.global::<WindowBridge>();
                 if is_empty {
-                    w.set_wallpaper_mode("none".into());
-                    w.invoke_set_wallpaper("none".into(), "".into(), 0.20);
+                    wb.set_wallpaper_mode("none".into());
+                    wb.invoke_set_wallpaper("none".into(), "".into(), 0.20);
                 } else {
-                    let cur_mode = w.get_wallpaper_mode().to_string();
-                    w.invoke_set_wallpaper(cur_mode.as_str().into(), next_path.as_str().into(), w.get_global_wallpaper_opacity());
+                    let cur_mode = wb.get_wallpaper_mode().to_string();
+                    let op = wb.get_global_wallpaper_opacity();
+                    wb.invoke_set_wallpaper(cur_mode.as_str().into(), next_path.as_str().into(), op);
                 }
 
                 if is_en(&core_state_wp_rm) {
@@ -1372,7 +1388,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let _core_state_wp_sel = ctx.core_state.clone();
     let wallpaper_cache_sel = Rc::clone(&ctx.wallpaper_cache);
     let wallpaper_preload_timer_sel = Rc::clone(&ctx.wallpaper_preload_timer);
-    window.on_select_wallpaper_image(move |idx| {
+    sb.on_select_wallpaper(move |idx| {
         if let Some(w) = window_weak.upgrade() {
             let u_idx = idx as usize;
             let (target_entry, actual_image_path) = {
@@ -1394,13 +1410,15 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
             if let Some(entry_str) = target_entry {
                 *active_idx_ref.borrow_mut() = u_idx;
-                w.set_wallpaper_active_index(u_idx as i32);
-                let cur_mode = w.get_wallpaper_mode().to_string();
+                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(u_idx as i32);
+                let wb = w.global::<WindowBridge>();
+                let cur_mode = wb.get_wallpaper_mode().to_string();
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
-                w.set_wallpaper_mode(apply_mode.into());
-                w.set_wallpaper_path(entry_str.as_str().into());
+                wb.set_wallpaper_mode(apply_mode.into());
+                wb.set_wallpaper_path(entry_str.as_str().into());
                 if !actual_image_path.is_empty() {
-                    w.invoke_set_wallpaper(apply_mode.into(), actual_image_path.as_str().into(), w.get_global_wallpaper_opacity());
+                    let op = wb.get_global_wallpaper_opacity();
+                    wb.invoke_set_wallpaper(apply_mode.into(), actual_image_path.as_str().into(), op);
                 }
 
                 // 立即预加载后继壁纸（如果存在多张壁纸）
@@ -1425,7 +1443,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let core_state_wp_slide = ctx.core_state.clone();
     let wallpaper_cache_slide = Rc::clone(&ctx.wallpaper_cache);
     let wallpaper_preload_timer_slide = Rc::clone(&ctx.wallpaper_preload_timer);
-    window.on_set_wallpaper_slideshow(move |interval, transition| {
+    sb.on_set_wallpaper_slideshow(move |interval, transition| {
         let interval_str = interval.as_str();
         let transition_str = transition.as_str();
 
@@ -1433,8 +1451,8 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
         *timer_ref.borrow_mut() = None;
 
         if let Some(w) = window_weak.upgrade() {
-            w.set_wallpaper_slideshow_interval(interval_str.into());
-            w.set_wallpaper_transition_effect(transition_str.into());
+            w.global::<SettingsBridge>().set_setting_wallpaper_slideshow(interval_str.into());
+            w.global::<SettingsBridge>().set_setting_wallpaper_transition(transition_str.into());
         }
 
         let int_clone = interval_str.to_string();
@@ -1500,9 +1518,11 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
                     if let Some((next_path, lookahead_path)) = tick_data {
                         if let Some(w) = window_weak_timer.upgrade() {
-                            let cur_mode = w.get_wallpaper_mode().to_string();
+                            let wb = w.global::<WindowBridge>();
+                            let cur_mode = wb.get_wallpaper_mode().to_string();
                             let apply_mode = if cur_mode == "none" { "terminal" } else { cur_mode.as_str() };
-                            w.invoke_set_wallpaper(apply_mode.into(), next_path.as_str().into(), w.get_global_wallpaper_opacity());
+                            let op = wb.get_global_wallpaper_opacity();
+                            wb.invoke_set_wallpaper(apply_mode.into(), next_path.as_str().into(), op);
                         }
 
                         // 立即预加载下下一张（保证每一轮轮播都有现成缓存，0ms 瞬间显示）

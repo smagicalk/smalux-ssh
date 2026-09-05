@@ -18,6 +18,7 @@ use smagical_core::{
 use crate::generated::{
     AppWindow, FileItemData as SlintFileItemData, FileTabData as SlintFileTabData,
     FilesBridge, HostItemData as SlintHostItemData, TransferItemData as SlintTransferItemData,
+    WindowBridge,
 };
 use crate::handlers::AppContext;
 
@@ -94,7 +95,7 @@ pub(crate) fn map_file_item_to_ui(item: &FileItemData) -> SlintFileItemData {
 
 /// 仅同步左侧本地 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
 pub(crate) fn sync_local_tabs_only(window: &AppWindow, ctx: &AppContext) {
-    let is_en = window.get_current_language() == "en-US";
+    let is_en = window.global::<WindowBridge>().get_current_language() == "en-US";
     let local_tabs = ctx.local_tabs.borrow();
     let active_local_id = ctx.active_local_tab_id.borrow().clone();
     let ui_local_tabs: Vec<SlintFileTabData> = local_tabs
@@ -132,8 +133,6 @@ pub(crate) fn sync_local_tabs_only(window: &AppWindow, ctx: &AppContext) {
         })
         .collect();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_local_tabs)));
-    window.set_local_tabs(model.clone());
-    window.set_active_local_tab_id(active_local_id.clone().into());
     let fb = window.global::<FilesBridge>();
     fb.set_local_tabs(model);
     fb.set_active_local_tab_id(active_local_id.into());
@@ -155,8 +154,6 @@ pub(crate) fn sync_remote_tabs_only(window: &AppWindow, ctx: &AppContext) {
         })
         .collect();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_remote_tabs)));
-    window.set_remote_tabs(model.clone());
-    window.set_active_remote_tab_id(active_remote_id.clone().into());
     let fb = window.global::<FilesBridge>();
     fb.set_remote_tabs(model);
     fb.set_active_remote_tab_id(active_remote_id.into());
@@ -173,9 +170,6 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
     // 3. 同步当前路径
     let local_path = ctx.local_current_path.borrow().clone();
     let remote_path = ctx.remote_current_path.borrow().clone();
-    window.set_local_current_path(local_path.clone().into());
-    window.set_remote_current_path(remote_path.clone().into());
-
     let fb = window.global::<FilesBridge>();
     fb.set_local_current_path(local_path.into());
     fb.set_remote_current_path(remote_path.into());
@@ -196,8 +190,6 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
 
     let local_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(local_items)));
     let remote_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(remote_items)));
-    window.set_local_files(local_model.clone());
-    window.set_remote_files(remote_model.clone());
     fb.set_local_files(local_model);
     fb.set_remote_files(remote_model);
 
@@ -223,11 +215,6 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
         tabs.iter().find(|t| t.tab_id == *act_id).map(|t| t.can_go_forward()).unwrap_or(false)
     };
 
-    window.set_local_can_go_back(local_can_back);
-    window.set_local_can_go_forward(local_can_fwd);
-    window.set_remote_can_go_back(remote_can_back);
-    window.set_remote_can_go_forward(remote_can_fwd);
-
     fb.set_local_can_go_back(local_can_back);
     fb.set_local_can_go_forward(local_can_fwd);
     fb.set_remote_can_go_back(remote_can_back);
@@ -235,7 +222,7 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
 
     // 6. 同步文件选择弹窗主机列表
     let file_hosts = build_file_launcher_hosts(ctx, "");
-    window.set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(file_hosts))));
+    fb.set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(file_hosts))));
 
     // 7. 同步实时传输任务列表 (支持文件夹树折叠过滤)
     let all_tasks = ctx.transfer_tasks.borrow();
@@ -257,7 +244,6 @@ pub(crate) fn sync_file_explorer_ui(window: &AppWindow, ctx: &AppContext) {
         .map(map_transfer_task_to_ui)
         .collect();
     let task_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(tasks)));
-    window.set_transfer_tasks(task_model.clone());
     fb.set_transfer_tasks(task_model);
 }
 
@@ -386,13 +372,15 @@ pub(crate) fn refresh_remote_path(ctx: &AppContext, new_path: &str) {
 
 /// 注册双盘文件管理与 SFTP 视图回调
 pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
+    let fb = window.global::<FilesBridge>();
+
     // -------------------------------------------------------------------------
     // 1. 左侧本地 Tab 栏交互回调
     // -------------------------------------------------------------------------
     // 1.1 选择本地 Tab
     let window_weak = window.as_weak();
     let ctx_select_loc = ctx.clone();
-    window.on_select_local_tab(move |tab_id| {
+    fb.on_select_local_tab(move |tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let tid = tab_id.to_string();
             *ctx_select_loc.active_local_tab_id.borrow_mut() = tid.clone();
@@ -421,7 +409,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 1.2 关闭本地 Tab (若全部关闭则自动新建 1 个默认 Tab 保底)
     let window_weak = window.as_weak();
     let ctx_close_loc = ctx.clone();
-    window.on_close_local_tab(move |tab_id| {
+    fb.on_close_local_tab(move |tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let tid = tab_id.to_string();
             let mut tabs = ctx_close_loc.local_tabs.borrow_mut();
@@ -466,7 +454,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 1.3 左侧 + 按钮：新建本地目录 Tab
     let window_weak = window.as_weak();
     let ctx_new_loc = ctx.clone();
-    window.on_new_local_tab(move || {
+    fb.on_new_local_tab(move || {
         if let Some(w) = window_weak.upgrade() {
             let mut tabs = ctx_new_loc.local_tabs.borrow_mut();
             let new_idx = tabs.len() + 1;
@@ -500,7 +488,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 2.1 选择远程 Tab
     let window_weak = window.as_weak();
     let ctx_select_rem = ctx.clone();
-    window.on_select_remote_tab(move |tab_id| {
+    fb.on_select_remote_tab(move |tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let tid = tab_id.to_string();
             *ctx_select_rem.active_remote_tab_id.borrow_mut() = tid.clone();
@@ -529,7 +517,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 2.2 关闭远程 Tab (若全部关闭则进入优雅空状态)
     let window_weak = window.as_weak();
     let ctx_close_rem = ctx.clone();
-    window.on_close_remote_tab(move |tab_id| {
+    fb.on_close_remote_tab(move |tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let tid = tab_id.to_string();
             let mut tabs = ctx_close_rem.remote_tabs.borrow_mut();
@@ -571,11 +559,11 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 2.3 右侧 + 按钮 / 空白页连接按钮：打开文件会话选择弹窗 (FileHostModal)
     let window_weak = window.as_weak();
     let ctx_new_rem = ctx.clone();
-    window.on_new_remote_tab(move || {
+    fb.on_new_remote_tab(move || {
         if let Some(w) = window_weak.upgrade() {
             let hosts = build_file_launcher_hosts(&ctx_new_rem, "");
-            w.set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(hosts))));
-            w.set_is_file_host_modal_open(true);
+            w.global::<FilesBridge>().set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(hosts))));
+            w.global::<FilesBridge>().set_is_file_host_modal_open(true);
             tracing::info!(target: "smagical_ui::files", "打开文件会话选择与 SFTP 连接弹窗");
         }
     });
@@ -585,7 +573,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let ctx_open_host = ctx.clone();
-    window.on_open_host_files(move |host_id| {
+    fb.on_open_host_files(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
             let h_id = host_id.to_string();
 
@@ -647,7 +635,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.1 本地路径导航 (支持回车直达与不存在气泡通知提示)
     let window_weak = window.as_weak();
     let ctx_nav_local = ctx.clone();
-    window.on_navigate_local_path(move |path| {
+    fb.on_navigate_local_path(move |path| {
         if let Some(w) = window_weak.upgrade() {
             let p_str = path.to_string();
             let old_p = ctx_nav_local.local_current_path.borrow().clone();
@@ -666,7 +654,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 Err(err) => {
                     ctx_nav_local.notify_error("路径不存在", err.clone());
                     let current_valid = ctx_nav_local.local_current_path.borrow().clone();
-                    w.set_local_current_path(current_valid.into());
+                    w.global::<FilesBridge>().set_local_current_path(current_valid.into());
                     tracing::warn!(target: "smagical_ui::files", "本地路径跳转失败: {}", p_str);
                 }
             }
@@ -676,7 +664,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.2 本地历史后退
     let window_weak = window.as_weak();
     let ctx_back_loc = ctx.clone();
-    window.on_navigate_local_back(move || {
+    fb.on_navigate_local_back(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_back_loc.active_local_tab_id.borrow().clone();
             let prev_path = {
@@ -701,7 +689,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.3 本地历史前进
     let window_weak = window.as_weak();
     let ctx_fwd_loc = ctx.clone();
-    window.on_navigate_local_forward(move || {
+    fb.on_navigate_local_forward(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_fwd_loc.active_local_tab_id.borrow().clone();
             let next_path = {
@@ -726,7 +714,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.4 本地返回上一级
     let window_weak = window.as_weak();
     let ctx_up_loc = ctx.clone();
-    window.on_navigate_local_up(move || {
+    fb.on_navigate_local_up(move || {
         if let Some(w) = window_weak.upgrade() {
             let current = ctx_up_loc.local_current_path.borrow().clone();
             let p = std::path::PathBuf::from(&current);
@@ -751,7 +739,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.5 远程路径导航 (支持回车直达与格式/路径气泡通知校验)
     let window_weak = window.as_weak();
     let ctx_nav_remote = ctx.clone();
-    window.on_navigate_remote_path(move |path| {
+    fb.on_navigate_remote_path(move |path| {
         if let Some(w) = window_weak.upgrade() {
             let p_str = path.to_string();
             let old_p = ctx_nav_remote.remote_current_path.borrow().clone();
@@ -770,7 +758,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 Err(err) => {
                     ctx_nav_remote.notify_error("路径不存在", err.clone());
                     let current_valid = ctx_nav_remote.remote_current_path.borrow().clone();
-                    w.set_remote_current_path(current_valid.into());
+                    w.global::<FilesBridge>().set_remote_current_path(current_valid.into());
                     tracing::warn!(target: "smagical_ui::files", "远程路径跳转失败: {}", p_str);
                 }
             }
@@ -780,7 +768,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.6 远程历史后退
     let window_weak = window.as_weak();
     let ctx_back_rem = ctx.clone();
-    window.on_navigate_remote_back(move || {
+    fb.on_navigate_remote_back(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_back_rem.active_remote_tab_id.borrow().clone();
             let target_path = {
@@ -805,7 +793,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.7 远程历史前进
     let window_weak = window.as_weak();
     let ctx_fwd_rem = ctx.clone();
-    window.on_navigate_remote_forward(move || {
+    fb.on_navigate_remote_forward(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_fwd_rem.active_remote_tab_id.borrow().clone();
             let target_path = {
@@ -830,7 +818,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.8 远程/右栏上级目录导航 (兼容本地与远程路径)
     let window_weak = window.as_weak();
     let ctx_up_remote = ctx.clone();
-    window.on_navigate_remote_up(move || {
+    fb.on_navigate_remote_up(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_up_remote.active_remote_tab_id.borrow().clone();
             let is_local_session = {
@@ -873,7 +861,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.5 打开本地文件/文件夹 (双击)
     let window_weak = window.as_weak();
     let ctx_open_local = ctx.clone();
-    window.on_open_local_item(move |path, is_dir| {
+    fb.on_open_local_item(move |path, is_dir| {
 
         if let Some(w) = window_weak.upgrade() {
             let p_str = path.to_string();
@@ -890,7 +878,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.4 打开远程文件/文件夹 (双击)
     let window_weak = window.as_weak();
     let ctx_open_remote = ctx.clone();
-    window.on_open_remote_item(move |path, is_dir| {
+    fb.on_open_remote_item(move |path, is_dir| {
         if let Some(w) = window_weak.upgrade() {
             let p_str = path.to_string();
             if is_dir {
@@ -906,7 +894,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.5 刷新本地文件列表
     let window_weak = window.as_weak();
     let ctx_ref_local = ctx.clone();
-    window.on_refresh_local_files(move || {
+    fb.on_refresh_local(move || {
         if let Some(w) = window_weak.upgrade() {
             let p = ctx_ref_local.local_current_path.borrow().clone();
             refresh_local_path(&ctx_ref_local, &p);
@@ -918,7 +906,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.6 刷新远程文件列表
     let window_weak = window.as_weak();
     let ctx_ref_remote = ctx.clone();
-    window.on_refresh_remote_files(move || {
+    fb.on_refresh_remote(move || {
         if let Some(w) = window_weak.upgrade() {
             let p = ctx_ref_remote.remote_current_path.borrow().clone();
             refresh_remote_path(&ctx_ref_remote, &p);
@@ -930,7 +918,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.7 上传选中文件 (Local -> Remote)
     let window_weak = window.as_weak();
     let ctx_upload = ctx.clone();
-    window.on_upload_file(move || {
+    fb.on_upload_file(move || {
         if let Some(w) = window_weak.upgrade() {
             let loc_path = ctx_upload.local_current_path.borrow().clone();
             let rem_path = ctx_upload.remote_current_path.borrow().clone();
@@ -971,7 +959,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.8 下载选中文件 (Remote -> Local)
     let window_weak = window.as_weak();
     let ctx_download = ctx.clone();
-    window.on_download_file(move || {
+    fb.on_download_file(move || {
         if let Some(w) = window_weak.upgrade() {
             let loc_path = ctx_download.local_current_path.borrow().clone();
             let rem_path = ctx_download.remote_current_path.borrow().clone();
@@ -1010,7 +998,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.9 清空已完成或失败的传输任务
     let window_weak = window.as_weak();
     let ctx_clear_trans = ctx.clone();
-    window.on_clear_completed_transfers(move || {
+    fb.on_clear_completed_transfers(move || {
         if let Some(w) = window_weak.upgrade() {
             let mut tasks = ctx_clear_trans.transfer_tasks.borrow_mut();
             tasks.retain(|t| t.status == TransferStatus::Transferring || t.status == TransferStatus::Pending);
@@ -1023,7 +1011,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.10 触发拖拽文件/文件夹传输任务 (支持单文件与多文件夹嵌套树)
     let window_weak = window.as_weak();
     let ctx_start_trans = ctx.clone();
-    window.on_start_transfer_task(move |dir, source_path, filename, is_dir, target_dir| {
+    fb.on_start_transfer_task(move |dir, source_path, filename, is_dir, target_dir| {
         if let Some(w) = window_weak.upgrade() {
             let dir_enum = if dir == "download" { TransferDirection::Download } else { TransferDirection::Upload };
             let src_str = source_path.to_string();
@@ -1188,7 +1176,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.11 折叠/展开传输队列中的文件夹任务
     let window_weak = window.as_weak();
     let ctx_toggle_trans = ctx.clone();
-    window.on_toggle_transfer_expand(move |task_id| {
+    fb.on_toggle_transfer_expand(move |task_id| {
         if let Some(w) = window_weak.upgrade() {
             let tid = task_id.to_string();
             let mut tasks = ctx_toggle_trans.transfer_tasks.borrow_mut();
@@ -1207,7 +1195,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.12 传输队列右键快捷操作 (暂停/继续/停止/重新传输/移除)
     let window_weak = window.as_weak();
     let ctx_trans_act = ctx.clone();
-    window.on_transfer_action(move |action, task_id| {
+    fb.on_transfer_action(move |action, task_id| {
         if let Some(w) = window_weak.upgrade() {
             let act = action.as_str();
             let tid = task_id.to_string();
@@ -1272,7 +1260,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4.13 文件/目录右键快捷操作 (打开/传输/新建文件夹/新建文件/刷新/删除)
     let window_weak = window.as_weak();
     let ctx_file_act = ctx.clone();
-    window.on_file_action(move |action, is_remote, path, name, is_dir| {
+    fb.on_file_action(move |action, is_remote, path, name, is_dir| {
         if let Some(w) = window_weak.upgrade() {
             let act = action.as_str();
             let p_str = path.to_string();
@@ -1332,7 +1320,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     };
                     tasks.push(task);
                     drop(tasks);
-                    w.set_is_transfer_queue_expanded(true);
+                    w.global::<FilesBridge>().set_is_transfer_queue_expanded(true);
                     sync_file_explorer_ui(&w, &ctx_file_act);
                     tracing::info!(target: "smagical_ui::files", "通过右键菜单创建传输任务: {}", dir_str);
                 }
@@ -1423,7 +1411,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // 4.14 复制路径到剪贴板
-    window.on_copy_to_clipboard(move |text| {
+    fb.on_copy_to_clipboard(move |text| {
         let t_str = text.to_string();
         if let Ok(mut cb) = arboard::Clipboard::new() {
             let _ = cb.set_text(t_str.clone());
@@ -1439,17 +1427,17 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // 5.1 实时搜索过滤
     let window_weak = window.as_weak();
     let ctx_filter_file = ctx.clone();
-    window.on_filter_file_launcher(move |query| {
+    fb.on_filter_file_launcher(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let hosts = build_file_launcher_hosts(&ctx_filter_file, query.as_str());
-            w.set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(hosts))));
+            w.global::<FilesBridge>().set_file_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(hosts))));
         }
     });
 
     // 5.2 选取主机并自动连接 SFTP 会话 (或在右栏打开本地目录会话)
     let window_weak = window.as_weak();
     let ctx_open_fhost = ctx.clone();
-    window.on_open_file_host(move |host_id| {
+    fb.on_open_file_host(move |host_id| {
         if let Some(w) = window_weak.upgrade() {
             let hid = host_id.to_string();
 
@@ -1552,7 +1540,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let ctx_reorder_loc = ctx.clone();
     let window_weak = window.as_weak();
-    window.on_reorder_local_tab(move |from_idx: i32, to_idx: i32| {
+    fb.on_reorder_local_tab(move |from_idx: i32, to_idx: i32| {
         if from_idx == to_idx || from_idx < 0 || to_idx < 0 {
             return;
         }
@@ -1575,7 +1563,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let ctx_reorder_rem = ctx.clone();
     let window_weak = window.as_weak();
-    window.on_reorder_remote_tab(move |from_idx: i32, to_idx: i32| {
+    fb.on_reorder_remote_tab(move |from_idx: i32, to_idx: i32| {
         if from_idx == to_idx || from_idx < 0 || to_idx < 0 {
             return;
         }
@@ -1592,6 +1580,10 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             sync_remote_tabs_only(&w, &ctx_reorder_rem);
         }
     });
+
+    // -------------------------------------------------------------------------
+    
+    // 6. 目录树折叠展开
+    fb.on_toggle_local_expand(|_| {});
+    fb.on_toggle_remote_expand(|_| {});
 }
-
-

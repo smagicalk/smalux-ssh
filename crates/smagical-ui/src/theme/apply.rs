@@ -123,19 +123,6 @@ pub fn sync_ui_themes(window: &AppWindow, service: &ThemeService) {
             .collect()
     };
 
-    window.set_custom_themes_count(custom_themes.len() as i32);
-    window.set_dark_themes_count(dark_themes.len() as i32);
-    window.set_light_themes_count(light_themes.len() as i32);
-
-    window.set_custom_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(custom_themes.clone()))));
-    window.set_dark_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(dark_themes.clone()))));
-    window.set_light_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(light_themes.clone()))));
-
-    window.set_custom_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(custom_themes.clone())))));
-    window.set_dark_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(dark_themes.clone())))));
-    window.set_light_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(light_themes.clone())))));
-
-    window.set_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_options.clone()))));
 
     let bridge = window.global::<crate::generated::SettingsBridge>();
     bridge.set_custom_themes_count(custom_themes.len() as i32);

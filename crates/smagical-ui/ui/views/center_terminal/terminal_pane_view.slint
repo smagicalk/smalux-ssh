@@ -97,6 +97,8 @@ export component TerminalPaneView inherits Rectangle {
     animate border-color { duration: 150ms; easing: ease-out; }
 
     VerticalLayout {
+        width: 100%;
+        height: 100%;
         padding: 0px;
         spacing: 0px;
 
@@ -104,6 +106,7 @@ export component TerminalPaneView inherits Rectangle {
         // 4. 窗格专属 Tab 页签栏 (高度 36px，左侧 Tab 序列，最右侧固定 + 按钮)
         // ---------------------------------------------------------------------
         header-bar := Rectangle {
+            width: 100%;
             height: 36px;
             background: AppTheme.panel-background;
 
@@ -127,6 +130,7 @@ export component TerminalPaneView inherits Rectangle {
 
             VerticalLayout {
                 alignment: center;
+                width: 100%;
                 height: 100%;
                 padding-left: 6px;
                 padding-right: 6px;
@@ -346,6 +350,7 @@ export component TerminalPaneView inherits Rectangle {
         // 5. 终端位图渲染主视口
         // ---------------------------------------------------------------------
         Rectangle {
+            width: 100%;
             vertical-stretch: 1;
             background: Colors.transparent;
             clip: true;

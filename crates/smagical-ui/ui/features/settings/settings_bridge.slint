@@ -238,6 +238,7 @@ export global SettingsBridge {
     callback change-bell-style(string);
     callback change-terminal-url-click(bool);
     callback change-terminal-highlight-keywords(bool);
+    callback change-terminal-custom-keywords(string);
     callback toggle-terminal-crt(bool);
     callback add-keyword-rule(string, string, string);
     callback update-keyword-rule(string, string, string, string);
@@ -256,6 +257,7 @@ export global SettingsBridge {
     callback export-backup-archive(bool);
     callback scan-and-import-openssh();
     callback import-external-file();
+    callback import-external-assets();
     callback rollback-snapshot(string);
     callback factory-reset-settings();
     callback toggle-debug-enabled(bool);

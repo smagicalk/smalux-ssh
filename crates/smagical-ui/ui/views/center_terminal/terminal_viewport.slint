@@ -11,6 +11,8 @@ import { TerminalPaneView } from "terminal_pane_view.slint";
 
 import { TabData, TerminalPaneData, TerminalSplitterData } from "../../features/terminal/terminal_model.slint";
 import { TerminalBridge } from "../../features/terminal/terminal_bridge.slint";
+import { SettingsBridge } from "../../features/settings/settings_bridge.slint";
+import { WindowBridge } from "../../features/window/window_bridge.slint";
 
 export { TerminalPaneData, TerminalSplitterData }
 
@@ -53,7 +55,7 @@ export component TerminalViewport inherits Rectangle {
     /// 副窗格 3 实时光栅化位图帧流 (4 分屏有效)
     in property <image> terminal-split3-image: TerminalBridge.terminal-split3-image;
     /// 分屏窗格总数量
-    in-out property <int> split-count: 1;
+    in-out property <int> split-count: TerminalBridge.split-count;
     /// 动态多窗格列表数据模型 (无限嵌套分屏)
     in property <[TerminalPaneData]> terminal-panes: TerminalBridge.panes;
     /// 动态分割条列表数据模型
@@ -86,18 +88,18 @@ export component TerminalViewport inherits Rectangle {
     in-out property <length> context-menu-y: 0px;
     in-out property <bool> has-selection: false;
     /// 鼠标右键单击快速粘贴
-    in property <bool> paste-on-right-click: true;
+    in property <bool> paste-on-right-click: SettingsBridge.setting-paste-on-right-click;
     /// 终端历史回滚总行数 (用于驱动滚动条与状态展示)
-    in property <int> history-size: 0;
+    in property <int> history-size: TerminalBridge.history-size;
     /// 当前相对底部的向上回滚行偏移量 (0 表示在最底部最新行)
-    in property <int> scroll-offset: 0;
+    in property <int> scroll-offset: TerminalBridge.scroll-offset;
 
     /// 壁纸展示模式 ("none" | "global" | "terminal")
-    in-out property <string> wallpaper-mode: "none";
+    in-out property <string> wallpaper-mode: WindowBridge.wallpaper-mode;
     /// 终端专属壁纸位图
-    in-out property <image> terminal-wallpaper-image;
+    in-out property <image> terminal-wallpaper-image: WindowBridge.terminal-wallpaper-image;
     /// 终端专属壁纸不透明度 (0.0 ~ 1.0)
-    in-out property <float> terminal-wallpaper-opacity: 0.20;
+    in-out property <float> terminal-wallpaper-opacity: WindowBridge.terminal-wallpaper-opacity;
 
     /// 终端实际物理像素渲染画布宽高
     out property <float> canvas-width: root.width / 1px;
@@ -106,6 +108,17 @@ export component TerminalViewport inherits Rectangle {
     /// 终端动态网格尺寸 (自适应计算字符列数与行数，同步回 Rust 后台 PTY)
     out property <int> terminal-cols: Math.max(10, Math.floor((root.width - 36px) / 8.5px));
     out property <int> terminal-rows: Math.max(5, Math.floor((root.height - 36px) / 18px));
+
+    changed canvas-width => { TerminalBridge.canvas-width = self.canvas-width; }
+    changed canvas-height => { TerminalBridge.canvas-height = self.canvas-height; }
+    changed terminal-cols => {
+        TerminalBridge.terminal-cols = self.terminal-cols;
+        TerminalBridge.terminal-resize(self.terminal-cols, self.terminal-rows);
+    }
+    changed terminal-rows => {
+        TerminalBridge.terminal-rows = self.terminal-rows;
+        TerminalBridge.terminal-resize(self.terminal-cols, self.terminal-rows);
+    }
 
     /// 鼠标划选高亮状态
     in-out property <int> sel-start-col: -1;
@@ -134,45 +147,19 @@ export component TerminalViewport inherits Rectangle {
     in-out property <length> drag-tab-x: 0px;
     in-out property <length> drag-tab-y: 0px;
 
-    /// Tab 栏调度交互回调
-    callback select-tab(string /* id */);
-    callback close-tab(string /* id */);
-    callback new-tab();
-    callback select-pane-tab(string /* pane_id */, string /* tab_id */);
-    callback close-pane-tab(string /* pane_id */, string /* tab_id */);
-    callback copy-tab-ip(string /* tab_id */);
-    callback close-other-tabs(string /* pane_id */, string /* tab_id */);
-    callback move-terminal-tab(string /* from_pane_id */, int /* from_index */, length /* drop_x */, length /* drop_y */);
-
-
-
-    /// 终端底层输入流与交互事件回调
-    callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
-    callback terminal-scroll(length /* delta */);
-    callback terminal-selection-changed(int /* sc */, int /* sr */, int /* ec */, int /* er */, bool /* has_sel */);
-    callback copy-text();
-    callback paste-text();
-    callback clear-screen();
-    callback split-terminal(string /* "horizontal" | "vertical" */);
-    callback close-split();
-    callback close-pane-by-index(int /* index */);
-    callback close-pane-by-id(string /* pane_id */);
-    callback select-pane(int /* index */);
-    callback select-pane-by-id(string /* pane_id */);
-    callback toggle-pane-zoom(string /* pane_id */);
-    callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
-
-    callback search-terminal(string /* query */, bool /* match_case */);
-    callback terminal-resize(int /* cols */, int /* rows */);
+    
 
     background: AppTheme.window-background;
 
     VerticalLayout {
+        width: 100%;
+        height: 100%;
         padding: 0px;
         spacing: 0px;
 
         // 1. 空状态默认 Tab 栏 (当无会话时展示标准 36px 栏，最右侧固定 + 按钮)
         if !root.has-active-session: Rectangle {
+            width: 100%;
             height: 36px;
             background: AppTheme.panel-background;
 
@@ -184,6 +171,8 @@ export component TerminalViewport inherits Rectangle {
             }
 
             HorizontalLayout {
+                width: 100%;
+                height: 100%;
                 padding-left: 6px;
                 padding-right: 6px;
                 alignment: end;
@@ -209,7 +198,7 @@ export component TerminalViewport inherits Rectangle {
                         }
 
                         empty-new-tab-touch := TouchArea {
-                            clicked => { root.new-tab(); }
+                            clicked => { TerminalBridge.new-tab(); WindowBridge.is-new-session-modal-open = true; }
                             mouse-cursor: pointer;
                         }
                     }
@@ -219,6 +208,7 @@ export component TerminalViewport inherits Rectangle {
 
         // 2. 终端主体区域 (当存在活跃会话时)
         if root.has-active-session: terminal-canvas := Rectangle {
+            width: 100%;
             background: AppTheme.window-background;
             vertical-stretch: 1;
             clip: true;
@@ -235,38 +225,38 @@ export component TerminalViewport inherits Rectangle {
                     }
                     // 全局快捷键: 复制 (Ctrl+Shift+C 或有选区时的 Ctrl+C)
                     if event.modifiers.control && ((event.modifiers.shift && (event.text == "c" || event.text == "C")) || (root.has-selection && (event.text == "c" || event.text == "C" || event.text == "\u{0003}"))) {
-                        root.copy-text();
+                        TerminalBridge.terminal-copy();
                         return accept;
                     }
                     // 全局快捷键: 粘贴 (Ctrl+Shift+V 或 Ctrl+V)
                     if event.modifiers.control && ((event.modifiers.shift && (event.text == "v" || event.text == "V")) || event.text == "\u{0016}") {
-                        root.paste-text();
+                        TerminalBridge.terminal-paste();
                         return accept;
                     }
                     // 全局快捷键: 垂直分屏 (Ctrl+Shift+D) (仅当当前存在多个 Tab 时可用)
                     if event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D") {
                         if root.tabs.length > 1 {
-                            root.split-terminal("vertical");
+                            TerminalBridge.split-terminal("vertical");
                         }
                         return accept;
                     }
                     // 全局快捷键: 水平分屏 (Ctrl+Shift+E) (仅当当前存在多个 Tab 时可用)
                     if event.modifiers.control && event.modifiers.shift && (event.text == "e" || event.text == "E") {
                         if root.tabs.length > 1 {
-                            root.split-terminal("horizontal");
+                            TerminalBridge.split-terminal("horizontal");
                         }
                         return accept;
                     }
 
                     // 全局快捷键: 清屏 (Ctrl+L)
                     if event.modifiers.control && (event.text == "l" || event.text == "L") {
-                        root.clear-screen();
+                        TerminalBridge.terminal-clear();
                         return accept;
                     }
 
                     // 统一转发按键文本与修饰键状态至 Rust 后端进行 ANSI 序列编码
                     if event.text != "" {
-                        root.terminal-key-input(event.text, event.modifiers.control, event.modifiers.shift, event.modifiers.alt);
+                        TerminalBridge.terminal-key-input(event.text, event.modifiers.control, event.modifiers.shift, event.modifiers.alt);
                         return accept;
                     }
                     reject
@@ -284,6 +274,8 @@ export component TerminalViewport inherits Rectangle {
 
             // 2.3 单屏终端位图渲染主视口
             if !root.is-split: TerminalPaneView {
+                width: 100%;
+                height: 100%;
                 pane-id: root.active-tab-id;
                 title: root.session-name;
                 image: root.terminal-screen-image;
@@ -294,7 +286,7 @@ export component TerminalViewport inherits Rectangle {
                 tabs: root.tabs;
                 active-tab-id: root.active-tab-id;
                 paste-on-right-click: root.paste-on-right-click;
-                paste-text => { root.paste-text(); }
+                paste-text => { TerminalBridge.terminal-paste(); }
 
                 is-dragging-tab: root.is-dragging-tab;
                 drag-tab-source-pane: root.drag-tab-source-pane;
@@ -312,7 +304,7 @@ export component TerminalViewport inherits Rectangle {
                 }
                 tab-drag-ended => {
                     if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-from-index >= 0 {
-                        root.move-terminal-tab("", root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
+                        TerminalBridge.move-terminal-tab("", root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
                     }
                     root.is-dragging-tab = false;
                     root.is-tab-drop-valid = true;
@@ -322,18 +314,17 @@ export component TerminalViewport inherits Rectangle {
 
                 select-tab(id) => {
                     root.active-tab-id = id;
-                    root.select-tab(id);
+                    TerminalBridge.select-tab(id);
                     terminal-focus.focus();
                     root.is-context-menu-open = false;
                     root.is-tab-context-menu-open = false;
                 }
                 close-tab(id) => {
-                    root.close-tab(id);
+                    TerminalBridge.close-tab(id);
                     root.is-context-menu-open = false;
                     root.is-tab-context-menu-open = false;
                 }
-                new-tab => {
-                    root.new-tab();
+                new-tab => { TerminalBridge.new-tab(); WindowBridge.is-new-session-modal-open = true;
                     root.is-context-menu-open = false;
                     root.is-tab-context-menu-open = false;
                 }
@@ -343,13 +334,13 @@ export component TerminalViewport inherits Rectangle {
                     root.is-tab-context-menu-open = false;
                 }
                 scroll(delta) => {
-                    root.terminal-scroll(delta);
+                    TerminalBridge.terminal-scroll(delta);
                     root.is-context-menu-open = false;
                     root.is-tab-context-menu-open = false;
                 }
                 selection-changed(sc, sr, ec, er, has-sel) => {
                     root.has-selection = has-sel;
-                    root.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                    TerminalBridge.terminal-selection-changed(sc, sr, ec, er, has-sel);
                     root.is-context-menu-open = false;
                     root.is-tab-context-menu-open = false;
                 }
@@ -395,7 +386,7 @@ export component TerminalViewport inherits Rectangle {
                     tabs: pane.tabs;
                     active-tab-id: pane.active-tab-id;
                     paste-on-right-click: root.paste-on-right-click;
-                    paste-text => { root.paste-text(); }
+                    paste-text => { TerminalBridge.terminal-paste(); }
 
                     is-dragging-tab: root.is-dragging-tab;
                     drag-tab-source-pane: root.drag-tab-source-pane;
@@ -415,7 +406,7 @@ export component TerminalViewport inherits Rectangle {
                     }
                     tab-drag-ended => {
                         if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-from-index >= 0 {
-                            root.move-terminal-tab(root.drag-tab-source-pane, root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
+                            TerminalBridge.move-terminal-tab(root.drag-tab-source-pane, root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
                         }
                         root.is-dragging-tab = false;
                         root.is-tab-drop-valid = true;
@@ -425,34 +416,32 @@ export component TerminalViewport inherits Rectangle {
 
                     select-tab(tab-id) => {
                         root.active-pane-id = pane.pane-id;
-                        root.select-pane-tab(pane.pane-id, tab-id);
+                        TerminalBridge.select-pane-tab(pane.pane-id, tab-id);
                         terminal-focus.focus();
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
                     close-tab(tab-id) => {
-                        root.close-pane-tab(pane.pane-id, tab-id);
+                        TerminalBridge.close-pane-tab(pane.pane-id, tab-id);
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
                     select => {
                         root.active-pane-id = pane.pane-id;
-                        root.select-pane-by-id(pane.pane-id);
+                        TerminalBridge.select-pane-by-id(pane.pane-id);
                         terminal-focus.focus();
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
-                    new-tab => {
-                        root.active-pane-id = pane.pane-id;
-                        root.new-tab();
+                    new-tab => { TerminalBridge.new-tab(); WindowBridge.is-new-session-modal-open = true;
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
                     split-right => {
                         if pane.tabs.length > 1 {
                             root.active-pane-id = pane.pane-id;
-                            root.select-pane-by-id(pane.pane-id);
-                            root.split-terminal("vertical");
+                            TerminalBridge.select-pane-by-id(pane.pane-id);
+                            TerminalBridge.split-terminal("vertical");
                             root.is-context-menu-open = false;
                             root.is-tab-context-menu-open = false;
                         }
@@ -460,31 +449,31 @@ export component TerminalViewport inherits Rectangle {
                     split-down => {
                         if pane.tabs.length > 1 {
                             root.active-pane-id = pane.pane-id;
-                            root.select-pane-by-id(pane.pane-id);
-                            root.split-terminal("horizontal");
+                            TerminalBridge.select-pane-by-id(pane.pane-id);
+                            TerminalBridge.split-terminal("horizontal");
                             root.is-context-menu-open = false;
                             root.is-tab-context-menu-open = false;
                         }
                     }
                     toggle-zoom => {
-                        root.toggle-pane-zoom(pane.pane-id);
+                        TerminalBridge.toggle-pane-zoom(pane.pane-id);
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
                     close => {
-                        root.close-pane-by-id(pane.pane-id);
+                        TerminalBridge.close-pane-by-id(pane.pane-id);
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
                     scroll(delta) => {
-                        root.terminal-scroll(delta);
+                        TerminalBridge.terminal-scroll(delta);
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
                     selection-changed(sc, sr, ec, er, has-sel) => {
                         root.active-pane-id = pane.pane-id;
                         root.has-selection = has-sel;
-                        root.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                        TerminalBridge.terminal-selection-changed(sc, sr, ec, er, has-sel);
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
                     }
@@ -492,7 +481,7 @@ export component TerminalViewport inherits Rectangle {
 
                     context-menu(mx, my) => {
                         root.active-pane-id = pane.pane-id;
-                        root.select-pane-by-id(pane.pane-id);
+                        TerminalBridge.select-pane-by-id(pane.pane-id);
                         root.context-menu-x = pane.x + mx;
                         root.context-menu-y = pane.y + 36px + my;
                         root.context-menu-can-split = pane.tabs.length > 1;
@@ -501,7 +490,7 @@ export component TerminalViewport inherits Rectangle {
                     }
                     tab-context-menu(tab_id, mx, my) => {
                         root.active-pane-id = pane.pane-id;
-                        root.select-pane-by-id(pane.pane-id);
+                        TerminalBridge.select-pane-by-id(pane.pane-id);
                         root.tab-context-menu-tab-id = tab_id;
                         root.tab-context-menu-pane-id = pane.pane-id;
                         root.tab-context-menu-x = pane.x + mx;
@@ -547,7 +536,7 @@ export component TerminalViewport inherits Rectangle {
                                 let delta = splitter.is-vertical ? dx : dy;
                                 let total = splitter.is-vertical ? root.canvas-width : root.canvas-height;
                                 if Math.abs(delta) >= 1.0 && total > 50.0 {
-                                    root.adjust-splitter(splitter.splitter-id, delta / total);
+                                    TerminalBridge.adjust-splitter(splitter.splitter-id, delta / total);
                                 }
                             }
                         }
@@ -564,9 +553,9 @@ export component TerminalViewport inherits Rectangle {
                 current-match: root.find-current-match;
                 total-matches: root.find-total-matches;
                 close => { root.is-find-open = false; }
-                find-next => { root.search-terminal(root.find-query, false); }
-                find-prev => { root.search-terminal(root.find-query, false); }
-                search-changed(q) => { root.search-terminal(q, false); }
+                find-next => { TerminalBridge.search-terminal(root.find-query, false); }
+                find-prev => { TerminalBridge.search-terminal(root.find-query, false); }
+                search-changed(q) => { TerminalBridge.search-terminal(q, false); }
             }
 
             // 2.6 右键上下文快捷菜单
@@ -578,12 +567,12 @@ export component TerminalViewport inherits Rectangle {
                 menu-y: root.context-menu-y;
                 has-selection: root.has-selection;
                 can-split: root.context-menu-can-split;
-                copy-text => { root.copy-text(); }
-                paste-text => { root.paste-text(); }
+                copy-text => { TerminalBridge.terminal-copy(); }
+                paste-text => { TerminalBridge.terminal-paste(); }
                 select-all => { }
-                clear-screen => { root.clear-screen(); }
-                split-right => { root.split-terminal("vertical"); }
-                split-down => { root.split-terminal("horizontal"); }
+                clear-screen => { TerminalBridge.terminal-clear(); }
+                split-right => { TerminalBridge.split-terminal("vertical"); }
+                split-down => { TerminalBridge.split-terminal("horizontal"); }
                 close-menu => { root.is-context-menu-open = false; }
             }
 
@@ -597,36 +586,36 @@ export component TerminalViewport inherits Rectangle {
                 can-split: root.tab-context-menu-can-split;
 
                 can-close-others: root.tab-context-menu-can-close-others;
-                copy-ip => { root.copy-tab-ip(root.tab-context-menu-tab-id); }
+                copy-ip => { TerminalBridge.copy-tab-ip(root.tab-context-menu-tab-id); }
                 split-right => {
                     if root.tab-context-menu-can-split {
                         if root.is-split {
-                            root.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                            TerminalBridge.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
                         } else {
-                            root.select-tab(root.tab-context-menu-tab-id);
+                            TerminalBridge.select-tab(root.tab-context-menu-tab-id);
                         }
-                        root.split-terminal("vertical");
+                        TerminalBridge.split-terminal("vertical");
                     }
                 }
                 split-down => {
                     if root.tab-context-menu-can-split {
                         if root.is-split {
-                            root.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                            TerminalBridge.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
                         } else {
-                            root.select-tab(root.tab-context-menu-tab-id);
+                            TerminalBridge.select-tab(root.tab-context-menu-tab-id);
                         }
-                        root.split-terminal("horizontal");
+                        TerminalBridge.split-terminal("horizontal");
                     }
                 }
                 close-tab => {
                     if root.is-split {
-                        root.close-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                        TerminalBridge.close-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
                     } else {
-                        root.close-tab(root.tab-context-menu-tab-id);
+                        TerminalBridge.close-tab(root.tab-context-menu-tab-id);
                     }
                 }
                 close-others => {
-                    root.close-other-tabs(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                    TerminalBridge.close-other-tabs(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
                 }
                 close-menu => { root.is-tab-context-menu-open = false; }
             }
@@ -656,10 +645,13 @@ export component TerminalViewport inherits Rectangle {
 
         // 3. 空状态 / 欢迎仪表盘 (当无会话时)
         if !root.has-active-session: Rectangle {
+            width: 100%;
             background: AppTheme.window-background;
             vertical-stretch: 1;
 
             VerticalLayout {
+                width: 100%;
+                height: 100%;
                 alignment: center;
                 spacing: 16px;
 

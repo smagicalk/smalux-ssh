@@ -23,22 +23,6 @@ pub(crate) fn load_credential_into_form(window: &AppWindow, cred: &CredentialRec
         "回显凭据详情至表单: ID=[{}], Name='{}', 类型={:?}, 算法='{}'",
         cred.id, cred.name, cred.cred_type, cred.algorithm
     );
-    window.set_is_credential_create_mode(false);
-    window.set_is_credential_editing(false);
-    window.set_active_credential_id(cred.id.clone().into());
-    window.set_credential_form_id(cred.id.clone().into());
-    window.set_credential_form_name(cred.name.clone().into());
-    window.set_credential_form_type(cred.cred_type.as_str().into());
-    window.set_credential_form_algorithm(cred.algorithm.clone().into());
-    window.set_credential_form_username(cred.username.clone().unwrap_or_default().into());
-    window.set_credential_form_secret_data(cred.secret_data.clone().into());
-    window.set_credential_form_passphrase(cred.passphrase.clone().unwrap_or_default().into());
-    window.set_credential_form_public_key(cred.public_key.clone().unwrap_or_default().into());
-    window.set_credential_form_fingerprint(cred.fingerprint.clone().unwrap_or_default().into());
-    window.set_credential_form_notes(cred.notes.clone().into());
-    window.set_credential_form_bound_host_count(cred.bound_host_count as i32);
-    window.set_credential_form_updated_at(cred.updated_at.clone().into());
-
     let bridge = window.global::<CredentialsBridge>();
     bridge.set_is_credential_create_mode(false);
     bridge.set_is_credential_editing(false);
@@ -60,21 +44,6 @@ pub(crate) fn load_credential_into_form(window: &AppWindow, cred: &CredentialRec
 /// 清空右侧表单并置为新建模式
 pub(crate) fn clear_form_for_create(window: &AppWindow) {
     tracing::debug!(target: "smagical_ui::credentials", "凭据表单置为新建模式");
-    window.set_is_credential_create_mode(true);
-    window.set_is_credential_editing(true);
-    window.set_credential_form_id("".into());
-    window.set_credential_form_name("".into());
-    window.set_credential_form_type("key".into());
-    window.set_credential_form_algorithm("Ed25519".into());
-    window.set_credential_form_username("root".into());
-    window.set_credential_form_secret_data("".into());
-    window.set_credential_form_passphrase("".into());
-    window.set_credential_form_public_key("".into());
-    window.set_credential_form_fingerprint("".into());
-    window.set_credential_form_notes("".into());
-    window.set_credential_form_bound_host_count(0);
-    window.set_credential_form_updated_at("".into());
-
     let bridge = window.global::<CredentialsBridge>();
     bridge.set_is_credential_create_mode(true);
     bridge.set_is_credential_editing(true);
@@ -153,8 +122,9 @@ pub(crate) fn sync_credentials_ui(
         })
         .collect();
 
-    let current_active_id = window.get_active_credential_id().to_string();
-    let is_create_mode = window.get_is_credential_create_mode();
+    let bridge = window.global::<CredentialsBridge>();
+    let current_active_id = bridge.get_active_credential_id().to_string();
+    let is_create_mode = bridge.get_is_credential_create_mode();
 
     // 若当前未在新建模式，且没有选中项或选中项不在列表中，自动选中第一项
     if !is_create_mode && !filtered_records.is_empty() {
@@ -169,16 +139,15 @@ pub(crate) fn sync_credentials_ui(
     }
 
     let model: ModelRc<CredentialItemData> = Rc::new(VecModel::from(ui_items)).into();
-    window.set_credentials(model.clone());
-
-    let bridge = window.global::<CredentialsBridge>();
     bridge.set_credentials(model);
     bridge.set_credential_filter_category(filter_cat.into());
     bridge.set_credential_search_query(search_q.into());
 }
 
-/// 注册所有凭据相关交互回调
+/// 注册所有凭据相关交互回调 (纯 MVVM 直连 CredentialsBridge)
 pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext) {
+    let bridge = window.global::<CredentialsBridge>();
+
     // -------------------------------------------------------------------------
     // 1. 初始化加载凭据列表并预先回显首个凭据
     // -------------------------------------------------------------------------
@@ -189,7 +158,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_sel = ctx.core_state.clone();
-    window.on_select_credential(move |id| {
+    bridge.on_select_credential(move |id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = id.to_string();
             if let Ok(Some(cred)) = core_state_sel.storage().credentials().get_by_id(&id_str) {
@@ -211,10 +180,21 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // 3. 开启新建凭据模式 (右侧面板转为创建表单)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    window.on_open_create_credential_modal(move || {
+    bridge.on_open_create_credential_modal(move || {
         if let Some(w) = window_weak.upgrade() {
             tracing::info!(target: "smagical_ui::credentials", "打开新建凭据面板");
             clear_form_for_create(&w);
+        }
+    });
+
+    let window_weak = window.as_weak();
+    bridge.on_create_new_credential(move |cred_type| {
+        if let Some(w) = window_weak.upgrade() {
+            tracing::info!(target: "smagical_ui::credentials", "创建指定类型凭据: {}", cred_type);
+            clear_form_for_create(&w);
+            if !cred_type.is_empty() {
+                w.global::<CredentialsBridge>().set_credential_form_type(cred_type);
+            }
         }
     });
 
@@ -223,10 +203,13 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_cancel = ctx.core_state.clone();
-    window.on_cancel_create_credential(move || {
+    bridge.on_cancel_create_credential(move || {
         if let Some(w) = window_weak.upgrade() {
             tracing::debug!(target: "smagical_ui::credentials", "取消新建凭据");
-            let active_id = w.get_active_credential_id().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let active_id = bridge.get_active_credential_id().to_string();
+            bridge.set_is_credential_create_mode(false);
+            bridge.set_is_credential_editing(false);
             if let Ok(Some(cred)) = core_state_cancel.storage().credentials().get_by_id(&active_id) {
                 load_credential_into_form(&w, &cred);
                 return;
@@ -242,11 +225,12 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // 5. 开启编辑当前凭据模式
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    window.on_start_edit_credential(move || {
+    bridge.on_start_edit_credential(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active_id = w.get_active_credential_id().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let active_id = bridge.get_active_credential_id().to_string();
             tracing::info!(target: "smagical_ui::credentials", "开启凭据编辑模式: ID=[{}]", active_id);
-            w.set_is_credential_editing(true);
+            bridge.set_is_credential_editing(true);
         }
     });
 
@@ -255,11 +239,12 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_ce = ctx.core_state.clone();
-    window.on_cancel_edit_credential(move || {
+    bridge.on_cancel_edit_credential(move || {
         if let Some(w) = window_weak.upgrade() {
-            let active_id = w.get_active_credential_id().to_string();
+            let bridge = w.global::<CredentialsBridge>();
+            let active_id = bridge.get_active_credential_id().to_string();
             tracing::debug!(target: "smagical_ui::credentials", "取消编辑凭据并回滚: ID=[{}]", active_id);
-            w.set_is_credential_editing(false);
+            bridge.set_is_credential_editing(false);
             if let Ok(Some(cred)) = core_state_ce.storage().credentials().get_by_id(&active_id) {
                 load_credential_into_form(&w, &cred);
             }
@@ -272,7 +257,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     let window_weak = window.as_weak();
     let core_state_save = ctx.core_state.clone();
     let notif_save = ctx.notifications.clone();
-    window.on_save_credential(move |id, name, cred_type, algorithm, username, secret_data, passphrase, public_key, fingerprint, notes| {
+    bridge.on_save_credential(move |id, name, cred_type, algorithm, username, secret_data, passphrase, public_key, fingerprint, notes| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = if id.is_empty() {
                 format!("cred-{}", &uuid::Uuid::new_v4().to_string()[..8])
@@ -292,6 +277,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             let pub_opt = if public_key.is_empty() { None } else { Some(public_key.to_string()) };
             let fp_opt = if fingerprint.is_empty() { None } else { Some(fingerprint.to_string()) };
 
+            let bridge = w.global::<CredentialsBridge>();
             let record = CredentialRecord {
                 id: id_str.clone(),
                 name: name_str.clone(),
@@ -302,7 +288,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
                 passphrase: pass_opt,
                 public_key: pub_opt,
                 fingerprint: fp_opt.clone(),
-                bound_host_count: w.get_credential_form_bound_host_count() as usize,
+                bound_host_count: bridge.get_credential_form_bound_host_count() as usize,
                 created_at: "2026-09-01 12:00:00".to_string(),
                 updated_at: "2026-09-01 14:40:00".to_string(),
                 notes: notes.to_string(),
@@ -347,12 +333,12 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
                 notif_save.success("凭据更新成功", format!("凭据 [{}] 已成功保存修改", name_str));
             }
 
-            w.set_is_credential_create_mode(false);
-            w.set_active_credential_id(id_str.clone().into());
+            bridge.set_is_credential_create_mode(false);
+            bridge.set_active_credential_id(id_str.clone().into());
             load_credential_into_form(&w, &record);
 
-            let cat = w.get_credential_filter_category();
-            let q = w.get_credential_search_query();
+            let cat = bridge.get_credential_filter_category();
+            let q = bridge.get_credential_search_query();
             sync_credentials_ui(&w, &core_state_save, &cat, &q);
         }
     });
@@ -363,7 +349,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     let window_weak = window.as_weak();
     let core_state_del = ctx.core_state.clone();
     let notif_del = ctx.notifications.clone();
-    window.on_delete_credential(move |id| {
+    bridge.on_delete_credential(move |id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = id.to_string();
             let _ = core_state_del.storage().credentials().delete(&id_str);
@@ -374,9 +360,10 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             });
             notif_del.info("凭据已删除", "指定凭据已从本地保管库中安全清除");
 
-            w.set_active_credential_id("".into());
-            let cat = w.get_credential_filter_category();
-            let q = w.get_credential_search_query();
+            let bridge = w.global::<CredentialsBridge>();
+            bridge.set_active_credential_id("".into());
+            let cat = bridge.get_credential_filter_category();
+            let q = bridge.get_credential_search_query();
             sync_credentials_ui(&w, &core_state_del, &cat, &q);
         }
     });
@@ -387,7 +374,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     let window_weak = window.as_weak();
     let core_state_copy = ctx.core_state.clone();
     let notif_copy = ctx.notifications.clone();
-    window.on_copy_credential_secret(move |id| {
+    bridge.on_copy_secret_to_clipboard(move |id, _field| {
         if let Some(_w) = window_weak.upgrade() {
             let id_str = id.to_string();
             if let Ok(Some(cred)) = core_state_copy.storage().credentials().get_by_id(&id_str) {
@@ -428,7 +415,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // 10. 复制自定义文本 (公钥/指纹) 回调
     // -------------------------------------------------------------------------
     let notif_custom_copy = ctx.notifications.clone();
-    window.on_copy_custom_text(move |text, title, msg| {
+    bridge.on_copy_custom_text(move |text, title, msg| {
         if let Ok(mut clipboard) = arboard::Clipboard::new() {
             let text_str = text.to_string();
             let _ = clipboard.set_text(text_str);
@@ -445,7 +432,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     let window_weak = window.as_weak();
     let core_state_gen = ctx.core_state.clone();
     let notif_gen_key = ctx.notifications.clone();
-    window.on_generate_credential_key(move |algorithm| {
+    bridge.on_generate_key_pair(move |algorithm| {
         if let Some(w) = window_weak.upgrade() {
             let algo = algorithm.to_string();
             let key_suffix = &uuid::Uuid::new_v4().to_string()[..8];
@@ -469,9 +456,10 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
                 )
             };
 
-            w.set_credential_form_secret_data(priv_key.into());
-            w.set_credential_form_public_key(pub_key.into());
-            w.set_credential_form_fingerprint(fp.clone().into());
+            let bridge = w.global::<CredentialsBridge>();
+            bridge.set_credential_form_secret_data(priv_key.into());
+            bridge.set_credential_form_public_key(pub_key.into());
+            bridge.set_credential_form_fingerprint(fp.clone().into());
 
             tracing::info!(
                 target: "smagical_ui::credentials",
@@ -493,13 +481,14 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     let window_weak = window.as_weak();
     let core_state_gp = ctx.core_state.clone();
     let notif_gen_pwd = ctx.notifications.clone();
-    window.on_generate_credential_password(move || {
+    bridge.on_generate_strong_password(move || {
         if let Some(w) = window_weak.upgrade() {
             let rand_part1 = &uuid::Uuid::new_v4().to_string()[..6];
             let rand_part2 = &uuid::Uuid::new_v4().to_string()[6..12];
             let strong_pwd = format!("Sm@lux#{}!{}", rand_part1, rand_part2);
 
-            w.set_credential_form_secret_data(strong_pwd.into());
+            let bridge = w.global::<CredentialsBridge>();
+            bridge.set_credential_form_secret_data(strong_pwd.into());
             tracing::info!(target: "smagical_ui::credentials", "一键生成强密码");
             // 显式广播强密码生成事件
             core_state_gp.events().dispatch(&PasswordGeneratedEvent {
@@ -516,70 +505,24 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     // 13. 分类与搜索过滤回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let core_state_filter = ctx.core_state.clone();
-    window.on_filter_credentials(move |cat, query| {
+    let core_state_cat = ctx.core_state.clone();
+    bridge.on_filter_category(move |cat| {
         if let Some(w) = window_weak.upgrade() {
-            tracing::debug!(
-                target: "smagical_ui::credentials",
-                "筛选凭据列表: 分类='{}', 关键词='{}'",
-                cat, query
-            );
-            w.set_credential_filter_category(cat.clone());
-            w.set_credential_search_query(query.clone());
-            sync_credentials_ui(&w, &core_state_filter, &cat, &query);
+            let b = w.global::<CredentialsBridge>();
+            b.set_credential_filter_category(cat.clone());
+            let q = b.get_credential_search_query();
+            sync_credentials_ui(&w, &core_state_cat, &cat, &q);
         }
     });
 
-    // -------------------------------------------------------------------------
-    // 14. CredentialsBridge 专属 MVVM 绑定
-    // -------------------------------------------------------------------------
-    let bridge = window.global::<CredentialsBridge>();
-    let w_bridge = window.as_weak();
-    bridge.on_select_credential(move |id| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_select_credential(id);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    bridge.on_start_edit_credential(move || {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_start_edit_credential();
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    bridge.on_cancel_edit_credential(move || {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_cancel_edit_credential();
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    bridge.on_delete_credential(move |id| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_delete_credential(id);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    bridge.on_copy_secret_to_clipboard(move |id, _field| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_copy_credential_secret(id);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    bridge.on_generate_key_pair(move |algo| {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_generate_credential_key(algo);
-        }
-    });
-
-    let w_bridge = window.as_weak();
-    bridge.on_generate_strong_password(move || {
-        if let Some(w) = w_bridge.upgrade() {
-            w.invoke_generate_credential_password();
+    let window_weak = window.as_weak();
+    let core_state_query = ctx.core_state.clone();
+    bridge.on_search_changed(move |query| {
+        if let Some(w) = window_weak.upgrade() {
+            let b = w.global::<CredentialsBridge>();
+            b.set_credential_search_query(query.clone());
+            let cat = b.get_credential_filter_category();
+            sync_credentials_ui(&w, &core_state_query, &cat, &query);
         }
     });
 }

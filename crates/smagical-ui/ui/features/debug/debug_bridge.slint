@@ -1,0 +1,61 @@
+// -----------------------------------------------------------------------------
+// 开发者全功能独立调试与实验特性领域状态总线 (Debug Domain Bridge)
+// 集中管理 F12 调试控制台弹窗显隐、实时日志流、数据压测、状态注入与特性门控
+// 彻底拔除 AppWindow 根组件上的 30+ 透传属性与调试透传回调
+// -----------------------------------------------------------------------------
+
+import { LogEntryData } from "../../components/debug_workbench/debug-logs-tab.slint";
+export { LogEntryData }
+
+export global DebugBridge {
+    // 弹窗显隐
+    in-out property <bool> is-open: false;
+
+    // 实时诊断日志流与通道开关
+    in-out property <[LogEntryData]> logs: [];
+    in-out property <bool> is-log-capture-enabled: true;
+
+    // 实验室特性门控 (Feature Flags)
+    in-out property <bool> flag-desktop-notifications: false;
+    in-out property <bool> flag-terminal-crt-shader: false;
+    in-out property <bool> flag-cloud-sync: false;
+    in-out property <bool> flag-terminal-scratchpad: false;
+    in-out property <bool> use-mock-storage: true;
+
+    // 调试控制台交互回调
+    callback close();
+    callback batch-generate(string /* prefix */, string /* count_str */, string /* ip_prefix */, string /* start_ip_str */, string /* port_str */, string /* group */, string /* status_mode */, bool /* overwrite */);
+    callback batch-update-status(string /* status_mode */);
+    callback batch-update-port(string /* new_port_str */);
+    callback inject-preset(string /* preset_id */);
+    callback quick-add-host(string /* name */, string /* ip */, string /* port_str */, string /* group */);
+    callback quick-add-group(string /* name */, string /* parent_id */);
+    callback clear-all-data();
+    callback reset-default-data();
+    callback batch-generate-credentials(string /* count_str */, string /* mode */, bool /* overwrite */);
+    callback quick-add-credential(string /* cred_type */, string /* name */, string /* data */);
+    callback reset-default-credentials();
+    callback clear-credentials();
+    callback batch-generate-snippets(string /* count_str */, bool /* overwrite */);
+    callback quick-add-snippet(string /* title */, string /* lang */, string /* cmd */);
+    callback reset-default-snippets();
+    callback clear-snippets();
+    callback clear-logs();
+    callback emit-test-log(string /* level */);
+    callback switch-theme(string /* id */);
+    callback toggle-color-mode();
+    callback force-repaint();
+    callback run-benchmark();
+    callback toggle-log-capture(bool /* enabled */);
+    callback navigate-to-settings(string /* category */);
+    callback switch-pipeline(string /* pipeline_id */);
+    callback save-pipeline();
+    callback restart-app();
+    callback toggle-feature-flag(string /* flag_name */, bool /* enabled */);
+    callback toggle-mock-storage(bool /* enabled */);
+    callback apply-config-preset(string /* preset_name */);
+    callback reset-all-settings();
+    callback change-modal-opacity(float /* opacity */);
+    callback toggle-desktop-notification(bool /* enabled */);
+    callback toggle-terminal-crt(bool /* enabled */);
+}

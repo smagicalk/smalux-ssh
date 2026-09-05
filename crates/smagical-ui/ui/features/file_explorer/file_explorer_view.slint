@@ -103,44 +103,6 @@ export component FileExplorerView inherits Rectangle {
     in property <bool> remote-can-go-forward: FilesBridge.remote-can-go-forward;
 
     // -------------------------------------------------------------------------
-    // 事件回调 (向后完全兼容现有 Rust Handlers 契约)
-    // -------------------------------------------------------------------------
-    callback select-local-tab(string /* tab_id */);
-    callback close-local-tab(string /* tab_id */);
-    callback new-local-tab();
-
-    callback select-remote-tab(string /* tab_id */);
-    callback close-remote-tab(string /* tab_id */);
-    callback new-remote-tab();
-
-    callback reorder-local-tab(int /* from_index */, int /* to_index */);
-    callback reorder-remote-tab(int /* from_index */, int /* to_index */);
-
-    callback navigate-local-back();
-    callback navigate-local-forward();
-    callback navigate-remote-back();
-    callback navigate-remote-forward();
-
-    callback navigate-local-path(string /* path */);
-    callback navigate-remote-path(string /* path */);
-    callback navigate-local-up();
-    callback navigate-remote-up();
-    callback open-local-item(string /* path */, bool /* is_dir */);
-    callback open-remote-item(string /* path */, bool /* is_dir */);
-    callback toggle-local-expand(string /* path */);
-    callback toggle-remote-expand(string /* path */);
-
-    callback refresh-local();
-    callback refresh-remote();
-    callback trigger-transfer();
-    callback clear-completed-transfers();
-    callback start-transfer-task(string /* direction */, string /* source_path */, string /* filename */, bool /* is_dir */, string /* target_path */);
-    callback toggle-transfer-expand(string /* task_id */);
-
-    callback transfer-action(string /* action */, string /* task_id */);
-    callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
-    callback copy-to-clipboard(string /* text */);
-
     // 菜单展开逻辑
     public function open_transfer_menu(mx: length, my: length, task_id: string, status: string, direction: string) {
         root.selected-transfer-id = task_id;
@@ -192,6 +154,8 @@ export component FileExplorerView inherits Rectangle {
     }
 
     VerticalLayout {
+        width: 100%;
+        height: 100%;
         padding: 0px;
         spacing: 0px;
 
@@ -235,19 +199,19 @@ export component FileExplorerView inherits Rectangle {
                 drag-x <=> root.drag-x;
                 drag-y <=> root.drag-y;
 
-                select-tab(id) => { root.select-local-tab(id); }
-                close-tab(id) => { root.close-local-tab(id); }
-                new-tab => { root.new-local-tab(); }
-                reorder-tab(from, to) => { root.reorder-local-tab(from, to); }
+                select-tab(id) => { FilesBridge.select-local-tab(id); }
+                close-tab(id) => { FilesBridge.close-local-tab(id); }
+                new-tab => { FilesBridge.new-local-tab(); }
+                reorder-tab(from, to) => { FilesBridge.reorder-local-tab(from, to); }
 
-                navigate-path(p) => { root.navigate-local-path(p); }
-                navigate-up => { root.navigate-local-up(); }
-                navigate-back => { root.navigate-local-back(); }
-                navigate-forward => { root.navigate-local-forward(); }
-                refresh => { root.refresh-local(); }
+                navigate-path(p) => { FilesBridge.navigate-local-path(p); }
+                navigate-up => { FilesBridge.navigate-local-up(); }
+                navigate-back => { FilesBridge.navigate-local-back(); }
+                navigate-forward => { FilesBridge.navigate-local-forward(); }
+                refresh => { FilesBridge.refresh-local(); }
                 toggle-transfer-queue => { /* Handled via is-transfer-queue-expanded binding */ }
-                open-item(p, is_dir) => { root.open-local-item(p, is_dir); }
-                start-transfer(dir, src, name, is_dir, target) => { root.start-transfer-task(dir, src, name, is_dir, target); }
+                open-item(p, is_dir) => { FilesBridge.open-local-item(p, is_dir); }
+                start-transfer(dir, src, name, is_dir, target) => { FilesBridge.start-transfer-task(dir, src, name, is_dir, target); }
                 request-file-menu(mx, my, is_rem, p, name, is_dir, is_blank) => { root.open_file_menu(mx, my, is_rem, p, name, is_dir, is_blank); }
             }
 
@@ -319,19 +283,19 @@ export component FileExplorerView inherits Rectangle {
                 drag-x <=> root.drag-x;
                 drag-y <=> root.drag-y;
 
-                select-tab(id) => { root.select-remote-tab(id); }
-                close-tab(id) => { root.close-remote-tab(id); }
-                new-tab => { root.new-remote-tab(); }
-                reorder-tab(from, to) => { root.reorder-remote-tab(from, to); }
+                select-tab(id) => { FilesBridge.select-remote-tab(id); }
+                close-tab(id) => { FilesBridge.close-remote-tab(id); }
+                new-tab => { FilesBridge.new-remote-tab(); }
+                reorder-tab(from, to) => { FilesBridge.reorder-remote-tab(from, to); }
 
-                navigate-path(p) => { root.navigate-remote-path(p); }
-                navigate-up => { root.navigate-remote-up(); }
-                navigate-back => { root.navigate-remote-back(); }
-                navigate-forward => { root.navigate-remote-forward(); }
-                refresh => { root.refresh-remote(); }
+                navigate-path(p) => { FilesBridge.navigate-remote-path(p); }
+                navigate-up => { FilesBridge.navigate-remote-up(); }
+                navigate-back => { FilesBridge.navigate-remote-back(); }
+                navigate-forward => { FilesBridge.navigate-remote-forward(); }
+                refresh => { FilesBridge.refresh-remote(); }
                 toggle-transfer-queue => { /* Handled via is-transfer-queue-expanded binding */ }
-                open-item(p, is_dir) => { root.open-remote-item(p, is_dir); }
-                start-transfer(dir, src, name, is_dir, target) => { root.start-transfer-task(dir, src, name, is_dir, target); }
+                open-item(p, is_dir) => { FilesBridge.open-remote-item(p, is_dir); }
+                start-transfer(dir, src, name, is_dir, target) => { FilesBridge.start-transfer-task(dir, src, name, is_dir, target); }
                 request-file-menu(mx, my, is_rem, p, name, is_dir, is_blank) => { root.open_file_menu(mx, my, is_rem, p, name, is_dir, is_blank); }
             }
         }
@@ -346,8 +310,8 @@ export component FileExplorerView inherits Rectangle {
             remote-files-count: root.remote-files.length;
 
             toggle-expand => { /* bound via is-expanded */ }
-            clear-completed => { root.clear-completed-transfers(); }
-            toggle-task-expand(id) => { root.toggle-transfer-expand(id); }
+            clear-completed => { FilesBridge.clear-completed-transfers(); }
+            toggle-task-expand(id) => { FilesBridge.toggle-transfer-expand(id); }
             request-transfer-menu(mx, local_my, tid, st, dir) => {
                 root.open_transfer_menu(mx, (root.height - 180px) + local_my, tid, st, dir);
             }
@@ -521,7 +485,7 @@ export component FileExplorerView inherits Rectangle {
         task-direction: root.selected-transfer-direction;
 
         transfer-action(act, tid) => {
-            root.transfer-action(act, tid);
+            FilesBridge.transfer-action(act, tid);
         }
         close-menu => {
             root.is-transfer-menu-open = false;
@@ -543,10 +507,10 @@ export component FileExplorerView inherits Rectangle {
         is-blank: root.file-menu-is-blank;
 
         file-action(act, rem, path, name, is_dir) => {
-            root.file-action(act, rem, path, name, is_dir);
+            FilesBridge.file-action(act, rem, path, name, is_dir);
         }
         copy-to-clipboard(text) => {
-            root.copy-to-clipboard(text);
+            FilesBridge.copy-to-clipboard(text);
         }
         close-menu => {
             root.is-file-menu-open = false;

@@ -7,6 +7,7 @@
 use std::sync::{Arc, RwLock};
 use smagical_core::event::{AppReadyEvent, ConfigChangedEvent, EventManager, HostAssetChangedEvent, NavigationTabClickedEvent};
 use smagical_core::AppStorage;
+use slint::ComponentHandle;
 use crate::generated::{AppWindow, HostItemData};
 
 /// 快速新建终端启动器后台异步预热服务
@@ -75,7 +76,7 @@ impl LauncherPrewarmService {
 
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = window_weak.upgrade() {
-                        w.set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(
+                        w.global::<crate::generated::WindowBridge>().set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(
                             slint::VecModel::from(prewarmed_cards),
                         )));
                     }

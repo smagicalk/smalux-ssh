@@ -2,6 +2,7 @@
 //!
 //! 跨平台智能检测当前系统 (Windows / Linux / macOS) 实际已安装且可用的 Shell 终端环境。
 
+use slint::ComponentHandle;
 use crate::LocalShellItemData;
 use std::path::Path;
 
@@ -377,7 +378,7 @@ pub fn start_local_shell_discovery(
             // 2. 异步回推到 UI 事件循环，就地更新 Slint 启动器数据模型
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {
-                    w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(
+                    w.global::<crate::generated::WindowBridge>().set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(
                         slint::VecModel::from(detected),
                     )));
                 }

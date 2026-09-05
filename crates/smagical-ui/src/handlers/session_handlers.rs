@@ -6,7 +6,7 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 use smagical_core::event::{TerminalSessionEvent, TerminalSplitChangedEvent};
 
-use crate::generated::{AppWindow, HostItemData, LocalShellItemData};
+use crate::generated::{AppWindow, HostItemData, LocalShellItemData, SettingsBridge, TerminalBridge, WindowBridge};
 use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, PaneGroup};
 use crate::terminal::{encode_key_event, SplitNode, SplitOrientation, TerminalInstance};
@@ -117,6 +117,7 @@ fn execute_close_session(
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
 pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
+    let tb = window.global::<TerminalBridge>();
     // 待确认关闭的会话 ID 挂起槽位
     let pending_close_tab_id = Rc::new(std::cell::RefCell::new(Option::<String>::None));
 
@@ -130,7 +131,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_close = Rc::clone(&ctx.active_terminals);
     let pending_close_tab_id_close = Rc::clone(&pending_close_tab_id);
     let ctx_close = ctx.clone();
-    window.on_close_tab(move |sess_id| {
+    tb.on_close_tab(move |sess_id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
 
@@ -140,7 +141,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 .find(|t| t.session_id == id_str)
                 .cloned();
 
-            if w.get_setting_confirm_close_tab() {
+            if w.global::<SettingsBridge>().get_setting_confirm_close_tab() {
                 if let Some(info) = session_opt {
                     let is_remote = !info.host_id.starts_with("local-") && !info.host_address.starts_with("Local");
                     let title = if is_remote {
@@ -155,9 +156,9 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     };
 
                     *pending_close_tab_id_close.borrow_mut() = Some(id_str);
-                    w.set_tab_close_confirm_title(title.into());
-                    w.set_tab_close_confirm_message(msg.into());
-                    w.set_is_tab_close_confirm_open(true);
+                    w.global::<TerminalBridge>().set_tab_close_confirm_title(title.into());
+                    w.global::<TerminalBridge>().set_tab_close_confirm_message(msg.into());
+                    w.global::<TerminalBridge>().set_is_tab_close_confirm_open(true);
                     tracing::info!(target: "smagical_ui::session", "拦截关闭 Tab 操作并呼出确认弹窗: {}", info.display_title);
                     return;
                 }
@@ -185,7 +186,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_pane = Rc::clone(&ctx.active_terminals);
     let pending_close_tab_id_pane = Rc::clone(&pending_close_tab_id);
     let ctx_pane = ctx.clone();
-    window.on_close_pane_tab(move |_pane_id, tab_id| {
+    tb.on_close_pane_tab(move |_pane_id, tab_id| {
         if let Some(w) = window_weak_pane.upgrade() {
             let id_str = tab_id.to_string();
 
@@ -194,7 +195,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 .find(|t| t.session_id == id_str)
                 .cloned();
 
-            if w.get_setting_confirm_close_tab() {
+            if w.global::<SettingsBridge>().get_setting_confirm_close_tab() {
                 if let Some(info) = session_opt {
                     let is_remote = !info.host_id.starts_with("local-") && !info.host_address.starts_with("Local");
                     let title = if is_remote {
@@ -209,9 +210,9 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     };
 
                     *pending_close_tab_id_pane.borrow_mut() = Some(id_str);
-                    w.set_tab_close_confirm_title(title.into());
-                    w.set_tab_close_confirm_message(msg.into());
-                    w.set_is_tab_close_confirm_open(true);
+                    w.global::<TerminalBridge>().set_tab_close_confirm_title(title.into());
+                    w.global::<TerminalBridge>().set_tab_close_confirm_message(msg.into());
+                    w.global::<TerminalBridge>().set_is_tab_close_confirm_open(true);
                     return;
                 }
             }
@@ -238,7 +239,16 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_confirm = Rc::clone(&ctx.active_terminals);
     let pending_close_tab_id_confirm = Rc::clone(&pending_close_tab_id);
     let ctx_confirm = ctx.clone();
-    window.on_confirm_close_tab(move || {
+    let window_weak_cancel = window.as_weak();
+    let pending_close_tab_id_cancel = Rc::clone(&pending_close_tab_id);
+    tb.on_cancel_close_tab(move || {
+        if let Some(w) = window_weak_cancel.upgrade() {
+            *pending_close_tab_id_cancel.borrow_mut() = None;
+            w.global::<TerminalBridge>().set_is_tab_close_confirm_open(false);
+        }
+    });
+
+    tb.on_confirm_close_tab(move || {
         if let Some(w) = window_weak_confirm.upgrade() {
             if let Some(id_str) = pending_close_tab_id_confirm.borrow_mut().take() {
                 execute_close_session(
@@ -259,9 +269,9 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak_toggle = window.as_weak();
     let core_state_toggle = ctx.core_state.clone();
-    window.on_toggle_confirm_close_tab(move |enabled| {
+    window.global::<SettingsBridge>().on_toggle_confirm_close_tab(move |enabled| {
         if let Some(w) = window_weak_toggle.upgrade() {
-            w.set_setting_confirm_close_tab(enabled);
+            w.global::<SettingsBridge>().set_setting_confirm_close_tab(enabled);
             let _ = core_state_toggle.storage().config().update(Box::new(move |c| {
                 c.confirm_close_tab = enabled;
             }));
@@ -276,7 +286,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 1.2 复制指定 Tab 会话对应的主机 IP / 连接地址
     // -------------------------------------------------------------------------
     let pane_groups_copy_ip = Rc::clone(&ctx.pane_groups);
-    window.on_copy_tab_ip(move |tab_id| {
+    tb.on_copy_tab_ip(move |tab_id| {
         let t_id = tab_id.to_string();
         let groups = pane_groups_copy_ip.borrow();
         let mut found_ip = None;
@@ -318,7 +328,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let global_split_tree_close_others = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_others = Rc::clone(&ctx.active_terminals);
     let ctx_close_others = ctx.clone();
-    window.on_close_other_tabs(move |pane_id, tab_id| {
+    tb.on_close_other_tabs(move |pane_id, tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let p_id = pane_id.to_string();
             let t_id = tab_id.to_string();
@@ -410,7 +420,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let global_split_tree_select = Rc::clone(&ctx.global_split_tree);
     let core_state_select = ctx.core_state.clone();
 
-    window.on_select_tab(move |sess_id| {
+    tb.on_select_tab(move |sess_id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = sess_id.to_string();
             let mut groups = pane_groups_select.borrow_mut();
@@ -439,7 +449,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_select_pane_tab = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_select_pane_tab = Rc::clone(&ctx.global_split_tree);
     let core_state_select_pane_tab = ctx.core_state.clone();
-    window.on_select_pane_tab(move |pane_id, tab_id| {
+    tb.on_select_pane_tab(move |pane_id, tab_id| {
         if let Some(w) = window_weak.upgrade() {
             let p_id = pane_id.to_string();
             let t_id = tab_id.to_string();
@@ -466,7 +476,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_move_tab = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_move_tab = Rc::clone(&ctx.global_split_tree);
     let core_state_move_tab = ctx.core_state.clone();
-    window.on_move_terminal_tab(move |from_pane_id, from_index, drop_x, drop_y| {
+    tb.on_move_terminal_tab(move |from_pane_id, from_index, drop_x, drop_y| {
         if let Some(w) = window_weak.upgrade() {
             let from_pid = from_pane_id.to_string();
             let from_idx = from_index as usize;
@@ -496,8 +506,8 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             // 2. 根据分屏模式推导落点目标窗格与插入位置
             let (to_pid, insert_pos) = if let Some(tree) = split_tree.as_ref() {
-                let vp_w = w.get_terminal_canvas_width().max(200.0);
-                let vp_h = w.get_terminal_canvas_height().max(100.0);
+                let vp_w = w.global::<TerminalBridge>().get_canvas_width().max(200.0);
+                let vp_h = w.global::<TerminalBridge>().get_canvas_height().max(100.0);
                 let (panes_layout, _) = tree.compute_pixel_layout(vp_w, vp_h, 2.0, None);
 
                 let target_layout = panes_layout.iter().find(|p| {
@@ -606,7 +616,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 3. 呼出新建终端会话弹窗回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    window.on_new_tab(move || {
+    tb.on_new_tab(move || {
         if let Some(_w) = window_weak.upgrade() {
             tracing::info!(target: "smagical_ui::session", "呼出快速新建会话中心");
         }
@@ -619,7 +629,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let master_tree_launcher = Rc::clone(&ctx.master_tree);
     let cached_shells_launcher = std::sync::Arc::clone(&ctx.cached_shells);
-    window.on_filter_launcher(move |query| {
+    window.global::<WindowBridge>().on_filter_launcher(move |query| {
         if let Some(w) = window_weak.upgrade() {
             let q = query.trim().to_lowercase();
             let all_cached = cached_shells_launcher.read().unwrap();
@@ -645,7 +655,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     .cloned()
                     .collect()
             };
-            w.set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_locals))));
+            w.global::<WindowBridge>().set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_locals))));
 
             let tree = master_tree_launcher.borrow();
             let filtered_hosts: Vec<HostItemData> = tree
@@ -671,7 +681,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     ping_ms: n.ping_ms,
                 })
                 .collect();
-            w.set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_hosts))));
+            w.global::<WindowBridge>().set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_hosts))));
         }
     });
 
@@ -683,7 +693,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_snippet = Rc::clone(&ctx.pane_groups);
     let active_pane_id_snippet = Rc::clone(&ctx.active_pane_id);
     let active_terminals_snippet = Rc::clone(&ctx.active_terminals);
-    window.on_send_snippet(move |cmd| {
+    tb.on_send_snippet(move |cmd| {
         let active_pid = active_pane_id_snippet.borrow().clone();
         let groups = pane_groups_snippet.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -704,7 +714,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_input = Rc::clone(&ctx.pane_groups);
     let active_pane_id_input = Rc::clone(&ctx.active_pane_id);
     let active_terminals_input = Rc::clone(&ctx.active_terminals);
-    window.on_terminal_key_input(move |text, is_ctrl, is_shift, is_alt| {
+    tb.on_terminal_key_input(move |text, is_ctrl, is_shift, is_alt| {
         let active_pid = active_pane_id_input.borrow().clone();
         let groups = pane_groups_input.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -735,7 +745,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_scroll = Rc::clone(&ctx.active_pane_id);
     let active_terminals_scroll = Rc::clone(&ctx.active_terminals);
     let scroll_accum = Rc::new(std::cell::Cell::new(0.0f32));
-    window.on_terminal_scroll(move |delta| {
+    tb.on_terminal_scroll(move |delta| {
         let active_pid = active_pane_id_scroll.borrow().clone();
         let groups = pane_groups_scroll.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -763,7 +773,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_copy = Rc::clone(&ctx.pane_groups);
     let active_pane_id_copy = Rc::clone(&ctx.active_pane_id);
     let active_terminals_copy = Rc::clone(&ctx.active_terminals);
-    window.on_terminal_copy(move || {
+    tb.on_terminal_copy(move || {
         let active_pid = active_pane_id_copy.borrow().clone();
         let groups = pane_groups_copy.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -789,7 +799,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_sel = Rc::clone(&ctx.active_pane_id);
     let active_terminals_sel = Rc::clone(&ctx.active_terminals);
     let core_state_sel = ctx.core_state.clone();
-    window.on_terminal_selection_changed(move |sc, sr, ec, er, has_sel| {
+    tb.on_terminal_selection_changed(move |sc, sr, ec, er, has_sel| {
         let active_pid = active_pane_id_sel.borrow().clone();
         let groups = pane_groups_sel.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -824,7 +834,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_paste = Rc::clone(&ctx.active_terminals);
     let core_state_paste = ctx.core_state.clone();
     let notif_paste = ctx.notifications.clone();
-    window.on_terminal_paste(move || {
+    tb.on_terminal_paste(move || {
         let active_pid = active_pane_id_paste.borrow().clone();
         let groups = pane_groups_paste.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -857,7 +867,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_clear = Rc::clone(&ctx.pane_groups);
     let active_pane_id_clear = Rc::clone(&ctx.active_pane_id);
     let active_terminals_clear = Rc::clone(&ctx.active_terminals);
-    window.on_terminal_clear(move || {
+    tb.on_terminal_clear(move || {
         let active_pid = active_pane_id_clear.borrow().clone();
         let groups = pane_groups_clear.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
@@ -885,7 +895,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let global_split_tree_split = Rc::clone(&ctx.global_split_tree);
     let next_pane_num_split = Rc::clone(&ctx.next_pane_num);
     let core_state_split = ctx.core_state.clone();
-    window.on_split_terminal(move |orient| {
+    tb.on_split_terminal(move |orient| {
         if let Some(w) = window_weak.upgrade() {
             let mut groups = pane_groups_split.borrow_mut();
             let mut active_pid = active_pane_id_split.borrow_mut();
@@ -953,7 +963,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let global_split_tree_close_id = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_id = Rc::clone(&ctx.active_terminals);
     let ctx_close_pane_id = ctx.clone();
-    window.on_close_pane_by_id(move |target_pane_id| {
+    tb.on_close_pane_by_id(move |target_pane_id| {
         if let Some(w) = window_weak.upgrade() {
             let pid = target_pane_id.to_string();
             let mut groups = pane_groups_close_id.borrow_mut();
@@ -1020,7 +1030,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_close_idx = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close_idx = Rc::clone(&ctx.global_split_tree);
     let active_terminals_close_idx = Rc::clone(&ctx.active_terminals);
-    window.on_close_pane_by_index(move |idx| {
+    tb.on_close_pane_by_index(move |idx| {
         if let Some(w) = window_weak.upgrade() {
             let mut groups = pane_groups_close_idx.borrow_mut();
             let mut active_pid = active_pane_id_close_idx.borrow_mut();
@@ -1064,7 +1074,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_pane_id_close_split = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_close_split = Rc::clone(&ctx.global_split_tree);
     let core_state_close_split = ctx.core_state.clone();
-    window.on_close_split(move || {
+    tb.on_close_split(move || {
         if let Some(w) = window_weak.upgrade() {
             let mut groups = pane_groups_close_split.borrow_mut();
             let mut active_pid = active_pane_id_close_split.borrow_mut();
@@ -1112,7 +1122,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_sel_id = Rc::clone(&ctx.pane_groups);
     let active_pane_id_sel_id = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_sel_id = Rc::clone(&ctx.global_split_tree);
-    window.on_select_pane_by_id(move |pane_id| {
+    tb.on_select_pane_by_id(move |pane_id| {
         if let Some(w) = window_weak.upgrade() {
             let pid = pane_id.to_string();
             let groups = pane_groups_sel_id.borrow();
@@ -1123,9 +1133,9 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     let window_weak = window.as_weak();
-    window.on_select_pane(move |idx| {
+    tb.on_select_pane(move |idx| {
         if let Some(w) = window_weak.upgrade() {
-            w.set_active_pane_index(idx);
+            w.global::<TerminalBridge>().set_active_pane_index(idx);
         }
     });
 
@@ -1133,7 +1143,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 13.1 切换单窗格临时最大化 (Zoom) 与还原回调
     // -------------------------------------------------------------------------
     let zoomed_pane_id_toggle = Rc::clone(&ctx.zoomed_pane_id);
-    window.on_toggle_pane_zoom(move |pane_id| {
+    tb.on_toggle_pane_zoom(move |pane_id| {
         let target_id = pane_id.to_string();
         let mut zoomed = zoomed_pane_id_toggle.borrow_mut();
         if zoomed.as_deref() == Some(target_id.as_str()) {
@@ -1149,7 +1159,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 13.2 动态拖拽调节分割条比例回调
     // -------------------------------------------------------------------------
     let global_split_tree_adjust = Rc::clone(&ctx.global_split_tree);
-    window.on_adjust_splitter(move |splitter_id, delta_ratio| {
+    tb.on_adjust_splitter(move |splitter_id, delta_ratio| {
         let mut tree_guard = global_split_tree_adjust.borrow_mut();
         if let Some(tree) = tree_guard.as_mut() {
             let _res = tree.adjust_splitter(splitter_id.as_str(), delta_ratio);
@@ -1159,7 +1169,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 14. 终端内文本查找回调
     // -------------------------------------------------------------------------
-    window.on_search_terminal(move |query, match_case| {
+    tb.on_search_terminal(move |query, match_case| {
         tracing::info!(target: "smagical_ui::terminal", "终端查找文本: {:?} (大小写敏感: {})", query, match_case);
     });
 
@@ -1169,7 +1179,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_resize = Rc::clone(&ctx.pane_groups);
     let active_pane_id_resize = Rc::clone(&ctx.active_pane_id);
     let active_terminals_resize = Rc::clone(&ctx.active_terminals);
-    window.on_terminal_resize(move |cols, rows| {
+    tb.on_terminal_resize(move |cols, rows| {
         let active_pid = active_pane_id_resize.borrow().clone();
         let groups = pane_groups_resize.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())

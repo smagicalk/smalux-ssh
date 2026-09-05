@@ -5,6 +5,7 @@ import { AppButton } from "../../components/base/app-button.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { TunnelItemData } from "../tunnels_view.slint";
 import { ScrollView } from "std-widgets.slint";
+import { TunnelsBridge } from "../../features/tunnels/tunnels_bridge.slint";
 
 export { TunnelItemData }
 
@@ -15,8 +16,8 @@ export component TunnelToolDrawer inherits DrawerContainer {
     title: @tr("主机端口转发");
     collapse-icon: "▶";
 
-    in property <string> active-host-name: "";
-    in property <[TunnelItemData]> tunnels: [];
+    in property <string> active-host-name: TunnelsBridge.active-host-name;
+    in property <[TunnelItemData]> tunnels: TunnelsBridge.host-tunnels;
 
     callback toggle-tunnel-running(string /* id */);
     callback open-tunnels-hub();

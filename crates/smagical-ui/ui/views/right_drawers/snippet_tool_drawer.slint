@@ -1,23 +1,17 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
 import { ScrollView, LineEdit } from "std-widgets.slint";
+import { SnippetsBridge, QuickCmdData } from "../../features/snippets/snippets_bridge.slint";
 
-/// 快捷指令结构
-export struct QuickCmdData {
-    id: string,
-    title: string,
-    command: string,
-    category: string,
-    language: string,
-}
+export { QuickCmdData }
 
 /// 右侧代码片段伴生工具栏抽屉 (Snippet Tool Drawer)
 export component SnippetToolDrawer inherits DrawerContainer {
     title: @tr("常用代码片段库");
     collapse-icon: "▶";
 
-    in property <[QuickCmdData]> quick-cmds: [];
-    in-out property <string> search_query: "";
+    in property <[QuickCmdData]> quick-cmds: SnippetsBridge.quick-cmds;
+    in-out property <string> search_query <=> SnippetsBridge.quick-cmds-search-query;
 
     callback send-to-terminal(string /* id */);
     callback search_changed(string /* query */);
@@ -49,7 +43,10 @@ export component SnippetToolDrawer inherits DrawerContainer {
                 LineEdit {
                     text <=> root.search_query;
                     placeholder-text: @tr("搜索片段...");
-                    edited(text) => { root.search_changed(text); }
+                    edited(text) => {
+                        SnippetsBridge.filter-quick-cmds(text);
+                        root.search_changed(text);
+                    }
                 }
             }
         }
@@ -66,7 +63,10 @@ export component SnippetToolDrawer inherits DrawerContainer {
                     border-color: AppTheme.border;
 
                     cmd-touch := TouchArea {
-                        clicked => { root.send-to-terminal(cmd.id); }
+                        clicked => {
+                            SnippetsBridge.request-run-snippet(cmd.id);
+                            root.send-to-terminal(cmd.id);
+                        }
                         mouse-cursor: pointer;
                     }
 
@@ -141,7 +141,10 @@ export component SnippetToolDrawer inherits DrawerContainer {
                             }
 
                             run-touch := TouchArea {
-                                clicked => { root.send-to-terminal(cmd.id); }
+                                clicked => {
+                                    SnippetsBridge.request-run-snippet(cmd.id);
+                                    root.send-to-terminal(cmd.id);
+                                }
                                 mouse-cursor: pointer;
                             }
                         }

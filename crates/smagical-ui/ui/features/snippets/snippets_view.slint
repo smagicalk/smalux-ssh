@@ -23,18 +23,18 @@ export component SnippetsCenterView inherits Rectangle {
     in-out property <string> selected_id: SnippetsBridge.active-snippet-id;
 
     // 详情编辑器数据绑定
-    in property <bool> has_selection: false;
+    in property <bool> has_selection: SnippetsBridge.has-selection;
     in property <bool> is_selected_group: SnippetsBridge.is-active-group;
     in-out property <string> edit_id: SnippetsBridge.form-id;
     in-out property <string> edit_title: SnippetsBridge.form-title;
-    in-out property <string> edit_category_name: "";
+    in-out property <string> edit_category_name: SnippetsBridge.form-category-name;
     in-out property <string> edit_language: SnippetsBridge.form-language;
     in-out property <string> edit_content: SnippetsBridge.form-code;
     in-out property <bool> edit_auto_execute: SnippetsBridge.form-auto-execute;
     in-out property <string> edit_description: SnippetsBridge.form-description;
     in-out property <bool> edit_is_favorite: SnippetsBridge.form-is-favorite;
-    in property <string> detected_variables_text: "";
-    in property <string> edit_updated_at: "";
+    in property <string> detected_variables_text: SnippetsBridge.form-detected-variables-text;
+    in property <string> edit_updated_at: SnippetsBridge.form-updated-at;
 
     // 拖拽交互状态
     in-out property <bool> is_dragging: false;
@@ -49,22 +49,9 @@ export component SnippetsCenterView inherits Rectangle {
     in-out property <length> drag_x: 0px;
     in-out property <length> drag_y: 0px;
 
-    // 回调事件
-    callback search_changed(string);
-    callback toggle_group_expanded(string /* group_id */);
-    callback select_node(string /* id */, bool /* is_group */);
-    callback toggle_favorite(string /* id */);
-    callback create_snippet;
-    callback create_group;
-    callback save_snippet;
-    callback delete_snippet(string /* id */);
-    callback delete_group(string /* id */);
-    callback copy_content(string /* id */);
-    callback execute_snippet(string /* id */);
-    callback move_node(string /* source_id */, string /* target_id */, string /* drop_position */);
-    callback request_drag_hover(string /* source_id */, int /* target_index */, float /* offset_in_row */);
-
     HorizontalLayout {
+        width: 100%;
+        height: 100%;
         padding: 0px;
         spacing: 0px;
 
@@ -87,14 +74,14 @@ export component SnippetsCenterView inherits Rectangle {
             drag_x <=> root.drag_x;
             drag_y <=> root.drag_y;
 
-            search_changed(text) => { root.search_changed(text); }
-            toggle_group_expanded(id) => { root.toggle_group_expanded(id); }
-            select_node(id, is_g) => { root.select_node(id, is_g); }
-            toggle_favorite(id) => { root.toggle_favorite(id); }
-            create_snippet => { root.create_snippet(); }
-            create_group => { root.create_group(); }
-            move_node(src, target, pos) => { root.move_node(src, target, pos); }
-            request_drag_hover(src, idx, offset) => { root.request_drag_hover(src, idx, offset); }
+            search_changed(text) => { SnippetsBridge.search-changed(text); }
+            toggle_group_expanded(id) => { SnippetsBridge.toggle-group-expanded(id); }
+            select_node(id, is_g) => { SnippetsBridge.select-node(id, is_g); }
+            toggle_favorite(id) => { SnippetsBridge.toggle-favorite(id); }
+            create_snippet => { SnippetsBridge.create-new-snippet(); }
+            create_group => { SnippetsBridge.create-new-group(); }
+            move_node(src, target, pos) => { SnippetsBridge.move-node(src, target, pos); }
+            request_drag_hover(src, idx, offset) => { SnippetsBridge.request-drag-hover(src, idx, offset); }
         }
 
         // ==========================================
@@ -106,7 +93,12 @@ export component SnippetsCenterView inherits Rectangle {
 
             // 2.0 未选择状态提示
             if !root.has_selection: Rectangle {
+                width: 100%;
+                height: 100%;
+
                 VerticalLayout {
+                    width: 100%;
+                    height: 100%;
                     alignment: center;
                     spacing: 10px;
 
@@ -140,23 +132,27 @@ export component SnippetsCenterView inherits Rectangle {
 
             // 2.1 选中的是文件夹分组
             if root.has_selection && root.is_selected_group: SnippetGroupDetail {
+                width: 100%;
+                height: 100%;
                 edit_id: root.edit_id;
                 edit_title: root.edit_title;
-                create_snippet => { root.create_snippet(); }
-                delete_group(id) => { root.delete_group(id); }
+                create_snippet => { SnippetsBridge.create-new-snippet(); }
+                delete_group(id) => { SnippetsBridge.delete-group(id); }
             }
 
             // 2.2 选中的是代码片段
             if root.has_selection && !root.is_selected_group: SnippetEditorPane {
+                width: 100%;
+                height: 100%;
                 edit_id <=> root.edit_id;
                 edit_title <=> root.edit_title;
                 edit_content <=> root.edit_content;
                 edit_auto_execute <=> root.edit_auto_execute;
                 edit_description <=> root.edit_description;
                 detected_variables_text: root.detected_variables_text;
-                copy_content(id) => { root.copy_content(id); }
-                save_snippet => { root.save_snippet(); }
-                delete_snippet(id) => { root.delete_snippet(id); }
+                copy_content(id) => { SnippetsBridge.copy-snippet(id); }
+                save_snippet => { SnippetsBridge.save-snippet(); }
+                delete_snippet(id) => { SnippetsBridge.delete-snippet(id); }
             }
         }
     }

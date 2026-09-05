@@ -1,0 +1,97 @@
+// -----------------------------------------------------------------------------
+// 主题设计与定制工坊领域全局状态总线 (Theme Editor Domain Bridge)
+// 集中管理 ThemeStudio 调色板、几何指标、实时预览笔刷、TOML 源码与交互回调
+// 彻底解耦 AppWindow 根组件与弹窗之间的 70+ 透传属性与回调
+// -----------------------------------------------------------------------------
+
+export global ThemeEditorBridge {
+    // 弹窗可见性
+    in-out property <bool> is-open: false;
+
+    // 表单基础元数据
+    in-out property <string> name: "My Custom Theme";
+    in-out property <string> author: "User";
+    in-out property <string> base: "builtin.ui.darcula";
+    in-out property <string> period: "night";
+
+    // 18 个全量颜色文本字段 (HEX 格式)
+    in-out property <string> window-bg: "#1e1e2e";
+    in-out property <string> panel-bg: "#181825";
+    in-out property <string> surface-bg: "#313244";
+    in-out property <string> control-bg: "#383a4c";
+    in-out property <string> foreground: "#cdd6f4";
+    in-out property <string> secondary-fg: "#a6adc8";
+    in-out property <string> disabled-fg: "#6c7086";
+    in-out property <string> accent: "#cba6f7";
+    in-out property <string> hover-bg: "#45475a";
+    in-out property <string> pressed-bg: "#585b70";
+    in-out property <string> selected-bg: "#cba6f7";
+    in-out property <string> selected-fg: "#ffffff";
+    in-out property <string> border: "#45475a";
+    in-out property <string> focus-border: "#cba6f7";
+    in-out property <string> success: "#a6e3a1";
+    in-out property <string> warning: "#f9e2af";
+    in-out property <string> danger: "#f38ba8";
+    in-out property <string> info: "#89b4fa";
+
+    // 18 个全量预览笔刷 (由 Rust 核心层同步解析)
+    in-out property <brush> preview-window-bg: #1e1e2e;
+    in-out property <brush> preview-panel-bg: #181825;
+    in-out property <brush> preview-surface-bg: #313244;
+    in-out property <brush> preview-control-bg: #383a4c;
+    in-out property <brush> preview-foreground: #cdd6f4;
+    in-out property <brush> preview-secondary-fg: #a6adc8;
+    in-out property <brush> preview-disabled-fg: #6c7086;
+    in-out property <brush> preview-accent: #cba6f7;
+    in-out property <brush> preview-hover-bg: #45475a;
+    in-out property <brush> preview-pressed-bg: #585b70;
+    in-out property <brush> preview-selected-bg: #cba6f7;
+    in-out property <brush> preview-selected-fg: #ffffff;
+    in-out property <brush> preview-border: #45475a;
+    in-out property <brush> preview-focus-border: #cba6f7;
+    in-out property <brush> preview-success: #a6e3a1;
+    in-out property <brush> preview-warning: #f9e2af;
+    in-out property <brush> preview-danger: #f38ba8;
+    in-out property <brush> preview-info: #89b4fa;
+
+    // 9 个全量几何尺寸排版数值 (字符串格式，方便数字输入框双向编辑)
+    in-out property <string> metric-radius-small: "2";
+    in-out property <string> metric-radius-medium: "4";
+    in-out property <string> metric-radius-large: "8";
+    in-out property <string> metric-spacing-small: "4";
+    in-out property <string> metric-spacing-medium: "8";
+    in-out property <string> metric-spacing-large: "16";
+    in-out property <string> metric-border-width: "1";
+    in-out property <string> metric-control-height: "32";
+    in-out property <string> metric-icon-size: "16";
+
+    // TOML 源码文本
+    in-out property <string> toml: "";
+
+    // 弹窗式色盘圆盘取色器状态
+    in-out property <bool> is-picker-open: false;
+    in-out property <string> picker-target-key: "";
+    in-out property <string> picker-target-label: "";
+    in-out property <string> picker-hex-value: "#1e1e2e";
+    in-out property <brush> picker-preview-brush: #1e1e2e;
+
+    in-out property <float> wheel-indicator-x: 90.0;
+    in-out property <float> wheel-indicator-y: 90.0;
+    in-out property <float> wheel-brightness: 1.0;
+    in-out property <brush> wheel-hue-brush: #ff0000;
+
+    // 交互操作回调
+    callback open-theme-editor();
+    callback close();
+    callback apply-preset(string /* preset_name */);
+    callback color-field-changed(string /* field */, string /* val */);
+    callback metric-field-changed(string /* field */, string /* val */);
+    callback meta-field-changed(string /* field */, string /* val */);
+    callback parse-and-sync-from-toml(string /* toml_str */);
+    callback copy-toml(string /* toml_str */);
+    callback save-and-activate();
+
+    callback wheel-coord-picked(float /* rel_x */, float /* rel_y */);
+    callback wheel-brightness-picked(float /* brightness */);
+    callback picker-hex-changed(string /* hex */);
+}
