@@ -1,0 +1,554 @@
+// -----------------------------------------------------------------------------
+// 双盘对开式文件管理与 SFTP 传输主视图 (File Explorer View)
+// 基于 Feature-First 架构，消灭 2500+ 行巨石，拆解为高内聚子组件
+// -----------------------------------------------------------------------------
+
+import { AppTheme } from "../../themes/app-theme.slint";
+import { FileItemData, FileTabData, TransferItemData } from "./file_explorer_model.slint";
+import { FileBrowserPane } from "./components/file_browser_pane.slint";
+import { TransferQueueDrawer } from "./components/transfer_queue_drawer.slint";
+import { TransferContextMenu } from "./components/transfer_context_menu.slint";
+import { FileContextMenu } from "./components/file_context_menu.slint";
+
+export {
+    FileItemData,
+    FileTabData,
+    TransferItemData,
+} from "./file_explorer_model.slint";
+
+export component FileExplorerView inherits Rectangle {
+    background: AppTheme.window-background;
+
+    // -------------------------------------------------------------------------
+    // 左右分栏权重比例 (默认 0.5 平分，两边等宽)
+    // -------------------------------------------------------------------------
+    in-out property <float> split-ratio: 0.5;
+
+    // -------------------------------------------------------------------------
+    // 左右独立会话 Tab 列表与激活 ID
+    // -------------------------------------------------------------------------
+    in property <[FileTabData]> local-tabs: [];
+    in-out property <string> active-local-tab-id: "";
+
+    in property <[FileTabData]> remote-tabs: [];
+    in-out property <string> active-remote-tab-id: "";
+
+    // -------------------------------------------------------------------------
+    // 当前工作路径与文件列表数据模型
+    // -------------------------------------------------------------------------
+    in-out property <string> local-current-path: "";
+    in-out property <string> remote-current-path: "";
+
+    in property <[FileItemData]> local-files: [];
+    in property <[FileItemData]> remote-files: [];
+    in-out property <string> selected-local-id: "";
+    in-out property <string> selected-remote-id: "";
+
+    // -------------------------------------------------------------------------
+    // 跨盘拖拽交互与状态 (Drag & Drop Transfer)
+    // -------------------------------------------------------------------------
+    in-out property <bool> is-dragging-file: false;
+    in-out property <string> drag-source: ""; // "local" | "remote"
+    in-out property <string> drag-file-id: "";
+    in-out property <string> drag-file-name: "";
+    in-out property <string> drag-file-path: "";
+    in-out property <bool> drag-file-is-dir: false;
+    in-out property <length> drag-x: 0px;
+    in-out property <length> drag-y: 0px;
+
+    // -------------------------------------------------------------------------
+    // Tab 拖拽重排状态与回调 (仅同栏内有效)
+    // -------------------------------------------------------------------------
+    in-out property <bool> is-dragging-tab: false;
+    in-out property <bool> is-tab-drop-valid: true;
+    in-out property <string> drag-tab-source: ""; // "local" | "remote"
+    in-out property <int> drag-tab-from-index: -1;
+    in-out property <int> drag-tab-to-index: -1;
+    in-out property <string> drag-tab-title: "";
+    in-out property <length> drag-tab-x: 0px;
+    in-out property <length> drag-tab-y: 0px;
+
+    // -------------------------------------------------------------------------
+    // 右键上下文菜单状态与定位坐标
+    // -------------------------------------------------------------------------
+    in-out property <bool> is-transfer-menu-open: false;
+    in-out property <length> transfer-menu-x: 0px;
+    in-out property <length> transfer-menu-y: 0px;
+    in-out property <string> selected-transfer-id: "";
+    in-out property <string> selected-transfer-status: "transferring";
+    in-out property <string> selected-transfer-direction: "upload";
+
+    in-out property <bool> is-file-menu-open: false;
+    in-out property <length> file-menu-x: 0px;
+    in-out property <length> file-menu-y: 0px;
+    in-out property <bool> file-menu-is-remote: false;
+    in-out property <string> file-menu-path: "";
+    in-out property <string> file-menu-name: "";
+    in-out property <bool> file-menu-is-dir: false;
+    in-out property <bool> file-menu-is-blank: false;
+
+    // -------------------------------------------------------------------------
+    // 传输队列状态
+    // -------------------------------------------------------------------------
+    in property <[TransferItemData]> transfer-tasks: [];
+    in-out property <bool> is-transfer-queue-expanded: false;
+
+    // -------------------------------------------------------------------------
+    // 左右历史导航状态
+    // -------------------------------------------------------------------------
+    in property <bool> local-can-go-back: false;
+    in property <bool> local-can-go-forward: false;
+    in property <bool> remote-can-go-back: false;
+    in property <bool> remote-can-go-forward: false;
+
+    // -------------------------------------------------------------------------
+    // 事件回调 (向后完全兼容现有 Rust Handlers 契约)
+    // -------------------------------------------------------------------------
+    callback select-local-tab(string /* tab_id */);
+    callback close-local-tab(string /* tab_id */);
+    callback new-local-tab();
+
+    callback select-remote-tab(string /* tab_id */);
+    callback close-remote-tab(string /* tab_id */);
+    callback new-remote-tab();
+
+    callback reorder-local-tab(int /* from_index */, int /* to_index */);
+    callback reorder-remote-tab(int /* from_index */, int /* to_index */);
+
+    callback navigate-local-back();
+    callback navigate-local-forward();
+    callback navigate-remote-back();
+    callback navigate-remote-forward();
+
+    callback navigate-local-path(string /* path */);
+    callback navigate-remote-path(string /* path */);
+    callback navigate-local-up();
+    callback navigate-remote-up();
+    callback open-local-item(string /* path */, bool /* is_dir */);
+    callback open-remote-item(string /* path */, bool /* is_dir */);
+    callback toggle-local-expand(string /* path */);
+    callback toggle-remote-expand(string /* path */);
+
+    callback refresh-local();
+    callback refresh-remote();
+    callback trigger-transfer();
+    callback clear-completed-transfers();
+    callback start-transfer-task(string /* direction */, string /* source_path */, string /* filename */, bool /* is_dir */, string /* target_path */);
+    callback toggle-transfer-expand(string /* task_id */);
+
+    callback transfer-action(string /* action */, string /* task_id */);
+    callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
+    callback copy-to-clipboard(string /* text */);
+
+    // 菜单展开逻辑
+    public function open_transfer_menu(mx: length, my: length, task_id: string, status: string, direction: string) {
+        root.selected-transfer-id = task_id;
+        root.selected-transfer-status = status;
+        root.selected-transfer-direction = direction;
+        let menu_w: length = 150px;
+        let menu_h: length = 115px;
+
+        if (mx + menu_w > root.width - 8px) {
+            root.transfer-menu-x = Math.max(4px, mx - menu_w);
+        } else {
+            root.transfer-menu-x = Math.max(4px, mx);
+        }
+
+        if (my + menu_h > root.height - 8px) {
+            root.transfer-menu-y = Math.max(4px, my - menu_h);
+        } else {
+            root.transfer-menu-y = Math.max(4px, my);
+        }
+
+        root.is-transfer-menu-open = true;
+        root.is-file-menu-open = false;
+    }
+
+    public function open_file_menu(mx: length, my: length, is_remote: bool, path: string, name: string, is_dir: bool, is_blank: bool) {
+        root.file-menu-is-remote = is_remote;
+        root.file-menu-path = path;
+        root.file-menu-name = name;
+        root.file-menu-is-dir = is_dir;
+        root.file-menu-is-blank = is_blank;
+
+        let menu_w: length = 164px;
+        let menu_h: length = is_blank ? 82px : 198px;
+
+        if (mx + menu_w > root.width - 8px) {
+            root.file-menu-x = Math.max(4px, mx - menu_w);
+        } else {
+            root.file-menu-x = Math.max(4px, mx);
+        }
+
+        if (my + menu_h > root.height - 8px) {
+            root.file-menu-y = Math.max(4px, my - menu_h);
+        } else {
+            root.file-menu-y = Math.max(4px, my);
+        }
+
+        root.is-file-menu-open = true;
+        root.is-transfer-menu-open = false;
+    }
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // =====================================================================
+        // 双盘主工作区 (左侧本地 ⇄ 5px 拖拽调宽细分割线 ⇄ 右侧远程)
+        // =====================================================================
+        HorizontalLayout {
+            vertical-stretch: 1;
+            spacing: 0px;
+
+            // 1. 左侧本地盘
+            FileBrowserPane {
+                horizontal-stretch: root.split-ratio;
+                is-remote: false;
+                tabs: root.local-tabs;
+                active-tab-id <=> root.active-local-tab-id;
+                current-path <=> root.local-current-path;
+                files: root.local-files;
+                selected-id <=> root.selected-local-id;
+                can-go-back: root.local-can-go-back;
+                can-go-forward: root.local-can-go-forward;
+                is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
+                pane-offset-x: 0px;
+                other-current-path: root.remote-current-path;
+
+                is-dragging-tab <=> root.is-dragging-tab;
+                is-tab-drop-valid <=> root.is-tab-drop-valid;
+                drag-tab-source <=> root.drag-tab-source;
+                drag-tab-from-index <=> root.drag-tab-from-index;
+                drag-tab-to-index <=> root.drag-tab-to-index;
+                drag-tab-title <=> root.drag-tab-title;
+                drag-tab-x <=> root.drag-tab-x;
+                drag-tab-y <=> root.drag-tab-y;
+
+                is-dragging-file <=> root.is-dragging-file;
+                drag-source <=> root.drag-source;
+                drag-file-id <=> root.drag-file-id;
+                drag-file-name <=> root.drag-file-name;
+                drag-file-path <=> root.drag-file-path;
+                drag-file-is-dir <=> root.drag-file-is-dir;
+                drag-x <=> root.drag-x;
+                drag-y <=> root.drag-y;
+
+                select-tab(id) => { root.select-local-tab(id); }
+                close-tab(id) => { root.close-local-tab(id); }
+                new-tab => { root.new-local-tab(); }
+                reorder-tab(from, to) => { root.reorder-local-tab(from, to); }
+
+                navigate-path(p) => { root.navigate-local-path(p); }
+                navigate-up => { root.navigate-local-up(); }
+                navigate-back => { root.navigate-local-back(); }
+                navigate-forward => { root.navigate-local-forward(); }
+                refresh => { root.refresh-local(); }
+                toggle-transfer-queue => { /* Handled via is-transfer-queue-expanded binding */ }
+                open-item(p, is_dir) => { root.open-local-item(p, is_dir); }
+                start-transfer(dir, src, name, is_dir, target) => { root.start-transfer-task(dir, src, name, is_dir, target); }
+                request-file-menu(mx, my, is_rem, p, name, is_dir, is_blank) => { root.open_file_menu(mx, my, is_rem, p, name, is_dir, is_blank); }
+            }
+
+            // 2. 中间 5px 可拖拽调宽细分割线
+            Rectangle {
+                width: 5px;
+                background: split-touch.has-hover || split-touch.pressed ? AppTheme.accent : AppTheme.panel-background;
+                animate background { duration: 120ms; }
+
+                // 左边线
+                Rectangle {
+                    x: 0px;
+                    width: 1px;
+                    height: 100%;
+                    background: AppTheme.border;
+                }
+
+                // 右边线
+                Rectangle {
+                    x: parent.width - 1px;
+                    width: 1px;
+                    height: 100%;
+                    background: AppTheme.border;
+                }
+
+                split-touch := TouchArea {
+                    mouse-cursor: col-resize;
+                    moved => {
+                        if self.pressed {
+                            root.split-ratio = Math.max(0.15, Math.min(0.85, root.split-ratio + (self.mouse-x - self.pressed-x) / 500px));
+                        }
+                    }
+                    double-clicked => {
+                        root.split-ratio = 0.5;
+                    }
+                }
+            }
+
+            // 3. 右侧远程盘
+            FileBrowserPane {
+                horizontal-stretch: 1.0 - root.split-ratio;
+                is-remote: true;
+                tabs: root.remote-tabs;
+                active-tab-id <=> root.active-remote-tab-id;
+                current-path <=> root.remote-current-path;
+                files: root.remote-files;
+                selected-id <=> root.selected-remote-id;
+                can-go-back: root.remote-can-go-back;
+                can-go-forward: root.remote-can-go-forward;
+                is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
+                pane-offset-x: (root.width - 5px) * root.split-ratio + 5px;
+                other-current-path: root.local-current-path;
+
+                is-dragging-tab <=> root.is-dragging-tab;
+                is-tab-drop-valid <=> root.is-tab-drop-valid;
+                drag-tab-source <=> root.drag-tab-source;
+                drag-tab-from-index <=> root.drag-tab-from-index;
+                drag-tab-to-index <=> root.drag-tab-to-index;
+                drag-tab-title <=> root.drag-tab-title;
+                drag-tab-x <=> root.drag-tab-x;
+                drag-tab-y <=> root.drag-tab-y;
+
+                is-dragging-file <=> root.is-dragging-file;
+                drag-source <=> root.drag-source;
+                drag-file-id <=> root.drag-file-id;
+                drag-file-name <=> root.drag-file-name;
+                drag-file-path <=> root.drag-file-path;
+                drag-file-is-dir <=> root.drag-file-is-dir;
+                drag-x <=> root.drag-x;
+                drag-y <=> root.drag-y;
+
+                select-tab(id) => { root.select-remote-tab(id); }
+                close-tab(id) => { root.close-remote-tab(id); }
+                new-tab => { root.new-remote-tab(); }
+                reorder-tab(from, to) => { root.reorder-remote-tab(from, to); }
+
+                navigate-path(p) => { root.navigate-remote-path(p); }
+                navigate-up => { root.navigate-remote-up(); }
+                navigate-back => { root.navigate-remote-back(); }
+                navigate-forward => { root.navigate-remote-forward(); }
+                refresh => { root.refresh-remote(); }
+                toggle-transfer-queue => { /* Handled via is-transfer-queue-expanded binding */ }
+                open-item(p, is_dir) => { root.open-remote-item(p, is_dir); }
+                start-transfer(dir, src, name, is_dir, target) => { root.start-transfer-task(dir, src, name, is_dir, target); }
+                request-file-menu(mx, my, is_rem, p, name, is_dir, is_blank) => { root.open_file_menu(mx, my, is_rem, p, name, is_dir, is_blank); }
+            }
+        }
+
+        // =====================================================================
+        // 4. 底部传输队列抽屉 (180px 展开态 / 28px 收起迷你态)
+        // =====================================================================
+        TransferQueueDrawer {
+            transfer-tasks: root.transfer-tasks;
+            is-expanded <=> root.is-transfer-queue-expanded;
+            local-files-count: root.local-files.length;
+            remote-files-count: root.remote-files.length;
+
+            toggle-expand => { /* bound via is-expanded */ }
+            clear-completed => { root.clear-completed-transfers(); }
+            toggle-task-expand(id) => { root.toggle-transfer-expand(id); }
+            request-transfer-menu(mx, local_my, tid, st, dir) => {
+                root.open_transfer_menu(mx, (root.height - 180px) + local_my, tid, st, dir);
+            }
+        }
+    }
+
+    // =========================================================================
+    // 5. 拖拽文件时的悬浮半透明动态虚影 (Floating Drag Ghost Preview)
+    // =========================================================================
+    if root.is-dragging-file: Rectangle {
+        x: Math.max(0px, Math.min(parent.width - self.width, root.drag-x));
+        y: Math.max(0px, Math.min(parent.height - self.height, root.drag-y));
+        width: 160px;
+        height: 30px;
+        border-radius: 6px;
+
+        property <bool> is-valid-target: (root.drag-source == "local" && root.drag-x > ((parent.width - 5px) * root.split-ratio)) || (root.drag-source == "remote" && root.drag-x < ((parent.width - 5px) * root.split-ratio));
+
+        background: is-valid-target ? AppTheme.surface-background.transparentize(15%) : AppTheme.surface-background.transparentize(35%);
+        border-width: 1.5px;
+        border-color: is-valid-target ? (root.drag-source == "local" ? #3b82f6 : #10b981) : AppTheme.border;
+        drop-shadow-blur: 10px;
+        drop-shadow-color: #00000055;
+        drop-shadow-offset-y: 4px;
+
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            spacing: 8px;
+            alignment: center;
+
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: root.drag-file-is-dir ? @image-url("../../assets/icons/folder.svg") : @image-url("../../assets/icons/file-text.svg");
+                    width: 14px;
+                    height: 14px;
+                    image-fit: contain;
+                    colorize: is-valid-target ? (root.drag-file-is-dir ? AppTheme.accent : AppTheme.foreground) : AppTheme.secondary-foreground;
+                }
+            }
+
+            Text {
+                text: root.drag-file-name;
+                font-size: 11px;
+                font-weight: 600;
+                color: is-valid-target ? AppTheme.foreground : AppTheme.secondary-foreground;
+                horizontal-stretch: 1;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    height: 16px;
+                    border-radius: 3px;
+                    background: is-valid-target ? (root.drag-source == "local" ? #3b82f633 : #10b98133) : AppTheme.control-background;
+                    HorizontalLayout {
+                        padding-left: 5px;
+                        padding-right: 5px;
+                        alignment: center;
+                        Text {
+                            text: is-valid-target ? (root.drag-source == "local" ? @tr("上传") : @tr("下载")) : @tr("无效");
+                            font-size: 9px;
+                            font-weight: 700;
+                            color: is-valid-target ? (root.drag-source == "local" ? #3b82f6 : #10b981) : AppTheme.disabled-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 6. 拖拽 Tab 时的悬浮半透明动态虚影 (Floating Tab Drag Ghost)
+    // =========================================================================
+    if root.is-dragging-tab: Rectangle {
+        x: Math.max(4px, Math.min(parent.width - self.width - 4px, root.drag-tab-x - self.width / 2));
+        y: Math.max(2px, Math.min(parent.height - self.height - 4px, root.drag-tab-y - self.height / 2));
+        width: 140px;
+        height: 28px;
+        border-radius: 4px;
+        background: root.is-tab-drop-valid ? AppTheme.surface-background : AppTheme.surface-background.transparentize(35%);
+        border-width: root.is-tab-drop-valid ? 1.5px : 1px;
+        border-color: root.is-tab-drop-valid ? (root.drag-tab-source == "remote" ? #10b981 : AppTheme.accent) : #e74848aa;
+        drop-shadow-blur: 10px;
+        drop-shadow-color: root.is-tab-drop-valid ? #00000088 : #00000044;
+        drop-shadow-offset-y: 3px;
+        opacity: root.is-tab-drop-valid ? 0.95 : 0.55;
+        z: 80;
+
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 6px;
+            spacing: 6px;
+            alignment: center;
+
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: root.drag-tab-source == "remote" ? @image-url("../../assets/icons/server.svg") : @image-url("../../assets/icons/folder.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: root.is-tab-drop-valid ? (root.drag-tab-source == "remote" ? #10b981 : AppTheme.accent) : AppTheme.disabled-foreground;
+                }
+            }
+
+            Text {
+                text: (root.drag-tab-title == "本地 (主目录)" || root.drag-tab-title == "Local (Home)") ? @tr("本地 (主目录)") : ((root.drag-tab-title == "本地" || root.drag-tab-title == "本地目录" || root.drag-tab-title == "Local Directory") ? @tr("本地目录") : root.drag-tab-title);
+                font-size: 11px;
+                font-weight: 600;
+                color: root.is-tab-drop-valid ? AppTheme.foreground : AppTheme.disabled-foreground;
+                horizontal-stretch: 1;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    height: 16px;
+                    border-radius: 3px;
+                    background: root.is-tab-drop-valid ? (root.drag-tab-source == "remote" ? #10b98133 : #3b82f633) : #e7484833;
+                    HorizontalLayout {
+                        padding-left: 5px;
+                        padding-right: 5px;
+                        alignment: center;
+                        Text {
+                            text: root.is-tab-drop-valid ? @tr("移动") : @tr("禁止");
+                            font-size: 9px;
+                            font-weight: 700;
+                            color: root.is-tab-drop-valid ? (root.drag-tab-source == "remote" ? #10b981 : #3b82f6) : AppTheme.danger;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 7. 右键菜单遮罩层
+    // =========================================================================
+    if root.is-file-menu-open || root.is-transfer-menu-open: TouchArea {
+        z: 90;
+        clicked => {
+            root.is-file-menu-open = false;
+            root.is-transfer-menu-open = false;
+        }
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.is-file-menu-open = false;
+                root.is-transfer-menu-open = false;
+            }
+        }
+    }
+
+    // =========================================================================
+    // 8. 传输队列右键快捷操作上下文菜单
+    // =========================================================================
+    if root.is-transfer-menu-open: TransferContextMenu {
+        z: 100;
+        is-open: root.is-transfer-menu-open;
+        menu-x: root.transfer-menu-x;
+        menu-y: root.transfer-menu-y;
+        task-id: root.selected-transfer-id;
+        task-status: root.selected-transfer-status;
+        task-direction: root.selected-transfer-direction;
+
+        transfer-action(act, tid) => {
+            root.transfer-action(act, tid);
+        }
+        close-menu => {
+            root.is-transfer-menu-open = false;
+        }
+    }
+
+    // =========================================================================
+    // 9. 文件/目录列表右键快捷操作上下文菜单
+    // =========================================================================
+    if root.is-file-menu-open: FileContextMenu {
+        z: 100;
+        is-open: root.is-file-menu-open;
+        menu-x: root.file-menu-x;
+        menu-y: root.file-menu-y;
+        is-remote: root.file-menu-is-remote;
+        target-path: root.file-menu-path;
+        target-name: root.file-menu-name;
+        is-dir: root.file-menu-is-dir;
+        is-blank: root.file-menu-is-blank;
+
+        file-action(act, rem, path, name, is_dir) => {
+            root.file-action(act, rem, path, name, is_dir);
+        }
+        copy-to-clipboard(text) => {
+            root.copy-to-clipboard(text);
+        }
+        close-menu => {
+            root.is-file-menu-open = false;
+        }
+    }
+}

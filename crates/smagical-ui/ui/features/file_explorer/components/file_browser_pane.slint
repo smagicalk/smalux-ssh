@@ -1,0 +1,784 @@
+// -----------------------------------------------------------------------------
+// 单盘文件浏览器组件 (File Browser Pane)
+// 高度复用于 Local 本地盘与 Remote 远程 SFTP 盘
+// 包含独立 Tab 栏、路径输入面包屑、操作工具栏、排序表头、树形文件列表与拖拽引擎
+// -----------------------------------------------------------------------------
+
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { StatusDot } from "../../../components/status-dot.slint";
+import { FileItemData, FileTabData } from "../file_explorer_model.slint";
+
+export component FileBrowserPane inherits Rectangle {
+    in property <bool> is-remote: false;
+    in property <[FileTabData]> tabs: [];
+    in-out property <string> active-tab-id: "";
+    in-out property <string> current-path: "";
+    in property <[FileItemData]> files: [];
+    in-out property <string> selected-id: "";
+    in property <bool> can-go-back: false;
+    in property <bool> can-go-forward: false;
+    in-out property <bool> is-transfer-queue-expanded: false;
+    in property <length> pane-offset-x: 0px;
+    in property <string> other-current-path: "";
+
+    // Tab 拖拽重排全局属性绑定
+    in-out property <bool> is-dragging-tab: false;
+    in-out property <bool> is-tab-drop-valid: true;
+    in-out property <string> drag-tab-source: "";
+    in-out property <int> drag-tab-from-index: -1;
+    in-out property <int> drag-tab-to-index: -1;
+    in-out property <string> drag-tab-title: "";
+    in-out property <length> drag-tab-x: 0px;
+    in-out property <length> drag-tab-y: 0px;
+
+    // 文件跨盘拖拽全局属性绑定
+    in-out property <bool> is-dragging-file: false;
+    in-out property <string> drag-source: "";
+    in-out property <string> drag-file-id: "";
+    in-out property <string> drag-file-name: "";
+    in-out property <string> drag-file-path: "";
+    in-out property <bool> drag-file-is-dir: false;
+    in-out property <length> drag-x: 0px;
+    in-out property <length> drag-y: 0px;
+
+    // 事件回调
+    callback select-tab(string /* tab_id */);
+    callback close-tab(string /* tab_id */);
+    callback new-tab();
+    callback reorder-tab(int /* from_index */, int /* to_index */);
+
+    callback navigate-path(string /* path */);
+    callback navigate-up();
+    callback navigate-back();
+    callback navigate-forward();
+    callback refresh();
+    callback toggle-transfer-queue();
+    callback open-item(string /* path */, bool /* is_dir */);
+    callback start-transfer(string /* direction */, string /* source_path */, string /* filename */, bool /* is_dir */, string /* target_path */);
+    callback request-file-menu(length /* global_mx */, length /* global_my */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */, bool /* is_blank */);
+
+    background: AppTheme.window-background;
+
+    // 领域专属色彩标识
+    property <color> pane-accent: root.is-remote ? #10b981 : AppTheme.accent;
+    property <string> current-source-name: root.is-remote ? "remote" : "local";
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // =====================================================================
+        // 1. 独立会话 Tab 栏 (36px 高度)
+        // =====================================================================
+        Rectangle {
+            height: 36px;
+            background: AppTheme.panel-background;
+
+            // 底部分割线
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+
+            // Tab 列表容器 (靠左排列，右侧留出 42px 给新建按钮)
+            HorizontalLayout {
+                x: 6px;
+                y: 0px;
+                width: parent.width - 42px;
+                height: 100%;
+                spacing: 4px;
+                alignment: start;
+
+                for tab[idx] in root.tabs: Rectangle {
+                    min-width: tab.is-active ? 130px : 120px;
+                    max-width: 180px;
+                    height: 28px;
+                    y: 4px;
+                    border-radius: 4px;
+                    opacity: (root.is-dragging-tab && root.drag-tab-source == root.current-source-name && root.drag-tab-from-index == idx) ? 0.35 : 1.0;
+                    background: tab.is-active ? AppTheme.surface-background : (tab-touch.has-hover ? AppTheme.hover-background : AppTheme.surface-background.transparentize(50%));
+                    border-width: (root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-source == root.current-source-name && root.drag-tab-to-index == idx && root.drag-tab-from-index != idx) ? 2px : 1px;
+                    border-color: (root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-source == root.current-source-name && root.drag-tab-to-index == idx && root.drag-tab-from-index != idx) ? root.pane-accent : (tab.is-active ? root.pane-accent : (tab-touch.has-hover ? root.pane-accent.transparentize(40%) : AppTheme.border));
+
+                    tab-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        clicked => {
+                            if !root.is-dragging-tab {
+                                root.select-tab(tab.id);
+                            }
+                        }
+                        moved => {
+                            if self.pressed && (self.mouse-x - self.pressed-x > 8px || self.mouse-x - self.pressed-x < -8px || self.mouse-y - self.pressed-y > 8px || self.mouse-y - self.pressed-y < -8px) {
+                                root.is-dragging-tab = true;
+                                root.drag-tab-source = root.current-source-name;
+                                root.drag-tab-from-index = idx;
+                                root.drag-tab-title = tab.title;
+
+                                let cur_gx: length = root.pane-offset-x + 6px + (idx * 134px) + self.mouse-x;
+                                let cur_gy: length = 4px + self.mouse-y;
+                                root.drag-tab-x = cur_gx;
+                                root.drag-tab-y = cur_gy;
+
+                                let is_valid: bool = cur_gx >= root.pane-offset-x && cur_gx <= (root.pane-offset-x + root.width) && cur_gy >= -15px && cur_gy <= 45px;
+                                root.is-tab-drop-valid = is_valid;
+
+                                if is_valid {
+                                    let rel_x: length = Math.max(0px, cur_gx - (root.pane-offset-x + 6px));
+                                    let target: int = Math.max(0, Math.min(root.tabs.length - 1, Math.floor(rel_x / 134px)));
+                                    root.drag-tab-to-index = target;
+                                } else {
+                                    root.drag-tab-to-index = -1;
+                                }
+                            }
+                        }
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.up {
+                                if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-source == root.current-source-name && root.drag-tab-from-index >= 0 && root.drag-tab-to-index >= 0 && root.drag-tab-from-index != root.drag-tab-to-index {
+                                    root.reorder-tab(root.drag-tab-from-index, root.drag-tab-to-index);
+                                }
+                                root.is-dragging-tab = false;
+                                root.is-tab-drop-valid = true;
+                                root.drag-tab-from-index = -1;
+                                root.drag-tab-to-index = -1;
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 6px;
+                        spacing: 6px;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: (root.is-remote && tab.host-id != "local") ? @image-url("../../../assets/icons/server.svg") : @image-url("../../../assets/icons/folder.svg");
+                                width: 13px;
+                                height: 13px;
+                                image-fit: contain;
+                                colorize: tab.is-active ? root.pane-accent : (tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                            }
+                        }
+
+                        // 远程主机在线状态指示灯
+                        if root.is-remote && tab.host-id != "local": VerticalLayout {
+                            alignment: center;
+                            StatusDot {
+                                status: tab.status != "" ? tab.status : "online";
+                                dot-size: 5px;
+                            }
+                        }
+
+                        Text {
+                            text: tab.host-id == "local" ? (tab.title == "本地 (主目录)" || tab.title == "Local (Home)" ? @tr("本地 (主目录)") : (tab.title == "本地" || tab.title == "本地目录" || tab.title == "Local Directory" ? @tr("本地目录") : tab.title)) : tab.title;
+                            font-size: 11px;
+                            font-weight: tab.is-active ? 700 : 500;
+                            color: tab.is-active ? AppTheme.foreground : (tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                            vertical-alignment: center;
+                        }
+
+                        // 关闭 Tab 按钮
+                        VerticalLayout {
+                            alignment: center;
+
+                            Rectangle {
+                                width: 16px;
+                                height: 16px;
+                                border-radius: 8px;
+                                background: close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                close-touch := TouchArea {
+                                    clicked => { root.close-tab(tab.id); }
+                                    mouse-cursor: pointer;
+                                }
+
+                                Image {
+                                    source: @image-url("../../../assets/icons/window-close.svg");
+                                    width: 8px;
+                                    height: 8px;
+                                    image-fit: contain;
+                                    colorize: close-touch.has-hover ? AppTheme.danger : AppTheme.disabled-foreground;
+                                    x: (parent.width - self.width) / 2;
+                                    y: (parent.height - self.height) / 2;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 新建会话 Tab + 按钮
+            Rectangle {
+                x: parent.width - self.width - 6px;
+                y: (parent.height - self.height) / 2;
+                width: 26px;
+                height: 26px;
+                border-radius: 4px;
+                background: new-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                new-touch := TouchArea {
+                    clicked => { root.new-tab(); }
+                    mouse-cursor: pointer;
+                }
+
+                Image {
+                    source: @image-url("../../../assets/icons/plus.svg");
+                    width: 12px;
+                    height: 12px;
+                    image-fit: contain;
+                    colorize: new-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    x: (parent.width - self.width) / 2;
+                    y: (parent.height - self.height) / 2;
+                }
+            }
+        }
+
+        // =====================================================================
+        // 2. 远程无会话时的优雅空态提示 (仅在 remote 且 tabs.length == 0 时展示)
+        // =====================================================================
+        if root.is-remote && root.tabs.length == 0: Rectangle {
+            vertical-stretch: 1;
+            horizontal-stretch: 1;
+            background: AppTheme.window-background;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 14px;
+                padding: 24px;
+
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../../assets/icons/server.svg");
+                        width: 48px;
+                        height: 48px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent.transparentize(40%);
+                    }
+                }
+
+                Text {
+                    text: @tr("未打开远程 SFTP 会话");
+                    font-size: 15px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: @tr("请在左侧主机列表双击选择主机，或点击右上角「+」连接远程主机");
+                    font-size: 12px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                }
+
+                HorizontalLayout {
+                    alignment: center;
+                    Rectangle {
+                        min-width: 146px;
+                        height: 32px;
+                        border-radius: 4px;
+                        background: connect-touch.has-hover ? AppTheme.accent.transparentize(20%) : AppTheme.accent;
+
+                        connect-touch := TouchArea {
+                            clicked => { root.new-tab(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 16px;
+                            padding-right: 16px;
+                            alignment: center;
+                            spacing: 6px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../../assets/icons/plus.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    image-fit: contain;
+                                    colorize: #ffffff;
+                                }
+                            }
+
+                            Text {
+                                text: @tr("连接远程主机");
+                                font-size: 12px;
+                                font-weight: 600;
+                                color: #ffffff;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =====================================================================
+        // 3. 工作区内容区 (路径导航栏 ➔ 排序表头 ➔ 文件列表)
+        // =====================================================================
+        if !root.is-remote || root.tabs.length > 0: VerticalLayout {
+            padding: 6px;
+            spacing: 6px;
+            vertical-stretch: 1;
+
+            // 3.1 路径导航栏: [Home][<-][->] ➔ [路径输入框] ➔ [传输][刷新]
+            Rectangle {
+                height: 32px;
+                border-radius: AppTheme.radius-medium;
+                background: AppTheme.panel-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+                    spacing: 4px;
+
+                    // Home 按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: home-touch.has-hover ? AppTheme.hover-background : transparent;
+                        home-touch := TouchArea {
+                            clicked => { root.navigate-path("~"); }
+                            mouse-cursor: pointer;
+                        }
+                        Image {
+                            source: @image-url("../../../assets/icons/home.svg");
+                            width: 13px;
+                            height: 13px;
+                            image-fit: contain;
+                            colorize: home-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+
+                    // 后退按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: (root.can-go-back && back-touch.has-hover) ? AppTheme.hover-background : transparent;
+                        back-touch := TouchArea {
+                            clicked => {
+                                if root.can-go-back {
+                                    root.navigate-back();
+                                }
+                            }
+                            mouse-cursor: root.can-go-back ? pointer : default;
+                        }
+                        Image {
+                            source: @image-url("../../../assets/icons/arrow-left.svg");
+                            width: 12px;
+                            height: 12px;
+                            image-fit: contain;
+                            colorize: root.can-go-back ? (back-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground) : AppTheme.disabled-foreground.transparentize(50%);
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+
+                    // 前进按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: (root.can-go-forward && fwd-touch.has-hover) ? AppTheme.hover-background : transparent;
+                        fwd-touch := TouchArea {
+                            clicked => {
+                                if root.can-go-forward {
+                                    root.navigate-forward();
+                                }
+                            }
+                            mouse-cursor: root.can-go-forward ? pointer : default;
+                        }
+                        Image {
+                            source: @image-url("../../../assets/icons/arrow-right.svg");
+                            width: 12px;
+                            height: 12px;
+                            image-fit: contain;
+                            colorize: root.can-go-forward ? (fwd-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground) : AppTheme.disabled-foreground.transparentize(50%);
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+
+                    // 路径输入框
+                    Rectangle {
+                        horizontal-stretch: 1;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: AppTheme.control-background;
+                        border-width: path-input.has-focus ? 1.5px : 1px;
+                        border-color: path-input.has-focus ? root.pane-accent : AppTheme.border;
+                        clip: true;
+
+                        animate border-color { duration: 120ms; }
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            spacing: 6px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../../assets/icons/folder-open.svg");
+                                    width: 13px;
+                                    height: 13px;
+                                    image-fit: contain;
+                                    colorize: path-input.has-focus ? root.pane-accent : AppTheme.secondary-foreground;
+                                }
+                            }
+
+                            path-input := TextInput {
+                                text: root.current-path;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                horizontal-alignment: left;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                                selection-background-color: AppTheme.selected-background;
+                                selection-foreground-color: AppTheme.selected-foreground;
+
+                                accepted => {
+                                    root.navigate-path(self.text);
+                                }
+                            }
+                        }
+                    }
+
+                    // 传输抽屉展开/收起按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: (root.is-transfer-queue-expanded || trans-touch.has-hover) ? AppTheme.hover-background : transparent;
+                        trans-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-queue-expanded = !root.is-transfer-queue-expanded;
+                                root.toggle-transfer-queue();
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        Image {
+                            source: @image-url("../../../assets/icons/arrow-up-down.svg");
+                            width: 12px;
+                            height: 12px;
+                            image-fit: contain;
+                            colorize: (root.is-transfer-queue-expanded || trans-touch.has-hover) ? root.pane-accent : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+
+                    // 刷新按钮
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 4px;
+                        background: ref-touch.has-hover ? AppTheme.hover-background : transparent;
+                        ref-touch := TouchArea {
+                            clicked => { root.refresh(); }
+                            mouse-cursor: pointer;
+                        }
+                        Image {
+                            source: @image-url("../../../assets/icons/refresh.svg");
+                            width: 12px;
+                            height: 12px;
+                            image-fit: contain;
+                            colorize: ref-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+            }
+
+            // 3.2 列表表头
+            Rectangle {
+                height: 24px;
+                background: AppTheme.panel-background;
+                border-radius: 4px;
+
+                HorizontalLayout {
+                    padding-left: 12px;
+                    padding-right: 12px;
+                    spacing: 8px;
+
+                    Text {
+                        text: @tr("名称");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.disabled-foreground;
+                        horizontal-stretch: 1;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: @tr("大小");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.disabled-foreground;
+                        width: 70px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+
+                    if root.is-remote: Text {
+                        text: @tr("权限");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.disabled-foreground;
+                        width: 85px;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: @tr("修改时间");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.disabled-foreground;
+                        width: 110px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 3.3 文件树形列表
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+
+                file-scroll := Flickable {
+                    width: 100%;
+                    height: 100%;
+                    interactive: false;
+                    viewport-height: (root.files.length + 1) * 27px;
+
+                    VerticalLayout {
+                        x: 0px;
+                        y: 0px;
+                        width: parent.width;
+                        spacing: 1px;
+                        alignment: start;
+
+                        // 文件夹第一项：.. 上层目录
+                        Rectangle {
+                            height: 26px;
+                            border-radius: 4px;
+                            background: dot-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                            dot-touch := TouchArea {
+                                double-clicked => {
+                                    root.navigate-up();
+                                }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 12px;
+                                spacing: 8px;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../../assets/icons/folder.svg");
+                                        width: 14px;
+                                        height: 14px;
+                                        image-fit: contain;
+                                        colorize: root.pane-accent;
+                                    }
+                                }
+
+                                Text {
+                                    text: "..";
+                                    font-size: 13px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                    horizontal-stretch: 1;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: "-";
+                                    font-size: 11px;
+                                    color: AppTheme.disabled-foreground;
+                                    width: 70px;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                }
+
+                                if root.is-remote: Text {
+                                    text: "drwxr-xr-x";
+                                    font-size: 10px;
+                                    color: AppTheme.disabled-foreground;
+                                    width: 75px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: "-";
+                                    font-size: 11px;
+                                    color: AppTheme.disabled-foreground;
+                                    width: 110px;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // 文件与目录项列表
+                        for item[idx] in root.files: Rectangle {
+                            height: 26px;
+                            border-radius: 4px;
+                            background: root.selected-id == item.id ? AppTheme.selected-background : (item-touch.has-hover ? AppTheme.hover-background : transparent);
+
+                            item-touch := TouchArea {
+                                mouse-cursor: pointer;
+                                clicked => {
+                                    root.selected-id = item.id;
+                                }
+                                double-clicked => {
+                                    root.open-item(item.path, item.is-dir);
+                                }
+                                moved => {
+                                    if self.pressed && (self.mouse-x - self.pressed-x > 8px || self.mouse-x - self.pressed-x < -8px || self.mouse-y - self.pressed-y > 8px || self.mouse-y - self.pressed-y < -8px) {
+                                        root.is-dragging-file = true;
+                                        root.drag-source = root.current-source-name;
+                                        root.drag-file-id = item.id;
+                                        root.drag-file-name = item.name;
+                                        root.drag-file-path = item.path;
+                                        root.drag-file-is-dir = item.is-dir;
+                                        root.drag-x = root.pane-offset-x + 12px + self.mouse-x;
+                                        root.drag-y = 80px + (idx + 1) * 27px + file-scroll.viewport-y + self.mouse-y;
+                                    }
+                                }
+                                pointer-event(event) => {
+                                    if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                                        root.request-file-menu(root.pane-offset-x + 12px + self.mouse-x, 80px + (idx + 1) * 27px + file-scroll.viewport-y + self.mouse-y, root.is-remote, item.path, item.name, item.is-dir, false);
+                                    }
+                                    if event.kind == PointerEventKind.up && root.is-dragging-file {
+                                        if root.is-remote {
+                                            // 远程向左拖入本地
+                                            if root.drag-source == "remote" && self.mouse-x < 0px {
+                                                root.start-transfer("download", root.drag-file-path, root.drag-file-name, root.drag-file-is-dir, root.other-current-path);
+                                                root.is-transfer-queue-expanded = true;
+                                            }
+                                        } else {
+                                            // 本地向右拖入远程
+                                            if root.drag-source == "local" && self.mouse-x > parent.width {
+                                                root.start-transfer("upload", root.drag-file-path, root.drag-file-name, root.drag-file-is-dir, root.other-current-path);
+                                                root.is-transfer-queue-expanded = true;
+                                            }
+                                        }
+                                        root.is-dragging-file = false;
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 10px;
+                                padding-right: 12px;
+                                spacing: 8px;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: item.is-dir ? @image-url("../../../assets/icons/folder.svg") : @image-url("../../../assets/icons/file-text.svg");
+                                        width: 14px;
+                                        height: 14px;
+                                        image-fit: contain;
+                                        colorize: item.is-dir ? root.pane-accent : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                Text {
+                                    text: item.name;
+                                    font-size: 12px;
+                                    font-weight: item.is-dir ? 600 : 400;
+                                    color: item.is-dir ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    horizontal-stretch: 1;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: item.size-formatted;
+                                    font-size: 11px;
+                                    color: AppTheme.disabled-foreground;
+                                    width: 70px;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                }
+
+                                if root.is-remote: Text {
+                                    text: item.permissions != "" ? item.permissions : "-";
+                                    font-size: 10px;
+                                    color: AppTheme.disabled-foreground;
+                                    width: 85px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+
+                                Text {
+                                    text: item.modified-formatted;
+                                    font-size: 11px;
+                                    color: AppTheme.disabled-foreground;
+                                    width: 110px;
+                                    horizontal-alignment: right;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 悬浮竖向滚动条
+                if file-scroll.viewport-height > file-scroll.height: Rectangle {
+                    x: parent.width - 6px;
+                    y: 0px;
+                    width: 6px;
+                    height: parent.height;
+
+                    Rectangle {
+                        x: 0.5px;
+                        y: Math.max(0px, Math.min(parent.height - self.height, (-file-scroll.viewport-y / Math.max(1px, file-scroll.viewport-height - file-scroll.height)) * (parent.height - self.height)));
+                        width: 5px;
+                        height: Math.max(28px, (file-scroll.height / file-scroll.viewport-height) * parent.height);
+                        border-radius: 2.5px;
+                        background: v-touch.has-hover || v-touch.pressed ? root.pane-accent : AppTheme.secondary-foreground.transparentize(60%);
+                        animate background { duration: 120ms; }
+
+                        v-touch := TouchArea {
+                            mouse-cursor: pointer;
+                            moved => {
+                                if self.pressed {
+                                    file-scroll.viewport-y = Math.min(0px, Math.max(file-scroll.height - file-scroll.viewport-height, file-scroll.viewport-y - (self.mouse-y - self.pressed-y) * (file-scroll.viewport-height / file-scroll.height)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

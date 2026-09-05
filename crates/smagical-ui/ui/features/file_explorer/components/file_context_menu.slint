@@ -1,0 +1,109 @@
+// -----------------------------------------------------------------------------
+// 文件/目录列表条目右键快捷操作上下文菜单 (File Context Menu)
+// -----------------------------------------------------------------------------
+
+import { ContextMenuItem, ContextMenuContainer } from "../../../components/context-menu.slint";
+
+export component FileContextMenu inherits ContextMenuContainer {
+    in property <bool> is-remote: false;
+    in property <string> target-path: "";
+    in property <string> target-name: "";
+    in property <bool> is-dir: false;
+    in property <bool> is-blank: false;
+
+    callback file-action(string /* action */, bool /* is_remote */, string /* path */, string /* name */, bool /* is_dir */);
+    callback copy-to-clipboard(string /* text */);
+    callback close-menu();
+
+    menu-width: 164px;
+    menu-height: root.is-blank ? 82px : 198px;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 1px;
+
+        // 1. 打开 / 进入目录 (非空白区域)
+        if !root.is-blank: ContextMenuItem {
+            item-id: "open";
+            title: root.is-dir ? @tr("进入目录") : @tr("打开文件");
+            icon: root.is-dir ? @image-url("../../../assets/icons/folder-open.svg") : @image-url("../../../assets/icons/file-text.svg");
+            clicked(id) => {
+                root.file-action(id, root.is-remote, root.target-path, root.target-name, root.is-dir);
+                root.close-menu();
+            }
+        }
+
+        // 2. 上传到远程 / 下载到本地 (非空白区域)
+        if !root.is-blank: ContextMenuItem {
+            item-id: "transfer";
+            title: root.is-remote ? @tr("下载到本地") : @tr("上传到远程");
+            icon: @image-url("../../../assets/icons/arrow-up-down.svg");
+            clicked(id) => {
+                root.file-action(id, root.is-remote, root.target-path, root.target-name, root.is-dir);
+                root.close-menu();
+            }
+        }
+
+        // 分割线
+        if !root.is-blank: ContextMenuItem { is-separator: true; }
+
+        // 3. 新建文件夹
+        ContextMenuItem {
+            item-id: "create_folder";
+            title: @tr("新建文件夹");
+            icon: @image-url("../../../assets/icons/folder-plus.svg");
+            clicked(id) => {
+                root.file-action(id, root.is-remote, root.target-path, "", true);
+                root.close-menu();
+            }
+        }
+
+        // 4. 新建文件
+        ContextMenuItem {
+            item-id: "create_file";
+            title: @tr("新建文件");
+            icon: @image-url("../../../assets/icons/plus.svg");
+            clicked(id) => {
+                root.file-action(id, root.is-remote, root.target-path, "", false);
+                root.close-menu();
+            }
+        }
+
+        // 5. 刷新目录
+        ContextMenuItem {
+            item-id: "refresh";
+            title: @tr("刷新目录");
+            icon: @image-url("../../../assets/icons/refresh.svg");
+            clicked(id) => {
+                root.file-action(id, root.is-remote, root.target-path, "", true);
+                root.close-menu();
+            }
+        }
+
+        // 分割线
+        if !root.is-blank: ContextMenuItem { is-separator: true; }
+
+        // 6. 复制完整路径 (非空白区域)
+        if !root.is-blank: ContextMenuItem {
+            item-id: "copy";
+            title: @tr("复制完整路径");
+            icon: @image-url("../../../assets/icons/copy.svg");
+            clicked(id) => {
+                root.copy-to-clipboard(root.target-path);
+                root.close-menu();
+            }
+        }
+
+        // 7. 删除 (非空白区域)
+        if !root.is-blank: ContextMenuItem {
+            item-id: "delete";
+            title: @tr("删除");
+            icon: @image-url("../../../assets/icons/trash.svg");
+            is-danger: true;
+            clicked(id) => {
+                root.file-action(id, root.is-remote, root.target-path, root.target-name, root.is-dir);
+                root.close-menu();
+            }
+        }
+    }
+}

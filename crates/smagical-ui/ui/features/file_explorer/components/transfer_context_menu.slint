@@ -1,0 +1,72 @@
+// -----------------------------------------------------------------------------
+// 传输队列右键快捷操作上下文菜单 (Transfer Context Menu)
+// -----------------------------------------------------------------------------
+
+import { ContextMenuItem, ContextMenuContainer } from "../../../components/context-menu.slint";
+
+export component TransferContextMenu inherits ContextMenuContainer {
+    in property <string> task-id: "";
+    in property <string> task-status: "transferring";
+    in property <string> task-direction: "upload";
+
+    callback transfer-action(string /* action */, string /* task_id */);
+    callback close-menu();
+
+    menu-width: 150px;
+    menu-height: 114px;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 1px;
+
+        // 1. 暂停 / 继续传输 (已完成或失败任务置灰禁用)
+        ContextMenuItem {
+            item-id: root.task-status == "paused" ? "resume" : "pause";
+            title: root.task-status == "paused" ? @tr("继续传输") : @tr("暂停传输");
+            icon: root.task-status == "paused" ? @image-url("../../../assets/icons/play.svg") : @image-url("../../../assets/icons/eraser.svg");
+            is-disabled: root.task-status == "completed" || root.task-status == "failed";
+            clicked(id) => {
+                root.transfer-action(id, root.task-id);
+                root.close-menu();
+            }
+        }
+
+        // 2. 停止传输 (已完成或失败任务置灰禁用)
+        ContextMenuItem {
+            item-id: "stop";
+            title: @tr("停止传输");
+            icon: @image-url("../../../assets/icons/window-close.svg");
+            is-danger: true;
+            is-disabled: root.task-status == "completed" || root.task-status == "failed";
+            clicked(id) => {
+                root.transfer-action(id, root.task-id);
+                root.close-menu();
+            }
+        }
+
+        // 3. 重新上传 / 重新下载
+        ContextMenuItem {
+            item-id: "retry";
+            title: root.task-direction == "download" ? @tr("重新下载") : @tr("重新上传");
+            icon: @image-url("../../../assets/icons/refresh.svg");
+            clicked(id) => {
+                root.transfer-action(id, root.task-id);
+                root.close-menu();
+            }
+        }
+
+        // 分割线
+        ContextMenuItem { is-separator: true; }
+
+        // 4. 移除此记录
+        ContextMenuItem {
+            item-id: "remove";
+            title: @tr("移除记录");
+            icon: @image-url("../../../assets/icons/trash.svg");
+            clicked(id) => {
+                root.transfer-action(id, root.task-id);
+                root.close-menu();
+            }
+        }
+    }
+}

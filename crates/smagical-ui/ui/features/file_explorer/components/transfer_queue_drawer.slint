@@ -1,0 +1,598 @@
+// -----------------------------------------------------------------------------
+// 文件传输队列抽屉组件 (Transfer Queue Drawer)
+// 支持底部 180px 展开态与 28px 迷你常驻状态栏切换
+// -----------------------------------------------------------------------------
+
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { TransferItemData } from "../file_explorer_model.slint";
+
+export component TransferQueueDrawer inherits Rectangle {
+    in property <[TransferItemData]> transfer-tasks: [];
+    in-out property <bool> is-expanded: false;
+    in property <int> local-files-count: 0;
+    in property <int> remote-files-count: 0;
+
+    callback toggle-expand();
+    callback clear-completed();
+    callback toggle-task-expand(string /* task_id */);
+    callback request-transfer-menu(length /* menu_x */, length /* local_my */, string /* task_id */, string /* status */, string /* direction */);
+
+    height: root.is-expanded ? 180px : 28px;
+    background: AppTheme.panel-background;
+    clip: true;
+
+    // 顶部分割线
+    Rectangle {
+        y: 0px;
+        height: 1px;
+        width: 100%;
+        background: AppTheme.border;
+    }
+
+    // =========================================================================
+    // 1. 展开态 (180px 高度任务列表)
+    // =========================================================================
+    if root.is-expanded: VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // 1.1 传输面板标题栏与操作按钮
+        Rectangle {
+            height: 32px;
+            background: AppTheme.surface-background;
+
+            // 底部细分割线
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border.transparentize(30%);
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 8px;
+                alignment: center;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../../assets/icons/arrow-up-down.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: AppTheme.accent;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: @tr("文件传输队列与实时任务");
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 18px;
+                        border-radius: 9px;
+                        background: AppTheme.control-background;
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+
+                            Text {
+                                text: root.transfer-tasks.length > 0 ? (root.transfer-tasks.length + " " + @tr("个任务")) : @tr("空闲");
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    horizontal-stretch: 1;
+                }
+
+                // 清空已完成按钮
+                if root.transfer-tasks.length > 0: VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 22px;
+                        border-radius: 4px;
+                        background: clear-trans-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        clear-trans-touch := TouchArea {
+                            clicked => { root.clear-completed(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 4px;
+                            alignment: center;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../../assets/icons/trash.svg");
+                                    width: 11px;
+                                    height: 11px;
+                                    image-fit: contain;
+                                    colorize: clear-trans-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                }
+                            }
+
+                            Text {
+                                text: @tr("清空已完成");
+                                font-size: 11px;
+                                color: clear-trans-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 关闭/折叠面板按钮
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 22px;
+                        height: 22px;
+                        border-radius: 4px;
+                        background: close-trans-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        close-trans-touch := TouchArea {
+                            clicked => {
+                                root.is-expanded = false;
+                                root.toggle-expand();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../../../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: close-trans-touch.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 1.2 传输任务列表表头栏
+        if root.transfer-tasks.length > 0: Rectangle {
+            height: 26px;
+            background: AppTheme.surface-background;
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 12px;
+                spacing: 8px;
+
+                Text {
+                    text: @tr("源路径 (文件名 / 目录)");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-stretch: 1;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("目标路径");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-stretch: 1;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("文件大小");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.disabled-foreground;
+                    width: 130px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("传输进度");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.disabled-foreground;
+                    width: 160px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("传输速度");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.disabled-foreground;
+                    width: 80px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("状态");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.disabled-foreground;
+                    width: 65px;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 1.3 传输任务列表内容
+        if root.transfer-tasks.length == 0: VerticalLayout {
+            alignment: center;
+            vertical-stretch: 1;
+            spacing: 6px;
+
+            HorizontalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("../../../assets/icons/arrow-up-down.svg");
+                    width: 24px;
+                    height: 24px;
+                    image-fit: contain;
+                    colorize: AppTheme.disabled-foreground.transparentize(50%);
+                }
+            }
+
+            Text {
+                text: @tr("暂无文件传输任务 (直接拖拽左/右侧文件或目录即可触发实时上传/下载)");
+                font-size: 11px;
+                color: AppTheme.disabled-foreground;
+                horizontal-alignment: center;
+            }
+        }
+
+        if root.transfer-tasks.length > 0: Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            trans-scroll := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: Math.max(self.height, root.transfer-tasks.length * 30px);
+
+                VerticalLayout {
+                    spacing: 0px;
+                    padding: 0px;
+
+                    for task[idx] in root.transfer-tasks: Rectangle {
+                        height: 30px;
+                        width: 100%;
+                        background: task-touch.has-hover ? AppTheme.hover-background : (task.is-dir ? AppTheme.control-background.transparentize(50%) : transparent);
+
+                        // 行底部分割线
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            width: 100%;
+                            background: AppTheme.border.transparentize(70%);
+                        }
+
+                        task-touch := TouchArea {
+                            clicked => {
+                                if task.is-dir {
+                                    root.toggle-task-expand(task.id);
+                                }
+                            }
+                            pointer-event(event) => {
+                                if event.kind == PointerEventKind.down && event.button == PointerEventButton.right {
+                                    root.request-transfer-menu(self.mouse-x + 12px, 58px + idx * 30px + trans-scroll.viewport-y + self.mouse-y, task.id, task.status, task.direction);
+                                }
+                            }
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 8px;
+
+                            // 1. 源路径与类型图标组
+                            HorizontalLayout {
+                                horizontal-stretch: 1;
+                                spacing: 6px;
+
+                                // 子项层级缩进
+                                if task.level > 0: Rectangle {
+                                    width: task.level * 16px;
+                                }
+
+                                // 文件夹折叠/展开小箭头 (仅对文件夹显示)
+                                if task.is-dir: VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: task.is-expanded ? @image-url("../../../assets/icons/chevron-down.svg") : @image-url("../../../assets/icons/chevron-right.svg");
+                                        width: 10px;
+                                        height: 10px;
+                                        image-fit: contain;
+                                        colorize: AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                // 上传/下载方向标识
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 18px;
+                                        height: 18px;
+                                        border-radius: 3px;
+                                        background: task.direction == "upload" ? #3b82f622 : #10b98122;
+
+                                        Image {
+                                            source: @image-url("../../../assets/icons/arrow-up-down.svg");
+                                            width: 10px;
+                                            height: 10px;
+                                            image-fit: contain;
+                                            colorize: task.direction == "upload" ? #3b82f6 : #10b981;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                    }
+                                }
+
+                                // 文件夹或文件图标
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: task.is-dir ? @image-url("../../../assets/icons/folder.svg") : @image-url("../../../assets/icons/file-text.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: task.is-dir ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                // 完整源路径 (或文件名)
+                                Text {
+                                    text: task.source-path;
+                                    font-size: 12px;
+                                    font-weight: task.is-dir ? 700 : 500;
+                                    color: task.is-dir ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    horizontal-stretch: 1;
+                                    horizontal-alignment: left;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+
+                                // 文件夹项数概览徽章
+                                if task.is-dir && task.item-count-text != "": VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 16px;
+                                        border-radius: 3px;
+                                        background: AppTheme.control-background;
+
+                                        HorizontalLayout {
+                                            padding-left: 4px;
+                                            padding-right: 4px;
+                                            alignment: center;
+                                            Text {
+                                                text: task.item-count-text;
+                                                font-size: 9px;
+                                                color: AppTheme.disabled-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 2. 目标路径
+                            Text {
+                                text: task.target-path;
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                                horizontal-stretch: 1;
+                                horizontal-alignment: left;
+                                overflow: elide;
+                                vertical-alignment: center;
+                            }
+
+                            // 3. 文件大小
+                            Text {
+                                text: task.size-text;
+                                font-size: 11px;
+                                color: AppTheme.disabled-foreground;
+                                width: 130px;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                            }
+
+                            // 4. 上传/下载进度 (进度条 + 百分比)
+                            VerticalLayout {
+                                alignment: center;
+                                width: 160px;
+
+                                Rectangle {
+                                    height: 14px;
+                                    border-radius: 7px;
+                                    background: AppTheme.control-background;
+                                    clip: true;
+
+                                    Rectangle {
+                                        x: 0px;
+                                        y: 0px;
+                                        width: parent.width * task.progress;
+                                        height: 100%;
+                                        border-radius: 7px;
+                                        background: task.status == "failed" ? AppTheme.danger : (task.status == "completed" ? #10b981 : (task.is-dir ? #8b5cf6 : AppTheme.accent));
+                                    }
+
+                                    Text {
+                                        text: Math.round(task.progress * 100) + "%" + (task.is-dir ? (" " + @tr("(总进度)")) : "");
+                                        font-size: 9px;
+                                        font-weight: 700;
+                                        color: AppTheme.foreground;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                            }
+
+                            // 5. 传输速度
+                            Text {
+                                text: task.speed-text;
+                                font-size: 11px;
+                                color: AppTheme.secondary-foreground;
+                                width: 80px;
+                                horizontal-alignment: right;
+                                vertical-alignment: center;
+                            }
+
+                            // 6. 状态徽章
+                            VerticalLayout {
+                                alignment: center;
+                                width: 65px;
+
+                                Rectangle {
+                                    height: 18px;
+                                    border-radius: 3px;
+                                    background: task.status == "completed" ? #10b98122 : (task.status == "failed" ? #ef444422 : #3b82f622);
+
+                                    HorizontalLayout {
+                                        padding-left: 6px;
+                                        padding-right: 6px;
+                                        alignment: center;
+
+                                        Text {
+                                            text: task.status == "completed" ? @tr("已完成") : (task.status == "failed" ? @tr("失败") : @tr("传输中"));
+                                            font-size: 10px;
+                                            font-weight: 600;
+                                            color: task.status == "completed" ? #10b981 : (task.status == "failed" ? #ef4444 : #3b82f6);
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 悬浮竖向滚动条
+            if trans-scroll.viewport-height > trans-scroll.height: Rectangle {
+                x: parent.width - 6px;
+                y: 0px;
+                width: 6px;
+                height: parent.height;
+
+                Rectangle {
+                    x: 0.5px;
+                    y: Math.max(0px, Math.min(parent.height - self.height, (-trans-scroll.viewport-y / Math.max(1px, trans-scroll.viewport-height - trans-scroll.height)) * (parent.height - self.height)));
+                    width: 5px;
+                    height: Math.max(24px, (trans-scroll.height / trans-scroll.viewport-height) * parent.height);
+                    border-radius: 2.5px;
+                    background: v-trans-touch.has-hover || v-trans-touch.pressed ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(60%);
+                    animate background { duration: 120ms; }
+
+                    v-trans-touch := TouchArea {
+                        mouse-cursor: pointer;
+                        moved => {
+                            if self.pressed {
+                                trans-scroll.viewport-y = Math.min(0px, Math.max(trans-scroll.height - trans-scroll.viewport-height, trans-scroll.viewport-y - (self.mouse-y - self.pressed-y) * (trans-scroll.viewport-height / trans-scroll.height)));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 2. 折叠迷你态 (28px 高度常驻底栏)
+    // =========================================================================
+    if !root.is-expanded: Rectangle {
+        height: 28px;
+        background: AppTheme.panel-background;
+
+        bot-bar-touch := TouchArea {
+            clicked => {
+                root.is-expanded = true;
+                root.toggle-expand();
+            }
+            mouse-cursor: pointer;
+        }
+
+        HorizontalLayout {
+            padding-left: 12px;
+            padding-right: 12px;
+            spacing: 8px;
+            alignment: center;
+
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("../../../assets/icons/arrow-up-down.svg");
+                    width: 12px;
+                    height: 12px;
+                    image-fit: contain;
+                    colorize: bot-bar-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                }
+            }
+
+            Text {
+                text: @tr("传输队列");
+                font-size: 11px;
+                font-weight: 600;
+                color: bot-bar-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: root.transfer-tasks.length > 0 ? ("(" + root.transfer-tasks.length + " " + @tr("个传输任务进行中 - 点击展开") + ")") : @tr("(当前无活动任务 - 点击展开)");
+                font-size: 11px;
+                color: bot-bar-touch.has-hover ? AppTheme.accent : AppTheme.disabled-foreground;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                horizontal-stretch: 1;
+            }
+
+            Text {
+                text: @tr("本地项: ") + root.local-files-count + " | " + @tr("远程项: ") + root.remote-files-count;
+                font-size: 11px;
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
