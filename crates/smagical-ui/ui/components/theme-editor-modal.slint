@@ -3,6 +3,7 @@ import { ColorWheelPickerModal } from "color-wheel-picker.slint";
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppCard } from "base/app-card.slint";
 import { AppButton } from "base/app-button.slint";
+import { AppVScrollBar } from "base/app-scroll-bar.slint";
 
 /// 调色板色块定义
 struct PaletteSwatch {
@@ -176,6 +177,11 @@ component MetricFieldInput inherits VerticalLayout {
 /// 主题设计与定制工坊弹窗 (Theme Studio Modal)
 export component ThemeEditorModal inherits Rectangle {
     in-out property <bool> is-open <=> ThemeEditorBridge.is-open;
+
+    width: 100%;
+    height: 100%;
+    z: 1500;
+    visible: root.is-open;
 
     // 表单状态属性 (直通 ThemeEditorBridge)
     in-out property <string> theme-name <=> ThemeEditorBridge.name;
@@ -896,22 +902,10 @@ export component ThemeEditorModal inherits Rectangle {
                             }
                         }
 
-                        // 极简半透明主题自适应滚动条
-                        if flick-form.viewport-height > flick-form.height: Rectangle {
-                            x: parent.width - 5px;
-                            y: 2px;
-                            width: 3px;
-                            height: parent.height - 4px;
-                            border-radius: 1.5px;
-                            background: transparent;
-
-                            Rectangle {
-                                y: -flick-form.viewport-y * (parent.height - 4px - self.height) / (flick-form.viewport-height - flick-form.height);
-                                width: 3px;
-                                height: max(28px, (flick-form.height / flick-form.viewport-height) * (parent.height - 4px));
-                                border-radius: 1.5px;
-                                background: AppTheme.secondary-foreground.transparentize(60%);
-                            }
+                        AppVScrollBar {
+                            viewport-height: flick-form.viewport-height;
+                            visible-height: flick-form.height;
+                            viewport-y <=> flick-form.viewport-y;
                         }
                     }
 
@@ -1229,22 +1223,10 @@ export component ThemeEditorModal inherits Rectangle {
                             }
                         }
 
-                        // 滚动条滑块
-                        if flick-toml.viewport-height > flick-toml.height: Rectangle {
-                            x: parent.width - 5px;
-                            y: 2px;
-                            width: 3px;
-                            height: parent.height - 4px;
-                            border-radius: 1.5px;
-                            background: transparent;
-
-                            Rectangle {
-                                y: -flick-toml.viewport-y * (parent.height - 4px - self.height) / (flick-toml.viewport-height - flick-toml.height);
-                                width: 3px;
-                                height: max(20px, (flick-toml.height / flick-toml.viewport-height) * (parent.height - 4px));
-                                border-radius: 1.5px;
-                                background: AppTheme.secondary-foreground.transparentize(60%);
-                            }
+                        AppVScrollBar {
+                            viewport-height: flick-toml.viewport-height;
+                            visible-height: flick-toml.height;
+                            viewport-y <=> flick-toml.viewport-y;
                         }
                     }
                 }

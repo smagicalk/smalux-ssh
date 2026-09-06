@@ -1,5 +1,9 @@
 import { AppTheme } from "../../../themes/app-theme.slint";
 import { AppSwitch } from "../../../shared/base/app-switch.slint";
+import { AppDropdown, DropdownItemData } from "../../../shared/base/app-dropdown.slint";
+import { AppSegmentedControl, SegmentItemData } from "../../../shared/base/app-segmented-control.slint";
+
+export { AppDropdown, DropdownItemData, AppSegmentedControl, SegmentItemData }
 
 /// 标准扁平开关组件 (重定向至 AppSwitch)
 export component SettingsSwitch inherits AppSwitch {}
@@ -314,227 +318,39 @@ export component KeyBadge inherits Rectangle {
     }
 }
 
-/// 语言下拉选择框组件
-export component LanguageDropdown inherits Rectangle {
+/// 语言下拉选择框组件 (基于共享 AppDropdown)
+export component LanguageDropdown inherits AppDropdown {
     in-out property <string> selected-lang: "zh-CN";
     callback switch-language(string);
 
     width: 140px;
-    height: 28px;
-    border-radius: AppTheme.radius-medium;
-    background: lang-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
-    border-width: 1px;
-    border-color: lang-touch.has-hover ? AppTheme.accent : AppTheme.border;
+    items: [
+        { id: "zh-CN", label: "简体中文" },
+        { id: "en-US", label: "English" },
+    ];
+    active-id <=> root.selected-lang;
+    active-label: root.selected-lang == "en-US" ? "English" : "简体中文";
 
-    HorizontalLayout {
-        padding-left: 10px;
-        padding-right: 10px;
-        alignment: space-between;
-
-        Text {
-            text: root.selected-lang == "en-US" ? "English" : "简体中文";
-            font-size: 11px;
-            font-weight: 500;
-            color: AppTheme.foreground;
-            vertical-alignment: center;
-        }
-
-        Text {
-            text: "▼";
-            font-size: 8px;
-            color: AppTheme.secondary-foreground;
-            vertical-alignment: center;
-        }
-    }
-
-    lang-touch := TouchArea {
-        clicked => {
-            lang-popup.show();
-        }
-        mouse-cursor: pointer;
-    }
-
-    lang-popup := PopupWindow {
-        x: 0px;
-        y: root.height + 4px;
-        width: root.width;
-
-        Rectangle {
-            border-radius: AppTheme.radius-medium;
-            background: AppTheme.surface-background;
-            border-width: 1px;
-            border-color: AppTheme.border;
-            drop-shadow-blur: 10px;
-            drop-shadow-color: #00000066;
-            drop-shadow-offset-y: 3px;
-
-            VerticalLayout {
-                padding: 4px;
-                spacing: 2px;
-
-                Rectangle {
-                    height: 26px;
-                    border-radius: AppTheme.radius-small;
-                    background: root.selected-lang == "zh-CN" ? AppTheme.accent.transparentize(80%) : (zh-opt.has-hover ? AppTheme.hover-background : transparent);
-
-                    zh-opt := TouchArea {
-                        clicked => {
-                            root.selected-lang = "zh-CN";
-                            root.switch-language("zh-CN");
-                            lang-popup.close();
-                        }
-                        mouse-cursor: pointer;
-                    }
-
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        alignment: space-between;
-
-                        Text {
-                            text: "简体中文";
-                            font-size: 11px;
-                            color: root.selected-lang == "zh-CN" ? AppTheme.accent : AppTheme.foreground;
-                            vertical-alignment: center;
-                        }
-
-                        if root.selected-lang == "zh-CN": Text {
-                            text: "✓";
-                            font-size: 11px;
-                            color: AppTheme.accent;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-
-                Rectangle {
-                    height: 26px;
-                    border-radius: AppTheme.radius-small;
-                    background: root.selected-lang == "en-US" ? AppTheme.accent.transparentize(80%) : (en-opt.has-hover ? AppTheme.hover-background : transparent);
-
-                    en-opt := TouchArea {
-                        clicked => {
-                            root.selected-lang = "en-US";
-                            root.switch-language("en-US");
-                            lang-popup.close();
-                        }
-                        mouse-cursor: pointer;
-                    }
-
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        alignment: space-between;
-
-                        Text {
-                            text: "English";
-                            font-size: 11px;
-                            color: root.selected-lang == "en-US" ? AppTheme.accent : AppTheme.foreground;
-                            vertical-alignment: center;
-                        }
-
-                        if root.selected-lang == "en-US": Text {
-                            text: "✓";
-                            font-size: 11px;
-                            color: AppTheme.accent;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-            }
-        }
+    selected(id, label) => {
+        root.switch-language(id);
     }
 }
 
-/// 渲染管线胶囊分段器
-export component PipelineSegmentedControl inherits Rectangle {
+/// 渲染管线胶囊分段器 (基于共享 AppSegmentedControl)
+export component PipelineSegmentedControl inherits AppSegmentedControl {
     in-out property <string> selected-pipe: "winit-skia";
     callback pipe-selected(string);
 
-    height: 30px;
-    border-radius: AppTheme.radius-medium;
-    background: AppTheme.control-background;
-    border-width: 1px;
-    border-color: AppTheme.border;
+    width: 290px;
+    items: [
+        { id: "winit-skia", label: "Skia (GPU)" },
+        { id: "winit-skia-opengl", label: "OpenGL" },
+        { id: "winit-femtovg", label: "FemtoVG" },
+    ];
+    active-id <=> root.selected-pipe;
 
-    HorizontalLayout {
-        padding: 2px;
-        spacing: 2px;
-
-        Rectangle {
-            horizontal-stretch: 1;
-            border-radius: AppTheme.radius-small;
-            background: root.selected-pipe == "winit-skia" ? AppTheme.surface-background : transparent;
-            border-width: root.selected-pipe == "winit-skia" ? 1px : 0px;
-            border-color: root.selected-pipe == "winit-skia" ? AppTheme.border : transparent;
-
-            TouchArea {
-                clicked => {
-                    root.selected-pipe = "winit-skia";
-                    root.pipe-selected("winit-skia");
-                }
-                mouse-cursor: pointer;
-            }
-
-            Text {
-                text: "Skia (GPU)";
-                font-size: 10px;
-                font-weight: root.selected-pipe == "winit-skia" ? 600 : 400;
-                color: root.selected-pipe == "winit-skia" ? AppTheme.foreground : AppTheme.secondary-foreground;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
-
-        Rectangle {
-            horizontal-stretch: 1;
-            border-radius: AppTheme.radius-small;
-            background: root.selected-pipe == "winit-skia-opengl" ? AppTheme.surface-background : transparent;
-            border-width: root.selected-pipe == "winit-skia-opengl" ? 1px : 0px;
-            border-color: root.selected-pipe == "winit-skia-opengl" ? AppTheme.border : transparent;
-
-            TouchArea {
-                clicked => {
-                    root.selected-pipe = "winit-skia-opengl";
-                    root.pipe-selected("winit-skia-opengl");
-                }
-                mouse-cursor: pointer;
-            }
-
-            Text {
-                text: "OpenGL";
-                font-size: 10px;
-                font-weight: root.selected-pipe == "winit-skia-opengl" ? 600 : 400;
-                color: root.selected-pipe == "winit-skia-opengl" ? AppTheme.foreground : AppTheme.secondary-foreground;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
-
-        Rectangle {
-            horizontal-stretch: 1;
-            border-radius: AppTheme.radius-small;
-            background: root.selected-pipe == "winit-femtovg" ? AppTheme.surface-background : transparent;
-            border-width: root.selected-pipe == "winit-femtovg" ? 1px : 0px;
-            border-color: root.selected-pipe == "winit-femtovg" ? AppTheme.border : transparent;
-
-            TouchArea {
-                clicked => {
-                    root.selected-pipe = "winit-femtovg";
-                    root.pipe-selected("winit-femtovg");
-                }
-                mouse-cursor: pointer;
-            }
-
-            Text {
-                text: "FemtoVG";
-                font-size: 10px;
-                font-weight: root.selected-pipe == "winit-femtovg" ? 600 : 400;
-                color: root.selected-pipe == "winit-femtovg" ? AppTheme.foreground : AppTheme.secondary-foreground;
-                horizontal-alignment: center;
-                vertical-alignment: center;
-            }
-        }
+    selected(p) => {
+        root.pipe-selected(p);
     }
 }
 

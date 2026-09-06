@@ -107,6 +107,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 Ok(()) => {
                     w.global::<WindowBridge>().set_current_theme_id(normalized_id.into());
                     w.global::<WindowBridge>().set_current_theme_name(name.into());
+                    w.global::<SettingsBridge>().set_current_theme_id(normalized_id.into());
                     let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
                     w.global::<WindowBridge>().set_is_dark_mode(!is_light);
                     core_state_theme.events().dispatch(&ThemeChangedEvent {
@@ -150,11 +151,13 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 let _ = apply_theme_by_id(&w, &*themes_clone.borrow(), "builtin.ui.darcula");
                 w.global::<WindowBridge>().set_current_theme_id("builtin.ui.darcula".into());
                 w.global::<WindowBridge>().set_current_theme_name("Darcula".into());
+                w.global::<SettingsBridge>().set_current_theme_id("builtin.ui.darcula".into());
                 w.global::<WindowBridge>().set_is_dark_mode(true);
             } else {
                 let _ = apply_theme_by_id(&w, &*themes_clone.borrow(), "builtin.ui.github-light");
                 w.global::<WindowBridge>().set_current_theme_id("builtin.ui.github-light".into());
                 w.global::<WindowBridge>().set_current_theme_name("GitHub Light".into());
+                w.global::<SettingsBridge>().set_current_theme_id("builtin.ui.github-light".into());
                 w.global::<WindowBridge>().set_is_dark_mode(false);
             }
 

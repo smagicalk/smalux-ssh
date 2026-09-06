@@ -111,7 +111,7 @@ export component DebugSnippetsTab inherits VerticalLayout {
                     height: 20px;
 
                     Image {
-                        source: @image-url("../../assets/icons/terminal.svg");
+                        source: @image-url("../../assets/icons/code.svg");
                         width: 14px;
                         height: 14px;
                         image-fit: contain;
@@ -220,7 +220,7 @@ export component DebugSnippetsTab inherits VerticalLayout {
 
                 AppFormInput {
                     label: @tr("脚本命令:");
-                    icon: @image-url("../../assets/icons/terminal.svg");
+                    icon: @image-url("../../assets/icons/code.svg");
                     has-icon: true;
                     text <=> root.quick-snippet-cmd;
                 }
@@ -284,7 +284,7 @@ export component DebugSnippetsTab inherits VerticalLayout {
                     AppFormInput {
                         horizontal-stretch: 3;
                         label: @tr("名称前缀:");
-                        icon: @image-url("../../assets/icons/terminal.svg");
+                        icon: @image-url("../../assets/icons/code.svg");
                         has-icon: true;
                         text <=> root.batch-snippet-prefix;
                     }

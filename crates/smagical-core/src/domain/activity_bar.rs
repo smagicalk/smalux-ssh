@@ -102,7 +102,7 @@ impl ActivityBarRegistry {
         registry.register(ActivityBarItem::top("hosts", "server", "主机资产管理", 10).with_shortcut("Ctrl+1"));
         registry.register(ActivityBarItem::top("files", "folder", "SFTP 文件管理", 20).with_shortcut("Ctrl+2"));
         registry.register(ActivityBarItem::top("credentials", "key", "凭据保管箱", 30).with_shortcut("Ctrl+3"));
-        registry.register(ActivityBarItem::top("snippets", "terminal", "常用脚本与代码段", 40).with_shortcut("Ctrl+4"));
+        registry.register(ActivityBarItem::top("snippets", "code", "常用脚本与代码段", 40).with_shortcut("Ctrl+4"));
         registry.register(ActivityBarItem::top("tunnels", "tunnel", "网络隧道代理", 50).with_shortcut("Ctrl+5"));
         registry.register(ActivityBarItem::top("history", "clock", "历史会话与审计", 60).with_shortcut("Ctrl+6"));
 

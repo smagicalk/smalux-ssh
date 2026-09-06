@@ -768,6 +768,33 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
+    // 7.1 终端直接跳转指定绝对历史偏移量 (支持右侧微型滚动条拖拽)
+    // -------------------------------------------------------------------------
+    let pane_groups_scroll_to = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_scroll_to = Rc::clone(&ctx.active_pane_id);
+    let active_terminals_scroll_to = Rc::clone(&ctx.active_terminals);
+    let w_scroll_to = window.as_weak();
+    tb.on_terminal_scroll_to(move |target_offset| {
+        let active_pid = active_pane_id_scroll_to.borrow().clone();
+        let groups = pane_groups_scroll_to.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_scroll_to.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let target = target_offset.max(0) as usize;
+                instance.scroll_to_offset(target);
+                let (hist_size, scroll_off) = instance.scroll_info();
+                if let Some(w) = w_scroll_to.upgrade() {
+                    let tb = w.global::<TerminalBridge>();
+                    tb.set_history_size(hist_size as i32);
+                    tb.set_scroll_offset(scroll_off as i32);
+                }
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // 8. 终端选区复制到剪贴板回调
     // -------------------------------------------------------------------------
     let pane_groups_copy = Rc::clone(&ctx.pane_groups);

@@ -10,6 +10,7 @@ import { SnippetsBridge } from "snippets_bridge.slint";
 import { SnippetTreePane } from "components/snippet_tree_pane.slint";
 import { SnippetGroupDetail } from "components/snippet_group_detail.slint";
 import { SnippetEditorPane } from "components/snippet_editor_pane.slint";
+import { FolderPickerModal } from "../../components/folder-picker-modal.slint";
 
 export { SnippetTreeNode, SnippetParamInputData }
 
@@ -105,7 +106,7 @@ export component SnippetsCenterView inherits Rectangle {
                     HorizontalLayout {
                         alignment: center;
                         Image {
-                            source: @image-url("../../assets/icons/terminal.svg");
+                            source: @image-url("../../assets/icons/code.svg");
                             width: 36px;
                             height: 36px;
                             image-fit: contain;
@@ -146,14 +147,35 @@ export component SnippetsCenterView inherits Rectangle {
                 height: 100%;
                 edit_id <=> root.edit_id;
                 edit_title <=> root.edit_title;
+                edit_category_id <=> SnippetsBridge.form-group-id;
+                edit_category_name <=> SnippetsBridge.form-category-name;
                 edit_content <=> root.edit_content;
                 edit_auto_execute <=> root.edit_auto_execute;
                 edit_description <=> root.edit_description;
                 detected_variables_text: root.detected_variables_text;
+                is_editing <=> SnippetsBridge.is-editing;
+                parent_options: SnippetsBridge.parent-options;
                 copy_content(id) => { SnippetsBridge.copy-snippet(id); }
                 save_snippet => { SnippetsBridge.save-snippet(); }
                 delete_snippet(id) => { SnippetsBridge.delete-snippet(id); }
             }
+        }
+    }
+
+    // 文件夹树形选取弹窗
+    FolderPickerModal {
+        is-open: SnippetsBridge.is-folder-picker-open;
+        title: @tr("选择所属文件夹");
+        prompt: @tr("请在下方树形结构中点选代码片段的归属文件夹：");
+        options: SnippetsBridge.parent-options;
+        current-id: SnippetsBridge.form-group-id;
+        current-name: SnippetsBridge.form-category-name != "" ? SnippetsBridge.form-category-name : @tr("根目录 (作为顶级分组)");
+        toggle-group(id) => { SnippetsBridge.toggle-group-expanded(id); }
+        close => { SnippetsBridge.is-folder-picker-open = false; }
+        confirmed(id, name) => {
+            SnippetsBridge.form-group-id = id;
+            SnippetsBridge.form-category-name = name;
+            SnippetsBridge.is-folder-picker-open = false;
         }
     }
 }

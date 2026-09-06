@@ -12,13 +12,13 @@ export component AppSegmentedControl inherits Rectangle {
     callback selected(string);
 
     height: 32px;
+    min-width: 160px;
     border-radius: AppTheme.radius-medium;
     background: AppTheme.control-background;
     border-width: 1px;
     border-color: AppTheme.border;
-    padding: 3px;
-
     HorizontalLayout {
+        padding: 3px;
         spacing: 3px;
 
         for item[idx] in root.items: Rectangle {
@@ -47,6 +47,7 @@ export component AppSegmentedControl inherits Rectangle {
                     item-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
                 horizontal-alignment: center;
                 vertical-alignment: center;
+                overflow: elide;
             }
         }
     }

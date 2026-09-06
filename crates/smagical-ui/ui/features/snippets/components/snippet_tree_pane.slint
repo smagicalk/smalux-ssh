@@ -263,28 +263,7 @@ export component SnippetTreePane inherits Rectangle {
                             spacing: 6px;
                             alignment: start;
 
-                            // 展开/折叠箭头 (仅分组展示)
-                            if node.is_group: VerticalLayout {
-                                alignment: center;
-                                width: 14px;
-                                height: 14px;
 
-                                Image {
-                                    source: node.is_expanded 
-                                        ? @image-url("../../../assets/icons/chevron-down.svg")
-                                        : @image-url("../../../assets/icons/chevron-right.svg");
-                                    width: 10px;
-                                    height: 10px;
-                                    image-fit: contain;
-                                    colorize: AppTheme.secondary-foreground;
-                                }
-                            }
-
-                            // 占位留白 (叶子节点无箭头，保持对齐)
-                            if !node.is_group: Rectangle {
-                                width: 14px;
-                                height: 14px;
-                            }
 
                             // 图标 (分组文件夹 vs 脚本文件)
                             VerticalLayout {
@@ -292,7 +271,7 @@ export component SnippetTreePane inherits Rectangle {
                                 Image {
                                     source: node.is_group 
                                         ? (node.is_expanded ? @image-url("../../../assets/icons/folder-open.svg") : @image-url("../../../assets/icons/folder.svg"))
-                                        : @image-url("../../../assets/icons/terminal.svg");
+                                        : @image-url("../../../assets/icons/code.svg");
                                     width: 14px;
                                     height: 14px;
                                     image-fit: contain;

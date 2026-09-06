@@ -173,6 +173,18 @@ impl TerminalParser {
         (self.term.history_size(), self.term.grid().display_offset())
     }
 
+    /// 视口滚动至指定绝对历史偏移量 (target_offset: 0 为最新输出底端, history_size 为最顶端)。
+    pub fn scroll_to_offset(&mut self, target_offset: usize) {
+        let history = self.term.history_size();
+        let target = target_offset.min(history);
+        let current = self.term.grid().display_offset();
+        let diff = target as i32 - current as i32;
+        if diff != 0 {
+            self.term.scroll_display(alacritty_terminal::grid::Scroll::Delta(diff));
+            self.dirty = true;
+        }
+    }
+
     /// 设置屏幕鼠标划选选区 `(start_col, start_row)` 到 `(end_col, end_row)`。
     pub fn set_selection(&mut self, start: (usize, usize), end: (usize, usize)) {
         self.selection = Some((start, end));

@@ -72,7 +72,7 @@ kubectl rollout restart deployment/{{deployment_name}} -n {{namespace:default}}
   - 内置循环依赖防呆检测（禁止将父文件夹移入其自身或子孙文件夹中）；
 - **节点状态与视觉表现**：
   - 文件夹：展开/折叠矢量图标 (`chevron-down.svg` / `chevron-right.svg`、`folder-open.svg` / `folder.svg`) + 直属子项统计胶囊 `Rectangle { height: 16px; border-radius: 8px; ... }`；
-  - 脚本：极简纯净终端图标 (`terminal.svg`) + 语言胶囊徽标 (`bash`/`sql`/`python` 等)，保持与主机树完全对齐的清爽视觉。
+  - 脚本：极简代码图标 (`code.svg`) + 语言胶囊徽标 (`bash`/`sql`/`python` 等)，保持与主机树完全对齐的清爽视觉。
 
 ---
 

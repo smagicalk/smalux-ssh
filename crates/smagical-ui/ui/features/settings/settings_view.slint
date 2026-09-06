@@ -53,11 +53,14 @@ export component SettingsCenterView inherits Rectangle {
                     spacing: 10px;
                     alignment: center;
 
-                    Image {
-                        source: @image-url("../../assets/icons/settings.svg");
-                        width: 20px;
-                        height: 20px;
-                        colorize: AppTheme.accent;
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/settings.svg");
+                            width: 20px;
+                            height: 20px;
+                            colorize: AppTheme.accent;
+                        }
                     }
 
                     VerticalLayout {

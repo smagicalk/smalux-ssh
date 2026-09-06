@@ -91,7 +91,6 @@ export { JumpHopData } from "views/tunnels_view.slint";
 import { SettingsCenterView, SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
 export { SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
 import { SnippetRunModal, SnippetParamFieldData } from "components/snippet-run-modal.slint";
-import { CreateSnippetGroupModal } from "components/create-snippet-group-modal.slint";
 import { ThemeEditorModal } from "components/theme-editor-modal.slint";
 
 
@@ -327,10 +326,14 @@ export component AppWindow inherits Window {
                             WindowBridge.navigate-to("tunnels", "");
                         } else if id == "files" {
                             // 切换至文件管理页面：左侧展示主机树抽屉，中央展示双盘文件管理器
-                            WindowBridge.active-left-tab = "files";
-                            WindowBridge.main-view = "files";
-                            WindowBridge.is-left-drawer-open = true;
-                            WindowBridge.navigate-to("files", "");
+                            if WindowBridge.main-view == "files" && WindowBridge.active-left-tab == "files" {
+                                WindowBridge.is-left-drawer-open = !WindowBridge.is-left-drawer-open;
+                            } else {
+                                WindowBridge.active-left-tab = "files";
+                                WindowBridge.main-view = "files";
+                                WindowBridge.is-left-drawer-open = true;
+                                WindowBridge.navigate-to("files", "");
+                            }
                         } else if id == "settings" {
                             // 切换至独立全屏偏好设置中心大页面 (含外观、终端、网络、快捷键与数据备份)
                             WindowBridge.active-left-tab = "settings";
@@ -758,15 +761,21 @@ export component AppWindow inherits Window {
         }
     }
 
-    // 新建代码片段文件夹弹窗
-    CreateSnippetGroupModal {
-        is_open <=> SnippetsBridge.is-create-group-modal-open;
-        group_name <=> SnippetsBridge.new-group-name;
-        selected_parent_id <=> SnippetsBridge.new-group-parent-id;
-        parent_options: SnippetsBridge.parent-options;
-        cancel => { SnippetsBridge.close-create-group-modal(); }
-        submit => { SnippetsBridge.submit-create-group(); }
-        select_parent(id) => { SnippetsBridge.new-group-parent-id = id; }
+    // 新建代码片段文件夹弹窗 (共用高品质树形分组弹窗)
+    CreateGroupModal {
+        is-open: SnippetsBridge.is-create-group-modal-open;
+        title: @tr("新建代码片段文件夹");
+        entity-label: @tr("所属上级文件夹");
+        placeholder: @tr("请输入文件夹名称，例如: Docker部署、运维脚本...");
+        default-parent-id: SnippetsBridge.new-group-parent-id != "" ? SnippetsBridge.new-group-parent-id : "root";
+        group-options: SnippetsBridge.parent-options;
+        toggle-group(id) => { SnippetsBridge.toggle-group-expanded(id); }
+        close => { SnippetsBridge.close-create-group-modal(); }
+        confirm(parent-id, name) => {
+            SnippetsBridge.new-group-parent-id = parent-id;
+            SnippetsBridge.new-group-name = name;
+            SnippetsBridge.submit-create-group();
+        }
     }
 
     // 代码片段动态参数填报执行弹窗

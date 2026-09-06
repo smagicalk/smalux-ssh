@@ -193,23 +193,11 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                         subtitle: @tr("自动识别终端输出中的状态代码、IPv4 地址、URL 链接并按照正则表达式规则着色");
                                         show-border: SettingsBridge.setting-terminal-highlight-keywords;
 
-                                        HorizontalLayout {
-                                            spacing: 8px;
-                                            alignment: center;
-
-                                            Text {
-                                                text: SettingsBridge.setting-terminal-highlight-keywords ? @tr("已启用") : @tr("已停用");
-                                                font-size: 11px;
-                                                color: SettingsBridge.setting-terminal-highlight-keywords ? AppTheme.accent : AppTheme.secondary-foreground;
-                                                vertical-alignment: center;
-                                            }
-
-                                            SettingsSwitch {
-                                                checked: SettingsBridge.setting-terminal-highlight-keywords;
-                                                toggled(c) => {
-                                                    SettingsBridge.setting-terminal-highlight-keywords = c;
-                                                    SettingsBridge.change-terminal-highlight-keywords(c);
-                                                }
+                                        SettingsSwitch {
+                                            checked: SettingsBridge.setting-terminal-highlight-keywords;
+                                            toggled(c) => {
+                                                SettingsBridge.setting-terminal-highlight-keywords = c;
+                                                SettingsBridge.change-terminal-highlight-keywords(c);
                                             }
                                         }
                                     }

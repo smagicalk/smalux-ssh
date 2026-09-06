@@ -42,10 +42,10 @@ export component RightToolBar inherits Rectangle {
             clicked => { root.tool-clicked("tunnel"); }
         }
 
-        // 3. 快捷命令
+        // 3. 常用代码片段
         ActionBarItem {
-            icon: @image-url("../assets/icons/zap.svg");
-            tooltip: @tr("快捷命令库");
+            icon: @image-url("../assets/icons/code.svg");
+            tooltip: @tr("常用代码片段");
             is-active: root.active-tool == "snippets";
             clicked => { root.tool-clicked("snippets"); }
         }

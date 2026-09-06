@@ -6,6 +6,11 @@ import { HistoryBridge } from "../features/history/history_bridge.slint";
 /// 会话历史详情与终端屏幕快照弹窗 (History Session Detail & Snapshot Modal)
 export component HistoryDetailModal inherits Rectangle {
     in-out property <bool> is-open: HistoryBridge.is-detail-open;
+
+    width: 100%;
+    height: 100%;
+    z: 1200;
+    visible: root.is-open;
     in property <string> history-id: HistoryBridge.detail-id;
     in property <string> session-title: HistoryBridge.detail-title;
     in property <string> session-address: HistoryBridge.detail-address;
@@ -336,6 +341,7 @@ export component HistoryDetailModal inherits Rectangle {
                             clip: true;
 
                             snap-scroll := Flickable {
+                                interactive: false;
                                 width: 100%;
                                 height: 100%;
                                 viewport-width: Math.max(self.width - 16px, 720px);

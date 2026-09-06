@@ -15,6 +15,7 @@ import {
     WallpaperItemCard,
 } from "../components/theme_cards.slint";
 import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+import { AppSlider } from "../../../shared/base/app-slider.slint";
 
                                 export component SettingsAppearanceTab inherits VerticalLayout {
                                     spacing: 16px;
@@ -438,65 +439,16 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                     }
                                                 }
 
-                                                // 鼠标可直接点击与自由按住拖动的滑动槽轨
-                                                slider-box := Rectangle {
+                                                // 通用滑块组件 (AppSlider)
+                                                AppSlider {
                                                     width: 180px;
-                                                    height: 24px;
-                                                    background: transparent;
-
-                                                    // 槽轨底色
-                                                    Rectangle {
-                                                        y: (parent.height - self.height) / 2;
-                                                        width: parent.width;
-                                                        height: 6px;
-                                                        border-radius: 3px;
-                                                        background: AppTheme.control-background;
-                                                        border-width: 1px;
-                                                        border-color: AppTheme.border;
-
-                                                        // 进度填充层
-                                                        Rectangle {
-                                                            x: 0px;
-                                                            width: Math.max(0px, Math.min(parent.width, parent.width * SettingsBridge.setting-wallpaper-opacity));
-                                                            height: 100%;
-                                                            border-radius: 3px;
-                                                            background: AppTheme.accent;
-                                                        }
-                                                    }
-
-                                                    // 滑动手柄圆形浮块 (Thumb Handle)
-                                                    Rectangle {
-                                                        x: Math.max(0px, Math.min(parent.width - self.width, parent.width * SettingsBridge.setting-wallpaper-opacity - self.width / 2));
-                                                        y: (parent.height - self.height) / 2;
-                                                        width: 14px;
-                                                        height: 14px;
-                                                        border-radius: 7px;
-                                                        background: #ffffff;
-                                                        border-width: 2.5px;
-                                                        border-color: AppTheme.accent;
-                                                        drop-shadow-blur: 4px;
-                                                        drop-shadow-color: #00000030;
-                                                    }
-
-                                                    // 交互拦截层：鼠标按下/点击/拖动平滑控制
-                                                    TouchArea {
-                                                        mouse-cursor: pointer;
-                                                        pointer-event(event) => {
-                                                            if event.kind == PointerEventKind.down {
-                                                                let raw_pct: float = self.mouse-x / self.width;
-                                                                let clamped: float = Math.max(0.01, Math.min(1.0, raw_pct));
-                                                                SettingsBridge.setting-wallpaper-opacity = Math.round(clamped * 100) / 100;
-                                                                SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
-                                                            }
-                                                        }
-                                                        moved => {
-                                                            if self.pressed {
-                                                                let raw_pct: float = self.mouse-x / self.width;
-                                                                let clamped: float = Math.max(0.01, Math.min(1.0, raw_pct));
-                                                                SettingsBridge.setting-wallpaper-opacity = Math.round(clamped * 100) / 100;
-                                                                SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
-                                                            }
-                                                        }
+                                                    show-value: false;
+                                                    minimum: 0.01;
+                                                    maximum: 1.0;
+                                                    step: 0.01;
+                                                    value <=> SettingsBridge.setting-wallpaper-opacity;
+                                                    changed(val) => {
+                                                        SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, val);
                                                     }
                                                 }
 
@@ -540,142 +492,6 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                                 let clamped = Math.max(0.01, Math.min(1.0, val));
                                                                 SettingsBridge.setting-wallpaper-opacity = Math.round(clamped * 100) / 100;
                                                                 SettingsBridge.change-wallpaper(SettingsBridge.setting-wallpaper-mode, SettingsBridge.setting-wallpaper-path, SettingsBridge.setting-wallpaper-opacity);
-                                                            }
-                                                        }
-
-                                                        Text {
-                                                            text: "%";
-                                                            font-size: 10px;
-                                                            color: AppTheme.secondary-foreground;
-                                                            vertical-alignment: center;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // 模态弹窗不透明度调节 (实验特性，支持鼠标任意拖动/点击 + 直接输入数字百分比 + 微调步进)
-                                        SettingsRow {
-                                            title: @tr("弹窗底板不透明度 (Modal Opacity)");
-                                            subtitle: @tr("[实验特性] 调节壁纸模式下弹出窗口与菜单的不透明度 (默认 100% 纯色遮挡防重叠，支持 60%~100% 微调)");
-
-                                            HorizontalLayout {
-                                                spacing: 10px;
-                                                alignment: center;
-
-                                                // 步进减小按钮 -
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
-                                                    clicked => {
-                                                        if SettingsBridge.setting-modal-opacity > 0.60 {
-                                                            SettingsBridge.setting-modal-opacity = Math.round((SettingsBridge.setting-modal-opacity - 0.05) * 100) / 100;
-                                                            SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
-                                                        }
-                                                    }
-                                                }
-
-                                                // 鼠标可直接点击与自由按住拖动的滑动槽轨
-                                                Rectangle {
-                                                    width: 180px;
-                                                    height: 24px;
-                                                    background: transparent;
-
-                                                    // 槽轨底色
-                                                    Rectangle {
-                                                        y: (parent.height - self.height) / 2;
-                                                        width: parent.width;
-                                                        height: 6px;
-                                                        border-radius: 3px;
-                                                        background: AppTheme.control-background;
-                                                        border-width: 1px;
-                                                        border-color: AppTheme.border;
-
-                                                        // 进度填充层
-                                                        Rectangle {
-                                                            x: 0px;
-                                                            width: Math.max(0px, Math.min(parent.width, parent.width * SettingsBridge.setting-modal-opacity));
-                                                            height: 100%;
-                                                            border-radius: 3px;
-                                                            background: AppTheme.accent;
-                                                        }
-                                                    }
-
-                                                    // 滑动手柄圆形浮块 (Thumb Handle)
-                                                    Rectangle {
-                                                        x: Math.max(0px, Math.min(parent.width - self.width, parent.width * SettingsBridge.setting-modal-opacity - self.width / 2));
-                                                        y: (parent.height - self.height) / 2;
-                                                        width: 14px;
-                                                        height: 14px;
-                                                        border-radius: 7px;
-                                                        background: #ffffff;
-                                                        border-width: 2.5px;
-                                                        border-color: AppTheme.accent;
-                                                        drop-shadow-blur: 4px;
-                                                        drop-shadow-color: #00000030;
-                                                    }
-
-                                                    // 交互拦截层：鼠标按下/点击/拖动平滑控制
-                                                    TouchArea {
-                                                        mouse-cursor: pointer;
-                                                        pointer-event(event) => {
-                                                            if event.kind == PointerEventKind.down {
-                                                                let raw_pct: float = self.mouse-x / self.width;
-                                                                let clamped: float = Math.max(0.60, Math.min(1.0, raw_pct));
-                                                                SettingsBridge.setting-modal-opacity = Math.round(clamped * 100) / 100;
-                                                                SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
-                                                            }
-                                                        }
-                                                        moved => {
-                                                            if self.pressed {
-                                                                let raw_pct: float = self.mouse-x / self.width;
-                                                                let clamped: float = Math.max(0.60, Math.min(1.0, raw_pct));
-                                                                SettingsBridge.setting-modal-opacity = Math.round(clamped * 100) / 100;
-                                                                SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
-                                                            }
-                                                        }
-                                                    }
-                                                }
-
-                                                // 步进增加按钮 +
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
-                                                    clicked => {
-                                                        if SettingsBridge.setting-modal-opacity < 1.0 {
-                                                            SettingsBridge.setting-modal-opacity = Math.min(1.0, Math.round((SettingsBridge.setting-modal-opacity + 0.05) * 100) / 100);
-                                                            SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
-                                                        }
-                                                    }
-                                                }
-
-                                                // 直接数字输入框 (支持直接键入 60~100 或 0.6~1.0)
-                                                Rectangle {
-                                                    width: 58px;
-                                                    height: 24px;
-                                                    border-radius: AppTheme.radius-small;
-                                                    background: AppTheme.control-background;
-                                                    border-width: 1px;
-                                                    border-color: modal-op-input.has-focus ? AppTheme.accent : AppTheme.border;
-
-                                                    HorizontalLayout {
-                                                        padding-left: 6px;
-                                                        padding-right: 6px;
-                                                        spacing: 2px;
-                                                        alignment: center;
-
-                                                        modal-op-input := TextInput {
-                                                            text: Math.round(SettingsBridge.setting-modal-opacity * 100);
-                                                            font-size: 11px;
-                                                            font-weight: 700;
-                                                            color: AppTheme.accent;
-                                                            horizontal-alignment: center;
-                                                            vertical-alignment: center;
-                                                            single-line: true;
-                                                            accepted => {
-                                                                let raw_val = self.text.to-float();
-                                                                let val = raw_val > 1.0 ? raw_val / 100.0 : raw_val;
-                                                                let clamped = Math.max(0.60, Math.min(1.0, val));
-                                                                SettingsBridge.setting-modal-opacity = Math.round(clamped * 100) / 100;
-                                                                SettingsBridge.change-modal-opacity(SettingsBridge.setting-modal-opacity);
                                                             }
                                                         }
 
@@ -831,25 +647,29 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                                         }
                                                                     }
 
-                                                                    // 右端操作：仅保留极简垃圾桶图标
-                                                                    Rectangle {
-                                                                        width: 22px;
-                                                                        height: 22px;
-                                                                        border-radius: 4px;
-                                                                        background: del-t.has-hover ? AppTheme.danger.transparentize(80%) : transparent;
+                                                                    // 右端操作：仅保留极简垃圾桶图标 (垂直居中)
+                                                                    VerticalLayout {
+                                                                        alignment: center;
 
-                                                                        del-t := TouchArea {
-                                                                            clicked => { SettingsBridge.remove-wallpaper(idx); }
-                                                                            mouse-cursor: pointer;
-                                                                        }
+                                                                        Rectangle {
+                                                                            width: 22px;
+                                                                            height: 22px;
+                                                                            border-radius: 4px;
+                                                                            background: del-t.has-hover ? AppTheme.danger.transparentize(80%) : transparent;
 
-                                                                        Image {
-                                                                            x: (parent.width - self.width) / 2;
-                                                                            y: (parent.height - self.height) / 2;
-                                                                            source: @image-url("../../../assets/icons/trash.svg");
-                                                                            width: 13px;
-                                                                            height: 13px;
-                                                                            colorize: del-t.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                                                                            del-t := TouchArea {
+                                                                                clicked => { SettingsBridge.remove-wallpaper(idx); }
+                                                                                mouse-cursor: pointer;
+                                                                            }
+
+                                                                            Image {
+                                                                                x: (parent.width - self.width) / 2;
+                                                                                y: (parent.height - self.height) / 2;
+                                                                                source: @image-url("../../../assets/icons/trash.svg");
+                                                                                width: 13px;
+                                                                                height: 13px;
+                                                                                colorize: del-t.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                                                                            }
                                                                         }
                                                                     }
                                                                 }

@@ -6,6 +6,12 @@ export { GroupTreeSelector, GroupOptionData }
 
 /// 新建主机分组弹窗组件 (Create Group Modal)
 export component CreateGroupModal inherits Rectangle {
+    /// 弹窗主标题
+    in property <string> title: @tr("新建主机分组");
+    /// 实体分类标签
+    in property <string> entity-label: @tr("所属上级分组");
+    /// 名称输入占位提示
+    in property <string> placeholder: @tr("请输入分组名称，例如: 微服务集群、测试数据库...");
     /// 弹窗显隐控制开关 (true: 显示弹窗, false: 隐藏弹窗)
     in property <bool> is-open: false;
     /// 上级分组树形选项数据列表 (由 Rust 存储层提供唯一真相源)
@@ -83,7 +89,7 @@ export component CreateGroupModal inherits Rectangle {
                         }
 
                         Text {
-                            text: @tr("新建主机分组");
+                            text: root.title;
                             font-size: 13px;
                             font-weight: 700;
                             color: AppTheme.foreground;
@@ -135,7 +141,7 @@ export component CreateGroupModal inherits Rectangle {
                         height: 14px;
 
                         Text {
-                            text: @tr("所属上级分组:");
+                            text: root.entity-label + ":";
                             font-size: 11px;
                             font-weight: 600;
                             color: AppTheme.secondary-foreground;
@@ -296,7 +302,7 @@ export component CreateGroupModal inherits Rectangle {
                             clip: true;
 
                             if root.group-name == "" && !name-input.has-focus: Text {
-                                text: @tr("请输入分组名称，例如: 微服务集群、测试数据库...");
+                                text: root.placeholder;
                                 font-size: 11px;
                                 color: AppTheme.disabled-foreground;
                                 vertical-alignment: center;

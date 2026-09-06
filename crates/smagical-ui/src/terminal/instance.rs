@@ -197,6 +197,11 @@ impl TerminalInstance {
         self.parser.scroll_info()
     }
 
+    /// 视口滚动至指定绝对历史偏移量。
+    pub fn scroll_to_offset(&mut self, target_offset: usize) {
+        self.parser.scroll_to_offset(target_offset);
+    }
+
     /// 提取会话终端屏幕与回滚历史的纯文本快照 (最多保留 max_lines 行，0 为不限)
     pub fn snapshot_text(&self, max_lines: usize) -> String {
         self.parser.extract_all_text(max_lines)

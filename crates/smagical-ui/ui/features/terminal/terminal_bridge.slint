@@ -75,6 +75,7 @@ export global TerminalBridge {
     // 终端核心底层交互回调
     callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);
     callback terminal-scroll(length /* delta */);
+    callback terminal-scroll-to(int /* target_offset */);
     callback terminal-selection-changed(int /* start_col */, int /* start_row */, int /* end_col */, int /* end_row */, bool /* has_selection */);
     callback terminal-copy();
     callback terminal-paste();

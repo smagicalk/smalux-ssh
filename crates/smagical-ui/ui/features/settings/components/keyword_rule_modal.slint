@@ -256,7 +256,7 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                 border-color: AppTheme.border;
 
                                 clr-pill := TouchArea {
-                                    clicked => { SettingsBridge.open-keyword-color-wheel(); }
+                                    clicked => { SettingsBridge.is-keyword-color-wheel-open = true; SettingsBridge.open-keyword-color-wheel(); }
                                     mouse-cursor: pointer;
                                 }
 
@@ -298,7 +298,7 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                 AppButton {
                                     text: @tr("🎨 色相圆盘取色器...");
                                     variant: "secondary";
-                                    clicked => { SettingsBridge.open-keyword-color-wheel(); }
+                                    clicked => { SettingsBridge.is-keyword-color-wheel-open = true; SettingsBridge.open-keyword-color-wheel(); }
                                 }
                             }
                         }

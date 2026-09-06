@@ -170,16 +170,18 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                         bridge.set_form_is_favorite(s.is_favorite);
                         bridge.set_form_updated_at(s.updated_at.clone().into());
 
-                        // 计算所属文件夹名称
-                        let cat_name = if let Some(ref gid) = s.parent_group_id {
-                            ctx.core_state.storage().snippets().get_group_by_id(gid)
+                        // 计算所属文件夹 ID 与名称
+                        let (cat_id, cat_name) = if let Some(ref gid) = s.parent_group_id {
+                            let name = ctx.core_state.storage().snippets().get_group_by_id(gid)
                                 .ok()
                                 .flatten()
                                 .map(|g| g.name)
-                                .unwrap_or_else(|| "根目录".to_string())
+                                .unwrap_or_else(|| "根目录".to_string());
+                            (gid.clone(), name)
                         } else {
-                            "根目录".to_string()
+                            ("root".to_string(), "根目录 (顶级文件夹)".to_string())
                         };
+                        bridge.set_form_group_id(cat_id.into());
                         bridge.set_form_category_name(cat_name.into());
 
                         // 识别变量占位符
@@ -232,7 +234,8 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                 bridge.set_is_create_mode(true);
                 bridge.set_form_id(new_id.into());
                 bridge.set_form_title("未命名代码片段".into());
-                bridge.set_form_category_name("根目录".into());
+                bridge.set_form_group_id("root".into());
+                bridge.set_form_category_name("根目录 (顶级文件夹)".into());
                 bridge.set_form_language("bash".into());
                 bridge.set_form_code("#!/bin/bash\n\n".into());
                 bridge.set_form_auto_execute(true);
@@ -356,17 +359,19 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                     return;
                 }
 
-                // 继承已有 parent_group_id 或保持 None
-                let existing_parent = ctx.core_state.storage().snippets().get_by_id(&id)
-                    .ok()
-                    .flatten()
-                    .and_then(|s| s.parent_group_id);
+                // 从表单获取目标归属父级分组 ID (若为 root 或空则为顶级分组)
+                let form_group_id = bridge.get_form_group_id().to_string();
+                let parent_group = if form_group_id == "root" || form_group_id.is_empty() {
+                    None
+                } else {
+                    Some(form_group_id)
+                };
 
                 let is_new = ctx.core_state.storage().snippets().get_by_id(&id).ok().flatten().is_none();
 
                 let record = SnippetRecord {
                     id: id.clone(),
-                    parent_group_id: existing_parent.clone(),
+                    parent_group_id: parent_group.clone(),
                     title: title.clone(),
                     content: content.clone(),
                     language: lang,
@@ -382,7 +387,7 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                     ctx.core_state.events().dispatch(&SnippetSavedEvent {
                         snippet_id: id,
                         title,
-                        parent_group_id: existing_parent,
+                        parent_group_id: parent_group,
                         is_new,
                     });
                     bridge.set_is_editing(false);

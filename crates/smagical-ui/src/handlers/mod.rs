@@ -2,6 +2,7 @@
 //!
 //! 将 Slint UI 各区域的回调绑定按功能域拆分为独立的处理器模块。
 
+pub(crate) mod color_utils;
 pub(crate) mod credential_handlers;
 pub(crate) mod debug_handlers;
 pub(crate) mod file_handlers;
