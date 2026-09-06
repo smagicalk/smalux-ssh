@@ -4,7 +4,7 @@ import { StatusDot } from "../../components/status-dot.slint";
 import { AppButton } from "../../components/base/app-button.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
 import { TunnelItemData } from "../tunnels_view.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 import { TunnelsBridge } from "../../features/tunnels/tunnels_bridge.slint";
 
 export { TunnelItemData }
@@ -113,12 +113,18 @@ export component TunnelToolDrawer inherits DrawerContainer {
             }
         }
 
-        if root.tunnels.length > 0: ScrollView {
+        if root.tunnels.length > 0: Rectangle {
             vertical-stretch: 1;
+            clip: true;
 
-            VerticalLayout {
-                spacing: 6px;
-                padding-right: 2px;
+            scroll-area := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: list-content.preferred-height;
+
+                list-content := VerticalLayout {
+                    spacing: 6px;
+                    padding-right: 2px;
 
                 for tun in root.tunnels: Rectangle {
                     height: 58px;
@@ -260,6 +266,13 @@ export component TunnelToolDrawer inherits DrawerContainer {
                     }
                 }
             }
+        }
+
+        AppVScrollBar {
+            viewport-height: scroll-area.viewport-height;
+            visible-height: scroll-area.height;
+            viewport-y <=> scroll-area.viewport-y;
+        }
         }
 
         // 3. 底部快捷跳转全屏大盘入口

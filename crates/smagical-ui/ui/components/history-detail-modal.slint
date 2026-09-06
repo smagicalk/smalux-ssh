@@ -1,6 +1,6 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppButton } from "base/app-button.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar, AppHScrollBar } from "base/app-scroll-bar.slint";
 import { HistoryBridge } from "../features/history/history_bridge.slint";
 
 /// 会话历史详情与终端屏幕快照弹窗 (History Session Detail & Snapshot Modal)
@@ -330,27 +330,47 @@ export component HistoryDetailModal inherits Rectangle {
                         border-color: AppTheme.border;
                         clip: true;
 
-                        if root.snapshot-content != "": ScrollView {
+                        if root.snapshot-content != "": Rectangle {
                             width: 100%;
                             height: 100%;
-                            viewport-width: Math.max(self.width - 16px, 720px);
-                            viewport-height: Math.max(self.height - 16px, root.snapshot-lines * 17px + 24px);
+                            clip: true;
 
-                            // 可直接鼠标划选高亮、自由复制的只读终端文本框
-                            TextInput {
-                                x: 12px;
-                                y: 10px;
-                                width: parent.viewport-width - 24px;
-                                height: parent.viewport-height - 20px;
-                                text: root.snapshot-content;
-                                read-only: true;
-                                single-line: false;
-                                wrap: no-wrap;
-                                font-family: "Consolas";
-                                font-size: 11px;
-                                color: AppTheme.foreground;
-                                selection-background-color: AppTheme.selected-background;
-                                selection-foreground-color: AppTheme.selected-foreground;
+                            snap-scroll := Flickable {
+                                width: 100%;
+                                height: 100%;
+                                viewport-width: Math.max(self.width - 16px, 720px);
+                                viewport-height: Math.max(self.height - 16px, root.snapshot-lines * 17px + 24px);
+
+                                // 可直接鼠标划选高亮、自由复制的只读终端文本框
+                                TextInput {
+                                    x: 12px;
+                                    y: 10px;
+                                    width: parent.viewport-width - 24px;
+                                    height: parent.viewport-height - 20px;
+                                    text: root.snapshot-content;
+                                    read-only: true;
+                                    single-line: false;
+                                    wrap: no-wrap;
+                                    font-family: "Consolas";
+                                    font-size: 11px;
+                                    color: AppTheme.foreground;
+                                    selection-background-color: AppTheme.selected-background;
+                                    selection-foreground-color: AppTheme.selected-foreground;
+                                }
+                            }
+
+                            AppVScrollBar {
+                                viewport-height: snap-scroll.viewport-height;
+                                visible-height: snap-scroll.height;
+                                viewport-y <=> snap-scroll.viewport-y;
+                                bottom-offset: snap-scroll.viewport-width > snap-scroll.width ? 6px : 0px;
+                            }
+
+                            AppHScrollBar {
+                                viewport-width: snap-scroll.viewport-width;
+                                visible-width: snap-scroll.width;
+                                viewport-x <=> snap-scroll.viewport-x;
+                                right-offset: snap-scroll.viewport-height > snap-scroll.height ? 6px : 0px;
                             }
                         }
 

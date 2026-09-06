@@ -1,6 +1,7 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
-import { ScrollView, LineEdit } from "std-widgets.slint";
+import { LineEdit } from "std-widgets.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 import { SnippetsBridge, QuickCmdData } from "../../features/snippets/snippets_bridge.slint";
 
 export { QuickCmdData }
@@ -51,9 +52,17 @@ export component SnippetToolDrawer inherits DrawerContainer {
             }
         }
 
-        ScrollView {
-            VerticalLayout {
-                spacing: 4px;
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            scroll-area := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: list-content.preferred-height;
+
+                list-content := VerticalLayout {
+                    spacing: 4px;
 
                 for cmd in root.quick-cmds: Rectangle {
                     height: 46px;
@@ -151,6 +160,13 @@ export component SnippetToolDrawer inherits DrawerContainer {
                     }
                 }
             }
+        }
+
+        AppVScrollBar {
+            viewport-height: scroll-area.viewport-height;
+            visible-height: scroll-area.height;
+            viewport-y <=> scroll-area.viewport-y;
+        }
         }
     }
 }

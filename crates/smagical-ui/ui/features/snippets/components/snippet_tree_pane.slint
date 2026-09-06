@@ -5,7 +5,7 @@
 // =============================================================================
 
 import { AppTheme } from "../../../themes/app-theme.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../../components/base/app-scroll-bar.slint";
 import { SearchInput } from "../../../components/search-input.slint";
 import { AppIconButton } from "../../../components/base/app-icon-button.slint";
 import { SnippetTreeNode } from "../snippets_model.slint";
@@ -161,11 +161,12 @@ export component SnippetTreePane inherits Rectangle {
             vertical-stretch: 1;
             clip: true;
 
-            snippet_scroll := ScrollView {
+            snippet_scroll := Flickable {
                 width: 100%;
                 height: 100%;
+                viewport-height: list-content.preferred-height;
 
-                VerticalLayout {
+                list-content := VerticalLayout {
                     spacing: 2px;
 
                     for node[idx] in root.tree_nodes: Rectangle {
@@ -358,6 +359,12 @@ export component SnippetTreePane inherits Rectangle {
                         }
                     }
                 }
+            }
+
+            AppVScrollBar {
+                viewport-height: snippet_scroll.viewport-height;
+                visible-height: snippet_scroll.height;
+                viewport-y <=> snippet_scroll.viewport-y;
             }
         }
     }

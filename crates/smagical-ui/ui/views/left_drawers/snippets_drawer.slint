@@ -2,7 +2,7 @@ import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
 import { SearchInput } from "../../components/search-input.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 import { SnippetTreeNode } from "../../features/snippets/snippets_model.slint";
 import { SnippetsBridge } from "../../features/snippets/snippets_bridge.slint";
 
@@ -147,11 +147,12 @@ export component SnippetsDrawer inherits DrawerContainer {
             vertical-stretch: 1;
             clip: true;
 
-            drawer_scroll := ScrollView {
+            drawer_scroll := Flickable {
                 width: 100%;
                 height: 100%;
+                viewport-height: list-content.preferred-height;
 
-                VerticalLayout {
+                list-content := VerticalLayout {
                     spacing: 2px;
                     alignment: start;
 
@@ -355,6 +356,12 @@ export component SnippetsDrawer inherits DrawerContainer {
                         }
                     }
                 }
+            }
+
+            AppVScrollBar {
+                viewport-height: drawer_scroll.viewport-height;
+                visible-height: drawer_scroll.height;
+                viewport-y <=> drawer_scroll.viewport-y;
             }
         }
     }

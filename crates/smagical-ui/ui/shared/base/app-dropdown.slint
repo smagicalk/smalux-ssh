@@ -1,5 +1,4 @@
 import { AppTheme } from "../../themes/app-theme.slint";
-import { ScrollView } from "std-widgets.slint";
 
 export struct DropdownItemData {
     id: string,
@@ -155,7 +154,7 @@ export component AppDropdown inherits Rectangle {
                 width: 3px;
                 height: Math.max(16px, (dd-box.height / dd-box.total-height) * dd-box.height);
                 border-radius: 1.5px;
-                background: AppTheme.border;
+                background: AppTheme.secondary-foreground.transparentize(50%);
             }
         }
     }

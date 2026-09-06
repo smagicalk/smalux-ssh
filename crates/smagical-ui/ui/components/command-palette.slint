@@ -1,6 +1,6 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { SearchInput } from "search-input.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "base/app-scroll-bar.slint";
 
 /// 命令项结构体
 export struct PaletteItemData {
@@ -71,56 +71,71 @@ export component CommandPalette inherits Rectangle {
                 }
 
                 // 结果列表
-                ScrollView {
-                    VerticalLayout {
-                        spacing: 4px;
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
 
-                        for item in root.items: Rectangle {
-                            height: 48px;
-                            border-radius: AppTheme.radius-medium;
-                            background: item-touch.has-hover ? AppTheme.hover-background : transparent;
+                    scroll-area := Flickable {
+                        width: 100%;
+                        height: 100%;
+                        viewport-height: list-content.preferred-height;
 
-                            item-touch := TouchArea {
-                                clicked => {
-                                    root.item-selected(item.id);
-                                    root.close();
-                                }
-                                mouse-cursor: pointer;
-                            }
+                        list-content := VerticalLayout {
+                            spacing: 4px;
 
-                            HorizontalLayout {
-                                padding-left: 12px;
-                                padding-right: 12px;
-                                spacing: 12px;
-                                alignment: center;
+                            for item in root.items: Rectangle {
+                                height: 48px;
+                                border-radius: AppTheme.radius-medium;
+                                background: item-touch.has-hover ? AppTheme.hover-background : transparent;
 
-                                Text {
-                                    text: item.icon-text;
-                                    font-size: 16px;
-                                    vertical-alignment: center;
+                                item-touch := TouchArea {
+                                    clicked => {
+                                        root.item-selected(item.id);
+                                        root.close();
+                                    }
+                                    mouse-cursor: pointer;
                                 }
 
-                                VerticalLayout {
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    spacing: 12px;
                                     alignment: center;
-                                    spacing: 2px;
 
                                     Text {
-                                        text: item.title;
-                                        font-size: 13px;
-                                        font-weight: 600;
-                                        color: AppTheme.foreground;
-                                        horizontal-alignment: left;
+                                        text: item.icon-text;
+                                        font-size: 16px;
+                                        vertical-alignment: center;
                                     }
 
-                                    Text {
-                                        text: item.subtitle;
-                                        font-size: 11px;
-                                        color: AppTheme.secondary-foreground;
-                                        horizontal-alignment: left;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 2px;
+
+                                        Text {
+                                            text: item.title;
+                                            font-size: 13px;
+                                            font-weight: 600;
+                                            color: AppTheme.foreground;
+                                            horizontal-alignment: left;
+                                        }
+
+                                        Text {
+                                            text: item.subtitle;
+                                            font-size: 11px;
+                                            color: AppTheme.secondary-foreground;
+                                            horizontal-alignment: left;
+                                        }
                                     }
                                 }
                             }
                         }
+                    }
+
+                    AppVScrollBar {
+                        viewport-height: scroll-area.viewport-height;
+                        visible-height: scroll-area.height;
+                        viewport-y <=> scroll-area.viewport-y;
                     }
                 }
             }

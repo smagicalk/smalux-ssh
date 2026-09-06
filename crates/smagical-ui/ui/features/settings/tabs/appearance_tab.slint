@@ -1,4 +1,4 @@
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../../components/base/app-scroll-bar.slint";
 import { AppTheme } from "../../../themes/app-theme.slint";
 import { SettingsBridge } from "../settings_bridge.slint";
 import {
@@ -742,91 +742,99 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                     }
                                                 }
 
-                                                if SettingsBridge.setting-wallpaper-list.length > 0: ScrollView {
-                                                    VerticalLayout {
-                                                        padding-left: 18px;
-                                                        padding-right: 18px;
-                                                        padding-top: 6px;
-                                                        padding-bottom: 6px;
-                                                        spacing: 4px;
+                                                if SettingsBridge.setting-wallpaper-list.length > 0: Rectangle {
+                                                    width: 100%;
+                                                    height: 100%;
 
-                                                        for wp[idx] in SettingsBridge.setting-wallpaper-list: Rectangle {
-                                                            height: 34px;
-                                                            border-radius: AppTheme.radius-small;
-                                                            background: idx == SettingsBridge.setting-wallpaper-active-index ?
-                                                                (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(80%) : AppTheme.accent.transparentize(88%)) :
-                                                                (row-t.has-hover ? AppTheme.hover-background : transparent);
-                                                            border-width: idx == SettingsBridge.setting-wallpaper-active-index ? 1px : 0px;
-                                                            border-color: AppTheme.accent;
+                                                    scroll-area := Flickable {
+                                                        width: 100%;
+                                                        height: 100%;
+                                                        viewport-height: list-content.preferred-height;
 
-                                                            row-t := TouchArea {
-                                                                clicked => {
-                                                                    SettingsBridge.setting-wallpaper-path = wp;
-                                                                    SettingsBridge.select-wallpaper(idx);
-                                                                }
-                                                                mouse-cursor: pointer;
-                                                            }
+                                                        list-content := VerticalLayout {
+                                                            padding-left: 18px;
+                                                            padding-right: 18px;
+                                                            padding-top: 6px;
+                                                            padding-bottom: 6px;
+                                                            spacing: 4px;
 
-                                                            HorizontalLayout {
-                                                                padding-left: 12px;
-                                                                padding-right: 12px;
-                                                                spacing: 10px;
-                                                                alignment: space-between;
+                                                            for wp[idx] in SettingsBridge.setting-wallpaper-list: Rectangle {
+                                                                height: 34px;
+                                                                border-radius: AppTheme.radius-small;
+                                                                background: idx == SettingsBridge.setting-wallpaper-active-index ?
+                                                                    (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(80%) : AppTheme.accent.transparentize(88%)) :
+                                                                    (row-t.has-hover ? AppTheme.hover-background : transparent);
+                                                                border-width: idx == SettingsBridge.setting-wallpaper-active-index ? 1px : 0px;
+                                                                border-color: AppTheme.accent;
 
-                                                                // 左端内容：图标 + 激活徽章 + 路径文本 (文字从左端开始，超长省略)
-                                                                HorizontalLayout {
-                                                                    horizontal-stretch: 1;
-                                                                    spacing: 8px;
-                                                                    alignment: start;
-
-                                                                    VerticalLayout {
-                                                                        alignment: center;
-                                                                        Image {
-                                                                            source: @image-url("../../../assets/icons/sparkles.svg");
-                                                                            width: 14px;
-                                                                            height: 14px;
-                                                                            colorize: idx == SettingsBridge.setting-wallpaper-active-index ? AppTheme.accent : AppTheme.secondary-foreground;
-                                                                        }
+                                                                row-t := TouchArea {
+                                                                    clicked => {
+                                                                        SettingsBridge.setting-wallpaper-path = wp;
+                                                                        SettingsBridge.select-wallpaper(idx);
                                                                     }
+                                                                    mouse-cursor: pointer;
+                                                                }
 
-                                                                    if idx == SettingsBridge.setting-wallpaper-active-index: Rectangle {
-                                                                        height: 18px;
-                                                                        border-radius: 9px;
-                                                                        background: AppTheme.accent;
-                                                                        y: (parent.height - self.height) / 2;
+                                                                HorizontalLayout {
+                                                                    padding-left: 12px;
+                                                                    padding-right: 12px;
+                                                                    spacing: 10px;
+                                                                    alignment: space-between;
 
-                                                                        HorizontalLayout {
-                                                                            padding-left: 6px;
-                                                                            padding-right: 6px;
+                                                                    // 左端内容：图标 + 激活徽章 + 路径文本 (文字从左端开始，超长省略)
+                                                                    HorizontalLayout {
+                                                                        horizontal-stretch: 1;
+                                                                        spacing: 8px;
+                                                                        alignment: start;
+
+                                                                        VerticalLayout {
                                                                             alignment: center;
+                                                                            Image {
+                                                                                source: @image-url("../../../assets/icons/sparkles.svg");
+                                                                                width: 14px;
+                                                                                height: 14px;
+                                                                                colorize: idx == SettingsBridge.setting-wallpaper-active-index ? AppTheme.accent : AppTheme.secondary-foreground;
+                                                                            }
+                                                                        }
+
+                                                                        if idx == SettingsBridge.setting-wallpaper-active-index: Rectangle {
+                                                                            height: 18px;
+                                                                            border-radius: 9px;
+                                                                            background: AppTheme.accent;
+                                                                            y: (parent.height - self.height) / 2;
+
+                                                                            HorizontalLayout {
+                                                                                padding-left: 6px;
+                                                                                padding-right: 6px;
+                                                                                Text {
+                                                                                    text: @tr("当前应用");
+                                                                                    font-size: 9px;
+                                                                                    font-weight: 700;
+                                                                                    color: #ffffff;
+                                                                                    vertical-alignment: center;
+                                                                                }
+                                                                            }
+                                                                        }
+
+                                                                        VerticalLayout {
+                                                                            horizontal-stretch: 1;
+                                                                            alignment: center;
+
                                                                             Text {
-                                                                                text: @tr("生效中");
-                                                                                font-size: 9px;
-                                                                                font-weight: 700;
-                                                                                color: AppTheme.selected-foreground;
+                                                                                text: wp;
+                                                                                font-size: 11px;
+                                                                                font-weight: idx == SettingsBridge.setting-wallpaper-active-index ? 600 : 400;
+                                                                                color: idx == SettingsBridge.setting-wallpaper-active-index ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                                                                overflow: elide;
                                                                                 vertical-alignment: center;
                                                                             }
                                                                         }
                                                                     }
 
-                                                                    Text {
-                                                                        text: wp;
-                                                                        font-family: "JetBrains Mono";
-                                                                        font-size: 11px;
-                                                                        font-weight: idx == SettingsBridge.setting-wallpaper-active-index ? 700 : 400;
-                                                                        color: idx == SettingsBridge.setting-wallpaper-active-index ? AppTheme.accent : AppTheme.foreground;
-                                                                        horizontal-alignment: left;
-                                                                        vertical-alignment: center;
-                                                                        overflow: elide;
-                                                                    }
-                                                                }
-
-                                                                // 右边固定删除图标 (垂直居中对齐)
-                                                                VerticalLayout {
-                                                                    alignment: center;
+                                                                    // 右端操作：仅保留极简垃圾桶图标
                                                                     Rectangle {
-                                                                        width: 24px;
-                                                                        height: 24px;
+                                                                        width: 22px;
+                                                                        height: 22px;
                                                                         border-radius: 4px;
                                                                         background: del-t.has-hover ? AppTheme.danger.transparentize(80%) : transparent;
 
@@ -847,6 +855,12 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                                 }
                                                             }
                                                         }
+                                                    }
+
+                                                    AppVScrollBar {
+                                                        viewport-height: scroll-area.viewport-height;
+                                                        visible-height: scroll-area.height;
+                                                        viewport-y <=> scroll-area.viewport-y;
                                                     }
                                                 }
                                             }

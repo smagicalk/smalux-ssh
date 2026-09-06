@@ -1,5 +1,5 @@
 import { AppTheme } from "../../themes/app-theme.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 import { ThemeOption, ThemeRow } from "../../views/left_drawers/settings_drawer.slint";
 import {
     SettingsBridge,
@@ -117,10 +117,11 @@ export component SettingsCenterView inherits Rectangle {
             width: 100%;
             spacing: 0px;
 
-            // 2.1 左侧分类导航菜单栏 (220px)
+            // 2.1 左侧固定宽导航菜单 (220px)
             Rectangle {
                 width: 220px;
                 background: AppTheme.panel-background;
+                clip: true;
 
                 Rectangle {
                     x: parent.width - 1px;
@@ -129,8 +130,12 @@ export component SettingsCenterView inherits Rectangle {
                     background: AppTheme.border;
                 }
 
-                ScrollView {
-                    VerticalLayout {
+                nav-scroll := Flickable {
+                    width: 100%;
+                    height: 100%;
+                    viewport-height: nav-content.preferred-height;
+
+                    nav-content := VerticalLayout {
                         padding-top: 12px;
                         padding-bottom: 12px;
                         padding-left: 8px;
@@ -195,18 +200,26 @@ export component SettingsCenterView inherits Rectangle {
                         }
                     }
                 }
+
+                AppVScrollBar {
+                    viewport-height: nav-scroll.viewport-height;
+                    visible-height: nav-scroll.height;
+                    viewport-y <=> nav-scroll.viewport-y;
+                }
             }
 
             // 2.2 右侧设置内容流 (100% 占满)
             Rectangle {
                 horizontal-stretch: 1;
                 background: transparent;
+                clip: true;
 
-                ScrollView {
+                scroll-area := Flickable {
                     width: 100%;
                     height: 100%;
+                    viewport-height: list-content.preferred-height;
 
-                    VerticalLayout {
+                    list-content := VerticalLayout {
                         width: 100%;
                         padding-top: 14px;
                         padding-bottom: 32px;
@@ -223,6 +236,12 @@ export component SettingsCenterView inherits Rectangle {
                         if SettingsBridge.active-category == "backup": SettingsStorageTab { width: 100%; }
                         if SettingsBridge.active-category == "security": SettingsSecurityTab { width: 100%; }
                     }
+                }
+
+                AppVScrollBar {
+                    viewport-height: scroll-area.viewport-height;
+                    visible-height: scroll-area.height;
+                    viewport-y <=> scroll-area.viewport-y;
                 }
             }
         }

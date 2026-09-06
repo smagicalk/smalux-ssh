@@ -10,7 +10,7 @@ import { AppButton } from "../../components/base/app-button.slint";
 import { StatusDot } from "../../components/status-dot.slint";
 import { CreateTunnelTypeModal } from "../../components/create-tunnel-type-modal.slint";
 import { HostTreeNode } from "../../views/left_drawers/hosts_drawer.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 
 import { JumpHopData, TunnelItemData } from "tunnels_model.slint";
 import { TunnelsBridge } from "tunnels_bridge.slint";
@@ -436,12 +436,18 @@ export component TunnelsCenterView inherits Rectangle {
                 }
 
                 // 2.5 配置详情与表单编辑区
-                ScrollView {
+                Rectangle {
                     vertical-stretch: 1;
+                    clip: true;
 
-                    VerticalLayout {
-                        alignment: start;
-                        spacing: 12px;
+                    scroll-area := Flickable {
+                        width: 100%;
+                        height: 100%;
+                        viewport-height: list-content.preferred-height;
+
+                        list-content := VerticalLayout {
+                            alignment: start;
+                            spacing: 12px;
 
                         // 表单 A: 端口转发专属表单 (本地/远程/动态网关/反向动态)
                         if root.form-type == "Local" || root.form-type == "Remote" || root.form-type == "Dynamic" || root.form-type == "ReverseDynamic": TunnelForwardForm {
@@ -502,9 +508,15 @@ export component TunnelsCenterView inherits Rectangle {
                             form-proxy-password <=> root.form-proxy-password;
                             form-ssh-command <=> root.form-ssh-command;
                             form-notes <=> root.form-notes;
-                            copy-custom-text(txt, title, msg) => { TunnelsBridge.copy-custom-text(txt, title, msg); }
                         }
                     }
+                }
+
+                AppVScrollBar {
+                    viewport-height: scroll-area.viewport-height;
+                    visible-height: scroll-area.height;
+                    viewport-y <=> scroll-area.viewport-y;
+                }
                 }
             }
         }

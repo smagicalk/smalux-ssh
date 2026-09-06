@@ -1,6 +1,6 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 
 /// 文件项数据结构
 export struct SftpFileItemData {
@@ -70,55 +70,70 @@ export component SftpToolDrawer inherits DrawerContainer {
         }
 
         // 文件列表
-        ScrollView {
-            VerticalLayout {
-                spacing: 4px;
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
 
-                for f in root.files: Rectangle {
-                    height: 32px;
-                    border-radius: AppTheme.radius-small;
-                    background: f-touch.has-hover ? AppTheme.hover-background : transparent;
+            scroll-area := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: list-content.preferred-height;
 
-                    f-touch := TouchArea {
-                        clicked => {
-                            if f.is-dir {
-                                root.change-dir(f.name);
-                            } else {
-                                root.download-file(f.name);
+                list-content := VerticalLayout {
+                    spacing: 4px;
+
+                    for f in root.files: Rectangle {
+                        height: 32px;
+                        border-radius: AppTheme.radius-small;
+                        background: f-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        f-touch := TouchArea {
+                            clicked => {
+                                if f.is-dir {
+                                    root.change-dir(f.name);
+                                } else {
+                                    root.download-file(f.name);
+                                }
                             }
-                        }
-                        mouse-cursor: pointer;
-                    }
-
-                    HorizontalLayout {
-                        padding-left: 8px;
-                        padding-right: 8px;
-                        spacing: 6px;
-                        alignment: center;
-
-                        Text {
-                            text: f.is-dir ? "▤" : "–";
-                            font-size: 11px;
-                            color: f.is-dir ? AppTheme.accent : AppTheme.secondary-foreground;
-                            vertical-alignment: center;
+                            mouse-cursor: pointer;
                         }
 
-                        Text {
-                            text: f.name;
-                            font-size: 11px;
-                            color: AppTheme.foreground;
-                            overflow: elide;
-                            horizontal-alignment: left;
-                        }
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            alignment: center;
 
-                        Text {
-                            text: f.size-str;
-                            font-size: 9px;
-                            color: AppTheme.secondary-foreground;
-                            horizontal-alignment: right;
+                            Text {
+                                text: f.is-dir ? "▤" : "–";
+                                font-size: 11px;
+                                color: f.is-dir ? AppTheme.accent : AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+
+                            Text {
+                                text: f.name;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                overflow: elide;
+                                horizontal-alignment: left;
+                            }
+
+                            Text {
+                                text: f.size-str;
+                                font-size: 9px;
+                                color: AppTheme.secondary-foreground;
+                                horizontal-alignment: right;
+                            }
                         }
                     }
                 }
+            }
+
+            AppVScrollBar {
+                viewport-height: scroll-area.viewport-height;
+                visible-height: scroll-area.height;
+                viewport-y <=> scroll-area.viewport-y;
             }
         }
     }

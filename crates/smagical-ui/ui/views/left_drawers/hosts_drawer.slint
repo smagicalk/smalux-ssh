@@ -3,7 +3,7 @@ import { DrawerContainer } from "../../components/drawer-container.slint";
 import { SearchInput } from "../../components/search-input.slint";
 import { StatusDot } from "../../components/status-dot.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
-import { ScrollView } from "std-widgets.slint";
+import { AppVScrollBar, AppHScrollBar } from "../../components/base/app-scroll-bar.slint";
 
 
 import { HostItemData, HostTreeNode } from "../../features/hosts/hosts_model.slint";
@@ -663,60 +663,19 @@ export component HostsDrawer inherits DrawerContainer {
                 }
             }
 
-            // 悬浮竖向滚动条 (宽 5px 导轨 + 滑块，支持滚轮与鼠标直接拖拽)
-            if scroll-area.viewport-height > scroll-area.height: Rectangle {
-                x: parent.width - 6px;
-                y: 0px;
-                width: 6px;
-                height: parent.height - (scroll-area.viewport-width > scroll-area.width ? 6px : 0px);
-
-                v-thumb := Rectangle {
-                    x: 0.5px;
-                    y: Math.max(0px, Math.min(parent.height - self.height, (-scroll-area.viewport-y / Math.max(1px, scroll-area.viewport-height - scroll-area.height)) * (parent.height - self.height)));
-                    width: 5px;
-                    height: Math.max(28px, (scroll-area.height / scroll-area.viewport-height) * parent.height);
-                    border-radius: 2.5px;
-                    background: v-touch.has-hover || v-touch.pressed ? AppTheme.accent : AppTheme.secondary-foreground.transparentize(50%);
-
-                    animate background { duration: 120ms; }
-
-                    v-touch := TouchArea {
-                        mouse-cursor: pointer;
-                        moved => {
-                            if self.pressed {
-                                scroll-area.viewport-y = Math.min(0px, Math.max(scroll-area.height - scroll-area.viewport-height, scroll-area.viewport-y - (self.mouse-y - self.pressed-y) * (scroll-area.viewport-height / scroll-area.height)));
-                            }
-                        }
-                    }
-                }
+            // 悬浮竖向与横向现代化主题滚动条
+            AppVScrollBar {
+                viewport-height: scroll-area.viewport-height;
+                visible-height: scroll-area.height;
+                viewport-y <=> scroll-area.viewport-y;
+                bottom-offset: (root.view-mode == "tree" && scroll-area.viewport-width > scroll-area.width) ? 6px : 0px;
             }
 
-            // 悬浮横向滚动条 (高 5px 导轨 + 滑块，在树形模式内容超宽时呈现，支持 Shift+滚轮与鼠标直接拖拽)
-            if root.view-mode == "tree" && scroll-area.viewport-width > scroll-area.width: Rectangle {
-                x: 0px;
-                y: parent.height - 6px;
-                height: 6px;
-                width: parent.width - (scroll-area.viewport-height > scroll-area.height ? 6px : 0px);
-
-                h-thumb := Rectangle {
-                    x: Math.max(0px, Math.min(parent.width - self.width, (-scroll-area.viewport-x / Math.max(1px, scroll-area.viewport-width - scroll-area.width)) * (parent.width - self.width)));
-                    y: 0.5px;
-                    height: 5px;
-                    width: Math.max(36px, (scroll-area.width / scroll-area.viewport-width) * parent.width);
-                    border-radius: 2.5px;
-                    background: h-touch.has-hover || h-touch.pressed ? AppTheme.accent : AppTheme.accent.transparentize(30%);
-
-                    animate background { duration: 120ms; }
-
-                    h-touch := TouchArea {
-                        mouse-cursor: pointer;
-                        moved => {
-                            if self.pressed {
-                                scroll-area.viewport-x = Math.min(0px, Math.max(scroll-area.width - scroll-area.viewport-width, scroll-area.viewport-x - (self.mouse-x - self.pressed-x) * (scroll-area.viewport-width / scroll-area.width)));
-                            }
-                        }
-                    }
-                }
+            if root.view-mode == "tree": AppHScrollBar {
+                viewport-width: scroll-area.viewport-width;
+                visible-width: scroll-area.width;
+                viewport-x <=> scroll-area.viewport-x;
+                right-offset: (scroll-area.viewport-height > scroll-area.height) ? 6px : 0px;
             }
 
             // 4. 浮动拖拽跟随卡片 (Drag Ghost Follower: 仅展示被拖动的源节点图标与名称，半透明预览)
