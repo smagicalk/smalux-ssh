@@ -1,6 +1,8 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { SearchInput } from "search-input.slint";
 import { AppVScrollBar } from "base/app-scroll-bar.slint";
+import { AppKeyCap } from "../shared/base/app-badge.slint";
+import { AppEmptyState } from "../shared/base/app-empty-state.slint";
 
 /// 命令项结构体
 export struct PaletteItemData {
@@ -61,13 +63,37 @@ export component CommandPalette inherits Rectangle {
                 HorizontalLayout {
                     padding-left: 4px;
                     padding-right: 4px;
-                    spacing: 12px;
+                    spacing: 6px;
+                    alignment: start;
 
                     Text {
-                        text: @tr("按 ↑↓ 导航  |  Enter 确认  |  Esc 关闭");
+                        text: @tr("导航");
                         font-size: 11px;
                         color: AppTheme.disabled-foreground;
+                        vertical-alignment: center;
                     }
+                    AppKeyCap { key-text: "↑"; }
+                    AppKeyCap { key-text: "↓"; }
+
+                    Rectangle { width: 4px; }
+
+                    Text {
+                        text: @tr("确认");
+                        font-size: 11px;
+                        color: AppTheme.disabled-foreground;
+                        vertical-alignment: center;
+                    }
+                    AppKeyCap { key-text: "Enter"; is-highlight: true; }
+
+                    Rectangle { width: 4px; }
+
+                    Text {
+                        text: @tr("关闭");
+                        font-size: 11px;
+                        color: AppTheme.disabled-foreground;
+                        vertical-alignment: center;
+                    }
+                    AppKeyCap { key-text: "Esc"; }
                 }
 
                 // 结果列表
@@ -130,6 +156,12 @@ export component CommandPalette inherits Rectangle {
                                 }
                             }
                         }
+                    }
+
+                    if root.items.length == 0: AppEmptyState {
+                        icon: @image-url("../assets/icons/search.svg");
+                        title: @tr("未找到匹配的命令或主机");
+                        subtitle: @tr("可尝试输入主机名、IP 地址或切换不同的关键字");
                     }
 
                     AppVScrollBar {

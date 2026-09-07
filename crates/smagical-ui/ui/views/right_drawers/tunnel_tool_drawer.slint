@@ -3,6 +3,7 @@ import { DrawerContainer } from "../../components/drawer-container.slint";
 import { StatusDot } from "../../components/status-dot.slint";
 import { AppButton } from "../../components/base/app-button.slint";
 import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { AppEmptyState } from "../../shared/base/app-empty-state.slint";
 import { TunnelItemData } from "../tunnels_view.slint";
 import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
 import { TunnelsBridge } from "../../features/tunnels/tunnels_bridge.slint";
@@ -82,34 +83,12 @@ export component TunnelToolDrawer inherits DrawerContainer {
             vertical-stretch: 1;
             background: transparent;
 
-            VerticalLayout {
-                alignment: center;
-                spacing: 10px;
-
-                Image {
-                    source: @image-url("../../assets/icons/tunnel.svg");
-                    width: 32px;
-                    height: 32px;
-                    colorize: AppTheme.secondary-foreground.transparentize(50%);
-                    horizontal-alignment: center;
-                }
-
-                Text {
-                    text: @tr("当前主机暂无专属端口转发规则");
-                    font-size: 11px;
-                    color: AppTheme.secondary-foreground;
-                    horizontal-alignment: center;
-                }
-
-                HorizontalLayout {
-                    alignment: center;
-                    AppButton {
-                        text: @tr("配置端口映射");
-                        variant: "outline";
-                        height: 26px;
-                        clicked => { root.start-create-tunnel(); }
-                    }
-                }
+            AppEmptyState {
+                icon: @image-url("../../assets/icons/tunnel.svg");
+                title: @tr("当前主机暂无专属端口转发规则");
+                show-action: true;
+                action-text: @tr("配置端口映射");
+                action-clicked => { root.start-create-tunnel(); }
             }
         }
 

@@ -1,0 +1,97 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppIconButton } from "app-icon-button.slint";
+import { AppTextInput } from "app-text-input.slint";
+
+/// 标准数值直接键入与步进微调复合控件 (AppNumberStepper)
+///
+/// 核心特性：
+/// 1. 左侧微调减号 + 中间直接输入框 + 单位标识 + 右侧微调加号；
+/// 2. 中间采用具备全域点击聚焦的 AppTextInput，支持键盘任意修改；
+/// 3. 内置边界检查 (min-value, max-value, step) 与回车合法性纠偏；
+/// 4. 彻底统一网络超时、TCP心跳保活、终端字号等场景的样板代码。
+export component AppNumberStepper inherits HorizontalLayout {
+    in-out property <int> value: 10;
+    in property <int> min-value: 1;
+    in property <int> max-value: 300;
+    in property <int> step: 5;
+    in property <string> unit: "";
+    in property <length> input-width: 56px;
+    in property <bool> enabled: true;
+
+    callback changed(int);
+
+    spacing: 6px;
+    alignment: center;
+    height: 28px;
+
+    // 1. 步进减号按钮
+    AppIconButton {
+        icon: @image-url("../../assets/icons/arrow-left.svg");
+        enabled: root.enabled && root.value > root.min-value;
+        y: (parent.height - self.height) / 2;
+        clicked => {
+            if root.value - root.step >= root.min-value {
+                root.value -= root.step;
+            } else {
+                root.value = root.min-value;
+            }
+            num-inp.text = root.value;
+            root.changed(root.value);
+        }
+    }
+
+    // 2. 居中数值直接打字输入框 (全域点击聚焦)
+    num-inp := AppTextInput {
+        width: root.input-width;
+        text: root.value;
+        enabled: root.enabled;
+        text-alignment: center;
+        size: "md";
+
+        edited(v) => {
+            let parsed = v.to-float();
+            if parsed >= root.min-value && parsed <= root.max-value {
+                root.value = Math.round(parsed);
+            }
+        }
+
+        accepted(v) => {
+            let parsed = v.to-float();
+            if parsed >= root.min-value && parsed <= root.max-value {
+                root.value = Math.round(parsed);
+            } else if parsed < root.min-value {
+                root.value = root.min-value;
+            } else {
+                root.value = root.max-value;
+            }
+            self.text = root.value;
+            root.changed(root.value);
+        }
+    }
+
+    // 3. 单位说明文本 (如 "秒", "次", "px")
+    if root.unit != "": Text {
+        text: root.unit;
+        font-size: 11px;
+        font-weight: 600;
+        color: AppTheme.secondary-foreground;
+        vertical-alignment: center;
+        y: (parent.height - self.height) / 2;
+    }
+
+    // 4. 步进加号按钮
+    AppIconButton {
+        icon: @image-url("../../assets/icons/arrow-right.svg");
+        enabled: root.enabled && root.value < root.max-value;
+        y: (parent.height - self.height) / 2;
+        clicked => {
+            if root.value + root.step <= root.max-value {
+                root.value += root.step;
+            } else {
+                root.value = root.max-value;
+            }
+            num-inp.text = root.value;
+            root.changed(root.value);
+        }
+    }
+}

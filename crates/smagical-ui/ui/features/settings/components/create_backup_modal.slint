@@ -1,0 +1,257 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import { AppButton } from "../../../shared/base/app-button.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
+
+/// 新建备份容灾任务模态弹窗 (CreateBackupModal)
+export component CreateBackupModal inherits Rectangle {
+    in-out property <string> form-name: "";
+    in-out property <string> form-type: "local"; // "local" | "webdav" | "s3" | "gist" | "self_hosted"
+    in-out property <string> form-endpoint: "";
+    in-out property <string> form-user: "";
+    in-out property <string> form-pass: "";
+    in-out property <string> form-strategy: "daily"; // "manual" | "hourly" | "daily" | "on_exit"
+
+    callback close();
+    callback save();
+
+    width: 100%;
+    height: 100%;
+    background: #000000.transparentize(50%);
+
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    Rectangle {
+        width: 520px;
+        height: 480px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 10px;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        clip: true;
+
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+            alignment: space-between;
+
+            // 标题
+            HorizontalLayout {
+                alignment: space-between;
+                VerticalLayout {
+                    spacing: 3px;
+                    Text {
+                        text: @tr("创建新的备份容灾节点");
+                        font-size: 15px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                    }
+                    Text {
+                        text: @tr("支持将资产库定时或手动增量同步至本地存储盘、私有 WebDAV、S3 或自建服务器");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                }
+
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: cx-t.has-hover ? AppTheme.hover-background : transparent;
+                    cx-t := TouchArea {
+                        clicked => { root.close(); }
+                        mouse-cursor: pointer;
+                    }
+                    Text {
+                        text: "×";
+                        font-size: 16px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 表单字段列表
+            VerticalLayout {
+                spacing: 10px;
+
+                // 1. 任务名称
+                VerticalLayout {
+                    spacing: 3px;
+                    Text { text: @tr("备份任务名称 *"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    AppTextInput {
+                        width: 100%;
+                        size: "sm";
+                        placeholder: @tr("例如: 个人 NAS WebDAV 每日备份 / 本地机械硬盘归档...");
+                        text <=> root.form-name;
+                    }
+                }
+
+                // 2. 存储协议类型
+                VerticalLayout {
+                    spacing: 3px;
+                    Text { text: @tr("存储协议类型 *"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        for tp in [
+                            { id: "local", name: @tr("本地磁盘") },
+                            { id: "webdav", name: "WebDAV" },
+                            { id: "s3", name: "Amazon S3" },
+                            { id: "gist", name: "GitHub Gist" },
+                            { id: "self_hosted", name: @tr("自建服务端") }
+                        ]: Rectangle {
+                            property <bool> is-sel: root.form-type == tp.id;
+                            height: 26px;
+                            border-radius: 4px;
+                            background: is-sel ? AppTheme.accent : tp-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: is-sel ? AppTheme.accent : AppTheme.border;
+                            tp-t := TouchArea {
+                                clicked => { root.form-type = tp.id; }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                alignment: center;
+                                Text {
+                                    text: tp.name;
+                                    font-size: 10px;
+                                    font-weight: is-sel ? 700 : 400;
+                                    color: is-sel ? AppTheme.selected-foreground : AppTheme.foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. 存储端点 / 路径
+                VerticalLayout {
+                    spacing: 3px;
+                    Text {
+                        text: root.form-type == "local" ? @tr("本地备份保存目录路径 *") :
+                              root.form-type == "gist" ? @tr("Gist ID (留空则新建公开/私有 Gist)") : @tr("服务器 URL / Endpoint / Bucket *");
+                        font-size: 10px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                    AppTextInput {
+                        width: 100%;
+                        size: "sm";
+                        placeholder: root.form-type == "local" ? "D:\\smalux_backups" : "https://dav.example.com/remote.php/webdav";
+                        text <=> root.form-endpoint;
+                    }
+                }
+
+                // 4. 账号与认证口令 (根据类型展示)
+                if root.form-type != "local": HorizontalLayout {
+                    spacing: 10px;
+                    VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 3px;
+                        Text {
+                            text: root.form-type == "gist" ? @tr("GitHub 个人访问令牌 (PAT) *") : @tr("用户名 / Access Key");
+                            font-size: 10px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                        AppTextInput {
+                            width: 100%;
+                            size: "sm";
+                            text <=> root.form-user;
+                        }
+                    }
+                    if root.form-type != "gist": VerticalLayout {
+                        horizontal-stretch: 1;
+                        spacing: 3px;
+                        Text { text: @tr("密码 / Secret Key"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        AppPasswordInput {
+                            width: 100%;
+                            size: "sm";
+                            text <=> root.form-pass;
+                        }
+                    }
+                }
+
+                // 5. 备份调度策略
+                VerticalLayout {
+                    spacing: 3px;
+                    Text { text: @tr("自动备份同步策略"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                    HorizontalLayout {
+                        spacing: 6px;
+                        for st in [
+                            { id: "manual", name: @tr("仅手动同步") },
+                            { id: "hourly", name: @tr("每小时自动增量") },
+                            { id: "daily", name: @tr("每天定时备份") },
+                            { id: "on_exit", name: @tr("软件退出时自动快照") }
+                        ]: Rectangle {
+                            property <bool> is-sel: root.form-strategy == st.id;
+                            height: 24px;
+                            border-radius: 4px;
+                            background: is-sel ? AppTheme.accent : st-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: is-sel ? AppTheme.accent : AppTheme.border;
+                            st-t := TouchArea {
+                                clicked => { root.form-strategy = st.id; }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout {
+                                padding-left: 8px;
+                                padding-right: 8px;
+                                alignment: center;
+                                Text {
+                                    text: st.name;
+                                    font-size: 10px;
+                                    font-weight: is-sel ? 700 : 400;
+                                    color: is-sel ? AppTheme.selected-foreground : AppTheme.foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 底部操作按钮
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+
+                AppButton {
+                    text: @tr("取消");
+                    size: "sm";
+                    variant: "secondary";
+                    clicked => { root.close(); }
+                }
+
+                AppButton {
+                    text: @tr("保存并创建备份节点");
+                    size: "sm";
+                    variant: "primary";
+                    has-icon: true;
+                    icon: @image-url("../../../assets/icons/check.svg");
+                    clicked => {
+                        if root.form-name != "" {
+                            SettingsBridge.save-new-backup-task(
+                                root.form-name,
+                                root.form-type,
+                                root.form-endpoint,
+                                root.form-user,
+                                root.form-pass,
+                                root.form-strategy
+                            );
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

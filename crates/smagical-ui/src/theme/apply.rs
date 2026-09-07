@@ -82,8 +82,12 @@ pub fn sync_ui_themes(window: &AppWindow, service: &ThemeService) {
     let mut light_themes = Vec::new();
     let mut all_options = Vec::new();
 
+    let show_system_theme = window.global::<crate::generated::DebugBridge>().get_show_system_theme();
     for def in service.list_ui() {
         let id_str = def.metadata.id.as_ref();
+        if id_str == "builtin.ui.system" && !show_system_theme {
+            continue;
+        }
         let is_builtin = id_str.starts_with("builtin.");
         let is_dark = def.metadata.period.map(|p| p == smagical_core::theme::ThemePeriod::Night).unwrap_or(true);
         if let Ok(resolved) = service.resolve_ui(id_str) {

@@ -8,9 +8,9 @@ export enum AppColorScheme {
 
 // Runtime theme surface. Rust writes resolved custom themes into these properties.
 export global AppTheme {
-    in-out property <string> theme-id: "builtin.ui.system";
-    in-out property <AppColorScheme> color-scheme: AppColorScheme.system;
-    in-out property <bool> use-system-palette: true;
+    in-out property <string> theme-id: "builtin.ui.darcula";
+    in-out property <AppColorScheme> color-scheme: AppColorScheme.dark;
+    in-out property <bool> use-system-palette: false;
     in-out property <brush> custom-window-background: #2b2b2b;
     in-out property <brush> custom-panel-background: #3c3f41;
     in-out property <brush> custom-surface-background: #313335;

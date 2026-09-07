@@ -1,0 +1,64 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppButton } from "app-button.slint";
+
+/// 标准统一列表/抽屉空状态占位组件 (AppEmptyState)
+///
+/// 核心特性：
+/// 1. 规范全站 8+ 处列表无数据或搜索过滤为空时的图文视觉排版；
+/// 2. 居中大图标 (48px) + 标题 (14px/700) + 辅助引导文案；
+/// 3. 可选行动操作按钮 (Action Button，如“快速添加”、“清空筛选”)。
+export component AppEmptyState inherits VerticalLayout {
+    in property <image> icon;
+    in property <string> title: @tr("暂无数据");
+    in property <string> subtitle: "";
+    in property <string> action-text: "";
+    in property <bool> show-action: false;
+
+    callback action-clicked();
+
+    alignment: center;
+    spacing: 10px;
+
+    // 1. 空状态矢量大图标
+    if root.icon.width > 0: HorizontalLayout {
+        alignment: center;
+        Image {
+            source: root.icon;
+            width: 44px;
+            height: 44px;
+            image-fit: contain;
+            colorize: AppTheme.disabled-foreground.transparentize(20%);
+        }
+    }
+
+    // 2. 主标题
+    Text {
+        text: root.title;
+        font-size: 13px;
+        font-weight: 700;
+        color: AppTheme.secondary-foreground;
+        horizontal-alignment: center;
+    }
+
+    // 3. 辅助引导文案
+    if root.subtitle != "": Text {
+        text: root.subtitle;
+        font-size: 11px;
+        color: AppTheme.disabled-foreground;
+        horizontal-alignment: center;
+        wrap: word-wrap;
+    }
+
+    // 4. 可选引导操作按钮
+    if root.show-action && root.action-text != "": HorizontalLayout {
+        alignment: center;
+        padding-top: 4px;
+
+        AppButton {
+            text: root.action-text;
+            size: "sm";
+            variant: "primary";
+            clicked => { root.action-clicked(); }
+        }
+    }
+}

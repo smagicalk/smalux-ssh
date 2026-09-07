@@ -2,8 +2,11 @@ import { AppTheme } from "../../../themes/app-theme.slint";
 import { AppSwitch } from "../../../shared/base/app-switch.slint";
 import { AppDropdown, DropdownItemData } from "../../../shared/base/app-dropdown.slint";
 import { AppSegmentedControl, SegmentItemData } from "../../../shared/base/app-segmented-control.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
+import { AppNumberStepper } from "../../../shared/base/app-number-stepper.slint";
 
-export { AppDropdown, DropdownItemData, AppSegmentedControl, SegmentItemData }
+export { AppDropdown, DropdownItemData, AppSegmentedControl, SegmentItemData, AppTextInput, AppPasswordInput, AppNumberStepper }
 
 /// 标准扁平开关组件 (重定向至 AppSwitch)
 export component SettingsSwitch inherits AppSwitch {}
@@ -295,13 +298,22 @@ export component SettingsSectionCard inherits Rectangle {
 export component KeyBadge inherits Rectangle {
     in property <string> key-text: "";
     in property <bool> is-highlight: false;
+    in property <bool> is-interactive: false;
+    in property <bool> is-recording: false;
+    callback clicked();
 
     height: 22px;
     min-width: 24px;
     border-radius: 4px;
-    background: root.is-highlight ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
-    border-width: 1px;
-    border-color: root.is-highlight ? AppTheme.accent : AppTheme.border;
+    background: root.is-recording ? AppTheme.accent.transparentize(80%) : root.is-highlight ? AppTheme.accent.transparentize(85%) : (kb-touch.has-hover && root.is-interactive) ? AppTheme.hover-background : AppTheme.control-background;
+    border-width: root.is-recording ? 1.5px : 1px;
+    border-color: root.is-recording ? AppTheme.accent : root.is-highlight ? AppTheme.accent : (kb-touch.has-hover && root.is-interactive) ? AppTheme.accent.transparentize(40%) : AppTheme.border;
+
+    kb-touch := TouchArea {
+        enabled: root.is-interactive;
+        clicked => { root.clicked(); }
+        mouse-cursor: root.is-interactive ? pointer : default;
+    }
 
     HorizontalLayout {
         padding-left: 6px;
@@ -311,7 +323,7 @@ export component KeyBadge inherits Rectangle {
             text: root.key-text;
             font-size: 11px;
             font-weight: 600;
-            color: root.is-highlight ? AppTheme.accent : AppTheme.foreground;
+            color: root.is-recording ? AppTheme.accent : root.is-highlight ? AppTheme.accent : AppTheme.foreground;
             vertical-alignment: center;
             horizontal-alignment: center;
         }

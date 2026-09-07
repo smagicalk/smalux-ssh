@@ -754,15 +754,20 @@ import { AppSlider } from "../../../shared/base/app-slider.slint";
                                                                 { id: "h", name: @tr("时") },
                                                                 { id: "off", name: @tr("关闭") }
                                                             ]: Rectangle {
+                                                                property <bool> is-selected: (SettingsBridge.setting-wallpaper-slideshow == "none" || SettingsBridge.setting-wallpaper-slideshow == "off") ? (u.id == "off") : (SettingsBridge.slideshow-unit-input == u.id);
                                                                 border-radius: 2px;
-                                                                background: SettingsBridge.slideshow-unit-input == u.id ? AppTheme.accent : u-touch.has-hover ? AppTheme.hover-background : transparent;
+                                                                background: is-selected ? AppTheme.accent : u-touch.has-hover ? AppTheme.hover-background : transparent;
 
                                                                 u-touch := TouchArea {
                                                                     clicked => {
                                                                         SettingsBridge.slideshow-unit-input = u.id;
                                                                         if u.id == "off" {
+                                                                            SettingsBridge.slideshow-number-input = "0";
                                                                             SettingsBridge.setting-wallpaper-slideshow = "none";
                                                                         } else {
+                                                                            if SettingsBridge.slideshow-number-input == "0" || SettingsBridge.slideshow-number-input == "" {
+                                                                                SettingsBridge.slideshow-number-input = "1";
+                                                                            }
                                                                             SettingsBridge.setting-wallpaper-slideshow = SettingsBridge.slideshow-number-input + u.id;
                                                                         }
                                                                         SettingsBridge.set-wallpaper-slideshow(SettingsBridge.setting-wallpaper-slideshow, SettingsBridge.setting-wallpaper-transition);
@@ -777,8 +782,8 @@ import { AppSlider } from "../../../shared/base/app-slider.slint";
                                                                     Text {
                                                                         text: u.name;
                                                                         font-size: 10px;
-                                                                        font-weight: SettingsBridge.slideshow-unit-input == u.id ? 700 : 400;
-                                                                        color: SettingsBridge.slideshow-unit-input == u.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                                                        font-weight: is-selected ? 700 : 400;
+                                                                        color: is-selected ? AppTheme.selected-foreground : AppTheme.foreground;
                                                                         vertical-alignment: center;
                                                                     }
                                                                 }

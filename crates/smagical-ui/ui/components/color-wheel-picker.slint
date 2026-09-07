@@ -239,6 +239,11 @@ export component ColorWheelPickerModal inherits Rectangle {
                             horizontal-stretch: 1;
                             clip: true;
 
+                            TouchArea {
+                                clicked => { pick-inp.focus(); }
+                                mouse-cursor: text;
+                            }
+
                             pick-inp := TextInput {
                                 width: 100%;
                                 height: 100%;

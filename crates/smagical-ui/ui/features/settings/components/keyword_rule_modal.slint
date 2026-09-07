@@ -2,6 +2,7 @@ import { ColorWheelPickerModal } from "../../../components/color-wheel-picker.sl
 import { AppTheme } from "../../../themes/app-theme.slint";
 import { SettingsBridge } from "../settings_bridge.slint";
 import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
 
     export component KeywordRuleModal inherits Rectangle {
     visible: SettingsBridge.is-add-keyword-modal-open;
@@ -115,32 +116,12 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                             }
                         }
 
-                        Rectangle {
-                            height: 32px;
-                            border-radius: AppTheme.radius-small;
-                            background: AppTheme.control-background;
-                            border-width: 1px;
-                            border-color: modal-pat.has-focus ? AppTheme.accent : AppTheme.border;
-
-                            HorizontalLayout {
-                                padding-left: 10px;
-                                padding-right: 10px;
-                                alignment: center;
-
-                                modal-pat := TextInput {
-                                    text <=> SettingsBridge.new-rule-pattern;
-                                    font-size: 11px;
-                                    font-family: "JetBrains Mono, monospace";
-                                    color: AppTheme.foreground;
-                                    single-line: true;
-                                }
-                                if SettingsBridge.new-rule-pattern == "": Text {
-                                    text: @tr("例如: \\b(ERROR|FATAL|CRITICAL)\\b");
-                                    font-size: 11px;
-                                    color: AppTheme.disabled-foreground;
-                                    vertical-alignment: center;
-                                }
-                            }
+                        AppTextInput {
+                            text <=> SettingsBridge.new-rule-pattern;
+                            placeholder: @tr("例如: \\b(ERROR|FATAL|CRITICAL)\\b");
+                            size: "lg";
+                            monospace: true;
+                            clearable: true;
                         }
 
                         // 快速填入常用预设
@@ -203,31 +184,11 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                             color: AppTheme.foreground;
                         }
 
-                        Rectangle {
-                            height: 32px;
-                            border-radius: AppTheme.radius-small;
-                            background: AppTheme.control-background;
-                            border-width: 1px;
-                            border-color: modal-rem.has-focus ? AppTheme.accent : AppTheme.border;
-
-                            HorizontalLayout {
-                                padding-left: 10px;
-                                padding-right: 10px;
-                                alignment: center;
-
-                                modal-rem := TextInput {
-                                    text <=> SettingsBridge.new-rule-remark;
-                                    font-size: 11px;
-                                    color: AppTheme.foreground;
-                                    single-line: true;
-                                }
-                                if SettingsBridge.new-rule-remark == "": Text {
-                                    text: @tr("输入规则备注，例如: 关键业务日志告警");
-                                    font-size: 11px;
-                                    color: AppTheme.disabled-foreground;
-                                    vertical-alignment: center;
-                                }
-                            }
+                        AppTextInput {
+                            text <=> SettingsBridge.new-rule-remark;
+                            placeholder: @tr("输入规则备注，例如: 关键业务日志告警");
+                            size: "lg";
+                            clearable: true;
                         }
                     }
 

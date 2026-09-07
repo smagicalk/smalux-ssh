@@ -1,0 +1,157 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 标准纯文本输入框原子组件 (AppTextInput)
+///
+/// 核心特性：
+/// 1. 底置全域焦点代理层，点击输入框内边距或空白任意死区 100% 聚焦；
+/// 2. 全框文本悬停光标 (mouse-cursor: text)；
+/// 3. 前缀图标 (prefix-icon)、后缀文本 (suffix-text) 与一键清空按钮 (clearable)；
+/// 4. 标准三档尺寸变体 (sm: 24px, md: 28px, lg: 32px) 与主题高亮动画。
+export component AppTextInput inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder: "";
+    in property <bool> enabled: true;
+    in property <bool> read-only: false;
+    in property <bool> clearable: false;
+    in property <image> prefix-icon;
+    in property <string> suffix-text: "";
+    in property <string> size: "md";
+    in property <length> input-height: root.size == "sm" ? 24px : (root.size == "lg" ? 32px : 28px);
+    in property <length> font-size: 11px;
+    in property <bool> monospace: false;
+    in property <TextHorizontalAlignment> text-alignment: left;
+    in property <InputType> input-type: InputType.text;
+    out property <bool> has-focus: input.has-focus;
+
+    callback accepted(string);
+    callback edited(string);
+    callback cleared();
+    forward-focus: input;
+
+    height: root.input-height;
+    border-radius: AppTheme.radius-medium;
+    background: !root.enabled ? AppTheme.control-background.transparentize(50%) : AppTheme.control-background;
+    border-width: 1px;
+    border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
+
+    animate border-color { duration: 120ms; }
+
+    // -----------------------------------------------------------------
+    // 底置全域焦点代理层 (置于底层，无论点击内边距还是两侧空白，100% 聚焦)
+    // -----------------------------------------------------------------
+    TouchArea {
+        enabled: root.enabled && !root.read-only;
+        clicked => { input.focus(); }
+        mouse-cursor: MouseCursor.text;
+    }
+
+    // -----------------------------------------------------------------
+    // 内容横向布局
+    // -----------------------------------------------------------------
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+
+        // 1. 可选前缀图标
+        if root.prefix-icon.width > 0: VerticalLayout {
+            alignment: center;
+            width: 14px;
+
+            Image {
+                source: root.prefix-icon;
+                width: 12px;
+                height: 12px;
+                image-fit: contain;
+                colorize: input.has-focus ? AppTheme.accent : AppTheme.secondary-foreground;
+                animate colorize { duration: 120ms; }
+            }
+        }
+
+        // 2. 文本输入与占位符包裹视区
+        Rectangle {
+            horizontal-stretch: 1;
+            clip: true;
+
+            // 内层全域点击聚焦代理
+            TouchArea {
+                enabled: root.enabled && !root.read-only;
+                clicked => { input.focus(); }
+                mouse-cursor: MouseCursor.text;
+            }
+
+            if input.text == "" && !input.has-focus && root.placeholder != "": Text {
+                text: root.placeholder;
+                font-size: root.font-size;
+                font-family: root.monospace ? "JetBrains Mono, Cascadia Code, Consolas, monospace" : "";
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+                horizontal-alignment: root.text-alignment;
+                overflow: elide;
+                width: 100%;
+                height: 100%;
+            }
+
+            input := TextInput {
+                width: 100%;
+                height: 100%;
+                font-size: root.font-size;
+                font-family: root.monospace ? "JetBrains Mono, Cascadia Code, Consolas, monospace" : "";
+                color: AppTheme.foreground;
+                selection-background-color: AppTheme.selected-background;
+                selection-foreground-color: AppTheme.selected-foreground;
+                horizontal-alignment: root.text-alignment;
+                vertical-alignment: center;
+                single-line: true;
+                enabled: root.enabled;
+                read-only: root.read-only;
+                input-type: root.input-type;
+
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+            }
+        }
+
+        // 3. 可选后缀单位/说明文本
+        if root.suffix-text != "": Text {
+            text: root.suffix-text;
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+            vertical-alignment: center;
+        }
+
+        // 4. 可选一键清空按钮
+        if root.clearable && input.text != "" && root.enabled && !root.read-only: VerticalLayout {
+            alignment: center;
+            width: 14px;
+
+            Rectangle {
+                width: 14px;
+                height: 14px;
+                border-radius: 7px;
+                background: btn-clr.has-hover ? AppTheme.hover-background : transparent;
+
+                btn-clr := TouchArea {
+                    clicked => {
+                        input.text = "";
+                        root.cleared();
+                        root.edited("");
+                        input.focus();
+                    }
+                    mouse-cursor: pointer;
+                }
+
+                Image {
+                    source: @image-url("../../assets/icons/window-close.svg");
+                    width: 8px;
+                    height: 8px;
+                    image-fit: contain;
+                    colorize: btn-clr.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}

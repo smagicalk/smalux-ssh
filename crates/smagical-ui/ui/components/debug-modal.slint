@@ -441,10 +441,12 @@ export component DebugModal inherits Rectangle {
                         flag-cloud-sync <=> root.flag-cloud-sync;
                         flag-terminal-scratchpad <=> root.flag-terminal-scratchpad;
                         use-mock-storage <=> root.use-mock-storage;
+                        show-system-theme <=> DebugBridge.show-system-theme;
                         current-theme-name: root.current-theme-name;
                         is-dark-mode: root.is-dark-mode;
                         setting-modal-opacity <=> root.setting-modal-opacity;
 
+                        toggle-show-system-theme(c) => { DebugBridge.toggle-show-system-theme(c); }
                         toggle-feature-flag(f, e) => { DebugBridge.toggle-feature-flag(f, e); }
                         toggle-mock-storage(e) => { DebugBridge.toggle-mock-storage(e); }
                         apply-config-preset(p) => { DebugBridge.apply-config-preset(p); }

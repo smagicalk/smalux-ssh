@@ -1337,4 +1337,15 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }));
         });
     }
+    {
+        let window_weak = window.as_weak();
+        let themes_ref = ctx.themes.clone();
+        db.on_toggle_show_system_theme(move |enabled| {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<DebugBridge>().set_show_system_theme(enabled);
+                let service = themes_ref.borrow();
+                crate::theme::sync_ui_themes(&w, &service);
+            }
+        });
+    }
 }

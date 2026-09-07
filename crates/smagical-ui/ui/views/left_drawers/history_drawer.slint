@@ -1,6 +1,7 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
 import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
+import { AppEmptyState } from "../../shared/base/app-empty-state.slint";
 
 /// 历史会话单项数据结构
 export struct HistoryItemData {
@@ -506,35 +507,11 @@ export component HistoryDrawer inherits DrawerContainer {
     }
 
         // 5. 空状态展示
-        if root.total-count == 0: VerticalLayout {
-            alignment: center;
-            spacing: 8px;
+        if root.total-count == 0: AppEmptyState {
             vertical-stretch: 1;
-
-            Image {
-                source: @image-url("../../assets/icons/clock.svg");
-                width: 32px;
-                height: 32px;
-                image-fit: contain;
-                colorize: AppTheme.disabled-foreground;
-                horizontal-alignment: center;
-            }
-
-            Text {
-                text: root.search-query != "" ? @tr("未找到匹配的历史记录") : @tr("暂无连接历史");
-                font-size: 11px;
-                font-weight: 600;
-                color: AppTheme.secondary-foreground;
-                horizontal-alignment: center;
-            }
-
-            Text {
-                text: root.search-query != "" ? @tr("请尝试其他搜索关键词") : @tr("在「主机」页面双击主机发起远程连接后将自动记录");
-                font-size: 10px;
-                color: AppTheme.disabled-foreground;
-                horizontal-alignment: center;
-            }
-
+            icon: @image-url("../../assets/icons/clock.svg");
+            title: root.search-query != "" ? @tr("未找到匹配的历史记录") : @tr("暂无连接历史");
+            subtitle: root.search-query != "" ? @tr("请尝试其他搜索关键词") : @tr("在「主机」页面双击主机发起远程连接后将自动记录");
         }
     }
 }

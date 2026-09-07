@@ -1,0 +1,76 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 标准多行长文本输入域组件 (AppTextArea)
+///
+/// 核心特性：
+/// 1. 自动换行 (wrap: word-wrap) 与最小高度自适应；
+/// 2. 底置全域焦点代理层，点击输入框底部或任意空白死区 100% 聚焦并将光标置于末尾；
+/// 3. 支持等宽代码字体切换 (monospace: true)，极度适配 SSH 密钥 (OpenSSH PEM)、配置脚本与 TOML 预览；
+/// 4. 聚焦主题色高亮描边动画与占位符优雅支持。
+export component AppTextArea inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder: "";
+    in property <bool> enabled: true;
+    in property <bool> read-only: false;
+    in property <bool> monospace: false;
+    in property <InputType> input-type: InputType.text;
+    in property <length> font-size: 11px;
+    out property <bool> has-focus: input.has-focus;
+
+    callback edited(string);
+    callback accepted(string);
+    forward-focus: input;
+
+    min-height: 56px;
+    border-radius: AppTheme.radius-medium;
+    background: !root.enabled ? AppTheme.control-background.transparentize(50%) : AppTheme.control-background;
+    border-width: 1px;
+    border-color: input.has-focus ? AppTheme.accent : AppTheme.border;
+    clip: true;
+
+    animate border-color { duration: 120ms; }
+
+    // 底置全域点击代理层 (无论点在下方留白还是空白区域，100% 触发聚焦)
+    TouchArea {
+        enabled: root.enabled && !root.read-only;
+        clicked => { input.focus(); }
+        mouse-cursor: MouseCursor.text;
+    }
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 6px;
+        padding-bottom: 6px;
+
+        Rectangle {
+            horizontal-stretch: 1;
+
+            if input.text == "" && !input.has-focus && root.placeholder != "": Text {
+                text: root.placeholder;
+                font-size: root.font-size;
+                font-family: root.monospace ? "JetBrains Mono, Cascadia Code, Consolas, monospace" : "";
+                color: AppTheme.disabled-foreground;
+                wrap: word-wrap;
+                width: 100%;
+            }
+
+            input := TextInput {
+                width: 100%;
+                font-size: root.font-size;
+                font-family: root.monospace ? "JetBrains Mono, Cascadia Code, Consolas, monospace" : "";
+                color: root.enabled ? AppTheme.foreground : AppTheme.secondary-foreground;
+                selection-background-color: AppTheme.selected-background;
+                selection-foreground-color: AppTheme.selected-foreground;
+                input-type: root.input-type;
+                single-line: false;
+                wrap: word-wrap;
+                enabled: root.enabled;
+                read-only: root.read-only;
+
+                edited => { root.edited(self.text); }
+                accepted => { root.accepted(self.text); }
+            }
+        }
+    }
+}

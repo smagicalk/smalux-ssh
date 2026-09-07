@@ -1,0 +1,186 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import { AppButton } from "../../../shared/base/app-button.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { KeyBadge } from "settings_widgets.slint";
+
+/// 自定义快捷键设置模态弹窗 (KeybindingEditModal)
+export component KeybindingEditModal inherits Rectangle {
+    in property <string> action-id: "";
+    in property <string> action-name: "";
+    in property <string> default-key: "";
+    in-out property <string> current-key: "";
+
+    callback close();
+    callback save(string /* new_key */);
+    callback reset();
+    callback clear-key();
+
+    width: 100%;
+    height: 100%;
+    background: #000000.transparentize(50%);
+
+    // 拦截外层遮罩点击
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    // 居中弹窗主体
+    Rectangle {
+        width: 460px;
+        height: 290px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 10px;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        clip: true;
+
+        // 阻止点击弹窗内部冒泡关闭
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 20px;
+            spacing: 16px;
+            alignment: space-between;
+
+            // 1. 弹窗标题与操作名
+            HorizontalLayout {
+                alignment: space-between;
+                VerticalLayout {
+                    spacing: 3px;
+                    Text {
+                        text: @tr("自定义快捷键");
+                        font-size: 15px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                    }
+                    Text {
+                        text: @tr("为「") + root.action-name + @tr("」设定个性化专属组合快捷键");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                }
+
+                // 右上角关闭按钮
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: x-touch.has-hover ? AppTheme.hover-background : transparent;
+                    x-touch := TouchArea {
+                        clicked => { root.close(); }
+                        mouse-cursor: pointer;
+                    }
+                    Text {
+                        text: "×";
+                        font-size: 16px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 2. 快捷键输入与录制展示卡片
+            Rectangle {
+                border-radius: 8px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.accent.transparentize(60%);
+                height: 74px;
+
+                VerticalLayout {
+                    padding: 12px;
+                    spacing: 8px;
+                    alignment: center;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        Text {
+                            text: @tr("当前映射按键:");
+                            font-size: 10px;
+                            color: AppTheme.disabled-foreground;
+                            vertical-alignment: center;
+                        }
+
+                        if root.default-key != "": HorizontalLayout {
+                            spacing: 4px;
+                            alignment: end;
+                            Text {
+                                text: @tr("官方默认:");
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                            }
+                            KeyBadge {
+                                key-text: root.default-key;
+                            }
+                        }
+                    }
+
+                    // 输入/编辑框 (支持直接输入如 Ctrl+Shift+P)
+                    AppTextInput {
+                        width: 100%;
+                        size: "sm";
+                        monospace: true;
+                        placeholder: @tr("请输入按键组合 (例如 Ctrl+Shift+T 或 Alt+Enter)...");
+                        text <=> root.current-key;
+                        text-alignment: center;
+                    }
+                }
+            }
+
+            // 3. 底部动作栏
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    AppButton {
+                        text: @tr("恢复默认");
+                        size: "sm";
+                        variant: "outline";
+                        has-icon: true;
+                        icon: @image-url("../../../assets/icons/refresh.svg");
+                        clicked => {
+                            root.reset();
+                            root.current-key = root.default-key;
+                        }
+                    }
+                    AppButton {
+                        text: @tr("清除解绑");
+                        size: "sm";
+                        variant: "ghost";
+                        clicked => {
+                            root.clear-key();
+                            root.current-key = "";
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    AppButton {
+                        text: @tr("取消");
+                        size: "sm";
+                        variant: "secondary";
+                        clicked => { root.close(); }
+                    }
+                    AppButton {
+                        text: @tr("保存快捷键");
+                        size: "sm";
+                        variant: "primary";
+                        has-icon: true;
+                        icon: @image-url("../../../assets/icons/check.svg");
+                        clicked => {
+                            root.save(root.current-key);
+                            root.close();
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

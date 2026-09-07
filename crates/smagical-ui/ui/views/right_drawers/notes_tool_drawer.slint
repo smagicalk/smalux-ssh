@@ -1,5 +1,6 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 import { DrawerContainer } from "../../components/drawer-container.slint";
+import { AppTextArea } from "../../shared/base/app-text-area.slint";
 
 /// 会话备忘笔记抽屉 (Notes Tool Drawer)
 export component NotesToolDrawer inherits DrawerContainer {
@@ -18,20 +19,9 @@ export component NotesToolDrawer inherits DrawerContainer {
             color: AppTheme.secondary-foreground;
         }
 
-        Rectangle {
-            border-radius: AppTheme.radius-medium;
-            background: AppTheme.control-background;
-            border-width: 1px;
-            border-color: AppTheme.border;
-
-            TextInput {
-                text <=> root.note-text;
-                font-size: 11px;
-                color: AppTheme.foreground;
-                selection-background-color: AppTheme.selected-background;
-                selection-foreground-color: AppTheme.selected-foreground;
-                wrap: word-wrap;
-            }
+        AppTextArea {
+            text <=> root.note-text;
+            min-height: 120px;
         }
     }
 }

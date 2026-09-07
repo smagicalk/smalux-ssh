@@ -8,257 +8,265 @@ import {
 } from "../components/settings_widgets.slint";
 import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
 
-                                export component SettingsSecurityTab inherits VerticalLayout {
-                                    spacing: 16px;
+export component SettingsSecurityTab inherits VerticalLayout {
+    spacing: 16px;
 
-                                    SettingsPageHeader {
-                                        title: @tr("安全隐私与开发者诊断");
-                                        subtitle: @tr("本地主密码保护、凭据保险箱、剪贴板自动清空、会话审计与开发者诊断");
-                                        icon: @image-url("../../../assets/icons/shield.svg");
-                                    }
+    SettingsPageHeader {
+        title: @tr("安全隐私与开发者诊断");
+        subtitle: @tr("本地主密码保护、凭据保险箱、剪贴板自动清空、会话审计与开发者诊断");
+        icon: @image-url("../../../assets/icons/shield.svg");
+    }
 
-                                    // 卡片 1: 本地主密码加密与保险箱安全
-                                    SettingsSectionCard {
-                                        title: @tr("本地凭据保险箱与主密码安全");
-                                        subtitle: @tr("使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护");
-                                        icon: @image-url("../../../assets/icons/shield.svg");
+    // 卡片 1: 本地主密码加密与保险箱安全
+    SettingsSectionCard {
+        title: @tr("本地凭据保险箱与主密码安全");
+        subtitle: @tr("使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护");
+        icon: @image-url("../../../assets/icons/shield.svg");
 
-                                        SettingsRow {
-                                            title: @tr("启用本地凭据主密码保护 (Master Password)");
-                                            subtitle: @tr("开启后，所有 SSH 私钥与连接密码将使用 Argon2id 派生密钥进行高强度 AES-256 加密");
+        SettingsRow {
+            title: @tr("启用本地凭据主密码保护 (Master Password)");
+            subtitle: @tr("开启后，所有 SSH 私钥与连接密码将使用 Argon2id 派生密钥进行高强度 AES-256 加密");
 
-                                            HorizontalLayout {
-                                                spacing: 10px;
-                                                alignment: center;
+            HorizontalLayout {
+                spacing: 10px;
+                alignment: center;
 
-                                                if SettingsBridge.setting-master-password-enabled: Text {
-                                                    text: @tr("已受主密码保护 (AES-256)");
-                                                    font-size: 10px;
-                                                    color: #10B981;
-                                                    font-weight: 600;
-                                                    vertical-alignment: center;
-                                                }
+                if SettingsBridge.setting-master-password-enabled: Text {
+                    text: @tr("已受主密码保护 (AES-256)");
+                    font-size: 10px;
+                    color: #10B981;
+                    font-weight: 600;
+                    vertical-alignment: center;
+                }
 
-                                                SettingsSwitch {
-                                                    checked: SettingsBridge.setting-master-password-enabled;
-                                                    toggled(c) => {
-                                                        if c && !SettingsBridge.setting-master-password-enabled {
-                                                            SettingsBridge.is-master-pwd-modal-open = true;
-                                                            SettingsBridge.master-pwd-old = "";
-                                                            SettingsBridge.master-pwd-new = "";
-                                                            SettingsBridge.master-pwd-confirm = "";
-                                                            SettingsBridge.master-pwd-error-msg = "";
-                                                        } else if !c {
-                                                            SettingsBridge.setting-master-password-enabled = false;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                SettingsSwitch {
+                    checked: SettingsBridge.setting-master-password-enabled;
+                    toggled(c) => {
+                        if c && !SettingsBridge.setting-master-password-enabled {
+                            SettingsBridge.is-master-pwd-modal-open = true;
+                            SettingsBridge.master-pwd-old = "";
+                            SettingsBridge.master-pwd-new = "";
+                            SettingsBridge.master-pwd-confirm = "";
+                            SettingsBridge.master-pwd-error-msg = "";
+                        } else if !c {
+                            SettingsBridge.setting-master-password-enabled = false;
+                        }
+                    }
+                }
+            }
+        }
 
-                                        if SettingsBridge.setting-master-password-enabled: SettingsRow {
-                                            title: @tr("主密码管理 (Manage Master Password)");
-                                            subtitle: @tr("随时验证旧密码并更新客户端主密码");
+        if SettingsBridge.setting-master-password-enabled: SettingsRow {
+            title: @tr("主密码管理 (Manage Master Password)");
+            subtitle: @tr("随时验证旧密码并更新客户端主密码");
 
-                                            AppButton {
-                                                text: @tr("🔑 修改主密码...");
-                                                variant: "secondary";
-                                                clicked => {
-                                                    SettingsBridge.is-master-pwd-modal-open = true;
-                                                    SettingsBridge.master-pwd-old = "";
-                                                    SettingsBridge.master-pwd-new = "";
-                                                    SettingsBridge.master-pwd-confirm = "";
-                                                    SettingsBridge.master-pwd-error-msg = "";
-                                                }
-                                            }
-                                        }
+            AppButton {
+                text: @tr("修改主密码...");
+                variant: "secondary";
+                has-icon: true;
+                icon: @image-url("../../../assets/icons/key.svg");
+                clicked => {
+                    SettingsBridge.is-master-pwd-modal-open = true;
+                    SettingsBridge.master-pwd-old = "";
+                    SettingsBridge.master-pwd-new = "";
+                    SettingsBridge.master-pwd-confirm = "";
+                    SettingsBridge.master-pwd-error-msg = "";
+                }
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("空闲自动锁定超时 (Auto-lock Timeout)");
-                                            subtitle: @tr("当客户端处于闲置无操作状态达设定时间后，自动锁定凭据保险箱");
+        SettingsRow {
+            title: @tr("空闲自动锁定超时 (Auto-lock Timeout)");
+            subtitle: @tr("当客户端处于闲置无操作状态达设定时间后，自动锁定凭据保险箱");
 
-                                            Rectangle {
-                                                height: 28px;
-                                                border-radius: AppTheme.radius-medium;
-                                                background: AppTheme.control-background;
-                                                border-width: 1px;
-                                                border-color: AppTheme.border;
+            Rectangle {
+                height: 28px;
+                border-radius: AppTheme.radius-medium;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
 
-                                                HorizontalLayout {
-                                                    padding: 2px;
-                                                    spacing: 2px;
+                HorizontalLayout {
+                    padding: 2px;
+                    spacing: 2px;
 
-                                                    for lk in [
-                                                        { id: "never", name: @tr("从不") },
-                                                        { id: "5m", name: "5 " + @tr("分钟") },
-                                                        { id: "15m", name: "15 " + @tr("分钟") },
-                                                        { id: "30m", name: "30 " + @tr("分钟") },
-                                                        { id: "1h", name: "1 " + @tr("小时") }
-                                                    ]: Rectangle {
-                                                        border-radius: AppTheme.radius-small;
-                                                        background: SettingsBridge.setting-auto-lock-timeout == lk.id ? AppTheme.accent : lk-t.has-hover ? AppTheme.hover-background : transparent;
-                                                        animate background { duration: 120ms; }
+                    for lk in [
+                        { id: "never", name: @tr("从不") },
+                        { id: "5m", name: "5 " + @tr("分钟") },
+                        { id: "15m", name: "15 " + @tr("分钟") },
+                        { id: "30m", name: "30 " + @tr("分钟") },
+                        { id: "1h", name: "1 " + @tr("小时") }
+                    ]: Rectangle {
+                        border-radius: AppTheme.radius-small;
+                        background: SettingsBridge.setting-auto-lock-timeout == lk.id ? AppTheme.accent : lk-t.has-hover ? AppTheme.hover-background : transparent;
+                        animate background { duration: 120ms; }
 
-                                                        lk-t := TouchArea {
-                                                            clicked => { SettingsBridge.setting-auto-lock-timeout = lk.id; }
-                                                            mouse-cursor: pointer;
-                                                        }
+                        lk-t := TouchArea {
+                            clicked => { SettingsBridge.setting-auto-lock-timeout = lk.id; }
+                            mouse-cursor: pointer;
+                        }
 
-                                                        HorizontalLayout {
-                                                            padding-left: 8px;
-                                                            padding-right: 8px;
-                                                            alignment: center;
-                                                            Text {
-                                                                text: lk.name;
-                                                                font-size: 10px;
-                                                                font-weight: SettingsBridge.setting-auto-lock-timeout == lk.id ? 700 : 500;
-                                                                color: SettingsBridge.setting-auto-lock-timeout == lk.id ? AppTheme.selected-foreground : AppTheme.foreground;
-                                                                vertical-alignment: center;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            Text {
+                                text: lk.name;
+                                font-size: 10px;
+                                font-weight: SettingsBridge.setting-auto-lock-timeout == lk.id ? 700 : 500;
+                                color: SettingsBridge.setting-auto-lock-timeout == lk.id ? AppTheme.selected-foreground : AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("Windows Hello / 生物识别快捷解锁 (Biometric Unlock)");
-                                            subtitle: @tr("允许首次通过主密码解锁后，使用系统指纹或面容识别快捷解锁");
-                                            SettingsSwitch {
-                                                checked <=> SettingsBridge.setting-biometric-unlock;
-                                            }
-                                        }
+        SettingsRow {
+            title: @tr("Windows Hello / 生物识别快捷解锁 (Biometric Unlock)");
+            subtitle: @tr("允许首次通过主密码解锁后，使用系统指纹或面容识别快捷解锁");
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-biometric-unlock;
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("窗口最小化或退出时立即锁定 (Lock on Minimize)");
-                                            subtitle: @tr("将客户端最小化到系统托盘或切出后台时立即清除内存派生密钥");
-                                            show-border: false;
-                                            SettingsSwitch {
-                                                checked <=> SettingsBridge.setting-lock-on-minimize;
-                                            }
-                                        }
-                                    }
+        SettingsRow {
+            title: @tr("窗口最小化或退出时立即锁定 (Lock on Minimize)");
+            subtitle: @tr("将客户端最小化到系统托盘或切出后台时立即清除内存派生密钥");
+            show-border: false;
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-lock-on-minimize;
+            }
+        }
+    }
 
-                                    // 卡片 2: 剪贴板与会话操作安全防护
-                                    SettingsSectionCard {
-                                        title: @tr("剪贴板与操作安全防护");
-                                        subtitle: @tr("敏感凭据自动清除、高危破坏性指令预警与会话审计日志");
-                                        icon: @image-url("../../../assets/icons/shield.svg");
+    // 卡片 2: 剪贴板与会话操作安全防护
+    SettingsSectionCard {
+        title: @tr("剪贴板与操作安全防护");
+        subtitle: @tr("敏感凭据自动清除、高危破坏性指令预警与会话审计日志");
+        icon: @image-url("../../../assets/icons/shield.svg");
 
-                                        SettingsRow {
-                                            title: @tr("敏感剪贴板自动清除 (Clear Clipboard Timeout)");
-                                            subtitle: @tr("从凭据库或终端复制密码/私钥 30 秒后自动清空系统剪贴板，防止恶意窥探");
-                                            SettingsSwitch {
-                                                checked <=> SettingsBridge.setting-clear-clipboard-timeout;
-                                            }
-                                        }
+        SettingsRow {
+            title: @tr("敏感剪贴板自动清除 (Clear Clipboard Timeout)");
+            subtitle: @tr("从凭据库或终端复制密码/私钥 30 秒后自动清空系统剪贴板，防止恶意窥探");
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-clear-clipboard-timeout;
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("高危破坏性指令执行预警 (Dangerous Command Warning)");
-                                            subtitle: @tr("在终端中输入 rm -rf, mkfs, reboot, fdisk 等危险命令时突出高亮警示");
-                                            SettingsSwitch {
-                                                checked <=> SettingsBridge.setting-confirm-dangerous-commands;
-                                            }
-                                        }
+        SettingsRow {
+            title: @tr("高危破坏性指令执行预警 (Dangerous Command Warning)");
+            subtitle: @tr("在终端中输入 rm -rf, mkfs, reboot, fdisk 等危险命令时突出高亮警示");
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-confirm-dangerous-commands;
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("会话操作安全审计日志 (Session Audit Logging)");
-                                            subtitle: @tr("在本地安全加密记录所有终端连接历史、高危操作命令时间戳与审计踪迹");
-                                            show-border: false;
-                                            SettingsSwitch {
-                                                checked <=> SettingsBridge.setting-session-audit-logging;
-                                            }
-                                        }
-                                    }
+        SettingsRow {
+            title: @tr("会话操作安全审计日志 (Session Audit Logging)");
+            subtitle: @tr("在本地安全加密记录所有终端连接历史、高危操作命令时间戳与审计踪迹");
+            show-border: false;
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-session-audit-logging;
+            }
+        }
+    }
 
-                                    // 卡片 3: 开发者控制台与底层诊断 (原通用迁移合并)
-                                    SettingsSectionCard {
-                                        title: @tr("开发者控制台与底层诊断");
-                                        subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
-                                        icon: @image-url("../../../assets/icons/bug.svg");
+    // 卡片 3: 开发者控制台与底层诊断
+    SettingsSectionCard {
+        title: @tr("开发者控制台与底层诊断");
+        subtitle: @tr("在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器");
+        icon: @image-url("../../../assets/icons/bug.svg");
 
-                                        SettingsRow {
-                                            has-icon: true;
-                                            icon: @image-url("../../../assets/icons/bug.svg");
-                                            title: @tr("开发者调试模式 (Developer Debug Mode)");
-                                            subtitle: @tr("开启开发者调试控制台 (F12) 与左侧活动栏诊断入口；关闭时仅隐藏调试入口，内部已配参数保持生效");
-                                            SettingsSwitch {
-                                                checked: SettingsBridge.setting-debug-enabled;
-                                                toggled(c) => {
-                                                    SettingsBridge.setting-debug-enabled = c;
-                                                    SettingsBridge.toggle-debug-enabled(c);
-                                                }
-                                            }
-                                        }
+        SettingsRow {
+            has-icon: true;
+            icon: @image-url("../../../assets/icons/bug.svg");
+            title: @tr("在界面中显示调试控制台入口 (Show Developer Tools in UI)");
+            subtitle: @tr("开启开发者调试控制台 (F12) 与左侧活动栏诊断入口；关闭后仅在 UI 隐藏调试入口，底层调试参数与功能保持生效");
+            SettingsSwitch {
+                checked: SettingsBridge.setting-debug-enabled;
+                toggled(c) => {
+                    SettingsBridge.setting-debug-enabled = c;
+                    SettingsBridge.toggle-debug-enabled(c);
+                }
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("全局运行时日志输出等级 (Log Level Filter)");
-                                            subtitle: @tr("过滤全局 tracing 诊断日志输出阈值 (排查问题时建议设为 DEBUG)");
+        SettingsRow {
+            title: @tr("全局运行时日志输出等级 (Log Level Filter)");
+            subtitle: @tr("过滤全局 tracing 诊断日志输出阈值 (默认建议设置为 INFO，排查问题时可设为 DEBUG)");
 
-                                            Rectangle {
-                                                height: 28px;
-                                                border-radius: AppTheme.radius-medium;
-                                                background: AppTheme.control-background;
-                                                border-width: 1px;
-                                                border-color: AppTheme.border;
+            Rectangle {
+                height: 28px;
+                border-radius: AppTheme.radius-medium;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
 
-                                                HorizontalLayout {
-                                                    padding: 2px;
-                                                    spacing: 2px;
+                HorizontalLayout {
+                    padding: 2px;
+                    spacing: 2px;
 
-                                                    for lv in ["DEBUG", "INFO", "WARN", "ERROR"]: Rectangle {
-                                                        border-radius: AppTheme.radius-small;
-                                                        background: SettingsBridge.setting-log-level == lv ? AppTheme.accent : lv-t.has-hover ? AppTheme.hover-background : transparent;
-                                                        animate background { duration: 120ms; }
+                    for lv in ["DEBUG", "INFO", "WARN", "ERROR"]: Rectangle {
+                        property <bool> is-selected: SettingsBridge.setting-log-level == lv;
+                        border-radius: AppTheme.radius-small;
+                        background: is-selected ? AppTheme.accent : lv-t.has-hover ? AppTheme.hover-background : transparent;
+                        animate background { duration: 120ms; }
 
-                                                        lv-t := TouchArea {
-                                                            clicked => { SettingsBridge.setting-log-level = lv; }
-                                                            mouse-cursor: pointer;
-                                                        }
+                        lv-t := TouchArea {
+                            clicked => {
+                                SettingsBridge.setting-log-level = lv;
+                                SettingsBridge.set-log-level(lv);
+                            }
+                            mouse-cursor: pointer;
+                        }
 
-                                                        HorizontalLayout {
-                                                            padding-left: 8px;
-                                                            padding-right: 8px;
-                                                            alignment: center;
-                                                            Text {
-                                                                text: lv;
-                                                                font-size: 10px;
-                                                                font-weight: SettingsBridge.setting-log-level == lv ? 700 : 500;
-                                                                color: SettingsBridge.setting-log-level == lv ? AppTheme.selected-foreground : AppTheme.foreground;
-                                                                vertical-alignment: center;
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            Text {
+                                text: lv;
+                                font-size: 10px;
+                                font-weight: is-selected ? 700 : 500;
+                                color: is-selected ? AppTheme.selected-foreground : AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+        }
 
-                                        SettingsRow {
-                                            title: @tr("运行时日志自动滚动通道 (Auto-scroll Log Channel)");
-                                            subtitle: @tr("当打开调试面板时实时保持最新日志自动滚动置底");
-                                            show-border: false;
-                                            SettingsSwitch {
-                                                checked <=> SettingsBridge.setting-debug-log-channel;
-                                            }
-                                        }
-                                    }
+        SettingsRow {
+            title: @tr("运行时日志自动滚动通道 (Auto-scroll Log Channel)");
+            subtitle: @tr("当打开调试面板时实时保持最新日志自动滚动置底");
+            show-border: false;
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-debug-log-channel;
+            }
+        }
+    }
 
-                                    // 卡片 4: 危险区域 (Danger Zone)
-                                    SettingsSectionCard {
-                                        title: @tr("危险区域 (Danger Zone)");
-                                        subtitle: @tr("重置本地偏好设置与清除临时状态（不会删除已保存的主机资产）");
-                                        icon: @image-url("../../../assets/icons/alert-triangle.svg");
+    // 卡片 4: 危险区域 (Danger Zone)
+    SettingsSectionCard {
+        title: @tr("危险区域 (Danger Zone)");
+        subtitle: @tr("重置本地偏好设置与清除临时状态（不会删除已保存的主机资产）");
+        icon: @image-url("../../../assets/icons/alert-triangle.svg");
 
-                                        SettingsRow {
-                                            title: @tr("危险区：恢复出厂设置 (Factory Reset)");
-                                            subtitle: @tr("清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）");
-                                            show-border: false;
+        SettingsRow {
+            title: @tr("危险区：恢复出厂设置 (Factory Reset)");
+            subtitle: @tr("清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）");
+            show-border: false;
 
-                                            AppButton {
-                                                text: @tr("⚠️ 恢复默认偏好");
-                                                variant: "danger";
-                                                clicked => { SettingsBridge.factory-reset-settings(); }
-                                            }
-                                        }
-                                    }
-                                }
+            AppButton {
+                text: @tr("恢复默认偏好");
+                variant: "danger";
+                has-icon: true;
+                icon: @image-url("../../../assets/icons/alert-triangle.svg");
+                clicked => { SettingsBridge.factory-reset-settings(); }
+            }
+        }
+    }
+}

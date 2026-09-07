@@ -89,6 +89,33 @@ impl Visit for MessageVisitor {
     }
 }
 
+use std::sync::atomic::AtomicU8;
+static GLOBAL_LOG_LEVEL: AtomicU8 = AtomicU8::new(1); // 0 = DEBUG, 1 = INFO, 2 = WARN, 3 = ERROR
+
+/// 动态修改全局运行时日志过滤级别
+pub fn set_global_runtime_log_level(level: &str) {
+    let val = match level.to_uppercase().as_str() {
+        "DEBUG" | "TRACE" => 0,
+        "INFO" => 1,
+        "WARN" | "WARNING" => 2,
+        "ERROR" => 3,
+        _ => 1,
+    };
+    GLOBAL_LOG_LEVEL.store(val, Ordering::SeqCst);
+    tracing::info!(target: "smagical_ui::settings", "全局运行时日志过滤等级已动态调整为: {}", level.to_uppercase());
+}
+
+/// 获取当前全局运行时日志等级
+pub fn get_global_runtime_log_level() -> &'static str {
+    match GLOBAL_LOG_LEVEL.load(Ordering::SeqCst) {
+        0 => "DEBUG",
+        1 => "INFO",
+        2 => "WARN",
+        3 => "ERROR",
+        _ => "INFO",
+    }
+}
+
 /// 专为 smalux UI 调试面板捕获日志的 Subscriber Layer
 #[derive(Clone)]
 pub struct UiLogLayer {
@@ -112,6 +139,16 @@ where
         }
 
         let meta = event.metadata();
+        let current_lvl = GLOBAL_LOG_LEVEL.load(Ordering::SeqCst);
+        let event_lvl = match *meta.level() {
+            Level::TRACE | Level::DEBUG => 0,
+            Level::INFO => 1,
+            Level::WARN => 2,
+            Level::ERROR => 3,
+        };
+        if event_lvl < current_lvl {
+            return;
+        }
 
         
         // 过滤掉部分过于嘈杂的外部依赖内部 trace/debug（如 winit, slint 内部布局渲染等）

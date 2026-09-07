@@ -4,6 +4,9 @@
 // -----------------------------------------------------------------------------
 
 import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppFormItem } from "../../../shared/base/app-form-item.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { AppTextArea } from "../../../shared/base/app-text-area.slint";
 
 export component TunnelForwardForm inherits VerticalLayout {
     in-out property <string> form-type: "Local";
@@ -141,38 +144,14 @@ export component TunnelForwardForm inherits VerticalLayout {
     }
 
     // 2. 规则描述名称
-    VerticalLayout {
-        alignment: start;
-        spacing: 4px;
-        width: 100%;
+    AppFormItem {
+        label: @tr("规则描述名称");
+        required: true;
 
-        Text {
-            text: @tr("规则描述名称");
-            font-size: 11px;
-            font-weight: 600;
-            color: AppTheme.secondary-foreground;
-        }
-        Rectangle {
-            height: 32px;
-            width: 100%;
-            border-radius: AppTheme.radius-medium;
-            background: AppTheme.control-background;
-            border-width: 1px;
-            border-color: AppTheme.border;
-
-            HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 10px;
-                TextInput {
-                    width: 100%;
-                    height: 100%;
-                    text <=> root.form-name;
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                    vertical-alignment: center;
-                    enabled: root.is-create-mode || root.is-editing;
-                }
-            }
+        AppTextInput {
+            text <=> root.form-name;
+            placeholder: @tr("例如: 生产数据库正向代理");
+            enabled: root.is-create-mode || root.is-editing;
         }
     }
 
@@ -255,71 +234,29 @@ export component TunnelForwardForm inherits VerticalLayout {
         width: 100%;
         spacing: 12px;
 
-        VerticalLayout {
+        AppFormItem {
             horizontal-stretch: 1;
-            spacing: 4px;
-            Text {
-                text: @tr("本地监听端口 (Local Port)");
-                font-size: 11px;
-                font-weight: 600;
-                color: AppTheme.secondary-foreground;
-            }
-            Rectangle {
-                height: 32px;
-                width: 100%;
-                border-radius: AppTheme.radius-medium;
-                background: AppTheme.control-background;
-                border-width: 1px;
-                border-color: AppTheme.border;
-
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    TextInput {
-                        width: 100%;
-                        height: 100%;
-                        text <=> root.form-local-port;
-                        font-size: 12px;
-                        font-family: "Cascadia Code, Consolas, monospace";
-                        color: AppTheme.foreground;
-                        vertical-alignment: center;
-                        enabled: root.is-create-mode || root.is-editing;
-                    }
-                }
+            label: @tr("本地监听端口 (Local Port)");
+            required: true;
+            AppTextInput {
+                text <=> root.form-local-port;
+                font-size: 12px;
+                monospace: true;
+                placeholder: "8080";
+                enabled: root.is-create-mode || root.is-editing;
             }
         }
 
-        VerticalLayout {
+        AppFormItem {
             horizontal-stretch: 1;
-            spacing: 4px;
-            Text {
-                text: @tr("远端目标服务端口 (Remote Port)");
-                font-size: 11px;
-                font-weight: 600;
-                color: AppTheme.secondary-foreground;
-            }
-            Rectangle {
-                height: 32px;
-                width: 100%;
-                border-radius: AppTheme.radius-medium;
-                background: AppTheme.control-background;
-                border-width: 1px;
-                border-color: AppTheme.border;
-
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    TextInput {
-                        width: 100%;
-                        height: 100%;
-                        text <=> root.form-remote-port;
-                        font-size: 12px;
-                        font-family: "Cascadia Code, Consolas, monospace";
-                        color: AppTheme.foreground;
-                        vertical-alignment: center;
-                        enabled: root.is-create-mode || root.is-editing;
-                    }
-                }
+            label: @tr("远端目标服务端口 (Remote Port)");
+            required: true;
+            AppTextInput {
+                text <=> root.form-remote-port;
+                font-size: 12px;
+                monospace: true;
+                placeholder: "80";
+                enabled: root.is-create-mode || root.is-editing;
             }
         }
     }
@@ -328,142 +265,54 @@ export component TunnelForwardForm inherits VerticalLayout {
         width: 100%;
         spacing: 12px;
 
-        VerticalLayout {
+        AppFormItem {
             horizontal-stretch: 1;
-            spacing: 4px;
-            Text {
-                text: @tr("本地目标服务端口 (Local Port)");
-                font-size: 11px;
-                font-weight: 600;
-                color: AppTheme.secondary-foreground;
-            }
-            Rectangle {
-                height: 32px;
-                width: 100%;
-                border-radius: AppTheme.radius-medium;
-                background: AppTheme.control-background;
-                border-width: 1px;
-                border-color: AppTheme.border;
-
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    TextInput {
-                        width: 100%;
-                        height: 100%;
-                        text <=> root.form-local-port;
-                        font-size: 12px;
-                        font-family: "Cascadia Code, Consolas, monospace";
-                        color: AppTheme.foreground;
-                        vertical-alignment: center;
-                        enabled: root.is-create-mode || root.is-editing;
-                    }
-                }
+            label: @tr("本地目标服务端口 (Local Port)");
+            required: true;
+            AppTextInput {
+                text <=> root.form-local-port;
+                font-size: 12px;
+                monospace: true;
+                placeholder: "8080";
+                enabled: root.is-create-mode || root.is-editing;
             }
         }
 
-        VerticalLayout {
+        AppFormItem {
             horizontal-stretch: 1;
-            spacing: 4px;
-            Text {
-                text: @tr("远程公网监听端口 (Remote Port)");
-                font-size: 11px;
-                font-weight: 600;
-                color: AppTheme.secondary-foreground;
-            }
-            Rectangle {
-                height: 32px;
-                width: 100%;
-                border-radius: AppTheme.radius-medium;
-                background: AppTheme.control-background;
-                border-width: 1px;
-                border-color: AppTheme.border;
-
-                HorizontalLayout {
-                    padding-left: 10px;
-                    padding-right: 10px;
-                    TextInput {
-                        width: 100%;
-                        height: 100%;
-                        text <=> root.form-remote-port;
-                        font-size: 12px;
-                        font-family: "Cascadia Code, Consolas, monospace";
-                        color: AppTheme.foreground;
-                        vertical-alignment: center;
-                        enabled: root.is-create-mode || root.is-editing;
-                    }
-                }
+            label: @tr("远程公网监听端口 (Remote Port)");
+            required: true;
+            AppTextInput {
+                text <=> root.form-remote-port;
+                font-size: 12px;
+                monospace: true;
+                placeholder: "80";
+                enabled: root.is-create-mode || root.is-editing;
             }
         }
     }
 
-    if root.form-type == "Dynamic": VerticalLayout {
-        width: 100%;
-        spacing: 4px;
-
-        Text {
-            text: @tr("本地 SOCKS5 网关监听端口 (Local Port)");
-            font-size: 11px;
-            font-weight: 600;
-            color: AppTheme.secondary-foreground;
-        }
-        Rectangle {
-            height: 32px;
-            width: 100%;
-            border-radius: AppTheme.radius-medium;
-            background: AppTheme.control-background;
-            border-width: 1px;
-            border-color: AppTheme.border;
-
-            HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 10px;
-                TextInput {
-                    width: 100%;
-                    height: 100%;
-                    text <=> root.form-local-port;
-                    font-size: 12px;
-                    font-family: "Cascadia Code, Consolas, monospace";
-                    color: AppTheme.foreground;
-                    vertical-alignment: center;
-                    enabled: root.is-create-mode || root.is-editing;
-                }
-            }
+    if root.form-type == "Dynamic": AppFormItem {
+        label: @tr("本地 SOCKS5 网关监听端口 (Local Port)");
+        required: true;
+        AppTextInput {
+            text <=> root.form-local-port;
+            font-size: 12px;
+            monospace: true;
+            placeholder: "1080";
+            enabled: root.is-create-mode || root.is-editing;
         }
     }
 
-    if root.form-type == "ReverseDynamic": VerticalLayout {
-        width: 100%;
-        spacing: 4px;
-
-        Text {
-            text: @tr("远程 SOCKS5 网关监听端口 (Remote Port)");
-            font-size: 11px;
-            font-weight: 600;
-            color: AppTheme.secondary-foreground;
-        }
-        Rectangle {
-            height: 32px;
-            width: 100%;
-            border-radius: AppTheme.radius-medium;
-            background: AppTheme.control-background;
-            border-width: 1px;
-            border-color: AppTheme.border;
-
-            HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 10px;
-                TextInput {
-                    width: 100%;
-                    height: 100%;
-                    text <=> root.form-remote-port;
-                    font-size: 12px;
-                    font-family: "Cascadia Code, Consolas, monospace";
-                    color: AppTheme.foreground;
-                    vertical-alignment: center;
-                    enabled: root.is-create-mode || root.is-editing;
-                }
-            }
+    if root.form-type == "ReverseDynamic": AppFormItem {
+        label: @tr("远程 SOCKS5 网关监听端口 (Remote Port)");
+        required: true;
+        AppTextInput {
+            text <=> root.form-remote-port;
+            font-size: 12px;
+            monospace: true;
+            placeholder: "1080";
+            enabled: root.is-create-mode || root.is-editing;
         }
     }
 
@@ -643,40 +492,14 @@ export component TunnelForwardForm inherits VerticalLayout {
     }
 
     // 6. 备注说明
-    VerticalLayout {
-        alignment: start;
-        spacing: 4px;
-        width: 100%;
-        Text {
-            text: @tr("备注说明与业务用途");
+    AppFormItem {
+        label: @tr("备注说明与业务用途");
+        AppTextArea {
+            text <=> root.form-notes;
             font-size: 11px;
-            font-weight: 600;
-            color: AppTheme.secondary-foreground;
-        }
-        Rectangle {
-            height: 50px;
-            width: 100%;
-            border-radius: AppTheme.radius-medium;
-            background: AppTheme.control-background;
-            border-width: 1px;
-            border-color: AppTheme.border;
-
-            VerticalLayout {
-                padding-left: 10px;
-                padding-right: 10px;
-                padding-top: 6px;
-                padding-bottom: 6px;
-                TextInput {
-                    width: 100%;
-                    height: 100%;
-                    text <=> root.form-notes;
-                    font-size: 12px;
-                    color: AppTheme.foreground;
-                    single-line: false;
-                    wrap: word-wrap;
-                    enabled: root.is-create-mode || root.is-editing;
-                }
-            }
+            placeholder: @tr("可在此记录转发用途、访问白名单或对应服务文档...");
+            enabled: root.is-create-mode || root.is-editing;
+            min-height: 50px;
         }
     }
 }

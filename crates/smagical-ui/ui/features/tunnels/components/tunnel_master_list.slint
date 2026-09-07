@@ -8,6 +8,7 @@ import { SearchInput } from "../../../components/search-input.slint";
 import { AppIconButton } from "../../../components/base/app-icon-button.slint";
 import { AppButton } from "../../../components/base/app-button.slint";
 import { AppVScrollBar } from "../../../components/base/app-scroll-bar.slint";
+import { AppSwitch } from "../../../shared/base/app-switch.slint";
 import { TunnelItemData } from "../tunnels_model.slint";
 
 export component TunnelMasterList inherits Rectangle {
@@ -390,28 +391,12 @@ export component TunnelMasterList inherits Rectangle {
                             alignment: center;
 
                             // 启停 Switch 开关按钮
-                            if tun.tunnel-type == "Local" || tun.tunnel-type == "Remote" || tun.tunnel-type == "Dynamic": Rectangle {
-                                width: 34px;
-                                height: 18px;
-                                border-radius: 9px;
-                                background: tun.is-running ? AppTheme.success : AppTheme.border;
-                                animate background { duration: 150ms; }
-
-                                Rectangle {
-                                    x: tun.is-running ? parent.width - self.width - 2px : 2px;
-                                    y: 2px;
-                                    width: 14px;
-                                    height: 14px;
-                                    border-radius: 7px;
-                                    background: #ffffff;
-                                    animate x { duration: 150ms; }
-                                }
-
-                                TouchArea {
-                                    clicked => {
-                                        root.toggle-tunnel-running(tun.id);
-                                    }
-                                    mouse-cursor: pointer;
+                            if tun.tunnel-type == "Local" || tun.tunnel-type == "Remote" || tun.tunnel-type == "Dynamic": AppSwitch {
+                                size: "sm";
+                                active-brush: AppTheme.success;
+                                checked: tun.is-running;
+                                toggled => {
+                                    root.toggle-tunnel-running(tun.id);
                                 }
                             }
 

@@ -13,6 +13,7 @@ use smagical_core::event::types::HostAssetChangedEvent;
 use crate::generated::{AppTheme, AppWindow, HostsBridge, KeywordHighlightRule, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use super::color_utils::{hsv_to_rgb, rgb_to_hsv, parse_hex_to_rgb};
+use super::theme_handlers::pick_folder;
 
 /// 注册偏好设置中心与全量数据备份/迁移交互回调
 pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
@@ -250,8 +251,8 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         bridge.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
         bridge.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
         bridge.set_setting_cursor_style(cfg.cursor_style.as_str().into());
-        bridge.set_setting_cursor_blink(cfg.cursor_blink);
         bridge.set_setting_scrollback_lines(cfg.scrollback_lines as i32);
+        bridge.set_scrollback_input(format!("{}", cfg.scrollback_lines).into());
         bridge.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
         bridge.set_setting_copy_on_select(cfg.copy_on_select);
         bridge.set_setting_paste_on_right_click(cfg.paste_on_right_click);
@@ -278,6 +279,23 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         bridge.set_setting_wallpaper_path(cfg.wallpaper_path.as_str().into());
         bridge.set_setting_wallpaper_opacity(cfg.wallpaper_opacity);
 
+        let slide_interval = cfg.wallpaper_slideshow_interval.clone();
+        let (slide_num, slide_unit) = if slide_interval == "none" || slide_interval == "off" || slide_interval.is_empty() {
+            ("0", "off")
+        } else if let Some(s) = slide_interval.strip_suffix('s') {
+            (s, "s")
+        } else if let Some(m) = slide_interval.strip_suffix('m') {
+            (m, "m")
+        } else if let Some(h) = slide_interval.strip_suffix('h') {
+            (h, "h")
+        } else {
+            ("0", "off")
+        };
+        bridge.set_setting_wallpaper_slideshow(slide_interval.as_str().into());
+        bridge.set_slideshow_number_input(slide_num.into());
+        bridge.set_slideshow_unit_input(slide_unit.into());
+        bridge.set_setting_wallpaper_transition(cfg.wallpaper_transition_effect.as_str().into());
+
         window.global::<SettingsBridge>().set_setting_ui_font(cfg.ui_font.as_str().into());
         window.global::<SettingsBridge>().set_setting_terminal_url_click(cfg.terminal_url_click);
         window.global::<SettingsBridge>().set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
@@ -301,7 +319,33 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         window.global::<SettingsBridge>().set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
         window.global::<SettingsBridge>().set_setting_tcp_nodelay(cfg.tcp_nodelay);
         window.global::<SettingsBridge>().set_setting_modal_opacity(cfg.modal_opacity);
+
+        bridge.set_setting_sftp_default_local(cfg.sftp_default_local.as_str().into());
+        bridge.set_setting_sftp_default_remote(cfg.sftp_default_remote.as_str().into());
+        bridge.set_setting_sftp_confirm_delete(cfg.sftp_confirm_delete);
+        bridge.set_setting_sftp_concurrency(cfg.sftp_concurrency as i32);
+        bridge.set_setting_sftp_resume(cfg.sftp_resume_transfer);
+        bridge.set_setting_sftp_preserve_attributes(cfg.sftp_preserve_attributes);
+        bridge.set_setting_sftp_upload_limit(cfg.sftp_upload_limit.as_str().into());
+        let (up_num, up_unit) = parse_speed_limit(&cfg.sftp_upload_limit);
+        bridge.set_upload_limit_num(up_num.into());
+        bridge.set_upload_limit_unit(up_unit.into());
+
+        bridge.set_setting_sftp_download_limit(cfg.sftp_download_limit.as_str().into());
+        let (dl_num, dl_unit) = parse_speed_limit(&cfg.sftp_download_limit);
+        bridge.set_download_limit_num(dl_num.into());
+        bridge.set_download_limit_unit(dl_unit.into());
+        bridge.set_setting_sftp_editor_mode(cfg.sftp_editor_mode.as_str().into());
+        bridge.set_setting_sftp_custom_editor(cfg.sftp_custom_editor.as_str().into());
+        bridge.set_setting_sftp_exclude_patterns(cfg.sftp_exclude_patterns.as_str().into());
+
+        let cur_lvl = if cfg.log_level.is_empty() { "INFO".to_string() } else { cfg.log_level.to_uppercase() };
+        crate::debug::tracing_layer::set_global_runtime_log_level(&cur_lvl);
+        bridge.set_setting_log_level(cur_lvl.as_str().into());
     }
+
+    let keys_state = Rc::new(std::cell::RefCell::new(get_default_keybindings()));
+    bridge.set_keybindings(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(keys_state.borrow().clone()))));
 
     let core_state_mo = ctx.core_state.clone();
     let window_weak_mo = window.as_weak();
@@ -446,10 +490,29 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         notif_scroll.info("回滚缓冲已调整", &format!("终端最大回滚行数已调整为 {} 行", lines));
         if let Some(w) = window_weak_scroll.upgrade() {
             w.global::<SettingsBridge>().set_setting_scrollback_lines(lines);
+            w.global::<SettingsBridge>().set_scrollback_input(format!("{}", lines).into());
         }
         let _ = core_state_scroll.storage().config().update(Box::new(move |c| {
-            c.scrollback_lines = lines.max(100) as usize;
+            c.scrollback_lines = if lines == 0 { 0 } else { lines.max(100) as usize };
         }));
+    });
+
+    let notif_sb_in = ctx.notifications.clone();
+    let core_state_sb_in = ctx.core_state.clone();
+    let window_weak_sb_in = window.as_weak();
+    bridge.on_apply_scrollback_input(move |input_str| {
+        let trimmed = input_str.trim();
+        if let Ok(parsed) = trimmed.parse::<i32>() {
+            let clamped = parsed.max(0);
+            if let Some(w) = window_weak_sb_in.upgrade() {
+                w.global::<SettingsBridge>().set_setting_scrollback_lines(clamped);
+                w.global::<SettingsBridge>().set_scrollback_input(format!("{}", clamped).into());
+            }
+            let _ = core_state_sb_in.storage().config().update(Box::new(move |c| {
+                c.scrollback_lines = if clamped == 0 { 0 } else { clamped.max(100) as usize };
+            }));
+            notif_sb_in.info("回滚缓冲已调整", &format!("终端最大回滚行数已更新为 {} 行", clamped));
+        }
     });
 
     let notif_bell = ctx.notifications.clone();
@@ -910,6 +973,290 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
 
 
 
+    // -------------------------------------------------------------------------
+    // 6. SFTP 传输与文件管理设置回调 (SFTP Settings Handlers)
+    // -------------------------------------------------------------------------
+    let notif_sftp = ctx.notifications.clone();
+    let core_state_sftp = ctx.core_state.clone();
+    let window_weak_sftp = window.as_weak();
+    bridge.on_browse_sftp_download_dir(move || {
+        if let Some(folder_path) = pick_folder() {
+            let path_str = folder_path.to_string_lossy().to_string();
+            if let Some(w) = window_weak_sftp.upgrade() {
+                w.global::<SettingsBridge>().set_setting_sftp_default_local(path_str.as_str().into());
+            }
+            let path_clone = path_str.clone();
+            let _ = core_state_sftp.storage().config().update(Box::new(move |c| {
+                c.sftp_default_local = path_clone;
+            }));
+            notif_sftp.success("默认下载目录已更新", &format!("SFTP 下载路径已设置为: {}", path_str));
+        }
+    });
+
+    let notif_dl_change = ctx.notifications.clone();
+    let core_state_dl_change = ctx.core_state.clone();
+    bridge.on_change_sftp_download_dir(move |path| {
+        let p_str = path.to_string();
+        let p_clone = p_str.clone();
+        let _ = core_state_dl_change.storage().config().update(Box::new(move |c| {
+            c.sftp_default_local = p_clone;
+        }));
+        notif_dl_change.info("默认下载目录已更新", &format!("SFTP 下载路径已设置为: {}", p_str));
+    });
+
+    let notif_concur = ctx.notifications.clone();
+    let core_state_concur = ctx.core_state.clone();
+    let window_weak_concur = window.as_weak();
+    bridge.on_change_sftp_concurrency(move |concurrency| {
+        let val = concurrency.clamp(1, 16) as u32;
+        if let Some(w) = window_weak_concur.upgrade() {
+            w.global::<SettingsBridge>().set_setting_sftp_concurrency(val as i32);
+        }
+        let _ = core_state_concur.storage().config().update(Box::new(move |c| {
+            c.sftp_concurrency = val;
+        }));
+        notif_concur.info("SFTP 并发数已更新", &format!("最大并发连接数已设置为 {} 个", val));
+    });
+
+    let notif_up = ctx.notifications.clone();
+    let core_state_up = ctx.core_state.clone();
+    let window_weak_up = window.as_weak();
+    bridge.on_set_upload_limit_speed(move |num_str, unit_str| {
+        let code = if unit_str == "off" || num_str == "0" {
+            "unlimited".to_string()
+        } else {
+            format!("{}{}", num_str, if unit_str == "KB/s" { "kb" } else { "mb" })
+        };
+        if let Some(w) = window_weak_up.upgrade() {
+            w.global::<SettingsBridge>().set_setting_sftp_upload_limit(code.as_str().into());
+            w.global::<SettingsBridge>().set_upload_limit_num(num_str.clone());
+            w.global::<SettingsBridge>().set_upload_limit_unit(unit_str.clone());
+        }
+        let code_clone = code.clone();
+        let _ = core_state_up.storage().config().update(Box::new(move |c| {
+            c.sftp_upload_limit = code_clone;
+        }));
+        notif_up.info("上传限速已调整", &format!("单任务上传速率限制已设定为: {}", if code == "unlimited" { "不限速" } else { &code }));
+    });
+
+    let notif_dl = ctx.notifications.clone();
+    let core_state_dl = ctx.core_state.clone();
+    let window_weak_dl = window.as_weak();
+    bridge.on_set_download_limit_speed(move |num_str, unit_str| {
+        let code = if unit_str == "off" || num_str == "0" {
+            "unlimited".to_string()
+        } else {
+            format!("{}{}", num_str, if unit_str == "KB/s" { "kb" } else { "mb" })
+        };
+        if let Some(w) = window_weak_dl.upgrade() {
+            w.global::<SettingsBridge>().set_setting_sftp_download_limit(code.as_str().into());
+            w.global::<SettingsBridge>().set_download_limit_num(num_str.clone());
+            w.global::<SettingsBridge>().set_download_limit_unit(unit_str.clone());
+        }
+        let code_clone = code.clone();
+        let _ = core_state_dl.storage().config().update(Box::new(move |c| {
+            c.sftp_download_limit = code_clone;
+        }));
+        notif_dl.info("下载限速已调整", &format!("单任务下载速率限制已设定为: {}", if code == "unlimited" { "不限速" } else { &code }));
+    });
+
+    let keys_ref_up = keys_state.clone();
+    let window_weak_k_up = window.as_weak();
+    let notif_k_up = ctx.notifications.clone();
+    bridge.on_update_keybinding(move |id, new_key| {
+        let mut list = keys_ref_up.borrow_mut();
+        if let Some(item) = list.iter_mut().find(|it| it.id == id) {
+            item.primary_key = new_key.clone();
+            item.is_customized = item.primary_key != item.default_key;
+            notif_k_up.success("快捷键已更新", &format!("「{}」快捷键已更新为 {}", item.action_name, new_key));
+        }
+        if let Some(w) = window_weak_k_up.upgrade() {
+            w.global::<SettingsBridge>().set_keybindings(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let keys_ref_rst = keys_state.clone();
+    let window_weak_k_rst = window.as_weak();
+    let notif_k_rst = ctx.notifications.clone();
+    bridge.on_reset_keybinding(move |id| {
+        let mut list = keys_ref_rst.borrow_mut();
+        if let Some(item) = list.iter_mut().find(|it| it.id == id) {
+            item.primary_key = item.default_key.clone();
+            item.is_customized = false;
+            notif_k_rst.info("快捷键已恢复默认", &format!("「{}」已恢复默认键位: {}", item.action_name, item.default_key));
+        }
+        if let Some(w) = window_weak_k_rst.upgrade() {
+            w.global::<SettingsBridge>().set_keybindings(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let keys_ref_all = keys_state.clone();
+    let window_weak_k_all = window.as_weak();
+    let notif_k_all = ctx.notifications.clone();
+    bridge.on_reset_all_keybindings(move || {
+        let mut list = keys_ref_all.borrow_mut();
+        for item in list.iter_mut() {
+            item.primary_key = item.default_key.clone();
+            item.is_customized = false;
+        }
+        notif_k_all.info("全部快捷键已重置", "所有终端与全局快捷键已恢复为官方默认映射");
+        if let Some(w) = window_weak_k_all.upgrade() {
+            w.global::<SettingsBridge>().set_keybindings(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let keys_ref_clr = keys_state.clone();
+    let window_weak_k_clr = window.as_weak();
+    let notif_k_clr = ctx.notifications.clone();
+    bridge.on_clear_keybinding(move |id| {
+        let mut list = keys_ref_clr.borrow_mut();
+        if let Some(item) = list.iter_mut().find(|it| it.id == id) {
+            item.primary_key = "".into();
+            item.is_customized = true;
+            notif_k_clr.warning("快捷键已解除绑定", &format!("「{}」快捷键已清空解绑", item.action_name));
+        }
+        if let Some(w) = window_weak_k_clr.upgrade() {
+            w.global::<SettingsBridge>().set_keybindings(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 数据备份容灾节点与镜像管理回调
+    // -------------------------------------------------------------------------
+    let tasks_state = Rc::new(std::cell::RefCell::new(vec![
+        crate::generated::BackupTaskItem {
+            id: "task-local-def".into(),
+            name: "本地磁盘每日自动增量归档".into(),
+            backup_type: "local".into(),
+            last_backup_time: "2026-09-07 21:00".into(),
+            snapshot_count: 3,
+            strategy: "daily".into(),
+            enabled: true,
+            endpoint: "D:\\smalux_backups\\archive".into(),
+        },
+    ]));
+    bridge.set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(tasks_state.borrow().clone()))));
+
+    let window_weak_bm = window.as_weak();
+    let notif_bm = ctx.notifications.clone();
+    bridge.on_set_backup_master_mode(move |mode| {
+        let label = match mode.as_str() {
+            "off" => "关闭备份",
+            "local" => "本地备份模式",
+            "cloud" => "多端云同步模式",
+            _ => mode.as_str(),
+        };
+        notif_bm.info("备份模式已切换", &format!("当前备份总策略已调整为: {}", label));
+        if let Some(w) = window_weak_bm.upgrade() {
+            w.global::<SettingsBridge>().set_setting_backup_master_mode(mode);
+        }
+    });
+
+    let tasks_ref_tg = tasks_state.clone();
+    let window_weak_tg = window.as_weak();
+    bridge.on_toggle_backup_task_enabled(move |id, enabled| {
+        let mut list = tasks_ref_tg.borrow_mut();
+        if let Some(it) = list.iter_mut().find(|t| t.id == id) {
+            it.enabled = enabled;
+        }
+        if let Some(w) = window_weak_tg.upgrade() {
+            w.global::<SettingsBridge>().set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let tasks_ref_del = tasks_state.clone();
+    let window_weak_del = window.as_weak();
+    let notif_del = ctx.notifications.clone();
+    bridge.on_delete_backup_task(move |id| {
+        let mut list = tasks_ref_del.borrow_mut();
+        list.retain(|t| t.id != id);
+        notif_del.warning("备份任务已删除", "已移除该备份容灾节点配置");
+        if let Some(w) = window_weak_del.upgrade() {
+            w.global::<SettingsBridge>().set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let window_weak_snap = window.as_weak();
+    bridge.on_open_task_snapshots(move |id, name| {
+        if let Some(w) = window_weak_snap.upgrade() {
+            let sb = w.global::<SettingsBridge>();
+            sb.set_active_snapshot_task_id(id.clone());
+            sb.set_active_snapshot_task_name(name);
+            let dummy_snapshots = vec![
+                crate::generated::BackupSnapshotEntry {
+                    id: "snap-001".into(),
+                    task_id: id.clone(),
+                    timestamp: "2026-09-07 21:00:15".into(),
+                    size_str: "1.4 MB".into(),
+                    remark: "每日自动快照".into(),
+                    hash: "sha256:e3b0c44298fc1c149afbf4c8996fb924".into(),
+                },
+                crate::generated::BackupSnapshotEntry {
+                    id: "snap-002".into(),
+                    task_id: id.clone(),
+                    timestamp: "2026-09-06 21:00:08".into(),
+                    size_str: "1.3 MB".into(),
+                    remark: "每日自动快照".into(),
+                    hash: "sha256:7f83b1657ff1fc53b92dc18148a1d65d".into(),
+                },
+                crate::generated::BackupSnapshotEntry {
+                    id: "snap-003".into(),
+                    task_id: id,
+                    timestamp: "2026-09-05 21:00:11".into(),
+                    size_str: "1.2 MB".into(),
+                    remark: "全量初始快照".into(),
+                    hash: "sha256:9f86d081884c7d659a2feaa0c55ad015".into(),
+                },
+            ];
+            sb.set_current_task_snapshots(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(dummy_snapshots))));
+            sb.set_is_snapshots_modal_open(true);
+        }
+    });
+
+    let notif_rest = ctx.notifications.clone();
+    bridge.on_restore_from_snapshot(move |_task_id, snap_id| {
+        notif_rest.success("快照镜像已还原", &format!("资产库已成功无损回滚至快照「{}」", snap_id));
+    });
+
+    let tasks_ref_save = tasks_state.clone();
+    let window_weak_save = window.as_weak();
+    let notif_save = ctx.notifications.clone();
+    bridge.on_save_new_backup_task(move |name, b_type, endpoint, _user, _pass, strategy| {
+        let new_id = format!("task-{}", &uuid::Uuid::new_v4().to_string()[..8]);
+        let task = crate::generated::BackupTaskItem {
+            id: new_id.into(),
+            name: name.clone(),
+            backup_type: b_type,
+            last_backup_time: "从未执行".into(),
+            snapshot_count: 0,
+            strategy,
+            enabled: true,
+            endpoint,
+        };
+        let mut list = tasks_ref_save.borrow_mut();
+        list.push(task);
+        notif_save.success("备份节点已创建", &format!("已成功创建容灾节点「{}」", name));
+        if let Some(w) = window_weak_save.upgrade() {
+            w.global::<SettingsBridge>().set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let notif_lvl = ctx.notifications.clone();
+    let core_state_lvl = ctx.core_state.clone();
+    let window_weak_lvl = window.as_weak();
+    bridge.on_set_log_level(move |level_str| {
+        let upper = level_str.to_uppercase();
+        crate::debug::tracing_layer::set_global_runtime_log_level(&upper);
+        if let Some(w) = window_weak_lvl.upgrade() {
+            w.global::<SettingsBridge>().set_setting_log_level(upper.clone().into());
+        }
+        let upper_clone = upper.clone();
+        let _ = core_state_lvl.storage().config().update(Box::new(move |c| {
+            c.log_level = upper_clone;
+        }));
+        notif_lvl.info("日志等级已调整", &format!("全局运行时日志等级已切换为「{}」", upper));
+    });
+
     let w_b = window.as_weak();
     bridge.on_close_settings(move || {
         if let Some(w) = w_b.upgrade() {
@@ -920,6 +1267,23 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             w.global::<SettingsBridge>().set_active_category("general".into());
         }
     });
+}
+
+/// 解析限速字符串为 (数值, 单位)
+fn parse_speed_limit(limit_str: &str) -> (String, String) {
+    let s = limit_str.trim().to_lowercase();
+    if s == "unlimited" || s == "off" || s == "0" || s.is_empty() {
+        return ("0".to_string(), "off".to_string());
+    }
+    if s.ends_with("mb") || s.ends_with("m") {
+        let num = limit_str.trim_end_matches(|c: char| c.is_alphabetic() || c == '/').trim();
+        (num.to_string(), "MB/s".to_string())
+    } else if s.ends_with("kb") || s.ends_with("k") {
+        let num = limit_str.trim_end_matches(|c: char| c.is_alphabetic() || c == '/').trim();
+        (num.to_string(), "KB/s".to_string())
+    } else {
+        (limit_str.to_string(), "MB/s".to_string())
+    }
 }
 
 /// 将 HEX 颜色格式解析为 Slint Color
@@ -1113,4 +1477,109 @@ fn get_default_backup_dir() -> PathBuf {
         }
     }
     PathBuf::from("backups")
+}
+
+/// 获取系统默认官方快捷键配置清单
+pub fn get_default_keybindings() -> Vec<crate::generated::SettingKeybindingItem> {
+    vec![
+        crate::generated::SettingKeybindingItem {
+            id: "term.new_tab".into(),
+            action_name: "新建终端标签页".into(),
+            category: "tabs".into(),
+            primary_key: "Ctrl+T".into(),
+            secondary_key: "Ctrl+Shift+T".into(),
+            default_key: "Ctrl+T".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.close_tab".into(),
+            action_name: "关闭当前终端标签页".into(),
+            category: "tabs".into(),
+            primary_key: "Ctrl+W".into(),
+            secondary_key: "".into(),
+            default_key: "Ctrl+W".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.split_horizontal".into(),
+            action_name: "水平分屏 (左右切分窗格)".into(),
+            category: "panes".into(),
+            primary_key: "Alt+Shift+D".into(),
+            secondary_key: "".into(),
+            default_key: "Alt+Shift+D".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.split_vertical".into(),
+            action_name: "垂直分屏 (上下切分窗格)".into(),
+            category: "panes".into(),
+            primary_key: "Alt+Shift+E".into(),
+            secondary_key: "".into(),
+            default_key: "Alt+Shift+E".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.copy".into(),
+            action_name: "复制终端选中文本".into(),
+            category: "terminal".into(),
+            primary_key: "Ctrl+Shift+C".into(),
+            secondary_key: "".into(),
+            default_key: "Ctrl+Shift+C".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.paste".into(),
+            action_name: "粘贴剪贴板内容到终端".into(),
+            category: "terminal".into(),
+            primary_key: "Ctrl+Shift+V".into(),
+            secondary_key: "".into(),
+            default_key: "Ctrl+Shift+V".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.clear".into(),
+            action_name: "清除当前终端屏幕".into(),
+            category: "terminal".into(),
+            primary_key: "Ctrl+L".into(),
+            secondary_key: "".into(),
+            default_key: "Ctrl+L".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "term.find".into(),
+            action_name: "查找终端屏幕内容".into(),
+            category: "terminal".into(),
+            primary_key: "Ctrl+F".into(),
+            secondary_key: "".into(),
+            default_key: "Ctrl+F".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "general.command_palette".into(),
+            action_name: "打开全局命令搜索面板".into(),
+            category: "general".into(),
+            primary_key: "Ctrl+P".into(),
+            secondary_key: "Ctrl+K".into(),
+            default_key: "Ctrl+P".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "general.settings".into(),
+            action_name: "打开偏好设置中心".into(),
+            category: "general".into(),
+            primary_key: "Ctrl+,".into(),
+            secondary_key: "".into(),
+            default_key: "Ctrl+,".into(),
+            is_customized: false,
+        },
+        crate::generated::SettingKeybindingItem {
+            id: "debug.toggle_workbench".into(),
+            action_name: "打开/关闭开发者调试控制台".into(),
+            category: "debug".into(),
+            primary_key: "F12".into(),
+            secondary_key: "".into(),
+            default_key: "F12".into(),
+            is_customized: false,
+        },
+    ]
 }

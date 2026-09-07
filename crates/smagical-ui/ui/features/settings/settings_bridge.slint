@@ -16,6 +16,8 @@ export struct SettingKeybindingItem {
     category: string,
     primary-key: string,
     secondary-key: string,
+    default-key: string,
+    is-customized: bool,
 }
 
 export struct SettingSnapshotItem {
@@ -24,6 +26,26 @@ export struct SettingSnapshotItem {
     description: string,
     host-count: int,
     cred-count: int,
+}
+
+export struct BackupTaskItem {
+    id: string,
+    name: string,
+    backup-type: string,     // "local" | "webdav" | "s3" | "gist" | "self_hosted"
+    last-backup-time: string,
+    snapshot-count: int,
+    strategy: string,        // "manual" | "hourly" | "daily" | "on_exit"
+    enabled: bool,
+    endpoint: string,
+}
+
+export struct BackupSnapshotEntry {
+    id: string,
+    task-id: string,
+    timestamp: string,
+    size-str: string,
+    remark: string,
+    hash: string,
 }
 
 /// 偏好设置中心领域桥接单例 (Settings Domain Bridge)
@@ -71,8 +93,8 @@ export global SettingsBridge {
     in-out property <int> setting-wallpaper-active-index: 0;
     in-out property <string> setting-wallpaper-slideshow: "none";
     in-out property <string> setting-wallpaper-transition: "fade";
-    in-out property <string> slideshow-number-input: "10";
-    in-out property <string> slideshow-unit-input: "min";
+    in-out property <string> slideshow-number-input: "0";
+    in-out property <string> slideshow-unit-input: "off";
     in-out property <string> setting-ui-font: "系统默认 (System Default)";
     in property <[string]> available-ui-fonts: ["系统默认 (System Default)", "Microsoft YaHei UI", "Segoe UI", "PingFang SC", "Inter", "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas"];
 
@@ -84,6 +106,7 @@ export global SettingsBridge {
     in-out property <string> setting-cursor-style: "block";
     in-out property <bool> setting-cursor-blink: true;
     in-out property <int> setting-scrollback-lines: 10000;
+    in-out property <string> scrollback-input: "10000";
     in-out property <bool> setting-copy-on-select: false;
     in-out property <bool> setting-paste-on-right-click: true;
     in-out property <bool> setting-warn-multiline-paste: true;
@@ -128,7 +151,11 @@ export global SettingsBridge {
     in-out property <string> setting-sftp-conflict-policy: "ask";
     in-out property <int> setting-sftp-concurrency: 3;
     in-out property <string> setting-sftp-upload-limit: "unlimited";
+    in-out property <string> upload-limit-num: "0";
+    in-out property <string> upload-limit-unit: "off";
     in-out property <string> setting-sftp-download-limit: "unlimited";
+    in-out property <string> download-limit-num: "0";
+    in-out property <string> download-limit-unit: "off";
     in-out property <bool> setting-sftp-resume: true;
     in-out property <bool> setting-sftp-preserve-attributes: true;
     in-out property <string> setting-sftp-editor-mode: "internal";
@@ -140,10 +167,24 @@ export global SettingsBridge {
     // -------------------------------------------------------------------------
     in-out property <[SettingKeybindingItem]> setting-keybindings: [];
     in-out property <[SettingKeybindingItem]> keybindings: [];
+    in-out property <string> keybindings-search: "";
+    in-out property <string> keybindings-filter-category: "all";
+    in-out property <string> editing-keybinding-id: "";
+    in-out property <bool> is-keybinding-modal-open: false;
+    in-out property <string> modal-keybinding-id: "";
+    in-out property <string> modal-keybinding-name: "";
+    in-out property <string> modal-keybinding-key: "";
 
     // -------------------------------------------------------------------------
     // 7. 数据备份与迁移 (Backup & Storage)
     // -------------------------------------------------------------------------
+    in-out property <string> setting-backup-master-mode: "off";
+    in-out property <[BackupTaskItem]> backup-tasks: [];
+    in-out property <[BackupSnapshotEntry]> current-task-snapshots: [];
+    in-out property <bool> is-create-backup-modal-open: false;
+    in-out property <bool> is-snapshots-modal-open: false;
+    in-out property <string> active-snapshot-task-id: "";
+    in-out property <string> active-snapshot-task-name: "";
     in-out property <string> setting-cloud-sync-backend: "none";
     in-out property <string> setting-cloud-sync-interval: "manual";
     in-out property <string> setting-cloud-e2ee-pass: "";
@@ -178,7 +219,7 @@ export global SettingsBridge {
     in-out property <bool> setting-session-audit-logging: false;
     in-out property <bool> setting-debug-enabled: false;
     in-out property <bool> setting-debug-log-channel: true;
-    in-out property <string> setting-log-level: "info";
+    in-out property <string> setting-log-level: "INFO";
 
     // -------------------------------------------------------------------------
     // 弹窗状态 (Modals)
@@ -232,6 +273,7 @@ export global SettingsBridge {
     callback change-cursor-style(string);
     callback change-cursor-blink(bool);
     callback change-scrollback-lines(int);
+    callback apply-scrollback-input(string);
     callback change-copy-on-select(bool);
     callback change-paste-on-right-click(bool);
     callback change-warn-multiline-paste(bool);
@@ -255,6 +297,8 @@ export global SettingsBridge {
     callback save-proxy-settings(string, string, bool, string, string);
     callback test-proxy-connectivity(string, string);
     callback export-backup-archive(bool);
+    callback set-upload-limit-speed(string, string);
+    callback set-download-limit-speed(string, string);
     callback scan-and-import-openssh();
     callback import-external-file();
     callback import-external-assets();
@@ -263,5 +307,19 @@ export global SettingsBridge {
     callback toggle-debug-enabled(bool);
     callback set-master-password(string, string);
     callback reset-master-password();
+    callback browse-sftp-download-dir();
+    callback change-sftp-download-dir(string);
+    callback change-sftp-concurrency(int);
+    callback update-keybinding(string, string);
+    callback reset-keybinding(string);
+    callback reset-all-keybindings();
+    callback clear-keybinding(string);
+    callback set-backup-master-mode(string);
+    callback toggle-backup-task-enabled(string, bool);
+    callback delete-backup-task(string);
+    callback open-task-snapshots(string, string);
+    callback restore-from-snapshot(string, string);
+    callback save-new-backup-task(string, string, string, string, string, string);
+    callback set-log-level(string);
     callback close-settings();
 }

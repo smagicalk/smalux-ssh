@@ -1,0 +1,84 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 标准统一状态徽章与协议标签 (AppBadge)
+///
+/// 核心特性：
+/// 1. 统一协议 (SSH/SFTP)、算法 (ed25519/RSA)、网络模式 (跳板机/代理池) 的标签风格；
+/// 2. 5 大色彩变体 ("default" | "success" | "warning" | "danger" | "accent")；
+/// 3. 支持内嵌微型矢量图标与双档尺寸 ("sm": 18px, "md": 22px)。
+export component AppBadge inherits Rectangle {
+    in property <string> text: "";
+    in property <image> icon;
+    in property <string> variant: "default";
+    in property <string> size: "sm";
+
+    property <color> badge-color:
+        root.variant == "success" ? #10b981 :
+        root.variant == "warning" ? #f59e0b :
+        root.variant == "danger" ? #ef4444 :
+        root.variant == "accent" ? AppTheme.accent :
+        AppTheme.secondary-foreground;
+
+    height: root.size == "md" ? 22px : 18px;
+    border-radius: root.size == "md" ? 4px : 3px;
+    background: root.badge-color.transparentize(88%);
+    border-width: 1px;
+    border-color: root.badge-color.transparentize(65%);
+
+    HorizontalLayout {
+        padding-left: root.size == "md" ? 8px : 6px;
+        padding-right: root.size == "md" ? 8px : 6px;
+        spacing: 4px;
+        alignment: center;
+
+        if root.icon.width > 0: VerticalLayout {
+            alignment: center;
+            width: root.size == "md" ? 11px : 9px;
+            Image {
+                source: root.icon;
+                width: root.size == "md" ? 11px : 9px;
+                height: root.size == "md" ? 11px : 9px;
+                image-fit: contain;
+                colorize: root.badge-color;
+            }
+        }
+
+        Text {
+            text: root.text;
+            font-size: root.size == "md" ? 11px : 10px;
+            font-weight: 600;
+            color: root.badge-color;
+            vertical-alignment: center;
+        }
+    }
+}
+
+/// 标准键盘键帽组件 (AppKeyCap)
+/// 用于命令面板、快捷键设置与提示气泡中渲染立体实体键帽 (如 "Ctrl", "Shift", "F12")
+export component AppKeyCap inherits Rectangle {
+    in property <string> key-text: "";
+    in property <bool> is-highlight: false;
+
+    height: 20px;
+    min-width: 22px;
+    border-radius: 4px;
+    background: root.is-highlight ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+    border-width: 1px;
+    border-color: root.is-highlight ? AppTheme.accent : AppTheme.border;
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        alignment: center;
+
+        Text {
+            text: root.key-text;
+            font-size: 10px;
+            font-weight: 700;
+            font-family: "JetBrains Mono, Cascadia Code, monospace";
+            color: root.is-highlight ? AppTheme.accent : AppTheme.foreground;
+            vertical-alignment: center;
+            horizontal-alignment: center;
+        }
+    }
+}

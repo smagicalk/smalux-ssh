@@ -1,5 +1,6 @@
 import { AppTheme } from "../themes/app-theme.slint";
 import { AppVScrollBar } from "../components/base/app-scroll-bar.slint";
+import { AppEmptyState } from "../shared/base/app-empty-state.slint";
 import { HistoryGroupData, HistoryItemData } from "left_drawers/history_drawer.slint";
 import { HistoryBridge } from "../features/history/history_bridge.slint";
 
@@ -560,34 +561,11 @@ export component HistoryCenterView inherits Rectangle {
         // ---------------------------------------------------------------------
         // 3. 空状态展示
         // ---------------------------------------------------------------------
-        if root.total-count == 0: VerticalLayout {
-            alignment: center;
-            spacing: 12px;
+        if root.total-count == 0: AppEmptyState {
             vertical-stretch: 1;
-
-            Image {
-                source: @image-url("../assets/icons/clock.svg");
-                width: 48px;
-                height: 48px;
-                image-fit: contain;
-                colorize: AppTheme.disabled-foreground;
-                horizontal-alignment: center;
-            }
-
-            Text {
-                text: root.search-query != "" ? @tr("未找到匹配的主机连接记录") : @tr("暂无历史连接记录");
-                font-size: 14px;
-                font-weight: 700;
-                color: AppTheme.secondary-foreground;
-                horizontal-alignment: center;
-            }
-
-            Text {
-                text: root.search-query != "" ? @tr("请尝试输入其他主机名称、IP 或用户名") : @tr("在「主机管理」中双击任意远程主机发起连接后，将自动在此沉淀连接足迹");
-                font-size: 12px;
-                color: AppTheme.disabled-foreground;
-                horizontal-alignment: center;
-            }
+            icon: @image-url("../assets/icons/clock.svg");
+            title: root.search-query != "" ? @tr("未找到匹配的主机连接记录") : @tr("暂无历史连接记录");
+            subtitle: root.search-query != "" ? @tr("请尝试输入其他主机名称、IP 或用户名") : @tr("在「主机管理」中双击任意远程主机发起连接后，将自动在此沉淀连接足迹");
         }
     }
 }

@@ -11,6 +11,9 @@ import {
 import { CategoryNavButton } from "./components/settings_widgets.slint";
 import { KeywordRuleModal } from "./components/keyword_rule_modal.slint";
 import { MasterPasswordModal } from "./components/master_pwd_modal.slint";
+import { KeybindingEditModal } from "./components/keybinding_edit_modal.slint";
+import { CreateBackupModal } from "./components/create_backup_modal.slint";
+import { BackupSnapshotsModal } from "./components/backup_snapshots_modal.slint";
 
 import { SettingsGeneralTab } from "./tabs/general_tab.slint";
 import { SettingsAppearanceTab } from "./tabs/appearance_tab.slint";
@@ -78,30 +81,6 @@ export component SettingsCenterView inherits Rectangle {
                             font-size: 10px;
                             color: AppTheme.secondary-foreground;
                         }
-                    }
-                }
-
-                // 右侧关闭按钮
-                Rectangle {
-                    width: 32px;
-                    height: 32px;
-                    border-radius: 6px;
-                    background: close-touch.has-hover ? AppTheme.hover-background : transparent;
-
-                    close-touch := TouchArea {
-                        clicked => {
-                            SettingsBridge.close-settings();
-                        }
-                        mouse-cursor: pointer;
-                    }
-
-                    Image {
-                        source: @image-url("../../assets/icons/window-close.svg");
-                        width: 16px;
-                        height: 16px;
-                        colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2;
                     }
                 }
             }
@@ -253,4 +232,27 @@ export component SettingsCenterView inherits Rectangle {
     // 3. 全屏模态弹窗 (Modals)
     KeywordRuleModal {}
     MasterPasswordModal {}
+
+    if SettingsBridge.is-keybinding-modal-open: KeybindingEditModal {
+        action-id: SettingsBridge.modal-keybinding-id;
+        action-name: SettingsBridge.modal-keybinding-name;
+        default-key: SettingsBridge.modal-keybinding-key;
+        current-key: SettingsBridge.modal-keybinding-key;
+        close => { SettingsBridge.is-keybinding-modal-open = false; }
+        save(new_k) => { SettingsBridge.update-keybinding(SettingsBridge.modal-keybinding-id, new_k); }
+        reset => { SettingsBridge.reset-keybinding(SettingsBridge.modal-keybinding-id); }
+        clear-key => { SettingsBridge.clear-keybinding(SettingsBridge.modal-keybinding-id); }
+    }
+
+    if SettingsBridge.is-create-backup-modal-open: CreateBackupModal {
+        close => { SettingsBridge.is-create-backup-modal-open = false; }
+    }
+
+    if SettingsBridge.is-snapshots-modal-open: BackupSnapshotsModal {
+        task-id: SettingsBridge.active-snapshot-task-id;
+        task-name: SettingsBridge.active-snapshot-task-name;
+        snapshots: SettingsBridge.current-task-snapshots;
+        close => { SettingsBridge.is-snapshots-modal-open = false; }
+        restore(tid, sid) => { SettingsBridge.restore-from-snapshot(tid, sid); }
+    }
 }

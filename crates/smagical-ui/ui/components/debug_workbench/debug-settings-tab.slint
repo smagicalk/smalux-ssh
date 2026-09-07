@@ -135,10 +135,14 @@ export component DebugSettingsTab inherits ScrollView {
     in-out property <bool> flag-terminal-crt-shader: false;
     in-out property <bool> flag-cloud-sync: false;
     in-out property <bool> flag-terminal-scratchpad: false;
+    in-out property <bool> flag-sync-pipeline-env: true;
     in-out property <bool> use-mock-storage: true;
+    in-out property <bool> show-system-theme: false;
     in property <string> current-theme-name: "Darcula";
     in property <bool> is-dark-mode: true;
     in-out property <float> setting-modal-opacity: 1.0;
+
+    callback toggle-show-system-theme(bool);
 
     callback toggle-feature-flag(string, bool);
     callback toggle-mock-storage(bool);
@@ -316,7 +320,31 @@ export component DebugSettingsTab inherits ScrollView {
                     }
                 }
 
-                // 特性行 5: 模态弹窗不透明度微调 (Modal Opacity)
+                // 特性行 5: 跟随系统主题实验性开关
+                FlagItemRow {
+                    title: @tr("显示跟随系统 (System) 实验性主题");
+                    subtitle: @tr("开启后在外观主题设置中显现 System 主题卡片，允许跟随操作系统深浅色动态切换");
+                    badge: "THEME";
+                    checked: root.show-system-theme;
+                    toggled(c) => {
+                        root.show-system-theme = c;
+                        root.toggle-show-system-theme(c);
+                    }
+                }
+
+                // 特性行 5: 渲染管线同步写入环境变量
+                FlagItemRow {
+                    title: @tr("渲染管线同步写入环境变量 (Sync SLINT_BACKEND)");
+                    subtitle: @tr("切换或保存渲染管线时，同步将后端写入进程 SLINT_BACKEND 环境变量；关闭后仅保存本地配置文件，不修改环境变量");
+                    badge: "ENV";
+                    checked: root.flag-sync-pipeline-env;
+                    toggled(c) => {
+                        root.flag-sync-pipeline-env = c;
+                        root.toggle-feature-flag("sync_pipeline_env", c);
+                    }
+                }
+
+                // 特性行 6: 模态弹窗不透明度微调 (Modal Opacity)
                 HorizontalLayout {
                     alignment: space-between;
                     height: 36px;

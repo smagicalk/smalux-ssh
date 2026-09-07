@@ -1,6 +1,7 @@
 import { AppTheme } from "../../../themes/app-theme.slint";
 import { SettingsBridge } from "../settings_bridge.slint";
 import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
 
     export component MasterPasswordModal inherits Rectangle {
     visible: SettingsBridge.is-master-pwd-modal-open;
@@ -96,24 +97,10 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                             width: 90px;
                             vertical-alignment: center;
                         }
-                        Rectangle {
-                            height: 28px;
+                        AppPasswordInput {
                             horizontal-stretch: 1;
-                            border-radius: AppTheme.radius-medium;
-                            background: AppTheme.control-background;
-                            border-width: 1px;
-                            border-color: AppTheme.border;
-                            HorizontalLayout {
-        padding-left: 8px;
-        padding-right: 8px;
-        TextInput {TextInput {
-                                text <=> SettingsBridge.master-pwd-old;
-                                font-size: 11px;
-                                color: AppTheme.foreground;
-                                vertical-alignment: center;
-                            }
-        }
-    }
+                            text <=> SettingsBridge.master-pwd-old;
+                            placeholder: @tr("输入当前旧主密码...");
                         }
                     }
 
@@ -129,24 +116,10 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                             width: 90px;
                             vertical-alignment: center;
                         }
-                        Rectangle {
-                            height: 28px;
+                        AppPasswordInput {
                             horizontal-stretch: 1;
-                            border-radius: AppTheme.radius-medium;
-                            background: AppTheme.control-background;
-                            border-width: 1px;
-                            border-color: AppTheme.border;
-                            HorizontalLayout {
-        padding-left: 8px;
-        padding-right: 8px;
-        TextInput {TextInput {
-                                text <=> SettingsBridge.master-pwd-new;
-                                font-size: 11px;
-                                color: AppTheme.foreground;
-                                vertical-alignment: center;
-                            }
-        }
-    }
+                            text <=> SettingsBridge.master-pwd-new;
+                            placeholder: @tr("输入新主密码...");
                         }
                     }
 
@@ -162,24 +135,10 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                             width: 90px;
                             vertical-alignment: center;
                         }
-                        Rectangle {
-                            height: 28px;
+                        AppPasswordInput {
                             horizontal-stretch: 1;
-                            border-radius: AppTheme.radius-medium;
-                            background: AppTheme.control-background;
-                            border-width: 1px;
-                            border-color: AppTheme.border;
-                            HorizontalLayout {
-        padding-left: 8px;
-        padding-right: 8px;
-        TextInput {TextInput {
-                                text <=> SettingsBridge.master-pwd-confirm;
-                                font-size: 11px;
-                                color: AppTheme.foreground;
-                                vertical-alignment: center;
-                            }
-        }
-    }
+                            text <=> SettingsBridge.master-pwd-confirm;
+                            placeholder: @tr("再次输入新主密码...");
                         }
                     }
 

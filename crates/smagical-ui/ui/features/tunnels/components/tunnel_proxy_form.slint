@@ -4,6 +4,7 @@
 // -----------------------------------------------------------------------------
 
 import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
 
 export component TunnelProxyForm inherits VerticalLayout {
     in property <bool> is-create-mode: false;
@@ -290,28 +291,11 @@ export component TunnelProxyForm inherits VerticalLayout {
                     color: AppTheme.secondary-foreground;
                     overflow: elide;
                 }
-                Rectangle {
-                    height: 32px;
-                    border-radius: AppTheme.radius-medium;
-                    background: AppTheme.control-background;
-                    border-width: 1px;
-                    border-color: AppTheme.border;
-
-                    HorizontalLayout {
-                        padding-left: 10px;
-                        padding-right: 10px;
-                        TextInput {
-                            width: 100%;
-                            height: 100%;
-                            text <=> root.form-proxy-password;
-                            font-size: 12px;
-                            font-family: "Cascadia Code, Consolas, monospace";
-                            color: AppTheme.foreground;
-                            input-type: password;
-                            vertical-alignment: center;
-                            enabled: root.is-create-mode || root.is-editing;
-                        }
-                    }
+                AppPasswordInput {
+                    text <=> root.form-proxy-password;
+                    size: "lg";
+                    placeholder: @tr("无需认证留空");
+                    enabled: root.is-create-mode || root.is-editing;
                 }
             }
         }

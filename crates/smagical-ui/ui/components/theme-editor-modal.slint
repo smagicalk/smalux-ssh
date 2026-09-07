@@ -4,6 +4,7 @@ import { AppTheme } from "../themes/app-theme.slint";
 import { AppCard } from "base/app-card.slint";
 import { AppButton } from "base/app-button.slint";
 import { AppVScrollBar } from "base/app-scroll-bar.slint";
+import { AppTextInput } from "../shared/base/app-text-input.slint";
 
 /// 调色板色块定义
 struct PaletteSwatch {
@@ -11,7 +12,7 @@ struct PaletteSwatch {
     c: color,
 }
 
-/// 颜色字段输入组件 (Hex 文本输入 + 颜色方块弹窗选择 + 调色盘图标)
+/// 颜色字段输入组件 (基于通用 AppTextInput 实现全域点击聚焦 + 颜色方块与调色盘弹窗选择)
 component ColorFieldInput inherits VerticalLayout {
     in property <string> label: "";
     in-out property <string> hex-value: "#000000";
@@ -33,84 +34,65 @@ component ColorFieldInput inherits VerticalLayout {
         }
     }
 
-    Rectangle {
+    HorizontalLayout {
+        spacing: 4px;
         height: 28px;
-        width: 100%;
-        border-radius: AppTheme.radius-medium;
-        background: AppTheme.control-background;
-        border-width: 1px;
-        border-color: t-inp.has-focus ? AppTheme.accent : AppTheme.border;
 
-        animate border-color { duration: 120ms; }
+        // 颜色预览小方块 (支持点击弹窗选择颜色)
+        color-box := Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background: root.preview-brush;
+            border-width: box-touch.has-hover ? 2px : 1px;
+            border-color: box-touch.has-hover ? AppTheme.accent : #ffffff40;
+            y: (parent.height - self.height) / 2;
 
-        HorizontalLayout {
-            padding-left: 5px;
-            padding-right: 5px;
-            spacing: 5px;
-            alignment: space-between;
+            box-touch := TouchArea {
+                clicked => { root.pick-color(); }
+                mouse-cursor: pointer;
+            }
+        }
 
-            // 颜色预览小方块 (支持点击弹窗选择颜色)
-            color-box := Rectangle {
-                width: 20px;
-                height: 20px;
-                border-radius: 4px;
-                background: root.preview-brush;
-                border-width: box-touch.has-hover ? 2px : 1px;
-                border-color: box-touch.has-hover ? AppTheme.accent : #ffffff40;
-                y: (parent.height - self.height) / 2;
+        // Hex 文本输入 (采用公共原子组件 AppTextInput，100% 全域点击聚焦)
+        AppTextInput {
+            horizontal-stretch: 1;
+            text <=> root.hex-value;
+            font-size: 11px;
+            monospace: true;
+            size: "sm";
+            input-height: 28px;
+            edited(v) => { root.changed(v); }
+        }
 
-                box-touch := TouchArea {
-                    clicked => { root.pick-color(); }
-                    mouse-cursor: pointer;
-                }
+        // 调色盘小按钮 (支持点击弹窗选择颜色)
+        Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background: btn-p.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+            border-width: 1px;
+            border-color: btn-p.has-hover ? AppTheme.accent : AppTheme.border;
+            y: (parent.height - self.height) / 2;
+
+            btn-p := TouchArea {
+                clicked => { root.pick-color(); }
+                mouse-cursor: pointer;
             }
 
-            // Hex 文本输入
-            Rectangle {
-                horizontal-stretch: 1;
-                clip: true;
-                t-inp := TextInput {
-                    width: 100%;
-                    height: 100%;
-                    text <=> root.hex-value;
-                    font-size: 11px;
-                    font-family: "JetBrains Mono";
-                    color: AppTheme.foreground;
-                    selection-background-color: AppTheme.selected-background;
-                    selection-foreground-color: AppTheme.selected-foreground;
-                    vertical-alignment: center;
-                    horizontal-alignment: left;
-                    edited => { root.changed(self.text); }
-                }
-            }
-
-            // 调色盘小按钮
-            Rectangle {
-                width: 18px;
-                height: 18px;
-                border-radius: 3px;
-                background: btn-p.has-hover ? AppTheme.hover-background : transparent;
-                y: (parent.height - self.height) / 2;
-
-                btn-p := TouchArea {
-                    clicked => { root.pick-color(); }
-                    mouse-cursor: pointer;
-                }
-
-                Image {
-                    source: @image-url("../assets/icons/palette.svg");
-                    width: 11px;
-                    height: 11px;
-                    colorize: btn-p.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
+            Image {
+                source: @image-url("../assets/icons/palette.svg");
+                width: 12px;
+                height: 12px;
+                colorize: btn-p.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
             }
         }
     }
 }
 
-/// 规格尺寸数值字段输入组件 (标签 + 数值输入框 + 单位 px)
+/// 规格尺寸数值字段输入组件 (基于通用 AppTextInput 实现全域点击聚焦与后缀单位)
 component MetricFieldInput inherits VerticalLayout {
     in property <string> label: "";
     in-out property <string> value-text: "4";
@@ -130,47 +112,14 @@ component MetricFieldInput inherits VerticalLayout {
         }
     }
 
-    Rectangle {
-        height: 28px;
-        width: 100%;
-        border-radius: AppTheme.radius-medium;
-        background: AppTheme.control-background;
-        border-width: 1px;
-        border-color: m-inp.has-focus ? AppTheme.accent : AppTheme.border;
-
-        animate border-color { duration: 120ms; }
-
-        HorizontalLayout {
-            padding-left: 8px;
-            padding-right: 8px;
-            spacing: 4px;
-            alignment: space-between;
-
-            Rectangle {
-                horizontal-stretch: 1;
-                clip: true;
-                m-inp := TextInput {
-                    width: 100%;
-                    height: 100%;
-                    text <=> root.value-text;
-                    font-size: 11px;
-                    font-family: "JetBrains Mono";
-                    color: AppTheme.foreground;
-                    selection-background-color: AppTheme.selected-background;
-                    selection-foreground-color: AppTheme.selected-foreground;
-                    vertical-alignment: center;
-                    horizontal-alignment: left;
-                    edited => { root.changed(self.text); }
-                }
-            }
-
-            Text {
-                text: "px";
-                font-size: 10px;
-                color: AppTheme.secondary-foreground;
-                vertical-alignment: center;
-            }
-        }
+    AppTextInput {
+        text <=> root.value-text;
+        font-size: 11px;
+        monospace: true;
+        suffix-text: "px";
+        size: "sm";
+        input-height: 28px;
+        edited(v) => { root.changed(v); }
     }
 }
 
@@ -339,8 +288,8 @@ export component ThemeEditorModal inherits Rectangle {
 
         // 居中主视窗
         Rectangle {
-            width: 880px;
-            height: 610px;
+            width: Math.min(920px, parent.width - 32px);
+            height: Math.min(630px, parent.height - 32px);
             x: (parent.width - self.width) / 2;
             y: (parent.height - self.height) / 2;
             border-radius: AppTheme.radius-large;
@@ -418,7 +367,8 @@ export component ThemeEditorModal inherits Rectangle {
                 // -----------------------------------------------------------------
                 HorizontalLayout {
                     spacing: 14px;
-                    height: 310px;
+                    vertical-stretch: 1;
+                    min-height: 280px;
 
                     // 左侧全量参数输入表单 (Flickable + 自适应极简滚动条，无杂色背景与错位焦点)
                     Rectangle {
@@ -451,22 +401,11 @@ export component ThemeEditorModal inherits Rectangle {
                                         horizontal-stretch: 1;
                                         spacing: 2px;
                                         Text { text: @tr("主题名称 (Name)"); font-size: 10px; color: AppTheme.secondary-foreground; }
-                                        Rectangle {
-                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: inp-name.has-focus ? AppTheme.accent : AppTheme.border;
-                                            TouchArea { clicked => { inp-name.focus(); } }
-                                            HorizontalLayout {
-                                                padding-left: 8px; padding-right: 8px;
-                                                inp-name := TextInput {
-                                                    width: 100%;
-                                                    height: 100%;
-                                                    text <=> root.theme-name;
-                                                    font-size: 11px;
-                                                    color: AppTheme.foreground;
-                                                    selection-background-color: AppTheme.selected-background;
-                                                    vertical-alignment: center;
-                                                    edited => { ThemeEditorBridge.meta-field-changed("name", self.text); }
-                                                }
-                                            }
+                                        AppTextInput {
+                                            text <=> root.theme-name;
+                                            size: "sm";
+                                            input-height: 26px;
+                                            edited(v) => { ThemeEditorBridge.meta-field-changed("name", v); }
                                         }
                                     }
 
@@ -474,22 +413,11 @@ export component ThemeEditorModal inherits Rectangle {
                                         width: 130px;
                                         spacing: 2px;
                                         Text { text: @tr("作者 (Author)"); font-size: 10px; color: AppTheme.secondary-foreground; }
-                                        Rectangle {
-                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: inp-auth.has-focus ? AppTheme.accent : AppTheme.border;
-                                            TouchArea { clicked => { inp-auth.focus(); } }
-                                            HorizontalLayout {
-                                                padding-left: 8px; padding-right: 8px;
-                                                inp-auth := TextInput {
-                                                    width: 100%;
-                                                    height: 100%;
-                                                    text <=> root.theme-author;
-                                                    font-size: 11px;
-                                                    color: AppTheme.foreground;
-                                                    selection-background-color: AppTheme.selected-background;
-                                                    vertical-alignment: center;
-                                                    edited => { ThemeEditorBridge.meta-field-changed("author", self.text); }
-                                                }
-                                            }
+                                        AppTextInput {
+                                            text <=> root.theme-author;
+                                            size: "sm";
+                                            input-height: 26px;
+                                            edited(v) => { ThemeEditorBridge.meta-field-changed("author", v); }
                                         }
                                     }
                                 }
@@ -503,22 +431,11 @@ export component ThemeEditorModal inherits Rectangle {
                                         horizontal-stretch: 1;
                                         spacing: 2px;
                                         Text { text: @tr("继承基底 (Base Theme)"); font-size: 10px; color: AppTheme.secondary-foreground; }
-                                        Rectangle {
-                                            height: 26px; border-radius: AppTheme.radius-medium; background: AppTheme.control-background; border-width: 1px; border-color: inp-base.has-focus ? AppTheme.accent : AppTheme.border;
-                                            TouchArea { clicked => { inp-base.focus(); } }
-                                            HorizontalLayout {
-                                                padding-left: 8px; padding-right: 8px;
-                                                inp-base := TextInput {
-                                                    width: 100%;
-                                                    height: 100%;
-                                                    text <=> root.theme-base;
-                                                    font-size: 11px;
-                                                    color: AppTheme.foreground;
-                                                    selection-background-color: AppTheme.selected-background;
-                                                    vertical-alignment: center;
-                                                    edited => { ThemeEditorBridge.meta-field-changed("base", self.text); }
-                                                }
-                                            }
+                                        AppTextInput {
+                                            text <=> root.theme-base;
+                                            size: "sm";
+                                            input-height: 26px;
+                                            edited(v) => { ThemeEditorBridge.meta-field-changed("base", v); }
                                         }
                                     }
 
@@ -901,13 +818,14 @@ export component ThemeEditorModal inherits Rectangle {
                                 }
                             }
                         }
-
-                        AppVScrollBar {
-                            viewport-height: flick-form.viewport-height;
-                            visible-height: flick-form.height;
-                            viewport-y <=> flick-form.viewport-y;
-                        }
                     }
+
+                    AppVScrollBar {
+                        viewport-height: flick-form.viewport-height;
+                        visible-height: flick-form.height;
+                        viewport-y <=> flick-form.viewport-y;
+                    }
+                }
 
                     // 右侧: 🖥️ 微型客户端沙盒预览窗口 (370px)
                     Rectangle {
@@ -1291,28 +1209,30 @@ export component ThemeEditorModal inherits Rectangle {
                     }
                 }
             }
+        }
 
-            // 🎨 现代化色相环圆盘取色器 (调用独立抽取的通用 ColorWheelPickerModal 组件)
-            ColorWheelPickerModal {
-                width: 100%;
-                height: 100%;
-                z: 2000;
-                is-open: root.is-picker-open;
-                title: @tr("色相圆盘取色器 · ") + root.picker-target-label;
-                hex-value <=> root.picker-hex-value;
-                preview-brush: root.picker-preview-brush;
-                indicator-x: root.wheel-indicator-x;
-                indicator-y: root.wheel-indicator-y;
-                brightness: root.wheel-brightness;
-                hue-brush: root.wheel-hue-brush;
+        // 🎨 现代化色相环圆盘取色器 (调用独立抽取的通用 ColorWheelPickerModal 组件)
+        ColorWheelPickerModal {
+            width: 100%;
+            height: 100%;
+            z: 2000;
+            is-open: root.is-picker-open;
+            title: @tr("色相圆盘取色器 · ") + root.picker-target-label;
+            hex-value <=> root.picker-hex-value;
+            preview-brush: root.picker-preview-brush;
+            indicator-x: root.wheel-indicator-x;
+            indicator-y: root.wheel-indicator-y;
+            brightness: root.wheel-brightness;
+            hue-brush: root.wheel-hue-brush;
 
-                wheel-coord-picked(x, y) => { ThemeEditorBridge.wheel-coord-picked(x, y); }
-                wheel-brightness-picked(b) => { ThemeEditorBridge.wheel-brightness-picked(b); }
-                hex-changed(h) => { ThemeEditorBridge.picker-hex-changed(h); }
-                confirmed(hex, brush) => { root.is-picker-open = false; }
-                close => { root.is-picker-open = false; }
+            wheel-coord-picked(x, y) => { ThemeEditorBridge.wheel-coord-picked(x, y); }
+            wheel-brightness-picked(b) => { ThemeEditorBridge.wheel-brightness-picked(b); }
+            hex-changed(h) => { ThemeEditorBridge.picker-hex-changed(h); }
+            confirmed(hex, brush) => {
+                root.commit-picker-color(hex);
+                root.is-picker-open = false;
             }
+            close => { root.is-picker-open = false; }
         }
     }
-}
 }

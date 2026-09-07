@@ -106,6 +106,9 @@ pub struct AppConfigRecord {
     pub tcp_nodelay: bool,
 
     // --- 传输与文件管理 (SFTP & File Transfers) ---
+    /// 默认本地下载存储目录
+    #[serde(default = "default_sftp_local")]
+    pub sftp_default_local: String,
     /// 默认远程初始工作目录 (如 "~" 或 "/")
     #[serde(default = "default_sftp_remote")]
     pub sftp_default_remote: String,
@@ -281,6 +284,7 @@ impl Default for AppConfigRecord {
             tcp_nodelay: true,
 
             // 传输与文件管理
+            sftp_default_local: default_sftp_local(),
             sftp_default_remote: default_sftp_remote(),
             sftp_confirm_delete: true,
             sftp_resume_transfer: true,
@@ -357,6 +361,28 @@ fn default_proxy_mode() -> String {
 
 fn default_proxy_server() -> String {
     "127.0.0.1:7890".to_string()
+}
+
+fn default_sftp_local() -> String {
+    #[cfg(windows)]
+    {
+        if let Ok(profile) = std::env::var("USERPROFILE") {
+            let p = std::path::Path::new(&profile).join("Downloads");
+            if p.exists() {
+                return p.to_string_lossy().to_string();
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    {
+        if let Ok(home) = std::env::var("HOME") {
+            let p = std::path::Path::new(&home).join("Downloads");
+            if p.exists() {
+                return p.to_string_lossy().to_string();
+            }
+        }
+    }
+    "~/Downloads".to_string()
 }
 
 fn default_sftp_remote() -> String {

@@ -1,0 +1,195 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge, BackupSnapshotEntry } from "../settings_bridge.slint";
+import { AppButton } from "../../../shared/base/app-button.slint";
+
+/// 备份镜像版本列表与版本还原弹窗 (BackupSnapshotsModal)
+export component BackupSnapshotsModal inherits Rectangle {
+    in property <string> task-id: "";
+    in property <string> task-name: "";
+    in property <[BackupSnapshotEntry]> snapshots: [];
+
+    callback close();
+    callback restore(string /* task_id */, string /* snapshot_id */);
+
+    width: 100%;
+    height: 100%;
+    background: #000000.transparentize(50%);
+
+    TouchArea {
+        clicked => { root.close(); }
+    }
+
+    Rectangle {
+        width: 580px;
+        height: 420px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: 10px;
+        background: AppTheme.surface-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        clip: true;
+
+        TouchArea {}
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+            alignment: space-between;
+
+            // 标题
+            HorizontalLayout {
+                alignment: space-between;
+                VerticalLayout {
+                    spacing: 3px;
+                    Text {
+                        text: @tr("备份镜像快照列表与还原");
+                        font-size: 15px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                    }
+                    Text {
+                        text: @tr("节点「") + root.task-name + @tr("」的历史快照镜像，可一键无损回退覆盖本地资产");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                }
+
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: sx-t.has-hover ? AppTheme.hover-background : transparent;
+                    sx-t := TouchArea {
+                        clicked => { root.close(); }
+                        mouse-cursor: pointer;
+                    }
+                    Text {
+                        text: "×";
+                        font-size: 16px;
+                        color: AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 镜像列表表格
+            Rectangle {
+                border-radius: 6px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                clip: true;
+                vertical-stretch: 1;
+
+                VerticalLayout {
+                    // 表头
+                    Rectangle {
+                        height: 28px;
+                        background: AppTheme.surface-background.darker(5%);
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            width: 100%;
+                            background: AppTheme.border;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: space-between;
+
+                            Text { text: @tr("镜像创建时间"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 150px; }
+                            Text { text: @tr("体积"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 60px; }
+                            Text { text: @tr("快照校验哈希"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; horizontal-stretch: 1; }
+                            Text { text: @tr("操作"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 90px; horizontal-alignment: right; }
+                        }
+                    }
+
+                    // 列表内容
+                    if root.snapshots.length == 0: VerticalLayout {
+                        alignment: center;
+                        padding: 30px;
+                        Text {
+                            text: @tr("暂无已生成的镜像快照 (首次备份将在调度周期到达或点击立即同步后产生)");
+                            font-size: 11px;
+                            color: AppTheme.disabled-foreground;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    for snap[sidx] in root.snapshots: Rectangle {
+                        height: 36px;
+                        background: Math.mod(sidx, 2) == 1 ? AppTheme.surface-background.transparentize(60%) : transparent;
+
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            width: 100%;
+                            background: AppTheme.border.transparentize(80%);
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            alignment: space-between;
+
+                            Text {
+                                text: snap.timestamp;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                                width: 150px;
+                            }
+
+                            Text {
+                                text: snap.size-str;
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                                width: 60px;
+                            }
+
+                            Text {
+                                text: snap.hash;
+                                font-size: 10px;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                                horizontal-stretch: 1;
+                                overflow: elide;
+                            }
+
+                            HorizontalLayout {
+                                width: 90px;
+                                alignment: end;
+
+                                AppButton {
+                                    text: @tr("一键还原");
+                                    size: "sm";
+                                    variant: "outline";
+                                    has-icon: true;
+                                    icon: @image-url("../../../assets/icons/upload.svg");
+                                    clicked => {
+                                        root.restore(snap.task-id, snap.id);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 底部关闭
+            HorizontalLayout {
+                alignment: end;
+                AppButton {
+                    text: @tr("关闭");
+                    size: "sm";
+                    variant: "secondary";
+                    clicked => { root.close(); }
+                }
+            }
+        }
+    }
+}

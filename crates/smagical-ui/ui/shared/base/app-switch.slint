@@ -1,19 +1,29 @@
 import { AppTheme } from "../../themes/app-theme.slint";
 
 /// 标准统一开关组件 (App Switch)
+///
+/// 核心特性：
+/// 1. 支持标准尺寸 ("md": 44x24px) 与紧凑微型尺寸 ("sm": 32x18px)；
+/// 2. 支持自定义激活状态色彩 (active-brush，如传入 AppTheme.success 用于表示“运行中”)；
+/// 3. 平滑滑动动画与阴影反馈。
 export component AppSwitch inherits Rectangle {
     in-out property <bool> checked: false;
     in property <bool> enabled: true;
+    in property <string> size: "md";
+    in property <brush> active-brush: AppTheme.accent;
     callback toggled(bool);
 
-    width: 44px;
-    height: 24px;
-    border-radius: 12px;
+    property <length> knob-size: root.size == "sm" ? 14px : 18px;
+    property <length> knob-inset: 2px;
+
+    width: root.size == "sm" ? 32px : 44px;
+    height: root.size == "sm" ? 18px : 24px;
+    border-radius: root.height / 2;
     background: !root.enabled ? AppTheme.control-background.transparentize(50%) :
-        root.checked ? AppTheme.accent : (s-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background);
+        root.checked ? root.active-brush : (s-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background);
     border-width: 1px;
     border-color: !root.enabled ? transparent :
-        root.checked ? AppTheme.accent : AppTheme.border;
+        root.checked ? root.active-brush : AppTheme.border;
 
     animate background { duration: 150ms; }
     animate border-color { duration: 150ms; }
@@ -29,11 +39,11 @@ export component AppSwitch inherits Rectangle {
 
     // 白色滑动旋钮
     Rectangle {
-        x: root.checked ? parent.width - self.width - 3px : 3px;
-        y: 3px;
-        width: 18px;
-        height: 18px;
-        border-radius: 9px;
+        x: root.checked ? parent.width - self.width - knob-inset : knob-inset;
+        y: knob-inset;
+        width: knob-size;
+        height: knob-size;
+        border-radius: knob-size / 2;
         background: #ffffff;
         drop-shadow-blur: 3px;
         drop-shadow-color: #00000040;
