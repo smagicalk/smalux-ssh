@@ -402,10 +402,9 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let pipe_name = match p_str.as_str() {
-                "winit-skia" => "Skia Auto (推荐)",
+                "winit-skia" => "Skia GPU (自动 / 推荐)",
                 "winit-skia-opengl" => "Skia OpenGL",
-                "winit-skia-vulkan" => "Skia Vulkan",
-                "winit-skia-software" => "CPU 软件安全渲染",
+                "winit-skia-software" => "CPU 软件渲染",
                 _ => p_str.as_str(),
             };
 
@@ -425,6 +424,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak_restart.upgrade() {
             if let Some(p_str) = pending_pipe_for_restart.borrow_mut().take() {
                 w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
+                w.global::<SettingsBridge>().set_active_rendering_pipeline(p_str.clone().into());
                 unsafe {
                     std::env::set_var("SLINT_BACKEND", &p_str);
                 }
@@ -452,6 +452,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak_cancel.upgrade() {
             if let Some(p_str) = pending_pipe_for_cancel.borrow_mut().take() {
                 w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
+                w.global::<SettingsBridge>().set_active_rendering_pipeline(p_str.clone().into());
                 unsafe {
                     std::env::set_var("SLINT_BACKEND", &p_str);
                 }

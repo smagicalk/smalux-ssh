@@ -937,3 +937,7 @@ Windows Hello / 生物识别快捷解锁 (Biometric Unlock)	Windows Hello / Biom
 远程文件双击打开方式 (Remote File Editor)	Remote File Double-click Action
 自定义外部编辑器程序路径 (Editor Executable)	Custom External Editor Executable
 传输忽略规则黑名单 (Exclusion Patterns)	Transfer Exclusion Patterns
+Skia GPU (自动)	Skia GPU (Auto)
+Skia OpenGL	Skia OpenGL
+CPU 软件渲染	CPU Software
+基于 Skia 图形引擎的渲染管线 (切换需重启客户端生效)	Graphics pipeline powered by Skia (Requires restart to take effect)

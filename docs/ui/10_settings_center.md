@@ -36,7 +36,7 @@
   - 关闭窗口时行为 (`close-action`: 最小化至托盘 / 直接退出)；
   - 关闭含活跃进程的终端 Tab 时确认 (`confirm-close-active`)；
 - **图形渲染管线诊断 (`rendering-diagnostics`)**：
-  - 显示底层图形管线（`winit-skia`、`winit-skia-opengl`、`winit-femtovg`）；
+  - 显示底层图形管线（`winit-skia`、`winit-skia-opengl`、`winit-skia-software`）；
   - 实时渲染诊断探针（帧率、单帧绘制耗时、脏矩形命中率）。
 
 ### 2. 🎨 外观与主题工坊 (`appearance`)

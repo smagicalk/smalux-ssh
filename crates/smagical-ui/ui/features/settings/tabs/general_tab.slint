@@ -37,10 +37,10 @@ import {
 
                                         SettingsRow {
                                             title: @tr("图形渲染引擎 (Graphics Engine)");
-                                            subtitle: @tr("控制底层 GPU 光栅化渲染管线 (切换需重启客户端生效)");
+                                            subtitle: @tr("基于 Skia 图形引擎的渲染管线 (切换需重启客户端生效)");
                                             show-border: false;
                                             PipelineSegmentedControl {
-                                                selected-pipe: SettingsBridge.active-rendering-pipeline;
+                                                selected-pipe <=> SettingsBridge.active-rendering-pipeline;
                                                 pipe-selected(p) => {
                                                     SettingsBridge.switch-rendering-pipeline(p);
                                                 }

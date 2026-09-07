@@ -124,7 +124,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 初始化图形渲染管线标识
     let initial_pipeline = std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "winit-skia".to_string());
-    window.global::<WindowBridge>().set_active_rendering_pipeline(initial_pipeline.into());
+    window.global::<WindowBridge>().set_active_rendering_pipeline(initial_pipeline.clone().into());
+    window.global::<SettingsBridge>().set_active_rendering_pipeline(initial_pipeline.into());
 
     // 同步初始化 Debug 日志缓冲区至 Slint 界面
     sync_ui_debug_logs(&window);

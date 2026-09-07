@@ -341,11 +341,11 @@ export component PipelineSegmentedControl inherits AppSegmentedControl {
     in-out property <string> selected-pipe: "winit-skia";
     callback pipe-selected(string);
 
-    width: 290px;
+    width: 320px;
     items: [
-        { id: "winit-skia", label: "Skia (GPU)" },
-        { id: "winit-skia-opengl", label: "OpenGL" },
-        { id: "winit-femtovg", label: "FemtoVG" },
+        { id: "winit-skia", label: @tr("Skia GPU (自动)") },
+        { id: "winit-skia-opengl", label: @tr("Skia OpenGL") },
+        { id: "winit-skia-software", label: @tr("CPU 软件渲染") },
     ];
     active-id <=> root.selected-pipe;
 
