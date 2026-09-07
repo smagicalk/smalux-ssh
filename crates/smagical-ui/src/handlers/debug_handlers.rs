@@ -619,12 +619,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     db.on_save_pipeline(move || {
         if let Some(w) = window_weak.upgrade() {
             let cur = w.global::<WindowBridge>().get_active_rendering_pipeline().to_string();
-            // Safety: 设置环境变量以持久化渲染后端配置
-            unsafe {
-                std::env::set_var("SLINT_BACKEND", &cur);
-            }
+            let _ = crate::pipeline_config::save_persisted_pipeline(&cur);
             w.window().request_redraw();
-            tracing::info!(target: "smagical_debug::render", "已成功保存渲染管线首选项: [{}] (将在下次启动时加载生效)", cur);
+            tracing::info!(target: "smagical_debug::render", "已成功保存渲染管线首选项至物理磁盘: [{}] (将在下次启动时加载生效)", cur);
             sync_ui_debug_logs(&w);
         }
     });
@@ -637,9 +634,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     db.on_restart_app(move || {
         if let Some(w) = window_weak.upgrade() {
             let cur = w.global::<WindowBridge>().get_active_rendering_pipeline().to_string();
-            unsafe {
-                std::env::set_var("SLINT_BACKEND", &cur);
-            }
+            let _ = crate::pipeline_config::save_persisted_pipeline(&cur);
             tracing::info!(target: "smagical_debug::render", "正在执行客户端安全重启以加载全新渲染管线: [{}]...", cur);
             
             // 确保异步会话数据落盘

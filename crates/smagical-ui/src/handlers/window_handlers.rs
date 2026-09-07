@@ -425,9 +425,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(p_str) = pending_pipe_for_restart.borrow_mut().take() {
                 w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
                 w.global::<SettingsBridge>().set_active_rendering_pipeline(p_str.clone().into());
-                unsafe {
-                    std::env::set_var("SLINT_BACKEND", &p_str);
+                
+                // 将配置真正持久化落盘至物理文件，保证无论未来如何启动均可生效
+                if let Err(err) = crate::pipeline_config::save_persisted_pipeline(&p_str) {
+                    tracing::error!(target: "smagical_ui::settings", "持久化保存渲染管线失败: {:?}", err);
                 }
+                
                 tracing::info!(target: "smagical_ui::settings", "正在执行客户端安全重启以生效全新渲染管线: [{}]...", p_str);
 
                 persistence_guard_restart.flush_and_wait(std::time::Duration::from_millis(500));
@@ -453,11 +456,14 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(p_str) = pending_pipe_for_cancel.borrow_mut().take() {
                 w.global::<WindowBridge>().set_active_rendering_pipeline(p_str.clone().into());
                 w.global::<SettingsBridge>().set_active_rendering_pipeline(p_str.clone().into());
-                unsafe {
-                    std::env::set_var("SLINT_BACKEND", &p_str);
+                
+                // 真正持久化落盘至物理文件，在下次启动时自动加载
+                if let Err(err) = crate::pipeline_config::save_persisted_pipeline(&p_str) {
+                    tracing::error!(target: "smagical_ui::settings", "持久化保存渲染管线失败: {:?}", err);
                 }
-                notif_pipe_cancel.info("渲染引擎配置已更新", "新管线首选项已保存，将在下次启动客户端时自动加载生效");
-                tracing::info!(target: "smagical_ui::settings", "用户选择稍后重启，渲染管线 [{}] 已暂存并在下次启动生效", p_str);
+                
+                notif_pipe_cancel.info("渲染引擎配置已更新", "新管线首选项已保存至配置文件，将在下次启动客户端时自动加载生效");
+                tracing::info!(target: "smagical_ui::settings", "用户选择稍后重启，渲染管线 [{}] 已持久化落盘并在下次启动生效", p_str);
             }
         }
     });

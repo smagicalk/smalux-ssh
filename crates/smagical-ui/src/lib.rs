@@ -44,6 +44,8 @@ pub(crate) mod right_panel_service;
 pub mod notification_service;
 /// 网络隧道与出网代理全局后台常驻守护服务模块。
 pub(crate) mod tunnel_daemon;
+/// 图形渲染管线本地持久化配置与启动分发模块。
+pub mod pipeline_config;
 
 
 use std::cell::RefCell;
@@ -122,8 +124,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
     // 同步初始化全部可用主题至 Slint 界面
     crate::theme::sync_ui_themes(&window, &themes.borrow());
 
-    // 初始化图形渲染管线标识
-    let initial_pipeline = std::env::var("SLINT_BACKEND").unwrap_or_else(|_| "winit-skia".to_string());
+    // 初始化图形渲染管线标识 (从磁盘持久化配置或环境变量载入)
+    let initial_pipeline = pipeline_config::init_runtime_pipeline();
+    tracing::info!(target: "smagical_ui::render", "当前加载生效的图形渲染管线: [{}]", initial_pipeline);
     window.global::<WindowBridge>().set_active_rendering_pipeline(initial_pipeline.clone().into());
     window.global::<SettingsBridge>().set_active_rendering_pipeline(initial_pipeline.into());
 

@@ -23,6 +23,7 @@ slint = { version = "1.16.1", default-features = false, features = [
     "compat-1-2",
     "backend-winit",
     "renderer-skia",
+    "renderer-skia-opengl",
     "unstable-winit-030",
 ] }
 
