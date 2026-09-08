@@ -10,6 +10,7 @@ export component BackupSnapshotsModal inherits Rectangle {
 
     callback close();
     callback restore(string /* task_id */, string /* snapshot_id */);
+    callback edit-task(string /* task_id */);
 
     width: 100%;
     height: 100%;
@@ -20,8 +21,8 @@ export component BackupSnapshotsModal inherits Rectangle {
     }
 
     Rectangle {
-        width: 580px;
-        height: 420px;
+        width: 600px;
+        height: 440px;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         border-radius: 10px;
@@ -55,21 +56,38 @@ export component BackupSnapshotsModal inherits Rectangle {
                     }
                 }
 
-                Rectangle {
-                    width: 24px;
-                    height: 24px;
-                    border-radius: 12px;
-                    background: sx-t.has-hover ? AppTheme.hover-background : transparent;
-                    sx-t := TouchArea {
-                        clicked => { root.close(); }
-                        mouse-cursor: pointer;
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+                    y: (parent.height - 28px) / 2;
+
+                    AppButton {
+                        text: @tr("编辑任务配置");
+                        size: "sm";
+                        variant: "secondary";
+                        has-icon: true;
+                        icon: @image-url("../../../assets/icons/pencil.svg");
+                        clicked => {
+                            root.edit-task(root.task-id);
+                        }
                     }
-                    Text {
-                        text: "×";
-                        font-size: 16px;
-                        color: AppTheme.secondary-foreground;
-                        horizontal-alignment: center;
-                        vertical-alignment: center;
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 12px;
+                        background: sx-t.has-hover ? AppTheme.hover-background : transparent;
+                        sx-t := TouchArea {
+                            clicked => { root.close(); }
+                            mouse-cursor: pointer;
+                        }
+                        Text {
+                            text: "×";
+                            font-size: 16px;
+                            color: AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
                     }
                 }
             }
@@ -180,9 +198,21 @@ export component BackupSnapshotsModal inherits Rectangle {
                 }
             }
 
-            // 底部关闭
+            // 底部操作栏
             HorizontalLayout {
-                alignment: end;
+                alignment: space-between;
+
+                AppButton {
+                    text: @tr("修改此备份节点配置...");
+                    size: "sm";
+                    variant: "outline";
+                    has-icon: true;
+                    icon: @image-url("../../../assets/icons/pencil.svg");
+                    clicked => {
+                        root.edit-task(root.task-id);
+                    }
+                }
+
                 AppButton {
                     text: @tr("关闭");
                     size: "sm";

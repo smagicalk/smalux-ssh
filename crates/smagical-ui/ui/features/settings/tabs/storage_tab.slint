@@ -55,43 +55,28 @@ export component SettingsStorageTab inherits VerticalLayout {
         }
     }
 
-    // 卡片 2: 自动化备份与多端节点容灾中心 (本地备份和云端同步双独立开关)
+    // 卡片 2: 自动化备份与多端节点容灾中心 (自动备份总开关)
     SettingsSectionCard {
         title: @tr("自动化备份与多端容灾节点管理");
-        subtitle: @tr("配置本地目录增量快照或远程云端多节点容灾，支持独立开关控制、生命周期清理与镜像还原");
+        subtitle: @tr("配置本地目录增量快照或远程云端多节点容灾，支持生命周期清理与镜像还原");
         icon: @image-url("../../../assets/icons/server.svg");
 
-        // 独立开关 1: 本地磁盘自动增量备份
         SettingsRow {
-            title: @tr("启用本地定时增量备份 (Local Auto Backup)");
-            subtitle: @tr("定期将主机资产、会话快照与配置自动写入本地硬盘指定目录");
+            title: @tr("启用自动化备份与容灾调度 (Automatic Backup)");
+            subtitle: @tr("按配置策略自动执行主机资产与配置增量快照，并同步至本地或云端容灾节点");
+            show-border: SettingsBridge.setting-backup-auto-enabled;
 
             SettingsSwitch {
-                checked: SettingsBridge.setting-backup-local-enabled;
+                checked: SettingsBridge.setting-backup-auto-enabled;
                 toggled(c) => {
-                    SettingsBridge.setting-backup-local-enabled = c;
-                    SettingsBridge.toggle-backup-local(c);
+                    SettingsBridge.setting-backup-auto-enabled = c;
+                    SettingsBridge.toggle-backup-auto(c);
                 }
             }
         }
 
-        // 独立开关 2: 云端多端容灾同步
-        SettingsRow {
-            title: @tr("启用云端多端容灾同步 (Multi-Device Cloud Sync)");
-            subtitle: @tr("并发调度 WebDAV / S3 / Gist / 自建云端备份节点，实现异地容灾与多设备协同");
-            show-border: SettingsBridge.setting-backup-local-enabled || SettingsBridge.setting-backup-cloud-enabled;
-
-            SettingsSwitch {
-                checked: SettingsBridge.setting-backup-cloud-enabled;
-                toggled(c) => {
-                    SettingsBridge.setting-backup-cloud-enabled = c;
-                    SettingsBridge.toggle-backup-cloud(c);
-                }
-            }
-        }
-
-        // 只要本地或云端任一开启，即展示备份节点与任务管理表格
-        if SettingsBridge.setting-backup-local-enabled || SettingsBridge.setting-backup-cloud-enabled: VerticalLayout {
+        // 只要自动备份开启，即展示备份节点与任务管理表格
+        if SettingsBridge.setting-backup-auto-enabled: VerticalLayout {
             padding: 16px;
             spacing: 12px;
 
@@ -139,7 +124,7 @@ export component SettingsStorageTab inherits VerticalLayout {
                     has-icon: true;
                     icon: @image-url("../../../assets/icons/plus.svg");
                     clicked => {
-                        SettingsBridge.is-create-backup-modal-open = true;
+                        SettingsBridge.open-create-backup-modal();
                     }
                 }
             }
@@ -177,7 +162,7 @@ export component SettingsStorageTab inherits VerticalLayout {
                             Text { text: @tr("镜像数量"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 70px; }
                             Text { text: @tr("调度与保留策略"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 120px; }
                             Text { text: @tr("启用"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 50px; horizontal-alignment: center; }
-                            Text { text: @tr("操作"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 70px; horizontal-alignment: right; }
+                            Text { text: @tr("操作"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 90px; horizontal-alignment: right; }
                         }
                     }
 
@@ -290,7 +275,8 @@ export component SettingsStorageTab inherits VerticalLayout {
                                 alignment: center;
                                 spacing: 2px;
                                 Text {
-                                    text: task.strategy == "daily" ? @tr("每天定时") :
+                                    text: task.strategy == "realtime" ? @tr("实时同步") :
+                                          task.strategy == "daily" ? @tr("每天定时") :
                                           task.strategy == "hourly" ? @tr("每小时") :
                                           task.strategy == "on_exit" ? @tr("软件退出时") : @tr("手动同步");
                                     font-size: 10px;
@@ -321,53 +307,80 @@ export component SettingsStorageTab inherits VerticalLayout {
                                 }
                             }
 
-                            // 7. 操作列 (最右端: 镜像列表与还原按钮、删除按钮)
-                            HorizontalLayout {
-                                width: 70px;
-                                alignment: end;
-                                spacing: 4px;
+                            // 7. 操作列 (最右端: 镜像快照列表、编辑任务、删除任务，完美垂直居中)
+                            VerticalLayout {
+                                width: 90px;
+                                alignment: center;
 
-                                // 镜像列表与版本还原按钮
-                                Rectangle {
-                                    width: 26px;
+                                HorizontalLayout {
+                                    alignment: end;
+                                    spacing: 4px;
                                     height: 26px;
-                                    border-radius: 4px;
-                                    background: snap-btn-t.has-hover ? AppTheme.hover-background : transparent;
-                                    snap-btn-t := TouchArea {
-                                        clicked => {
-                                            SettingsBridge.open-task-snapshots(task.id, task.name);
-                                        }
-                                        mouse-cursor: pointer;
-                                    }
-                                    Image {
-                                        source: @image-url("../../../assets/icons/archive.svg");
-                                        width: 13px;
-                                        height: 13px;
-                                        colorize: snap-btn-t.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
-                                        x: (parent.width - self.width) / 2;
-                                        y: (parent.height - self.height) / 2;
-                                    }
-                                }
 
-                                // 删除该任务按钮
-                                Rectangle {
-                                    width: 26px;
-                                    height: 26px;
-                                    border-radius: 4px;
-                                    background: del-btn-t.has-hover ? AppTheme.danger.transparentize(85%) : transparent;
-                                    del-btn-t := TouchArea {
-                                        clicked => {
-                                            SettingsBridge.delete-backup-task(task.id);
+                                    // 镜像列表与版本还原按钮
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: 4px;
+                                        background: snap-btn-t.has-hover ? AppTheme.hover-background : transparent;
+                                        snap-btn-t := TouchArea {
+                                            clicked => {
+                                                SettingsBridge.open-task-snapshots(task.id, task.name);
+                                            }
+                                            mouse-cursor: pointer;
                                         }
-                                        mouse-cursor: pointer;
+                                        Image {
+                                            source: @image-url("../../../assets/icons/archive.svg");
+                                            width: 13px;
+                                            height: 13px;
+                                            colorize: snap-btn-t.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
                                     }
-                                    Image {
-                                        source: @image-url("../../../assets/icons/trash.svg");
-                                        width: 13px;
-                                        height: 13px;
-                                        colorize: del-btn-t.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
-                                        x: (parent.width - self.width) / 2;
-                                        y: (parent.height - self.height) / 2;
+
+                                    // 编辑该任务配置按钮
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: 4px;
+                                        background: edit-btn-t.has-hover ? AppTheme.hover-background : transparent;
+                                        edit-btn-t := TouchArea {
+                                            clicked => {
+                                                SettingsBridge.open-edit-backup-task(task.id);
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+                                        Image {
+                                            source: @image-url("../../../assets/icons/pencil.svg");
+                                            width: 13px;
+                                            height: 13px;
+                                            colorize: edit-btn-t.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
+                                    }
+
+                                    // 删除该任务按钮
+                                    Rectangle {
+                                        width: 26px;
+                                        height: 26px;
+                                        border-radius: 4px;
+                                        background: del-btn-t.has-hover ? AppTheme.danger.transparentize(85%) : transparent;
+                                        del-btn-t := TouchArea {
+                                            clicked => {
+                                                SettingsBridge.delete-backup-task(task.id);
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+                                        Image {
+                                            source: @image-url("../../../assets/icons/trash.svg");
+                                            width: 13px;
+                                            height: 13px;
+                                            colorize: del-btn-t.has-hover ? AppTheme.danger : AppTheme.secondary-foreground;
+                                            x: (parent.width - self.width) / 2;
+                                            y: (parent.height - self.height) / 2;
+                                        }
                                     }
                                 }
                             }
@@ -377,8 +390,8 @@ export component SettingsStorageTab inherits VerticalLayout {
             }
         }
 
-        // 若两者均未开启，显示停用说明提示
-        if !SettingsBridge.setting-backup-local-enabled && !SettingsBridge.setting-backup-cloud-enabled: Rectangle {
+        // 若未开启，显示停用说明提示
+        if !SettingsBridge.setting-backup-auto-enabled: Rectangle {
             height: 72px;
             border-radius: 6px;
             background: AppTheme.control-background.transparentize(40%);
@@ -389,14 +402,14 @@ export component SettingsStorageTab inherits VerticalLayout {
                 alignment: center;
                 spacing: 4px;
                 Text {
-                    text: @tr("自动化备份与多端同步已处于停用状态");
+                    text: @tr("自动化备份与多端容灾已处于停用状态");
                     font-size: 11px;
                     font-weight: 600;
                     color: AppTheme.disabled-foreground;
                     horizontal-alignment: center;
                 }
                 Text {
-                    text: @tr("开启上方的「本地定时增量备份」或「云端多端容灾同步」开关后，即可配置与调度容灾节点");
+                    text: @tr("开启上方的「启用自动化备份与容灾调度」开关后，即可配置与调度容灾节点");
                     font-size: 10px;
                     color: AppTheme.disabled-foreground;
                     horizontal-alignment: center;
@@ -405,10 +418,10 @@ export component SettingsStorageTab inherits VerticalLayout {
         }
     }
 
-    // 卡片 3: 立即全量双向同步操作 (在本地或云端开启时显示)
-    if SettingsBridge.setting-backup-local-enabled || SettingsBridge.setting-backup-cloud-enabled: SettingsSectionCard {
+    // 卡片 3: 立即全量双向同步操作 (在自动化备份开启时显示)
+    if SettingsBridge.setting-backup-auto-enabled: SettingsSectionCard {
         title: @tr("立即执行全量容灾备份与检测");
-        subtitle: @tr("测试各备份节点网络连通性、立即推送最新增量快照或从远端拉取覆盖本地资产");
+        subtitle: @tr("立即推送最新增量快照或从远端拉取覆盖本地资产");
         icon: @image-url("../../../assets/icons/refresh.svg");
 
         SettingsRow {
@@ -421,19 +434,11 @@ export component SettingsStorageTab inherits VerticalLayout {
                 alignment: end;
 
                 AppButton {
-                    text: @tr("测试全节点连通性");
-                    variant: "secondary";
-                    has-icon: true;
-                    icon: @image-url("../../../assets/icons/server.svg");
-                    clicked => { }
-                }
-
-                AppButton {
                     text: @tr("立即增量同步");
                     variant: "primary";
                     has-icon: true;
                     icon: @image-url("../../../assets/icons/download.svg");
-                    clicked => { }
+                    clicked => { SettingsBridge.trigger-instant-backup(); }
                 }
 
                 AppButton {
@@ -441,7 +446,7 @@ export component SettingsStorageTab inherits VerticalLayout {
                     variant: "secondary";
                     has-icon: true;
                     icon: @image-url("../../../assets/icons/upload.svg");
-                    clicked => { }
+                    clicked => { SettingsBridge.trigger-restore-remote(); }
                 }
             }
         }

@@ -5,6 +5,7 @@ import {
     SettingsSectionCard,
     SettingsRow,
     SettingsSwitch,
+    AppNumberStepper,
 } from "../components/settings_widgets.slint";
 import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
 
@@ -230,52 +231,15 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                             title: @tr("SSH 连接超时时间 (Connection Timeout)");
                                             subtitle: @tr("在发起 SSH 握手或 TCP 套接字建立时的最大等待时限 (秒)");
 
-                                            HorizontalLayout {
-                                                width: 140px;
-                                                spacing: 8px;
-                                                alignment: end;
-                                                height: 28px;
-
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
-                                                    y: (parent.height - self.height) / 2;
-                                                    clicked => {
-                                                        if SettingsBridge.setting-connect-timeout > 5 {
-                                                            SettingsBridge.setting-connect-timeout -= 5;
-                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
-                                                        }
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    width: 76px;
-                                                    height: 28px;
-                                                    border-radius: AppTheme.radius-small;
-                                                    background: AppTheme.control-background;
-                                                    border-width: 1px;
-                                                    border-color: AppTheme.border;
-
-                                                    HorizontalLayout {
-                                                        alignment: center;
-                                                        Text {
-                                                            text: SettingsBridge.setting-connect-timeout + " " + @tr("秒");
-                                                            font-size: 11px;
-                                                            font-weight: 700;
-                                                            color: AppTheme.foreground;
-                                                            vertical-alignment: center;
-                                                        }
-                                                    }
-                                                }
-
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
-                                                    y: (parent.height - self.height) / 2;
-                                                    clicked => {
-                                                        if SettingsBridge.setting-connect-timeout < 300 {
-                                                            SettingsBridge.setting-connect-timeout += 5;
-                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
-                                                        }
-                                                    }
+                                            AppNumberStepper {
+                                                value <=> SettingsBridge.setting-connect-timeout;
+                                                min-value: 1;
+                                                max-value: 300;
+                                                step: 5;
+                                                unit: @tr("秒");
+                                                input-width: 56px;
+                                                changed(v) => {
+                                                    SettingsBridge.change-network-handshake(v, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
                                                 }
                                             }
                                         }
@@ -284,52 +248,15 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                             title: @tr("TCP 心跳保活探测间隔 (ServerAliveInterval)");
                                             subtitle: @tr("向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开 (0 为禁用)");
 
-                                            HorizontalLayout {
-                                                width: 140px;
-                                                spacing: 8px;
-                                                alignment: end;
-                                                height: 28px;
-
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
-                                                    y: (parent.height - self.height) / 2;
-                                                    clicked => {
-                                                        if SettingsBridge.setting-keepalive-interval >= 5 {
-                                                            SettingsBridge.setting-keepalive-interval -= 5;
-                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
-                                                        }
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    width: 76px;
-                                                    height: 28px;
-                                                    border-radius: AppTheme.radius-small;
-                                                    background: AppTheme.control-background;
-                                                    border-width: 1px;
-                                                    border-color: AppTheme.border;
-
-                                                    HorizontalLayout {
-                                                        alignment: center;
-                                                        Text {
-                                                            text: SettingsBridge.setting-keepalive-interval == 0 ? @tr("已禁用") : (SettingsBridge.setting-keepalive-interval + " " + @tr("秒"));
-                                                            font-size: 11px;
-                                                            font-weight: 700;
-                                                            color: SettingsBridge.setting-keepalive-interval == 0 ? AppTheme.secondary-foreground : AppTheme.accent;
-                                                            vertical-alignment: center;
-                                                        }
-                                                    }
-                                                }
-
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
-                                                    y: (parent.height - self.height) / 2;
-                                                    clicked => {
-                                                        if SettingsBridge.setting-keepalive-interval < 300 {
-                                                            SettingsBridge.setting-keepalive-interval += 5;
-                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
-                                                        }
-                                                    }
+                                            AppNumberStepper {
+                                                value <=> SettingsBridge.setting-keepalive-interval;
+                                                min-value: 0;
+                                                max-value: 300;
+                                                step: 5;
+                                                unit: @tr("秒");
+                                                input-width: 56px;
+                                                changed(v) => {
+                                                    SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, v, SettingsBridge.setting-keepalive-count-max);
                                                 }
                                             }
                                         }
@@ -338,52 +265,15 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                             title: @tr("心跳保活最大丢失阈值 (ServerAliveCountMax)");
                                             subtitle: @tr("若连续发送心跳探测均未得到服务器响应，判定链路断开的连续重试次数");
 
-                                            HorizontalLayout {
-                                                width: 140px;
-                                                spacing: 8px;
-                                                alignment: end;
-                                                height: 28px;
-
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-left.svg");
-                                                    y: (parent.height - self.height) / 2;
-                                                    clicked => {
-                                                        if SettingsBridge.setting-keepalive-count-max > 1 {
-                                                            SettingsBridge.setting-keepalive-count-max -= 1;
-                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
-                                                        }
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    width: 76px;
-                                                    height: 28px;
-                                                    border-radius: AppTheme.radius-small;
-                                                    background: AppTheme.control-background;
-                                                    border-width: 1px;
-                                                    border-color: AppTheme.border;
-
-                                                    HorizontalLayout {
-                                                        alignment: center;
-                                                        Text {
-                                                            text: SettingsBridge.setting-keepalive-count-max + " " + @tr("次");
-                                                            font-size: 11px;
-                                                            font-weight: 700;
-                                                            color: AppTheme.foreground;
-                                                            vertical-alignment: center;
-                                                        }
-                                                    }
-                                                }
-
-                                                AppIconButton {
-                                                    icon: @image-url("../../../assets/icons/arrow-right.svg");
-                                                    y: (parent.height - self.height) / 2;
-                                                    clicked => {
-                                                        if SettingsBridge.setting-keepalive-count-max < 20 {
-                                                            SettingsBridge.setting-keepalive-count-max += 1;
-                                                            SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, SettingsBridge.setting-keepalive-count-max);
-                                                        }
-                                                    }
+                                            AppNumberStepper {
+                                                value <=> SettingsBridge.setting-keepalive-count-max;
+                                                min-value: 1;
+                                                max-value: 100;
+                                                step: 1;
+                                                unit: @tr("次");
+                                                input-width: 56px;
+                                                changed(v) => {
+                                                    SettingsBridge.change-network-handshake(SettingsBridge.setting-connect-timeout, SettingsBridge.setting-keepalive-interval, v);
                                                 }
                                             }
                                         }

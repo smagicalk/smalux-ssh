@@ -180,11 +180,23 @@ export global SettingsBridge {
     // 7. 数据备份与迁移 (Backup & Storage)
     // -------------------------------------------------------------------------
     in-out property <string> setting-backup-master-mode: "off";
-    in-out property <bool> setting-backup-local-enabled: false;
+    in-out property <bool> setting-backup-auto-enabled: true;
+    in-out property <bool> setting-backup-local-enabled: true;
     in-out property <bool> setting-backup-cloud-enabled: false;
     in-out property <[BackupTaskItem]> backup-tasks: [];
     in-out property <[BackupSnapshotEntry]> current-task-snapshots: [];
     in-out property <bool> is-create-backup-modal-open: false;
+    in-out property <bool> is-edit-backup-modal-mode: false;
+    in-out property <string> backup-modal-edit-id: "";
+    in-out property <string> backup-modal-form-name: "";
+    in-out property <string> backup-modal-form-type: "local";
+    in-out property <string> backup-modal-form-endpoint: "";
+    in-out property <string> backup-modal-form-user: "";
+    in-out property <string> backup-modal-form-pass: "";
+    in-out property <string> backup-modal-form-strategy: "daily";
+    in-out property <string> backup-modal-form-retention-val: "10";
+    in-out property <string> backup-modal-form-retention-unit: "copies";
+    in-out property <string> backup-modal-form-retention-summary: "保留最近 10 份";
     in-out property <bool> is-snapshots-modal-open: false;
     in-out property <string> active-snapshot-task-id: "";
     in-out property <string> active-snapshot-task-name: "";
@@ -319,6 +331,7 @@ export global SettingsBridge {
     callback clear-keybinding(string);
     pure callback format-keybinding-event(string, bool, bool, bool, bool) -> string;
     callback set-backup-master-mode(string);
+    callback toggle-backup-auto(bool);
     callback toggle-backup-local(bool);
     callback toggle-backup-cloud(bool);
     callback browse-backup-local-dir();
@@ -326,7 +339,12 @@ export global SettingsBridge {
     callback delete-backup-task(string);
     callback open-task-snapshots(string, string);
     callback restore-from-snapshot(string, string);
+    callback open-create-backup-modal();
+    callback open-edit-backup-task(string);
     callback save-new-backup-task(string, string, string, string, string, string, string);
+    callback update-backup-task(string, string, string, string, string, string, string, string);
+    callback trigger-instant-backup();
+    callback trigger-restore-remote();
     callback set-log-level(string);
     callback close-settings();
 }

@@ -245,6 +245,17 @@ export component SettingsCenterView inherits Rectangle {
     }
 
     if SettingsBridge.is-create-backup-modal-open: CreateBackupModal {
+        is-edit-mode: SettingsBridge.is-edit-backup-modal-mode;
+        edit-task-id: SettingsBridge.backup-modal-edit-id;
+        form-name <=> SettingsBridge.backup-modal-form-name;
+        form-type <=> SettingsBridge.backup-modal-form-type;
+        form-endpoint <=> SettingsBridge.backup-modal-form-endpoint;
+        form-user <=> SettingsBridge.backup-modal-form-user;
+        form-pass <=> SettingsBridge.backup-modal-form-pass;
+        form-strategy <=> SettingsBridge.backup-modal-form-strategy;
+        form-retention-val <=> SettingsBridge.backup-modal-form-retention-val;
+        form-retention-unit <=> SettingsBridge.backup-modal-form-retention-unit;
+        form-retention-summary <=> SettingsBridge.backup-modal-form-retention-summary;
         close => { SettingsBridge.is-create-backup-modal-open = false; }
     }
 
@@ -254,5 +265,9 @@ export component SettingsCenterView inherits Rectangle {
         snapshots: SettingsBridge.current-task-snapshots;
         close => { SettingsBridge.is-snapshots-modal-open = false; }
         restore(tid, sid) => { SettingsBridge.restore-from-snapshot(tid, sid); }
+        edit-task(tid) => {
+            SettingsBridge.is-snapshots-modal-open = false;
+            SettingsBridge.open-edit-backup-task(tid);
+        }
     }
 }

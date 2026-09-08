@@ -17,7 +17,33 @@ pub fn encode_key_event(text: &str, is_ctrl: bool, _is_shift: bool, is_alt: bool
         return Vec::new();
     }
 
+    // 0. 过滤纯修饰键、状态锁定键与系统无打印特殊控制码 (例如单独按下 Shift, Ctrl, Alt, CapsLock, NumLock 等)
+    // 注意：组合键（如 Ctrl+C）此时 text 为 "c"，不会被拦截；只有单独按下了修饰键本身时才会过滤
     let first_char = text.chars().next().unwrap();
+    if matches!(first_char, '\u{0010}'..='\u{0017}') {
+        return Vec::new();
+    }
+
+    if matches!(
+        text,
+        "Shift"
+            | "ShiftR"
+            | "Control"
+            | "ControlR"
+            | "Alt"
+            | "AltGr"
+            | "AltR"
+            | "Meta"
+            | "MetaR"
+            | "CapsLock"
+            | "NumLock"
+            | "ScrollLock"
+            | "Menu"
+            | "Pause"
+            | "PrintScreen"
+    ) {
+        return Vec::new();
+    }
 
     // 1. 处理 Ctrl 组合键 (Ctrl+A ~ Ctrl+Z 及 ASCII 控制符)
     if is_ctrl {
@@ -124,5 +150,20 @@ mod tests {
     fn test_encode_normal_text() {
         assert_eq!(encode_key_event("ls -la", false, false, false), b"ls -la".to_vec());
         assert_eq!(encode_key_event("中文测试", false, false, false), "中文测试".as_bytes().to_vec());
+    }
+
+    #[test]
+    fn test_encode_standalone_modifiers() {
+        // 单按或长按 Shift/Ctrl/Alt/CapsLock/NumLock 等被安全过滤，不向 PTY 发送任何字节
+        assert_eq!(encode_key_event("\u{0010}", false, true, false), Vec::<u8>::new()); // Shift
+        assert_eq!(encode_key_event("\u{0011}", true, false, false), Vec::<u8>::new()); // Control
+        assert_eq!(encode_key_event("\u{0012}", false, false, true), Vec::<u8>::new()); // Alt
+        assert_eq!(encode_key_event("\u{0014}", false, false, false), Vec::<u8>::new()); // CapsLock
+        assert_eq!(encode_key_event("\u{0015}", false, false, false), Vec::<u8>::new()); // NumLock
+        assert_eq!(encode_key_event("Shift", false, true, false), Vec::<u8>::new());
+        assert_eq!(encode_key_event("Control", true, false, false), Vec::<u8>::new());
+        // 组合键（如 Ctrl+C、Ctrl+D）不受任何影响
+        assert_eq!(encode_key_event("c", true, false, false), vec![3]);
+        assert_eq!(encode_key_event("d", true, false, false), vec![4]);
     }
 }

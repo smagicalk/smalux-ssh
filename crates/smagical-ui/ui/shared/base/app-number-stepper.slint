@@ -24,6 +24,12 @@ export component AppNumberStepper inherits HorizontalLayout {
     alignment: center;
     height: 28px;
 
+    changed value => {
+        if !num-inp.has-focus {
+            num-inp.text = root.value;
+        }
+    }
+
     // 1. 步进减号按钮
     AppIconButton {
         icon: @image-url("../../assets/icons/arrow-left.svg");
@@ -52,6 +58,7 @@ export component AppNumberStepper inherits HorizontalLayout {
             let parsed = v.to-float();
             if parsed >= root.min-value && parsed <= root.max-value {
                 root.value = Math.round(parsed);
+                root.changed(root.value);
             }
         }
 

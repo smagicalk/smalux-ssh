@@ -4,14 +4,16 @@ import { AppButton } from "../../../shared/base/app-button.slint";
 import { AppTextInput } from "../../../shared/base/app-text-input.slint";
 import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
 
-/// 新建备份容灾任务模态弹窗 (CreateBackupModal)
+/// 新建与编辑备份容灾任务模态弹窗 (CreateBackupModal)
 export component CreateBackupModal inherits Rectangle {
+    in-out property <bool> is-edit-mode: false;
+    in-out property <string> edit-task-id: "";
     in-out property <string> form-name: "";
     in-out property <string> form-type: "local"; // "local" | "webdav" | "s3" | "gist" | "self_hosted"
     in-out property <string> form-endpoint: "";
     in-out property <string> form-user: "";
     in-out property <string> form-pass: "";
-    in-out property <string> form-strategy: "daily"; // "manual" | "hourly" | "daily" | "on_exit"
+    in-out property <string> form-strategy: "daily"; // "realtime" | "manual" | "hourly" | "daily" | "on_exit"
     in-out property <string> form-retention-val: "10";
     in-out property <string> form-retention-unit: "copies"; // "copies" | "days" | "hours" | "unlimited"
     in-out property <string> form-retention-summary: "保留最近 10 份";
@@ -40,8 +42,8 @@ export component CreateBackupModal inherits Rectangle {
     }
 
     Rectangle {
-        width: 540px;
-        height: 560px;
+        width: Math.min(620px, parent.width - 32px);
+        height: Math.min(610px, parent.height - 32px);
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         border-radius: 10px;
@@ -53,23 +55,24 @@ export component CreateBackupModal inherits Rectangle {
         TouchArea {}
 
         VerticalLayout {
-            padding: 22px;
-            spacing: 12px;
+            padding: 24px;
+            spacing: 13px;
             alignment: space-between;
 
-            // 标题
+            // 标题栏
             HorizontalLayout {
                 alignment: space-between;
                 VerticalLayout {
                     spacing: 3px;
                     Text {
-                        text: @tr("创建新的备份容灾节点");
+                        text: root.is-edit-mode ? @tr("编辑备份容灾节点") : @tr("创建新的备份容灾节点");
                         font-size: 15px;
                         font-weight: 700;
                         color: AppTheme.foreground;
                     }
                     Text {
-                        text: @tr("支持将资产库定时或手动增量同步至本地存储盘、私有 WebDAV、S3 或自建服务器");
+                        text: root.is-edit-mode ? @tr("修改当前备份节点的存储端点、认证凭据、同步策略与快照生命周期") :
+                                                 @tr("支持将资产库定时或实时同步至本地存储盘、私有 WebDAV、S3 或自建服务器");
                         font-size: 11px;
                         color: AppTheme.secondary-foreground;
                     }
@@ -94,9 +97,9 @@ export component CreateBackupModal inherits Rectangle {
                 }
             }
 
-            // 表单字段列表
+            // 表单字段列表 (全宽占满设计)
             VerticalLayout {
-                spacing: 10px;
+                spacing: 11px;
 
                 // 1. 任务名称
                 VerticalLayout {
@@ -110,7 +113,7 @@ export component CreateBackupModal inherits Rectangle {
                     }
                 }
 
-                // 2. 存储协议类型
+                // 2. 存储协议类型 (等宽横向占满)
                 VerticalLayout {
                     spacing: 3px;
                     Text { text: @tr("存储协议类型 *"); font-size: 10px; color: AppTheme.secondary-foreground; }
@@ -123,8 +126,9 @@ export component CreateBackupModal inherits Rectangle {
                             { id: "gist", name: "GitHub Gist" },
                             { id: "self_hosted", name: @tr("自建服务端") }
                         ]: Rectangle {
+                            horizontal-stretch: 1;
                             property <bool> is-sel: root.form-type == tp.id;
-                            height: 26px;
+                            height: 28px;
                             border-radius: 4px;
                             background: is-sel ? AppTheme.accent : tp-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                             border-width: 1px;
@@ -134,12 +138,10 @@ export component CreateBackupModal inherits Rectangle {
                                 mouse-cursor: pointer;
                             }
                             HorizontalLayout {
-                                padding-left: 8px;
-                                padding-right: 8px;
                                 alignment: center;
                                 Text {
                                     text: tp.name;
-                                    font-size: 10px;
+                                    font-size: 11px;
                                     font-weight: is-sel ? 700 : 400;
                                     color: is-sel ? AppTheme.selected-foreground : AppTheme.foreground;
                                     vertical-alignment: center;
@@ -208,20 +210,22 @@ export component CreateBackupModal inherits Rectangle {
                     }
                 }
 
-                // 5. 备份调度策略
+                // 5. 备份调度策略 (包含实时同步、每天、每小时、退出时、手动同步，等宽横向占满)
                 VerticalLayout {
                     spacing: 3px;
                     Text { text: @tr("自动备份同步策略"); font-size: 10px; color: AppTheme.secondary-foreground; }
                     HorizontalLayout {
                         spacing: 6px;
                         for st in [
-                            { id: "manual", name: @tr("仅手动同步") },
-                            { id: "hourly", name: @tr("每小时自动增量") },
-                            { id: "daily", name: @tr("每天定时备份") },
-                            { id: "on_exit", name: @tr("软件退出时自动快照") }
+                            { id: "realtime", name: @tr("实时同步") },
+                            { id: "daily", name: @tr("每天定时") },
+                            { id: "hourly", name: @tr("每小时") },
+                            { id: "on_exit", name: @tr("软件退出时") },
+                            { id: "manual", name: @tr("仅手动同步") }
                         ]: Rectangle {
+                            horizontal-stretch: 1;
                             property <bool> is-sel: root.form-strategy == st.id;
-                            height: 24px;
+                            height: 28px;
                             border-radius: 4px;
                             background: is-sel ? AppTheme.accent : st-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                             border-width: 1px;
@@ -231,8 +235,6 @@ export component CreateBackupModal inherits Rectangle {
                                 mouse-cursor: pointer;
                             }
                             HorizontalLayout {
-                                padding-left: 8px;
-                                padding-right: 8px;
                                 alignment: center;
                                 Text {
                                     text: st.name;
@@ -243,6 +245,16 @@ export component CreateBackupModal inherits Rectangle {
                                 }
                             }
                         }
+                    }
+
+                    Text {
+                        text: root.form-strategy == "realtime" ? @tr("策略说明: 监听配置与主机资产修改事件，发生变更时自动实时触发增量同步") :
+                              root.form-strategy == "daily" ? @tr("策略说明: 每天固定时间静默自动备份一次增量快照") :
+                              root.form-strategy == "hourly" ? @tr("策略说明: 每隔 1 小时自动进行增量备份与校验") :
+                              root.form-strategy == "on_exit" ? @tr("策略说明: 软件安全退出时自动生成并推送最新快照") :
+                              @tr("策略说明: 仅在设置中心手动点击「立即增量同步」时触发备份");
+                        font-size: 10px;
+                        color: AppTheme.accent;
                     }
                 }
 
@@ -255,13 +267,12 @@ export component CreateBackupModal inherits Rectangle {
                         Text { text: root.form-retention-summary; font-size: 10px; font-weight: 700; color: AppTheme.accent; }
                     }
 
-                    // 上行: 数值直接输入 + 单位切换胶囊
+                    // 上行: 数值直接输入 + 单位切换胶囊 (占满整行)
                     HorizontalLayout {
                         spacing: 8px;
-                        alignment: start;
 
                         if root.form-retention-unit != "unlimited": AppTextInput {
-                            width: 110px;
+                            width: 120px;
                             size: "sm";
                             placeholder: "10";
                             text <=> root.form-retention-val;
@@ -275,14 +286,16 @@ export component CreateBackupModal inherits Rectangle {
                         // 单位胶囊
                         HorizontalLayout {
                             spacing: 4px;
+                            horizontal-stretch: 1;
                             for u in [
-                                { id: "copies", name: @tr("按份数 (份)") },
-                                { id: "days", name: @tr("按天数 (天)") },
-                                { id: "hours", name: @tr("按小时 (小时)") },
+                                { id: "copies", name: @tr("按份数") },
+                                { id: "days", name: @tr("按天数") },
+                                { id: "hours", name: @tr("按小时") },
                                 { id: "unlimited", name: @tr("永久保留") }
                             ]: Rectangle {
+                                horizontal-stretch: 1;
                                 property <bool> is-u-sel: root.form-retention-unit == u.id;
-                                height: 24px;
+                                height: 26px;
                                 border-radius: 4px;
                                 background: is-u-sel ? AppTheme.accent : ru-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
                                 border-width: 1px;
@@ -295,8 +308,6 @@ export component CreateBackupModal inherits Rectangle {
                                     mouse-cursor: pointer;
                                 }
                                 HorizontalLayout {
-                                    padding-left: 8px;
-                                    padding-right: 8px;
                                     alignment: center;
                                     Text {
                                         text: u.name;
@@ -310,7 +321,7 @@ export component CreateBackupModal inherits Rectangle {
                         }
                     }
 
-                    // 下行: 常用快捷选择按钮
+                    // 下行: 常用快捷选择按钮 (占满整行)
                     HorizontalLayout {
                         spacing: 6px;
                         for qk in [
@@ -321,9 +332,10 @@ export component CreateBackupModal inherits Rectangle {
                             { id: "hours_24", val: "24", unit: "hours", name: @tr("保留 24 小时") },
                             { id: "all", val: "0", unit: "unlimited", name: @tr("永久不清理") }
                         ]: Rectangle {
+                            horizontal-stretch: 1;
                             property <bool> is-qk-active: (qk.unit == "unlimited" && root.form-retention-unit == "unlimited") ||
                                                           (qk.unit == root.form-retention-unit && qk.val == root.form-retention-val);
-                            height: 20px;
+                            height: 22px;
                             border-radius: 3px;
                             background: is-qk-active ? AppTheme.accent.transparentize(80%) : qk-t.has-hover ? AppTheme.hover-background : transparent;
                             border-width: 1px;
@@ -337,8 +349,6 @@ export component CreateBackupModal inherits Rectangle {
                                 mouse-cursor: pointer;
                             }
                             HorizontalLayout {
-                                padding-left: 6px;
-                                padding-right: 6px;
                                 alignment: center;
                                 Text {
                                     text: qk.name;
@@ -366,22 +376,35 @@ export component CreateBackupModal inherits Rectangle {
                 }
 
                 AppButton {
-                    text: @tr("保存并创建备份节点");
+                    text: root.is-edit-mode ? @tr("保存修改") : @tr("保存并创建备份节点");
                     size: "sm";
                     variant: "primary";
                     has-icon: true;
                     icon: @image-url("../../../assets/icons/check.svg");
                     clicked => {
                         if root.form-name != "" {
-                            SettingsBridge.save-new-backup-task(
-                                root.form-name,
-                                root.form-type,
-                                root.form-endpoint,
-                                root.form-user,
-                                root.form-pass,
-                                root.form-strategy,
-                                root.form-retention-summary
-                            );
+                            if root.is-edit-mode {
+                                SettingsBridge.update-backup-task(
+                                    root.edit-task-id,
+                                    root.form-name,
+                                    root.form-type,
+                                    root.form-endpoint,
+                                    root.form-user,
+                                    root.form-pass,
+                                    root.form-strategy,
+                                    root.form-retention-summary
+                                );
+                            } else {
+                                SettingsBridge.save-new-backup-task(
+                                    root.form-name,
+                                    root.form-type,
+                                    root.form-endpoint,
+                                    root.form-user,
+                                    root.form-pass,
+                                    root.form-strategy,
+                                    root.form-retention-summary
+                                );
+                            }
                             root.close();
                         }
                     }

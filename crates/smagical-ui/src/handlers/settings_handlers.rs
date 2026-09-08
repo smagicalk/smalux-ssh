@@ -1302,8 +1302,14 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 本地备份与云端容灾独立开关回调
     // -------------------------------------------------------------------------
+    // 本地备份与云端容灾总开关回调
+    // -------------------------------------------------------------------------
+    let notif_tba = ctx.notifications.clone();
+    bridge.on_toggle_backup_auto(move |enabled| {
+        notif_tba.info("自动备份策略调整", &format!("自动化备份与多端容灾调度已{}", if enabled { "开启" } else { "停用" }));
+    });
+
     let notif_tbl = ctx.notifications.clone();
     bridge.on_toggle_backup_local(move |enabled| {
         notif_tbl.info("本地备份策略调整", &format!("本地自动增量备份已{}", if enabled { "开启" } else { "停用" }));
@@ -1422,6 +1428,64 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         notif_rest.success("快照镜像已还原", &format!("资产库已成功无损回滚至快照「{}」", snap_id));
     });
 
+    let window_weak_cb = window.as_weak();
+    bridge.on_open_create_backup_modal(move || {
+        if let Some(w) = window_weak_cb.upgrade() {
+            let sb = w.global::<SettingsBridge>();
+            sb.set_is_edit_backup_modal_mode(false);
+            sb.set_backup_modal_edit_id("".into());
+            sb.set_backup_modal_form_name("".into());
+            sb.set_backup_modal_form_type("local".into());
+            sb.set_backup_modal_form_endpoint("".into());
+            sb.set_backup_modal_form_user("".into());
+            sb.set_backup_modal_form_pass("".into());
+            sb.set_backup_modal_form_strategy("daily".into());
+            sb.set_backup_modal_form_retention_val("10".into());
+            sb.set_backup_modal_form_retention_unit("copies".into());
+            sb.set_backup_modal_form_retention_summary("保留最近 10 份".into());
+            sb.set_is_create_backup_modal_open(true);
+        }
+    });
+
+    let tasks_ref_eb = tasks_state.clone();
+    let window_weak_eb = window.as_weak();
+    bridge.on_open_edit_backup_task(move |id| {
+        let list = tasks_ref_eb.borrow();
+        if let Some(task) = list.iter().find(|t| t.id == id) {
+            if let Some(w) = window_weak_eb.upgrade() {
+                let sb = w.global::<SettingsBridge>();
+                sb.set_is_edit_backup_modal_mode(true);
+                sb.set_backup_modal_edit_id(task.id.clone());
+                sb.set_backup_modal_form_name(task.name.clone());
+                sb.set_backup_modal_form_type(task.backup_type.clone());
+                sb.set_backup_modal_form_endpoint(task.endpoint.clone());
+                sb.set_backup_modal_form_user("".into());
+                sb.set_backup_modal_form_pass("".into());
+                sb.set_backup_modal_form_strategy(task.strategy.clone());
+
+                let ret_str = task.retention.to_string();
+                let (val, unit) = if ret_str.contains("永久") {
+                    ("0".to_string(), "unlimited".to_string())
+                } else if ret_str.contains("天") {
+                    let digits: String = ret_str.chars().filter(|c| c.is_ascii_digit()).collect();
+                    (if digits.is_empty() { "7".to_string() } else { digits }, "days".to_string())
+                } else if ret_str.contains("小时") {
+                    let digits: String = ret_str.chars().filter(|c| c.is_ascii_digit()).collect();
+                    (if digits.is_empty() { "24".to_string() } else { digits }, "hours".to_string())
+                } else {
+                    let digits: String = ret_str.chars().filter(|c| c.is_ascii_digit()).collect();
+                    (if digits.is_empty() { "10".to_string() } else { digits }, "copies".to_string())
+                };
+
+                sb.set_backup_modal_form_retention_val(val.into());
+                sb.set_backup_modal_form_retention_unit(unit.into());
+                sb.set_backup_modal_form_retention_summary(task.retention.clone());
+                sb.set_is_snapshots_modal_open(false);
+                sb.set_is_create_backup_modal_open(true);
+            }
+        }
+    });
+
     let tasks_ref_save = tasks_state.clone();
     let window_weak_save = window.as_weak();
     let notif_save = ctx.notifications.clone();
@@ -1444,6 +1508,34 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         if let Some(w) = window_weak_save.upgrade() {
             w.global::<SettingsBridge>().set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
         }
+    });
+
+    let tasks_ref_upd = tasks_state.clone();
+    let window_weak_upd = window.as_weak();
+    let notif_upd = ctx.notifications.clone();
+    bridge.on_update_backup_task(move |id, name, b_type, endpoint, _user, _pass, strategy, retention| {
+        let mut list = tasks_ref_upd.borrow_mut();
+        if let Some(t) = list.iter_mut().find(|t| t.id == id) {
+            t.name = name.clone();
+            t.backup_type = b_type;
+            t.endpoint = endpoint;
+            t.strategy = strategy;
+            t.retention = retention;
+        }
+        notif_upd.success("备份节点已更新", &format!("已成功更新容灾节点「{}」配置", name));
+        if let Some(w) = window_weak_upd.upgrade() {
+            w.global::<SettingsBridge>().set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(list.clone()))));
+        }
+    });
+
+    let notif_inst = ctx.notifications.clone();
+    bridge.on_trigger_instant_backup(move || {
+        notif_inst.info("正在执行增量同步", "已向所有启用的备份节点分发最新资产增量快照");
+    });
+
+    let notif_rest_rem = ctx.notifications.clone();
+    bridge.on_trigger_restore_remote(move || {
+        notif_rest_rem.warning("远端快照拉取中", "正在从远端容灾节点拉取并校验资产镜像");
     });
 
     let notif_lvl = ctx.notifications.clone();

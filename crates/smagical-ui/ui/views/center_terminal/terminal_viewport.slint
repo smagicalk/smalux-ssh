@@ -268,6 +268,13 @@ export component TerminalViewport inherits Rectangle {
                         return accept;
                     }
 
+                    // 过滤纯修饰键与锁定键（避免单按或长按 Shift/Ctrl/Alt 等向终端误发字符，组合键如 Ctrl+C 此时 text 为 "c"，不受影响）
+                    if event.text == Key.Shift || event.text == Key.Control
+                        || event.text == Key.Alt || event.text == Key.AltGr
+                        || event.text == Key.Meta || event.text == Key.CapsLock {
+                        return accept;
+                    }
+
                     // 统一转发按键文本与修饰键状态至 Rust 后端进行 ANSI 序列编码
                     if event.text != "" {
                         TerminalBridge.terminal-key-input(event.text, event.modifiers.control, event.modifiers.shift, event.modifiers.alt);
