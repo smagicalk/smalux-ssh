@@ -71,6 +71,8 @@ export global TerminalBridge {
     callback select-pane-by-id(string /* pane_id */);
     callback toggle-pane-zoom(string /* pane_id */);
     callback adjust-splitter(string /* splitter_id */, float /* delta_ratio */);
+    callback pane-scroll(string /* pane_id */, length /* delta */);
+    callback pane-scroll-to(string /* pane_id */, int /* target_offset */);
 
     // 终端核心底层交互回调
     callback terminal-key-input(string /* text */, bool /* is_ctrl */, bool /* is_shift */, bool /* is_alt */);

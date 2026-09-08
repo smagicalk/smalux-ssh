@@ -795,6 +795,77 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
+    // 7.2 分屏窗格独立滚轮视口滚动回调
+    // -------------------------------------------------------------------------
+    let pane_groups_pane_scroll = Rc::clone(&ctx.pane_groups);
+    let active_terminals_pane_scroll = Rc::clone(&ctx.active_terminals);
+    let active_pane_id_pane_scroll = Rc::clone(&ctx.active_pane_id);
+    let w_pane_scroll = window.as_weak();
+    let pane_scroll_accum = Rc::new(std::cell::RefCell::new(std::collections::HashMap::<String, f32>::new()));
+    tb.on_pane_scroll(move |pane_id, delta| {
+        let target_pid = pane_id.as_str();
+        let groups = pane_groups_pane_scroll.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == target_pid)
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut map = pane_scroll_accum.borrow_mut();
+            let accum = map.entry(target_pid.to_string()).or_insert(0.0f32);
+            let current = *accum + delta;
+            let line_step = 40.0f32;
+            let lines = (current / line_step) as i32;
+
+            if lines != 0 {
+                *accum = current - (lines as f32) * line_step;
+                let mut terminals = active_terminals_pane_scroll.borrow_mut();
+                if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                    instance.scroll_delta(lines);
+                    let (hist_size, scroll_off) = instance.scroll_info();
+                    let active_pid = active_pane_id_pane_scroll.borrow().clone();
+                    if active_pid == target_pid {
+                        if let Some(w) = w_pane_scroll.upgrade() {
+                            let tb = w.global::<TerminalBridge>();
+                            tb.set_history_size(hist_size as i32);
+                            tb.set_scroll_offset(scroll_off as i32);
+                        }
+                    }
+                }
+            } else {
+                *accum = current;
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 7.3 分屏窗格独立滚动条直接拖拽绝对跳转回调
+    // -------------------------------------------------------------------------
+    let pane_groups_pane_scroll_to = Rc::clone(&ctx.pane_groups);
+    let active_terminals_pane_scroll_to = Rc::clone(&ctx.active_terminals);
+    let active_pane_id_pane_scroll_to = Rc::clone(&ctx.active_pane_id);
+    let w_pane_scroll_to = window.as_weak();
+    tb.on_pane_scroll_to(move |pane_id, target_offset| {
+        let target_pid = pane_id.as_str();
+        let groups = pane_groups_pane_scroll_to.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == target_pid)
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_pane_scroll_to.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let target = target_offset.max(0) as usize;
+                instance.scroll_to_offset(target);
+                let (hist_size, scroll_off) = instance.scroll_info();
+                let active_pid = active_pane_id_pane_scroll_to.borrow().clone();
+                if active_pid == target_pid {
+                    if let Some(w) = w_pane_scroll_to.upgrade() {
+                        let tb = w.global::<TerminalBridge>();
+                        tb.set_history_size(hist_size as i32);
+                        tb.set_scroll_offset(scroll_off as i32);
+                    }
+                }
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // 8. 终端选区复制到剪贴板回调
     // -------------------------------------------------------------------------
     let pane_groups_copy = Rc::clone(&ctx.pane_groups);

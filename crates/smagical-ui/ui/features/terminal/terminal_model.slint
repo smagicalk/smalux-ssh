@@ -32,6 +32,12 @@ export struct TerminalPaneData {
     tabs: [TabData],
     /// 该窗格当前激活的 Tab ID
     active-tab-id: string,
+    /// 该窗格当前活动会话的历史回滚行数
+    history-size: int,
+    /// 该窗格当前相对底部的向上回滚行偏移量
+    scroll-offset: int,
+    /// 该窗格当前的终端行数 (用于驱动滚动条比例)
+    terminal-rows: int,
 }
 
 /// 窗格间可拖拽分割条数据模型

@@ -530,43 +530,57 @@ pub fn run() -> Result<(), slint::PlatformError> {
                             let group_opt = groups.iter().find(|g| g.pane_id == pl.pane_id);
                             let active_sess_opt = group_opt.and_then(|g| g.get_active_session());
 
+                            let mut hist_size = 0i32;
+                            let mut scroll_off = 0i32;
+                            let mut term_rows = 24i32;
+
                             if let Some(active_sess) = active_sess_opt
                                 && let Some(instance) = terminals.get_mut(&active_sess.session_id)
-                                && let Some(renderer) = renderer_opt.as_mut()
                             {
-                                let (cw, ch) = renderer.cell_size();
-                                let title_bar_h = 36.0f32;
-                                let content_w = (pl.width - (renderer.padding_x * 2) as f32).max(40.0);
-                                let content_h = (pl.height - title_bar_h - (renderer.padding_y * 2) as f32).max(20.0);
+                                if let Some(renderer) = renderer_opt.as_mut() {
+                                    let (cw, ch) = renderer.cell_size();
+                                    let title_bar_h = 36.0f32;
+                                    let content_w = (pl.width - (renderer.padding_x * 2) as f32).max(40.0);
+                                    let content_h = (pl.height - title_bar_h - (renderer.padding_y * 2) as f32).max(20.0);
 
-                                let target_cols = ((content_w / cw as f32) as u16).max(10);
-                                let target_rows = ((content_h / ch as f32) as u16).max(3);
+                                    let target_cols = ((content_w / cw as f32) as u16).max(10);
+                                    let target_rows = ((content_h / ch as f32) as u16).max(3);
+                                    term_rows = target_rows as i32;
 
-                                if instance.size.cols != target_cols || instance.size.rows != target_rows {
-                                    let _ = instance.resize(target_cols, target_rows);
+                                    if instance.size.cols != target_cols || instance.size.rows != target_rows {
+                                        let _ = instance.resize(target_cols, target_rows);
+                                    }
+
+                                    let has_new_output = instance.poll_output();
+                                    let is_dirty = instance.parser.take_dirty();
+
+                                    let img_w = (target_cols as u32 * cw + renderer.padding_x * 2).max(50);
+                                    let img_h = (target_rows as u32 * ch + renderer.padding_y * 2).max(30);
+
+                                    let mut buf = match pane_pixel_buffers.remove(&pl.pane_id) {
+                                        Some(b) if b.width() == img_w && b.height() == img_h => b,
+                                        _ => slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(img_w, img_h),
+                                    };
+
+                                    if has_new_output || is_dirty || !pane_rendered_images.contains_key(&pl.pane_id) {
+                                        renderer.render_to_buffer(instance.parser.term(), instance.parser.selection(), &mut buf);
+                                        let img = slint::Image::from_rgba8(buf.clone());
+                                        pane_rendered_images.insert(pl.pane_id.clone(), img.clone());
+                                        pane_image = img;
+                                    } else if let Some(cached_img) = pane_rendered_images.get(&pl.pane_id) {
+                                        pane_image = cached_img.clone();
+                                    }
+
+                                    pane_pixel_buffers.insert(pl.pane_id.clone(), buf);
                                 }
 
-                                let has_new_output = instance.poll_output();
-                                let is_dirty = instance.parser.take_dirty();
-
-                                let img_w = (target_cols as u32 * cw + renderer.padding_x * 2).max(50);
-                                let img_h = (target_rows as u32 * ch + renderer.padding_y * 2).max(30);
-
-                                let mut buf = match pane_pixel_buffers.remove(&pl.pane_id) {
-                                    Some(b) if b.width() == img_w && b.height() == img_h => b,
-                                    _ => slint::SharedPixelBuffer::<slint::Rgba8Pixel>::new(img_w, img_h),
-                                };
-
-                                if has_new_output || is_dirty || !pane_rendered_images.contains_key(&pl.pane_id) {
-                                    renderer.render_to_buffer(instance.parser.term(), instance.parser.selection(), &mut buf);
-                                    let img = slint::Image::from_rgba8(buf.clone());
-                                    pane_rendered_images.insert(pl.pane_id.clone(), img.clone());
-                                    pane_image = img;
-                                } else if let Some(cached_img) = pane_rendered_images.get(&pl.pane_id) {
-                                    pane_image = cached_img.clone();
+                                let (hs, so) = instance.scroll_info();
+                                hist_size = hs as i32;
+                                scroll_off = so as i32;
+                                if pl.pane_id == active_pid {
+                                    tb.set_history_size(hist_size);
+                                    tb.set_scroll_offset(scroll_off);
                                 }
-
-                                pane_pixel_buffers.insert(pl.pane_id.clone(), buf);
                             }
 
                             let (title, status, pane_tabs, active_tab_id) = if let Some(group) = group_opt {
@@ -602,6 +616,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
                                 status: status.into(),
                                 tabs: pane_tabs_rc,
                                 active_tab_id: active_tab_id.into(),
+                                history_size: hist_size,
+                                scroll_offset: scroll_off,
+                                terminal_rows: term_rows,
                             });
                         }
 

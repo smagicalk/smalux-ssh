@@ -399,6 +399,9 @@ export component TerminalViewport inherits Rectangle {
                     total-panes: pane.total-panes;
                     tabs: pane.tabs;
                     active-tab-id: pane.active-tab-id;
+                    history-size: pane.history-size;
+                    scroll-offset: pane.scroll-offset;
+                    terminal-rows: pane.terminal-rows;
                     paste-on-right-click: root.paste-on-right-click;
                     paste-text => { TerminalBridge.terminal-paste(); }
 
@@ -480,9 +483,14 @@ export component TerminalViewport inherits Rectangle {
                         root.is-tab-context-menu-open = false;
                     }
                     scroll(delta) => {
-                        TerminalBridge.terminal-scroll(delta);
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.pane-scroll(pane.pane-id, delta);
                         root.is-context-menu-open = false;
                         root.is-tab-context-menu-open = false;
+                    }
+                    scroll-to(target-off) => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.pane-scroll-to(pane.pane-id, target-off);
                     }
                     selection-changed(sc, sr, ec, er, has-sel) => {
                         root.active-pane-id = pane.pane-id;
@@ -636,8 +644,8 @@ export component TerminalViewport inherits Rectangle {
 
 
 
-            // 2.7 终端右侧微型历史滚动条 (当存在回滚历史时展示，起始于 Tab 栏下方并纵贯全屏)
-            if root.history-size > 0: scrollbar-track := Rectangle {
+            // 2.7 终端右侧微型历史滚动条 (单屏且存在回滚历史时展示，起始于 Tab 栏下方并纵贯全屏)
+            if !root.is-split && root.history-size > 0: scrollbar-track := Rectangle {
                 x: parent.width - 9px;
                 y: 38px;
                 width: 6px;

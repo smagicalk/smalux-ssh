@@ -52,6 +52,14 @@ export component TerminalPaneView inherits Rectangle {
     in property <int> drag-tab-from-index: -1;
     /// 鼠标右键单击快速粘贴
     in property <bool> paste-on-right-click: true;
+    /// 窗格终端历史回滚总行数 (用于驱动窗格自身专属滚动条)
+    in property <int> history-size: 0;
+    /// 当前窗格相对底部的向上回滚行偏移量 (0 表示在最底部最新行)
+    in-out property <int> scroll-offset: 0;
+    /// 窗格当前的终端行数 (用于驱动滚动条滑块比例)
+    in property <int> terminal-rows: 24;
+    /// 窗格滚动条拖拽交互状态
+    property <bool> is-dragging-scrollbar: false;
 
     // -------------------------------------------------------------------------
     // 2. 交互回调接口
@@ -76,6 +84,19 @@ export component TerminalPaneView inherits Rectangle {
     callback close();
     /// 鼠标滚轮滚动回调
     callback scroll(length /* delta-y */);
+    /// 窗格滚动条直接拖拽绝对跳转回调
+    callback scroll-to(int /* target-offset */);
+
+    function apply-scrollbar-drag(mouse-y: length, thumb-h: length, max-travel: length) {
+        if max-travel <= 0px || root.history-size <= 0 {
+            return;
+        }
+        let target-thumb-y = Math.max(0px, Math.min(max-travel, mouse-y - thumb-h / 2));
+        let progress = (target-thumb-y / 1px) / Math.max(1.0, max-travel / 1px);
+        let target-offset = Math.round((1.0 - progress) * root.history-size);
+        root.scroll-offset = target-offset;
+        root.scroll-to(target-offset);
+    }
     /// 鼠标划选区域变更回调
     callback selection-changed(int /* sc */, int /* sr */, int /* ec */, int /* er */, bool /* has_sel */);
     /// 呼出右键快捷菜单回调
@@ -416,6 +437,57 @@ export component TerminalPaneView inherits Rectangle {
                 }
 
                 mouse-cursor: text;
+            }
+
+            // 5.3 窗格独立专属微型历史滚动条 (该窗格有回滚历史时在自身右边缘纵贯展示)
+            if root.history-size > 0: pane-scrollbar-track := Rectangle {
+                x: parent.width - 7px;
+                y: 2px;
+                width: 5px;
+                height: Math.max(20px, parent.height - 4px);
+                border-radius: 2.5px;
+                background: pane-scroll-touch.has-hover || root.is-dragging-scrollbar ? AppTheme.border.transparentize(50%) : AppTheme.border.transparentize(85%);
+                animate background { duration: 150ms; }
+
+                property <length> thumb-h: Math.max(24px, Math.min(52px, self.height * ((root.terminal-rows * 1.0) / Math.max(1.0, (root.history-size + root.terminal-rows) * 1.0))));
+                property <length> max-travel: Math.max(1px, self.height - self.thumb-h);
+                property <length> thumb-y: self.max-travel * (1.0 - Math.min(1.0, Math.max(0.0, (root.scroll-offset * 1.0) / Math.max(1.0, root.history-size * 1.0))));
+
+                // 滑块
+                Rectangle {
+                    x: 0px;
+                    y: pane-scrollbar-track.thumb-y;
+                    width: 5px;
+                    height: pane-scrollbar-track.thumb-h;
+                    border-radius: 2.5px;
+                    background: root.scroll-offset > 0 ? (pane-scroll-touch.has-hover || root.is-dragging-scrollbar ? AppTheme.accent.brighter(15%) : AppTheme.accent) : (pane-scroll-touch.has-hover || root.is-dragging-scrollbar ? AppTheme.secondary-foreground : AppTheme.secondary-foreground.transparentize(50%));
+                    animate background { duration: 120ms; }
+                }
+
+                // 触控感应区 (放宽至 12px 方便抓取)
+                pane-scroll-touch := TouchArea {
+                    x: -4px;
+                    y: 0px;
+                    width: parent.width + 8px;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                            root.is-dragging-scrollbar = true;
+                            root.select();
+                            root.apply-scrollbar-drag(self.mouse-y, pane-scrollbar-track.thumb-h, pane-scrollbar-track.max-travel);
+                        } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                            root.is-dragging-scrollbar = false;
+                        }
+                    }
+
+                    moved => {
+                        if root.is-dragging-scrollbar && self.pressed {
+                            root.apply-scrollbar-drag(self.mouse-y, pane-scrollbar-track.thumb-h, pane-scrollbar-track.max-travel);
+                        }
+                    }
+                }
             }
 
         }
