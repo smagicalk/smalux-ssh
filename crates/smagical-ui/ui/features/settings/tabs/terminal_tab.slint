@@ -76,7 +76,7 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
 
                                     SettingsRow {
                                         title: @tr("鼠标右键单击快速粘贴 (Paste on Right Click)");
-                                        subtitle: @tr("在终端视口右击直接粘贴当前系统剪贴板文本");
+                                        subtitle: @tr("开启后在终端右键直接粘贴剪贴板文本（支持按住 Shift 切换快速粘贴与右键菜单）");
                                         SettingsSwitch {
                                             checked: SettingsBridge.setting-paste-on-right-click;
                                             toggled(c) => {

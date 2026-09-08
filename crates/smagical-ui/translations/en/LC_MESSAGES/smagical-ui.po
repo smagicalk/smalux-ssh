@@ -1,4 +1,4 @@
-﻿#
+#
 msgid ""
 msgstr ""
 "Project-Id-Version: smalux-ssh 0.1.0\n"
@@ -2888,6 +2888,11 @@ msgstr "Paste on Right Click"
 msgctxt "SettingsCenterView"
 msgid "在终端视口右击直接粘贴当前系统剪贴板文本"
 msgstr "Right-click anywhere inside the terminal viewport to instantly paste clipboard text"
+
+#: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\features\settings\tabs\terminal_tab.slint:79
+msgctxt "TerminalTab"
+msgid "开启后在终端右键直接粘贴剪贴板文本（支持按住 Shift 切换快速粘贴与右键菜单）"
+msgstr "Directly paste clipboard text on right-click (hold Shift to toggle between paste and context menu)"
 
 #: F:\code\rust\smalux-ssh\crates\smagical-ui\ui\views\settings_view.slint:1542
 msgctxt "SettingsCenterView"

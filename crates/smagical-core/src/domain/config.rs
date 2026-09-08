@@ -263,7 +263,7 @@ impl Default for AppConfigRecord {
             cursor_blink: true,
             scrollback_lines: 10000,
             copy_on_select: false,
-            paste_on_right_click: true,
+            paste_on_right_click: false,
             warn_on_multiline_paste: true,
             terminal_url_click: true,
             terminal_highlight_keywords: true,

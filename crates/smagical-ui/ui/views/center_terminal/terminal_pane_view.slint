@@ -50,8 +50,8 @@ export component TerminalPaneView inherits Rectangle {
     in property <bool> is-dragging-tab: false;
     in property <string> drag-tab-source-pane: "";
     in property <int> drag-tab-from-index: -1;
-    /// 鼠标右键单击快速粘贴
-    in property <bool> paste-on-right-click: true;
+    /// 鼠标右键单击快速粘贴 (默认关闭，按 Shift+右键 可快速触发；开启时普通右键快速粘贴，按 Shift+右键 呼出菜单)
+    in property <bool> paste-on-right-click: false;
     /// 窗格终端历史回滚总行数 (用于驱动窗格自身专属滚动条)
     in property <int> history-size: 0;
     /// 当前窗格相对底部的向上回滚行偏移量 (0 表示在最底部最新行)
@@ -392,7 +392,8 @@ export component TerminalPaneView inherits Rectangle {
                     if event.kind == PointerEventKind.down {
                         root.select();
                         if event.button == PointerEventButton.right {
-                            if root.paste-on-right-click {
+                            let should-paste = root.paste-on-right-click ? !event.modifiers.shift : event.modifiers.shift;
+                            if should-paste {
                                 root.paste-text();
                             } else {
                                 root.context-menu(self.mouse-x, self.mouse-y);

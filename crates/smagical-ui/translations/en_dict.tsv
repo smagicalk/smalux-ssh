@@ -421,6 +421,7 @@ OpenSSH ProxyJump 级联调用参数预览 (-J)	OpenSSH ProxyJump Arguments Prev
 在终端视口中用鼠标选中文字时，立即自动复制，无需手动按快捷键	Automatically copy selected text in terminal viewport without pressing shortcut keys
 鼠标右键单击快速粘贴 (Paste on Right Click)	Paste on Right Click
 在终端视口右击直接粘贴当前系统剪贴板文本	Right-click anywhere inside the terminal viewport to instantly paste clipboard text
+开启后在终端右键直接粘贴剪贴板文本（支持按住 Shift 切换快速粘贴与右键菜单）	Directly paste clipboard text on right-click (hold Shift to toggle between paste and context menu)
 粘贴多行或含回车命令时前置告警	Warn Before Pasting Multi-line or Enter Commands
 防止意外在生产服务器直接执行复制进来的换行危险命令	Prevent accidental execution of dangerous multi-line commands on production servers
 网络与 SSH	Network & SSH
