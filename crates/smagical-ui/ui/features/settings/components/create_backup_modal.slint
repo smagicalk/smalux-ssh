@@ -12,6 +12,21 @@ export component CreateBackupModal inherits Rectangle {
     in-out property <string> form-user: "";
     in-out property <string> form-pass: "";
     in-out property <string> form-strategy: "daily"; // "manual" | "hourly" | "daily" | "on_exit"
+    in-out property <string> form-retention-val: "10";
+    in-out property <string> form-retention-unit: "copies"; // "copies" | "days" | "hours" | "unlimited"
+    in-out property <string> form-retention-summary: "保留最近 10 份";
+
+    function update-retention-summary() {
+        if root.form-retention-unit == "unlimited" {
+            root.form-retention-summary = "永久保留";
+        } else if root.form-retention-unit == "days" {
+            root.form-retention-summary = "保留最近 " + root.form-retention-val + " 天";
+        } else if root.form-retention-unit == "hours" {
+            root.form-retention-summary = "保留最近 " + root.form-retention-val + " 小时";
+        } else {
+            root.form-retention-summary = "保留最近 " + root.form-retention-val + " 份";
+        }
+    }
 
     callback close();
     callback save();
@@ -25,8 +40,8 @@ export component CreateBackupModal inherits Rectangle {
     }
 
     Rectangle {
-        width: 520px;
-        height: 480px;
+        width: 540px;
+        height: 560px;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         border-radius: 10px;
@@ -39,7 +54,7 @@ export component CreateBackupModal inherits Rectangle {
 
         VerticalLayout {
             padding: 22px;
-            spacing: 14px;
+            spacing: 12px;
             alignment: space-between;
 
             // 标题
@@ -134,7 +149,7 @@ export component CreateBackupModal inherits Rectangle {
                     }
                 }
 
-                // 3. 存储端点 / 路径
+                // 3. 存储端点 / 路径 (本地模式支持直接浏览选择文件夹)
                 VerticalLayout {
                     spacing: 3px;
                     Text {
@@ -143,11 +158,24 @@ export component CreateBackupModal inherits Rectangle {
                         font-size: 10px;
                         color: AppTheme.secondary-foreground;
                     }
-                    AppTextInput {
-                        width: 100%;
-                        size: "sm";
-                        placeholder: root.form-type == "local" ? "D:\\smalux_backups" : "https://dav.example.com/remote.php/webdav";
-                        text <=> root.form-endpoint;
+                    HorizontalLayout {
+                        spacing: 6px;
+                        AppTextInput {
+                            horizontal-stretch: 1;
+                            size: "sm";
+                            placeholder: root.form-type == "local" ? "D:\\smalux_backups" : "https://dav.example.com/remote.php/webdav";
+                            text <=> root.form-endpoint;
+                        }
+                        if root.form-type == "local": AppButton {
+                            text: @tr("浏览...");
+                            size: "sm";
+                            variant: "secondary";
+                            has-icon: true;
+                            icon: @image-url("../../../assets/icons/folder.svg");
+                            clicked => {
+                                SettingsBridge.browse-backup-local-dir();
+                            }
+                        }
                     }
                 }
 
@@ -217,6 +245,112 @@ export component CreateBackupModal inherits Rectangle {
                         }
                     }
                 }
+
+                // 6. 历史快照清理与版本保留策略 (支持直接输入数值 + 快捷预设)
+                VerticalLayout {
+                    spacing: 4px;
+                    HorizontalLayout {
+                        alignment: space-between;
+                        Text { text: @tr("快照清理与版本保留策略 (Retention Policy)"); font-size: 10px; color: AppTheme.secondary-foreground; }
+                        Text { text: root.form-retention-summary; font-size: 10px; font-weight: 700; color: AppTheme.accent; }
+                    }
+
+                    // 上行: 数值直接输入 + 单位切换胶囊
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        if root.form-retention-unit != "unlimited": AppTextInput {
+                            width: 110px;
+                            size: "sm";
+                            placeholder: "10";
+                            text <=> root.form-retention-val;
+                            suffix-text: root.form-retention-unit == "copies" ? @tr("份") :
+                                         root.form-retention-unit == "days" ? @tr("天") : @tr("小时");
+                            edited(v) => {
+                                root.update-retention-summary();
+                            }
+                        }
+
+                        // 单位胶囊
+                        HorizontalLayout {
+                            spacing: 4px;
+                            for u in [
+                                { id: "copies", name: @tr("按份数 (份)") },
+                                { id: "days", name: @tr("按天数 (天)") },
+                                { id: "hours", name: @tr("按小时 (小时)") },
+                                { id: "unlimited", name: @tr("永久保留") }
+                            ]: Rectangle {
+                                property <bool> is-u-sel: root.form-retention-unit == u.id;
+                                height: 24px;
+                                border-radius: 4px;
+                                background: is-u-sel ? AppTheme.accent : ru-t.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: is-u-sel ? AppTheme.accent : AppTheme.border;
+                                ru-t := TouchArea {
+                                    clicked => {
+                                        root.form-retention-unit = u.id;
+                                        root.update-retention-summary();
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+                                HorizontalLayout {
+                                    padding-left: 8px;
+                                    padding-right: 8px;
+                                    alignment: center;
+                                    Text {
+                                        text: u.name;
+                                        font-size: 10px;
+                                        font-weight: is-u-sel ? 700 : 400;
+                                        color: is-u-sel ? AppTheme.selected-foreground : AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 下行: 常用快捷选择按钮
+                    HorizontalLayout {
+                        spacing: 6px;
+                        for qk in [
+                            { id: "copies_5", val: "5", unit: "copies", name: @tr("保留 5 份") },
+                            { id: "copies_10", val: "10", unit: "copies", name: @tr("保留 10 份") },
+                            { id: "days_7", val: "7", unit: "days", name: @tr("保留 7 天") },
+                            { id: "days_30", val: "30", unit: "days", name: @tr("保留 30 天") },
+                            { id: "hours_24", val: "24", unit: "hours", name: @tr("保留 24 小时") },
+                            { id: "all", val: "0", unit: "unlimited", name: @tr("永久不清理") }
+                        ]: Rectangle {
+                            property <bool> is-qk-active: (qk.unit == "unlimited" && root.form-retention-unit == "unlimited") ||
+                                                          (qk.unit == root.form-retention-unit && qk.val == root.form-retention-val);
+                            height: 20px;
+                            border-radius: 3px;
+                            background: is-qk-active ? AppTheme.accent.transparentize(80%) : qk-t.has-hover ? AppTheme.hover-background : transparent;
+                            border-width: 1px;
+                            border-color: is-qk-active ? AppTheme.accent : AppTheme.border.transparentize(40%);
+                            qk-t := TouchArea {
+                                clicked => {
+                                    root.form-retention-unit = qk.unit;
+                                    root.form-retention-val = qk.val;
+                                    root.update-retention-summary();
+                                }
+                                mouse-cursor: pointer;
+                            }
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                alignment: center;
+                                Text {
+                                    text: qk.name;
+                                    font-size: 9px;
+                                    color: is-qk-active ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    font-weight: is-qk-active ? 700 : 400;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // 底部操作按钮
@@ -245,7 +379,8 @@ export component CreateBackupModal inherits Rectangle {
                                 root.form-endpoint,
                                 root.form-user,
                                 root.form-pass,
-                                root.form-strategy
+                                root.form-strategy,
+                                root.form-retention-summary
                             );
                             root.close();
                         }

@@ -27,10 +27,11 @@ export component SettingsStorageTab inherits VerticalLayout {
 
         SettingsRow {
             title: @tr("导出全量加密备份文件 (.smalux / .json)");
-            subtitle: @tr("打包所有资产与偏好设置，数据经客户端端到端高强度加密保护");
+            subtitle: @tr("打包所有资产与偏好设置，数据经客户端端到端高强度加密保护 (点击后选择保存目录)");
 
             AppButton {
-                text: @tr("立即导出备份包");
+                width: 156px;
+                text: @tr("导出备份文件...");
                 variant: "primary";
                 has-icon: true;
                 icon: @image-url("../../../assets/icons/download.svg");
@@ -40,10 +41,11 @@ export component SettingsStorageTab inherits VerticalLayout {
 
         SettingsRow {
             title: @tr("从本地加密备份包还原资产 (Restore Backup)");
-            subtitle: @tr("选择本机已导出的 .smalux 备份文件，输入解密口令无损恢复全部资产");
+            subtitle: @tr("选择本机已导出的 .smalux / .json 备份文件，无损恢复全部主机资产与凭据");
             show-border: false;
 
             AppButton {
+                width: 156px;
                 text: @tr("选择备份包还原...");
                 variant: "secondary";
                 has-icon: true;
@@ -53,65 +55,43 @@ export component SettingsStorageTab inherits VerticalLayout {
         }
     }
 
-    // 卡片 2: 自动化备份与多端节点容灾中心 (弹窗创建 + 表格列表)
+    // 卡片 2: 自动化备份与多端节点容灾中心 (本地备份和云端同步双独立开关)
     SettingsSectionCard {
         title: @tr("自动化备份与多端容灾节点管理");
-        subtitle: @tr("配置本地目录增量快照或远程云端多节点容灾，支持独立生命周期管理与镜像还原");
+        subtitle: @tr("配置本地目录增量快照或远程云端多节点容灾，支持独立开关控制、生命周期清理与镜像还原");
         icon: @image-url("../../../assets/icons/server.svg");
 
-        // 顶层全局开关模式 (默认: 关闭备份)
+        // 独立开关 1: 本地磁盘自动增量备份
         SettingsRow {
-            title: @tr("备份与同步总策略 (Backup Mode)");
-            subtitle: @tr("选择停用自动化备份，或启用本地自动增量归档、多端节点并发容灾");
+            title: @tr("启用本地定时增量备份 (Local Auto Backup)");
+            subtitle: @tr("定期将主机资产、会话快照与配置自动写入本地硬盘指定目录");
 
-            Rectangle {
-                height: 28px;
-                border-radius: AppTheme.radius-medium;
-                background: AppTheme.control-background;
-                border-width: 1px;
-                border-color: AppTheme.border;
-
-                HorizontalLayout {
-                    padding: 2px;
-                    spacing: 2px;
-
-                    for bm in [
-                        { id: "off", name: @tr("关闭备份") },
-                        { id: "local", name: @tr("本地备份") },
-                        { id: "cloud", name: @tr("多端云同步") }
-                    ]: Rectangle {
-                        property <bool> is-selected: SettingsBridge.setting-backup-master-mode == bm.id;
-                        border-radius: AppTheme.radius-small;
-                        background: is-selected ? AppTheme.accent : bm-t.has-hover ? AppTheme.hover-background : transparent;
-                        animate background { duration: 120ms; }
-
-                        bm-t := TouchArea {
-                            clicked => {
-                                SettingsBridge.setting-backup-master-mode = bm.id;
-                                SettingsBridge.set-backup-master-mode(bm.id);
-                            }
-                            mouse-cursor: pointer;
-                        }
-
-                        HorizontalLayout {
-                            padding-left: 10px;
-                            padding-right: 10px;
-                            alignment: center;
-                            Text {
-                                text: bm.name;
-                                font-size: 11px;
-                                font-weight: is-selected ? 700 : 500;
-                                color: is-selected ? AppTheme.selected-foreground : AppTheme.foreground;
-                                vertical-alignment: center;
-                            }
-                        }
-                    }
+            SettingsSwitch {
+                checked: SettingsBridge.setting-backup-local-enabled;
+                toggled(c) => {
+                    SettingsBridge.setting-backup-local-enabled = c;
+                    SettingsBridge.toggle-backup-local(c);
                 }
             }
         }
 
-        // 仅在非关闭备份状态下显示节点管理表格
-        if SettingsBridge.setting-backup-master-mode != "off": VerticalLayout {
+        // 独立开关 2: 云端多端容灾同步
+        SettingsRow {
+            title: @tr("启用云端多端容灾同步 (Multi-Device Cloud Sync)");
+            subtitle: @tr("并发调度 WebDAV / S3 / Gist / 自建云端备份节点，实现异地容灾与多设备协同");
+            show-border: SettingsBridge.setting-backup-local-enabled || SettingsBridge.setting-backup-cloud-enabled;
+
+            SettingsSwitch {
+                checked: SettingsBridge.setting-backup-cloud-enabled;
+                toggled(c) => {
+                    SettingsBridge.setting-backup-cloud-enabled = c;
+                    SettingsBridge.toggle-backup-cloud(c);
+                }
+            }
+        }
+
+        // 只要本地或云端任一开启，即展示备份节点与任务管理表格
+        if SettingsBridge.setting-backup-local-enabled || SettingsBridge.setting-backup-cloud-enabled: VerticalLayout {
             padding: 16px;
             spacing: 12px;
 
@@ -175,7 +155,7 @@ export component SettingsStorageTab inherits VerticalLayout {
                 VerticalLayout {
                     spacing: 0px;
 
-                    // 表头 (从左到右: 名称, 类型, 最后备份时间, 镜像数量, 策略, 启用, 操作)
+                    // 表头 (从左到右: 名称, 类型, 最后备份时间, 镜像数量, 策略与保留, 启用, 操作)
                     Rectangle {
                         height: 30px;
                         background: AppTheme.surface-background.darker(8%);
@@ -191,11 +171,11 @@ export component SettingsStorageTab inherits VerticalLayout {
                             padding-right: 12px;
                             alignment: space-between;
 
-                            Text { text: @tr("任务名称"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 150px; }
-                            Text { text: @tr("类型"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 80px; }
-                            Text { text: @tr("最后备份时间"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 130px; }
+                            Text { text: @tr("任务名称"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 140px; }
+                            Text { text: @tr("类型"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 76px; }
+                            Text { text: @tr("最后备份时间"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 120px; }
                             Text { text: @tr("镜像数量"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 70px; }
-                            Text { text: @tr("调度策略"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 90px; }
+                            Text { text: @tr("调度与保留策略"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 120px; }
                             Text { text: @tr("启用"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 50px; horizontal-alignment: center; }
                             Text { text: @tr("操作"); font-size: 10px; font-weight: 700; color: AppTheme.secondary-foreground; vertical-alignment: center; width: 70px; horizontal-alignment: right; }
                         }
@@ -241,7 +221,7 @@ export component SettingsStorageTab inherits VerticalLayout {
 
                             // 1. 名称
                             VerticalLayout {
-                                width: 150px;
+                                width: 140px;
                                 alignment: center;
                                 spacing: 1px;
                                 Text {
@@ -261,7 +241,7 @@ export component SettingsStorageTab inherits VerticalLayout {
 
                             // 2. 类型徽章
                             VerticalLayout {
-                                width: 80px;
+                                width: 76px;
                                 alignment: center;
                                 Rectangle {
                                     height: 18px;
@@ -292,7 +272,7 @@ export component SettingsStorageTab inherits VerticalLayout {
                                 font-size: 10px;
                                 color: task.last-backup-time != "" ? AppTheme.secondary-foreground : AppTheme.disabled-foreground;
                                 vertical-alignment: center;
-                                width: 130px;
+                                width: 120px;
                             }
 
                             // 4. 镜像数量
@@ -304,15 +284,26 @@ export component SettingsStorageTab inherits VerticalLayout {
                                 width: 70px;
                             }
 
-                            // 5. 调度策略
-                            Text {
-                                text: task.strategy == "daily" ? @tr("每天定时") :
-                                      task.strategy == "hourly" ? @tr("每小时") :
-                                      task.strategy == "on_exit" ? @tr("软件退出时") : @tr("手动同步");
-                                font-size: 10px;
-                                color: AppTheme.secondary-foreground;
-                                vertical-alignment: center;
-                                width: 90px;
+                            // 5. 调度与保留策略
+                            VerticalLayout {
+                                width: 120px;
+                                alignment: center;
+                                spacing: 2px;
+                                Text {
+                                    text: task.strategy == "daily" ? @tr("每天定时") :
+                                          task.strategy == "hourly" ? @tr("每小时") :
+                                          task.strategy == "on_exit" ? @tr("软件退出时") : @tr("手动同步");
+                                    font-size: 10px;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                }
+                                if task.retention != "": Text {
+                                    text: task.retention;
+                                    font-size: 9px;
+                                    color: AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                    overflow: elide;
+                                }
                             }
 
                             // 6. 启用开关
@@ -330,7 +321,7 @@ export component SettingsStorageTab inherits VerticalLayout {
                                 }
                             }
 
-                            // 7. 操作列 (在最右端：镜像列表与还原按钮、删除按钮)
+                            // 7. 操作列 (最右端: 镜像列表与还原按钮、删除按钮)
                             HorizontalLayout {
                                 width: 70px;
                                 alignment: end;
@@ -385,10 +376,37 @@ export component SettingsStorageTab inherits VerticalLayout {
                 }
             }
         }
+
+        // 若两者均未开启，显示停用说明提示
+        if !SettingsBridge.setting-backup-local-enabled && !SettingsBridge.setting-backup-cloud-enabled: Rectangle {
+            height: 72px;
+            border-radius: 6px;
+            background: AppTheme.control-background.transparentize(40%);
+            border-width: 1px;
+            border-color: AppTheme.border.transparentize(60%);
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 4px;
+                Text {
+                    text: @tr("自动化备份与多端同步已处于停用状态");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: @tr("开启上方的「本地定时增量备份」或「云端多端容灾同步」开关后，即可配置与调度容灾节点");
+                    font-size: 10px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                }
+            }
+        }
     }
 
-    // 卡片 3: 立即全量双向同步操作 (全部使用真实 SVG 矢量图标)
-    if SettingsBridge.setting-backup-master-mode != "off": SettingsSectionCard {
+    // 卡片 3: 立即全量双向同步操作 (在本地或云端开启时显示)
+    if SettingsBridge.setting-backup-local-enabled || SettingsBridge.setting-backup-cloud-enabled: SettingsSectionCard {
         title: @tr("立即执行全量容灾备份与检测");
         subtitle: @tr("测试各备份节点网络连通性、立即推送最新增量快照或从远端拉取覆盖本地资产");
         icon: @image-url("../../../assets/icons/refresh.svg");

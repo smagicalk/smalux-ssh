@@ -29,28 +29,34 @@ export component SettingsFilesTab inherits VerticalLayout {
             title: @tr("默认本地下载目录 (Default Download Dir)");
             subtitle: @tr("从远程 SFTP 下载文件时默认保存的本地文件夹路径 (支持直接输入路径或点击浏览选择)");
 
-            HorizontalLayout {
-                spacing: 8px;
-                alignment: end;
+            VerticalLayout {
+                alignment: center;
 
-                AppTextInput {
-                    width: 240px;
-                    text <=> SettingsBridge.setting-sftp-default-local;
-                    placeholder: @tr("例如: C:/Users/.../Downloads");
-                    size: "sm";
-                    clearable: true;
-                    accepted(v) => {
-                        SettingsBridge.change-sftp-download-dir(v);
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: end;
+
+                    AppTextInput {
+                        width: 260px;
+                        height: 28px;
+                        input-height: 28px;
+                        text <=> SettingsBridge.setting-sftp-default-local;
+                        placeholder: @tr("例如: C:/Users/.../Downloads");
+                        clearable: true;
+                        accepted(v) => {
+                            SettingsBridge.change-sftp-download-dir(v);
+                        }
                     }
-                }
 
-                AppButton {
-                    text: @tr("浏览选择...");
-                    icon: @image-url("../../../assets/icons/folder.svg");
-                    has-icon: true;
-                    variant: "secondary";
-                    clicked => {
-                        SettingsBridge.browse-sftp-download-dir();
+                    AppButton {
+                        height: 28px;
+                        text: @tr("浏览选择...");
+                        icon: @image-url("../../../assets/icons/folder.svg");
+                        has-icon: true;
+                        variant: "secondary";
+                        clicked => {
+                            SettingsBridge.browse-sftp-download-dir();
+                        }
                     }
                 }
             }

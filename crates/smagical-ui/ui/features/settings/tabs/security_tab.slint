@@ -1,5 +1,6 @@
 import { AppTheme } from "../../../themes/app-theme.slint";
 import { SettingsBridge } from "../settings_bridge.slint";
+import { WindowBridge } from "../../window/window_bridge.slint";
 import {
     SettingsPageHeader,
     SettingsSectionCard,
@@ -185,9 +186,10 @@ export component SettingsSecurityTab inherits VerticalLayout {
             title: @tr("在界面中显示调试控制台入口 (Show Developer Tools in UI)");
             subtitle: @tr("开启开发者调试控制台 (F12) 与左侧活动栏诊断入口；关闭后仅在 UI 隐藏调试入口，底层调试参数与功能保持生效");
             SettingsSwitch {
-                checked: SettingsBridge.setting-debug-enabled;
+                checked: WindowBridge.is-debug-enabled;
                 toggled(c) => {
                     SettingsBridge.setting-debug-enabled = c;
+                    WindowBridge.toggle-debug-enabled(c);
                     SettingsBridge.toggle-debug-enabled(c);
                 }
             }

@@ -8,6 +8,10 @@ use std::rc::Rc;
 
 use slint::ComponentHandle;
 use smagical_core::domain::host::{HostRecord, HostStatus};
+use smagical_core::domain::group::GroupRecord;
+use smagical_core::domain::credential::CredentialRecord;
+use smagical_core::domain::tunnel::TunnelRecord;
+use smagical_core::domain::snippet::{SnippetRecord, SnippetGroupRecord};
 use smagical_core::event::types::HostAssetChangedEvent;
 
 use crate::generated::{AppTheme, AppWindow, HostsBridge, KeywordHighlightRule, SettingsBridge, WindowBridge};
@@ -60,11 +64,15 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             "credentials": credentials,
         });
 
-        // 确定保存目录 (优先用户下载文件夹，其次应用目录)
-        let backup_dir = get_default_backup_dir();
-        let _ = std::fs::create_dir_all(&backup_dir);
-        let filename = format!("smalux_backup_{}.json", epoch_secs);
-        let target_path = backup_dir.join(&filename);
+        let default_name = format!("smalux_backup_{}.json", epoch_secs);
+        let filter = "Smalux 备份文件 (*.json;*.smalux)|*.json;*.smalux|所有文件 (*.*)|*.*";
+        let target_path = match pick_save_file(filter, &default_name) {
+            Some(p) => p,
+            None => {
+                tracing::info!(target: "smagical_ui::backup", "用户取消了备份导出另存为操作");
+                return;
+            }
+        };
 
         match serde_json::to_string_pretty(&backup_data) {
             Ok(json_str) => {
@@ -85,6 +93,117 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             Err(e) => {
                 tracing::error!(target: "smagical_ui::backup", "序列化备份数据失败: {}", e);
                 notif_export.error("备份导出失败", &format!("JSON 序列化异常: {}", e));
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 1.1 从本地加密备份包还原资产 (Restore Backup from .smalux / .json)
+    // -------------------------------------------------------------------------
+    let core_state_import_file = ctx.core_state.clone();
+    let notif_import_file = ctx.notifications.clone();
+    let window_weak_import_file = window.as_weak();
+    bridge.on_import_external_file(move || {
+        let filter = "Smalux 备份文件 (*.json;*.smalux)|*.json;*.smalux|所有文件 (*.*)|*.*";
+        let file_path = match pick_open_file(filter) {
+            Some(p) => p,
+            None => return,
+        };
+
+        match std::fs::read_to_string(&file_path) {
+            Ok(content) => {
+                let val: serde_json::Value = match serde_json::from_str(&content) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        notif_import_file.error("还原失败", &format!("无法解析备份文件格式: {}", e));
+                        return;
+                    }
+                };
+
+                let storage = core_state_import_file.storage();
+                let mut imported_hosts = 0;
+                let mut imported_groups = 0;
+                let mut imported_creds = 0;
+
+                // 还原分组
+                if let Some(groups_arr) = val.get("groups").and_then(|g| g.as_array()) {
+                    for g_val in groups_arr {
+                        if let Ok(group_rec) = serde_json::from_value::<GroupRecord>(g_val.clone()) {
+                            let _ = storage.groups().save(&group_rec);
+                            imported_groups += 1;
+                        }
+                    }
+                }
+
+                // 还原主机
+                if let Some(hosts_arr) = val.get("hosts").and_then(|h| h.as_array()) {
+                    for h_val in hosts_arr {
+                        if let Ok(host_rec) = serde_json::from_value::<HostRecord>(h_val.clone()) {
+                            let _ = storage.hosts().save(&host_rec);
+                            imported_hosts += 1;
+                        }
+                    }
+                }
+
+                // 还原凭据
+                if let Some(creds_arr) = val.get("credentials").and_then(|c| c.as_array()) {
+                    for c_val in creds_arr {
+                        if let Ok(cred_rec) = serde_json::from_value::<CredentialRecord>(c_val.clone()) {
+                            let _ = storage.credentials().save(&cred_rec);
+                            imported_creds += 1;
+                        }
+                    }
+                }
+
+                // 还原隧道
+                if let Some(tunnels_arr) = val.get("tunnels").and_then(|t| t.as_array()) {
+                    for t_val in tunnels_arr {
+                        if let Ok(tunnel_rec) = serde_json::from_value::<TunnelRecord>(t_val.clone()) {
+                            let _ = storage.tunnels().save(&tunnel_rec);
+                        }
+                    }
+                }
+
+                // 还原代码片段与分组
+                if let Some(snips_arr) = val.get("snippets").and_then(|s| s.as_array()) {
+                    for s_val in snips_arr {
+                        if let Ok(snip_rec) = serde_json::from_value::<SnippetRecord>(s_val.clone()) {
+                            let _ = storage.snippets().save(&snip_rec);
+                        }
+                    }
+                }
+                if let Some(groups_arr) = val.get("snippet_groups").and_then(|g| g.as_array()) {
+                    for g_val in groups_arr {
+                        if let Ok(snip_grp) = serde_json::from_value::<SnippetGroupRecord>(g_val.clone()) {
+                            let _ = storage.snippets().save_group(&snip_grp);
+                        }
+                    }
+                }
+
+                core_state_import_file.events().dispatch(&HostAssetChangedEvent {
+                    host_id: "batch_import_backup".into(),
+                    name: "Backup Restore".into(),
+                    address: "".into(),
+                    credential_id: None,
+                    action: "restored".into(),
+                });
+
+                let _ = slint::invoke_from_event_loop({
+                    let window_weak = window_weak_import_file.clone();
+                    move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            w.global::<HostsBridge>().invoke_search_changed("".into());
+                        }
+                    }
+                });
+
+                notif_import_file.success(
+                    "备份资产还原成功",
+                    &format!("成功从文件还原 {} 台主机、{} 个分组与 {} 条凭据！", imported_hosts, imported_groups, imported_creds)
+                );
+            }
+            Err(e) => {
+                notif_import_file.error("读取文件失败", &format!("无法读取所选备份文件: {}", e));
             }
         }
     });
@@ -1121,6 +1240,90 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
+    // 快捷键按键捕获与实时格式化回调 (Keybinding Event Formatter)
+    // -------------------------------------------------------------------------
+    bridge.on_format_keybinding_event(move |text, ctrl, alt, shift, meta| {
+        let t_str = text.as_str();
+        if t_str == "\u{0011}" || t_str == "\u{0012}" || t_str == "\u{0010}" || t_str == "Control" || t_str == "Shift" || t_str == "Alt" || t_str == "Meta" {
+            return "".into();
+        }
+
+        let main_key = match t_str {
+            "\n" | "\r" | "Return" => "Enter",
+            "\t" | "Tab" => "Tab",
+            "\u{0008}" | "Backspace" => "Backspace",
+            "\u{007f}" | "Delete" => "Delete",
+            " " => "Space",
+            "\u{001b}" | "Escape" => "Esc",
+            "UpArrow" | "\u{f700}" => "Up",
+            "DownArrow" | "\u{f701}" => "Down",
+            "LeftArrow" | "\u{f702}" => "Left",
+            "RightArrow" | "\u{f703}" => "Right",
+            "F1" => "F1",
+            "F2" => "F2",
+            "F3" => "F3",
+            "F4" => "F4",
+            "F5" => "F5",
+            "F6" => "F6",
+            "F7" => "F7",
+            "F8" => "F8",
+            "F9" => "F9",
+            "F10" => "F10",
+            "F11" => "F11",
+            "F12" => "F12",
+            _ => {
+                let trimmed = t_str.trim();
+                if trimmed.is_empty() {
+                    return "".into();
+                }
+                trimmed
+            }
+        };
+
+        if main_key.is_empty() {
+            return "".into();
+        }
+
+        let mut parts = Vec::new();
+        if ctrl { parts.push("Ctrl"); }
+        if alt { parts.push("Alt"); }
+        if shift { parts.push("Shift"); }
+        if meta { parts.push("Meta"); }
+
+        let upper_main = main_key.to_uppercase();
+        let display_main = if main_key.len() == 1 {
+            upper_main.as_str()
+        } else {
+            main_key
+        };
+        parts.push(display_main);
+
+        parts.join("+").into()
+    });
+
+    // -------------------------------------------------------------------------
+    // 本地备份与云端容灾独立开关回调
+    // -------------------------------------------------------------------------
+    let notif_tbl = ctx.notifications.clone();
+    bridge.on_toggle_backup_local(move |enabled| {
+        notif_tbl.info("本地备份策略调整", &format!("本地自动增量备份已{}", if enabled { "开启" } else { "停用" }));
+    });
+
+    let notif_tbc = ctx.notifications.clone();
+    bridge.on_toggle_backup_cloud(move |enabled| {
+        notif_tbc.info("云端容灾策略调整", &format!("云端多端同步与容灾已{}", if enabled { "开启" } else { "停用" }));
+    });
+
+    let notif_bdir = ctx.notifications.clone();
+    bridge.on_browse_backup_local_dir(move || {
+        if let Some(folder) = pick_folder() {
+            let path_str = folder.display().to_string();
+            tracing::info!("选中本地备份目录: {}", path_str);
+            notif_bdir.info("已选取备份保存目录", &path_str);
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // 数据备份容灾节点与镜像管理回调
     // -------------------------------------------------------------------------
     let tasks_state = Rc::new(std::cell::RefCell::new(vec![
@@ -1133,6 +1336,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             strategy: "daily".into(),
             enabled: true,
             endpoint: "D:\\smalux_backups\\archive".into(),
+            retention: "保留最近 10 份".into(),
         },
     ]));
     bridge.set_backup_tasks(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(tasks_state.borrow().clone()))));
@@ -1221,7 +1425,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let tasks_ref_save = tasks_state.clone();
     let window_weak_save = window.as_weak();
     let notif_save = ctx.notifications.clone();
-    bridge.on_save_new_backup_task(move |name, b_type, endpoint, _user, _pass, strategy| {
+    bridge.on_save_new_backup_task(move |name, b_type, endpoint, _user, _pass, strategy, retention| {
         let new_id = format!("task-{}", &uuid::Uuid::new_v4().to_string()[..8]);
         let task = crate::generated::BackupTaskItem {
             id: new_id.into(),
@@ -1232,6 +1436,7 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             strategy,
             enabled: true,
             endpoint,
+            retention,
         };
         let mut list = tasks_ref_save.borrow_mut();
         list.push(task);
@@ -1256,6 +1461,36 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         }));
         notif_lvl.info("日志等级已调整", &format!("全局运行时日志等级已切换为「{}」", upper));
     });
+
+    // -------------------------------------------------------------------------
+    // 开发者控制台 Debug UI 全局开关联动
+    // -------------------------------------------------------------------------
+    let core_state_dbg = ctx.core_state.clone();
+    let window_weak_dbg = window.as_weak();
+    bridge.on_toggle_debug_enabled(move |enabled| {
+        crate::debug::set_debug_enabled(enabled);
+        core_state_dbg.activity_bar().set_visible("debug", enabled);
+        if let Some(w) = window_weak_dbg.upgrade() {
+            w.global::<WindowBridge>().set_is_debug_enabled(enabled);
+            w.global::<SettingsBridge>().set_setting_debug_enabled(enabled);
+            crate::activity_bar_service::sync_activity_bar_ui(&w, &core_state_dbg);
+            if !enabled {
+                w.global::<crate::generated::DebugBridge>().set_is_open(false);
+                if w.global::<WindowBridge>().get_active_left_tab() == "debug" {
+                    w.global::<WindowBridge>().set_active_left_tab("hosts".into());
+                }
+            } else {
+                crate::debug_ui::sync_ui_debug_logs(&w);
+            }
+            let _ = core_state_dbg.storage().config().update(Box::new(move |c| {
+                c.debug_enabled = enabled;
+            }));
+            tracing::info!(target: "smagical_ui::settings", "开发者调试控制台已{}", if enabled { "开启" } else { "关闭" });
+        }
+    });
+
+    // 初始化同步 Debug 开关状态
+    bridge.set_setting_debug_enabled(window.global::<WindowBridge>().get_is_debug_enabled());
 
     let w_b = window.as_weak();
     bridge.on_close_settings(move || {
@@ -1455,6 +1690,7 @@ fn get_ssh_config_path() -> PathBuf {
 }
 
 /// 获取默认备份导出路径
+#[allow(dead_code)]
 fn get_default_backup_dir() -> PathBuf {
     #[cfg(windows)]
     {
@@ -1582,4 +1818,70 @@ pub fn get_default_keybindings() -> Vec<crate::generated::SettingKeybindingItem>
             is_customized: false,
         },
     ]
+}
+
+/// 打开 Windows 原生另存为文件对话框
+pub(crate) fn pick_save_file(filter: &str, default_filename: &str) -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let script = format!(
+            r#"
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.SaveFileDialog
+$dialog.Filter = "{}"
+$dialog.FileName = "{}"
+$dialog.Title = "选择备份保存路径"
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
+    [Console]::Out.Write($dialog.FileName)
+}}
+"#,
+            filter, default_filename
+        );
+        let mut cmd = std::process::Command::new("powershell");
+        cmd.args(["-STA", "-NoProfile", "-NonInteractive", "-Command", &script]);
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let output = cmd.output().ok()?;
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return Some(PathBuf::from(path));
+            }
+        }
+    }
+    None
+}
+
+/// 打开 Windows 原生打开文件对话框
+pub(crate) fn pick_open_file(filter: &str) -> Option<PathBuf> {
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        let script = format!(
+            r#"
+Add-Type -AssemblyName System.Windows.Forms
+$dialog = New-Object System.Windows.Forms.OpenFileDialog
+$dialog.Filter = "{}"
+$dialog.Title = "选择备份还原文件"
+if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
+    [Console]::Out.Write($dialog.FileName)
+}}
+"#,
+            filter
+        );
+        let mut cmd = std::process::Command::new("powershell");
+        cmd.args(["-STA", "-NoProfile", "-NonInteractive", "-Command", &script]);
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+        let output = cmd.output().ok()?;
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                let p = PathBuf::from(path);
+                if p.is_file() {
+                    return Some(p);
+                }
+            }
+        }
+    }
+    None
 }

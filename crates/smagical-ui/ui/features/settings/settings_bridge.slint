@@ -37,6 +37,7 @@ export struct BackupTaskItem {
     strategy: string,        // "manual" | "hourly" | "daily" | "on_exit"
     enabled: bool,
     endpoint: string,
+    retention: string,
 }
 
 export struct BackupSnapshotEntry {
@@ -179,6 +180,8 @@ export global SettingsBridge {
     // 7. 数据备份与迁移 (Backup & Storage)
     // -------------------------------------------------------------------------
     in-out property <string> setting-backup-master-mode: "off";
+    in-out property <bool> setting-backup-local-enabled: false;
+    in-out property <bool> setting-backup-cloud-enabled: false;
     in-out property <[BackupTaskItem]> backup-tasks: [];
     in-out property <[BackupSnapshotEntry]> current-task-snapshots: [];
     in-out property <bool> is-create-backup-modal-open: false;
@@ -314,12 +317,16 @@ export global SettingsBridge {
     callback reset-keybinding(string);
     callback reset-all-keybindings();
     callback clear-keybinding(string);
+    pure callback format-keybinding-event(string, bool, bool, bool, bool) -> string;
     callback set-backup-master-mode(string);
+    callback toggle-backup-local(bool);
+    callback toggle-backup-cloud(bool);
+    callback browse-backup-local-dir();
     callback toggle-backup-task-enabled(string, bool);
     callback delete-backup-task(string);
     callback open-task-snapshots(string, string);
     callback restore-from-snapshot(string, string);
-    callback save-new-backup-task(string, string, string, string, string, string);
+    callback save-new-backup-task(string, string, string, string, string, string, string);
     callback set-log-level(string);
     callback close-settings();
 }
