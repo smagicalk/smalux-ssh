@@ -188,32 +188,36 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                             padding-right: 18px;
                                                             spacing: 12px;
 
-                                                            // 列 1: 正则表达式 (最左端，固定 220px)
-                                                            HorizontalLayout {
+                                                            // 列 1: 正则表达式 (最左端，固定 220px，垂直居中对齐)
+                                                            VerticalLayout {
                                                                 width: 220px;
-                                                                alignment: start;
+                                                                alignment: center;
 
-                                                                Rectangle {
-                                                                    height: 24px;
-                                                                    border-radius: 4px;
-                                                                    background: AppTheme.surface-background;
-                                                                    border-width: 1px;
-                                                                    border-color: AppTheme.border;
+                                                                HorizontalLayout {
+                                                                    alignment: start;
 
-                                                                    HorizontalLayout {
-                                                                        padding-left: 8px;
-                                                                        padding-right: 8px;
-                                                                        alignment: start;
+                                                                    Rectangle {
+                                                                        height: 24px;
+                                                                        border-radius: 4px;
+                                                                        background: AppTheme.surface-background;
+                                                                        border-width: 1px;
+                                                                        border-color: AppTheme.border;
 
-                                                                        Text {
-                                                                            text: rule.pattern;
-                                                                            font-size: 11px;
-                                                                            font-family: "JetBrains Mono, monospace";
-                                                                            font-weight: 600;
-                                                                            color: AppTheme.accent;
-                                                                            vertical-alignment: center;
-                                                                            horizontal-alignment: left;
-                                                                            overflow: elide;
+                                                                        HorizontalLayout {
+                                                                            padding-left: 8px;
+                                                                            padding-right: 8px;
+                                                                            alignment: start;
+
+                                                                            Text {
+                                                                                text: rule.pattern;
+                                                                                font-size: 11px;
+                                                                                font-family: "JetBrains Mono, monospace";
+                                                                                font-weight: 600;
+                                                                                color: AppTheme.accent;
+                                                                                vertical-alignment: center;
+                                                                                horizontal-alignment: left;
+                                                                                overflow: elide;
+                                                                            }
                                                                         }
                                                                     }
                                                                 }
@@ -253,11 +257,14 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                                                 width: 60px;
                                                                 alignment: center;
 
-                                                                SettingsSwitch {
-                                                                    checked: rule.enabled;
-                                                                    toggled(c) => {
-                                                                        rule.enabled = c;
-                                                                        SettingsBridge.toggle-keyword-rule(rule.id, c);
+                                                                VerticalLayout {
+                                                                    alignment: center;
+                                                                    SettingsSwitch {
+                                                                        checked: rule.enabled;
+                                                                        toggled(c) => {
+                                                                            rule.enabled = c;
+                                                                            SettingsBridge.toggle-keyword-rule(rule.id, c);
+                                                                        }
                                                                     }
                                                                 }
                                                             }
