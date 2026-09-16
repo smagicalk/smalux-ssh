@@ -2,9 +2,7 @@
 //!
 //! 提供领域资产与配置的仓储 Trait 接口定义，完全解耦具体存储介质 (内存、JSON 文件、SQLite、加密数据库等)。
 
-/// 基于纯内存与预设种子的 Mock 存储实现。
-pub mod mock;
-pub mod mock_storage;
+
 
 use crate::domain::{config::AppConfigRecord, group::GroupRecord, history::HistoryRecord, host::HostRecord};
 
@@ -252,6 +250,4 @@ pub trait AppStorage: Send + Sync {
     /// 强制将内存缓冲数据持久化刷盘
     fn flush(&self) -> StorageResult<()>;
 }
-
-pub use mock::MockStorage;
 

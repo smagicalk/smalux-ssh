@@ -1,7 +1,7 @@
 //! 预设集群与丰富演示资产种子数据
 
 use std::collections::HashMap;
-use crate::domain::{
+use smagical_core::domain::{
     credential::{CredentialRecord, CredentialType},
     group::GroupRecord,
     history::HistoryRecord,
@@ -922,14 +922,14 @@ logout"#.to_string(),
                 remote_host: "192.168.1.100".to_string(),
                 remote_port: 22,
                 jump_chain: vec![
-                    crate::domain::tunnel::JumpHopRecord {
+                    smagical_core::domain::tunnel::JumpHopRecord {
                         host_id: "5".to_string(),
                         host_name: "auth-gateway-edge".to_string(),
                         host_address: "47.98.12.33".to_string(),
                         host_port: 22,
                         enabled: true,
                     },
-                    crate::domain::tunnel::JumpHopRecord {
+                    smagical_core::domain::tunnel::JumpHopRecord {
                         host_id: "1".to_string(),
                         host_name: "prod-server-01".to_string(),
                         host_address: "192.168.1.100".to_string(),

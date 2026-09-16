@@ -17,7 +17,7 @@ pub use snippet_repo::MockSnippetRepository;
 pub use tunnel_repo::MockTunnelRepository;
 pub use config_repo::MockConfigRepository;
 
-use crate::storage::{
+use smagical_core::storage::{
     AppStorage, ConfigRepository, CredentialRepository, GroupRepository, HistoryRepository,
     HostRepository, SnippetRepository, StorageResult, TunnelRepository,
 };
@@ -118,7 +118,7 @@ impl AppStorage for MockStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::domain::{
+    use smagical_core::domain::{
         credential::{CredentialRecord, CredentialType},
         history::HistoryRecord,
         host::HostRecord,

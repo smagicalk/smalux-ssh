@@ -1,8 +1,8 @@
 //! 内存分组仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::group::GroupRecord;
-use crate::storage::{GroupRepository, StorageError, StorageResult};
+use smagical_core::domain::group::GroupRecord;
+use smagical_core::storage::{GroupRepository, StorageError, StorageResult};
 
 /// 线程安全的内存分组仓储实现
 #[derive(Debug, Default, Clone)]
@@ -44,7 +44,7 @@ impl GroupRepository for MockGroupRepository {
         } else {
             write_guard.push(group.clone());
         }
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存分组: {} (ID: {})", group.name, group.id);
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存分组: {} (ID: {})", group.name, group.id);
         Ok(())
     }
 
@@ -52,7 +52,7 @@ impl GroupRepository for MockGroupRepository {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|g| g.id == id) {
             let removed = write_guard.remove(pos);
-            tracing::info!(target: "smagical_core::storage", "MockStorage 删除分组: {} (ID: {})", removed.name, id);
+            tracing::info!(target: "smagical_storage::mock", "MockStorage 删除分组: {} (ID: {})", removed.name, id);
             Ok(true)
         } else {
             Ok(false)
@@ -63,7 +63,7 @@ impl GroupRepository for MockGroupRepository {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(g) = write_guard.iter_mut().find(|g| g.id == id) {
             g.is_expanded = expanded;
-            tracing::debug!(target: "smagical_core::storage", "MockStorage 切换分组展开状态: {} -> {}", id, expanded);
+            tracing::debug!(target: "smagical_storage::mock", "MockStorage 切换分组展开状态: {} -> {}", id, expanded);
             Ok(())
         } else {
             Err(StorageError::NotFound(format!("分组不存在: {}", id)))
@@ -124,7 +124,7 @@ impl GroupRepository for MockGroupRepository {
         }
 
         tracing::info!(
-            target: "smagical_core::storage",
+            target: "smagical_storage::mock",
             "MockStorage 迁移分组: {} -> 上级: {:?} (递归更新 {} 个后裔分组层级)",
             id, new_parent_str, descendants.len()
         );

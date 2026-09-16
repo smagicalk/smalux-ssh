@@ -1,8 +1,8 @@
 //! 内存主机仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::host::HostRecord;
-use crate::storage::{HostRepository, StorageError, StorageResult};
+use smagical_core::domain::host::HostRecord;
+use smagical_core::storage::{HostRepository, StorageError, StorageResult};
 
 /// 线程安全的内存主机仓储实现
 #[derive(Debug, Default, Clone)]
@@ -54,7 +54,7 @@ impl HostRepository for MockHostRepository {
         } else {
             write_guard.push(host.clone());
         }
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存主机: {} ({}:{})", host.name, host.address, host.port);
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存主机: {} ({}:{})", host.name, host.address, host.port);
         Ok(())
     }
 
@@ -67,7 +67,7 @@ impl HostRepository for MockHostRepository {
                 write_guard.push(host.clone());
             }
         }
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 批量保存主机: {} 台", hosts.len());
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 批量保存主机: {} 台", hosts.len());
         Ok(())
     }
 
@@ -75,7 +75,7 @@ impl HostRepository for MockHostRepository {
         let mut write_guard = self.hosts.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|h| h.id == id) {
             let removed = write_guard.remove(pos);
-            tracing::info!(target: "smagical_core::storage", "MockStorage 删除主机: {} ({})", removed.name, id);
+            tracing::info!(target: "smagical_storage::mock", "MockStorage 删除主机: {} ({})", removed.name, id);
             Ok(true)
         } else {
             Ok(false)
@@ -101,7 +101,7 @@ impl HostRepository for MockHostRepository {
         }
 
         *write_guard = reordered;
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 更新主机列表显示顺序 (共 {} 项)", ordered_ids.len());
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 更新主机列表显示顺序 (共 {} 项)", ordered_ids.len());
         Ok(())
     }
 }

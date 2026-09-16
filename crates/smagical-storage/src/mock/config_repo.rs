@@ -1,8 +1,8 @@
 //! 内存配置仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::config::AppConfigRecord;
-use crate::storage::{ConfigRepository, StorageError, StorageResult};
+use smagical_core::domain::config::AppConfigRecord;
+use smagical_core::storage::{ConfigRepository, StorageError, StorageResult};
 
 /// 线程安全的内存偏好配置仓储实现
 #[derive(Debug, Default, Clone)]

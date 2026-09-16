@@ -22,6 +22,7 @@ serde_json.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "time", "json"] }
 tracing-appender.workspace = true
 smagical-core = { path = "../smagical-core" }
+smagical-storage = { path = "../smagical-storage" }
 smagical-ui-view = { path = "../smagical-ui-view" }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 winit = { version = "0.30", default-features = false }

@@ -1,8 +1,8 @@
 //! 内存会话历史与屏幕快照仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::history::HistoryRecord;
-use crate::storage::{HistoryRepository, StorageError, StorageResult};
+use smagical_core::domain::history::HistoryRecord;
+use smagical_core::storage::{HistoryRepository, StorageError, StorageResult};
 
 /// 线程安全的内存会话历史仓储实现
 #[derive(Debug, Default, Clone)]
@@ -39,7 +39,6 @@ impl MockHistoryRepository {
         }
     }
 }
-
 
 impl HistoryRepository for MockHistoryRepository {
     fn list_all(&self) -> StorageResult<Vec<HistoryRecord>> {
@@ -78,7 +77,7 @@ impl HistoryRepository for MockHistoryRepository {
             let _ = self.delete_snapshot(&removed.id);
         }
 
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存历史记录: {} ({})", record.title, record.address);
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存历史记录: {} ({})", record.title, record.address);
         Ok(())
     }
 
@@ -91,7 +90,7 @@ impl HistoryRepository for MockHistoryRepository {
                 write_guard.push(record.clone());
             }
         }
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 批量保存历史记录: {} 条", records.len());
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 批量保存历史记录: {} 条", records.len());
         Ok(())
     }
 
@@ -100,7 +99,7 @@ impl HistoryRepository for MockHistoryRepository {
         if let Some(pos) = write_guard.iter().position(|h| h.id == id) {
             let removed = write_guard.remove(pos);
             let _ = self.delete_snapshot(id);
-            tracing::info!(target: "smagical_core::storage", "MockStorage 删除历史记录: {} ({})", removed.title, id);
+            tracing::info!(target: "smagical_storage::mock", "MockStorage 删除历史记录: {} ({})", removed.title, id);
             Ok(true)
         } else {
             Ok(false)
@@ -123,7 +122,7 @@ impl HistoryRepository for MockHistoryRepository {
                 snap_guard.clear();
             }
         }
-        tracing::info!(target: "smagical_core::storage", "MockStorage 清空历史记录 (keep_pinned: {})", keep_pinned);
+        tracing::info!(target: "smagical_storage::mock", "MockStorage 清空历史记录 (keep_pinned: {})", keep_pinned);
         Ok(())
     }
 
@@ -131,7 +130,7 @@ impl HistoryRepository for MockHistoryRepository {
         let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(h) = write_guard.iter_mut().find(|h| h.id == id) {
             h.is_pinned = !h.is_pinned;
-            tracing::info!(target: "smagical_core::storage", "MockStorage 切换历史记录置顶状态: {} -> {}", id, h.is_pinned);
+            tracing::info!(target: "smagical_storage::mock", "MockStorage 切换历史记录置顶状态: {} -> {}", id, h.is_pinned);
             Ok(h.is_pinned)
         } else {
             Err(StorageError::NotFound(format!("历史记录 ID 未找到: {}", id)))
@@ -152,7 +151,7 @@ impl HistoryRepository for MockHistoryRepository {
 
         let mut write_guard = self.snapshots.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         write_guard.insert(history_id.to_string(), truncated_content);
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存终端屏幕快照: {} (max_lines: {})", history_id, max_lines);
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存终端屏幕快照: {} (max_lines: {})", history_id, max_lines);
         Ok(())
     }
 

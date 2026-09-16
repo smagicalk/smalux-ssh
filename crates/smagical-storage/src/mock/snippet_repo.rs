@@ -1,8 +1,8 @@
 //! 内存代码片段与多层分组仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::snippet::{SnippetGroupRecord, SnippetRecord};
-use crate::storage::{SnippetRepository, StorageError, StorageResult};
+use smagical_core::domain::snippet::{SnippetGroupRecord, SnippetRecord};
+use smagical_core::storage::{SnippetRepository, StorageError, StorageResult};
 
 /// 线程安全的内存代码片段仓储实现
 #[derive(Debug, Default, Clone)]
@@ -67,7 +67,7 @@ impl SnippetRepository for MockSnippetRepository {
         } else {
             write_guard.push(record.clone());
         }
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存代码片段: {} ({})", record.title, record.language);
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存代码片段: {} ({})", record.title, record.language);
         Ok(())
     }
 
@@ -87,7 +87,7 @@ impl SnippetRepository for MockSnippetRepository {
         let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|s| s.id == id) {
             write_guard.remove(pos);
-            tracing::debug!(target: "smagical_core::storage", "MockStorage 删除代码片段: ID={}", id);
+            tracing::debug!(target: "smagical_storage::mock", "MockStorage 删除代码片段: ID={}", id);
             Ok(true)
         } else {
             Ok(false)

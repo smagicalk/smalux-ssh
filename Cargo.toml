@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/smagical-core",
+    "crates/smagical-storage",
     "crates/smagical-ui-view",
     "crates/smagical-ui",
 ]

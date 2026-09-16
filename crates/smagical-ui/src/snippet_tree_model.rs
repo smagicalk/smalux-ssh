@@ -416,7 +416,7 @@ pub fn build_snippet_group_options(storage: &dyn AppStorage) -> Vec<GroupOptionD
 #[cfg(test)]
 mod tests {
     use super::*;
-    use smagical_core::MockStorage;
+    use smagical_storage::MockStorage;
 
     #[test]
     fn test_snippet_tree_model_building_and_expansion() {

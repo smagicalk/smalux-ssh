@@ -12,7 +12,7 @@ use crate::event::{
     TerminalFocusChangedEvent, TerminalSessionEvent, ThemeChangedEvent,
     WindowStateChangedEvent,
 };
-use crate::storage::{AppStorage, MockStorage};
+use crate::storage::AppStorage;
 
 /// 无界面依赖的核心状态引擎 (Core State Engine)
 ///
@@ -255,31 +255,13 @@ fn attach_default_event_loggers(events: &EventManager) {
 }
 
 impl CoreState {
-    /// 默认采用预设种子内存存储创建 CoreState
-    pub fn new_mock() -> Self {
-        tracing::debug!(target: "smagical_core", "初始化 CoreState 核心状态引擎 (MockStorage 模式)");
-        let storage: Arc<dyn AppStorage> = Arc::new(MockStorage::new_seeded());
-        let event_manager = Arc::new(EventManager::new());
-        attach_default_event_loggers(&event_manager);
-
-        let activity_bar = Arc::new(ActivityBarRegistry::new_with_defaults());
-        let right_panels = Arc::new(RwLock::new(RightPanelRegistry::default()));
-        let active_terminal = Arc::new(RwLock::new(None));
-        let navigation = Arc::new(RwLock::new(NavigationRouter::default()));
-
-        Self {
-            storage: Arc::new(RwLock::new(storage)),
-            is_mock: Arc::new(RwLock::new(true)),
-            event_manager,
-            activity_bar,
-            right_panels,
-            active_terminal,
-            navigation,
-        }
+    /// 使用任意存储后端创建 CoreState (默认非 Mock 模式)
+    pub fn new(storage: Arc<dyn AppStorage>) -> Self {
+        Self::with_storage(storage, false)
     }
 
-    /// 使用任意存储后端创建 CoreState
-    pub fn new(storage: Arc<dyn AppStorage>) -> Self {
+    /// 指定存储后端及是否处于 Mock 模式创建 CoreState
+    pub fn with_storage(storage: Arc<dyn AppStorage>, is_mock: bool) -> Self {
         let event_manager = Arc::new(EventManager::new());
         attach_default_event_loggers(&event_manager);
 
@@ -290,7 +272,7 @@ impl CoreState {
 
         Self {
             storage: Arc::new(RwLock::new(storage)),
-            is_mock: Arc::new(RwLock::new(false)),
+            is_mock: Arc::new(RwLock::new(is_mock)),
             event_manager,
             activity_bar,
             right_panels,
@@ -309,18 +291,12 @@ impl CoreState {
         *self.is_mock.read().unwrap()
     }
 
-    /// 动态切换数据层实现 (Mock 存储 vs 物理持久化数据层)
-    pub fn set_mock_storage(&self, enable_mock: bool) {
+    /// 动态切换数据层实现
+    pub fn set_storage(&self, storage: Arc<dyn AppStorage>, is_mock: bool) {
         let mut is_mock_guard = self.is_mock.write().unwrap();
-        *is_mock_guard = enable_mock;
+        *is_mock_guard = is_mock;
         let mut storage_guard = self.storage.write().unwrap();
-        if enable_mock {
-            tracing::info!(target: "smagical_core::storage", "数据层已切换至: [MockStorage] 内存种子存储");
-            *storage_guard = Arc::new(MockStorage::new_seeded());
-        } else {
-            tracing::info!(target: "smagical_core::storage", "数据层已切换至: [PhysicalStorage] 物理存储模式 (基线空仓储)");
-            *storage_guard = Arc::new(MockStorage::new());
-        }
+        *storage_guard = storage;
     }
 
     /// 获取集中式事件管理器引用
@@ -447,25 +423,33 @@ impl CoreState {
     }
 }
 
-impl Default for CoreState {
-    fn default() -> Self {
-        Self::new_mock()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn new_mock_state_has_seeded_groups_and_hosts() {
-        let state = CoreState::new_mock();
-        let groups = state.storage().groups().list_all().unwrap();
-        let hosts = state.storage().hosts().list_all().unwrap();
+    struct DummyStorage;
+    impl AppStorage for DummyStorage {
+        fn hosts(&self) -> &dyn crate::storage::HostRepository { unimplemented!() }
+        fn groups(&self) -> &dyn crate::storage::GroupRepository { unimplemented!() }
+        fn history(&self) -> &dyn crate::storage::HistoryRepository { unimplemented!() }
+        fn credentials(&self) -> &dyn crate::storage::CredentialRepository { unimplemented!() }
+        fn snippets(&self) -> &dyn crate::storage::SnippetRepository { unimplemented!() }
+        fn tunnels(&self) -> &dyn crate::storage::TunnelRepository { unimplemented!() }
+        fn config(&self) -> &dyn crate::storage::ConfigRepository { unimplemented!() }
+        fn reload(&self) -> crate::storage::StorageResult<()> { Ok(()) }
+        fn flush(&self) -> crate::storage::StorageResult<()> { Ok(()) }
+    }
 
-        assert!(!groups.is_empty());
-        assert!(!hosts.is_empty());
-        assert_eq!(groups[0].id, "grp-prod");
+    fn create_test_state() -> CoreState {
+        CoreState::with_storage(Arc::new(DummyStorage), true)
+    }
+
+    #[test]
+    fn test_core_state_storage_injection_and_mock_flag() {
+        let state = create_test_state();
+        assert!(state.is_mock_storage());
+        state.set_storage(Arc::new(DummyStorage), false);
+        assert!(!state.is_mock_storage());
     }
 
     #[test]
@@ -473,7 +457,7 @@ mod tests {
         use std::sync::atomic::{AtomicBool, Ordering};
         use crate::event::{SnippetSavedEvent, SnippetDeletedEvent, SnippetExecutedEvent, SnippetGroupSavedEvent, SnippetGroupDeletedEvent};
 
-        let state = CoreState::new_mock();
+        let state = create_test_state();
 
         let saved_called = Arc::new(AtomicBool::new(false));
         let deleted_called = Arc::new(AtomicBool::new(false));

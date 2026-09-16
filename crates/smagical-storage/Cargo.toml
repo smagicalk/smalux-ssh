@@ -1,5 +1,5 @@
 [package]
-name = "smagical-core"
+name = "smagical-storage"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,11 +7,10 @@ license.workspace = true
 authors.workspace = true
 
 [dependencies]
-serde.workspace = true
+smagical-core = { path = "../smagical-core" }
+anyhow.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 thiserror.workspace = true
-toml.workspace = true
 uuid.workspace = true
-directories.workspace = true
 tracing.workspace = true
-

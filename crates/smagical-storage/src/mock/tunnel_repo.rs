@@ -1,8 +1,8 @@
 //! 内存网络隧道与代理仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::tunnel::{TunnelRecord, TunnelType};
-use crate::storage::{StorageError, StorageResult, TunnelRepository};
+use smagical_core::domain::tunnel::{TunnelRecord, TunnelType};
+use smagical_core::storage::{StorageError, StorageResult, TunnelRepository};
 
 /// 线程安全的内存网络隧道仓储实现
 #[derive(Debug, Default, Clone)]

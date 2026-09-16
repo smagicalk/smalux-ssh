@@ -1,8 +1,8 @@
 //! 内存安全凭据仓储实现
 
 use std::sync::{Arc, RwLock};
-use crate::domain::{credential::{CredentialRecord, CredentialType}, host::HostRecord};
-use crate::storage::{CredentialRepository, StorageError, StorageResult};
+use smagical_core::domain::{credential::{CredentialRecord, CredentialType}, host::HostRecord};
+use smagical_core::storage::{CredentialRepository, StorageError, StorageResult};
 
 /// 线程安全的内存安全凭据仓储实现
 #[derive(Debug, Default, Clone)]
@@ -110,7 +110,7 @@ impl CredentialRepository for MockCredentialRepository {
         } else {
             write_guard.push(record.clone());
         }
-        tracing::debug!(target: "smagical_core::storage", "MockStorage 保存凭据: {} ({})", record.name, record.algorithm);
+        tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存凭据: {} ({})", record.name, record.algorithm);
         Ok(())
     }
 
@@ -130,7 +130,7 @@ impl CredentialRepository for MockCredentialRepository {
         let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|c| c.id == id) {
             write_guard.remove(pos);
-            tracing::debug!(target: "smagical_core::storage", "MockStorage 删除凭据: ID={}", id);
+            tracing::debug!(target: "smagical_storage::mock", "MockStorage 删除凭据: ID={}", id);
             Ok(true)
         } else {
             Ok(false)

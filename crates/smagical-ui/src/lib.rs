@@ -125,8 +125,9 @@ pub fn run() -> Result<(), slint::PlatformError> {
     sync_ui_debug_logs(&window);
 
 
-    // 初始化 CoreState 核心状态引擎 (基于 MockStorage 预设种子存储)
-    let core_state = Rc::new(CoreState::new_mock());
+    // 初始化 CoreState 核心状态引擎 (通过依赖注入传入 MockStorage 预设种子存储)
+    let storage = std::sync::Arc::new(smagical_storage::MockStorage::new_seeded());
+    let core_state = Rc::new(CoreState::with_storage(storage, true));
     let initial_config = core_state.storage().config().get().unwrap_or_default();
 
     // -------------------------------------------------------------------------

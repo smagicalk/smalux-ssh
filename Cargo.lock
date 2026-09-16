@@ -4507,6 +4507,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "smagical-storage"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "serde",
+ "serde_json",
+ "smagical-core",
+ "thiserror 2.0.20",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "smagical-ui"
 version = "0.1.0"
 dependencies = [
@@ -4522,6 +4535,7 @@ dependencies = [
  "serde_json",
  "slint",
  "smagical-core",
+ "smagical-storage",
  "smagical-ui-view",
  "tracing",
  "tracing-appender",

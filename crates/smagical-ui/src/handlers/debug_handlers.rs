@@ -1078,7 +1078,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         let ctx = ctx.clone();
         db.on_reset_default_snippets(move || {
             if let Some(w) = window_weak.upgrade() {
-                let default_storage = smagical_core::MockStorage::new_seeded();
+                let default_storage = smagical_storage::MockStorage::new_seeded();
                 if let Ok(groups) = default_storage.snippets().list_groups() {
                     for g in groups {
                         let _ = ctx.core_state.storage().snippets().save_group(&g);
@@ -1169,7 +1169,15 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         let notif = ctx.notifications.clone();
         let core_state_mock = ctx.core_state.clone();
         db.on_toggle_mock_storage(move |enabled| {
-            core_state_mock.set_mock_storage(enabled);
+            if enabled {
+                let storage = std::sync::Arc::new(smagical_storage::MockStorage::new_seeded());
+                core_state_mock.set_storage(storage, true);
+                tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [MockStorage] 内存种子存储");
+            } else {
+                let storage = std::sync::Arc::new(smagical_storage::MockStorage::new());
+                core_state_mock.set_storage(storage, false);
+                tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [PhysicalStorage] 物理存储模式 (基线空仓储)");
+            }
             if let Some(w) = window_weak.upgrade() {
                 w.global::<DebugBridge>().set_use_mock_storage(enabled);
             }

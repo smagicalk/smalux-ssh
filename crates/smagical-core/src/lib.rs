@@ -51,7 +51,7 @@ pub use domain::{
 pub use state::core_state::CoreState;
 pub use storage::{
     AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
-    MockStorage, SnippetRepository, StorageError, StorageResult,
+    SnippetRepository, StorageError, StorageResult,
 };
 
 
