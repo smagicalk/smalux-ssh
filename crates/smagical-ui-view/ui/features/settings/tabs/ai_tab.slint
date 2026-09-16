@@ -1,0 +1,520 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge, AiEndpointProfile } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+    AppTextInput,
+    AppPasswordInput,
+} from "../components/settings_widgets.slint";
+import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint";
+import { AppTextArea } from "../../../shared/base/app-text-area.slint";
+
+/// AI 运维副驾驶与大模型配置面板 (AI Copilot Settings Tab)
+/// 架构升级设计：
+/// 1. 多端口/端点表格管理 (API Endpoints Profile Table)：表格上下列严格靠左端对齐，表头居中；一键无缝热切换与弹窗完整配置
+/// 2. AI 运维安全与全局审核规则 (Global Safety & Audit Policies)：纯全局独立参数，聚焦于操作安全审核、上下文协同与专家人设
+export component SettingsAiTab inherits VerticalLayout {
+    spacing: 16px;
+
+    SettingsPageHeader {
+        title: @tr("AI 助手与运维大模型配置");
+        subtitle: @tr("管理多服务商 API 端点端口与模型库、配置全局操作安全审查与专家提示词");
+        icon: @image-url("../../../assets/icons/sparkles.svg");
+    }
+
+    // =========================================================================
+    // 卡片 1: AI 接口端点与端口配置 (API Endpoints Profile Table)
+    // =========================================================================
+    SettingsSectionCard {
+        title: @tr("AI 接口端点与端口配置 (API Endpoints)");
+        subtitle: @tr("支持多端点/多端口配置（官方接口、代理端口、本地 Ollama 等），表格化展示与一键无缝热切换");
+        icon: @image-url("../../../assets/icons/server.svg");
+
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
+
+            // 表格上方操作条
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+
+                    Text {
+                        text: @tr("已配置的 AI 端点端口");
+                        font-size: 12px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+
+                    Rectangle {
+                        height: 18px;
+                        border-radius: 9px;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            padding-right: 6px;
+                            alignment: center;
+                            Text {
+                                text: SettingsBridge.setting-ai-endpoints.length + " " + @tr("个端点");
+                                font-size: 9px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // 弹窗添加端口端点按钮
+                AppButton {
+                    text: @tr("添加端点端口");
+                    variant: "primary";
+                    size: "sm";
+                    has-icon: true;
+                    icon: @image-url("../../../assets/icons/plus.svg");
+                    clicked => {
+                        SettingsBridge.open-add-ai-endpoint-modal();
+                    }
+                }
+            }
+
+            // 端点表格容器
+            Rectangle {
+                border-radius: 6px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                clip: true;
+
+                VerticalLayout {
+                    spacing: 0px;
+
+                    // 表头 (端点名称, 接口地址 Base URL, 协议模式, 默认模型, 状态, 操作)
+                    // 严格规范：列宽固定对齐，标题文字在每列的中间 (horizontal-alignment: center)
+                    Rectangle {
+                        height: 32px;
+                        background: AppTheme.surface-background.darker(8%);
+
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            width: 100%;
+                            background: AppTheme.border;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 8px;
+
+                            Text {
+                                text: @tr("端点名称");
+                                width: 130px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: @tr("接口地址 (Base URL)");
+                                horizontal-stretch: 1;
+                                min-width: 160px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: @tr("协议模式");
+                                width: 90px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: @tr("默认模型");
+                                width: 140px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: @tr("状态");
+                                width: 80px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.secondary-foreground;
+                            }
+                            Text {
+                                text: @tr("操作");
+                                width: 130px;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+
+                    // 空状态
+                    if SettingsBridge.setting-ai-endpoints.length == 0: VerticalLayout {
+                        alignment: center;
+                        padding: 32px;
+                        spacing: 6px;
+
+                        Text {
+                            text: @tr("暂无配置的 AI 端点");
+                            font-size: 12px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            horizontal-alignment: center;
+                        }
+                        Text {
+                            text: @tr("点击右上角「添加端点端口」即可配置官方 API、代理端口或本地私有模型");
+                            font-size: 10px;
+                            color: AppTheme.disabled-foreground;
+                            horizontal-alignment: center;
+                        }
+                    }
+
+                    // 表格数据行 (同列所有都靠左端对齐，列宽与表头像素级一致)
+                    for ep[idx] in SettingsBridge.setting-ai-endpoints: Rectangle {
+                        height: 42px;
+                        background: ep.is-active ? AppTheme.accent.transparentize(90%) :
+                                    Math.mod(idx, 2) == 1 ? AppTheme.surface-background.transparentize(50%) : transparent;
+
+                        Rectangle {
+                            y: parent.height - 1px;
+                            height: 1px;
+                            width: 100%;
+                            background: ep.is-active ? AppTheme.accent.transparentize(60%) : AppTheme.border.transparentize(80%);
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 12px;
+                            padding-right: 12px;
+                            spacing: 8px;
+
+                            // 1. 端点名称 (靠左端对齐)
+                            HorizontalLayout {
+                                width: 130px;
+                                alignment: start;
+                                spacing: 6px;
+
+                                if ep.is-active: VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        width: 3px;
+                                        height: 14px;
+                                        border-radius: 1.5px;
+                                        background: AppTheme.accent;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: ep.name;
+                                        font-size: 11px;
+                                        font-weight: ep.is-active ? 700 : 500;
+                                        color: ep.is-active ? AppTheme.accent : AppTheme.foreground;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 2. 接口地址 (Base URL) (靠左端对齐)
+                            VerticalLayout {
+                                horizontal-stretch: 1;
+                                min-width: 160px;
+                                alignment: center;
+                                Text {
+                                    text: ep.base-url;
+                                    font-size: 10px;
+                                    color: AppTheme.secondary-foreground;
+                                    overflow: elide;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // 3. 协议模式 (靠左端对齐)
+                            HorizontalLayout {
+                                width: 90px;
+                                alignment: start;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 20px;
+                                        border-radius: 4px;
+                                        background: ep.api-mode == "response" ? #8B5CF6.transparentize(85%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: ep.api-mode == "response" ? #8B5CF6.transparentize(50%) : AppTheme.border;
+                                        HorizontalLayout {
+                                            padding-left: 6px;
+                                            padding-right: 6px;
+                                            alignment: center;
+                                            Text {
+                                                text: ep.api-mode == "response" ? "Response" : "Chat";
+                                                font-size: 9px;
+                                                font-weight: 600;
+                                                color: ep.api-mode == "response" ? #A78BFA : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 4. 默认模型 (靠左端对齐)
+                            HorizontalLayout {
+                                width: 140px;
+                                alignment: start;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 20px;
+                                        max-width: 136px;
+                                        border-radius: 4px;
+                                        background: AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border;
+                                        HorizontalLayout {
+                                            padding-left: 6px;
+                                            padding-right: 6px;
+                                            alignment: start;
+                                            Text {
+                                                text: ep.selected-model;
+                                                font-size: 9px;
+                                                font-weight: 600;
+                                                color: AppTheme.foreground;
+                                                overflow: elide;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 5. 状态 (靠左端对齐)
+                            HorizontalLayout {
+                                width: 80px;
+                                alignment: start;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 18px;
+                                        border-radius: 9px;
+                                        background: ep.is-active ? AppTheme.success.transparentize(85%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: ep.is-active ? AppTheme.success.transparentize(50%) : AppTheme.border;
+                                        HorizontalLayout {
+                                            padding-left: 6px;
+                                            padding-right: 6px;
+                                            alignment: start;
+                                            spacing: 4px;
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Rectangle {
+                                                    width: 5px;
+                                                    height: 5px;
+                                                    border-radius: 2.5px;
+                                                    background: ep.is-active ? AppTheme.success : AppTheme.disabled-foreground;
+                                                }
+                                            }
+                                            Text {
+                                                text: ep.is-active ? @tr("使用中") : @tr("未激活");
+                                                font-size: 9px;
+                                                font-weight: ep.is-active ? 700 : 400;
+                                                color: ep.is-active ? AppTheme.success : AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 6. 操作 (靠左端对齐)
+                            HorizontalLayout {
+                                width: 130px;
+                                alignment: start;
+                                spacing: 4px;
+
+                                if ep.is-active: VerticalLayout {
+                                    alignment: center;
+                                    Rectangle {
+                                        height: 22px;
+                                        border-radius: 3px;
+                                        background: AppTheme.accent.transparentize(85%);
+                                        HorizontalLayout {
+                                            padding-left: 6px;
+                                            padding-right: 6px;
+                                            alignment: center;
+                                            Text {
+                                                text: @tr("当前激活");
+                                                font-size: 9px;
+                                                font-weight: 700;
+                                                color: AppTheme.accent;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if !ep.is-active: VerticalLayout {
+                                    alignment: center;
+                                    AppButton {
+                                        text: @tr("一键切换");
+                                        variant: "secondary";
+                                        size: "sm";
+                                        height: 22px;
+                                        clicked => {
+                                            SettingsBridge.switch-ai-endpoint(ep.id);
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    AppIconButton {
+                                        icon: @image-url("../../../assets/icons/pencil.svg");
+                                        clicked => {
+                                            SettingsBridge.open-edit-ai-endpoint-modal(ep.id);
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    AppIconButton {
+                                        icon: @image-url("../../../assets/icons/trash.svg");
+                                        clicked => {
+                                            SettingsBridge.delete-ai-endpoint(ep.id);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // =========================================================================
+    // 卡片 2: AI 运维环境协同与专家人设 (Context & System Prompt)
+    // =========================================================================
+    SettingsSectionCard {
+        title: @tr("AI 运维环境协同与专家人设 (Context & System Prompt)");
+        subtitle: @tr("配置终端屏幕实时上下文协同策略、专家人设提示词与生产环境指令安全护栏");
+        icon: @image-url("../../../assets/icons/shield.svg");
+
+        // 1. 允许携带终端屏幕上下文 (Context-Aware)
+        SettingsRow {
+            title: @tr("允许携带终端屏幕上下文 (Context-Aware)");
+            subtitle: @tr("提问时自动附带当前主机 OS 发行版与最新终端输出，大幅提升排障精准度");
+
+            SettingsSwitch {
+                checked <=> SettingsBridge.setting-ai-context-aware;
+            }
+        }
+
+        // 3. 运维专家系统提示词 (System Prompt)
+        VerticalLayout {
+            padding-left: 16px;
+            padding-right: 16px;
+            padding-top: 8px;
+            padding-bottom: 12px;
+            spacing: 8px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: @tr("运维专家系统提示词 (System Prompt)");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                }
+
+                AppButton {
+                    text: @tr("恢复推荐默认");
+                    variant: "ghost";
+                    height: 22px;
+                    font-size: 10px;
+                    clicked => {
+                        SettingsBridge.reset-ai-system-prompt();
+                    }
+                }
+            }
+
+            Text {
+                text: @tr("约束大模型的角色人设、输出格式、安全红线与针对 Linux 终端的回复规范");
+                font-size: 10px;
+                color: AppTheme.secondary-foreground;
+            }
+
+            AppTextArea {
+                text <=> SettingsBridge.setting-ai-system-prompt;
+                min-height: 85px;
+            }
+        }
+
+        // 4. 生产环境高危指令拦截机制提示卡片
+        Rectangle {
+            border-radius: 6px;
+            background: AppTheme.accent.transparentize(94%);
+            border-width: 1px;
+            border-color: AppTheme.accent.transparentize(70%);
+
+            HorizontalLayout {
+                padding: 10px;
+                spacing: 8px;
+                alignment: start;
+
+                VerticalLayout {
+                    alignment: start;
+                    Image {
+                        source: @image-url("../../../assets/icons/info-circle.svg");
+                        width: 14px;
+                        height: 14px;
+                        colorize: AppTheme.accent;
+                    }
+                }
+
+                VerticalLayout {
+                    spacing: 2px;
+                    horizontal-stretch: 1;
+
+                    Text {
+                        text: @tr("生产环境指令防御与脱敏说明：");
+                        font-size: 10px;
+                        font-weight: 700;
+                        color: AppTheme.accent;
+                    }
+                    Text {
+                        text: @tr("Smalux-SSH 内置高危指令拦截器（如 rm -rf /、mkfs、dd、重分区与格式化指令），即使审核策略设为宽松放行，高危命令亦会触发二级模态确认；同时所有向远端 AI 发送的上下文均自动剔除私钥与连接凭据。");
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                        wrap: word-wrap;
+                    }
+                }
+            }
+        }
+    }
+}

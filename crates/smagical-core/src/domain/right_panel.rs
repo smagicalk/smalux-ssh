@@ -63,17 +63,18 @@ impl Default for RightPanelRegistry {
     fn default() -> Self {
         let mut registry = Self {
             items: HashMap::new(),
-            active_panel_id: Some("info".into()),
+            active_panel_id: Some("monitor".into()),
             is_drawer_open: false,
-            drawer_width: 320,
+            drawer_width: 340,
         };
 
-        // 预置默认右侧伴生面板 (标准权重顺序)
-        registry.register(RightPanelItem::new("info", "info", "主机与会话详情", 10).with_shortcut("Ctrl+Shift+I"));
-        registry.register(RightPanelItem::new("tunnel", "tunnel", "主机专属端口转发与隧道", 15).with_shortcut("Ctrl+Shift+T"));
-        registry.register(RightPanelItem::new("snippets", "terminal", "关联常用脚本与片段", 20).with_shortcut("Ctrl+Shift+S"));
-        registry.register(RightPanelItem::new("sftp", "folder", "远端文件快速传输", 30).with_shortcut("Ctrl+Shift+F"));
-        registry.register(RightPanelItem::new("ai", "sparkles", "AI 终端智能助手", 40).with_shortcut("Ctrl+Shift+A"));
+        // 预置默认右侧伴生面板 (保持现有顺序: 系统监控 -> SFTP -> 片段 -> tmux -> 端口转发 -> AI)
+        registry.register(RightPanelItem::new("monitor", "activity", "系统监控", 10).with_shortcut("Ctrl+Shift+M"));
+        registry.register(RightPanelItem::new("sftp", "folder", "SFTP 传输", 20).with_shortcut("Ctrl+Shift+F"));
+        registry.register(RightPanelItem::new("snippets", "code", "常用代码片段", 30).with_shortcut("Ctrl+Shift+S"));
+        registry.register(RightPanelItem::new("tmux", "layout-grid", "tmux 会话管理", 40).with_shortcut("Ctrl+Shift+X"));
+        registry.register(RightPanelItem::new("tunnel", "tunnel", "端口转发与隧道", 50).with_shortcut("Ctrl+Shift+T"));
+        registry.register(RightPanelItem::new("ai", "sparkles", "AI 终端助手", 60).with_shortcut("Ctrl+Shift+A"));
 
         registry
     }
@@ -190,18 +191,19 @@ mod tests {
     fn test_right_panel_registry_defaults_and_sorting() {
         let mut reg = RightPanelRegistry::default();
         let list = reg.list_visible();
-        assert_eq!(list.len(), 5);
-        assert_eq!(list[0].id, "info");
-        assert_eq!(list[1].id, "tunnel");
+        assert_eq!(list.len(), 6);
+        assert_eq!(list[0].id, "monitor");
+        assert_eq!(list[1].id, "sftp");
         assert_eq!(list[2].id, "snippets");
-        assert_eq!(list[3].id, "sftp");
-        assert_eq!(list[4].id, "ai");
+        assert_eq!(list[3].id, "tmux");
+        assert_eq!(list[4].id, "tunnel");
+        assert_eq!(list[5].id, "ai");
 
         // 调整 ai 排序到第一位
         assert!(reg.set_order("ai", 5));
         let list2 = reg.list_visible();
         assert_eq!(list2[0].id, "ai");
-        assert_eq!(list2[1].id, "info");
+        assert_eq!(list2[1].id, "monitor");
     }
 
     #[test]
@@ -210,13 +212,13 @@ mod tests {
         assert!(!reg.is_drawer_open());
 
         // 首次点击展开
-        let opened = reg.toggle_panel("info");
+        let opened = reg.toggle_panel("monitor");
         assert!(opened);
         assert!(reg.is_drawer_open());
-        assert_eq!(reg.active_panel_id(), Some("info"));
+        assert_eq!(reg.active_panel_id(), Some("monitor"));
 
         // 再次点击相同面板则折叠
-        let opened_again = reg.toggle_panel("info");
+        let opened_again = reg.toggle_panel("monitor");
         assert!(!opened_again);
         assert!(!reg.is_drawer_open());
 

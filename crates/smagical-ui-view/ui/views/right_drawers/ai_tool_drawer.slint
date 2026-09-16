@@ -1,0 +1,1860 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { AppButton } from "../../components/base/app-button.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
+import { AiBridge, AiChatMessage, AiHistorySession } from "../../features/ai/ai_bridge.slint";
+
+export { AiChatMessage, AiHistorySession }
+
+/// 现代 AI 运维副驾驶伴生工具栏抽屉 (AI Tool Drawer)
+/// 参考 Cursor / Warp AI / Trae 等现代客户端设计规范：
+/// 顶部具备新建对话(+)与历史会话表样式图标，中间提供深度思考链、自然语言回复、命令生成与操作安全审核，
+/// 底部集成多行输入、模型选择器、思考度调节与操作审核策略。
+export component AiToolDrawer inherits DrawerContainer {
+    title: @tr("AI");
+    collapse-icon: "▶";
+
+    // 会话与消息流 (由 AiBridge 全局管理，严格遵循每机独立会话隔离)
+    in-out property <[AiChatMessage]> messages: AiBridge.messages;
+    in-out property <[AiHistorySession]> history-sessions: AiBridge.history-sessions;
+    in-out property <string> input-text: AiBridge.input-text;
+
+    // 模型、模式、审核数据层与选择器状态
+    in-out property <[string]> available-models: AiBridge.available-models;
+    in-out property <string> selected-model: AiBridge.selected-model;
+    in-out property <[string]> available-modes: AiBridge.available-modes;
+    in-out property <string> thinking-degree: AiBridge.thinking-degree;
+    in-out property <[string]> available-audit-policies: AiBridge.available-audit-policies;
+    in-out property <string> audit-policy: AiBridge.audit-policy;
+    in-out property <[string]> available-audit-modes: AiBridge.available-audit-modes;
+    in-out property <string> audit-mode: AiBridge.audit-mode;
+    in-out property <[string]> available-auto-audit-levels: AiBridge.available-auto-audit-levels;
+    in-out property <string> auto-audit-level: AiBridge.auto-audit-level;
+
+    in property <string> active-host-name: AiBridge.active-host-name;
+    in property <bool> has-active-host: AiBridge.has-active-host;
+    in property <bool> is-generating: AiBridge.is-generating;
+
+    // 下拉弹窗展开状态 (0: 全部关闭, 1: 模型下拉, 2: 模式下拉, 3: 审核下拉)
+    property <int> active-dropdown: 0;
+    // 审核二级子菜单展开状态 (保留兼容)
+    property <bool> is-audit-submenu-open: false;
+
+    // 历史会话浮层开关
+    property <bool> is-history-panel-open: false;
+
+    // 回调
+    callback send-message(string /* content */, string /* model */, string /* thinking */, string /* audit */);
+    callback apply-suggested-cmd(string /* cmd */);
+    callback inject-and-run-cmd(string /* cmd */);
+    callback new-session();
+    callback switch-session(string /* id */);
+    callback delete-session(string /* id */);
+    callback model-selected(string /* model */);
+    callback mode-selected(string /* mode */);
+    callback audit-policy-selected(string /* policy */);
+    callback audit-selected(string /* audit */);
+    callback auto-audit-level-selected(string /* level */);
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        // 无活跃终端时的占位空状态
+        if !root.has-active-host: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: AppTheme.panel-background;
+            z: 200;
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/sparkles.svg");
+                        width: 36px;
+                        height: 36px;
+                        colorize: AppTheme.disabled-foreground;
+                    }
+                }
+                Text {
+                    text: @tr("未连接主机");
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: @tr("请在中央终端打开会话或连接远程主机\nAI 将自动挂载主机上下文");
+                    font-size: 10px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        if root.has-active-host: VerticalLayout {
+            padding: 8px;
+            spacing: 6px;
+
+        // 1. 顶部辅助栏 (新建对话 + 历史会话入口)
+        Rectangle {
+            height: 28px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.control-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 6px;
+                alignment: space-between;
+
+                // 左侧模型状态胶囊
+                HorizontalLayout {
+                    spacing: 5px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/sparkles.svg");
+                            width: 12px;
+                            height: 12px;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: root.selected-model;
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            height: 14px;
+                            border-radius: 3px;
+                            background: AppTheme.panel-background;
+                            HorizontalLayout {
+                                padding-left: 4px;
+                                padding-right: 4px;
+                                Text {
+                                    text: root.thinking-degree == "深度思考 (R1)" ? "CoT" : "Fast";
+                                    font-size: 8px;
+                                    font-weight: 700;
+                                    color: AppTheme.accent;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+
+                    // 当前伴生主机徽章
+                    if root.active-host-name != "": VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            height: 14px;
+                            border-radius: 3px;
+                            background: AppTheme.hover-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                            HorizontalLayout {
+                                padding-left: 5px;
+                                padding-right: 5px;
+                                Text {
+                                    text: "🎯 " + root.active-host-name;
+                                    font-size: 8px;
+                                    font-weight: 600;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 右侧操作：+ (新建会话) 与 表样式图标 (历史记录) - 垂直严格居中
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: end;
+
+                    // 新建会话按钮 (+)
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../../assets/icons/plus.svg");
+                            icon-size: 12px;
+                            clicked => {
+                                root.new-session();
+                                root.is-history-panel-open = false;
+                            }
+                        }
+                    }
+
+                    // 历史记录表样式图标 (会话历史)
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../../assets/icons/clock.svg");
+                            icon-size: 12px;
+                            clicked => {
+                                root.is-history-panel-open = !root.is-history-panel-open;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 中间交互流与消息展示区
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            msg-scroll := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: msg-list.preferred-height;
+
+                msg-list := VerticalLayout {
+                    spacing: 10px;
+                    padding-right: 4px;
+                    padding-bottom: 24px;
+
+                    // 空状态引导
+                    if root.messages.length == 0: Rectangle {
+                        height: 220px;
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 10px;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/sparkles.svg");
+                                    width: 24px;
+                                    height: 24px;
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+
+                            Text {
+                                text: @tr("AI 已就绪");
+                                font-size: 12px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                                horizontal-alignment: center;
+                            }
+
+                            Text {
+                                text: @tr("智能生成 Shell 指令、自动化排查故障与日志诊断");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                horizontal-alignment: center;
+                            }
+
+                            // 推荐 Prompt 快捷卡片
+                            VerticalLayout {
+                                spacing: 4px;
+
+                                for chip in [
+                                    @tr("⚡ 排查当前高 CPU 占用的 Top 进程"),
+                                    @tr("🔍 统计大于 100MB 的日志文件"),
+                                    @tr("🛡️ 查看开放监听端口与防火墙规则"),
+                                    @tr("🔄 测试 Nginx 配置语法并平滑重载"),
+                                ]: Rectangle {
+                                    height: 26px;
+                                    border-radius: 4px;
+                                    background: chip-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    chip-touch := TouchArea {
+                                        clicked => {
+                                            root.input-text = chip;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        alignment: start;
+                                        Text {
+                                            text: chip;
+                                            font-size: 10px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                            overflow: elide;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 消息气泡流 (独立卡片自适应，显式绑定首选高度)
+                    for msg[msg-idx] in root.messages: VerticalLayout {
+                        spacing: 0;
+
+                        // 1. 用户提问内容 (轻量高亮气泡)
+                        if msg.sender == "user": Rectangle {
+                            height: user-bubble-layout.preferred-height;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.accent.transparentize(85%);
+                            border-width: 1px;
+                            border-color: AppTheme.accent.transparentize(60%);
+
+                            user-bubble-layout := VerticalLayout {
+                                padding: 8px;
+                                spacing: 4px;
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text {
+                                        text: @tr("我 (Operator)");
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        color: AppTheme.accent;
+                                    }
+                                    Text {
+                                        text: msg.timestamp;
+                                        font-size: 9px;
+                                        color: AppTheme.disabled-foreground;
+                                    }
+                                }
+
+                                Text {
+                                    text: msg.content;
+                                    font-size: 11px;
+                                    color: AppTheme.foreground;
+                                    wrap: word-wrap;
+                                }
+                            }
+                        }
+
+                        // 2. AI 回复内容 (含思考过程、说明文本、指令卡片与操作审核栏)
+                        if msg.sender == "assistant": Rectangle {
+                            height: ai-bubble-layout.preferred-height;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.panel-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+
+                            ai-bubble-layout := VerticalLayout {
+                                padding: 8px;
+                                spacing: 8px;
+
+                            // 2.1 头部信息 (副驾驶回复 + 时间戳)
+                            HorizontalLayout {
+                                alignment: space-between;
+                                HorizontalLayout {
+                                    spacing: 4px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/sparkles.svg");
+                                            width: 11px;
+                                            height: 11px;
+                                            image-fit: contain;
+                                            colorize: AppTheme.accent;
+                                        }
+                                    }
+                                    Text {
+                                        text: @tr("AI 回复");
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                                Text {
+                                    text: msg.timestamp;
+                                    font-size: 9px;
+                                    color: AppTheme.disabled-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            // 2.2 思考过程折叠块 (Thinking CoT)
+                            if msg.thinking-content != "": Rectangle {
+                                border-radius: 4px;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border.transparentize(50%);
+                                clip: true;
+
+                                VerticalLayout {
+                                    padding: 6px;
+                                    spacing: 4px;
+
+                                    // 折叠标题栏 (可点击交互，尺寸明确)
+                                    Rectangle {
+                                        height: 20px;
+                                        border-radius: 3px;
+                                        background: think-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                        think-touch := TouchArea {
+                                            clicked => {
+                                                AiBridge.toggle-thinking-expanded(msg.id);
+                                            }
+                                            mouse-cursor: pointer;
+                                        }
+
+                                        HorizontalLayout {
+                                            padding-left: 4px;
+                                            padding-right: 4px;
+                                            alignment: space-between;
+
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                alignment: start;
+                                                Text {
+                                                    text: "💭 " + @tr("思考过程 (Deep Thinking)");
+                                                    font-size: 9px;
+                                                    font-weight: 600;
+                                                    color: AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Text {
+                                                    text: msg.is-thinking-expanded ? "▲" : "▼";
+                                                    font-size: 8px;
+                                                    color: AppTheme.disabled-foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    if msg.is-thinking-expanded: Text {
+                                        text: msg.thinking-content;
+                                        font-size: 9px;
+                                        color: AppTheme.secondary-foreground;
+                                        font-family: "JetBrains Mono, Consolas, monospace";
+                                        wrap: word-wrap;
+                                    }
+                                }
+                            }
+
+                            // 2.3 自然语言说明文本
+                            Text {
+                                text: msg.content;
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                wrap: word-wrap;
+                            }
+
+                            // 2.4 推荐执行的 Shell 命令代码块
+                            if msg.suggested-cmd != "": Rectangle {
+                                border-radius: 4px;
+                                background: #0d1117;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+                                clip: true;
+
+                                VerticalLayout {
+                                    padding: 8px;
+                                    spacing: 4px;
+
+                                    HorizontalLayout {
+                                        alignment: space-between;
+                                        Text {
+                                            text: "bash";
+                                            font-size: 8px;
+                                            font-weight: 700;
+                                            color: #58a6ff;
+                                        }
+                                        Text {
+                                            text: @tr("推荐指令");
+                                            font-size: 8px;
+                                            color: #8b949e;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: msg.suggested-cmd;
+                                        font-size: 11px;
+                                        font-family: "JetBrains Mono, Consolas, monospace";
+                                        color: #3fb950;
+                                        wrap: word-wrap;
+                                    }
+                                }
+                            }
+
+                            // 2.5 核心操作审核栏 (Action Audit & Approval)
+                            if msg.suggested-cmd != "": Rectangle {
+                                border-radius: 4px;
+                                background: msg.cmd-risk-level == "high" ? AppTheme.danger.transparentize(90%) :
+                                            msg.cmd-risk-level == "medium" ? AppTheme.warning.transparentize(90%) :
+                                            AppTheme.success.transparentize(90%);
+                                border-width: 1px;
+                                border-color: msg.cmd-risk-level == "high" ? AppTheme.danger.transparentize(60%) :
+                                             msg.cmd-risk-level == "medium" ? AppTheme.warning.transparentize(60%) :
+                                             AppTheme.success.transparentize(60%);
+                                clip: true;
+
+                                VerticalLayout {
+                                    padding: 6px;
+                                    spacing: 6px;
+
+                                    // 风险审核状态条 (图标与文字严格居中，文案防止溢出)
+                                    HorizontalLayout {
+                                        alignment: space-between;
+                                        height: 18px;
+
+                                        HorizontalLayout {
+                                            spacing: 4px;
+                                            alignment: start;
+                                            horizontal-stretch: 1;
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Image {
+                                                    source: msg.cmd-risk-level == "high" ? @image-url("../../assets/icons/alert-triangle.svg") : @image-url("../../assets/icons/shield.svg");
+                                                    width: 12px;
+                                                    height: 12px;
+                                                    image-fit: contain;
+                                                    colorize: msg.cmd-risk-level == "high" ? AppTheme.danger :
+                                                              msg.cmd-risk-level == "medium" ? AppTheme.warning :
+                                                              AppTheme.success;
+                                                }
+                                            }
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Text {
+                                                    text: msg.cmd-risk-level == "high" ? @tr("高危操作审核") :
+                                                          msg.cmd-risk-level == "medium" ? @tr("配置变更审核") :
+                                                          @tr("安全只读指令");
+                                                    font-size: 10px;
+                                                    font-weight: 700;
+                                                    color: msg.cmd-risk-level == "high" ? AppTheme.danger :
+                                                           msg.cmd-risk-level == "medium" ? AppTheme.warning :
+                                                           AppTheme.success;
+                                                    overflow: elide;
+                                                }
+                                            }
+                                        }
+
+                                        // 右侧审核状态胶囊标签 (清晰表达：待审核 / 已放行 / 已放弃 / 已执行)
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                height: 16px;
+                                                border-radius: 3px;
+                                                background: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success.transparentize(80%) :
+                                                            msg.audit-status == "rejected" ? AppTheme.danger.transparentize(85%) :
+                                                            AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success.transparentize(50%) :
+                                                             msg.audit-status == "rejected" ? AppTheme.danger.transparentize(60%) :
+                                                             AppTheme.border;
+
+                                                HorizontalLayout {
+                                                    padding-left: 5px;
+                                                    padding-right: 5px;
+                                                    spacing: 3px;
+                                                    alignment: center;
+
+                                                    VerticalLayout {
+                                                        alignment: center;
+                                                        Image {
+                                                            source: (msg.audit-status == "approved" || msg.audit-status == "executed") ? @image-url("../../assets/icons/check.svg") :
+                                                                    msg.audit-status == "rejected" ? @image-url("../../assets/icons/window-close.svg") :
+                                                                    @image-url("../../assets/icons/shield.svg");
+                                                            width: 9px;
+                                                            height: 9px;
+                                                            image-fit: contain;
+                                                            colorize: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success :
+                                                                      msg.audit-status == "rejected" ? AppTheme.danger :
+                                                                      AppTheme.warning;
+                                                        }
+                                                    }
+
+                                                    VerticalLayout {
+                                                        alignment: center;
+                                                        Text {
+                                                            text: msg.audit-status == "executed" ? @tr("已执行") :
+                                                                  msg.audit-status == "approved" ? @tr("已放行") :
+                                                                  msg.audit-status == "rejected" ? @tr("已放弃") :
+                                                                  @tr("待审核");
+                                                            font-size: 8px;
+                                                            font-weight: 700;
+                                                            color: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success :
+                                                                   msg.audit-status == "rejected" ? AppTheme.danger :
+                                                                   AppTheme.warning;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 审核决策理由展示条 (AI 审核通过或需人工介入的明确理由)
+                                    if msg.audit-reason != "": Rectangle {
+                                        border-radius: 3px;
+                                        background: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success.transparentize(90%) :
+                                                    msg.audit-status == "rejected" ? AppTheme.danger.transparentize(90%) :
+                                                    AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success.transparentize(65%) :
+                                                     msg.audit-status == "rejected" ? AppTheme.danger.transparentize(65%) :
+                                                     AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 6px;
+                                            padding-right: 6px;
+                                            padding-top: 4px;
+                                            padding-bottom: 4px;
+                                            spacing: 4px;
+                                            alignment: start;
+
+                                            VerticalLayout {
+                                                alignment: start;
+                                                padding-top: 1px;
+                                                Text {
+                                                    text: (msg.audit-status == "approved" || msg.audit-status == "executed") ? "💡" :
+                                                          msg.audit-status == "rejected" ? "🛑" : "🔒";
+                                                    font-size: 9px;
+                                                }
+                                            }
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                horizontal-stretch: 1;
+                                                Text {
+                                                    text: msg.audit-reason;
+                                                    font-size: 9px;
+                                                    color: (msg.audit-status == "approved" || msg.audit-status == "executed") ? AppTheme.success :
+                                                           msg.audit-status == "rejected" ? AppTheme.danger :
+                                                           (msg.cmd-risk-level == "high" ? AppTheme.danger : AppTheme.secondary-foreground);
+                                                    wrap: word-wrap;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    // 审核决策与指令操作按钮行 (复制命令 / 放弃 / 执行)
+                                    HorizontalLayout {
+                                        spacing: 4px;
+                                        alignment: end;
+                                        height: 22px;
+
+                                        // 按钮 1: 复制命令 (随时可用)
+                                        Rectangle {
+                                            height: 22px;
+                                            border-radius: 3px;
+                                            background: copy-btn-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                            border-width: 1px;
+                                            border-color: copy-btn-touch.has-hover ? AppTheme.accent.transparentize(40%) : AppTheme.border;
+                                            animate background { duration: 100ms; }
+
+                                            copy-btn-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => {
+                                                    AiBridge.copy-command(msg.suggested-cmd);
+                                                }
+                                            }
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                spacing: 3px;
+                                                alignment: center;
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Image {
+                                                        source: @image-url("../../assets/icons/copy.svg");
+                                                        width: 10px;
+                                                        height: 10px;
+                                                        image-fit: contain;
+                                                        colorize: copy-btn-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                                    }
+                                                }
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Text {
+                                                        text: @tr("复制");
+                                                        font-size: 9px;
+                                                        font-weight: 500;
+                                                        color: copy-btn-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 按钮 2: 放弃 (仅在待审核时展示)
+                                        if msg.audit-status == "pending": Rectangle {
+                                            height: 22px;
+                                            border-radius: 3px;
+                                            background: reject-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                            border-width: 1px;
+                                            border-color: reject-touch.has-hover ? AppTheme.danger.transparentize(50%) : AppTheme.border;
+                                            animate background { duration: 100ms; }
+
+                                            reject-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => {
+                                                    msg.audit-status = "rejected";
+                                                    AiBridge.update-message-audit(msg.id, "rejected");
+                                                }
+                                            }
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                spacing: 3px;
+                                                alignment: center;
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Image {
+                                                        source: @image-url("../../assets/icons/window-close.svg");
+                                                        width: 9px;
+                                                        height: 9px;
+                                                        image-fit: contain;
+                                                        colorize: AppTheme.danger;
+                                                    }
+                                                }
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Text {
+                                                        text: @tr("放弃");
+                                                        font-size: 9px;
+                                                        font-weight: 500;
+                                                        color: AppTheme.danger;
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                        // 按钮 3: 执行 (仅在待审核时展示)
+                                        if msg.audit-status == "pending": Rectangle {
+                                            height: 22px;
+                                            border-radius: 3px;
+                                            background: exec-touch.has-hover ? AppTheme.accent.darker(10%) : AppTheme.accent;
+                                            border-width: 1px;
+                                            border-color: AppTheme.accent;
+                                            animate background { duration: 100ms; }
+
+                                            exec-touch := TouchArea {
+                                                mouse-cursor: pointer;
+                                                clicked => {
+                                                    msg.audit-status = "executed";
+                                                    AiBridge.update-message-audit(msg.id, "executed");
+                                                    root.inject-and-run-cmd(msg.suggested-cmd);
+                                                }
+                                            }
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                spacing: 3px;
+                                                alignment: center;
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Image {
+                                                        source: @image-url("../../assets/icons/play.svg");
+                                                        width: 9px;
+                                                        height: 9px;
+                                                        image-fit: contain;
+                                                        colorize: #ffffff;
+                                                    }
+                                                }
+
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Text {
+                                                        text: msg.audit-status == "pending" ? @tr("放行执行") : @tr("执行");
+                                                        font-size: 9px;
+                                                        font-weight: 700;
+                                                        color: #ffffff;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                    // 正在深度思考中卡片 (当 is-generating 为 true 时展示)
+                    if root.is-generating: Rectangle {
+                        height: generating-layout.preferred-height;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: AppTheme.accent.transparentize(50%);
+                        clip: true;
+
+                        generating-layout := VerticalLayout {
+                            padding: 10px;
+                            spacing: 6px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/sparkles.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: AppTheme.accent;
+                                    }
+                                }
+                                Text {
+                                    text: @tr("AI 深度思考中 (CoT 推理)...");
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.accent;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Text {
+                                text: @tr("正在挂载主机上下文、研判系统日志并规划执行命令...");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+
+                    // 底部缓冲垫，保证滚动到底部完整展示所有阴影与卡片操作
+                    Rectangle {
+                        height: 36px;
+                    }
+                }
+            }
+
+            AppVScrollBar {
+                viewport-height: msg-scroll.viewport-height;
+                visible-height: msg-scroll.height;
+                viewport-y <=> msg-scroll.viewport-y;
+            }
+        }
+
+        // 3. 下方一体化输入与控制卡片 (外边框圈起输入框与底部按钮群，高度调低并固定在下端)
+        Rectangle {
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.panel-background;
+            border-width: 1px;
+            border-color: input-touch.has-hover || txt-area.has-focus ? AppTheme.accent : AppTheme.border;
+            animate border-color { duration: 120ms; }
+
+            VerticalLayout {
+                padding: 6px;
+                spacing: 6px;
+
+                // 3.1 紧凑多行文本输入区 (高度调低，纯净无内边框)
+                Rectangle {
+                    min-height: 38px;
+                    max-height: 72px;
+                    clip: true;
+
+                    input-touch := TouchArea {
+                        clicked => { txt-area.focus(); }
+                        mouse-cursor: MouseCursor.text;
+                    }
+
+                    if root.input-text == "" && !txt-area.has-focus: Text {
+                        text: @tr("输入自然语言描述运维目标或提问 (Enter 发送)...");
+                        font-size: 11px;
+                        color: AppTheme.disabled-foreground;
+                        x: 4px;
+                        y: 4px;
+                        width: parent.width - 8px;
+                        wrap: word-wrap;
+                    }
+
+                    txt-area := TextInput {
+                        x: 4px;
+                        y: 4px;
+                        width: parent.width - 8px;
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        selection-background-color: AppTheme.selected-background;
+                        selection-foreground-color: AppTheme.selected-foreground;
+                        single-line: false;
+                        wrap: word-wrap;
+                        text <=> root.input-text;
+
+                        key-pressed(event) => {
+                            if event.text == Key.Return && !event.modifiers.shift {
+                                if root.input-text != "" {
+                                    root.send-message(root.input-text, root.selected-model, root.thinking-degree, root.audit-mode);
+                                    root.input-text = "";
+                                }
+                                return accept;
+                            }
+                            reject
+                        }
+
+                        accepted => {
+                            if root.input-text != "" {
+                                root.send-message(root.input-text, root.selected-model, root.thinking-degree, root.audit-mode);
+                                root.input-text = "";
+                            }
+                        }
+                    }
+                }
+
+                // 3.2 底部控制按钮行 (左侧：模型、思考、审核；右侧固定：提交上箭头纯图标按钮)
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    // 左侧三个控制选项下拉选择框群 (垂直严格居中对齐)
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: start;
+
+                        // 1. 模型下拉选择框
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 22px;
+                                border-radius: 4px;
+                                background: model-touch.has-hover || root.active-dropdown == 1 ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: root.active-dropdown == 1 ? AppTheme.accent : AppTheme.border;
+
+                                model-touch := TouchArea {
+                                    clicked => {
+                                        root.active-dropdown = (root.active-dropdown == 1 ? 0 : 1);
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 3px;
+                                    alignment: center;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/sparkles.svg");
+                                            width: 10px;
+                                            height: 10px;
+                                            colorize: root.active-dropdown == 1 ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: root.selected-model;
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "▼";
+                                            font-size: 7px;
+                                            color: AppTheme.disabled-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. 模式下拉选择框
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 22px;
+                                border-radius: 4px;
+                                background: mode-touch.has-hover || root.active-dropdown == 2 ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: root.active-dropdown == 2 ? AppTheme.accent : AppTheme.border;
+
+                                mode-touch := TouchArea {
+                                    clicked => {
+                                        root.active-dropdown = (root.active-dropdown == 2 ? 0 : 2);
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 3px;
+                                    alignment: center;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/zap.svg");
+                                            width: 10px;
+                                            height: 10px;
+                                            colorize: root.active-dropdown == 2 ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: root.thinking-degree;
+                                            font-size: 9px;
+                                            color: AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "▼";
+                                            font-size: 7px;
+                                            color: AppTheme.disabled-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. 安全审核策略下拉选择框 (单层 5 档)
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 22px;
+                                border-radius: 4px;
+                                background: audit-touch.has-hover || root.active-dropdown == 3 ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: root.active-dropdown == 3 ? AppTheme.accent : AppTheme.border;
+
+                                audit-touch := TouchArea {
+                                    clicked => {
+                                        root.active-dropdown = (root.active-dropdown == 3 ? 0 : 3);
+                                        root.is-audit-submenu-open = false;
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 4px;
+                                    alignment: center;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: root.audit-policy == "纯人工" ? @image-url("../../assets/icons/lock.svg") :
+                                                    root.audit-policy == "AI自审" ? @image-url("../../assets/icons/sparkles.svg") :
+                                                    @image-url("../../assets/icons/shield.svg");
+                                            width: 10px;
+                                            height: 10px;
+                                            colorize: root.audit-policy == "免审直达" ? AppTheme.danger :
+                                                      root.audit-policy == "辅助运维" ? AppTheme.warning :
+                                                      root.audit-policy == "只读巡检" ? AppTheme.success :
+                                                      root.audit-policy == "AI自审" ? #A78BFA :
+                                                      AppTheme.secondary-foreground;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: root.audit-policy;
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: root.audit-policy == "免审直达" ? AppTheme.danger :
+                                                   root.audit-policy == "辅助运维" ? AppTheme.warning :
+                                                   root.audit-policy == "只读巡检" ? AppTheme.success :
+                                                   root.audit-policy == "AI自审" ? #A78BFA :
+                                                   AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: "▼";
+                                            font-size: 7px;
+                                            color: AppTheme.disabled-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 右侧固定提交按钮 (上箭头纯图标按钮，垂直水平严格居中)
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 4px;
+                            background: root.input-text != "" ? (submit-touch.has-hover ? AppTheme.accent.darker(10%) : AppTheme.accent) : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: root.input-text != "" ? AppTheme.accent : AppTheme.border;
+                            animate background { duration: 100ms; }
+
+                            submit-touch := TouchArea {
+                                enabled: root.input-text != "";
+                                mouse-cursor: root.input-text != "" ? pointer : default;
+                                clicked => {
+                                    if root.input-text != "" {
+                                        root.send-message(root.input-text, root.selected-model, root.thinking-degree, root.audit-policy);
+                                        root.input-text = "";
+                                    }
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/arrow-up.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: root.input-text != "" ? #ffffff : AppTheme.disabled-foreground;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 3.5 底部设置下拉选择框弹窗浮层 (模型 / 模式 / 审核，紧致无多余空白，自适应高度)
+    if root.active-dropdown > 0: Rectangle {
+        width: 100%;
+        height: 100%;
+        z: 80;
+
+        // 点击空白处关闭下拉
+        TouchArea {
+            clicked => { root.active-dropdown = 0; }
+        }
+
+        Rectangle {
+            x: root.active-dropdown == 1 ? 8px : (root.active-dropdown == 2 ? 60px : Math.max(8px, parent.width - 248px));
+            y: parent.height - self.height - 42px;
+            width: root.active-dropdown == 1 ? 160px : (root.active-dropdown == 2 ? 140px : 240px);
+            height: drop-layout.preferred-height;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #00000080;
+
+            TouchArea { } // 阻断点击穿透
+
+            drop-layout := VerticalLayout {
+                padding: 4px;
+                spacing: 2px;
+
+                // 1. 模型下拉列表
+                if root.active-dropdown == 1: VerticalLayout {
+                    spacing: 2px;
+                    for m in root.available-models: Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: m-item-touch.has-hover ? AppTheme.hover-background : (m == root.selected-model ? AppTheme.hover-background : transparent);
+                        m-item-touch := TouchArea {
+                            clicked => {
+                                root.selected-model = m;
+                                root.model-selected(m);
+                                AiBridge.model-selected(m);
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: space-between;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/sparkles.svg");
+                                        width: 11px;
+                                        height: 11px;
+                                        colorize: m == root.selected-model ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        image-fit: contain;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: m;
+                                        font-size: 10px;
+                                        font-weight: m == root.selected-model ? 700 : 400;
+                                        color: m == root.selected-model ? AppTheme.accent : AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            if m == root.selected-model: VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/check.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.accent;
+                                    image-fit: contain;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. 思考模式下拉列表
+                if root.active-dropdown == 2: VerticalLayout {
+                    spacing: 2px;
+                    for mode in root.available-modes: Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: mode-item-touch.has-hover ? AppTheme.hover-background : (mode == root.thinking-degree ? AppTheme.hover-background : transparent);
+                        mode-item-touch := TouchArea {
+                            clicked => {
+                                root.thinking-degree = mode;
+                                root.mode-selected(mode);
+                                AiBridge.mode-selected(mode);
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: space-between;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/zap.svg");
+                                        width: 11px;
+                                        height: 11px;
+                                        colorize: mode == root.thinking-degree ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        image-fit: contain;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: mode;
+                                        font-size: 10px;
+                                        font-weight: mode == root.thinking-degree ? 700 : 400;
+                                        color: mode == root.thinking-degree ? AppTheme.accent : AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            if mode == root.thinking-degree: VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/check.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.accent;
+                                    image-fit: contain;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 3. 安全审核策略选择 (4 档规则过滤 + 1 档 AI 语义认知自审)
+                if root.active-dropdown == 3: VerticalLayout {
+                    spacing: 2px;
+
+                    // 分区 1: 规则审核
+                    Rectangle {
+                        height: 18px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            Text {
+                                text: @tr("规则审核 (确定性级别硬过滤)");
+                                font-size: 8px;
+                                font-weight: 700;
+                                color: AppTheme.disabled-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 1.1 纯人工
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 3px;
+                        background: pol-man-touch.has-hover ? AppTheme.hover-background : (root.audit-policy == "纯人工" ? AppTheme.hover-background : transparent);
+                        pol-man-touch := TouchArea {
+                            clicked => {
+                                root.audit-policy = "纯人工";
+                                root.audit-mode = "人工";
+                                root.audit-policy-selected("纯人工");
+                                AiBridge.audit-policy-selected("纯人工");
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        VerticalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            spacing: 1px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/lock.svg");
+                                            width: 11px;
+                                            height: 11px;
+                                            colorize: root.audit-policy == "纯人工" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            image-fit: contain;
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: @tr("纯人工");
+                                            font-size: 10px;
+                                            font-weight: root.audit-policy == "纯人工" ? 700 : 500;
+                                            color: root.audit-policy == "纯人工" ? AppTheme.accent : AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                if root.audit-policy == "纯人工": VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/check.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: AppTheme.accent;
+                                        image-fit: contain;
+                                    }
+                                }
+                            }
+                            Text {
+                                text: @tr("全量拦截，所有生成指令必须人工确认执行");
+                                font-size: 8px;
+                                color: AppTheme.disabled-foreground;
+                                overflow: elide;
+                            }
+                        }
+                    }
+
+                    // 1.2 只读巡检 (推荐)
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 3px;
+                        background: pol-ins-touch.has-hover ? AppTheme.hover-background : (root.audit-policy == "只读巡检" ? AppTheme.hover-background : transparent);
+                        pol-ins-touch := TouchArea {
+                            clicked => {
+                                root.audit-policy = "只读巡检";
+                                root.audit-mode = "自动";
+                                root.auto-audit-level = "安全";
+                                root.audit-policy-selected("只读巡检");
+                                AiBridge.audit-policy-selected("只读巡检");
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        VerticalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            spacing: 1px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/shield.svg");
+                                            width: 11px;
+                                            height: 11px;
+                                            colorize: root.audit-policy == "只读巡检" ? AppTheme.success : AppTheme.secondary-foreground;
+                                            image-fit: contain;
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        HorizontalLayout {
+                                            spacing: 4px;
+                                            Text {
+                                                text: @tr("只读巡检");
+                                                font-size: 10px;
+                                                font-weight: root.audit-policy == "只读巡检" ? 700 : 500;
+                                                color: root.audit-policy == "只读巡检" ? AppTheme.success : AppTheme.foreground;
+                                                vertical-alignment: center;
+                                            }
+                                            Rectangle {
+                                                height: 13px;
+                                                border-radius: 2px;
+                                                background: AppTheme.success.transparentize(85%);
+                                                HorizontalLayout {
+                                                    padding-left: 3px;
+                                                    padding-right: 3px;
+                                                    Text {
+                                                        text: @tr("推荐");
+                                                        font-size: 8px;
+                                                        font-weight: 600;
+                                                        color: AppTheme.success;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                if root.audit-policy == "只读巡检": VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/check.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: AppTheme.success;
+                                        image-fit: contain;
+                                    }
+                                }
+                            }
+                            Text {
+                                text: @tr("只读探测自动跑，配置与文件变更强制拦截");
+                                font-size: 8px;
+                                color: AppTheme.disabled-foreground;
+                                overflow: elide;
+                            }
+                        }
+                    }
+
+                    // 1.3 辅助运维
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 3px;
+                        background: pol-warn-touch.has-hover ? AppTheme.hover-background : (root.audit-policy == "辅助运维" ? AppTheme.hover-background : transparent);
+                        pol-warn-touch := TouchArea {
+                            clicked => {
+                                root.audit-policy = "辅助运维";
+                                root.audit-mode = "自动";
+                                root.auto-audit-level = "警告";
+                                root.audit-policy-selected("辅助运维");
+                                AiBridge.audit-policy-selected("辅助运维");
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        VerticalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            spacing: 1px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/shield.svg");
+                                            width: 11px;
+                                            height: 11px;
+                                            colorize: root.audit-policy == "辅助运维" ? AppTheme.warning : AppTheme.secondary-foreground;
+                                            image-fit: contain;
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: @tr("辅助运维");
+                                            font-size: 10px;
+                                            font-weight: root.audit-policy == "辅助运维" ? 700 : 500;
+                                            color: root.audit-policy == "辅助运维" ? AppTheme.warning : AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                if root.audit-policy == "辅助运维": VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/check.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: AppTheme.warning;
+                                        image-fit: contain;
+                                    }
+                                }
+                            }
+                            Text {
+                                text: @tr("放行常规启停修改，仅高危破坏指令需确认");
+                                font-size: 8px;
+                                color: AppTheme.disabled-foreground;
+                                overflow: elide;
+                            }
+                        }
+                    }
+
+                    // 1.4 免审直达
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 3px;
+                        background: pol-dir-touch.has-hover ? AppTheme.hover-background : (root.audit-policy == "免审直达" ? AppTheme.hover-background : transparent);
+                        pol-dir-touch := TouchArea {
+                            clicked => {
+                                root.audit-policy = "免审直达";
+                                root.audit-mode = "自动";
+                                root.auto-audit-level = "危险";
+                                root.audit-policy-selected("免审直达");
+                                AiBridge.audit-policy-selected("免审直达");
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        VerticalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            spacing: 1px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/shield.svg");
+                                            width: 11px;
+                                            height: 11px;
+                                            colorize: root.audit-policy == "免审直达" ? AppTheme.danger : AppTheme.secondary-foreground;
+                                            image-fit: contain;
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: @tr("免审直达");
+                                            font-size: 10px;
+                                            font-weight: root.audit-policy == "免审直达" ? 700 : 500;
+                                            color: root.audit-policy == "免审直达" ? AppTheme.danger : AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                if root.audit-policy == "免审直达": VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/check.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: AppTheme.danger;
+                                        image-fit: contain;
+                                    }
+                                }
+                            }
+                            Text {
+                                text: @tr("零拦截完全放行，适合本地沙箱与测试容器");
+                                font-size: 8px;
+                                color: AppTheme.disabled-foreground;
+                                overflow: elide;
+                            }
+                        }
+                    }
+
+                    // 雅致分割线
+                    Rectangle {
+                        height: 1px;
+                        background: AppTheme.border.transparentize(50%);
+                    }
+
+                    // 分区 2: 智能审核
+                    Rectangle {
+                        height: 18px;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            Text {
+                                text: @tr("智能审核 (大模型认知推理)");
+                                font-size: 8px;
+                                font-weight: 700;
+                                color: #A78BFA;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 2.1 AI 自主审核
+                    Rectangle {
+                        height: 32px;
+                        border-radius: 3px;
+                        background: pol-ai-touch.has-hover ? AppTheme.hover-background : (root.audit-policy == "AI自审" ? #8B5CF6.transparentize(85%) : transparent);
+                        pol-ai-touch := TouchArea {
+                            clicked => {
+                                root.audit-policy = "AI自审";
+                                root.audit-mode = "AI";
+                                root.audit-policy-selected("AI自审");
+                                AiBridge.audit-policy-selected("AI自审");
+                                root.active-dropdown = 0;
+                            }
+                            mouse-cursor: pointer;
+                        }
+                        VerticalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            alignment: center;
+                            spacing: 1px;
+                            HorizontalLayout {
+                                alignment: space-between;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/sparkles.svg");
+                                            width: 11px;
+                                            height: 11px;
+                                            colorize: root.audit-policy == "AI自审" ? #A78BFA : AppTheme.secondary-foreground;
+                                            image-fit: contain;
+                                        }
+                                    }
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Text {
+                                            text: @tr("AI 自主审核");
+                                            font-size: 10px;
+                                            font-weight: root.audit-policy == "AI自审" ? 700 : 500;
+                                            color: root.audit-policy == "AI自审" ? #A78BFA : AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                                if root.audit-policy == "AI自审": VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/check.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        colorize: #A78BFA;
+                                        image-fit: contain;
+                                    }
+                                }
+                            }
+                            Text {
+                                text: @tr("由 AI 结合上下文自主决策，风险附带说明");
+                                font-size: 8px;
+                                color: AppTheme.disabled-foreground;
+                                overflow: elide;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 4. 浮动历史会话面板 (点击历史图标展开)
+    if root.has-active-host && root.is-history-panel-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #00000099;
+
+        TouchArea { } // 阻断点击穿透
+
+        Rectangle {
+            width: Math.min(parent.width - 24px, 300px);
+            height: 320px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 16px;
+            drop-shadow-color: #000000.transparentize(0.5);
+
+            TouchArea { }
+
+            VerticalLayout {
+                padding: 12px;
+                spacing: 8px;
+
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 5px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../../assets/icons/clock.svg");
+                                width: 12px;
+                                height: 12px;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("历史对话记录");
+                                font-size: 12px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../../assets/icons/window-close.svg");
+                            icon-size: 12px;
+                            clicked => { root.is-history-panel-open = false; }
+                        }
+                    }
+                }
+
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+
+                    Flickable {
+                        width: 100%;
+                        height: 100%;
+                        viewport-height: root.history-sessions.length * 48px;
+
+                        VerticalLayout {
+                            spacing: 4px;
+
+                            for sess in root.history-sessions: Rectangle {
+                                height: 44px;
+                                border-radius: AppTheme.radius-medium;
+                                background: sess-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                sess-touch := TouchArea {
+                                    clicked => {
+                                        root.switch-session(sess.id);
+                                        root.is-history-panel-open = false;
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                VerticalLayout {
+                                    padding: 6px;
+                                    spacing: 2px;
+
+                                    HorizontalLayout {
+                                        alignment: space-between;
+                                        Text {
+                                            text: sess.title;
+                                            font-size: 10px;
+                                            font-weight: 600;
+                                            color: AppTheme.foreground;
+                                            overflow: elide;
+                                            horizontal-stretch: 1;
+                                        }
+
+                                        AppIconButton {
+                                            icon: @image-url("../../assets/icons/trash.svg");
+                                            icon-size: 10px;
+                                            clicked => {
+                                                root.delete-session(sess.id);
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        alignment: space-between;
+                                        Text {
+                                            text: sess.message-count + " " + @tr("条交互");
+                                            font-size: 8px;
+                                            color: AppTheme.disabled-foreground;
+                                        }
+                                        Text {
+                                            text: sess.updated-time;
+                                            font-size: 8px;
+                                            color: AppTheme.disabled-foreground;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    AppButton {
+                        text: @tr("+ 开启新对话");
+                        variant: "primary";
+                        height: 24px;
+                        font-size: 10px;
+                        clicked => {
+                            root.new-session();
+                            root.is-history-panel-open = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+}
+

@@ -36,9 +36,11 @@ fn execute_close_session(
         let _ = instance.pty.kill();
     }
 
+    let mut closed_host_id = String::new();
     let mut target_group_idx = None;
     for (idx, g) in groups.iter_mut().enumerate() {
         if let Some(pos) = g.tabs.iter().position(|t| t.session_id == id_str) {
+            closed_host_id = g.tabs[pos].host_id.clone();
             g.tabs.remove(pos);
             target_group_idx = Some(idx);
             if g.active_tab_id == id_str && !g.tabs.is_empty() {
@@ -72,10 +74,21 @@ fn execute_close_session(
     let is_split = split_tree.is_some();
     sync_active_session_ui(window, &groups, &active_pid, is_split);
     crate::session::sync_active_session_to_core(&groups, &active_pid, &ctx.core_state);
+
+    // 检查关联主机是否已无存活终端 Tab
+    let remaining_host_tabs = if !closed_host_id.is_empty() {
+        groups.iter().flat_map(|g| g.tabs.iter()).filter(|t| t.host_id == closed_host_id).count()
+    } else {
+        0
+    };
+
+    // 释放该主机关联的右侧伴生抽屉资源 (AI 推理中止、会话清理等)
+    crate::handlers::right_drawer_handlers::handle_host_session_closed(window, &closed_host_id, remaining_host_tabs);
+
     ctx.core_state.events().dispatch(&TerminalSessionEvent {
         session_id: id_str.to_string(),
-        host_id: "".into(),
-        action: "closed".into(),
+        host_id: closed_host_id,
+        action: if remaining_host_tabs == 0 { "closed".into() } else { "tab_closed".into() },
     });
     tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
 
@@ -143,16 +156,33 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             if w.global::<SettingsBridge>().get_setting_confirm_close_tab() {
                 if let Some(info) = session_opt {
+                    let is_en = w.global::<WindowBridge>().get_current_language() == "en-US";
                     let is_remote = !info.host_id.starts_with("local-") && !info.host_address.starts_with("Local");
-                    let title = if is_remote {
-                        format!("断开远程主机连接: {}", info.display_title)
+                    let title = if is_en {
+                        if is_remote {
+                            format!("Disconnect Remote Host: {}", info.display_title)
+                        } else {
+                            format!("Close Terminal Session: {}", info.display_title)
+                        }
                     } else {
-                        format!("关闭终端会话: {}", info.display_title)
+                        if is_remote {
+                            format!("断开远程主机连接: {}", info.display_title)
+                        } else {
+                            format!("关闭终端会话: {}", info.display_title)
+                        }
                     };
-                    let msg = if is_remote {
-                        format!("确定要断开与主机 [{}] 的 SSH 连接吗？未保存的工作和远程正在运行的任务将立即终止。", info.host_name)
+                    let msg = if is_en {
+                        if is_remote {
+                            format!("Are you sure you want to disconnect SSH connection to host [{}]? Unsaved work and running remote tasks will be terminated.", info.host_name)
+                        } else {
+                            format!("Are you sure you want to close local terminal [{}]? Running processes will be terminated.", info.display_title)
+                        }
                     } else {
-                        format!("确定要关闭本地终端 [{}] 吗？正在运行的进程将被终止。", info.display_title)
+                        if is_remote {
+                            format!("确定要断开与主机 [{}] 的 SSH 连接吗？未保存的工作和远程正在运行的任务将立即终止。", info.host_name)
+                        } else {
+                            format!("确定要关闭本地终端 [{}] 吗？正在运行的进程将被终止。", info.display_title)
+                        }
                     };
 
                     *pending_close_tab_id_close.borrow_mut() = Some(id_str);
@@ -197,16 +227,33 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             if w.global::<SettingsBridge>().get_setting_confirm_close_tab() {
                 if let Some(info) = session_opt {
+                    let is_en = w.global::<WindowBridge>().get_current_language() == "en-US";
                     let is_remote = !info.host_id.starts_with("local-") && !info.host_address.starts_with("Local");
-                    let title = if is_remote {
-                        format!("断开远程主机连接: {}", info.display_title)
+                    let title = if is_en {
+                        if is_remote {
+                            format!("Disconnect Remote Host: {}", info.display_title)
+                        } else {
+                            format!("Close Terminal Session: {}", info.display_title)
+                        }
                     } else {
-                        format!("关闭终端会话: {}", info.display_title)
+                        if is_remote {
+                            format!("断开远程主机连接: {}", info.display_title)
+                        } else {
+                            format!("关闭终端会话: {}", info.display_title)
+                        }
                     };
-                    let msg = if is_remote {
-                        format!("确定要断开与主机 [{}] 的 SSH 连接吗？未保存的工作和远程正在运行的任务将立即终止。", info.host_name)
+                    let msg = if is_en {
+                        if is_remote {
+                            format!("Are you sure you want to disconnect SSH connection to host [{}]? Unsaved work and running remote tasks will be terminated.", info.host_name)
+                        } else {
+                            format!("Are you sure you want to close local terminal [{}]? Running processes will be terminated.", info.display_title)
+                        }
                     } else {
-                        format!("确定要关闭本地终端 [{}] 吗？正在运行的进程将被终止。", info.display_title)
+                        if is_remote {
+                            format!("确定要断开与主机 [{}] 的 SSH 连接吗？未保存的工作和远程正在运行的任务将立即终止。", info.host_name)
+                        } else {
+                            format!("确定要关闭本地终端 [{}] 吗？正在运行的进程将被终止。", info.display_title)
+                        }
                     };
 
                     *pending_close_tab_id_pane.borrow_mut() = Some(id_str);
@@ -264,20 +311,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
-    // -------------------------------------------------------------------------
-    // 1.3 切换“关闭标签页时防误触确认”开关回调
-    // -------------------------------------------------------------------------
-    let window_weak_toggle = window.as_weak();
-    let core_state_toggle = ctx.core_state.clone();
-    window.global::<SettingsBridge>().on_toggle_confirm_close_tab(move |enabled| {
-        if let Some(w) = window_weak_toggle.upgrade() {
-            w.global::<SettingsBridge>().set_setting_confirm_close_tab(enabled);
-            let _ = core_state_toggle.storage().config().update(Box::new(move |c| {
-                c.confirm_close_tab = enabled;
-            }));
-            tracing::info!(target: "smagical_ui::settings", "关闭标签页时防误触确认设置为: {}", enabled);
-        }
-    });
+
 
 
 
@@ -339,6 +373,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             let target_group_idx = groups.iter().position(|g| g.pane_id == p_id)
                 .or_else(|| groups.iter().position(|g| g.tabs.iter().any(|t| t.session_id == t_id)));
 
+            let mut removed_hosts = Vec::new();
             if let Some(idx) = target_group_idx {
                 let g = &mut groups[idx];
                 let mut removed_tabs = Vec::new();
@@ -347,6 +382,9 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                         true
                     } else {
                         removed_tabs.push(t.session_id.clone());
+                        if !t.host_id.is_empty() && !removed_hosts.contains(&t.host_id) {
+                            removed_hosts.push(t.host_id.clone());
+                        }
                         false
                     }
                 });
@@ -403,6 +441,14 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let is_split = split_tree.is_some();
             sync_active_session_ui(&w, &groups, &active_pid, is_split);
+
+            for h_id in removed_hosts {
+                let remaining = groups.iter().flat_map(|g| g.tabs.iter()).filter(|t| t.host_id == h_id).count();
+                if remaining == 0 {
+                    crate::handlers::right_drawer_handlers::handle_host_session_closed(&w, &h_id, 0);
+                }
+            }
+
             tracing::info!(target: "smagical_ui::session", "已在窗格 [{}] 关闭其他会话，保留: {}", p_id, t_id);
 
         }
@@ -1083,10 +1129,11 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                                 let _ = ctx_close_pane_id.core_state.storage().history().save(&hist);
                             }
                         }
+                        let remaining_host_tabs = groups.iter().flat_map(|g| g.tabs.iter()).filter(|other| other.host_id == t.host_id).count();
                         ctx_close_pane_id.core_state.events().dispatch(&TerminalSessionEvent {
                             session_id: t.session_id.clone(),
-                            host_id: "".into(),
-                            action: "closed".into(),
+                            host_id: t.host_id.clone(),
+                            action: if remaining_host_tabs == 0 { "closed".into() } else { "tab_closed".into() },
                         });
                     }
                 }

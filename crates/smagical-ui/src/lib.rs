@@ -46,6 +46,8 @@ pub mod notification_service;
 pub(crate) mod tunnel_daemon;
 /// 图形渲染管线本地持久化配置与启动分发模块。
 pub mod pipeline_config;
+/// 桌面系统托盘常驻守护与交互服务模块。
+pub mod tray;
 
 
 use std::cell::RefCell;
@@ -63,22 +65,11 @@ use tree_model::{
     calculate_max_tree_width,
 };
 
+#[doc(hidden)]
 #[allow(missing_docs, dead_code)]
-mod generated {
-    slint::include_modules!();
-}
+pub use smagical_ui_view as generated;
 
-pub use generated::{
-    HostsBridge,
-    SettingsBridge,
-    ThemeEditorBridge,
-    DebugBridge,
-    TerminalBridge,
-    WindowBridge,
-    ActivityBarItemData, AppColorScheme, AppTheme, AppWindow, GroupOptionData, HostItemData,
-    HostTreeNode, LocalShellItemData, LogEntryData, TabData, TerminalPaneData, TerminalSplitterData,
-    ToastItemData,
-};
+pub use smagical_ui_view::*;
 
 
 
@@ -136,10 +127,31 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 初始化 CoreState 核心状态引擎 (基于 MockStorage 预设种子存储)
     let core_state = Rc::new(CoreState::new_mock());
+    let initial_config = core_state.storage().config().get().unwrap_or_default();
+
+    // -------------------------------------------------------------------------
+    // 国际化语言环境初始化 (根据持久化配置生效 Slint 捆绑翻译与 UI 语言)
+    // -------------------------------------------------------------------------
+    let initial_lang = initial_config.language.as_str();
+    let slint_lang_code = match initial_lang {
+        "en-US" | "en" => "en",
+        _ => "",
+    };
+    if !slint_lang_code.is_empty() {
+        if let Err(err) = slint::select_bundled_translation(slint_lang_code) {
+            tracing::error!(target: "smagical_ui::i18n", "初始化加载捆绑翻译失败: {:?}", err);
+        } else {
+            tracing::info!(target: "smagical_ui::i18n", "冷启动成功生效 UI 语言: [{}]", slint_lang_code);
+        }
+    }
+
+    let wb = window.global::<WindowBridge>();
+    wb.set_current_language(initial_config.language.as_str().into());
+    window.global::<SettingsBridge>().set_setting_language(initial_config.language.as_str().into());
 
     // 同步 Debug 开启状态与侧边栏动态注册菜单项到 Slint 界面
     let is_dbg = crate::debug::is_debug_enabled();
-    window.global::<WindowBridge>().set_is_debug_enabled(is_dbg);
+    wb.set_is_debug_enabled(is_dbg);
     core_state.activity_bar().set_visible("debug", is_dbg);
     activity_bar_service::sync_activity_bar_ui(&window, &core_state);
     right_panel_service::sync_right_panel_ui(&window, &core_state);
@@ -169,6 +181,18 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 触发全局应用启动事件
     core_state.events().dispatch(&smagical_core::AppBootEvent);
+
+    // 初始化并启动系统托盘常驻守护服务 (支持最小化到托盘、右键菜单快捷操作与呼出唤醒)
+    let _tray_service = match tray::TrayService::init(&window) {
+        Ok(t) => {
+            tracing::info!(target: "smalux::tray", "桌面系统托盘服务挂载就绪");
+            Some(t)
+        }
+        Err(err) => {
+            tracing::warn!(target: "smalux::tray", "初始化系统托盘服务受限: {:?}", err);
+            None
+        }
+    };
 
 
 
@@ -286,6 +310,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let remote_file_nodes = Rc::new(RefCell::new(Vec::new()));
     let transfer_tasks = Rc::new(RefCell::new(Vec::<smagical_core::TransferTask>::new()));
     let notifications = notification_service::NotificationManager::new(window.as_weak());
+    notifications.set_duration_preset(&initial_config.toast_duration);
 
     // 代码片段树形与多层层级初始状态
     let initial_snippet_master = snippet_tree_model::build_raw_snippet_tree_from_storage(core_state.storage().as_ref());
@@ -303,8 +328,6 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     let tunnel_search_query = Rc::new(RefCell::new(String::new()));
     let tunnel_filter_category = Rc::new(RefCell::new("all".to_string()));
-
-    let initial_config = core_state.storage().config().get().unwrap_or_default();
 
     let wallpapers = Rc::new(RefCell::new(initial_config.wallpaper_list.clone()));
     let active_wallpaper_idx = Rc::new(RefCell::new(initial_config.wallpaper_active_index));
@@ -361,6 +384,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
         tunnel_search_query,
         tunnel_filter_category,
+        tray_active: Rc::new(RefCell::new(_tray_service.is_some())),
     };
 
     // 初始同步历史会话抽屉、双盘文件浏览器、代码片段中心与网络隧道中枢数据
@@ -376,11 +400,12 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
     // 同步底层配置仓储 (ConfigRepository) 状态至 Slint 界面
     let wb = window.global::<WindowBridge>();
-    wb.set_current_language(initial_config.language.as_str().into());
-    window.global::<SettingsBridge>().set_setting_close_action(initial_config.close_action.as_str().into());
+    let sb = window.global::<SettingsBridge>();
+    sb.set_setting_close_action(initial_config.close_action.as_str().into());
     window.global::<SettingsBridge>().set_setting_start_on_boot(initial_config.start_on_boot);
     window.global::<SettingsBridge>().set_setting_confirm_close_tab(initial_config.confirm_close_tab);
     window.global::<SettingsBridge>().set_setting_confirm_close_active(initial_config.confirm_close_active);
+    window.global::<SettingsBridge>().set_setting_toast_duration(initial_config.toast_duration.as_str().into());
     window.global::<SettingsBridge>().set_setting_copy_on_select(initial_config.copy_on_select);
     window.global::<SettingsBridge>().set_setting_paste_on_right_click(initial_config.paste_on_right_click);
     window.global::<SettingsBridge>().set_setting_warn_multiline_paste(initial_config.warn_on_multiline_paste);
@@ -649,7 +674,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
     // 触发全局应用界面首帧就绪事件
     core_state.events().dispatch(&smagical_core::AppReadyEvent);
 
-    window.run()?;
+    window.show()?;
+    slint::run_event_loop_until_quit()?;
     Ok(())
 
 }

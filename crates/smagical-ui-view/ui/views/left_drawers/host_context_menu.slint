@@ -1,0 +1,182 @@
+// =============================================================================
+// 文件名称: host_context_menu.slint
+// 模块功能: 主机资产树与列表专属右键上下文菜单 (Host & Group Context Menu)
+// 核心设计:
+//   针对主机节点 (Host) 提供：连接终端、SFTP 文件、复制 IP/命令、克隆主机、删除主机；
+//   针对分组节点 (Group) 提供：在此组新建主机、新建子分组、展开/折叠、删除分组。
+// =============================================================================
+
+import { AppTheme } from "../../themes/app-theme.slint";
+import { ContextMenuItem, ContextMenuContainer } from "../../components/context-menu.slint";
+
+export component HostContextMenu inherits ContextMenuContainer {
+    /// 目标是否为分组节点
+    in property <bool> is-group: false;
+    /// 目标节点唯一标识
+    in property <string> target-id: "";
+    /// 目标节点展示名称
+    in property <string> target-name: "";
+    /// 目标主机地址
+    in property <string> target-address: "";
+    /// 目标主机端口
+    in property <int> target-port: 22;
+
+    // 回调动作
+    callback open-terminal(string /* id */);
+    callback open-sftp(string /* id */);
+    callback edit-host(string /* id */);
+    callback copy-address(string /* address */);
+    callback copy-command(string /* id */);
+    callback clone-host(string /* id */);
+    callback delete-target(string /* id */, bool /* is_group */);
+    callback create-host-in-group(string /* group_id */);
+    callback create-subgroup(string /* group_id */);
+    callback toggle-expand(string /* group_id */);
+    callback close-menu();
+
+    menu-width: 172px;
+    menu-height: root.is-group ? 124px : 174px;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 1px;
+        alignment: start;
+
+        // =====================================================================
+        // 分支 A: 主机节点右键菜单 (Host Node Menu)
+        // =====================================================================
+        if !root.is-group: VerticalLayout {
+            spacing: 1px;
+            alignment: start;
+
+            // 1. 启动终端连接
+            ContextMenuItem {
+                item-id: "open_terminal";
+                title: @tr("连接终端会话");
+                icon: @image-url("../../assets/icons/terminal.svg");
+                shortcut: "Enter";
+                clicked(id) => {
+                    root.open-terminal(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            // 2. 远程 SFTP 文件管理器
+            ContextMenuItem {
+                item-id: "open_sftp";
+                title: @tr("打开 SFTP 传输");
+                icon: @image-url("../../assets/icons/folder-open.svg");
+                clicked(id) => {
+                    root.open-sftp(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            ContextMenuItem { is-separator: true; }
+
+            // 3. 编辑主机配置
+            ContextMenuItem {
+                item-id: "edit_host";
+                title: @tr("编辑主机");
+                icon: @image-url("../../assets/icons/pencil.svg");
+                clicked(id) => {
+                    root.edit-host(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            // 4. 复制 IP 地址
+            ContextMenuItem {
+                item-id: "copy_address";
+                title: @tr("复制主机地址");
+                icon: @image-url("../../assets/icons/copy.svg");
+                clicked(id) => {
+                    root.copy-address(root.target-address != "" ? root.target-address : root.target-name);
+                    root.close-menu();
+                }
+            }
+
+            // 5. 克隆主机
+            ContextMenuItem {
+                item-id: "clone_host";
+                title: @tr("克隆此主机");
+                icon: @image-url("../../assets/icons/plus.svg");
+                clicked(id) => {
+                    root.clone-host(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            ContextMenuItem { is-separator: true; }
+
+            // 6. 删除主机 (危险项)
+            ContextMenuItem {
+                item-id: "delete_host";
+                title: @tr("删除主机");
+                icon: @image-url("../../assets/icons/window-close.svg");
+                is-danger: true;
+                clicked(id) => {
+                    root.delete-target(root.target-id, false);
+                    root.close-menu();
+                }
+            }
+        }
+
+        // =====================================================================
+        // 分支 B: 分组节点右键菜单 (Group Node Menu)
+        // =====================================================================
+        if root.is-group: VerticalLayout {
+            spacing: 1px;
+            alignment: start;
+
+            // 1. 在当前分组下快速新建主机 (痛点功能：自动绑定父级分组)
+            ContextMenuItem {
+                item-id: "create_host_in_group";
+                title: @tr("在此组新建主机");
+                icon: @image-url("../../assets/icons/plus.svg");
+                clicked(id) => {
+                    root.create-host-in-group(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            // 2. 新建子分组
+            ContextMenuItem {
+                item-id: "create_subgroup";
+                title: @tr("新建子分组");
+                icon: @image-url("../../assets/icons/folder-plus.svg");
+                clicked(id) => {
+                    root.create-subgroup(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            ContextMenuItem { is-separator: true; }
+
+            // 3. 折叠 / 展开
+            ContextMenuItem {
+                item-id: "toggle_expand";
+                title: @tr("切换展开 / 折叠");
+                icon: @image-url("../../assets/icons/folder.svg");
+                clicked(id) => {
+                    root.toggle-expand(root.target-id);
+                    root.close-menu();
+                }
+            }
+
+            ContextMenuItem { is-separator: true; }
+
+            // 4. 删除分组 (危险项)
+            ContextMenuItem {
+                item-id: "delete_group";
+                title: @tr("删除此分组");
+                icon: @image-url("../../assets/icons/window-close.svg");
+                is-danger: true;
+                clicked(id) => {
+                    root.delete-target(root.target-id, true);
+                    root.close-menu();
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,52 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 动态微光脉冲状态指示组件
+/// 用于证明探针或连接处于实时监听与活跃流动状态
+export component PulseIndicator {
+    in property <color> pulse-color: AppTheme.success;
+    in property <bool> active: true;
+    in property <string> text: @tr("实时侦听中");
+    in property <bool> show-text: true;
+
+    height: 20px;
+
+    HorizontalLayout {
+        spacing: 5px;
+        alignment: start;
+
+        // 微光发光双层圆点
+        Rectangle {
+            width: 12px;
+            height: 12px;
+            y: (parent.height - self.height) / 2;
+
+            // 外层光晕圆环
+            Rectangle {
+                width: 12px;
+                height: 12px;
+                border-radius: 6px;
+                background: root.active ? root.pulse-color.transparentize(80%) : transparent;
+                border-width: 1px;
+                border-color: root.active ? root.pulse-color.transparentize(50%) : AppTheme.disabled-foreground.transparentize(60%);
+            }
+
+            // 内层实体核心点
+            Rectangle {
+                x: 3px;
+                y: 3px;
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: root.active ? root.pulse-color : AppTheme.disabled-foreground;
+            }
+        }
+
+        if root.show-text: Text {
+            text: root.text;
+            font-size: 8px;
+            font-weight: 600;
+            color: root.active ? root.pulse-color : AppTheme.disabled-foreground;
+            vertical-alignment: center;
+        }
+    }
+}

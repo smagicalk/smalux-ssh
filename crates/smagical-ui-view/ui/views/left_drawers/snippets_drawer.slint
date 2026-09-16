@@ -1,0 +1,351 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { SearchInput } from "../../components/search-input.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
+import { SnippetTreeNode } from "../../features/snippets/snippets_model.slint";
+import { SnippetsBridge } from "../../features/snippets/snippets_bridge.slint";
+
+export { SnippetTreeNode }
+
+/// 代码片段管理抽屉组件 (Snippets Drawer)
+///
+/// 具备与主机抽屉完全一致的现代化树形多层层级折叠展开、分类检索、拖拽调序与分组迁移能力。
+export component SnippetsDrawer inherits DrawerContainer {
+    title: @tr("代码片段");
+    collapse-icon: "◀";
+
+    /// 树形数据源
+    in property <[SnippetTreeNode]> tree-nodes: SnippetsBridge.tree-nodes;
+    /// 搜索过滤关键词
+    in-out property <string> search-query: SnippetsBridge.search-query;
+    /// 当前选中的节点 ID
+    in-out property <string> selected-id: SnippetsBridge.active-snippet-id;
+
+    /// 拖拽交互状态
+    in-out property <bool> is-dragging: false;
+    in-out property <string> drag-source-id: "";
+    in-out property <string> drag-source-name: "";
+    in-out property <bool> drag-source-is-group: false;
+    in-out property <string> drop-target-id: "";
+    in-out property <string> drop-target-name: "";
+    in-out property <int> drop-target-index: -1;
+    in-out property <string> drop-position: "inside";
+    in-out property <bool> drop-target-valid: false;
+    in-out property <length> drag-x: 0px;
+    in-out property <length> drag-y: 0px;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 8px;
+
+        // 1. 顶部检索框
+        SearchInput {
+            text <=> root.search-query;
+            placeholder: @tr("搜索代码片段、脚本或分组...");
+            changed(text) => { SnippetsBridge.search-changed(text); }
+        }
+
+        // 2. 栏目标题与操作栏
+        HorizontalLayout {
+            padding-left: 4px;
+            padding-right: 4px;
+            alignment: space-between;
+            height: 22px;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+
+                Text {
+                    text: @tr("树形层级视图");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    height: 16px;
+                    border-radius: 8px;
+                    background: AppTheme.control-background;
+
+                    HorizontalLayout {
+                        padding-left: 6px;
+                        padding-right: 6px;
+
+                        Text {
+                            text: root.tree-nodes.length + " " + @tr("项");
+                            font-size: 9px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            // 新建分组与新建片段
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: end;
+
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/folder-plus.svg");
+                    clicked => { SnippetsBridge.create-new-group(); }
+                }
+
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/plus.svg");
+                    clicked => { SnippetsBridge.create-new-snippet(); }
+                }
+            }
+        }
+
+        // 2.5 拖拽时的顶级根目录放置区
+        if root.is-dragging: Rectangle {
+            height: 28px;
+            border-radius: 4px;
+            background: root.drop-target-id == "root" ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
+            border-width: 1.5px;
+            border-color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.border;
+            animate background { duration: 120ms; }
+            animate border-color { duration: 120ms; }
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 6px;
+                alignment: center;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/folder.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.secondary-foreground;
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: @tr("移至根目录 (顶级)");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // 3. 核心树形节点滚动视口
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            drawer_scroll := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: list-content.preferred-height;
+
+                list-content := VerticalLayout {
+                    spacing: 2px;
+                    alignment: start;
+
+                    for node[idx] in root.tree-nodes: Rectangle {
+                        height: 30px;
+                        width: 100%;
+                        border-radius: 4px;
+                        opacity: (root.is-dragging && node.id == root.drag-source-id) ? 0.35 : 1.0;
+                        background: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid)
+                            ? AppTheme.accent.transparentize(85%)
+                            : (node.id == root.selected-id)
+                                ? AppTheme.control-background
+                                : (item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent);
+                        border-width: 1px;
+                        border-color: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid)
+                            ? AppTheme.accent.transparentize(40%)
+                            : (node.id == root.selected-id ? AppTheme.border : transparent);
+
+                        animate background { duration: root.is-dragging ? 0ms : 120ms; }
+                        animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
+
+                        item-touch := TouchArea {
+                            pointer-event(event) => {
+                                if event.kind == PointerEventKind.down {
+                                    root.drag-source-id = node.id;
+                                    root.drag-source-name = node.name;
+                                    root.drag-source-is-group = node.is-group;
+                                    root.is-dragging = false;
+                                    root.drop-target-index = -1;
+                                }
+                                if event.kind == PointerEventKind.up {
+                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
+                                        if root.drop-target-id == "root" {
+                                            SnippetsBridge.move-node(root.drag-source-id, "root", "root");
+                                        } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
+                                            SnippetsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                        }
+                                    }
+                                    root.is-dragging = false;
+                                    root.drag-source-id = "";
+                                    root.drop-target-id = "";
+                                    root.drop-target-name = "";
+                                    root.drop-target-index = -1;
+                                    root.drop-position = "inside";
+                                }
+                                if event.kind == PointerEventKind.cancel {
+                                    root.is-dragging = false;
+                                    root.drag-source-id = "";
+                                    root.drop-target-id = "";
+                                    root.drop-target-name = "";
+                                    root.drop-target-index = -1;
+                                    root.drop-position = "inside";
+                                }
+                            }
+                            moved => {
+                                if self.pressed {
+                                    if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
+                                        root.is-dragging = true;
+                                        root.drag-source-id = node.id;
+                                        root.drag-source-name = node.name;
+                                        root.drag-source-is-group = node.is-group;
+                                        root.drag-x = self.mouse-x;
+                                        let total_y = idx * 32px + self.mouse-y;
+                                        root.drag-y = total_y;
+
+                                        let screen_y = total_y + drawer_scroll.viewport-y;
+                                        if screen_y < 16px {
+                                            root.drop-target-index = -1;
+                                            root.drop-target-id = "root";
+                                            root.drop-position = "root";
+                                            root.drop-target-valid = true;
+                                            SnippetsBridge.request-drag-hover(root.drag-source-id, -1, 0.0);
+                                        } else {
+                                            let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
+                                            root.drop-target-index = target_idx;
+                                            root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
+                                            SnippetsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                                        }
+                                    }
+                                }
+                            }
+                            clicked => {
+                                if !root.is-dragging {
+                                    if node.is-group {
+                                        SnippetsBridge.toggle-group-expanded(node.id);
+                                    }
+                                    root.selected-id = node.id;
+                                    SnippetsBridge.select-node(node.id, node.is-group);
+                                }
+                            }
+                            double-clicked => {
+                                if !node.is-group && !root.is-dragging {
+                                    SnippetsBridge.request-run-snippet(node.id);
+                                }
+                            }
+                            mouse-cursor: root.is-dragging ? copy : pointer;
+                        }
+
+                        // 拖拽下插指示线
+                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid && root.drop-target-id != "root": Rectangle {
+                            x: 6px + node.level * 14px;
+                            y: parent.height - 2px;
+                            width: Math.min(140px, parent.width - 16px - node.level * 14px);
+                            height: 2px;
+                            background: AppTheme.accent;
+                            border-radius: 1px;
+                            z: 20;
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px + node.level * 16px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            alignment: space-between;
+
+                            // 左侧：图标 + 名称
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+
+                                // 节点图标
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    if node.is-group: Image {
+                                        source: node.is-expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg");
+                                        width: 14px;
+                                        height: 14px;
+                                        image-fit: contain;
+                                        colorize: (node.id == root.selected-id) ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    }
+
+                                    if !node.is-group: Image {
+                                        source: @image-url("../../assets/icons/code.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: (node.id == root.selected-id) ? AppTheme.accent : (item-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                    }
+                                }
+
+                                // 节点名称
+                                VerticalLayout {
+                                    alignment: center;
+
+                                    Text {
+                                        text: node.name;
+                                        font-size: 11px;
+                                        font-weight: node.is-group ? 600 : 500;
+                                        color: (node.id == root.selected-id) ? AppTheme.accent : AppTheme.foreground;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 右侧：文件夹数量与脚本语言胶囊
+                            HorizontalLayout {
+                                spacing: 5px;
+                                alignment: end;
+
+                                // 文件夹子项计数胶囊
+                                if node.is-group: Rectangle {
+                                    height: 16px;
+                                    border-radius: 8px;
+                                    background: AppTheme.control-background;
+
+                                    HorizontalLayout {
+                                        padding-left: 5px;
+                                        padding-right: 5px;
+
+                                        Text {
+                                            text: node.item_count;
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+
+
+                            }
+                        }
+                    }
+                }
+            }
+
+            AppVScrollBar {
+                viewport-height: drawer_scroll.viewport-height;
+                visible-height: drawer_scroll.height;
+                viewport-y <=> drawer_scroll.viewport-y;
+            }
+        }
+    }
+}

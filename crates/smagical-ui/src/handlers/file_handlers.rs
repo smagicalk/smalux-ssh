@@ -2,6 +2,7 @@
 //!
 //! 负责本地与远程文件系统目录遍历、独立双栏 Tab 调度、路径导航与文件上传/下载任务流转。
 
+use std::cell::RefCell;
 use std::path::PathBuf;
 use std::rc::Rc;
 use slint::ComponentHandle;
@@ -11,7 +12,7 @@ use smagical_core::event::{
     FileTabOpeningEvent, FileTransferStartedEvent,
 };
 use smagical_core::{
-    generate_mock_remote_directory, scan_local_directory, FileItemData,
+    scan_local_directory, FileItemData,
     LocalFileTabSession, RemoteFileTabSession, TransferDirection, TransferStatus, TransferTask,
 };
 
@@ -21,6 +22,10 @@ use crate::generated::{
     WindowBridge,
 };
 use crate::handlers::AppContext;
+
+thread_local! {
+    static FILE_APP_CTX: RefCell<Option<AppContext>> = const { RefCell::new(None) };
+}
 
 /// 将核心层 `TransferTask` 转换为 Slint UI 传输数据项 (支持单文件与文件夹树形展开)
 pub(crate) fn map_transfer_task_to_ui(t: &TransferTask) -> SlintTransferItemData {
@@ -92,6 +97,39 @@ pub(crate) fn map_file_item_to_ui(item: &FileItemData) -> SlintFileItemData {
     }
 }
 
+/// 递归扫描指定本地文件夹，统计文件总数、总大小与子文件层级信息
+fn scan_folder_recursive(dir: &std::path::Path) -> (usize, u64, Vec<(String, PathBuf, u64, String)>) {
+    let mut file_count = 0;
+    let mut total_bytes = 0;
+    let mut sub_items = Vec::new();
+
+    fn walk(
+        base: &std::path::Path,
+        current: &std::path::Path,
+        file_count: &mut usize,
+        total_bytes: &mut u64,
+        sub_items: &mut Vec<(String, PathBuf, u64, String)>,
+    ) {
+        if let Ok(entries) = std::fs::read_dir(current) {
+            for entry in entries.flatten() {
+                let p = entry.path();
+                if p.is_dir() {
+                    walk(base, &p, file_count, total_bytes, sub_items);
+                } else if p.is_file() {
+                    *file_count += 1;
+                    let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    *total_bytes += size;
+                    let rel = p.strip_prefix(base).unwrap_or(&p).to_string_lossy().replace('\\', "/");
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    sub_items.push((name, p, size, rel));
+                }
+            }
+        }
+    }
+
+    walk(dir, dir, &mut file_count, &mut total_bytes, &mut sub_items);
+    (file_count, total_bytes, sub_items)
+}
 
 /// 仅同步左侧本地 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
 pub(crate) fn sync_local_tabs_only(window: &AppWindow, ctx: &AppContext) {
@@ -296,22 +334,58 @@ pub(crate) fn refresh_local_path(ctx: &AppContext, new_path: &str) {
     let _ = try_refresh_local_path(ctx, new_path, true);
 }
 
+/// 判断当前右栏 SFTP / 远程文件上下文是否为本地会话
+pub(crate) fn is_remote_tab_local(ctx: &AppContext) -> bool {
+    let act_id = ctx.active_remote_tab_id.borrow().clone();
+    let tabs = ctx.remote_tabs.borrow();
+    if let Some(t) = tabs.iter().find(|t| t.tab_id == act_id) {
+        return t.host_id == "local" || t.host_id.starts_with("local-");
+    }
+    // 备选：如果当前无选中的 remote_tab，则以中央终端活跃会话为准
+    let active_pane_id = ctx.active_pane_id.borrow().clone();
+    let pane_groups = ctx.pane_groups.borrow();
+    if let Some(group) = pane_groups.iter().find(|g| g.pane_id == active_pane_id).or_else(|| pane_groups.first()) {
+        if let Some(s) = group.get_active_session() {
+            return s.host_id == "local" || s.host_id.starts_with("local-") || s.host_id.is_empty();
+        }
+    }
+    true // 默认本地优先
+}
+
 /// 扫描并更新右栏文件列表 (带错误校验与历史记录，自适应本地与远程会话)
 pub(crate) fn try_refresh_remote_path(ctx: &AppContext, new_path: &str, push_history: bool) -> Result<(), String> {
     let act_id = ctx.active_remote_tab_id.borrow().clone();
-    let is_local_session = {
-        let tabs = ctx.remote_tabs.borrow();
-        tabs.iter().find(|t| t.tab_id == act_id).map(|t| t.host_id == "local").unwrap_or(false)
-    };
+    let is_local_session = is_remote_tab_local(ctx);
 
     if is_local_session {
         // 右栏当前激活会话为本地目录
         let target = if new_path == "~" || new_path.is_empty() {
             directories::BaseDirs::new()
                 .map(|p| p.home_dir().to_path_buf())
-                .unwrap_or_else(|| PathBuf::from("/"))
+                .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+        } else if new_path.starts_with("~/") || new_path.starts_with("~\\") {
+            if let Some(home) = directories::BaseDirs::new().map(|p| p.home_dir().to_path_buf()) {
+                home.join(&new_path[2..])
+            } else {
+                PathBuf::from(new_path)
+            }
         } else {
-            PathBuf::from(new_path)
+            let p = PathBuf::from(new_path);
+            if p.is_relative() {
+                let curr = ctx.remote_current_path.borrow().clone();
+                if !curr.is_empty() {
+                    let base = PathBuf::from(&curr);
+                    if base.is_dir() {
+                        base.join(p)
+                    } else {
+                        p
+                    }
+                } else {
+                    p
+                }
+            } else {
+                p
+            }
         };
 
         if !target.exists() {
@@ -323,7 +397,17 @@ pub(crate) fn try_refresh_remote_path(ctx: &AppContext, new_path: &str, push_his
 
         match scan_local_directory(&target) {
             Ok(files) => {
-                let resolved_path = target.to_string_lossy().to_string();
+                let s = if let Ok(canon) = target.canonicalize() {
+                    canon.to_string_lossy().to_string()
+                } else {
+                    target.to_string_lossy().to_string()
+                };
+                let resolved_path = if let Some(stripped) = s.strip_prefix(r"\\?\") {
+                    stripped.to_string()
+                } else {
+                    s
+                };
+
                 *ctx.remote_current_path.borrow_mut() = resolved_path.clone();
                 *ctx.remote_file_nodes.borrow_mut() = files;
 
@@ -334,21 +418,28 @@ pub(crate) fn try_refresh_remote_path(ctx: &AppContext, new_path: &str, push_his
                     } else {
                         tab.current_path = resolved_path;
                     }
+                } else {
+                    let tid = if act_id.is_empty() { "rtab-local".to_string() } else { act_id.clone() };
+                    let session = RemoteFileTabSession::new(
+                        tid.clone(),
+                        "local",
+                        "本地终端",
+                        "Local Filesystem",
+                        resolved_path,
+                    );
+                    tabs.push(session);
+                    drop(tabs);
+                    *ctx.active_remote_tab_id.borrow_mut() = tid;
                 }
                 Ok(())
             }
             Err(e) => Err(format!("无法读取目录 [{}]: {}", target.display(), e)),
         }
     } else {
-        // 右栏当前激活会话为远程 SFTP
+        // 远程会话模式：目前优先测试本地终端真实数据，不再使用假数据
         let clean_path = if new_path == "~" || new_path.is_empty() { "/root" } else { new_path };
-        if !clean_path.starts_with('/') {
-            return Err(format!("远程路径必须以绝对路径 '/' 开头: {}", clean_path));
-        }
-
         *ctx.remote_current_path.borrow_mut() = clean_path.to_string();
-        let files = generate_mock_remote_directory(clean_path);
-        *ctx.remote_file_nodes.borrow_mut() = files;
+        *ctx.remote_file_nodes.borrow_mut() = Vec::new();
 
         let mut tabs = ctx.remote_tabs.borrow_mut();
         if let Some(tab) = tabs.iter_mut().find(|t| t.tab_id == act_id) {
@@ -367,11 +458,97 @@ pub(crate) fn refresh_remote_path(ctx: &AppContext, new_path: &str) {
     let _ = try_refresh_remote_path(ctx, new_path, true);
 }
 
+/// 当右栏伴生抽屉切换至 SFTP 或活跃终端主机发生变更时，同步刷新 SFTP 抽屉真实数据
+pub(crate) fn sync_sftp_drawer_for_host(
+    window: &AppWindow,
+    ctx: &AppContext,
+    host_id: &str,
+    host_name: &str,
+) {
+    let is_local = host_id == "local" || host_id.starts_with("local-") || host_id.is_empty();
+
+    if is_local {
+        // 1. 确保在 remote_tabs 中有对应的本地文件会话
+        let act_id = ctx.active_remote_tab_id.borrow().clone();
+        let mut tabs = ctx.remote_tabs.borrow_mut();
+        let has_matching_tab = tabs.iter().any(|t| t.tab_id == act_id && (t.host_id == "local" || t.host_id.starts_with("local-")));
+
+        if !has_matching_tab {
+            if let Some(existing) = tabs.iter().find(|t| t.host_id == "local" || t.host_id.starts_with("local-")) {
+                *ctx.active_remote_tab_id.borrow_mut() = existing.tab_id.clone();
+            } else {
+                let tid = format!("rtab-{}", if host_id.is_empty() { "local" } else { host_id });
+                let home_path = directories::BaseDirs::new()
+                    .map(|p| p.home_dir().to_string_lossy().to_string())
+                    .unwrap_or_else(|| ".".to_string());
+                let session = RemoteFileTabSession::new(
+                    tid.clone(),
+                    if host_id.is_empty() { "local" } else { host_id },
+                    if host_name.is_empty() { "本地终端" } else { host_name },
+                    "Local Filesystem",
+                    home_path,
+                );
+                tabs.push(session);
+                *ctx.active_remote_tab_id.borrow_mut() = tid;
+            }
+        }
+        drop(tabs);
+
+        // 2. 获取当前路径或默认主目录
+        let current_p = ctx.remote_current_path.borrow().clone();
+        let target_p = if current_p.is_empty() || !std::path::Path::new(&current_p).exists() {
+            directories::BaseDirs::new()
+                .map(|p| p.home_dir().to_string_lossy().to_string())
+                .unwrap_or_else(|| ".".to_string())
+        } else {
+            current_p
+        };
+
+        // 3. 扫描真实本地文件并同步 UI
+        let _ = try_refresh_remote_path(ctx, &target_p, false);
+        sync_file_explorer_ui(window, ctx);
+        tracing::info!(target: "smagical_ui::files", "右栏 SFTP 伴生抽屉成功同步本地终端真实目录: {}", target_p);
+    } else {
+        // 远程主机模式
+        let act_id = ctx.active_remote_tab_id.borrow().clone();
+        let mut tabs = ctx.remote_tabs.borrow_mut();
+        let has_matching_tab = tabs.iter().any(|t| t.tab_id == act_id && t.host_id == host_id);
+
+        if !has_matching_tab {
+            if let Some(existing) = tabs.iter().find(|t| t.host_id == host_id) {
+                *ctx.active_remote_tab_id.borrow_mut() = existing.tab_id.clone();
+            } else {
+                let tid = format!("rtab-{}", host_id);
+                let session = RemoteFileTabSession::new(
+                    tid.clone(),
+                    host_id,
+                    host_name,
+                    "Remote Host",
+                    "/root",
+                );
+                tabs.push(session);
+                *ctx.active_remote_tab_id.borrow_mut() = tid;
+            }
+        }
+        drop(tabs);
+
+        let current_p = ctx.remote_current_path.borrow().clone();
+        let target_p = if current_p.is_empty() { "/root".to_string() } else { current_p };
+        let _ = try_refresh_remote_path(ctx, &target_p, false);
+        sync_file_explorer_ui(window, ctx);
+        tracing::info!(target: "smagical_ui::files", "右栏 SFTP 伴生抽屉切换至远程主机: {}", host_id);
+    }
+}
+
 
 
 
 /// 注册双盘文件管理与 SFTP 视图回调
 pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
+    FILE_APP_CTX.with(|cell| {
+        *cell.borrow_mut() = Some(ctx.clone());
+    });
+
     let fb = window.global::<FilesBridge>();
 
     // -------------------------------------------------------------------------
@@ -821,10 +998,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     fb.on_navigate_remote_up(move || {
         if let Some(w) = window_weak.upgrade() {
             let act_id = ctx_up_remote.active_remote_tab_id.borrow().clone();
-            let is_local_session = {
-                let tabs = ctx_up_remote.remote_tabs.borrow();
-                tabs.iter().find(|t| t.tab_id == act_id).map(|t| t.host_id == "local").unwrap_or(false)
-            };
+            let is_local_session = is_remote_tab_local(&ctx_up_remote);
             let current = ctx_up_remote.remote_current_path.borrow().clone();
 
             if is_local_session {
@@ -887,6 +1061,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 tracing::info!(target: "smagical_ui::files", "进入远程目录: {}", p_str);
             } else {
                 tracing::info!(target: "smagical_ui::files", "双击远程文件: {}", p_str);
+                if is_remote_tab_local(&ctx_open_remote) {
+                    #[cfg(target_os = "windows")]
+                    let _ = std::process::Command::new("explorer").arg(&p_str).spawn();
+                    #[cfg(not(target_os = "windows"))]
+                    let _ = std::process::Command::new("xdg-open").arg(&p_str).spawn();
+                }
             }
         }
     });
@@ -915,45 +1095,134 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
         }
     });
 
-    // 4.7 上传选中文件 (Local -> Remote)
+    // 4.7 上传系统文件 (弹窗系统文件选择，支持多选并真正加入传输任务队列)
     let window_weak = window.as_weak();
-    let ctx_upload = ctx.clone();
     fb.on_upload_file(move || {
-        if let Some(w) = window_weak.upgrade() {
-            let loc_path = ctx_upload.local_current_path.borrow().clone();
-            let rem_path = ctx_upload.remote_current_path.borrow().clone();
-            let filename = std::path::Path::new(&loc_path)
-                .file_name()
-                .map(|s| s.to_string_lossy().to_string())
-                .unwrap_or_else(|| "uploaded_file.bin".to_string());
+        let is_en = window_weak.upgrade().map(|w| w.global::<WindowBridge>().get_current_language() == "en-US").unwrap_or(false);
+        let w_weak = window_weak.clone();
+        std::thread::spawn(move || {
+            let dialog_title = if is_en { "Select files to upload (multiple selection supported)" } else { "选择要上传的文件 (支持多选)" };
+            let picked = rfd::FileDialog::new()
+                .set_title(dialog_title)
+                .pick_files();
+            if let Some(files) = picked {
+                if files.is_empty() { return; }
+                slint::invoke_from_event_loop(move || {
+                    if let Some(w) = w_weak.upgrade() {
+                        FILE_APP_CTX.with(|cell| {
+                            if let Some(ctx_up) = cell.borrow().as_ref() {
+                                let rem_path = ctx_up.remote_current_path.borrow().clone();
+                                let mut tasks = ctx_up.transfer_tasks.borrow_mut();
+                                for path in files {
+                                    let filename = path.file_name()
+                                        .map(|s| s.to_string_lossy().to_string())
+                                        .unwrap_or_else(|| "uploaded_file.bin".to_string());
+                                    let size = std::fs::metadata(&path).map(|m| m.len()).unwrap_or(1024 * 1024);
+                                    let task_id = format!("task-up-{}", uuid::Uuid::new_v4().simple());
+                                    let target_path = format!("{}/{}", rem_path.trim_end_matches('/'), filename);
+                                    tasks.push(TransferTask {
+                                        id: task_id,
+                                        parent_id: None,
+                                        session_id: "session-active".into(),
+                                        filename,
+                                        is_dir: false,
+                                        is_expanded: false,
+                                        level: 0,
+                                        item_count_text: "".into(),
+                                        source_path: path.to_string_lossy().to_string(),
+                                        target_path,
+                                        direction: TransferDirection::Upload,
+                                        total_bytes: size,
+                                        transferred_bytes: 0,
+                                        speed_bytes_per_sec: 14_800_000,
+                                        status: TransferStatus::Transferring,
+                                        error_message: None,
+                                    });
+                                }
+                                drop(tasks);
+                                sync_file_explorer_ui(&w, ctx_up);
+                            }
+                        });
+                    }
+                }).ok();
+            }
+        });
+    });
 
-            let task_id = format!("task-up-{}", ctx_upload.transfer_tasks.borrow().len() + 1);
-            let task = TransferTask {
-                id: task_id.clone(),
-                parent_id: None,
-                session_id: "session-active".into(),
-                filename,
-                is_dir: false,
-                is_expanded: false,
-                level: 0,
-                item_count_text: "".into(),
-                source_path: loc_path.clone(),
-                target_path: rem_path.clone(),
-                direction: TransferDirection::Upload,
-                total_bytes: 45_200_000,
-                transferred_bytes: 31_640_000,
-                speed_bytes_per_sec: 14_800_000,
-                status: TransferStatus::Transferring,
-                error_message: None,
-            };
-            ctx_upload.transfer_tasks.borrow_mut().push(task);
-            sync_file_explorer_ui(&w, &ctx_upload);
-            tracing::info!(
-                target: "smagical_ui::files",
-                "创建文件上传任务: 本地目录 [{}] -> 远程目录 [{}]",
-                loc_path, rem_path
-            );
-        }
+    // 4.7b 上传系统文件夹 (弹窗系统文件夹选择，递归扫描并真正加入传输任务队列)
+    let window_weak_folder = window.as_weak();
+    fb.on_upload_folder(move || {
+        let is_en = window_weak_folder.upgrade().map(|w| w.global::<WindowBridge>().get_current_language() == "en-US").unwrap_or(false);
+        let w_weak = window_weak_folder.clone();
+        std::thread::spawn(move || {
+            let dialog_title = if is_en { "Select folder to upload" } else { "选择要上传的文件夹" };
+            let picked = rfd::FileDialog::new()
+                .set_title(dialog_title)
+                .pick_folder();
+            if let Some(dir_path) = picked {
+                let (file_count, total_bytes, sub_items) = scan_folder_recursive(&dir_path);
+                slint::invoke_from_event_loop(move || {
+                    if let Some(w) = w_weak.upgrade() {
+                        FILE_APP_CTX.with(|cell| {
+                            if let Some(ctx_up) = cell.borrow().as_ref() {
+                                let rem_path = ctx_up.remote_current_path.borrow().clone();
+                                let dir_name = dir_path.file_name()
+                                    .map(|s| s.to_string_lossy().to_string())
+                                    .unwrap_or_else(|| "folder".to_string());
+
+                                let parent_task_id = format!("task-dir-{}", uuid::Uuid::new_v4().simple());
+                                let target_dir_path = format!("{}/{}", rem_path.trim_end_matches('/'), dir_name);
+
+                                let mut tasks = ctx_up.transfer_tasks.borrow_mut();
+                                tasks.push(TransferTask {
+                                    id: parent_task_id.clone(),
+                                    parent_id: None,
+                                    session_id: "session-active".into(),
+                                    filename: dir_name,
+                                    is_dir: true,
+                                    is_expanded: true,
+                                    level: 0,
+                                    item_count_text: format!("{} 项", file_count),
+                                    source_path: dir_path.to_string_lossy().to_string(),
+                                    target_path: target_dir_path.clone(),
+                                    direction: TransferDirection::Upload,
+                                    total_bytes,
+                                    transferred_bytes: 0,
+                                    speed_bytes_per_sec: 15_200_000,
+                                    status: TransferStatus::Transferring,
+                                    error_message: None,
+                                });
+
+                                for (sub_name, sub_path, sub_size, sub_rel) in sub_items {
+                                    let child_task_id = format!("task-sub-{}", uuid::Uuid::new_v4().simple());
+                                    let child_target = format!("{}/{}", target_dir_path, sub_rel);
+                                    tasks.push(TransferTask {
+                                        id: child_task_id,
+                                        parent_id: Some(parent_task_id.clone()),
+                                        session_id: "session-active".into(),
+                                        filename: sub_name,
+                                        is_dir: false,
+                                        is_expanded: false,
+                                        level: 1,
+                                        item_count_text: "".into(),
+                                        source_path: sub_path.to_string_lossy().to_string(),
+                                        target_path: child_target,
+                                        direction: TransferDirection::Upload,
+                                        total_bytes: sub_size,
+                                        transferred_bytes: 0,
+                                        speed_bytes_per_sec: 15_200_000,
+                                        status: TransferStatus::Transferring,
+                                        error_message: None,
+                                    });
+                                }
+                                drop(tasks);
+                                sync_file_explorer_ui(&w, ctx_up);
+                            }
+                        });
+                    }
+                }).ok();
+            }
+        });
     });
 
     // 4.8 下载选中文件 (Remote -> Local)

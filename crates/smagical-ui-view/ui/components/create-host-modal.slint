@@ -1,0 +1,752 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppButton } from "base/app-button.slint";
+import { GroupOptionData } from "group-tree-selector.slint";
+import { CredentialOptionData, JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData } from "../features/hosts/hosts_model.slint";
+import { HostsBridge } from "../features/hosts/hosts_bridge.slint";
+import { GroupPickerDialog } from "create_host/pickers/group-picker-dialog.slint";
+import { CredentialPickerDialog } from "create_host/pickers/credential-picker-dialog.slint";
+import { JumpPickerDialog } from "create_host/pickers/jump-picker-dialog.slint";
+import { ProxyPickerDialog } from "create_host/pickers/proxy-picker-dialog.slint";
+import { CreateHostGeneralTab } from "create_host/tabs/create-host-general-tab.slint";
+import { CreateHostNetworkTab } from "create_host/tabs/create-host-network-tab.slint";
+import { CreateHostJumpTab } from "create_host/tabs/create-host-jump-tab.slint";
+import { CreateHostAdvancedTab } from "create_host/tabs/create-host-advanced-tab.slint";
+
+export { CredentialOptionData, JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData }
+
+/// 新建与编辑主机资产弹窗组件 (Create Host Modal)
+///
+/// 采用四 Tab 结构分类组织常规认证、网络与代理、跳板机级联链路及高级选项，
+/// 完美支持凭据中心二级检索、有序跳板串编组、隧道中心代理复用与即时探活。
+export component CreateHostModal inherits Rectangle {
+    /// 弹窗显隐控制开关
+    in property <bool> is-open: false;
+    /// 上级分组树形选项数据列表 (来自 Rust 存储层)
+    in property <[GroupOptionData]> group-options: [];
+    /// 凭据简要下拉选项列表 (来自 Rust 存储层)
+    in property <[CredentialOptionData]> credential-options: [];
+    /// 可作为跳板机的主机列表 (来自 Rust 存储层)
+    in property <[JumpHostOptionData]> jump-host-options: [];
+    /// 预设跳板串列表 (来自网络与隧道中心)
+    in property <[PresetJumpChainData]> preset-jump-chains: [];
+    /// 已有代理配置列表 (来自网络与隧道中心)
+    in property <[ProxyOptionData]> proxy-options: [];
+    /// 默认预选的上级分组 ID
+    in property <string> default-parent-id: "root";
+    /// 测试连接状态 ("idle" | "testing" | "success" | "error")
+    in property <string> test-status: "idle";
+    /// 测试连接反馈文本
+    in property <string> test-message: "";
+    /// 是否为编辑模式 (true 为编辑已有主机，false 为新建主机)
+    in property <bool> is-edit-mode: false;
+    /// 当前正在编辑的主机 ID
+    in property <string> editing-host-id: "";
+
+    // 表单状态属性
+    property <string> active-tab: "general"; // "general" | "network" | "jump" | "advanced"
+    in-out property <string> host-name: "";
+    in-out property <string> host-address: "";
+    in-out property <string> host-port-str: "22";
+    in-out property <string> selected-parent-id: root.default-parent-id;
+    in-out property <string> selected-parent-name: @tr("根目录 (顶级主机)");
+    in-out property <string> auth-type: "credential"; // "credential" | "password" | "key"
+    in-out property <string> selected-cred-id: "";
+    in-out property <string> selected-cred-name: "";
+    in-out property <string> selected-cred-user: "";
+    in-out property <string> selected-cred-type: "";
+    in-out property <string> selected-cred-alg: "";
+    in-out property <string> auth-username: "root";
+    in-out property <string> auth-password: "";
+    in-out property <bool> save-to-credentials: false;
+    in-out property <string> auth-key-username: "root";
+    in-out property <string> auth-key-data: "";
+    in-out property <string> auth-key-passphrase: "";
+    in-out property <bool> save-key-to-credentials: false;
+
+    // 网络与代理属性 (严格三段互斥模式：直连 / 引用隧道代理 / 手动自定义)
+    in-out property <string> proxy-mode: "direct"; // "direct" | "tunnel" | "custom"
+    in-out property <string> selected-tunnel-proxy-id: "";
+    in-out property <string> selected-tunnel-proxy-name: "";
+    in-out property <string> selected-tunnel-proxy-proto: "SOCKS5";
+    in-out property <string> selected-tunnel-proxy-host: "";
+    in-out property <int> selected-tunnel-proxy-port: 1080;
+    in-out property <string> selected-tunnel-proxy-user: "";
+
+    in-out property <string> custom-proxy-proto: "socks5"; // "socks5" | "http" | "https"
+    in-out property <string> custom-proxy-host: "";
+    in-out property <string> custom-proxy-port-str: "";
+    in-out property <string> custom-proxy-username: "";
+    in-out property <string> custom-proxy-password: "";
+    in-out property <string> keepalive-interval-str: "30";
+    in-out property <string> connect-timeout-str: "10";
+
+    // 高级选项
+    in-out property <string> initial-dir: "";
+    in-out property <string> startup-cmd: "";
+    in-out property <string> term-type: "xterm-256color";
+    in-out property <string> notes: "";
+
+    // 内部子选择器状态
+    property <bool> is-group-picker-open: false;
+    property <string> temp-selected-group-id: root.selected-parent-id;
+    property <string> temp-selected-group-name: root.selected-parent-name;
+    property <bool> is-cred-picker-open: false;
+    property <string> cred-filter-category: "all"; // "all" | "key" | "password" | "agent"
+    property <string> cred-search-query: "";
+    property <string> temp-selected-cred-id: "";
+    property <string> temp-selected-cred-name: "";
+    property <string> temp-selected-cred-user: "";
+    property <string> temp-selected-cred-type: "";
+    property <string> temp-selected-cred-alg: "";
+
+    // 跳板机与代理二级弹窗状态
+    property <bool> is-jump-picker-open: false;
+    property <string> jump-picker-tab: "hosts"; // "hosts" | "presets"
+    property <string> jump-search-query: "";
+    property <bool> is-proxy-picker-open: false;
+    property <string> proxy-search-query: "";
+
+    // 动态引用的隧道中心预设跳板串 (直接引用，网络与隧道中心变更全局自动生效)
+    in-out property <string> selected-preset-jump-id: "";
+    in-out property <string> selected-preset-jump-name: "";
+    in-out property <string> selected-preset-jump-summary: "";
+    in-out property <int> selected-preset-jump-hop-count: 0;
+
+    // 回调定义
+    callback close();
+    callback toggle-group(string /* id */);
+    callback test-connection(string /* address */, int /* port */);
+    callback filter-credentials(string /* category */, string /* query */);
+    callback filter-proxies(string /* query */);
+    callback submit(
+        string /* name */,
+        string /* address */,
+        int /* port */,
+        string /* parent_group_id */,
+        string /* auth_type */,
+        string /* credential_id */,
+        string /* username */,
+        string /* password */,
+        string /* key_data */,
+        string /* key_passphrase */,
+        bool /* save_to_credentials */,
+        string /* proxy_type */,
+        string /* proxy_host */,
+        int /* proxy_port */,
+        string /* proxy_username */,
+        string /* proxy_password */,
+        string /* jump_chain_summary */,
+        int /* keepalive_interval */,
+        string /* initial_dir */,
+        string /* startup_cmd */,
+        string /* term_type */,
+        string /* notes */
+    );
+
+    // 重置所有表单字段至默认值
+    function reset-form() {
+        root.active-tab = "general";
+        root.host-name = "";
+        root.host-address = "";
+        root.host-port-str = "22";
+        root.selected-parent-id = root.default-parent-id;
+        root.selected-parent-name = @tr("根目录 (顶级主机)");
+        root.auth-type = "credential";
+        root.selected-cred-id = "";
+        root.selected-cred-name = "";
+        root.selected-cred-user = "";
+        root.selected-cred-type = "";
+        root.selected-cred-alg = "";
+        root.auth-username = "root";
+        root.auth-password = "";
+        root.save-to-credentials = false;
+        root.auth-key-username = "root";
+        root.auth-key-data = "";
+        root.auth-key-passphrase = "";
+        root.save-key-to-credentials = false;
+        root.proxy-mode = "direct";
+        root.selected-tunnel-proxy-id = "";
+        root.selected-tunnel-proxy-name = "";
+        root.selected-tunnel-proxy-proto = "SOCKS5";
+        root.selected-tunnel-proxy-host = "";
+        root.selected-tunnel-proxy-port = 1080;
+        root.selected-tunnel-proxy-user = "";
+        root.custom-proxy-proto = "socks5";
+        root.custom-proxy-host = "";
+        root.custom-proxy-port-str = "";
+        root.custom-proxy-username = "";
+        root.custom-proxy-password = "";
+        root.keepalive-interval-str = "30";
+        root.connect-timeout-str = "10";
+        root.initial-dir = "";
+        root.startup-cmd = "";
+        root.term-type = "xterm-256color";
+        root.notes = "";
+        root.is-group-picker-open = false;
+        root.is-cred-picker-open = false;
+        root.cred-filter-category = "all";
+        root.cred-search-query = "";
+        root.temp-selected-cred-id = "";
+        root.temp-selected-cred-name = "";
+        root.temp-selected-cred-user = "";
+        root.temp-selected-cred-type = "";
+        root.temp-selected-cred-alg = "";
+        root.is-jump-picker-open = false;
+        root.jump-picker-tab = "hosts";
+        root.jump-search-query = "";
+        root.is-proxy-picker-open = false;
+        root.proxy-search-query = "";
+        root.selected-preset-jump-id = "";
+        root.selected-preset-jump-name = "";
+        root.selected-preset-jump-summary = "";
+        root.selected-preset-jump-hop-count = 0;
+        HostsBridge.clear-create-host-jump-chain();
+    }
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6; // 统一半透明暗色遮罩
+        z: 100;
+
+        // 点击遮罩防穿透
+        TouchArea { }
+
+        // =========================================================================
+        // 1. 主弹窗卡片 (560px × 530px 居中卡片容器)
+        // =========================================================================
+        Rectangle {
+            width: 560px;
+            height: 530px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+
+            // 拦截卡片内部点击
+            TouchArea { }
+
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding: 16px;
+                spacing: 10px;
+
+                // 1.1 顶部标题栏与关闭按键
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 26px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../assets/icons/server.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: root.is-edit-mode ? @tr("编辑主机配置 (Edit Host)") : @tr("新建主机配置 (Create Host)");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: close-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        close-btn-touch := TouchArea {
+                            clicked => {
+                                root.reset-form();
+                                root.close();
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: close-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 1.2 顶部四 Tab 分类导航胶囊
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    HorizontalLayout {
+                        padding: 3px;
+                        spacing: 4px;
+
+                        // Tab 1: 常规与认证
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: root.active-tab == "general" ? AppTheme.surface-background : (tab1-touch.has-hover ? AppTheme.hover-background : transparent);
+                            border-width: root.active-tab == "general" ? 1px : 0px;
+                            border-color: root.active-tab == "general" ? AppTheme.border : transparent;
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("常规与认证");
+                                    font-size: 11px;
+                                    font-weight: root.active-tab == "general" ? 700 : 500;
+                                    color: root.active-tab == "general" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            tab1-touch := TouchArea {
+                                clicked => { root.active-tab = "general"; }
+                                mouse-cursor: pointer;
+                            }
+                        }
+
+                        // Tab 2: 网络与代理
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: root.active-tab == "network" ? AppTheme.surface-background : (tab2-touch.has-hover ? AppTheme.hover-background : transparent);
+                            border-width: root.active-tab == "network" ? 1px : 0px;
+                            border-color: root.active-tab == "network" ? AppTheme.border : transparent;
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("网络与代理");
+                                    font-size: 11px;
+                                    font-weight: root.active-tab == "network" ? 700 : 500;
+                                    color: root.active-tab == "network" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            tab2-touch := TouchArea {
+                                clicked => { root.active-tab = "network"; }
+                                mouse-cursor: pointer;
+                            }
+                        }
+
+                        // Tab 3: 跳板机链路
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: root.active-tab == "jump" ? AppTheme.surface-background : (tab-jump-touch.has-hover ? AppTheme.hover-background : transparent);
+                            border-width: root.active-tab == "jump" ? 1px : 0px;
+                            border-color: root.active-tab == "jump" ? AppTheme.border : transparent;
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("跳板机链路");
+                                    font-size: 11px;
+                                    font-weight: root.active-tab == "jump" ? 700 : 500;
+                                    color: root.active-tab == "jump" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+
+                                if root.selected-preset-jump-id != "" || HostsBridge.create-host-jump-chain.length > 0: Rectangle {
+                                    width: 16px;
+                                    height: 14px;
+                                    border-radius: 7px;
+                                    background: root.selected-preset-jump-id != "" ? #10b981 : AppTheme.accent;
+                                    y: (parent.height - self.height) / 2;
+
+                                    Text {
+                                        text: root.selected-preset-jump-id != "" ? "🔗" : HostsBridge.create-host-jump-chain.length;
+                                        font-size: 8px;
+                                        font-weight: 700;
+                                        color: #ffffff;
+                                        horizontal-alignment: center;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            tab-jump-touch := TouchArea {
+                                clicked => { root.active-tab = "jump"; }
+                                mouse-cursor: pointer;
+                            }
+                        }
+
+                        // Tab 4: 高级与终端
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: root.active-tab == "advanced" ? AppTheme.surface-background : (tab3-touch.has-hover ? AppTheme.hover-background : transparent);
+                            border-width: root.active-tab == "advanced" ? 1px : 0px;
+                            border-color: root.active-tab == "advanced" ? AppTheme.border : transparent;
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("高级与终端");
+                                    font-size: 11px;
+                                    font-weight: root.active-tab == "advanced" ? 700 : 500;
+                                    color: root.active-tab == "advanced" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            tab3-touch := TouchArea {
+                                clicked => { root.active-tab = "advanced"; }
+                                mouse-cursor: pointer;
+                            }
+                        }
+                    }
+                }
+
+                // 1.3 中间主表单内容区 (带平滑垂直滚动)
+                Flickable {
+                    vertical-stretch: 1;
+                    viewport-height: form-container.preferred-height;
+
+                    form-container := VerticalLayout {
+                        spacing: 12px;
+                        padding-right: 4px;
+
+                        // TAB 1 内容：常规与认证 (General & Auth)
+                        if root.active-tab == "general": CreateHostGeneralTab {
+                            host-name <=> root.host-name;
+                            host-address <=> root.host-address;
+                            host-port-str <=> root.host-port-str;
+                            selected-parent-name: root.selected-parent-name;
+                            auth-type <=> root.auth-type;
+                            selected-cred-id: root.selected-cred-id;
+                            selected-cred-name: root.selected-cred-name;
+                            selected-cred-user: root.selected-cred-user;
+                            selected-cred-type: root.selected-cred-type;
+                            selected-cred-alg: root.selected-cred-alg;
+                            auth-username <=> root.auth-username;
+                            auth-password <=> root.auth-password;
+                            auth-key-username <=> root.auth-key-username;
+                            auth-key-data <=> root.auth-key-data;
+                            auth-key-passphrase <=> root.auth-key-passphrase;
+
+                            open-group-picker => {
+                                root.temp-selected-group-id = root.selected-parent-id;
+                                root.temp-selected-group-name = root.selected-parent-name;
+                                root.is-group-picker-open = true;
+                            }
+                            open-cred-picker => {
+                                root.temp-selected-cred-id = root.selected-cred-id;
+                                root.temp-selected-cred-name = root.selected-cred-name;
+                                root.temp-selected-cred-user = root.selected-cred-user;
+                                root.temp-selected-cred-type = root.selected-cred-type;
+                                root.temp-selected-cred-alg = root.selected-cred-alg;
+                                root.cred-filter-category = root.selected-cred-type != "" ? root.selected-cred-type : "all";
+                                root.cred-search-query = "";
+                                root.filter-credentials(root.cred-filter-category, "");
+                                root.is-cred-picker-open = true;
+                            }
+                            clear-cred => {
+                                root.selected-cred-id = "";
+                                root.selected-cred-name = "";
+                                root.selected-cred-user = "";
+                                root.selected-cred-type = "";
+                                root.selected-cred-alg = "";
+                            }
+                        }
+
+                        // TAB 2 内容：网络与代理 (Network & Proxy)
+                        if root.active-tab == "network": CreateHostNetworkTab {
+                            keepalive-interval-str <=> root.keepalive-interval-str;
+                            connect-timeout-str <=> root.connect-timeout-str;
+                            proxy-mode <=> root.proxy-mode;
+                            selected-tunnel-proxy-id <=> root.selected-tunnel-proxy-id;
+                            selected-tunnel-proxy-name <=> root.selected-tunnel-proxy-name;
+                            selected-tunnel-proxy-proto <=> root.selected-tunnel-proxy-proto;
+                            selected-tunnel-proxy-host <=> root.selected-tunnel-proxy-host;
+                            selected-tunnel-proxy-port <=> root.selected-tunnel-proxy-port;
+                            selected-tunnel-proxy-user <=> root.selected-tunnel-proxy-user;
+                            custom-proxy-proto <=> root.custom-proxy-proto;
+                            custom-proxy-host <=> root.custom-proxy-host;
+                            custom-proxy-port-str <=> root.custom-proxy-port-str;
+                            custom-proxy-username <=> root.custom-proxy-username;
+                            custom-proxy-password <=> root.custom-proxy-password;
+
+                            open-proxy-picker => {
+                                root.proxy-search-query = "";
+                                root.filter-proxies("");
+                                root.is-proxy-picker-open = true;
+                            }
+                            clear-tunnel-proxy => {
+                                root.selected-tunnel-proxy-id = "";
+                                root.selected-tunnel-proxy-name = "";
+                                root.selected-tunnel-proxy-host = "";
+                                root.selected-tunnel-proxy-user = "";
+                            }
+                        }
+
+                        // TAB 3 内容：跳板机链路 (ProxyJump Cascaded Chain)
+                        if root.active-tab == "jump": CreateHostJumpTab {
+                            selected-preset-jump-id <=> root.selected-preset-jump-id;
+                            selected-preset-jump-name <=> root.selected-preset-jump-name;
+                            selected-preset-jump-summary <=> root.selected-preset-jump-summary;
+                            selected-preset-jump-hop-count <=> root.selected-preset-jump-hop-count;
+
+                            open-jump-picker => {
+                                root.jump-search-query = "";
+                                root.jump-picker-tab = "hosts";
+                                root.is-jump-picker-open = true;
+                            }
+                            clear-jump-chain => {
+                                root.selected-preset-jump-id = "";
+                                root.selected-preset-jump-name = "";
+                                root.selected-preset-jump-summary = "";
+                                root.selected-preset-jump-hop-count = 0;
+                                HostsBridge.clear-create-host-jump-chain();
+                            }
+                        }
+
+                        // TAB 4 内容：高级与终端 (Advanced & Terminal)
+                        if root.active-tab == "advanced": CreateHostAdvancedTab {
+                            initial-dir <=> root.initial-dir;
+                            startup-cmd <=> root.startup-cmd;
+                            term-type <=> root.term-type;
+                            notes <=> root.notes;
+                        }
+                    }
+                }
+
+                // 1.4 分割线
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                // 1.5 底部操作栏 (左侧测试连接，右侧取消与确认保存)
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    // 左侧：⚡ 测试连接按钮与即时探活结果反馈
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        AppButton {
+                            text: root.test-status == "testing" ? @tr("正在探活...") : @tr("⚡ 测试连接");
+                            variant: "secondary";
+                            enabled: root.host-address != "" && root.test-status != "testing";
+                            clicked => {
+                                root.test-connection(
+                                    root.host-address,
+                                    root.host-port-str == "" ? 22 : root.host-port-str.to-float()
+                                );
+                            }
+                        }
+
+                        if root.test-status == "success": VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "✓ " + root.test-message;
+                                font-size: 11px;
+                                font-weight: 600;
+                                color: #10b981; // 翠绿色
+                                vertical-alignment: center;
+                            }
+                        }
+
+                        if root.test-status == "error": VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: "✕ " + root.test-message;
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.danger;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 右侧：取消与保存动作
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        AppButton {
+                            text: @tr("取消");
+                            variant: "secondary";
+                            clicked => {
+                                root.reset-form();
+                                root.close();
+                            }
+                        }
+
+                        AppButton {
+                            text: root.is-edit-mode ? @tr("保存修改") : @tr("保存主机配置");
+                            icon: @image-url("../assets/icons/check.svg");
+                            has-icon: true;
+                            variant: root.host-address != "" ? "primary" : "secondary";
+                            enabled: root.host-address != "";
+                            clicked => {
+                                let port = root.host-port-str == "" ? 22 : root.host-port-str.to-float();
+                                let final-name = root.host-name != "" ? root.host-name : root.host-address;
+                                let keepalive = root.keepalive-interval-str == "" ? 30 : root.keepalive-interval-str.to-float();
+                                let final-proxy-type = root.proxy-mode == "direct" ? "direct" : (root.proxy-mode == "tunnel" ? root.selected-tunnel-proxy-proto : root.custom-proxy-proto);
+                                let final-proxy-host = root.proxy-mode == "direct" ? "" : (root.proxy-mode == "tunnel" ? root.selected-tunnel-proxy-host : root.custom-proxy-host);
+                                let final-proxy-port = root.proxy-mode == "direct" ? 0 : (root.proxy-mode == "tunnel" ? root.selected-tunnel-proxy-port : (root.custom-proxy-port-str == "" ? 0 : root.custom-proxy-port-str.to-float()));
+                                let final-proxy-user = root.proxy-mode == "direct" ? "" : (root.proxy-mode == "tunnel" ? root.selected-tunnel-proxy-user : root.custom-proxy-username);
+                                let final-proxy-pass = root.proxy-mode == "custom" ? root.custom-proxy-password : "";
+
+                                root.submit(
+                                    final-name,
+                                    root.host-address,
+                                    port,
+                                    root.selected-parent-id,
+                                    root.auth-type,
+                                    root.selected-cred-id,
+                                    root.auth-type == "password" ? root.auth-username : (root.auth-type == "key" ? root.auth-key-username : ""),
+                                    root.auth-password,
+                                    root.auth-key-data,
+                                    root.auth-key-passphrase,
+                                    root.auth-type == "password" ? root.save-to-credentials : root.save-key-to-credentials,
+                                    final-proxy-type,
+                                    final-proxy-host,
+                                    final-proxy-port,
+                                    final-proxy-user,
+                                    final-proxy-pass,
+                                    root.selected-preset-jump-id != "" ? ("preset:" + root.selected-preset-jump-id) : (HostsBridge.create-host-jump-chain.length > 0 ? ("jump_hops:" + HostsBridge.create-host-jump-chain.length) : ""),
+                                    keepalive,
+                                    root.initial-dir,
+                                    root.startup-cmd,
+                                    root.term-type,
+                                    root.notes
+                                );
+                                root.reset-form();
+                                root.close();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 2. 所属分组二级树形弹窗 (GroupPickerDialog)
+        // =========================================================================
+        GroupPickerDialog {
+            is-open: root.is-group-picker-open;
+            group-options: root.group-options;
+            temp-selected-group-id <=> root.temp-selected-group-id;
+            temp-selected-group-name <=> root.temp-selected-group-name;
+            close => { root.is-group-picker-open = false; }
+            confirmed(id, name) => {
+                root.selected-parent-id = id;
+                root.selected-parent-name = name;
+                root.is-group-picker-open = false;
+            }
+            toggle-group(id) => {
+                root.toggle-group(id);
+            }
+        }
+
+        // =========================================================================
+        // 3. 关联凭据二级分类与搜索选择弹窗 (CredentialPickerDialog)
+        // =========================================================================
+        CredentialPickerDialog {
+            is-open: root.is-cred-picker-open;
+            credential-options: root.credential-options;
+            cred-filter-category <=> root.cred-filter-category;
+            cred-search-query <=> root.cred-search-query;
+            temp-selected-cred-id <=> root.temp-selected-cred-id;
+            temp-selected-cred-name <=> root.temp-selected-cred-name;
+            temp-selected-cred-user <=> root.temp-selected-cred-user;
+            temp-selected-cred-type <=> root.temp-selected-cred-type;
+            temp-selected-cred-alg <=> root.temp-selected-cred-alg;
+            close => { root.is-cred-picker-open = false; }
+            filter-credentials(cat, q) => { root.filter-credentials(cat, q); }
+            confirmed(id, name, user, ctype, alg) => {
+                root.selected-cred-id = id;
+                root.selected-cred-name = name;
+                root.selected-cred-user = user;
+                root.selected-cred-type = ctype;
+                root.selected-cred-alg = alg;
+                root.is-cred-picker-open = false;
+            }
+        }
+
+        // =========================================================================
+        // 4. 添加跳板节点 / 导入预设跳板串二级弹窗 (JumpPickerDialog)
+        // =========================================================================
+        JumpPickerDialog {
+            is-open: root.is-jump-picker-open;
+            jump-host-options: root.jump-host-options;
+            preset-jump-chains: root.preset-jump-chains;
+            jump-picker-tab <=> root.jump-picker-tab;
+            jump-search-query <=> root.jump-search-query;
+            close => { root.is-jump-picker-open = false; }
+            select-host(id, name, addr, port) => {
+                root.selected-preset-jump-id = "";
+                root.selected-preset-jump-name = "";
+                root.selected-preset-jump-summary = "";
+                root.selected-preset-jump-hop-count = 0;
+                HostsBridge.add-create-host-jump-hop(id, name, addr, port);
+                root.is-jump-picker-open = false;
+            }
+            select-preset(id, name, summary, hop-count) => {
+                root.selected-preset-jump-id = id;
+                root.selected-preset-jump-name = name;
+                root.selected-preset-jump-summary = summary;
+                root.selected-preset-jump-hop-count = hop-count;
+                HostsBridge.clear-create-host-jump-chain();
+                root.is-jump-picker-open = false;
+            }
+        }
+
+        // =========================================================================
+        // 5. 从网络与隧道中心选择已有代理二级弹窗 (ProxyPickerDialog)
+        // =========================================================================
+        ProxyPickerDialog {
+            is-open: root.is-proxy-picker-open;
+            proxy-options: root.proxy-options;
+            proxy-search-query <=> root.proxy-search-query;
+            close => { root.is-proxy-picker-open = false; }
+            filter-proxies(q) => { root.filter-proxies(q); }
+            select-proxy(id, name, proto, host, port, user) => {
+                root.proxy-mode = "tunnel";
+                root.selected-tunnel-proxy-id = id;
+                root.selected-tunnel-proxy-name = name;
+                root.selected-tunnel-proxy-proto = proto;
+                root.selected-tunnel-proxy-host = host;
+                root.selected-tunnel-proxy-port = port;
+                root.selected-tunnel-proxy-user = user;
+                root.is-proxy-picker-open = false;
+            }
+        }
+    }
+}

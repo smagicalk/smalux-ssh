@@ -58,8 +58,7 @@ impl Default for TerminalPalette {
 }
 
 /// 内置官方开源 JetBrains Mono 等宽字体二进制数据 (OFL 许可)
-const EMBEDDED_JETBRAINS_MONO: &[u8] =
-    include_bytes!("../../ui/assets/fonts/JetBrainsMono-Regular.ttf");
+const EMBEDDED_JETBRAINS_MONO: &[u8] = smagical_ui_view::JETBRAINS_MONO_BYTES;
 
 /// 终端字符点阵光栅化与像素帧生成渲染器。
 pub struct TerminalRenderer {

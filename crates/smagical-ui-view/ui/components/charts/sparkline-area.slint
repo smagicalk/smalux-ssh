@@ -1,0 +1,180 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+
+/// 微型渐变面积时序波形图组件 (Sparkline Area Chart)
+/// 基于纯 Slint 原生矢量 Path 渲染，GPU 硬件加速，满幅横向占满 300px 时间轴
+export component SparklineArea {
+    in property <string> commands-area: "";
+    in property <string> commands-line: "";
+    in property <color> line-color: #38bdf8;
+    in property <length> line-width: 1.5px;
+
+    // 可选第二条曲线 (如网络双轨双向吞吐)
+    in property <bool> show-secondary: false;
+    in property <string> secondary-commands-area: "";
+    in property <string> secondary-commands-line: "";
+    in property <color> secondary-line-color: #818cf8;
+
+    // 标注文本
+    in property <string> current-val-text: "";
+    in property <string> peak-val-text: "";
+    in property <string> time-label: "-30s";
+
+    in property <float> viewbox-width: 300.0;
+    in property <float> viewbox-height: 48.0;
+
+    height: 52px;
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+        border-radius: 4px;
+        background: AppTheme.control-background.transparentize(50%);
+        border-width: 1px;
+        border-color: AppTheme.border.transparentize(70%);
+        clip: true;
+
+        // 1. 中间时间垂直参考虚线 (-15s 刻度)
+        Rectangle {
+            x: parent.width * 0.50;
+            y: 0px;
+            width: 1px;
+            height: 100%;
+            background: AppTheme.border.transparentize(80%);
+        }
+
+        // 2. 背景微弱水平辅助线 (33% 和 66% 刻度参考)
+        Rectangle {
+            x: 0px;
+            y: parent.height * 0.33;
+            width: 100%;
+            height: 1px;
+            background: AppTheme.border.transparentize(75%);
+        }
+        Rectangle {
+            x: 0px;
+            y: parent.height * 0.66;
+            width: 100%;
+            height: 1px;
+            background: AppTheme.border.transparentize(85%);
+        }
+
+        // 3. 第二条曲线 (若启用，如网络 TX 上行，置于底层)
+        if root.show-secondary && root.secondary-commands-area != "": Path {
+            width: 100%;
+            height: 100%;
+            viewbox-x: 0.0;
+            viewbox-y: 0.0;
+            viewbox-width: root.viewbox-width;
+            viewbox-height: root.viewbox-height;
+            commands: root.secondary-commands-area;
+            fill: @linear-gradient(180deg, root.secondary-line-color.transparentize(70%) 0%, root.secondary-line-color.transparentize(100%) 100%);
+        }
+
+        if root.show-secondary && root.secondary-commands-line != "": Path {
+            width: 100%;
+            height: 100%;
+            viewbox-x: 0.0;
+            viewbox-y: 0.0;
+            viewbox-width: root.viewbox-width;
+            viewbox-height: root.viewbox-height;
+            commands: root.secondary-commands-line;
+            stroke: root.secondary-line-color;
+            stroke-width: 1.2px;
+        }
+
+        // 4. 主曲线面积填充 (如 CPU 或网络 RX 下行，闭合渐变)
+        if root.commands-area != "": Path {
+            width: 100%;
+            height: 100%;
+            viewbox-x: 0.0;
+            viewbox-y: 0.0;
+            viewbox-width: root.viewbox-width;
+            viewbox-height: root.viewbox-height;
+            commands: root.commands-area;
+            fill: @linear-gradient(180deg, root.line-color.transparentize(60%) 0%, root.line-color.transparentize(100%) 100%);
+        }
+
+        // 5. 主曲线描边高光
+        if root.commands-line != "": Path {
+            width: 100%;
+            height: 100%;
+            viewbox-x: 0.0;
+            viewbox-y: 0.0;
+            viewbox-width: root.viewbox-width;
+            viewbox-height: root.viewbox-height;
+            commands: root.commands-line;
+            stroke: root.line-color;
+            stroke-width: root.line-width;
+        }
+
+        // 6. 顶部浮层标签 (左侧峰值，右侧当前瞬时大字)
+        HorizontalLayout {
+            padding-left: 6px;
+            padding-right: 6px;
+            padding-top: 3px;
+            alignment: space-between;
+            height: 18px;
+
+            if root.peak-val-text != "": Text {
+                text: root.peak-val-text;
+                font-size: 8px;
+                font-weight: 600;
+                color: root.line-color.transparentize(15%);
+                vertical-alignment: center;
+            }
+
+            if root.current-val-text != "": Rectangle {
+                height: 15px;
+                border-radius: 3px;
+                background: AppTheme.surface-background.transparentize(20%);
+                border-width: 1px;
+                border-color: root.line-color.transparentize(50%);
+
+                HorizontalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+                    Text {
+                        text: root.current-val-text;
+                        font-size: 8.5px;
+                        font-weight: 700;
+                        color: root.line-color;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // 7. 底部时间标尺 (-30s, -15s, 现在)
+        HorizontalLayout {
+            y: parent.height - self.height - 2px;
+            padding-left: 6px;
+            padding-right: 6px;
+            alignment: space-between;
+            height: 12px;
+
+            Text {
+                text: "-30s";
+                font-size: 7.5px;
+                font-weight: 500;
+                color: AppTheme.disabled-foreground.transparentize(20%);
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: "-15s";
+                font-size: 7.5px;
+                font-weight: 500;
+                color: AppTheme.disabled-foreground.transparentize(40%);
+                vertical-alignment: center;
+            }
+
+            Text {
+                text: @tr("现在");
+                font-size: 7.5px;
+                font-weight: 500;
+                color: AppTheme.disabled-foreground.transparentize(20%);
+                vertical-alignment: center;
+            }
+        }
+    }
+}

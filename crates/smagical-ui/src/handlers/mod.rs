@@ -8,6 +8,7 @@ pub(crate) mod debug_handlers;
 pub(crate) mod file_handlers;
 pub(crate) mod history_handlers;
 pub(crate) mod host_handlers;
+pub(crate) mod right_drawer_handlers;
 pub(crate) mod session_handlers;
 pub(crate) mod settings_handlers;
 pub(crate) mod snippet_handlers;
@@ -121,6 +122,8 @@ pub(crate) struct AppContext {
     pub tunnel_search_query: Rc<RefCell<String>>,
     /// 隧道分类过滤 ("all" | "forward" | "jump" | "proxy")
     pub tunnel_filter_category: Rc<RefCell<String>>,
+    /// 系统托盘是否处于实际就绪状态
+    pub tray_active: Rc<RefCell<bool>>,
 }
 
 #[allow(dead_code)]
@@ -182,6 +185,8 @@ pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     settings_handlers::register_settings_handlers(window, ctx);
     // 11. 挂载配色主题管理与背景壁纸轮播回调 (自定义、导入、导出、删除、多壁纸轮播)
     theme_handlers::register_theme_and_wallpaper_handlers(window, ctx);
+    // 12. 挂载右侧伴生抽屉生命周期治理、惰性采样与每机独立 AI 会话服务
+    right_drawer_handlers::register_right_drawer_handlers(window, ctx);
 }
 
 

@@ -240,50 +240,8 @@ impl PtyProcess {
     }
 
     /// 根据本地 Shell 标识构建命令行启动配置。
+    /// 统一委托给 local_shells 模块，使用已探测验证的绝对路径与专用参数 (如 Git Bash 的 --login -i)。
     fn resolve_command_by_id(shell_id: &str) -> CommandBuilder {
-        #[cfg(windows)]
-        {
-            match shell_id {
-                "local-pwsh7" => {
-                    let pwsh7_path = "C:\\Program Files\\PowerShell\\7\\pwsh.exe";
-                    if std::path::Path::new(pwsh7_path).exists() {
-                        CommandBuilder::new(pwsh7_path)
-                    } else {
-                        CommandBuilder::new("pwsh.exe")
-                    }
-                }
-                "local-powershell" => CommandBuilder::new("powershell.exe"),
-                "local-cmd" => CommandBuilder::new("cmd.exe"),
-                "local-wsl" => CommandBuilder::new("wsl.exe"),
-                "local-gitbash" => {
-                    let git_bash = "C:\\Program Files\\Git\\bin\\bash.exe";
-                    if std::path::Path::new(git_bash).exists() {
-                        CommandBuilder::new(git_bash)
-                    } else {
-                        CommandBuilder::new("bash.exe")
-                    }
-                }
-                "local-nushell" => CommandBuilder::new("nu.exe"),
-                _ => {
-                    // 默认降级尝试 PowerShell
-                    CommandBuilder::new("powershell.exe")
-                }
-            }
-        }
-
-        #[cfg(not(windows))]
-        {
-            match shell_id {
-                "local-bash" => CommandBuilder::new("/bin/bash"),
-                "local-zsh" => CommandBuilder::new("/bin/zsh"),
-                "local-fish" => CommandBuilder::new("/usr/bin/fish"),
-                "local-sh" => CommandBuilder::new("/bin/sh"),
-                "local-nushell" => CommandBuilder::new("/usr/bin/nu"),
-                _ => {
-                    let default_sh = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_string());
-                    CommandBuilder::new(default_sh)
-                }
-            }
-        }
+        crate::local_shells::resolve_command_for_shell(shell_id)
     }
 }

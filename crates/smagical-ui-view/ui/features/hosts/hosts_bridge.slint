@@ -1,0 +1,128 @@
+import { HostItemData, HostTreeNode, CredentialOptionData, JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData } from "./hosts_model.slint";
+import { GroupOptionData } from "../../components/create-group-modal.slint";
+
+export { HostItemData, HostTreeNode, CredentialOptionData, JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData }
+
+/// 主机与资产树领域全局状态总线 (Hosts & Assets Bridge)
+export global HostsBridge {
+    // 状态属性
+    in-out property <[HostTreeNode]> tree-nodes: [];
+    in-out property <[HostItemData]> hosts: [];
+    in-out property <string> hosts-view-mode: "tree";
+    in-out property <length> tree-content-width: 240px;
+    in-out property <string> selected-host-id: "";
+    in-out property <string> search-query: "";
+    in-out property <bool> is-create-group-open: false;
+    in-out property <string> create-group-default-parent: "root";
+    in-out property <[GroupOptionData]> group-options: [];
+    in-out property <length> left-drawer-width: 240px;
+
+    // 新建与编辑主机弹窗状态与数据源
+    in-out property <bool> is-create-host-modal-open: false;
+    in-out property <string> create-host-default-parent: "root";
+    in-out property <bool> is-edit-mode: false;
+    in-out property <string> editing-host-id: "";
+
+    // 主机表单状态双向绑定
+    in-out property <string> form-host-name: "";
+    in-out property <string> form-host-address: "";
+    in-out property <string> form-host-port-str: "22";
+    in-out property <string> form-parent-id: "root";
+    in-out property <string> form-parent-name: "根目录 (顶级主机)";
+    in-out property <string> form-auth-type: "credential";
+    in-out property <string> form-cred-id: "";
+    in-out property <string> form-cred-name: "";
+    in-out property <string> form-cred-user: "";
+    in-out property <string> form-cred-type: "";
+    in-out property <string> form-cred-alg: "";
+    in-out property <string> form-auth-username: "root";
+    in-out property <string> form-auth-password: "";
+    in-out property <string> form-auth-key-username: "root";
+    in-out property <string> form-auth-key-data: "";
+    in-out property <string> form-auth-key-passphrase: "";
+    in-out property <string> form-proxy-mode: "direct";
+    in-out property <string> form-custom-proxy-proto: "socks5";
+    in-out property <string> form-custom-proxy-host: "";
+    in-out property <string> form-custom-proxy-port-str: "";
+    in-out property <string> form-custom-proxy-username: "";
+    in-out property <string> form-custom-proxy-password: "";
+    in-out property <string> form-keepalive-str: "30";
+    in-out property <string> form-initial-dir: "";
+    in-out property <string> form-startup-cmd: "";
+    in-out property <string> form-term-type: "xterm-256color";
+    in-out property <string> form-notes: "";
+    in-out property <string> form-preset-jump-id: "";
+    in-out property <string> form-preset-jump-name: "";
+    in-out property <string> form-preset-jump-summary: "";
+    in-out property <int> form-preset-jump-hop-count: 0;
+
+    in-out property <[CredentialOptionData]> credential-options: [];
+    in-out property <[JumpHostOptionData]> jump-host-options: [];
+    in-out property <[PresetJumpChainData]> preset-jump-chains: [];
+    in-out property <[ProxyOptionData]> proxy-options: [];
+    in-out property <[JumpHopItemData]> create-host-jump-chain: [];
+    in-out property <string> test-connection-status: "idle"; // "idle" | "testing" | "success" | "error"
+    in-out property <string> test-connection-message: "";
+
+    // 拖拽悬停状态
+    in-out property <string> drop-target-id: "";
+    in-out property <int> drop-target-index: -1;
+    in-out property <string> drop-position: "none";
+    in-out property <bool> drop-target-valid: false;
+
+    // 交互回调
+    callback select-host(string /* id */);
+    callback open-host(string /* id */);
+    callback toggle-group(string /* id */);
+    callback toggle-selector-group(string /* id */);
+    callback move-node(string /* source_id */, string /* target_id */, string /* drop_pos */);
+    callback request-drag-hover(string /* source_id */, int /* target_index */, float /* offset_in_row */);
+    callback create-group(string /* parent_id */, string /* name */);
+    callback open-create-group-modal(string /* parent_id */);
+    callback delete-node(string /* id */, bool /* is_group */);
+    callback clone-host(string /* id */);
+    callback open-host-files(string /* id */);
+    callback copy-to-clipboard(string /* text */);
+    callback create-new-host();
+    callback create-new-group();
+    callback search-changed(string /* query */);
+    callback switch-view-mode(string /* mode */);
+    callback close-group-modal();
+
+    // 新建与编辑主机相关回调
+    callback open-create-host-modal(string /* default_parent_id */);
+    callback open-edit-host-modal(string /* host_id */);
+    callback close-create-host-modal();
+    callback submit-create-host(
+        string /* name */,
+        string /* address */,
+        int /* port */,
+        string /* parent_group_id */,
+        string /* auth_type */,
+        string /* credential_id */,
+        string /* username */,
+        string /* password */,
+        string /* key_data */,
+        string /* key_passphrase */,
+        bool /* save_to_credentials */,
+        string /* proxy_type */,
+        string /* proxy_host */,
+        int /* proxy_port */,
+        string /* proxy_username */,
+        string /* proxy_password */,
+        string /* jump_chain_summary */,
+        int /* keepalive_interval */,
+        string /* initial_dir */,
+        string /* startup_cmd */,
+        string /* term_type */,
+        string /* notes */
+    );
+    callback test-host-connection(string /* address */, int /* port */);
+    callback filter-create-host-credentials(string /* category */, string /* query */);
+    callback filter-create-host-proxies(string /* query */);
+    callback add-create-host-jump-hop(string /* id */, string /* name */, string /* address */, int /* port */);
+    callback import-create-host-preset-chain(string /* hops_serialized */, bool /* replace */);
+    callback move-create-host-jump-hop(int /* from_idx */, int /* to_idx */);
+    callback remove-create-host-jump-hop(int /* idx */);
+    callback clear-create-host-jump-chain();
+}

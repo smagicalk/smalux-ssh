@@ -1,0 +1,1415 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { AppButton } from "../../components/base/app-button.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
+import { FileItemData, TransferItemData } from "../../features/file_explorer/file_explorer_model.slint";
+import { FilesBridge } from "../../features/file_explorer/file_explorer_bridge.slint";
+
+export { FileItemData, TransferItemData }
+
+/// 兼容性导出
+export struct SftpFileItemData {
+    name: string,
+    is-dir: bool,
+    size-str: string,
+}
+
+/// 快速 SFTP 抽屉 (SFTP Tool Drawer)
+/// 专为右侧栏设计，默认 ~ 用户主目录，具备与左侧/主文件管理器一致的视觉质感，
+/// 顶部支持快捷路径导航与上传，中间展示紧凑文件列表，底部实时呈现传输队列与传输进度。
+export component SftpToolDrawer inherits DrawerContainer {
+    title: @tr("SFTP 远程传输");
+    collapse-icon: "▶";
+
+    in-out property <string> current-dir: FilesBridge.remote-current-path != "" ? FilesBridge.remote-current-path : "~";
+    in property <[FileItemData]> files: FilesBridge.remote-files;
+    in property <[TransferItemData]> transfer-tasks: FilesBridge.transfer-tasks;
+    in property <bool> can-go-back: FilesBridge.remote-can-go-back;
+    in property <bool> can-go-forward: FilesBridge.remote-can-go-forward;
+    in-out property <string> selected-id: FilesBridge.selected-remote-id;
+    property <bool> is-transfer-expanded: false;
+    in-out property <length> transfer-panel-height: 150px;
+    in property <bool> has-active-terminal: true;
+
+    /// 右键上下文菜单状态 (文件)
+    in-out property <bool> is-context-menu-open: false;
+    in-out property <string> context-path: "";
+    in-out property <string> context-name: "";
+    in-out property <bool> context-is-dir: false;
+    in-out property <length> context-menu-x: 0px;
+    in-out property <length> context-menu-y: 0px;
+
+    /// 右键上下文菜单状态 (传输任务)
+    in-out property <bool> is-transfer-context-menu-open: false;
+    in-out property <string> context-transfer-id: "";
+    in-out property <string> context-transfer-name: "";
+    in-out property <string> context-transfer-path: "";
+    in-out property <string> context-transfer-status: "";
+    in-out property <length> transfer-context-menu-x: 0px;
+    in-out property <length> transfer-context-menu-y: 0px;
+
+    callback upload-file();
+    callback upload-folder();
+    callback download-file(string /* path */);
+    callback change-dir(string /* path */);
+    callback navigate-up();
+    callback navigate-back();
+    callback navigate-forward();
+    callback refresh();
+    callback clear-completed-transfers();
+
+    // 抽屉主内容外壳 (允许浮层右键菜单绝对定位)
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        // 无活跃终端时的占位空状态
+        if !root.has-active-terminal: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: AppTheme.panel-background;
+            z: 200;
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/folder.svg");
+                        width: 36px;
+                        height: 36px;
+                        colorize: AppTheme.disabled-foreground;
+                    }
+                }
+                Text {
+                    text: @tr("未连接主机");
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: @tr("请在中央终端打开或连接远程主机\nSFTP 远程文件传输将自动唤醒");
+                    font-size: 10px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        if root.has-active-terminal: VerticalLayout {
+            padding: 0px;
+            spacing: 0px;
+
+            // 上半部分内容区 (内衬 padding: 8px)
+            VerticalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-top: 8px;
+                padding-bottom: 6px;
+                spacing: 6px;
+                vertical-stretch: 1;
+
+                // 1. 顶部路径条与操作导航区: [Home] [<-] [->] [路径输入框] [刷新] [传输列表]
+                Rectangle {
+                    height: 32px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    HorizontalLayout {
+                        padding-left: 4px;
+                        padding-right: 4px;
+                        padding-top: 4px;
+                        padding-bottom: 4px;
+                        spacing: 4px;
+
+                        // 1. 最左端固定图标群：[Home] [<-] [->] (紧贴左侧)
+                        HorizontalLayout {
+                            spacing: 2px;
+                            horizontal-stretch: 0;
+
+                            // 1.1 房子图标 (home) - 回到主目录 ~
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    border-radius: 3px;
+                                    background: home-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                    home-touch := TouchArea {
+                                        clicked => {
+                                            FilesBridge.navigate-remote-path("~");
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        source: @image-url("../../assets/icons/home.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        image-fit: contain;
+                                        colorize: home-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                            }
+
+                            // 1.2 后退按钮 (<-)
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    border-radius: 3px;
+                                    background: (root.can-go-back && back-touch.has-hover) ? AppTheme.hover-background : transparent;
+
+                                    back-touch := TouchArea {
+                                        enabled: root.can-go-back;
+                                        clicked => {
+                                            if root.can-go-back {
+                                                root.navigate-back();
+                                            }
+                                        }
+                                        mouse-cursor: root.can-go-back ? pointer : default;
+                                    }
+
+                                    Image {
+                                        source: @image-url("../../assets/icons/arrow-left.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        image-fit: contain;
+                                        colorize: root.can-go-back ? (back-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground) : AppTheme.disabled-foreground.transparentize(60%);
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                            }
+
+                            // 1.3 前进按钮 (->)
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    border-radius: 3px;
+                                    background: (root.can-go-forward && fwd-touch.has-hover) ? AppTheme.hover-background : transparent;
+
+                                    fwd-touch := TouchArea {
+                                        enabled: root.can-go-forward;
+                                        clicked => {
+                                            if root.can-go-forward {
+                                                root.navigate-forward();
+                                            }
+                                        }
+                                        mouse-cursor: root.can-go-forward ? pointer : default;
+                                    }
+
+                                    Image {
+                                        source: @image-url("../../assets/icons/arrow-right.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        image-fit: contain;
+                                        colorize: root.can-go-forward ? (fwd-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground) : AppTheme.disabled-foreground.transparentize(60%);
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 2. 中间：路径输入展示与修改框 (horizontal-stretch: 1 完整占满中间全部剩余空间)
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            height: 24px;
+                            background: AppTheme.panel-background;
+                            border-radius: 3px;
+                            border-width: path-input.has-focus ? 1.5px : 1px;
+                            border-color: path-input.has-focus ? #10b981 : AppTheme.border.transparentize(40%);
+                            clip: true;
+                            animate border-color { duration: 120ms; }
+
+                            HorizontalLayout {
+                                padding-left: 6px;
+                                padding-right: 6px;
+                                spacing: 4px;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/folder-open.svg");
+                                        width: 11px;
+                                        height: 11px;
+                                        image-fit: contain;
+                                        colorize: path-input.has-focus ? #10b981 : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                path-input := TextInput {
+                                    text: root.current-dir != "" ? root.current-dir : "~";
+                                    font-size: 11px;
+                                    font-family: "JetBrains Mono, Consolas, monospace";
+                                    color: AppTheme.foreground;
+                                    horizontal-alignment: left;
+                                    vertical-alignment: center;
+                                    horizontal-stretch: 1;
+                                    selection-background-color: AppTheme.selected-background;
+                                    selection-foreground-color: AppTheme.selected-foreground;
+
+                                    accepted => {
+                                        FilesBridge.navigate-remote-path(self.text);
+                                    }
+                                }
+                            }
+                        }
+
+                        // 3. 最右端固定图标群：[刷新] [传输] (紧贴右侧)
+                        HorizontalLayout {
+                            spacing: 2px;
+                            horizontal-stretch: 0;
+
+                            // 3.1 刷新图标
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    border-radius: 3px;
+                                    background: refresh-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                    refresh-touch := TouchArea {
+                                        clicked => {
+                                            root.refresh();
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        source: @image-url("../../assets/icons/refresh.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        image-fit: contain;
+                                        colorize: refresh-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+                                }
+                            }
+
+                            // 3.2 传输图标 (固定最右端，点击展开/关闭传输列表)
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 22px;
+                                    height: 22px;
+                                    border-radius: 3px;
+                                    background: (root.is-transfer-expanded || trans-touch.has-hover) ? AppTheme.hover-background : transparent;
+
+                                    trans-touch := TouchArea {
+                                        clicked => {
+                                            root.is-transfer-expanded = !root.is-transfer-expanded;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    Image {
+                                        source: @image-url("../../assets/icons/arrow-up-down.svg");
+                                        width: 12px;
+                                        height: 12px;
+                                        image-fit: contain;
+                                        colorize: root.is-transfer-expanded ? #10b981 : (trans-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                                        x: (parent.width - self.width) / 2;
+                                        y: (parent.height - self.height) / 2;
+                                    }
+
+                                    // 任务活跃指示微标
+                                    if root.transfer-tasks.length > 0: Rectangle {
+                                        x: parent.width - 6px;
+                                        y: 1px;
+                                        width: 5px;
+                                        height: 5px;
+                                        border-radius: 2.5px;
+                                        background: #10b981;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 2. 快速操作栏 (上传按钮与状态提示)
+                HorizontalLayout {
+                    height: 24px;
+                    spacing: 6px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                width: 6px;
+                                height: 6px;
+                                border-radius: 3px;
+                                background: #10b981; // Remote SFTP green accent
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: root.files.length + " " + @tr("项");
+                                font-size: 10px;
+                                font-weight: 600;
+                                color: AppTheme.secondary-foreground;
+                            }
+                        }
+                    }
+
+                    // 上传操作按钮组 (支持选择文件与选择文件夹)
+                    HorizontalLayout {
+                        spacing: 4px;
+
+                        AppButton {
+                            text: @tr("↑ 上传文件");
+                            variant: "primary";
+                            height: 22px;
+                            font-size: 10px;
+                            clicked => {
+                                root.upload-file();
+                            }
+                        }
+
+                        AppButton {
+                            text: @tr("📁 上传目录");
+                            variant: "secondary";
+                            height: 22px;
+                            font-size: 10px;
+                            clicked => {
+                                root.upload-folder();
+                            }
+                        }
+                    }
+                }
+
+                // 3. 紧凑表头
+                Rectangle {
+                    height: 20px;
+                    background: AppTheme.panel-background;
+                    border-radius: 3px;
+
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        spacing: 6px;
+
+                        Text {
+                            text: @tr("名称");
+                            font-size: 10px;
+                            font-weight: 600;
+                            color: AppTheme.disabled-foreground;
+                            horizontal-stretch: 1;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: @tr("大小");
+                            font-size: 10px;
+                            font-weight: 600;
+                            color: AppTheme.disabled-foreground;
+                            width: 50px;
+                            horizontal-alignment: right;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: @tr("时间");
+                            font-size: 10px;
+                            font-weight: 600;
+                            color: AppTheme.disabled-foreground;
+                            width: 56px;
+                            horizontal-alignment: right;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 4. 核心文件列表区域
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+
+                    file-scroll := Flickable {
+                        width: 100%;
+                        height: 100%;
+                        viewport-height: (root.files.length + 1) * 26px;
+
+                        VerticalLayout {
+                            x: 0px;
+                            y: 0px;
+                            width: parent.width;
+                            spacing: 1px;
+                            alignment: start;
+
+                            // 第一行：.. 上级目录
+                            Rectangle {
+                                height: 24px;
+                                border-radius: AppTheme.radius-small;
+                                background: dot-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                dot-touch := TouchArea {
+                                    double-clicked => {
+                                        root.navigate-up();
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 6px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../assets/icons/folder.svg");
+                                            width: 12px;
+                                            height: 12px;
+                                            colorize: #10b981;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: "..";
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        color: AppTheme.foreground;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: "-";
+                                        font-size: 9px;
+                                        color: AppTheme.disabled-foreground;
+                                        width: 50px;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: "-";
+                                        font-size: 9px;
+                                        color: AppTheme.disabled-foreground;
+                                        width: 56px;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+
+                            // 真实文件与目录条目
+                            for item[idx] in root.files: Rectangle {
+                                height: 24px;
+                                border-radius: AppTheme.radius-small;
+                                background: root.selected-id == item.id ? AppTheme.accent.transparentize(80%) :
+                                            row-touch.has-hover ? AppTheme.hover-background : transparent;
+                                border-width: 1px;
+                                border-color: root.selected-id == item.id ? AppTheme.accent.transparentize(50%) : transparent;
+                                animate background { duration: 80ms; }
+
+                                row-touch := TouchArea {
+                                    pointer-event(event) => {
+                                        if event.kind == PointerEventKind.down {
+                                            if event.button == PointerEventButton.right {
+                                                root.is-context-menu-open = true;
+                                                root.context-path = item.path;
+                                                root.context-name = item.name;
+                                                root.context-is-dir = item.is-dir;
+                                                root.selected-id = item.id;
+                                                FilesBridge.selected-remote-id = item.id;
+                                                let click_y = 102px + (root.current-dir != "/" ? 25px : 0px) + idx * 25px + file-scroll.viewport-y + self.mouse-y;
+                                                let click_x = 8px + self.mouse-x;
+                                                if click_y + 140px > root.height - 8px {
+                                                    root.context-menu-y = Math.max(8px, click_y - 138px);
+                                                } else {
+                                                    root.context-menu-y = Math.max(8px, Math.min(root.height - 146px, click_y));
+                                                }
+                                                root.context-menu-x = Math.max(8px, Math.min(root.width - 156px, click_x));
+                                            } else {
+                                                root.is-context-menu-open = false;
+                                            }
+                                        }
+                                    }
+                                    clicked => {
+                                        if !root.is-context-menu-open {
+                                            root.selected-id = item.id;
+                                            FilesBridge.selected-remote-id = item.id;
+                                        }
+                                    }
+                                    double-clicked => {
+                                        if !root.is-context-menu-open {
+                                            if item.is-dir {
+                                                root.change-dir(item.path);
+                                            } else {
+                                                root.download-file(item.path);
+                                            }
+                                        }
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 6px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: item.is-dir ? @image-url("../../assets/icons/folder.svg") : @image-url("../../assets/icons/file-text.svg");
+                                            width: 12px;
+                                            height: 12px;
+                                            colorize: item.is-dir ? #10b981 : AppTheme.secondary-foreground;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: item.name;
+                                        font-size: 11px;
+                                        font-weight: item.is-dir ? 600 : 400;
+                                        color: item.is-dir ? AppTheme.foreground : AppTheme.foreground.transparentize(10%);
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: item.size-formatted;
+                                        font-size: 9px;
+                                        color: AppTheme.disabled-foreground;
+                                        width: 50px;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: item.modified-formatted;
+                                        font-size: 8px;
+                                        color: AppTheme.disabled-foreground;
+                                        width: 56px;
+                                        horizontal-alignment: right;
+                                        vertical-alignment: center;
+                                        overflow: elide;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    AppVScrollBar {
+                        viewport-height: file-scroll.viewport-height;
+                        visible-height: file-scroll.height;
+                        viewport-y <=> file-scroll.viewport-y;
+                    }
+                }
+            }
+
+            // 5. 底部传输进度与过程面板 (直接占满整个下方，支持向上拖拽调节高度)
+            trans-panel := Rectangle {
+                width: 100%;
+                height: root.is-transfer-expanded ? root.transfer-panel-height : 26px;
+                background: AppTheme.panel-background;
+                clip: true;
+
+                // 顶部 1px 分界线
+                Rectangle {
+                    y: 0px;
+                    width: 100%;
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                // 顶部可拖拽调节手柄 (仅展开状态可向上/向下调节高度)
+                if root.is-transfer-expanded: Rectangle {
+                    y: 0px;
+                    height: 5px;
+                    width: 100%;
+                    z: 20;
+                    background: split-touch.has-hover || split-touch.pressed ? AppTheme.accent : transparent;
+                    animate background { duration: 100ms; }
+
+                    split-touch := TouchArea {
+                        mouse-cursor: row-resize;
+                        moved => {
+                            if self.pressed {
+                                let delta = self.mouse-y - self.pressed-y;
+                                root.transfer-panel-height = Math.max(80px, Math.min(root.height - 120px, root.transfer-panel-height - delta));
+                            }
+                        }
+                        double-clicked => {
+                            root.transfer-panel-height = 150px;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    padding-left: 8px;
+                    padding-right: 8px;
+                    padding-top: 4px;
+                    padding-bottom: 4px;
+                    spacing: 4px;
+
+                    // 传输面板头部 (点击自由切换展开/折叠)
+                    Rectangle {
+                        height: 18px;
+
+                        header-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-expanded = !root.is-transfer-expanded;
+                            }
+                            mouse-cursor: pointer;
+                        }
+
+                        HorizontalLayout {
+                            alignment: space-between;
+
+                            HorizontalLayout {
+                                spacing: 5px;
+                                alignment: start;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../assets/icons/arrow-up-down.svg");
+                                        width: 11px;
+                                        height: 11px;
+                                        colorize: header-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: @tr("传输进度与队列");
+                                        font-size: 10px;
+                                        font-weight: 700;
+                                        color: header-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+
+                                if root.transfer-tasks.length > 0: Rectangle {
+                                    height: 14px;
+                                    border-radius: 7px;
+                                    background: AppTheme.accent.transparentize(80%);
+                                    HorizontalLayout {
+                                        padding-left: 5px;
+                                        padding-right: 5px;
+                                        Text {
+                                            text: root.transfer-tasks.length + "";
+                                            font-size: 8px;
+                                            font-weight: 700;
+                                            color: AppTheme.accent;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: end;
+
+                                if root.is-transfer-expanded && root.transfer-tasks.length > 0: AppButton {
+                                    text: @tr("清空完成");
+                                    variant: "ghost";
+                                    height: 16px;
+                                    font-size: 8px;
+                                    clicked => {
+                                        root.clear-completed-transfers();
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    Text {
+                                        text: root.is-transfer-expanded ? "▼" : "▲";
+                                        font-size: 8px;
+                                        color: header-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // 展开状态下的传输任务列表
+                    if root.is-transfer-expanded: Rectangle {
+                        vertical-stretch: 1;
+                        clip: true;
+
+                        trans-scroll := Flickable {
+                            width: 100%;
+                            height: 100%;
+                            viewport-height: max(self.height, root.transfer-tasks.length * 36px);
+
+                            if root.transfer-tasks.length == 0: VerticalLayout {
+                                alignment: center;
+                                height: 100%;
+                                Text {
+                                    text: @tr("暂无进行中的文件传输任务");
+                                    font-size: 9px;
+                                    color: AppTheme.disabled-foreground;
+                                    horizontal-alignment: center;
+                                }
+                            }
+
+                            if root.transfer-tasks.length > 0: VerticalLayout {
+                                spacing: 4px;
+                                padding-right: 4px;
+
+                                for task[t-idx] in root.transfer-tasks: Rectangle {
+                                    height: 32px;
+                                    border-radius: 3px;
+                                    background: trans-item-touch.has-hover ? AppTheme.hover-background : (task.is-dir ? AppTheme.control-background.transparentize(50%) : AppTheme.control-background);
+                                    border-width: 1px;
+                                    border-color: task.is-dir ? AppTheme.accent.transparentize(80%) : AppTheme.border;
+
+                                    trans-item-touch := TouchArea {
+                                        pointer-event(event) => {
+                                            if event.kind == PointerEventKind.down {
+                                                if event.button == PointerEventButton.right {
+                                                    root.is-transfer-context-menu-open = true;
+                                                    root.is-context-menu-open = false;
+                                                    root.context-transfer-id = task.id;
+                                                    root.context-transfer-name = task.filename;
+                                                    root.context-transfer-path = task.target-path != "" ? task.target-path : task.source-path;
+                                                    root.context-transfer-status = task.status;
+                                                    let click_y = trans-panel.y + 26px + t-idx * 36px + trans-scroll.viewport-y + self.mouse-y;
+                                                    let click_x = 8px + self.mouse-x;
+                                                    if click_y + 140px > root.height - 8px {
+                                                        root.transfer-context-menu-y = Math.max(8px, click_y - 135px);
+                                                    } else {
+                                                        root.transfer-context-menu-y = Math.max(8px, Math.min(root.height - 145px, click_y));
+                                                    }
+                                                    root.transfer-context-menu-x = Math.max(8px, Math.min(root.width - 148px, click_x));
+                                                } else {
+                                                    root.is-transfer-context-menu-open = false;
+                                                }
+                                            }
+                                        }
+                                        clicked => {
+                                            if task.is-dir {
+                                                FilesBridge.toggle-transfer-expand(task.id);
+                                            }
+                                        }
+                                        mouse-cursor: task.is-dir ? pointer : default;
+                                    }
+
+                                    VerticalLayout {
+                                        padding: 4px;
+                                        spacing: 2px;
+
+                                        // 上部: 缩进 + 方向 + 折叠三角 + 图标 + 文件/文件夹名 + 项数 + 大小/速度 + 百分比
+                                        HorizontalLayout {
+                                            alignment: space-between;
+
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                alignment: start;
+                                                horizontal-stretch: 1;
+
+                                                // 1. 子项层级缩进
+                                                if task.level > 0: Rectangle {
+                                                    width: task.level * 10px;
+                                                }
+
+                                                // 2. 文件夹展开/折叠三角指示 (仅对文件夹显示)
+                                                if task.is-dir: VerticalLayout {
+                                                    alignment: center;
+                                                    Text {
+                                                        text: task.is-expanded ? "▼" : "▶";
+                                                        font-size: 8px;
+                                                        font-weight: 700;
+                                                        color: AppTheme.secondary-foreground;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+
+                                                // 3. 上传/下载方向标识
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Text {
+                                                        text: task.direction == "upload" ? "↑" : "↓";
+                                                        font-size: 9px;
+                                                        font-weight: 700;
+                                                        color: task.direction == "upload" ? AppTheme.accent : #10b981;
+                                                    }
+                                                }
+
+                                                // 4. 文件夹或文件图标
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    Image {
+                                                        source: task.is-dir ? @image-url("../../assets/icons/folder.svg") : @image-url("../../assets/icons/file-text.svg");
+                                                        width: 11px;
+                                                        height: 11px;
+                                                        image-fit: contain;
+                                                        colorize: task.is-dir ? #f59e0b : (task.direction == "upload" ? AppTheme.accent : #10b981);
+                                                    }
+                                                }
+
+                                                // 5. 任务文件名或目录名
+                                                VerticalLayout {
+                                                    alignment: center;
+                                                    horizontal-stretch: 1;
+                                                    Text {
+                                                        text: task.filename;
+                                                        font-size: 9px;
+                                                        font-weight: task.is-dir ? 700 : 600;
+                                                        color: AppTheme.foreground;
+                                                        overflow: elide;
+                                                    }
+                                                }
+
+                                                // 6. 文件夹项数概览徽章
+                                                if task.is-dir && task.item-count-text != "": VerticalLayout {
+                                                    alignment: center;
+                                                    Rectangle {
+                                                        height: 13px;
+                                                        border-radius: 2px;
+                                                        background: AppTheme.hover-background;
+                                                        HorizontalLayout {
+                                                            padding-left: 3px;
+                                                            padding-right: 3px;
+                                                            alignment: center;
+                                                            Text {
+                                                                text: task.item-count-text;
+                                                                font-size: 8px;
+                                                                color: AppTheme.secondary-foreground;
+                                                                vertical-alignment: center;
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            // 右侧速率与百分比
+                                            HorizontalLayout {
+                                                spacing: 4px;
+                                                alignment: end;
+
+                                                Text {
+                                                    text: task.speed-text != "" ? task.speed-text : task.size-text;
+                                                    font-size: 8px;
+                                                    color: AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+
+                                                Text {
+                                                    text: Math.round(task.progress * 100) + "%";
+                                                    font-size: 8px;
+                                                    font-weight: 700;
+                                                    color: task.status == "completed" ? #10b981 : AppTheme.accent;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+
+                                        // 下部: 进度条
+                                        Rectangle {
+                                            height: 3px;
+                                            border-radius: 1px;
+                                            background: AppTheme.border;
+
+                                            Rectangle {
+                                                x: 0px;
+                                                y: 0px;
+                                                width: parent.width * Math.max(0.0, Math.min(1.0, task.progress));
+                                                height: 100%;
+                                                border-radius: 1px;
+                                                background: task.status == "completed" ? #10b981 :
+                                                            task.status == "failed" ? AppTheme.danger : AppTheme.accent;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if root.transfer-tasks.length > 0: AppVScrollBar {
+                            viewport-height: trans-scroll.viewport-height;
+                            visible-height: trans-scroll.height;
+                            viewport-y <=> trans-scroll.viewport-y;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 6. 右键上下文菜单浮层
+        if root.is-context-menu-open: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z: 100;
+
+            TouchArea {
+                clicked => { root.is-context-menu-open = false; }
+                pointer-event(event) => {
+                    if event.kind == PointerEventKind.down {
+                        root.is-context-menu-open = false;
+                    }
+                }
+            }
+
+            Rectangle {
+                x: root.context-menu-x;
+                y: root.context-menu-y;
+                width: 148px;
+                border-radius: AppTheme.radius-medium;
+                background: AppTheme.surface-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                drop-shadow-blur: 16px;
+                drop-shadow-color: #00000066;
+                drop-shadow-offset-y: 4px;
+
+                TouchArea { }
+
+                VerticalLayout {
+                    padding: 4px;
+                    spacing: 2px;
+
+                    // 1. 进入目录 / 下载文件
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 3px;
+                        background: menu-open-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: root.context-is-dir ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/file-text.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+                            Text {
+                                text: root.context-is-dir ? @tr("进入目录") : @tr("打开 / 下载");
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        menu-open-touch := TouchArea {
+                            clicked => {
+                                root.is-context-menu-open = false;
+                                if root.context-is-dir {
+                                    root.change-dir(root.context-path);
+                                } else {
+                                    root.download-file(root.context-path);
+                                }
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 2. 下载到本地
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 3px;
+                        background: menu-dl-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/download.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: #10b981;
+                                }
+                            }
+                            Text {
+                                text: @tr("下载到本地");
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        menu-dl-touch := TouchArea {
+                            clicked => {
+                                root.is-context-menu-open = false;
+                                FilesBridge.file-action("transfer", true, root.context-path, root.context-name, root.context-is-dir);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 2.2 上传文件到当前目录
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 3px;
+                        background: menu-upf-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/upload.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+                            Text {
+                                text: @tr("上传文件到此目录...");
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        menu-upf-touch := TouchArea {
+                            clicked => {
+                                root.is-context-menu-open = false;
+                                root.upload-file();
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 2.3 上传文件夹到当前目录
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 3px;
+                        background: menu-upd-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/folder.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: #f59e0b;
+                                }
+                            }
+                            Text {
+                                text: @tr("上传文件夹到此目录...");
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        menu-upd-touch := TouchArea {
+                            clicked => {
+                                root.is-context-menu-open = false;
+                                root.upload-folder();
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 3. 复制完整路径
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 3px;
+                        background: menu-copy-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/copy.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.secondary-foreground;
+                                }
+                            }
+                            Text {
+                                text: @tr("复制完整路径");
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        menu-copy-touch := TouchArea {
+                            clicked => {
+                                root.is-context-menu-open = false;
+                                FilesBridge.copy-to-clipboard(root.context-path);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 分割线
+                    Rectangle {
+                        height: 1px;
+                        background: AppTheme.border;
+                    }
+
+                    // 4. 刷新目录
+                    Rectangle {
+                        height: 26px;
+                        border-radius: 3px;
+                        background: menu-ref-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 8px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/refresh.svg");
+                                    width: 12px;
+                                    height: 12px;
+                                    colorize: AppTheme.secondary-foreground;
+                                }
+                            }
+                            Text {
+                                text: @tr("刷新当前目录");
+                                font-size: 11px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        menu-ref-touch := TouchArea {
+                            clicked => {
+                                root.is-context-menu-open = false;
+                                root.refresh();
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 浮层传输任务右键上下文菜单
+        if root.is-transfer-context-menu-open: Rectangle {
+            width: 100%;
+            height: 100%;
+            z: 110;
+
+            TouchArea {
+                clicked => { root.is-transfer-context-menu-open = false; }
+            }
+
+            Rectangle {
+                x: root.transfer-context-menu-x;
+                y: root.transfer-context-menu-y;
+                width: 140px;
+                height: t-menu-layout.preferred-height;
+                border-radius: AppTheme.radius-medium;
+                background: AppTheme.modal-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                drop-shadow-blur: 16px;
+                drop-shadow-color: #00000088;
+
+                t-menu-layout := VerticalLayout {
+                    padding: 4px;
+                    spacing: 2px;
+
+                    // 1. 定位到文件
+                    Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: tm-locate-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/folder-open.svg");
+                                    width: 11px;
+                                    height: 11px;
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+                            Text {
+                                text: @tr("定位到该文件");
+                                font-size: 10px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        tm-locate-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-context-menu-open = false;
+                                let p = root.context-transfer-path;
+                                root.change-dir(p);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 2. 复制文件路径
+                    Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: tm-copy-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/copy.svg");
+                                    width: 11px;
+                                    height: 11px;
+                                    colorize: AppTheme.secondary-foreground;
+                                }
+                            }
+                            Text {
+                                text: @tr("复制文件路径");
+                                font-size: 10px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        tm-copy-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-context-menu-open = false;
+                                FilesBridge.copy-to-clipboard(root.context-transfer-path);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 3. 重新传输
+                    Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: tm-retry-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/refresh.svg");
+                                    width: 11px;
+                                    height: 11px;
+                                    colorize: #10b981;
+                                }
+                            }
+                            Text {
+                                text: @tr("重新传输");
+                                font-size: 10px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        tm-retry-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-context-menu-open = false;
+                                FilesBridge.transfer-action("retry", root.context-transfer-id);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 4. 从列表中移除
+                    Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: tm-cancel-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/trash.svg");
+                                    width: 11px;
+                                    height: 11px;
+                                    colorize: AppTheme.danger;
+                                }
+                            }
+                            Text {
+                                text: @tr("从列表中移除");
+                                font-size: 10px;
+                                color: AppTheme.danger;
+                                vertical-alignment: center;
+                            }
+                        }
+                        tm-cancel-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-context-menu-open = false;
+                                FilesBridge.transfer-action("cancel", root.context-transfer-id);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+
+                    // 分割线
+                    Rectangle {
+                        height: 1px;
+                        background: AppTheme.border;
+                    }
+
+                    // 5. 清空已完成
+                    Rectangle {
+                        height: 24px;
+                        border-radius: 3px;
+                        background: tm-clear-touch.has-hover ? AppTheme.hover-background : transparent;
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            spacing: 6px;
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../../assets/icons/eraser.svg");
+                                    width: 11px;
+                                    height: 11px;
+                                    colorize: AppTheme.secondary-foreground;
+                                }
+                            }
+                            Text {
+                                text: @tr("清空所有已完成");
+                                font-size: 10px;
+                                color: AppTheme.foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                        tm-clear-touch := TouchArea {
+                            clicked => {
+                                root.is-transfer-context-menu-open = false;
+                                root.clear-completed-transfers();
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

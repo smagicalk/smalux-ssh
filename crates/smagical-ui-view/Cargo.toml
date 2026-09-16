@@ -1,0 +1,19 @@
+[package]
+name = "smagical-ui-view"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+build = "build.rs"
+
+[dependencies]
+slint.workspace = true
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[build-dependencies]
+slint-build.workspace = true

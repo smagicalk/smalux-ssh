@@ -45,7 +45,7 @@ pub use domain::{
     right_panel::{RightPanelItem, RightPanelRegistry},
     snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable},
     terminal_context::{ActiveTerminalSessionContext, TerminalAction},
-    tunnel::{JumpHopRecord, TunnelRecord, TunnelType},
+    tunnel::{JumpHopRecord, TunnelRecord, TunnelRunMode, TunnelType},
 };
 
 pub use state::core_state::CoreState;

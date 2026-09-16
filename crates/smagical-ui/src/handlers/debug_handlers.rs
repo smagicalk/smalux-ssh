@@ -374,6 +374,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 ping_ms: 22,
                 sort_order: 0,
                 notes: String::new(),
+                ..Default::default()
             };
             let _ = core_state_qh.storage().hosts().save(&host_rec);
 
@@ -1248,8 +1249,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 w.global::<SettingsBridge>().set_setting_terminal_crt(false);
                 w.global::<SettingsBridge>().set_setting_always_on_top(false);
                 w.global::<SettingsBridge>().set_setting_start_on_boot(false);
-                w.global::<SettingsBridge>().set_setting_confirm_close_tab(true);
-                w.global::<SettingsBridge>().set_setting_confirm_close_active(true);
+                w.global::<SettingsBridge>().set_setting_confirm_close_tab(false);
+                w.global::<SettingsBridge>().set_setting_confirm_close_active(false);
+                w.global::<SettingsBridge>().set_setting_toast_duration("3".into());
+                notif.set_duration_preset("3");
                 w.global::<WindowBridge>().set_wallpaper_mode("none".into());
                 w.global::<WindowBridge>().invoke_set_wallpaper("none".into(), "".into(), 0.20);
                 w.global::<WindowBridge>().invoke_switch_theme("builtin.ui.darcula".into());

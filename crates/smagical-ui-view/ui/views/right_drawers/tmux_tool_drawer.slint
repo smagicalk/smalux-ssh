@@ -1,0 +1,621 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { DrawerContainer } from "../../components/drawer-container.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+import { AppButton } from "../../components/base/app-button.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { AppEmptyState } from "../../shared/base/app-empty-state.slint";
+import { AppTextInput } from "../../shared/base/app-text-input.slint";
+import { AppVScrollBar } from "../../components/base/app-scroll-bar.slint";
+import { TerminalBridge } from "../../features/terminal/terminal_bridge.slint";
+import { WindowBridge } from "../../features/window/window_bridge.slint";
+
+export struct TmuxSessionItem {
+    id: string,
+    name: string,
+    windows-count: int,
+    is-attached: bool,
+    created-time: string,
+}
+
+component TmuxActionCard inherits Rectangle {
+    in property <string> title;
+    in property <string> shortcut;
+    in property <image> icon;
+    callback clicked();
+
+    height: 26px;
+    border-radius: 4px;
+    background: act-touch.pressed ? AppTheme.hover-background.darker(8%) :
+                act-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+    border-width: 1px;
+    border-color: act-touch.has-hover ? AppTheme.accent.transparentize(60%) : AppTheme.border;
+    animate background { duration: 100ms; }
+    animate border-color { duration: 100ms; }
+
+    act-touch := TouchArea {
+        clicked => { root.clicked(); }
+        mouse-cursor: pointer;
+    }
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 4px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: start;
+
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: root.icon;
+                    width: 11px;
+                    height: 11px;
+                    colorize: act-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.title;
+                    font-size: 10px;
+                    font-weight: 500;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                height: 15px;
+                border-radius: 2px;
+                background: AppTheme.panel-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+
+                HorizontalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+
+                    Text {
+                        text: root.shortcut;
+                        font-size: 8px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 右侧 tmux 终端会话管理器抽屉 (Tmux Tool Drawer)
+/// 伴随活动 SSH 终端，提供远程 tmux 会话列表检视、一键 Attach 挂载恢复、快捷新建以及常用免记快捷键工具箱。
+export component TmuxToolDrawer inherits DrawerContainer {
+    title: @tr("tmux 会话管理");
+    collapse-icon: "▶";
+
+    in property <string> active-host-name: TerminalBridge.active-host-name;
+    in property <bool> has-active-terminal: true;
+    in-out property <[TmuxSessionItem]> sessions: [
+        { id: "s1", name: "prod-worker", windows-count: 3, is-attached: true, created-time: "2小时前" },
+        { id: "s2", name: "train-job", windows-count: 1, is-attached: false, created-time: "昨天 18:30" },
+        { id: "s3", name: "dev-build", windows-count: 2, is-attached: false, created-time: "3天前" },
+    ];
+
+    callback attach-session(string /* name */);
+    callback kill-session(string /* name */);
+    callback new-session(string /* name */);
+    callback detach-current();
+    callback new-window();
+    callback split-horizontal();
+    callback split-vertical();
+    callback refresh();
+
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        // 无活跃终端时的占位空状态
+        if !root.has-active-terminal: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: AppTheme.panel-background;
+            z: 200;
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/terminal.svg");
+                        width: 36px;
+                        height: 36px;
+                        colorize: AppTheme.disabled-foreground;
+                    }
+                }
+                Text {
+                    text: @tr("未连接主机");
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: @tr("请在中央终端打开会话或连接远程主机\ntmux 会话管理将自动关联");
+                    font-size: 10px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        if root.has-active-terminal: VerticalLayout {
+            padding: 8px;
+            spacing: 8px;
+
+        // 1. 顶部当前主机与操作栏
+        Rectangle {
+            height: 32px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.control-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 6px;
+                alignment: space-between;
+
+                // 当前聚焦主机提示
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/server.svg");
+                            width: 12px;
+                            height: 12px;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: root.active-host-name != "" ? root.active-host-name : @tr("当前主机");
+                            font-size: 11px;
+                            font-weight: 600;
+                            color: AppTheme.foreground;
+                            overflow: elide;
+                        }
+                    }
+                }
+
+                // 刷新与新建按钮
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: end;
+
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../../assets/icons/refresh.svg");
+                            icon-size: 12px;
+                            clicked => { root.refresh(); }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        AppButton {
+                            text: @tr("+ 新建");
+                            variant: "primary";
+                            height: 22px;
+                            clicked => {
+                                WindowBridge.is-create-tmux-open = true;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 状态与列表统计
+        HorizontalLayout {
+            padding-left: 2px;
+            padding-right: 2px;
+            alignment: space-between;
+            height: 18px;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+
+                Text {
+                    text: @tr("tmux 会话列表");
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Rectangle {
+                    height: 14px;
+                    border-radius: 7px;
+                    background: AppTheme.control-background;
+
+                    HorizontalLayout {
+                        padding-left: 5px;
+                        padding-right: 5px;
+
+                        Text {
+                            text: root.sessions.length + " " + @tr("个");
+                            font-size: 8px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            Text {
+                text: @tr("后台持久保活");
+                font-size: 9px;
+                color: AppTheme.disabled-foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 4. 会话列表卡片区
+        if root.sessions.length == 0: Rectangle {
+            vertical-stretch: 1;
+            background: transparent;
+
+            AppEmptyState {
+                icon: @image-url("../../assets/icons/layout-grid.svg");
+                title: @tr("未检测到 tmux 会话");
+                subtitle: @tr("点击右上角 + 新建会话，或在终端中运行 tmux new -s <name>");
+                show-action: true;
+                action-text: @tr("创建首个会话");
+                action-clicked => { WindowBridge.is-create-tmux-open = true; }
+            }
+        }
+
+        if root.sessions.length > 0: Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            scroll-area := Flickable {
+                width: 100%;
+                height: 100%;
+                viewport-height: list-content.preferred-height;
+
+                list-content := VerticalLayout {
+                    spacing: 6px;
+                    padding-right: 2px;
+
+                    for item in root.sessions: Rectangle {
+                        height: 52px;
+                        border-radius: AppTheme.radius-medium;
+                        background: card-touch.has-hover ? AppTheme.hover-background : AppTheme.panel-background;
+                        border-width: 1px;
+                        border-color: card-touch.has-hover ? AppTheme.accent.transparentize(60%) : (
+                            item.is-attached ? AppTheme.success.transparentize(65%) : AppTheme.border
+                        );
+                        clip: true;
+                        animate background { duration: 120ms; }
+                        animate border-color { duration: 120ms; }
+
+                        card-touch := TouchArea {
+                            // 卡片悬停响应
+                        }
+
+                        // 左侧微光状态指示条
+                        Rectangle {
+                            x: 0px;
+                            y: 0px;
+                            width: 3px;
+                            height: 100%;
+                            background: item.is-attached ? AppTheme.success : AppTheme.border.transparentize(50%);
+                        }
+
+                        HorizontalLayout {
+                            padding-left: 8px;
+                            padding-right: 8px;
+                            padding-top: 6px;
+                            padding-bottom: 6px;
+                            spacing: 8px;
+
+                            // 左侧会话终端图标徽章
+                            VerticalLayout {
+                                alignment: center;
+                                Rectangle {
+                                    width: 28px;
+                                    height: 28px;
+                                    border-radius: 6px;
+                                    background: item.is-attached ? AppTheme.success.transparentize(85%) : AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: item.is-attached ? AppTheme.success.transparentize(60%) : AppTheme.border;
+
+                                    Image {
+                                        source: @image-url("../../assets/icons/terminal.svg");
+                                        width: 13px;
+                                        height: 13px;
+                                        colorize: item.is-attached ? AppTheme.success : AppTheme.secondary-foreground;
+                                    }
+                                }
+                            }
+
+                            // 中间信息流 (两行紧凑清晰)
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 3px;
+                                horizontal-stretch: 1;
+
+                                // 顶部行：会话名称 + 窗口数胶囊
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    alignment: start;
+
+                                    Text {
+                                        text: item.name;
+                                        font-size: 11px;
+                                        font-weight: 700;
+                                        font-family: "JetBrains Mono, Consolas, monospace";
+                                        color: AppTheme.foreground;
+                                        overflow: elide;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Rectangle {
+                                        height: 15px;
+                                        border-radius: 3px;
+                                        background: AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: AppTheme.border;
+
+                                        HorizontalLayout {
+                                            padding-left: 5px;
+                                            padding-right: 5px;
+                                            alignment: center;
+                                            Text {
+                                                text: item.windows-count + " " + @tr("窗口");
+                                                font-size: 8px;
+                                                font-weight: 600;
+                                                color: AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // 底部行：附加状态指示点与文字 + 创建时间
+                                HorizontalLayout {
+                                    spacing: 5px;
+                                    alignment: start;
+
+                                    // 状态指示点
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 5px;
+                                            height: 5px;
+                                            border-radius: 2.5px;
+                                            background: item.is-attached ? AppTheme.success : AppTheme.disabled-foreground;
+                                        }
+                                    }
+
+                                    // 状态文字
+                                    Text {
+                                        text: item.is-attached ? @tr("Attached (活跃中)") : @tr("Detached (已挂起)");
+                                        font-size: 9px;
+                                        font-weight: 500;
+                                        color: item.is-attached ? AppTheme.success : AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: "·";
+                                        font-size: 9px;
+                                        color: AppTheme.border;
+                                        vertical-alignment: center;
+                                    }
+
+                                    // 时间
+                                    HorizontalLayout {
+                                        spacing: 3px;
+                                        alignment: start;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../../assets/icons/clock.svg");
+                                                width: 8px;
+                                                height: 8px;
+                                                colorize: AppTheme.disabled-foreground;
+                                            }
+                                        }
+                                        Text {
+                                            text: item.created-time;
+                                            font-size: 8px;
+                                            color: AppTheme.disabled-foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 右侧操作群 (垂直居中严格对齐)
+                            HorizontalLayout {
+                                spacing: 4px;
+                                alignment: end;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    AppButton {
+                                        text: item.is-attached ? @tr("切换") : @tr("进入");
+                                        variant: item.is-attached ? "secondary" : "primary";
+                                        height: 22px;
+                                        font-size: 9px;
+                                        clicked => {
+                                            root.attach-session(item.name);
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    AppIconButton {
+                                        icon: @image-url("../../assets/icons/trash.svg");
+                                        icon-size: 11px;
+                                        clicked => {
+                                            root.kill-session(item.name);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            AppVScrollBar {
+                viewport-height: scroll-area.viewport-height;
+                visible-height: scroll-area.height;
+                viewport-y <=> scroll-area.viewport-y;
+            }
+        }
+
+        // 5. 底部常用免记快捷键工具箱
+        Rectangle {
+            height: 104px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.control-background.transparentize(40%);
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 6px;
+                spacing: 5px;
+
+                // 面板头部
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 14px;
+
+                    HorizontalLayout {
+                        spacing: 4px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../../assets/icons/layout-grid.svg");
+                                width: 10px;
+                                height: 10px;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("tmux 免记快捷操作");
+                                font-size: 10px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: @tr("直发终端");
+                            font-size: 8px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                    }
+                }
+
+                // 2x2 快捷按钮阵列
+                HorizontalLayout {
+                    spacing: 4px;
+
+                    TmuxActionCard {
+                        horizontal-stretch: 1;
+                        title: @tr("脱离");
+                        shortcut: "prefix d";
+                        icon: @image-url("../../assets/icons/panel-right-close.svg");
+                        clicked => { root.detach-current(); }
+                    }
+
+                    TmuxActionCard {
+                        horizontal-stretch: 1;
+                        title: @tr("新窗口");
+                        shortcut: "prefix c";
+                        icon: @image-url("../../assets/icons/plus.svg");
+                        clicked => { root.new-window(); }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 4px;
+
+                    TmuxActionCard {
+                        horizontal-stretch: 1;
+                        title: @tr("横向分屏");
+                        shortcut: "prefix %";
+                        icon: @image-url("../../assets/icons/split-h.svg");
+                        clicked => { root.split-horizontal(); }
+                    }
+
+                    TmuxActionCard {
+                        horizontal-stretch: 1;
+                        title: @tr("纵向分屏");
+                        shortcut: "prefix \"";
+                        icon: @image-url("../../assets/icons/split-v.svg");
+                        clicked => { root.split-vertical(); }
+                    }
+                }
+
+                // 底部提示
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: center;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/info-circle.svg");
+                            width: 9px;
+                            height: 9px;
+                            colorize: AppTheme.disabled-foreground;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: @tr("提示: 若未安装 tmux，可运行 apt install tmux");
+                            font-size: 8px;
+                            color: AppTheme.disabled-foreground;
+                            overflow: elide;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+}

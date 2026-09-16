@@ -1,0 +1,796 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { StatusDot } from "../../components/status-dot.slint";
+import { TabItem } from "../../components/tab-item.slint";
+import { AppIconButton } from "../../components/base/app-icon-button.slint";
+import { TabData } from "tab_bar.slint";
+import { TerminalFindBar } from "terminal_find_bar.slint";
+import { TerminalContextMenu } from "terminal_context_menu.slint";
+import { TabContextMenu } from "tab_context_menu.slint";
+import { TerminalPaneView } from "terminal_pane_view.slint";
+
+
+import { TabData, TerminalPaneData, TerminalSplitterData } from "../../features/terminal/terminal_model.slint";
+import { TerminalBridge } from "../../features/terminal/terminal_bridge.slint";
+import { SettingsBridge } from "../../features/settings/settings_bridge.slint";
+import { WindowBridge } from "../../features/window/window_bridge.slint";
+
+export { TerminalPaneData, TerminalSplitterData }
+
+/// 终端屏幕与多会话光栅化像素视口 (Terminal Viewport)
+///
+/// 承载终端位图光栅化渲染、键盘事件捕获转发、鼠标交互、多会话 Tab 调度、查找浮层与右键菜单。
+export component TerminalViewport inherits Rectangle {
+    /// 当前是否存在处于连接状态的活跃终端会话
+    in property <bool> has-active-session: TerminalBridge.has-active-session;
+    /// 当前激活会话的展示名称 (如: "node-1 #1")
+    in property <string> session-name: TerminalBridge.active-session-name;
+    /// 当前激活会话的连接地址 (如: "192.168.1.101:22" 或 "Local (pwsh.exe)")
+    in property <string> host-address: TerminalBridge.active-host-address;
+    /// 当前主机的 ICMP 延迟毫秒数 (本地 Shell 为 0)
+    in property <int> ping-ms: TerminalBridge.active-host-ping-ms;
+    /// 是否开启多终端分屏模式
+    in-out property <bool> is-split: TerminalBridge.is-split;
+    /// 分屏排布方向 ("vertical" 左右垂直分屏 | "horizontal" 上下水平分屏)
+    in-out property <string> split-orientation: TerminalBridge.split-orientation;
+    /// 分屏窗格尺寸比例 (0.15 ~ 0.85, 默认 0.5)
+    in-out property <float> split-ratio: TerminalBridge.split-ratio;
+    /// 当前获得键盘焦点的窗格索引 (0: 主窗格, 1: 副窗格)
+    in-out property <int> active-pane-index: TerminalBridge.active-pane-index;
+    /// 当前激活聚焦的窗格唯一 ID
+    in-out property <string> active-pane-id: TerminalBridge.active-pane-id;
+
+    /// 活跃 Tab 会话列表数据模型
+    in property <[TabData]> tabs: TerminalBridge.tabs;
+    /// 当前被选中的 Tab 会话 ID
+    in-out property <string> active-tab-id: TerminalBridge.active-session-tab;
+    /// 顶部 Tab 栏鼠标滚轮水平滑动像素偏移量
+    in-out property <length> tab-scroll-offset: 0px;
+
+    /// 主窗格实时光栅化位图帧流
+    in property <image> terminal-screen-image: TerminalBridge.terminal-screen-image;
+    /// 副窗格 1 实时光栅化位图帧流 (分屏模式有效)
+    in property <image> terminal-split-image: TerminalBridge.terminal-split-image;
+    /// 副窗格 2 实时光栅化位图帧流 (3/4 分屏有效)
+    in property <image> terminal-split2-image: TerminalBridge.terminal-split2-image;
+    /// 副窗格 3 实时光栅化位图帧流 (4 分屏有效)
+    in property <image> terminal-split3-image: TerminalBridge.terminal-split3-image;
+    /// 分屏窗格总数量
+    in-out property <int> split-count: TerminalBridge.split-count;
+    /// 动态多窗格列表数据模型 (无限嵌套分屏)
+    in property <[TerminalPaneData]> terminal-panes: TerminalBridge.panes;
+    /// 动态分割条列表数据模型
+    in property <[TerminalSplitterData]> terminal-splitters: TerminalBridge.splitters;
+    /// 分割条拖拽持久状态 (保存在 root 组件上，绝不受模型更新重置影响)
+    in-out property <bool> is-dragging-splitter: false;
+    in-out property <string> dragging-splitter-id: "";
+    in-out property <bool> dragging-is-vertical: false;
+    in-out property <length> drag-start-mouse: 0px;
+
+    /// 副窗格 1 展示名称
+
+
+
+    in property <string> split-session-name: "";
+    /// 副窗格 2 展示名称
+    in property <string> split2-session-name: "";
+    /// 副窗格 3 展示名称
+    in property <string> split3-session-name: "";
+
+    /// 终端内浮动查找栏状态与匹配计数
+    in-out property <bool> is-find-open: false;
+    in-out property <string> find-query: "";
+    in property <int> find-current-match: 0;
+    in property <int> find-total-matches: 0;
+
+    /// 终端右键快捷菜单状态与浮动坐标
+    in-out property <bool> is-context-menu-open: false;
+    in-out property <length> context-menu-x: 0px;
+    in-out property <length> context-menu-y: 0px;
+    in-out property <bool> has-selection: false;
+    /// 鼠标右键单击快速粘贴
+    in property <bool> paste-on-right-click: SettingsBridge.setting-paste-on-right-click;
+    /// 终端历史回滚总行数 (用于驱动滚动条与状态展示)
+    in property <int> history-size: TerminalBridge.history-size;
+    /// 当前相对底部的向上回滚行偏移量 (0 表示在最底部最新行)
+    in property <int> scroll-offset: TerminalBridge.scroll-offset;
+
+    /// 壁纸展示模式 ("none" | "global" | "terminal")
+    in-out property <string> wallpaper-mode: WindowBridge.wallpaper-mode;
+    /// 终端专属壁纸位图
+    in-out property <image> terminal-wallpaper-image: WindowBridge.terminal-wallpaper-image;
+    /// 终端专属壁纸不透明度 (0.0 ~ 1.0)
+    in-out property <float> terminal-wallpaper-opacity: WindowBridge.terminal-wallpaper-opacity;
+
+    /// 终端实际物理像素渲染画布宽高
+    out property <float> canvas-width: root.width / 1px;
+    out property <float> canvas-height: Math.max(10px, root.height) / 1px;
+
+    /// 终端动态网格尺寸 (自适应计算字符列数与行数，同步回 Rust 后台 PTY)
+    out property <int> terminal-cols: Math.max(10, Math.floor((root.width - 36px) / 8.5px));
+    out property <int> terminal-rows: Math.max(5, Math.floor((root.height - 36px) / 18px));
+
+    changed canvas-width => { TerminalBridge.canvas-width = self.canvas-width; }
+    changed canvas-height => { TerminalBridge.canvas-height = self.canvas-height; }
+    changed terminal-cols => {
+        TerminalBridge.terminal-cols = self.terminal-cols;
+        TerminalBridge.terminal-resize(self.terminal-cols, self.terminal-rows);
+    }
+    changed terminal-rows => {
+        TerminalBridge.terminal-rows = self.terminal-rows;
+        TerminalBridge.terminal-resize(self.terminal-cols, self.terminal-rows);
+    }
+
+    /// 鼠标划选高亮状态
+    in-out property <int> sel-start-col: -1;
+    in-out property <int> sel-start-row: -1;
+    in-out property <int> sel-end-col: -1;
+    in-out property <int> sel-end-row: -1;
+    in-out property <bool> is-selecting: false;
+    property <bool> context-menu-can-split: false;
+
+    /// 滚动条拖拽交互状态
+    property <bool> is-dragging-scrollbar: false;
+
+    function apply-scrollbar-drag(mouse-y: length, thumb-h: length, max-travel: length) {
+        if max-travel <= 0px || root.history-size <= 0 {
+            return;
+        }
+        let target-thumb-y = Math.max(0px, Math.min(max-travel, mouse-y - thumb-h / 2));
+        let progress = (target-thumb-y / 1px) / Math.max(1.0, max-travel / 1px);
+        let target-offset = Math.round((1.0 - progress) * root.history-size);
+        TerminalBridge.scroll-offset = target-offset;
+        TerminalBridge.terminal-scroll-to(target-offset);
+    }
+
+    /// Tab 专属右键快捷菜单状态
+    in-out property <bool> is-tab-context-menu-open: false;
+    in-out property <length> tab-context-menu-x: 0px;
+    in-out property <length> tab-context-menu-y: 0px;
+    in-out property <string> tab-context-menu-tab-id: "";
+    in-out property <string> tab-context-menu-pane-id: "";
+    property <bool> tab-context-menu-can-split: false;
+    property <bool> tab-context-menu-can-close-others: false;
+
+    /// Tab 拖拽调度全局状态
+    in-out property <bool> is-dragging-tab: false;
+    in-out property <bool> is-tab-drop-valid: true;
+    in-out property <string> drag-tab-source-pane: "";
+    in-out property <int> drag-tab-from-index: -1;
+    in-out property <string> drag-tab-title: "";
+    in-out property <string> drag-tab-status: "online";
+    in-out property <length> drag-tab-x: 0px;
+    in-out property <length> drag-tab-y: 0px;
+
+    
+
+    background: AppTheme.window-background;
+
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+        padding: 0px;
+        spacing: 0px;
+
+        // 1. 空状态默认 Tab 栏 (当无会话时展示标准 36px 栏，最右侧固定 + 按钮)
+        if !root.has-active-session: Rectangle {
+            width: 100%;
+            height: 36px;
+            background: AppTheme.panel-background;
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                width: 100%;
+                background: AppTheme.border;
+            }
+
+            HorizontalLayout {
+                width: 100%;
+                height: 100%;
+                padding-left: 6px;
+                padding-right: 6px;
+                alignment: end;
+
+                VerticalLayout {
+                    alignment: center;
+
+                    Rectangle {
+                        width: 26px;
+                        height: 26px;
+                        border-radius: 4px;
+                        background: empty-new-tab-touch.has-hover ? AppTheme.hover-background : Colors.transparent;
+
+                        Text {
+                            text: "+";
+                            font-size: 16px;
+                            font-weight: 600;
+                            color: empty-new-tab-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+
+                        empty-new-tab-touch := TouchArea {
+                            clicked => { TerminalBridge.new-tab(); WindowBridge.is-new-session-modal-open = true; }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. 终端主体区域 (当存在活跃会话时)
+        if root.has-active-session: terminal-canvas := Rectangle {
+            width: 100%;
+            background: AppTheme.window-background;
+            vertical-stretch: 1;
+            clip: true;
+
+
+
+            // 2.1 键盘按键与焦点捕捉层 (捕获字符与修饰键并统一转发至 Rust 后端状态机)
+            terminal-focus := FocusScope {
+                key-pressed(event) => {
+                    // 全局快捷键: 关闭当前标签页 (Ctrl+W)
+                    if event.modifiers.control && (event.text == "w" || event.text == "W" || event.text == "\u{0017}") {
+                        if root.active-tab-id != "" {
+                            TerminalBridge.close-tab(root.active-tab-id);
+                        }
+                        return accept;
+                    }
+                    // 全局快捷键: 查找浮层 (Ctrl+F)
+                    if event.modifiers.control && (event.text == "f" || event.text == "F" || event.text == "\u{0006}") {
+                        root.is-find-open = !root.is-find-open;
+                        return accept;
+                    }
+                    // 全局快捷键: 复制 (Ctrl+Shift+C 或有选区时的 Ctrl+C)
+                    if event.modifiers.control && ((event.modifiers.shift && (event.text == "c" || event.text == "C")) || (root.has-selection && (event.text == "c" || event.text == "C" || event.text == "\u{0003}"))) {
+                        TerminalBridge.terminal-copy();
+                        return accept;
+                    }
+                    // 全局快捷键: 粘贴 (Ctrl+Shift+V 或 Ctrl+V)
+                    if event.modifiers.control && ((event.modifiers.shift && (event.text == "v" || event.text == "V")) || event.text == "\u{0016}") {
+                        TerminalBridge.terminal-paste();
+                        return accept;
+                    }
+                    // 全局快捷键: 垂直分屏 (向右分屏 Ctrl+D 或 Ctrl+Shift+D) (仅当当前存在多个 Tab 时可用)
+                    if event.modifiers.control && (event.text == "d" || event.text == "D" || event.text == "\u{0004}") {
+                        if root.tabs.length > 1 {
+                            TerminalBridge.split-terminal("vertical");
+                            return accept;
+                        }
+                    }
+                    // 全局快捷键: 水平分屏 (向下分屏 Ctrl+E 或 Ctrl+Shift+E) (仅当当前存在多个 Tab 时可用)
+                    if event.modifiers.control && (event.text == "e" || event.text == "E" || event.text == "\u{0005}") {
+                        if root.tabs.length > 1 {
+                            TerminalBridge.split-terminal("horizontal");
+                            return accept;
+                        }
+                    }
+
+                    // 全局快捷键: 清屏 (Ctrl+L)
+                    if event.modifiers.control && (event.text == "l" || event.text == "L" || event.text == "\u{000c}") {
+                        TerminalBridge.terminal-clear();
+                        return accept;
+                    }
+
+                    // 过滤纯修饰键与锁定键（避免单按或长按 Shift/Ctrl/Alt 等向终端误发字符，组合键如 Ctrl+C 此时 text 为 "c"，不受影响）
+                    if event.text == Key.Shift || event.text == Key.Control
+                        || event.text == Key.Alt || event.text == Key.AltGr
+                        || event.text == Key.Meta || event.text == Key.CapsLock {
+                        return accept;
+                    }
+
+                    // 统一转发按键文本与修饰键状态至 Rust 后端进行 ANSI 序列编码
+                    if event.text != "" {
+                        TerminalBridge.terminal-key-input(event.text, event.modifiers.control, event.modifiers.shift, event.modifiers.alt);
+                        return accept;
+                    }
+                    reject
+                }
+            }
+
+            // 2.1 终端专属背景壁纸层 (当模式为 terminal 且壁纸有效时展示)
+            if root.wallpaper-mode == "terminal" && root.terminal-wallpaper-image.width > 0: Image {
+                source: root.terminal-wallpaper-image;
+                width: 100%;
+                height: 100%;
+                image-fit: cover;
+                opacity: root.terminal-wallpaper-opacity;
+            }
+
+            // 2.3 单屏终端位图渲染主视口
+            if !root.is-split: TerminalPaneView {
+                width: 100%;
+                height: 100%;
+                pane-id: root.active-tab-id;
+                title: root.session-name;
+                image: root.terminal-screen-image;
+                is-active: true;
+                status: "online";
+                pane-index: 1;
+                total-panes: 1;
+                tabs: root.tabs;
+                active-tab-id: root.active-tab-id;
+                paste-on-right-click: root.paste-on-right-click;
+                paste-text => { TerminalBridge.terminal-paste(); }
+
+                is-dragging-tab: root.is-dragging-tab;
+                drag-tab-source-pane: root.drag-tab-source-pane;
+                drag-tab-from-index: root.drag-tab-from-index;
+
+                tab-drag-moved(from-idx, title, status, lx, ly) => {
+                    root.is-dragging-tab = true;
+                    root.drag-tab-source-pane = "";
+                    root.drag-tab-from-index = from-idx;
+                    root.drag-tab-title = title;
+                    root.drag-tab-status = status;
+                    root.drag-tab-x = lx;
+                    root.drag-tab-y = ly;
+                    root.is-tab-drop-valid = lx >= 0px && lx <= root.width && ly >= -15px && ly <= root.height;
+                }
+                tab-drag-ended => {
+                    if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-from-index >= 0 {
+                        TerminalBridge.move-terminal-tab("", root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
+                    }
+                    root.is-dragging-tab = false;
+                    root.is-tab-drop-valid = true;
+                    root.drag-tab-from-index = -1;
+                    root.drag-tab-source-pane = "";
+                }
+
+                select-tab(id) => {
+                    root.active-tab-id = id;
+                    TerminalBridge.select-tab(id);
+                    terminal-focus.focus();
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                close-tab(id) => {
+                    TerminalBridge.close-tab(id);
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                new-tab => { TerminalBridge.new-tab(); WindowBridge.is-new-session-modal-open = true;
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                select => {
+                    terminal-focus.focus();
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                scroll(delta) => {
+                    TerminalBridge.terminal-scroll(delta);
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                selection-changed(sc, sr, ec, er, has-sel) => {
+                    root.has-selection = has-sel;
+                    TerminalBridge.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                    root.is-context-menu-open = false;
+                    root.is-tab-context-menu-open = false;
+                }
+                context-menu(mx, my) => {
+                    root.context-menu-x = mx;
+                    root.context-menu-y = 36px + my;
+                    root.context-menu-can-split = root.tabs.length > 1;
+                    root.is-context-menu-open = true;
+                    root.is-tab-context-menu-open = false;
+                }
+                tab-context-menu(tab_id, mx, my) => {
+                    root.tab-context-menu-tab-id = tab_id;
+                    root.tab-context-menu-pane-id = root.active-pane-id;
+                    root.tab-context-menu-x = mx;
+                    root.tab-context-menu-y = my;
+                    root.tab-context-menu-can-split = root.tabs.length > 1;
+                    root.tab-context-menu-can-close-others = root.tabs.length > 1;
+                    root.is-tab-context-menu-open = true;
+                    root.is-context-menu-open = false;
+                }
+
+            }
+
+            // 2.4 任意层级嵌套多分屏模式视口 (数据驱动二叉树拓扑)
+            if root.is-split: Rectangle {
+                width: 100%;
+                height: 100%;
+
+                // 2.4.1 动态渲染全部叶子终端独立窗格组件
+                for pane in root.terminal-panes: TerminalPaneView {
+                    x: pane.x;
+                    y: pane.y;
+                    width: pane.width;
+                    height: pane.height;
+                    pane-id: pane.pane-id;
+                    title: pane.title;
+                    image: pane.image;
+                    is-active: pane.is-active;
+                    is-zoomed: pane.is-zoomed;
+                    status: pane.status;
+                    pane-index: pane.pane-index;
+                    total-panes: pane.total-panes;
+                    tabs: pane.tabs;
+                    active-tab-id: pane.active-tab-id;
+                    history-size: pane.history-size;
+                    scroll-offset: pane.scroll-offset;
+                    terminal-rows: pane.terminal-rows;
+                    paste-on-right-click: root.paste-on-right-click;
+                    paste-text => { TerminalBridge.terminal-paste(); }
+
+                    is-dragging-tab: root.is-dragging-tab;
+                    drag-tab-source-pane: root.drag-tab-source-pane;
+                    drag-tab-from-index: root.drag-tab-from-index;
+
+                    tab-drag-moved(from-idx, title, status, lx, ly) => {
+                        root.is-dragging-tab = true;
+                        root.drag-tab-source-pane = pane.pane-id;
+                        root.drag-tab-from-index = from-idx;
+                        root.drag-tab-title = title;
+                        root.drag-tab-status = status;
+                        let gx = pane.x + lx;
+                        let gy = pane.y + ly;
+                        root.drag-tab-x = gx;
+                        root.drag-tab-y = gy;
+                        root.is-tab-drop-valid = gx >= 0px && gx <= root.width && gy >= -15px && gy <= root.height;
+                    }
+                    tab-drag-ended => {
+                        if root.is-dragging-tab && root.is-tab-drop-valid && root.drag-tab-from-index >= 0 {
+                            TerminalBridge.move-terminal-tab(root.drag-tab-source-pane, root.drag-tab-from-index, root.drag-tab-x, root.drag-tab-y);
+                        }
+                        root.is-dragging-tab = false;
+                        root.is-tab-drop-valid = true;
+                        root.drag-tab-from-index = -1;
+                        root.drag-tab-source-pane = "";
+                    }
+
+                    select-tab(tab-id) => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.select-pane-tab(pane.pane-id, tab-id);
+                        terminal-focus.focus();
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    close-tab(tab-id) => {
+                        TerminalBridge.close-pane-tab(pane.pane-id, tab-id);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    select => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.select-pane-by-id(pane.pane-id);
+                        terminal-focus.focus();
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    new-tab => { TerminalBridge.new-tab(); WindowBridge.is-new-session-modal-open = true;
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    split-right => {
+                        if pane.tabs.length > 1 {
+                            root.active-pane-id = pane.pane-id;
+                            TerminalBridge.select-pane-by-id(pane.pane-id);
+                            TerminalBridge.split-terminal("vertical");
+                            root.is-context-menu-open = false;
+                            root.is-tab-context-menu-open = false;
+                        }
+                    }
+                    split-down => {
+                        if pane.tabs.length > 1 {
+                            root.active-pane-id = pane.pane-id;
+                            TerminalBridge.select-pane-by-id(pane.pane-id);
+                            TerminalBridge.split-terminal("horizontal");
+                            root.is-context-menu-open = false;
+                            root.is-tab-context-menu-open = false;
+                        }
+                    }
+                    toggle-zoom => {
+                        TerminalBridge.toggle-pane-zoom(pane.pane-id);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    close => {
+                        TerminalBridge.close-pane-by-id(pane.pane-id);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    scroll(delta) => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.pane-scroll(pane.pane-id, delta);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    scroll-to(target-off) => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.pane-scroll-to(pane.pane-id, target-off);
+                    }
+                    selection-changed(sc, sr, ec, er, has-sel) => {
+                        root.active-pane-id = pane.pane-id;
+                        root.has-selection = has-sel;
+                        TerminalBridge.terminal-selection-changed(sc, sr, ec, er, has-sel);
+                        root.is-context-menu-open = false;
+                        root.is-tab-context-menu-open = false;
+                    }
+
+
+                    context-menu(mx, my) => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.select-pane-by-id(pane.pane-id);
+                        root.context-menu-x = pane.x + mx;
+                        root.context-menu-y = pane.y + 36px + my;
+                        root.context-menu-can-split = pane.tabs.length > 1;
+                        root.is-context-menu-open = true;
+                        root.is-tab-context-menu-open = false;
+                    }
+                    tab-context-menu(tab_id, mx, my) => {
+                        root.active-pane-id = pane.pane-id;
+                        TerminalBridge.select-pane-by-id(pane.pane-id);
+                        root.tab-context-menu-tab-id = tab_id;
+                        root.tab-context-menu-pane-id = pane.pane-id;
+                        root.tab-context-menu-x = pane.x + mx;
+                        root.tab-context-menu-y = pane.y + my;
+                        root.tab-context-menu-can-split = pane.tabs.length > 1;
+                        root.tab-context-menu-can-close-others = pane.tabs.length > 1;
+                        root.is-tab-context-menu-open = true;
+                        root.is-context-menu-open = false;
+                    }
+
+                }
+
+
+                // 2.4.2 动态渲染全部超窄拖拽分割条 (视觉 2px，触控感应热区 8px)
+                for splitter in root.terminal-splitters: Rectangle {
+                    x: splitter.x;
+                    y: splitter.y;
+                    width: splitter.width;
+                    height: splitter.height;
+                    background: split-bar-touch.has-hover || split-bar-touch.pressed ? AppTheme.accent : AppTheme.border;
+                    animate background { duration: 120ms; }
+
+                    split-bar-touch := TouchArea {
+                        x: splitter.is-vertical ? -3px : 0px;
+                        y: splitter.is-vertical ? 0px : -3px;
+                        width: splitter.is-vertical ? parent.width + 6px : parent.width;
+                        height: splitter.is-vertical ? parent.height : parent.height + 6px;
+                        mouse-cursor: splitter.is-vertical ? col-resize : row-resize;
+                        property <length> press-x: 0px;
+                        property <length> press-y: 0px;
+
+                        pointer-event(event) => {
+                            if event.kind == PointerEventKind.down {
+                                self.press-x = self.mouse-x;
+                                self.press-y = self.mouse-y;
+                            }
+                        }
+
+                        moved => {
+                            if self.pressed {
+                                let dx = (self.mouse-x - self.press-x) / 1px;
+                                let dy = (self.mouse-y - self.press-y) / 1px;
+                                let delta = splitter.is-vertical ? dx : dy;
+                                let total = splitter.is-vertical ? root.canvas-width : root.canvas-height;
+                                if Math.abs(delta) >= 1.0 && total > 50.0 {
+                                    TerminalBridge.adjust-splitter(splitter.splitter-id, delta / total);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 2.5 浮动文本搜索栏 (Ctrl+F)
+            if root.is-find-open: TerminalFindBar {
+                x: parent.width - self.width - 16px;
+                y: 10px;
+                is-open: root.is-find-open;
+                search-query <=> root.find-query;
+                current-match: root.find-current-match;
+                total-matches: root.find-total-matches;
+                close => { root.is-find-open = false; }
+                find-next => { TerminalBridge.search-terminal(root.find-query, false); }
+                find-prev => { TerminalBridge.search-terminal(root.find-query, false); }
+                search-changed(q) => { TerminalBridge.search-terminal(q, false); }
+            }
+
+            // 2.6 右键上下文快捷菜单
+            if root.is-context-menu-open: TerminalContextMenu {
+                x: Math.max(2px, Math.min(parent.width - self.width - 4px, root.context-menu-x));
+                y: Math.max(2px, Math.min(parent.height - self.height - 4px, root.context-menu-y));
+                is-open: root.is-context-menu-open;
+                menu-x: root.context-menu-x;
+                menu-y: root.context-menu-y;
+                has-selection: root.has-selection;
+                can-split: root.context-menu-can-split;
+                copy-text => { TerminalBridge.terminal-copy(); }
+                paste-text => { TerminalBridge.terminal-paste(); }
+                select-all => { }
+                clear-screen => { TerminalBridge.terminal-clear(); }
+                split-right => { TerminalBridge.split-terminal("vertical"); }
+                split-down => { TerminalBridge.split-terminal("horizontal"); }
+                close-tab => { TerminalBridge.close-tab(root.active-tab-id); }
+                close-menu => { root.is-context-menu-open = false; }
+            }
+
+            // 2.6.2 Tab 标签专属右键快捷菜单
+            if root.is-tab-context-menu-open: TabContextMenu {
+                x: Math.max(2px, Math.min(parent.width - self.width - 4px, root.tab-context-menu-x));
+                y: Math.max(2px, Math.min(parent.height - self.height - 4px, root.tab-context-menu-y));
+                is-open: root.is-tab-context-menu-open;
+                menu-x: root.tab-context-menu-x;
+                menu-y: root.tab-context-menu-y;
+                can-split: root.tab-context-menu-can-split;
+
+                can-close-others: root.tab-context-menu-can-close-others;
+                copy-ip => { TerminalBridge.copy-tab-ip(root.tab-context-menu-tab-id); }
+                split-right => {
+                    if root.tab-context-menu-can-split {
+                        if root.is-split {
+                            TerminalBridge.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                        } else {
+                            TerminalBridge.select-tab(root.tab-context-menu-tab-id);
+                        }
+                        TerminalBridge.split-terminal("vertical");
+                    }
+                }
+                split-down => {
+                    if root.tab-context-menu-can-split {
+                        if root.is-split {
+                            TerminalBridge.select-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                        } else {
+                            TerminalBridge.select-tab(root.tab-context-menu-tab-id);
+                        }
+                        TerminalBridge.split-terminal("horizontal");
+                    }
+                }
+                close-tab => {
+                    if root.is-split {
+                        TerminalBridge.close-pane-tab(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                    } else {
+                        TerminalBridge.close-tab(root.tab-context-menu-tab-id);
+                    }
+                }
+                close-others => {
+                    TerminalBridge.close-other-tabs(root.tab-context-menu-pane-id, root.tab-context-menu-tab-id);
+                }
+                close-menu => { root.is-tab-context-menu-open = false; }
+            }
+
+
+
+            // 2.7 终端右侧微型历史滚动条 (单屏且存在回滚历史时展示，起始于 Tab 栏下方并纵贯全屏)
+            if !root.is-split && root.history-size > 0: scrollbar-track := Rectangle {
+                x: parent.width - 9px;
+                y: 38px;
+                width: 6px;
+                height: Math.max(30px, parent.height - 40px);
+                border-radius: 3px;
+                background: scroll-touch.has-hover || root.is-dragging-scrollbar ? AppTheme.border.transparentize(50%) : AppTheme.border.transparentize(85%);
+                animate background { duration: 150ms; }
+
+                property <length> thumb-h: Math.max(32px, Math.min(56px, self.height * ((root.terminal-rows * 1.0) / Math.max(1.0, (root.history-size + root.terminal-rows) * 1.0))));
+                property <length> max-travel: Math.max(1px, self.height - self.thumb-h);
+                // 当 offset=0 时在底端，offset=history-size 时在顶端
+                property <length> thumb-y: self.max-travel * (1.0 - Math.min(1.0, Math.max(0.0, (root.scroll-offset * 1.0) / Math.max(1.0, root.history-size * 1.0))));
+
+                // 变色滑块 (精致适中尺寸，变色与高亮反馈)
+                Rectangle {
+                    x: 0px;
+                    y: scrollbar-track.thumb-y;
+                    width: 6px;
+                    height: scrollbar-track.thumb-h;
+                    border-radius: 3px;
+                    background: root.scroll-offset > 0 ? (scroll-touch.has-hover || root.is-dragging-scrollbar ? AppTheme.accent.brighter(15%) : AppTheme.accent) : (scroll-touch.has-hover || root.is-dragging-scrollbar ? AppTheme.secondary-foreground : AppTheme.secondary-foreground.transparentize(50%));
+                    animate background { duration: 120ms; }
+                }
+
+                // 触控抓取区域 (放宽宽度至 14px，便于鼠标精准拾取与拖动)
+                scroll-touch := TouchArea {
+                    x: -4px;
+                    y: 0px;
+                    width: parent.width + 8px;
+                    height: parent.height;
+                    mouse-cursor: pointer;
+
+                    pointer-event(event) => {
+                        if event.kind == PointerEventKind.down && event.button == PointerEventButton.left {
+                            root.is-dragging-scrollbar = true;
+                            root.apply-scrollbar-drag(self.mouse-y, scrollbar-track.thumb-h, scrollbar-track.max-travel);
+                        } else if event.kind == PointerEventKind.up && event.button == PointerEventButton.left {
+                            root.is-dragging-scrollbar = false;
+                        }
+                    }
+
+                    moved => {
+                        if root.is-dragging-scrollbar && self.pressed {
+                            root.apply-scrollbar-drag(self.mouse-y, scrollbar-track.thumb-h, scrollbar-track.max-travel);
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 空状态 / 欢迎仪表盘 (当无会话时)
+        if !root.has-active-session: Rectangle {
+            width: 100%;
+            background: AppTheme.window-background;
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                alignment: center;
+                spacing: 16px;
+
+                Text {
+                    text: "✨ smalux-ssh";
+                    font-size: 28px;
+                    font-weight: 700;
+                    color: AppTheme.accent;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: @tr("请从左侧双击主机发起连接，或点击右上角 + 快速新建本地/远程终端");
+                    font-size: 13px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 4. Tab 拖拽浮动虚影 (Floating Ghost Card - 尺寸与原装 Tab 卡片 140px x 28px 完全一致)
+    // -------------------------------------------------------------------------
+    if root.is-dragging-tab: Rectangle {
+        x: root.drag-tab-x - 70px;
+        y: root.drag-tab-y - 14px;
+        width: 140px;
+        height: 28px;
+        border-radius: 4px;
+        opacity: root.is-tab-drop-valid ? 0.90 : 0.45;
+        background: AppTheme.surface-background.transparentize(15%);
+        border-width: 1.5px;
+        border-color: root.is-tab-drop-valid ? AppTheme.accent : AppTheme.danger;
+        drop-shadow-blur: 8px;
+        drop-shadow-color: #000000.transparentize(40%);
+
+        HorizontalLayout {
+            padding-left: 8px;
+            padding-right: 8px;
+            spacing: 6px;
+            alignment: center;
+
+            VerticalLayout {
+                alignment: center;
+                Image {
+                    source: @image-url("../../assets/icons/terminal.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: root.is-tab-drop-valid ? AppTheme.accent : AppTheme.disabled-foreground;
+                }
+            }
+
+            if root.is-tab-drop-valid: VerticalLayout {
+                alignment: center;
+                StatusDot {
+                    status: root.drag-tab-status;
+                    dot-size: 5px;
+                }
+            }
+
+            Text {
+                text: root.drag-tab-title;
+                font-size: 11px;
+                font-weight: 700;
+                color: root.is-tab-drop-valid ? AppTheme.foreground : AppTheme.disabled-foreground;
+                overflow: elide;
+                horizontal-stretch: 1;
+                vertical-alignment: center;
+            }
+        }
+    }
+}

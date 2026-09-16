@@ -1,0 +1,128 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "../../group-tree-selector.slint";
+import { AppButton } from "../../base/app-button.slint";
+
+export { GroupOptionData }
+
+export component GroupPickerDialog inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[GroupOptionData]> group-options: [];
+    in-out property <string> temp-selected-group-id: "";
+    in-out property <string> temp-selected-group-name: "";
+
+    callback close();
+    callback confirmed(string /* id */, string /* name */);
+    callback toggle-group(string /* id */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6; // 叠层遮罩
+        z: 110;
+
+        TouchArea { }
+
+        Rectangle {
+            width: 420px;
+            height: 380px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.accent;
+
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding: 16px;
+                spacing: 10px;
+
+                // 标题
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 24px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../../../assets/icons/folder.svg");
+                                width: 14px;
+                                height: 14px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+                        Text {
+                            text: @tr("选择目标所属分组");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: picker-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        picker-close-touch := TouchArea {
+                            clicked => { root.close(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../../../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: picker-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 树形选择器
+                GroupTreeSelector {
+                    vertical-stretch: 1;
+                    options: root.group-options;
+                    selected-id <=> root.temp-selected-group-id;
+                    selection-changed(id, name) => {
+                        root.temp-selected-group-id = id;
+                        root.temp-selected-group-name = name;
+                    }
+                    toggle-group(id) => {
+                        root.toggle-group(id);
+                    }
+                }
+
+                // 确定与取消
+                HorizontalLayout {
+                    alignment: end;
+                    spacing: 10px;
+                    height: 32px;
+
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        clicked => { root.close(); }
+                    }
+
+                    AppButton {
+                        text: @tr("确定选择");
+                        variant: "primary";
+                        clicked => {
+                            root.confirmed(root.temp-selected-group-id, root.temp-selected-group-name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

@@ -53,7 +53,7 @@ impl From<String> for HostStatus {
 }
 
 /// 主机资产记录模型。
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub struct HostRecord {
     /// 主机记录的稳定唯一标识 (如 "1", "host-k8s-w1")。
     pub id: String,
@@ -62,6 +62,7 @@ pub struct HostRecord {
     /// 主机名或 IP 地址。
     pub address: String,
     /// SSH 服务端口 (默认为 22)。
+    #[serde(default = "default_ssh_port")]
     pub port: u16,
     /// 所属分组的唯一标识符 (None 表示未分组)。
     pub parent_group_id: Option<String>,
@@ -75,6 +76,74 @@ pub struct HostRecord {
     pub sort_order: i32,
     /// 主机备注说明信息。
     pub notes: String,
+
+    // --- 认证配置扩展 ---
+    /// 认证模式 ("credential" | "password" | "key" | "agent")
+    #[serde(default)]
+    pub auth_type: String,
+    /// 直录用户名 (未选用凭据资产时直接保存在主机上的账号)
+    #[serde(default)]
+    pub username: Option<String>,
+    /// 直录密码 (未选用凭据资产时直接保存在主机上的密码)
+    #[serde(default)]
+    pub password: Option<String>,
+    /// 直录私钥数据 (未选用凭据资产时直接保存在主机上的私钥文本)
+    #[serde(default)]
+    pub key_data: Option<String>,
+    /// 直录私钥口令
+    #[serde(default)]
+    pub key_passphrase: Option<String>,
+
+    // --- 网络代理配置 ---
+    /// 代理类型 ("direct" | "socks5" | "http" | "tunnel")
+    #[serde(default)]
+    pub proxy_type: Option<String>,
+    /// 代理服务器地址
+    #[serde(default)]
+    pub proxy_host: Option<String>,
+    /// 代理端口
+    #[serde(default)]
+    pub proxy_port: Option<u16>,
+    /// 代理认证用户名
+    #[serde(default)]
+    pub proxy_username: Option<String>,
+    /// 代理认证密码
+    #[serde(default)]
+    pub proxy_password: Option<String>,
+
+    // --- 跳板机链路 ---
+    /// 跳板链路摘要描述或引用 ID (如 "preset:preset-prod-bastions" 或 "jump_hops:2")
+    #[serde(default)]
+    pub jump_chain_summary: Option<String>,
+
+    // --- 高级选项 ---
+    /// 心跳保活间隔 (秒)
+    #[serde(default = "default_keepalive")]
+    pub keepalive_interval: u32,
+    /// 连接超时时间 (秒)
+    #[serde(default = "default_connect_timeout")]
+    pub connect_timeout: u32,
+    /// 初始工作目录
+    #[serde(default)]
+    pub initial_dir: Option<String>,
+    /// 登录后自动执行的启动命令
+    #[serde(default)]
+    pub startup_cmd: Option<String>,
+    /// 终端仿真类型 (如 "xterm-256color")
+    #[serde(default)]
+    pub term_type: Option<String>,
+}
+
+fn default_ssh_port() -> u16 {
+    22
+}
+
+fn default_keepalive() -> u32 {
+    30
+}
+
+fn default_connect_timeout() -> u32 {
+    10
 }
 
 impl HostRecord {
@@ -90,12 +159,11 @@ impl HostRecord {
             name: name.into(),
             address: address.into(),
             port,
-            parent_group_id: None,
-            credential_id: None,
             status: HostStatus::Online,
-            ping_ms: 0,
-            sort_order: 0,
-            notes: String::new(),
+            keepalive_interval: 30,
+            connect_timeout: 10,
+            term_type: Some("xterm-256color".to_string()),
+            ..Default::default()
         }
     }
 

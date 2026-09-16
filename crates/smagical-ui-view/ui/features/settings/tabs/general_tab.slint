@@ -1,0 +1,142 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import {
+    SettingsPageHeader,
+    SettingsSectionCard,
+    SettingsRow,
+    SettingsSwitch,
+    LanguageDropdown,
+    PipelineSegmentedControl,
+    ToastDurationDropdown,
+} from "../components/settings_widgets.slint";
+
+export component SettingsGeneralTab inherits VerticalLayout {
+    spacing: 16px;
+
+    SettingsPageHeader {
+        title: @tr("通用与窗口交互");
+        subtitle: @tr("控制客户端界面语言、启动流程与后台挂起行为");
+        icon: @image-url("../../../assets/icons/home.svg");
+    }
+
+    SettingsSectionCard {
+        title: @tr("界面显示与图形渲染引擎");
+        subtitle: @tr("国际化语言环境与底层 GPU 硬件加速光栅化管线");
+        icon: @image-url("../../../assets/icons/settings.svg");
+
+        SettingsRow {
+            title: @tr("界面显示语言 (Language)");
+            subtitle: @tr("设置客户端主界面展示的默认语言");
+            LanguageDropdown {
+                selected-lang: SettingsBridge.setting-language;
+                switch-language(lang) => {
+                    SettingsBridge.setting-language = lang;
+                    SettingsBridge.switch-language(lang);
+                }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("图形渲染引擎 (Graphics Engine)");
+            subtitle: @tr("基于 Skia 图形引擎的渲染管线 (切换需重启客户端生效)");
+            show-border: false;
+            PipelineSegmentedControl {
+                selected-pipe <=> SettingsBridge.active-rendering-pipeline;
+                pipe-selected(p) => {
+                    SettingsBridge.switch-rendering-pipeline(p);
+                }
+            }
+        }
+    }
+
+    SettingsSectionCard {
+        title: @tr("窗口生命周期与防误触");
+        subtitle: @tr("置顶悬浮、安全断开防呆确认与系统托盘常驻");
+        icon: @image-url("../../../assets/icons/home.svg");
+
+        SettingsRow {
+            title: @tr("窗口始终置顶 (Always on Top)");
+            subtitle: @tr("保持主窗口始终位于其他应用窗口最顶层，避免排查故障时频繁切换焦点");
+            SettingsSwitch {
+                checked: SettingsBridge.setting-always-on-top;
+                toggled(c) => {
+                    SettingsBridge.setting-always-on-top = c;
+                    SettingsBridge.toggle-always-on-top(c);
+                }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("关闭会话标签页时二次确认 (Confirm Closing Tab)");
+            subtitle: @tr("关闭正在运行的远程 SSH 或本地终端标签页前弹出安全确认，防止手滑误断开");
+            SettingsSwitch {
+                checked: SettingsBridge.setting-confirm-close-tab;
+                toggled(c) => {
+                    SettingsBridge.setting-confirm-close-tab = c;
+                    SettingsBridge.toggle-confirm-close-tab(c);
+                }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("退出应用时确认活跃连接 (Confirm Before Exit)");
+            subtitle: @tr("当后台存在未断开的 SSH 或本地终端会话时，点击窗口关闭按钮或按 Alt+F4 弹出防误触提示");
+            SettingsSwitch {
+                checked: SettingsBridge.setting-confirm-close-active;
+                toggled(c) => {
+                    SettingsBridge.setting-confirm-close-active = c;
+                    SettingsBridge.toggle-confirm-close-active(c);
+                }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("点击窗口关闭按钮时行为");
+            subtitle: @tr("关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线");
+            SettingsSwitch {
+                checked: SettingsBridge.setting-close-action == "tray";
+                toggled(c) => {
+                    if c {
+                        SettingsBridge.setting-close-action = "tray";
+                        SettingsBridge.change-close-action("tray");
+                    } else {
+                        SettingsBridge.setting-close-action = "exit";
+                        SettingsBridge.change-close-action("exit");
+                    }
+                }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("开机随系统自动启动 (Launch on Boot)");
+            subtitle: @tr("登录操作系统时自动启动客户端，方便后台网络隧道与端口转发无缝就绪");
+            show-border: false;
+            SettingsSwitch {
+                checked: SettingsBridge.setting-start-on-boot;
+                toggled(c) => {
+                    SettingsBridge.setting-start-on-boot = c;
+                    SettingsBridge.toggle-start-on-boot(c);
+                }
+            }
+        }
+    }
+
+    SettingsSectionCard {
+        title: @tr("操作提示与系统通知");
+        subtitle: @tr("控制客户端操作反馈气泡的停留时长与展示行为");
+        icon: @image-url("../../../assets/icons/info-circle.svg");
+
+        SettingsRow {
+            title: @tr("提示信息停留时间 (Toast Duration)");
+            subtitle: @tr("控制右上角操作反馈气泡的自动消隐倒计时，避免复杂提示一闪而过");
+            show-border: false;
+            ToastDurationDropdown {
+                selected-duration: SettingsBridge.setting-toast-duration;
+                duration-selected(d) => {
+                    SettingsBridge.setting-toast-duration = d;
+                    SettingsBridge.change-toast-duration(d);
+                }
+            }
+        }
+    }
+}

@@ -235,6 +235,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_close = Rc::clone(&ctx.pane_groups);
     let persistence_guard_close = std::sync::Arc::clone(&ctx.persistence_guard);
     let notif_close = ctx.notifications.clone();
+    let tray_active_close = Rc::clone(&ctx.tray_active);
     window.on_close_window(move || {
         if let Some(w) = window_weak.upgrade() {
             let mut remote_count = 0;
@@ -250,7 +251,30 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             }
             let active_count = remote_count + local_count;
 
-            // A. 如果开启了活跃会话防呆确认，且当前有活跃会话（优先拦截弹窗）
+            // A. 如果设置关闭时最小化到系统托盘 (tray)
+            if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
+                if *tray_active_close.borrow() {
+                    let _ = w.hide();
+                    w.window().with_winit_window(|win| {
+                        win.set_visible(false);
+                    });
+                    notif_close.info("已最小化到托盘后台", "网络隧道与 SSH 会话在后台持续保持连接中");
+                    tracing::info!(target: "smagical_ui::window", "窗口关闭动作已转为托盘后台常驻运行");
+                    return;
+                } else {
+                    notif_close.warning(
+                        "系统托盘未就绪",
+                        "当前环境系统托盘未成功挂载，为防止窗口消失后无法唤醒，已取消最小化到托盘",
+                    );
+                    tracing::warn!(
+                        target: "smagical_ui::window",
+                        "系统托盘未激活，阻止转入无界面后台孤儿状态"
+                    );
+                    return;
+                }
+            }
+
+            // B. 如果开启了活跃会话防呆确认，且当前有活跃会话（优先拦截弹窗）
             if active_count > 0 && w.global::<SettingsBridge>().get_setting_confirm_close_active() {
                 w.global::<WindowBridge>().set_is_exit_confirm_open(true);
                 tracing::info!(
@@ -258,14 +282,6 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     "检测到 {} 个远程 SSH 会话和 {} 个本地终端正在运行，拦截关闭并弹出二次确认",
                     remote_count, local_count
                 );
-                return;
-            }
-
-            // B. 如果设置关闭时最小化到系统托盘 (tray)
-            if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
-                w.window().set_minimized(true);
-                notif_close.info("已最小化到后台", "网络隧道与 SSH 会话在后台持续保持连接中");
-                tracing::info!(target: "smagical_ui::window", "窗口关闭动作已转为托盘后台运行");
                 return;
             }
 
@@ -280,8 +296,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 );
                 return;
             }
+            crate::handlers::right_drawer_handlers::cleanup_on_exit();
             persistence_guard_close.flush_and_wait(std::time::Duration::from_millis(1000));
             core_state_close.events().dispatch(&AppExitEvent { exit_code: 0 });
+            let _ = slint::quit_event_loop();
             std::process::exit(0);
         }
     });
@@ -291,17 +309,25 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak_req = window.as_weak();
     let pane_groups_req = Rc::clone(&ctx.pane_groups);
+    let tray_active_req = Rc::clone(&ctx.tray_active);
     window.window().on_close_requested(move || -> slint::CloseRequestResponse {
         if let Some(w) = window_weak_req.upgrade() {
             let active_count: usize = pane_groups_req.borrow().iter().map(|g| g.tabs.len()).sum();
+            if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
+                if *tray_active_req.borrow() {
+                    let _ = w.hide();
+                    w.window().with_winit_window(|win| {
+                        win.set_visible(false);
+                    });
+                    return slint::CloseRequestResponse::KeepWindowShown;
+                }
+            }
             if active_count > 0 && w.global::<SettingsBridge>().get_setting_confirm_close_active() {
                 w.global::<WindowBridge>().set_is_exit_confirm_open(true);
                 return slint::CloseRequestResponse::KeepWindowShown;
             }
-            if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
-                w.window().set_minimized(true);
-                return slint::CloseRequestResponse::KeepWindowShown;
-            }
+            w.invoke_force_close_window();
+            return slint::CloseRequestResponse::KeepWindowShown;
         }
         slint::CloseRequestResponse::HideWindow
     });
@@ -312,8 +338,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let core_state_force = ctx.core_state.clone();
     let persistence_guard_force = std::sync::Arc::clone(&ctx.persistence_guard);
     window.on_force_close_window(move || {
+        crate::handlers::right_drawer_handlers::cleanup_on_exit();
         persistence_guard_force.flush_and_wait(std::time::Duration::from_millis(1000));
         core_state_force.events().dispatch(&AppExitEvent { exit_code: 0 });
+        let _ = slint::quit_event_loop();
         std::process::exit(0);
     });
 
@@ -401,17 +429,31 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 return;
             }
 
-            let pipe_name = match p_str.as_str() {
-                "winit-skia" => "Skia GPU (自动 / 推荐)",
-                "winit-skia-opengl" => "Skia OpenGL",
-                "winit-skia-software" => "CPU 软件渲染",
-                _ => p_str.as_str(),
+            let is_en = w.global::<WindowBridge>().get_current_language() == "en-US";
+            let pipe_name = if is_en {
+                match p_str.as_str() {
+                    "winit-skia" => "Skia GPU (Auto / Recommended)",
+                    "winit-skia-opengl" => "Skia OpenGL",
+                    "winit-skia-software" => "CPU Software",
+                    _ => p_str.as_str(),
+                }
+            } else {
+                match p_str.as_str() {
+                    "winit-skia" => "Skia GPU (自动 / 推荐)",
+                    "winit-skia-opengl" => "Skia OpenGL",
+                    "winit-skia-software" => "CPU 软件渲染",
+                    _ => p_str.as_str(),
+                }
+            };
+
+            let msg = if is_en {
+                format!("Switching rendering engine to [{}] requires restarting the client to reinitialize GPU pipeline bindings. Restart now?", pipe_name)
+            } else {
+                format!("切换渲染引擎为 [{}] 需要重启客户端以完成底层 GPU 显卡管线重新绑定。是否立即重启？", pipe_name)
             };
 
             *pending_pipe_for_switch.borrow_mut() = Some(p_str.clone());
-            w.global::<WindowBridge>().set_restart_confirm_message(
-                format!("切换渲染引擎为 [{}] 需要重启客户端以完成底层 GPU 显卡管线重新绑定。是否立即重启？", pipe_name).into()
-            );
+            w.global::<WindowBridge>().set_restart_confirm_message(msg.into());
             w.global::<WindowBridge>().set_is_restart_confirm_open(true);
             tracing::info!(target: "smagical_ui::settings", "请求切换渲染引擎为: {}，已唤起重启确认弹窗", p_str);
         }

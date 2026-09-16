@@ -1,0 +1,102 @@
+import { SnippetTreeNode, QuickCmdData } from "./snippets_model.slint";
+import { SnippetParamFieldData } from "../../components/snippet-run-modal.slint";
+import { GroupOptionData } from "../../components/create-group-modal.slint";
+
+export { SnippetTreeNode, SnippetParamFieldData, GroupOptionData, QuickCmdData }
+
+/// 代码片段与多层脚本库领域全局状态总线 (Snippets Bridge)
+export global SnippetsBridge {
+    // 树形节点与视图
+    in-out property <[SnippetTreeNode]> tree-nodes: [];
+    in-out property <string> search-query: "";
+    in-out property <string> active-snippet-id: "";
+    in-out property <bool> is-active-group: false;
+    in-out property <bool> has-selection: false;
+
+    // 代码片段表单详情
+    in-out property <bool> is-editing: false;
+    in-out property <bool> is-create-mode: false;
+    in-out property <string> form-id: "";
+    in-out property <string> form-title: "";
+    in-out property <string> form-group-id: "";
+    in-out property <string> form-category-name: "";
+    in-out property <string> form-description: "";
+    in-out property <string> form-language: "Bash";
+    in-out property <string> form-code: "";
+    in-out property <bool> form-auto-execute: false;
+    in-out property <bool> form-is-favorite: false;
+    in-out property <string> form-detected-variables-text: "";
+    in-out property <string> form-updated-at: "";
+
+    // 分组信息与下拉选项
+    in-out property <string> group-form-id: "";
+    in-out property <string> group-form-name: "";
+    in-out property <string> group-form-parent-id: "";
+    in property <[GroupOptionData]> parent-options: [];
+
+    // 动态参数运行模态窗
+    in-out property <bool> is-run-modal-open: false;
+    in-out property <string> run-snippet-id: "";
+    in-out property <string> run-snippet-title: "";
+    in-out property <string> run-raw-command: "";
+    in-out property <string> run-rendered-command: "";
+    in-out property <[SnippetParamFieldData]> run-params-list: [];
+
+    // 新建分组模态窗
+    in-out property <bool> is-create-group-modal-open: false;
+    in-out property <bool> is-folder-picker-open: false;
+    in-out property <string> default-parent-group-id: "";
+    in-out property <string> new-group-name: "";
+    in-out property <string> new-group-parent-id: "root";
+
+    // 新建代码片段模态窗 (Create Snippet Modal)
+    in-out property <bool> is-create-snippet-modal-open: false;
+
+    // 编辑代码片段模态窗 (Edit Snippet Modal)
+    in-out property <bool> is-edit-snippet-modal-open: false;
+
+    // 快捷指令与伴生抽屉
+    in-out property <[QuickCmdData]> quick-cmds: [];
+    in-out property <string> quick-cmds-search-query: "";
+
+    // 拖拽悬停状态
+    in-out property <string> drop-target-id: "";
+    in-out property <int> drop-target-index: -1;
+    in-out property <string> drop-position: "none";
+    in-out property <bool> drop-target-valid: false;
+
+    // 交互回调
+    callback select-node(string /* id */, bool /* is_group */);
+    callback toggle-group-expanded(string /* group_id */);
+    callback search-changed(string /* query */);
+    callback toggle-favorite(string /* id */);
+
+    callback create-new-snippet();
+    callback create-new-group();
+    callback start-edit();
+    callback cancel-edit();
+    callback save-snippet();
+    callback delete-snippet(string /* id */);
+    callback copy-snippet(string /* id */);
+    callback move-node(string /* source_id */, string /* target_id */, string /* drop_pos */);
+    callback request-drag-hover(string /* source_id */, int /* target_index */, float /* offset_in_row */);
+
+    callback save-group(string /* id */, string /* name */, string /* parent_id */);
+    callback delete-group(string /* id */);
+    callback submit-create-group();
+
+    callback filter-quick-cmds(string /* query */);
+
+    callback request-run-snippet(string /* id */);
+    callback run-param-changed(int /* index */, string /* val */);
+    callback execute-run-modal();
+    callback cancel-run-modal();
+    callback close-create-group-modal();
+
+    callback open-create-snippet-modal();
+    callback close-create-snippet-modal();
+    callback submit-create-snippet(string /* title */, string /* group_id */, string /* language */, string /* code */, string /* description */, bool /* auto_execute */);
+
+    callback open-edit-snippet-modal(string /* id */);
+    callback close-edit-snippet-modal();
+}

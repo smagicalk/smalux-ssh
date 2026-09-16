@@ -1,0 +1,276 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppButton } from "../../base/app-button.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { ProxyOptionData } from "../../../features/hosts/hosts_model.slint";
+
+export { ProxyOptionData }
+
+export component ProxyPickerDialog inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[ProxyOptionData]> proxy-options: [];
+    in-out property <string> proxy-search-query: "";
+
+    callback close();
+    callback filter-proxies(string /* query */);
+    callback select-proxy(string /* id */, string /* name */, string /* proto */, string /* host */, int /* port */, string /* username */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000bf; // 叠层半透明暗色遮罩
+        z: 118;
+
+        TouchArea { }
+
+        Rectangle {
+            width: 520px;
+            height: 480px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+
+            TouchArea { }
+
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding: 16px;
+                spacing: 10px;
+
+                // 顶部标题与关闭
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 26px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../../../assets/icons/tunnel.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: @tr("选择网络与隧道中心已有代理");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Rectangle {
+                            width: 24px;
+                            height: 24px;
+                            border-radius: 4px;
+                            background: proxy-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                            proxy-close-touch := TouchArea {
+                                clicked => { root.close(); }
+                                mouse-cursor: pointer;
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    Image {
+                                        source: @image-url("../../../assets/icons/window-close.svg");
+                                        width: 10px;
+                                        height: 10px;
+                                        image-fit: contain;
+                                        colorize: proxy-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 实时搜索框
+                AppTextInput {
+                    text <=> root.proxy-search-query;
+                    placeholder: @tr("🔍 搜索代理名称、协议、主机地址、端口...");
+                    input-height: 28px;
+                    font-size: 11px;
+                    clearable: true;
+                    edited(q) => {
+                        root.filter-proxies(q);
+                    }
+                    cleared => {
+                        root.proxy-search-query = "";
+                        root.filter-proxies("");
+                    }
+                }
+
+                // 代理列表
+                Flickable {
+                    vertical-stretch: 1;
+                    min-height: 280px;
+                    viewport-height: max(self.height, proxy-items-container.preferred-height);
+
+                    proxy-items-container := VerticalLayout {
+                        alignment: start;
+                        spacing: 4px;
+                        padding-right: 2px;
+
+                        // 空状态提示
+                        if root.proxy-options.length == 0: Rectangle {
+                            height: 180px;
+                            border-radius: AppTheme.radius-medium;
+                            background: AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+
+                            VerticalLayout {
+                                alignment: center;
+                                spacing: 6px;
+
+                                Text {
+                                    text: @tr("🔍 未检索到匹配的代理通道服务");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                    horizontal-alignment: center;
+                                }
+
+                                Text {
+                                    text: @tr("可更换搜索关键词，或在网络与代理页面直接手动录入代理信息");
+                                    font-size: 10px;
+                                    color: AppTheme.disabled-foreground;
+                                    horizontal-alignment: center;
+                                }
+                            }
+                        }
+
+                        for p in root.proxy-options: Rectangle {
+                            height: 44px;
+                            border-radius: 4px;
+                            background: p-item-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: p-item-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+                            p-item-touch := TouchArea {
+                                clicked => {
+                                    root.select-proxy(p.id, p.name, p.proto, p.host, p.port, p.username);
+                                }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                padding-left: 12px;
+                                padding-right: 12px;
+                                spacing: 10px;
+                                alignment: space-between;
+
+                                HorizontalLayout {
+                                    spacing: 10px;
+                                    alignment: start;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            height: 20px;
+                                            border-radius: 3px;
+                                            background: AppTheme.accent.transparentize(85%);
+                                            border-width: 1px;
+                                            border-color: AppTheme.accent;
+
+                                            HorizontalLayout {
+                                                padding-left: 6px;
+                                                padding-right: 6px;
+                                                Text {
+                                                    text: p.proto;
+                                                    font-size: 9px;
+                                                    font-weight: 700;
+                                                    color: AppTheme.accent;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 2px;
+
+                                        Text {
+                                            text: p.name;
+                                            font-size: 12px;
+                                            font-weight: 600;
+                                            color: p-item-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
+                                        }
+
+                                        Text {
+                                            text: p.host + ":" + p.port + (p.username != "" ? (" @" + p.username) : "");
+                                            font-size: 10px;
+                                            color: AppTheme.secondary-foreground;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    HorizontalLayout {
+                                        alignment: center;
+                                        spacing: 4px;
+
+                                        Text {
+                                            text: @tr("填入");
+                                            font-size: 11px;
+                                            font-weight: 600;
+                                            color: p-item-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            vertical-alignment: center;
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../../../assets/icons/arrow-right.svg");
+                                                width: 11px;
+                                                height: 11px;
+                                                image-fit: contain;
+                                                colorize: p-item-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 底部边框分割线
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                // 底部关闭按钮
+                HorizontalLayout {
+                    alignment: end;
+                    height: 32px;
+
+                    AppButton {
+                        text: @tr("取消");
+                        variant: "secondary";
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+        }
+    }
+}

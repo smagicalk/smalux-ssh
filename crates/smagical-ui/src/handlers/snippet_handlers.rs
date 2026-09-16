@@ -10,7 +10,7 @@ use smagical_core::domain::snippet::{SnippetGroupRecord, SnippetRecord};
 use smagical_core::domain::terminal_context::TerminalAction;
 use smagical_core::event::{SnippetDeletedEvent, SnippetExecutedEvent, SnippetGroupDeletedEvent, SnippetGroupSavedEvent, SnippetSavedEvent};
 
-use crate::generated::{AppWindow, QuickCmdData, SnippetParamFieldData, SnippetsBridge};
+use crate::generated::{AppWindow, QuickCmdData, SnippetParamFieldData, SnippetsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use crate::snippet_tree_model::{
     build_raw_snippet_tree_from_storage, build_search_snippet_tree_nodes,
@@ -233,16 +233,17 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                 bridge.set_is_editing(true);
                 bridge.set_is_create_mode(true);
                 bridge.set_form_id(new_id.into());
-                bridge.set_form_title("未命名代码片段".into());
+                let is_en = w.global::<WindowBridge>().get_current_language() == "en-US";
+                bridge.set_form_title(if is_en { "Untitled Snippet".into() } else { "未命名代码片段".into() });
                 bridge.set_form_group_id("root".into());
-                bridge.set_form_category_name("根目录 (顶级文件夹)".into());
+                bridge.set_form_category_name(if is_en { "Root Directory (Top-level)".into() } else { "根目录 (顶级文件夹)".into() });
                 bridge.set_form_language("bash".into());
                 bridge.set_form_code("#!/bin/bash\n\n".into());
                 bridge.set_form_auto_execute(true);
                 bridge.set_form_description("".into());
                 bridge.set_form_is_favorite(false);
                 bridge.set_form_detected_variables_text("".into());
-                bridge.set_form_updated_at("刚刚".into());
+                bridge.set_form_updated_at(if is_en { "Just now".into() } else { "刚刚".into() });
             }
         });
     }
@@ -392,6 +393,7 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                     });
                     bridge.set_is_editing(false);
                     bridge.set_is_create_mode(false);
+                    bridge.set_is_edit_snippet_modal_open(false);
                     ctx.notify_success("保存成功", "代码片段已更新并保存至库中");
                     sync_ui_snippets(&w, &ctx);
                 }
@@ -760,6 +762,124 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                 } else {
                     bridge.set_drop_position("after".into());
                 }
+            }
+        });
+    }
+
+    // 19. 新建代码片段弹窗控制
+    {
+        let w_handle = window.as_weak();
+        sb.on_open_create_snippet_modal(move || {
+            if let Some(w) = w_handle.upgrade() {
+                w.global::<SnippetsBridge>().set_is_create_snippet_modal_open(true);
+            }
+        });
+    }
+    {
+        let w_handle = window.as_weak();
+        sb.on_close_create_snippet_modal(move || {
+            if let Some(w) = w_handle.upgrade() {
+                w.global::<SnippetsBridge>().set_is_create_snippet_modal_open(false);
+            }
+        });
+    }
+    {
+        let ctx = ctx.clone();
+        let w_handle = window.as_weak();
+        sb.on_submit_create_snippet(move |title, group_id, language, code, description, auto_execute| {
+            if let Some(w) = w_handle.upgrade() {
+                let title_str = title.to_string();
+                let code_str = code.to_string();
+                if title_str.trim().is_empty() {
+                    ctx.notify_warning("创建失败", "代码片段名称不能为空");
+                    return;
+                }
+                if code_str.trim().is_empty() {
+                    ctx.notify_warning("创建失败", "脚本/指令内容不能为空");
+                    return;
+                }
+
+                let gid_str = group_id.to_string();
+                let parent_group = if gid_str == "root" || gid_str.is_empty() {
+                    None
+                } else {
+                    Some(gid_str)
+                };
+
+                let new_id = format!("snip-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+                let record = SnippetRecord {
+                    id: new_id.clone(),
+                    parent_group_id: parent_group.clone(),
+                    title: title_str.clone(),
+                    content: code_str,
+                    language: language.to_string(),
+                    tags: Vec::new(),
+                    auto_execute,
+                    description: description.to_string(),
+                    is_favorite: false,
+                    sort_order: 0,
+                    updated_at: "刚刚".to_string(),
+                };
+
+                if let Ok(()) = ctx.core_state.storage().snippets().save(&record) {
+                    ctx.core_state.events().dispatch(&SnippetSavedEvent {
+                        snippet_id: new_id,
+                        title: title_str,
+                        parent_group_id: parent_group,
+                        is_new: true,
+                    });
+                    w.global::<SnippetsBridge>().set_is_create_snippet_modal_open(false);
+                    ctx.notify_success("创建成功", "已成功新建代码片段并添加至库中");
+                    sync_ui_snippets(&w, &ctx);
+                }
+            }
+        });
+    }
+
+    // 17. 打开编辑代码片段弹窗
+    {
+        let ctx = ctx.clone();
+        let w_handle = window.as_weak();
+        sb.on_open_edit_snippet_modal(move |snippet_id| {
+            if let Some(w) = w_handle.upgrade() {
+                let bridge = w.global::<SnippetsBridge>();
+                let id_str = snippet_id.to_string();
+                if let Ok(Some(s)) = ctx.core_state.storage().snippets().get_by_id(&id_str) {
+                    bridge.set_form_id(s.id.clone().into());
+                    bridge.set_form_title(s.title.clone().into());
+                    bridge.set_form_language(s.language.clone().into());
+                    bridge.set_form_code(s.content.clone().into());
+                    bridge.set_form_auto_execute(s.auto_execute);
+                    bridge.set_form_description(s.description.clone().into());
+                    bridge.set_form_is_favorite(s.is_favorite);
+                    bridge.set_form_updated_at(s.updated_at.clone().into());
+
+                    let (cat_id, cat_name) = if let Some(ref gid) = s.parent_group_id {
+                        let name = ctx.core_state.storage().snippets().get_group_by_id(gid)
+                            .ok()
+                            .flatten()
+                            .map(|g| g.name)
+                            .unwrap_or_else(|| "根目录".to_string());
+                        (gid.clone(), name)
+                    } else {
+                        ("root".to_string(), "根目录 (顶级文件夹)".to_string())
+                    };
+                    bridge.set_form_group_id(cat_id.into());
+                    bridge.set_form_category_name(cat_name.into());
+                    bridge.set_is_editing(true);
+                    bridge.set_is_create_mode(false);
+                    bridge.set_is_edit_snippet_modal_open(true);
+                }
+            }
+        });
+    }
+
+    // 18. 关闭编辑代码片段弹窗
+    {
+        let w_handle = window.as_weak();
+        sb.on_close_edit_snippet_modal(move || {
+            if let Some(w) = w_handle.upgrade() {
+                w.global::<SnippetsBridge>().set_is_edit_snippet_modal_open(false);
             }
         });
     }

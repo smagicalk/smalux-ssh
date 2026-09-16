@@ -1,0 +1,420 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "group-tree-selector.slint";
+import { AppButton } from "base/app-button.slint";
+import { AppIconButton } from "base/app-icon-button.slint";
+import { AppTextInput } from "../shared/base/app-text-input.slint";
+import { AppTextArea } from "../shared/base/app-text-area.slint";
+import { AppFormItem } from "../shared/base/app-form-item.slint";
+import { AppVScrollBar } from "base/app-scroll-bar.slint";
+
+export { GroupOptionData }
+
+/// 新建代码片段弹窗组件 (Create Snippet Modal)
+/// 专为右侧栏及全局极速新建代码片段设计，支持输入名称、选择所属文件夹、编程语言、代码脚本内容、描述与自动执行策略。
+export component CreateSnippetModal inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[GroupOptionData]> group-options: [];
+
+    in-out property <string> form-title: "";
+    in-out property <string> form-group-id: "root";
+    in-out property <string> form-group-name: @tr("根目录 (顶级文件夹)");
+    in-out property <string> form-language: "Bash";
+    in-out property <string> form-code: "";
+    in-out property <string> form-description: "";
+    in-out property <bool> form-auto-execute: false;
+
+    property <bool> is-folder-picker-open: false;
+    property <string> temp-group-id: root.form-group-id;
+    property <string> temp-group-name: root.form-group-name;
+
+    callback close();
+    callback confirm(string /* title */, string /* group_id */, string /* language */, string /* code */, string /* description */, bool /* auto_execute */);
+    callback toggle-group(string /* id */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6;
+
+        TouchArea { } // 拦截穿透
+
+        Rectangle {
+            width: 500px;
+            height: 520px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #000000.transparentize(0.4);
+
+            TouchArea { } // 阻止事件穿透
+
+            VerticalLayout {
+                padding: 18px;
+                spacing: 12px;
+
+                // 1. 顶部标题栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+                        Text {
+                            text: @tr("新建代码片段");
+                            font-size: 15px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+                        Text {
+                            text: @tr("配置常用运维脚本或命令模板，支持终端一键注入运行");
+                            font-size: 11px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../assets/icons/window-close.svg");
+                            icon-size: 14px;
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+
+                // 2. 表单核心滚动区
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+
+                    scroll-area := Flickable {
+                        width: 100%;
+                        height: 100%;
+                        viewport-height: max(self.height, form-layout.preferred-height);
+
+                        form-layout := VerticalLayout {
+                            padding-right: 6px;
+                            spacing: 10px;
+                            alignment: start;
+
+                            // 片段名称
+                            AppFormItem {
+                                label: @tr("代码片段名称 (Title)");
+                                required: true;
+                                AppTextInput {
+                                    text <=> root.form-title;
+                                    placeholder: @tr("例如: Docker 日志清理、系统健康检查...");
+                                }
+                            }
+
+                            // 所属文件夹
+                            AppFormItem {
+                                label: @tr("所属分类文件夹 (Folder)");
+                                Rectangle {
+                                    height: 30px;
+                                    border-radius: AppTheme.radius-medium;
+                                    background: group-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+
+                                    group-touch := TouchArea {
+                                        clicked => {
+                                            root.temp-group-id = root.form-group-id;
+                                            root.temp-group-name = root.form-group-name;
+                                            root.is-folder-picker-open = true;
+                                        }
+                                        mouse-cursor: pointer;
+                                    }
+
+                                    HorizontalLayout {
+                                        padding-left: 8px;
+                                        padding-right: 8px;
+                                        alignment: space-between;
+
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Image {
+                                                    source: @image-url("../assets/icons/folder.svg");
+                                                    width: 12px;
+                                                    height: 12px;
+                                                    colorize: AppTheme.accent;
+                                                }
+                                            }
+                                            VerticalLayout {
+                                                alignment: center;
+                                                Text {
+                                                    text: root.form-group-name != "" ? root.form-group-name : @tr("根目录 (顶级文件夹)");
+                                                    font-size: 11px;
+                                                    color: AppTheme.foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Text {
+                                                text: "▼";
+                                                font-size: 9px;
+                                                color: AppTheme.secondary-foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+
+                            // 脚本代码内容
+                            AppFormItem {
+                                label: @tr("脚本/指令内容 (Command & Script)");
+                                required: true;
+                                AppTextArea {
+                                    text <=> root.form-code;
+                                    placeholder: @tr("#!/bin/bash\n# 输入脚本内容，支持 {{variable}} 变量模板占位符...");
+                                    monospace: true;
+                                    min-height: 90px;
+                                }
+                            }
+
+                            // 描述与用途
+                            AppFormItem {
+                                label: @tr("用途说明与备注 (Description)");
+                                AppTextInput {
+                                    text <=> root.form-description;
+                                    placeholder: @tr("可选: 说明该脚本的执行时机与注意事项...");
+                                }
+                            }
+
+                            // 自动回车执行策略
+                            Rectangle {
+                                height: 32px;
+                                border-radius: AppTheme.radius-medium;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                HorizontalLayout {
+                                    padding-left: 10px;
+                                    padding-right: 10px;
+                                    alignment: space-between;
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../assets/icons/play.svg");
+                                                width: 12px;
+                                                height: 12px;
+                                                colorize: root.form-auto-execute ? AppTheme.success : AppTheme.secondary-foreground;
+                                            }
+                                        }
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Text {
+                                                text: @tr("注入终端后直接自动回车执行");
+                                                font-size: 11px;
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            width: 32px;
+                                            height: 18px;
+                                            border-radius: 9px;
+                                            background: root.form-auto-execute ? AppTheme.success : AppTheme.border;
+                                            animate background { duration: 150ms; }
+
+                                            Rectangle {
+                                                x: root.form-auto-execute ? parent.width - self.width - 2px : 2px;
+                                                y: 2px;
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 7px;
+                                                background: #ffffff;
+                                                animate x { duration: 150ms; }
+                                            }
+
+                                            TouchArea {
+                                                clicked => { root.form-auto-execute = !root.form-auto-execute; }
+                                                mouse-cursor: pointer;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    AppVScrollBar {
+                        viewport-height: scroll-area.viewport-height;
+                        visible-height: scroll-area.height;
+                        viewport-y <=> scroll-area.viewport-y;
+                    }
+                }
+
+                // 3. 底部操作栏
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: @tr("支持 {{var}} 动态参数注入");
+                            font-size: 10px;
+                            color: AppTheme.disabled-foreground;
+                        }
+                    }
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        AppButton {
+                            text: @tr("取消");
+                            variant: "secondary";
+                            height: 28px;
+                            clicked => { root.close(); }
+                        }
+
+                        AppButton {
+                            text: @tr("保存代码片段");
+                            variant: "primary";
+                            height: 28px;
+                            enabled: root.form-title != "" && root.form-code != "";
+                            clicked => {
+                                root.confirm(
+                                    root.form-title,
+                                    root.form-group-id,
+                                    root.form-language,
+                                    root.form-code,
+                                    root.form-description,
+                                    root.form-auto-execute
+                                );
+                                root.form-title = "";
+                                root.form-code = "";
+                                root.form-description = "";
+                                root.form-group-id = "root";
+                                root.form-group-name = @tr("根目录 (顶级文件夹)");
+                                root.form-auto-execute = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 二级选择所属文件夹弹窗
+        if root.is-folder-picker-open: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: #00000088;
+
+            TouchArea { } // 拦截点击穿透
+
+            Rectangle {
+                width: 360px;
+                height: 380px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                border-radius: AppTheme.radius-large;
+                background: AppTheme.modal-background;
+                border-width: 1px;
+                border-color: AppTheme.border;
+                drop-shadow-blur: 16px;
+                drop-shadow-color: #000000.transparentize(0.5);
+
+                TouchArea { }
+
+                VerticalLayout {
+                    padding: 14px;
+                    spacing: 10px;
+
+                    HorizontalLayout {
+                        alignment: space-between;
+                        height: 28px;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Text {
+                                text: @tr("选择所属分类文件夹");
+                                font-size: 13px;
+                                font-weight: 700;
+                                color: AppTheme.foreground;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            AppIconButton {
+                                icon: @image-url("../assets/icons/window-close.svg");
+                                icon-size: 12px;
+                                clicked => { root.is-folder-picker-open = false; }
+                            }
+                        }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                        border-radius: AppTheme.radius-medium;
+                        background: AppTheme.control-background;
+                        border-width: 1px;
+                        border-color: AppTheme.border;
+                        clip: true;
+
+                        GroupTreeSelector {
+                            options: root.group-options;
+                            selected-id: root.temp-group-id;
+                            selection-changed(id, name) => {
+                                root.temp-group-id = id;
+                                root.temp-group-name = name;
+                            }
+                            toggle-group(id) => {
+                                root.toggle-group(id);
+                            }
+                        }
+                    }
+
+                    HorizontalLayout {
+                        alignment: end;
+                        spacing: 8px;
+                        height: 26px;
+
+                        AppButton {
+                            text: @tr("取消");
+                            variant: "secondary";
+                            height: 26px;
+                            clicked => { root.is-folder-picker-open = false; }
+                        }
+
+                        AppButton {
+                            text: @tr("确定选择");
+                            variant: "primary";
+                            height: 26px;
+                            clicked => {
+                                root.form-group-id = root.temp-group-id;
+                                root.form-group-name = root.temp-group-name;
+                                root.is-folder-picker-open = false;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

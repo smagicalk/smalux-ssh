@@ -84,6 +84,51 @@ pub struct JumpHopRecord {
     pub enabled: bool,
 }
 
+fn default_true() -> bool {
+    true
+}
+
+/// 隧道运行与触发模式 (Run & Trigger Mode)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum TunnelRunMode {
+    /// 伴随终端启闭 (默认): 关联主机终端连接时激活，终端全部关闭时自动释放本地端口
+    #[default]
+    #[serde(rename = "follow_terminal", alias = "FollowTerminal", alias = "terminal")]
+    FollowTerminal,
+    /// 常驻后台: 只要开关开启，随软件启动始终保持后台监听 (原跟随应用自启)
+    #[serde(rename = "follow_app", alias = "FollowApp", alias = "app", alias = "always")]
+    FollowApp,
+}
+
+impl TunnelRunMode {
+    /// 获取运行模式的标准英文字符串标识 ("FollowTerminal", "FollowApp")
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            TunnelRunMode::FollowTerminal => "FollowTerminal",
+            TunnelRunMode::FollowApp => "FollowApp",
+        }
+    }
+
+    /// 获取运行模式的友好中文显示名称 ("伴随终端", "常驻后台")
+    pub fn display_name(&self) -> &'static str {
+        match self {
+            TunnelRunMode::FollowTerminal => "伴随终端",
+            TunnelRunMode::FollowApp => "常驻后台",
+        }
+    }
+}
+
+impl std::str::FromStr for TunnelRunMode {
+    type Err = ();
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "followterminal" | "follow_terminal" | "terminal" => Ok(TunnelRunMode::FollowTerminal),
+            "followapp" | "follow_app" | "app" | "always" => Ok(TunnelRunMode::FollowApp),
+            _ => Ok(TunnelRunMode::FollowTerminal),
+        }
+    }
+}
+
 /// 隧道与网络连接记录
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TunnelRecord {
@@ -108,9 +153,15 @@ pub struct TunnelRecord {
     /// 跳板机级联节点列表 (按 Hop 1 -> Hop 2 -> Hop 3 顺序串联)
     #[serde(default)]
     pub jump_chain: Vec<JumpHopRecord>,
-    /// 当前是否处于激活运行状态
+    /// 规则是否启用 (由主 Switch 开关控制，关闭即彻底停用)
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    /// 当前是否处于物理运行监听状态
     pub is_running: bool,
-    /// 应用启动时是否静默自启
+    /// 运行与触发模式 (默认 FollowTerminal: 伴随终端启闭)
+    #[serde(default)]
+    pub run_mode: TunnelRunMode,
+    /// 应用启动时是否静默自启 (保留兼容字段，与 FollowApp 协同)
     pub auto_start: bool,
     /// 断线是否自动重连 (指数退避)
     pub auto_reconnect: bool,
@@ -309,7 +360,9 @@ mod tests {
             remote_host: "10.0.0.8".to_string(),
             remote_port: 3306,
             jump_chain: Vec::new(),
+            enabled: true,
             is_running: true,
+            run_mode: TunnelRunMode::FollowTerminal,
             auto_start: true,
             auto_reconnect: true,
             remote_dns: false,
@@ -369,7 +422,9 @@ mod tests {
                     enabled: false,
                 },
             ],
+            enabled: true,
             is_running: true,
+            run_mode: TunnelRunMode::FollowTerminal,
             auto_start: true,
             auto_reconnect: true,
             remote_dns: false,
@@ -402,7 +457,9 @@ mod tests {
             remote_host: "192.168.1.100".to_string(),
             remote_port: 1080,
             jump_chain: Vec::new(),
+            enabled: true,
             is_running: true,
+            run_mode: TunnelRunMode::FollowApp,
             auto_start: false,
             auto_reconnect: true,
             remote_dns: true,
@@ -429,7 +486,9 @@ mod tests {
             remote_host: "10.0.0.1".to_string(),
             remote_port: 7890,
             jump_chain: Vec::new(),
+            enabled: true,
             is_running: true,
+            run_mode: TunnelRunMode::FollowApp,
             auto_start: false,
             auto_reconnect: true,
             remote_dns: true,

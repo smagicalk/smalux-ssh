@@ -1,0 +1,560 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
+import { AppTextArea } from "../../../shared/base/app-text-area.slint";
+
+export component CreateHostGeneralTab inherits VerticalLayout {
+    spacing: 10px;
+
+    in-out property <string> host-name: "";
+    in-out property <string> host-address: "";
+    in-out property <string> host-port-str: "22";
+    in-out property <string> selected-parent-name: "";
+    in-out property <string> auth-type: "credential"; // "credential" | "password" | "key"
+    in-out property <string> selected-cred-id: "";
+    in-out property <string> selected-cred-name: "";
+    in-out property <string> selected-cred-user: "";
+    in-out property <string> selected-cred-type: "";
+    in-out property <string> selected-cred-alg: "";
+    in-out property <string> auth-username: "root";
+    in-out property <string> auth-password: "";
+    in-out property <string> auth-key-username: "root";
+    in-out property <string> auth-key-data: "";
+    in-out property <string> auth-key-passphrase: "";
+
+    callback open-group-picker();
+    callback open-cred-picker();
+    callback clear-cred();
+
+    // 1. 主机别名
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: @tr("主机别名 (选填):");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+        AppTextInput {
+            text <=> root.host-name;
+            placeholder: @tr("例如: 生产-K8s-主节点 (留空则默认使用主机地址)");
+            input-height: 32px;
+            font-size: 11px;
+            clearable: true;
+        }
+    }
+
+    // 2. 主机地址与端口号 (并排排布)
+    HorizontalLayout {
+        spacing: 10px;
+
+        // 主机地址 (占 75% 宽度)
+        VerticalLayout {
+            horizontal-stretch: 3;
+            spacing: 4px;
+            Text {
+                text: @tr("主机地址 (IP / 域名):");
+                font-size: 11px;
+                font-weight: 600;
+                color: AppTheme.secondary-foreground;
+            }
+            AppTextInput {
+                text <=> root.host-address;
+                placeholder: @tr("例如: 192.168.1.100 或 ssh.example.com");
+                prefix-icon: @image-url("../../../assets/icons/server.svg");
+                has-prefix-icon: true;
+                input-height: 32px;
+                font-size: 11px;
+                clearable: true;
+            }
+        }
+
+        // 端口号 (占 25% 宽度)
+        VerticalLayout {
+            horizontal-stretch: 1;
+            spacing: 4px;
+            Text {
+                text: @tr("SSH 端口:");
+                font-size: 11px;
+                font-weight: 600;
+                color: AppTheme.secondary-foreground;
+            }
+            AppTextInput {
+                text <=> root.host-port-str;
+                placeholder: "22";
+                input-height: 32px;
+                font-size: 11px;
+            }
+        }
+    }
+
+    // 3. 所属分组选择栏
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: @tr("所属资产分组:");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+
+        Rectangle {
+            height: 32px;
+            border-radius: AppTheme.radius-medium;
+            background: group-pick-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+            border-width: 1px;
+            border-color: group-pick-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+            group-pick-touch := TouchArea {
+                clicked => { root.open-group-picker(); }
+                mouse-cursor: pointer;
+            }
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                spacing: 8px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: start;
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../../assets/icons/folder.svg");
+                            width: 14px;
+                            height: 14px;
+                            image-fit: contain;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+                    Text {
+                        text: root.selected-parent-name;
+                        font-size: 11px;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Text {
+                    text: @tr("更改分组 ▼");
+                    font-size: 10px;
+                    color: AppTheme.accent;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // 4. 身份认证分段切换栏
+    VerticalLayout {
+        spacing: 6px;
+        Rectangle {
+            height: 1px;
+            background: AppTheme.border;
+        }
+
+        HorizontalLayout {
+            alignment: space-between;
+            height: 20px;
+            Text {
+                text: @tr("身份认证方式 (Authentication):");
+                font-size: 11px;
+                font-weight: 700;
+                color: AppTheme.foreground;
+                vertical-alignment: center;
+            }
+        }
+
+        // 认证方式三段单选开关
+        Rectangle {
+            height: 30px;
+            border-radius: 4px;
+            background: AppTheme.control-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding: 2px;
+                spacing: 2px;
+
+                // 模式 1: 关联凭据库
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 3px;
+                    background: root.auth-type == "credential" ? AppTheme.surface-background : transparent;
+                    border-width: root.auth-type == "credential" ? 1px : 0px;
+                    border-color: root.auth-type == "credential" ? AppTheme.border : transparent;
+
+                    Text {
+                        text: @tr("🔑 关联凭据库");
+                        font-size: 10px;
+                        font-weight: root.auth-type == "credential" ? 700 : 500;
+                        color: root.auth-type == "credential" ? AppTheme.accent : AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        clicked => { root.auth-type = "credential"; }
+                        mouse-cursor: pointer;
+                    }
+                }
+
+                // 模式 2: 账号密码
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 3px;
+                    background: root.auth-type == "password" ? AppTheme.surface-background : transparent;
+                    border-width: root.auth-type == "password" ? 1px : 0px;
+                    border-color: root.auth-type == "password" ? AppTheme.border : transparent;
+
+                    Text {
+                        text: @tr("🔒 账号密码");
+                        font-size: 10px;
+                        font-weight: root.auth-type == "password" ? 700 : 500;
+                        color: root.auth-type == "password" ? AppTheme.accent : AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        clicked => { root.auth-type = "password"; }
+                        mouse-cursor: pointer;
+                    }
+                }
+
+                // 模式 3: SSH 私钥
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 3px;
+                    background: root.auth-type == "key" ? AppTheme.surface-background : transparent;
+                    border-width: root.auth-type == "key" ? 1px : 0px;
+                    border-color: root.auth-type == "key" ? AppTheme.border : transparent;
+
+                    Text {
+                        text: @tr("📄 SSH 私钥");
+                        font-size: 10px;
+                        font-weight: root.auth-type == "key" ? 700 : 500;
+                        color: root.auth-type == "key" ? AppTheme.accent : AppTheme.secondary-foreground;
+                        horizontal-alignment: center;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        clicked => { root.auth-type = "key"; }
+                        mouse-cursor: pointer;
+                    }
+                }
+            }
+        }
+
+        // 4.1 关联凭据库模式表单
+        if root.auth-type == "credential": VerticalLayout {
+            spacing: 6px;
+
+            // 未选择任何凭据
+            if root.selected-cred-id == "": Rectangle {
+                height: 38px;
+                border-radius: AppTheme.radius-medium;
+                background: cred-unselected-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                border-width: 1px;
+                border-color: cred-unselected-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+                cred-unselected-touch := TouchArea {
+                    clicked => { root.open-cred-picker(); }
+                    mouse-cursor: pointer;
+                }
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 8px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../../../assets/icons/key.svg");
+                                width: 14px;
+                                height: 14px;
+                                image-fit: contain;
+                                colorize: cred-unselected-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                            }
+                        }
+
+                        Text {
+                            text: @tr("未选择凭据 (点击选择 密钥 / 密码 / Agent)");
+                            font-size: 11px;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Text {
+                        text: @tr("选择凭据 ▼");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.accent;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+
+            // 已选定凭据
+            if root.selected-cred-id != "": Rectangle {
+                height: 44px;
+                border-radius: AppTheme.radius-medium;
+                background: AppTheme.accent.transparentize(90%);
+                border-width: 1px;
+                border-color: AppTheme.accent.transparentize(50%);
+
+                HorizontalLayout {
+                    padding-left: 10px;
+                    padding-right: 10px;
+                    spacing: 10px;
+                    alignment: space-between;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: root.selected-cred-type == "key" ? @image-url("../../../assets/icons/key.svg") : (root.selected-cred-type == "password" ? @image-url("../../../assets/icons/lock.svg") : @image-url("../../../assets/icons/shield.svg"));
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 2px;
+
+                            HorizontalLayout {
+                                spacing: 6px;
+                                alignment: start;
+
+                                Text {
+                                    text: root.selected-cred-name;
+                                    font-size: 11px;
+                                    font-weight: 700;
+                                    color: AppTheme.foreground;
+                                    vertical-alignment: center;
+                                }
+
+                                Rectangle {
+                                    height: 16px;
+                                    border-radius: 3px;
+                                    background: AppTheme.surface-background;
+                                    border-width: 1px;
+                                    border-color: AppTheme.border;
+                                    HorizontalLayout {
+                                        padding-left: 4px;
+                                        padding-right: 4px;
+                                        Text {
+                                            text: root.selected-cred-type == "key" ? @tr("密钥") : (root.selected-cred-type == "password" ? @tr("密码") : (root.selected-cred-type == "agent" ? @tr("Agent") : root.selected-cred-type));
+                                            font-size: 9px;
+                                            font-weight: 600;
+                                            color: AppTheme.accent;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                }
+                            }
+
+                            Text {
+                                text: @tr("用户名: ") + root.selected-cred-user + (root.selected-cred-alg != "" ? @tr(" · 算法: ") + root.selected-cred-alg : "");
+                                font-size: 9px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    // 右侧：更换凭据与清除
+                    HorizontalLayout {
+                        spacing: 6px;
+                        alignment: end;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 24px;
+                                border-radius: 4px;
+                                background: cred-change-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                                cred-change-touch := TouchArea {
+                                    clicked => { root.open-cred-picker(); }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    Text {
+                                        text: @tr("更改凭据 ▼");
+                                        font-size: 10px;
+                                        color: AppTheme.accent;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 24px;
+                                border-radius: 4px;
+                                background: cred-clear-touch.has-hover ? AppTheme.danger.transparentize(85%) : transparent;
+
+                                cred-clear-touch := TouchArea {
+                                    clicked => { root.clear-cred(); }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 4px;
+                                    alignment: center;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../../../assets/icons/trash.svg");
+                                            width: 12px;
+                                            height: 12px;
+                                            colorize: AppTheme.danger;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: @tr("删除凭据");
+                                        font-size: 10px;
+                                        font-weight: 500;
+                                        color: AppTheme.danger;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4.2 账号密码直接录入模式
+        if root.auth-type == "password": VerticalLayout {
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                // 用户名
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text {
+                        text: @tr("登录用户名:");
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                    }
+                    AppTextInput {
+                        text <=> root.auth-username;
+                        placeholder: "root";
+                        input-height: 30px;
+                        font-size: 11px;
+                    }
+                }
+
+                // 密码
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text {
+                        text: @tr("登录密码:");
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                    }
+                    AppPasswordInput {
+                        text <=> root.auth-password;
+                        placeholder: @tr("请输入 SSH 密码");
+                        input-height: 30px;
+                    }
+                }
+            }
+        }
+
+        // 4.3 SSH 私钥直接录入模式
+        if root.auth-type == "key": VerticalLayout {
+            spacing: 8px;
+
+            HorizontalLayout {
+                spacing: 10px;
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text {
+                        text: @tr("登录用户名:");
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                    }
+                    AppTextInput {
+                        text <=> root.auth-key-username;
+                        placeholder: "root";
+                        input-height: 30px;
+                        font-size: 11px;
+                    }
+                }
+
+                VerticalLayout {
+                    horizontal-stretch: 1;
+                    spacing: 4px;
+                    Text {
+                        text: @tr("密钥口令 (Passphrase，无口令可留空):");
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                    }
+                    AppPasswordInput {
+                        text <=> root.auth-key-passphrase;
+                        placeholder: @tr("可选密钥口令");
+                        input-height: 30px;
+                    }
+                }
+            }
+
+            // 私钥内容/路径多行文本
+            VerticalLayout {
+                spacing: 4px;
+                Text {
+                    text: @tr("私钥内容 (PEM 文本) 或本地文件路径:");
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                }
+                AppTextArea {
+                    text <=> root.auth-key-data;
+                    placeholder: @tr("粘贴 -----BEGIN OPENSSH PRIVATE KEY----- 或输入本地文件绝对路径 (如 C:\\Users\\user\\.ssh\\id_ed25519)");
+                    min-height: 60px;
+                    monospace: true;
+                    font-size: 10px;
+                }
+            }
+        }
+    }
+}

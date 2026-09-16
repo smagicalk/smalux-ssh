@@ -8,7 +8,7 @@
 use std::sync::Arc;
 use smagical_core::event::{
     AppBeforeExitEvent, AppReadyEvent, EventManager, TerminalFocusChangedEvent,
-    TunnelStateChangedEvent,
+    TerminalSessionEvent, TunnelStateChangedEvent,
 };
 use smagical_core::AppStorage;
 use slint::ComponentHandle;
@@ -32,7 +32,7 @@ impl TunnelDaemonService {
 
     /// 注册跟随整个应用生命周期的全局常驻事件监听
     pub fn register(self: Arc<Self>, events: &EventManager) {
-        // 1. 全局应用启动就绪：自动扫描并启动标记为 auto_start 的网络规则
+        // 1. 全局应用启动就绪：自动扫描并启动标记为 auto_start / FollowApp 的常驻网络规则
         let s_ready = Arc::clone(&self);
         let g_ready = events.global().listen(move |_: &AppReadyEvent| {
             s_ready.handle_app_startup_autostart();
@@ -59,6 +59,13 @@ impl TunnelDaemonService {
             s_state.handle_tunnel_state_changed(e);
         });
         g_state.detach();
+
+        // 5. 终端会话启闭联动：关联主机终端打开时拉起 FollowTerminal 隧道，全部关闭时自动释放
+        let s_session = Arc::clone(&self);
+        let g_session = events.global().listen(move |e: &TerminalSessionEvent| {
+            s_session.handle_terminal_session_event(e);
+        });
+        g_session.detach();
     }
 
     /// 应用引导启动时执行自启规则扫描与可用性探测。
@@ -70,7 +77,7 @@ impl TunnelDaemonService {
         std::thread::Builder::new()
             .name("tunnel-autostart-daemon".into())
             .spawn(move || {
-                tracing::info!(target: "smalux::tunnel", "应用首帧就绪，开始扫描并自启标记为 auto_start 的网络隧道与代理...");
+                tracing::info!(target: "smalux::tunnel", "应用首帧就绪，开始扫描并自启常驻后台 (FollowApp) 的网络隧道与代理...");
 
                 let all_tunnels = match storage.tunnels().list_all() {
                     Ok(list) => list,
@@ -80,7 +87,9 @@ impl TunnelDaemonService {
                     }
                 };
 
-                let autostart_rules: Vec<_> = all_tunnels.into_iter().filter(|t| t.auto_start).collect();
+                let autostart_rules: Vec<_> = all_tunnels.into_iter().filter(|t| {
+                    t.enabled && (t.run_mode == smagical_core::domain::tunnel::TunnelRunMode::FollowApp || t.auto_start)
+                }).collect();
                 let autostart_total = autostart_rules.len();
                 let mut success_count = 0;
                 let mut failed_count = 0;
@@ -95,7 +104,7 @@ impl TunnelDaemonService {
 
                 tracing::info!(
                     target: "smalux::tunnel",
-                    "全局自启规则扫描完毕：共检测到 {} 条自启配置，成功启动 {} 条，异常关闭 {} 条（已保持关闭态等待手动打开，无前台弹窗打扰）",
+                    "全局常驻规则扫描完毕：共检测到 {} 条自启配置，成功启动 {} 条，异常关闭 {} 条（已保持关闭态等待手动打开，无前台弹窗打扰）",
                     autostart_total, success_count, failed_count
                 );
 
@@ -107,6 +116,73 @@ impl TunnelDaemonService {
                 });
             })
             .ok();
+    }
+
+    /// 响应终端会话生命周期事件 (打开或销毁)
+    fn handle_terminal_session_event(&self, e: &TerminalSessionEvent) {
+        let host_id = e.host_id.trim();
+        if host_id.is_empty() || host_id == "local" {
+            return;
+        }
+
+        let storage = Arc::clone(&self.storage);
+        let window_weak = self.window_weak.clone();
+        let h_id = host_id.to_string();
+        let action = e.action.clone();
+
+        std::thread::Builder::new()
+            .name("tunnel-session-daemon".into())
+            .spawn(move || {
+                let all_tunnels = storage.tunnels().list_all().unwrap_or_default();
+                if action == "opened" {
+                    for tun in all_tunnels {
+                        let is_match = tun.enabled
+                            && tun.run_mode == smagical_core::domain::tunnel::TunnelRunMode::FollowTerminal
+                            && tun.ssh_host_id.as_deref() == Some(&h_id);
+                        if is_match && !tun.is_running {
+                            if Self::try_start_tunnel(&storage, &tun) {
+                                tracing::info!(
+                                    target: "smalux::tunnel",
+                                    "[终端伴生自动拉起] 成功激活主机 [{}] 伴生隧道: [{}] '{}'",
+                                    h_id, tun.id, tun.name
+                                );
+                            }
+                        }
+                    }
+                } else if action == "closed" {
+                    // 当该主机的终端全部关闭时，释放端口
+                    for tun in all_tunnels {
+                        let is_match = tun.run_mode == smagical_core::domain::tunnel::TunnelRunMode::FollowTerminal
+                            && tun.ssh_host_id.as_deref() == Some(&h_id);
+                        if is_match && tun.is_running {
+                            let _ = storage.tunnels().set_running(&tun.id, false);
+                            tracing::info!(
+                                target: "smalux::tunnel",
+                                "[终端伴生自动释放] 释放主机 [{}] 隧道端口: [{}] '{}:{}'",
+                                h_id, tun.id, tun.local_bind, tun.local_port
+                            );
+                        }
+                    }
+                }
+
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        w.global::<TunnelsBridge>().invoke_sync_host_tunnels();
+                    }
+                });
+            })
+            .ok();
+    }
+
+    /// 尝试激活单条网络规则（探测端口、绑定检查并更新运行状态）
+    pub fn try_start_tunnel(storage: &Arc<dyn AppStorage>, tun: &smagical_core::TunnelRecord) -> bool {
+        Self::try_start_tunnel_on_boot(storage, tun)
+    }
+
+    /// 主动停止单条网络规则并释放端口
+    pub fn stop_tunnel(storage: &Arc<dyn AppStorage>, tunnel_id: &str) {
+        let _ = storage.tunnels().set_running(tunnel_id, false);
+        tracing::info!(target: "smalux::tunnel", "[主动停止] 释放隧道连接与端口: [{}]", tunnel_id);
     }
 
     /// 尝试在启动时激活单条网络规则。

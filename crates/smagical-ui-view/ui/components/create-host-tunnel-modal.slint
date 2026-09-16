@@ -1,0 +1,691 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { AppButton } from "base/app-button.slint";
+import { AppIconButton } from "base/app-icon-button.slint";
+import { AppFormItem } from "../shared/base/app-form-item.slint";
+import { AppTextInput } from "../shared/base/app-text-input.slint";
+import { AppVScrollBar } from "base/app-scroll-bar.slint";
+import { TunnelsBridge } from "../features/tunnels/tunnels_bridge.slint";
+
+/// 主机专属端口转发新建弹窗 (Create Host Tunnel Modal)
+///
+/// 专为右侧栏主机端口转发设计，直接弹窗配置而无需跳转脱离终端；
+/// 严格锁定绑定当前终端宿主主机，禁止篡改切换，支持 Local (-L)、Remote (-R)、Dynamic (-D) 转发模式。
+export component CreateHostTunnelModal inherits Rectangle {
+    in-out property <bool> is-open: false;
+
+    in property <string> host-name: TunnelsBridge.active-host-name;
+    in property <string> host-id: TunnelsBridge.active-host-id;
+
+    in-out property <string> form-name <=> TunnelsBridge.form-name;
+    in-out property <string> form-type <=> TunnelsBridge.form-type;
+    in-out property <string> form-local-bind <=> TunnelsBridge.form-local-bind;
+    in-out property <string> form-local-port <=> TunnelsBridge.form-local-port;
+    in-out property <string> form-remote-host <=> TunnelsBridge.form-remote-host;
+    in-out property <string> form-remote-port <=> TunnelsBridge.form-remote-port;
+    in-out property <string> form-run-mode <=> TunnelsBridge.form-run-mode;
+    in-out property <bool> form-auto-reconnect <=> TunnelsBridge.form-auto-reconnect;
+    in-out property <bool> form-compression <=> TunnelsBridge.form-compression;
+    in-out property <bool> form-remote-dns <=> TunnelsBridge.form-remote-dns;
+    in-out property <string> form-notes <=> TunnelsBridge.form-notes;
+
+    callback close();
+    callback save();
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000a6; // 统一半透明暗色遮罩
+
+        // 拦截点击穿透
+        TouchArea { }
+
+        // 弹窗本体 (520 x 530px，居中呈现，紧凑聚焦)
+        Rectangle {
+            width: 520px;
+            height: 530px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #000000.transparentize(0.4);
+
+            TouchArea { } // 阻止事件穿透
+
+            VerticalLayout {
+                padding: 18px;
+                spacing: 12px;
+
+                // -------------------------------------------------------------
+                // 1. 顶部标题栏与关闭按钮
+                // -------------------------------------------------------------
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 36px;
+
+                    VerticalLayout {
+                        alignment: center;
+                        spacing: 2px;
+                        Text {
+                            text: @tr("新建主机端口转发规则");
+                            font-size: 15px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+                        Text {
+                            text: @tr("配置端口转发通道，随当前主机终端生命周期自动伴生管理");
+                            font-size: 11px;
+                            color: AppTheme.secondary-foreground;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        AppIconButton {
+                            icon: @image-url("../assets/icons/window-close.svg");
+                            icon-size: 14px;
+                            clicked => { root.close(); }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // 2. 宿主主机专属锁定横幅 (严格绑定当前主机，不可更换)
+                // -------------------------------------------------------------
+                Rectangle {
+                    height: 36px;
+                    border-radius: AppTheme.radius-medium;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        alignment: space-between;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            alignment: start;
+
+                            VerticalLayout {
+                                alignment: center;
+                                Image {
+                                    source: @image-url("../assets/icons/server.svg");
+                                    width: 14px;
+                                    height: 14px;
+                                    colorize: AppTheme.accent;
+                                }
+                            }
+
+                            VerticalLayout {
+                                alignment: center;
+                                HorizontalLayout {
+                                    spacing: 6px;
+                                    Text {
+                                        text: @tr("绑定主机:");
+                                        font-size: 11px;
+                                        color: AppTheme.secondary-foreground;
+                                        vertical-alignment: center;
+                                    }
+                                    Text {
+                                        text: root.host-name != "" ? root.host-name : @tr("当前主机");
+                                        font-size: 12px;
+                                        font-weight: 700;
+                                        color: AppTheme.foreground;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+
+                        // 锁定状态徽章
+                        VerticalLayout {
+                            alignment: center;
+                            Rectangle {
+                                height: 20px;
+                                border-radius: 3px;
+                                background: AppTheme.accent.transparentize(85%);
+                                border-width: 1px;
+                                border-color: AppTheme.accent.transparentize(60%);
+
+                                HorizontalLayout {
+                                    padding-left: 6px;
+                                    padding-right: 6px;
+                                    spacing: 4px;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Image {
+                                            source: @image-url("../assets/icons/lock.svg");
+                                            width: 10px;
+                                            height: 10px;
+                                            colorize: AppTheme.accent;
+                                        }
+                                    }
+
+                                    Text {
+                                        text: @tr("已绑定当前主机 · 专属规则");
+                                        font-size: 9px;
+                                        font-weight: 600;
+                                        color: AppTheme.accent;
+                                        vertical-alignment: center;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // 3. 可滚动核心表单区
+                // -------------------------------------------------------------
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+
+                    scroll-area := Flickable {
+                        width: 100%;
+                        height: 100%;
+                        viewport-height: max(self.height, form-layout.preferred-height);
+
+                        form-layout := VerticalLayout {
+                            padding-right: 6px;
+                            spacing: 12px;
+                            alignment: start;
+
+                            // 3.1 转发工作模式三选一
+                            VerticalLayout {
+                                spacing: 4px;
+                                alignment: start;
+                                Text {
+                                    text: @tr("端口转发工作模式");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+
+                                HorizontalLayout {
+                                    height: 30px;
+                                    spacing: 8px;
+
+                                    // 本地正向 (-L)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "Local" ? AppTheme.accent.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "Local" ? AppTheme.accent : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("本地正向 (-L)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "Local" ? 700 : 400;
+                                            color: root.form-type == "Local" ? AppTheme.accent : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            clicked => { root.form-type = "Local"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 远程反向 (-R)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "Remote" ? #e67e22.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "Remote" ? #e67e22 : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("远程反向 (-R)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "Remote" ? 700 : 400;
+                                            color: root.form-type == "Remote" ? #e67e22 : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            clicked => { root.form-type = "Remote"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 动态转发 (-D SOCKS5)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "Dynamic" ? #9b59b6.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "Dynamic" ? #9b59b6 : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("动态转发 (-D)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "Dynamic" ? 700 : 400;
+                                            color: root.form-type == "Dynamic" ? #9b59b6 : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            clicked => { root.form-type = "Dynamic"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 反向动态 (-R SOCKS5)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: root.form-type == "ReverseDynamic" ? #16a085.transparentize(80%) : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.border;
+
+                                        Text {
+                                            text: @tr("反向动态 (-R)");
+                                            font-size: 11px;
+                                            font-weight: root.form-type == "ReverseDynamic" ? 700 : 400;
+                                            color: root.form-type == "ReverseDynamic" ? #16a085 : AppTheme.foreground;
+                                            horizontal-alignment: center;
+                                            vertical-alignment: center;
+                                        }
+
+                                        TouchArea {
+                                            clicked => { root.form-type = "ReverseDynamic"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 3.2 规则名称
+                            AppFormItem {
+                                label: @tr("规则别名 (Name)");
+                                required: true;
+                                AppTextInput {
+                                    text <=> root.form-name;
+                                    placeholder: @tr("例如: MySQL 3306 转发、Redis 映射...");
+                                }
+                            }
+
+                            // 3.3 端口与地址映射字段 (依据模式动态展现)
+                            if root.form-type == "Local" || root.form-type == "Remote": HorizontalLayout {
+                                spacing: 12px;
+
+                                // 本地监听配置
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 8px;
+
+                                    AppFormItem {
+                                        label: @tr("本地监听地址 (Local Bind)");
+                                        AppTextInput {
+                                            text <=> root.form-local-bind;
+                                            placeholder: "127.0.0.1";
+                                            monospace: true;
+                                        }
+                                    }
+
+                                    AppFormItem {
+                                        label: @tr("本地端口 (Local Port)");
+                                        required: true;
+                                        AppTextInput {
+                                            text <=> root.form-local-port;
+                                            placeholder: "8080";
+                                            monospace: true;
+                                        }
+                                    }
+                                }
+
+                                // 目标主机配置
+                                VerticalLayout {
+                                    horizontal-stretch: 1;
+                                    spacing: 8px;
+
+                                    AppFormItem {
+                                        label: @tr("目标服务地址 (Remote Host)");
+                                        required: true;
+                                        AppTextInput {
+                                            text <=> root.form-remote-host;
+                                            placeholder: @tr("127.0.0.1 或 10.0.0.8");
+                                            monospace: true;
+                                        }
+                                    }
+
+                                    AppFormItem {
+                                        label: @tr("目标端口 (Remote Port)");
+                                        required: true;
+                                        AppTextInput {
+                                            text <=> root.form-remote-port;
+                                            placeholder: "80";
+                                            monospace: true;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.form-type == "Dynamic": HorizontalLayout {
+                                spacing: 12px;
+                                alignment: start;
+
+                                VerticalLayout {
+                                    width: 220px;
+                                    AppFormItem {
+                                        label: @tr("本地监听绑定 (Local Bind)");
+                                        AppTextInput {
+                                            text <=> root.form-local-bind;
+                                            placeholder: "127.0.0.1";
+                                            monospace: true;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    width: 160px;
+                                    AppFormItem {
+                                        label: @tr("SOCKS5 网关端口 (Port)");
+                                        required: true;
+                                        AppTextInput {
+                                            text <=> root.form-local-port;
+                                            placeholder: "1080";
+                                            monospace: true;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.form-type == "ReverseDynamic": HorizontalLayout {
+                                spacing: 12px;
+                                alignment: start;
+
+                                VerticalLayout {
+                                    width: 220px;
+                                    AppFormItem {
+                                        label: @tr("远程监听地址 (Remote Bind)");
+                                        AppTextInput {
+                                            text <=> root.form-remote-host;
+                                            placeholder: "127.0.0.1";
+                                            monospace: true;
+                                        }
+                                    }
+                                }
+
+                                VerticalLayout {
+                                    width: 160px;
+                                    AppFormItem {
+                                        label: @tr("远程 SOCKS5 端口 (Port)");
+                                        required: true;
+                                        AppTextInput {
+                                            text <=> root.form-remote-port;
+                                            placeholder: "1080";
+                                            monospace: true;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 3.4 启动与运行策略
+                            VerticalLayout {
+                                spacing: 6px;
+                                alignment: start;
+
+                                Text {
+                                    text: @tr("启停与生命周期策略");
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    color: AppTheme.secondary-foreground;
+                                }
+
+                                HorizontalLayout {
+                                    height: 30px;
+                                    spacing: 8px;
+
+                                    // 模式 1: 伴随终端 (默认)
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: (root.form-run-mode == "FollowTerminal" || root.form-run-mode == "")
+                                            ? AppTheme.accent.transparentize(85%)
+                                            : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: (root.form-run-mode == "FollowTerminal" || root.form-run-mode == "")
+                                            ? AppTheme.accent
+                                            : AppTheme.border;
+
+                                        HorizontalLayout {
+                                            alignment: center;
+                                            spacing: 6px;
+                                            Text {
+                                                text: @tr("伴随终端启闭 (默认)");
+                                                font-size: 11px;
+                                                font-weight: (root.form-run-mode == "FollowTerminal" || root.form-run-mode == "") ? 700 : 400;
+                                                color: (root.form-run-mode == "FollowTerminal" || root.form-run-mode == "") ? AppTheme.accent : AppTheme.foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            clicked => { root.form-run-mode = "FollowTerminal"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+
+                                    // 模式 2: 常驻后台
+                                    Rectangle {
+                                        horizontal-stretch: 1;
+                                        border-radius: 4px;
+                                        background: (root.form-run-mode == "FollowApp")
+                                            ? AppTheme.accent.transparentize(85%)
+                                            : AppTheme.control-background;
+                                        border-width: 1px;
+                                        border-color: (root.form-run-mode == "FollowApp")
+                                            ? AppTheme.accent
+                                            : AppTheme.border;
+
+                                        HorizontalLayout {
+                                            alignment: center;
+                                            spacing: 6px;
+                                            Text {
+                                                text: @tr("常驻后台 (随客户端自启)");
+                                                font-size: 11px;
+                                                font-weight: (root.form-run-mode == "FollowApp") ? 700 : 400;
+                                                color: (root.form-run-mode == "FollowApp") ? AppTheme.accent : AppTheme.foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+
+                                        TouchArea {
+                                            clicked => { root.form-run-mode = "FollowApp"; }
+                                            mouse-cursor: pointer;
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 3.5 高级选项复选框
+                            HorizontalLayout {
+                                height: 22px;
+                                spacing: 20px;
+                                alignment: start;
+
+                                // 自动重连
+                                Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-auto-reconnect ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-auto-reconnect ? AppTheme.accent : AppTheme.border;
+                                                if root.form-auto-reconnect: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+                                        Text {
+                                            text: @tr("断线自动重连");
+                                            font-size: 11px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    TouchArea {
+                                        clicked => { root.form-auto-reconnect = !root.form-auto-reconnect; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+
+                                // 传输压缩
+                                Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-compression ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-compression ? AppTheme.accent : AppTheme.border;
+                                                if root.form-compression: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+                                        Text {
+                                            text: @tr("启用传输压缩 (-C)");
+                                            font-size: 11px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    TouchArea {
+                                        clicked => { root.form-compression = !root.form-compression; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+
+                                // 远端 DNS
+                                Rectangle {
+                                    background: transparent;
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: start;
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                width: 14px;
+                                                height: 14px;
+                                                border-radius: 3px;
+                                                background: root.form-remote-dns ? AppTheme.accent : AppTheme.control-background;
+                                                border-width: 1px;
+                                                border-color: root.form-remote-dns ? AppTheme.accent : AppTheme.border;
+                                                if root.form-remote-dns: Image {
+                                                    source: @image-url("../assets/icons/check.svg");
+                                                    width: 9px;
+                                                    height: 9px;
+                                                    x: (parent.width - self.width) / 2;
+                                                    y: (parent.height - self.height) / 2;
+                                                    colorize: #ffffff;
+                                                }
+                                            }
+                                        }
+                                        Text {
+                                            text: @tr("远端 DNS 解析");
+                                            font-size: 11px;
+                                            color: AppTheme.foreground;
+                                            vertical-alignment: center;
+                                        }
+                                    }
+                                    TouchArea {
+                                        clicked => { root.form-remote-dns = !root.form-remote-dns; }
+                                        mouse-cursor: pointer;
+                                    }
+                                }
+                            }
+
+                            // 3.6 备注说明
+                            AppFormItem {
+                                label: @tr("备忘与用途说明 (Notes)");
+                                AppTextInput {
+                                    text <=> root.form-notes;
+                                    placeholder: @tr("可选: 记录映射用途，例如: 测试内网 RDS 数据库访问");
+                                }
+                            }
+                        }
+                    }
+
+                    AppVScrollBar {
+                        viewport-height: scroll-area.viewport-height;
+                        visible-height: scroll-area.height;
+                        viewport-y <=> scroll-area.viewport-y;
+                    }
+                }
+
+                // -------------------------------------------------------------
+                // 4. 底部操作按钮栏
+                // -------------------------------------------------------------
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 32px;
+
+                    // 左侧提示
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: @tr("保存后将立即写入存储并在终端打开时自动建立连接");
+                            font-size: 10px;
+                            color: AppTheme.disabled-foreground;
+                        }
+                    }
+
+                    // 右侧动作按钮
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: end;
+
+                        AppButton {
+                            text: @tr("取消");
+                            variant: "secondary";
+                            height: 28px;
+                            clicked => { root.close(); }
+                        }
+
+                        AppButton {
+                            text: @tr("创建并保存规则");
+                            variant: "primary";
+                            height: 28px;
+                            clicked => { root.save(); }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

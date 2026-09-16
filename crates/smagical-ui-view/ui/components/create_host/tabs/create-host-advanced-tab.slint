@@ -1,0 +1,82 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { AppTextArea } from "../../../shared/base/app-text-area.slint";
+
+export component CreateHostAdvancedTab inherits VerticalLayout {
+    spacing: 12px;
+
+    in-out property <string> initial-dir: "";
+    in-out property <string> startup-cmd: "";
+    in-out property <string> term-type: "xterm-256color";
+    in-out property <string> notes: "";
+
+    // 初始工作目录
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: @tr("登录初始工作目录 (Initial Directory):");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+        AppTextInput {
+            text <=> root.initial-dir;
+            placeholder: @tr("例如: /data/www 或 /home/work (留空为默认根目录)");
+            input-height: 32px;
+            font-size: 11px;
+            clearable: true;
+        }
+    }
+
+    // 开机自动执行脚本
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: @tr("登录后自动敲入脚本 (Startup Command):");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+        AppTextInput {
+            text <=> root.startup-cmd;
+            placeholder: @tr("例如: tmux a || tmux 或 source ~/.bashrc");
+            input-height: 32px;
+            font-size: 11px;
+            clearable: true;
+        }
+    }
+
+    // 终端仿真类型
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: @tr("终端仿真类型 (TERM 环境量):");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+        AppTextInput {
+            text <=> root.term-type;
+            placeholder: "xterm-256color";
+            input-height: 32px;
+            font-size: 11px;
+        }
+    }
+
+    // 备注多行文本
+    VerticalLayout {
+        spacing: 4px;
+        Text {
+            text: @tr("主机备忘与备注 (Notes):");
+            font-size: 11px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+        AppTextArea {
+            text <=> root.notes;
+            placeholder: @tr("记录主机硬件配置、日常维护人、业务负责人或常用端口说明...");
+            min-height: 70px;
+            font-size: 11px;
+        }
+    }
+}

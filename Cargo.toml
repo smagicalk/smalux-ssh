@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/smagical-core",
+    "crates/smagical-ui-view",
     "crates/smagical-ui",
 ]
 resolver = "3"
@@ -13,13 +14,13 @@ license = "MIT"
 authors = ["smagical"]
 
 [workspace.dependencies]
-anyhow = "1"
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-thiserror = "2"
-toml = "0.9"
-uuid = { version = "1", features = ["v4", "serde"] }
-slint = { version = "1.16.1", default-features = false, features = [
+anyhow = "1.0.104"
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
+thiserror = "2.0.20"
+toml = "1.1"
+uuid = { version = "1.26.1", features = ["v4", "serde"] }
+slint = { version = "1.17.1", default-features = false, features = [
     "compat-1-2",
     "backend-winit",
     "renderer-skia",
@@ -31,22 +32,24 @@ slint = { version = "1.16.1", default-features = false, features = [
 
 
 
-slint-build = "1.16.1"
-directories = "6"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "time", "json"] }
-tracing-appender = "0.2"
-portable-pty = "0.8"
-alacritty_terminal = "0.26"
-fontdue = "0.9"
-arboard = "3"
-vt100 = "0.15"
+slint-build = "1.17.1"
+directories = "6.0.0"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", features = ["env-filter", "fmt", "time", "json"] }
+tracing-appender = "0.2.5"
+portable-pty = "0.9.0"
+alacritty_terminal = "0.26.0"
+fontdue = "0.9.4"
+arboard = "3.6.1"
+vt100 = "0.16.2"
 
 [profile.dev]
 # 降低局部变量调试符号（保留 panic 行号与堆栈追踪），显著降低 PDB 体积和 MSVC 磁盘写入耗时
 debug = 1
 
+# Slint 自动生成的大型 UI AST 无需调试符号，彻底避免 LLVM 编译期 Out of Memory
+[profile.dev.package.smagical-ui-view]
+debug = 0
 
-
-
-
+[profile.test.package.smagical-ui-view]
+debug = 0

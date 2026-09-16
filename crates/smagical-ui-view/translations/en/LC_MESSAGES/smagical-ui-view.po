@@ -1,0 +1,5255 @@
+﻿# smalux-ssh 官方英文翻译字典 (Standard Gettext PO)
+msgid ""
+msgstr ""
+"Project-Id-Version: smalux-ssh 0.1.0\n"
+"Report-Msgid-Bugs-To: dev@smalux.io\n"
+"POT-Creation-Date: 2026-09-12 00:00+0000\n"
+"PO-Revision-Date: 2026-09-12 00:00+0000\n"
+"Last-Translator: smalux <dev@smalux.io>\n"
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid " · 算法: "
+msgstr " · Alg: "
+
+msgid " | 可见节点: "
+msgstr " | Visible Nodes: "
+
+msgid " 份"
+msgstr " copies"
+
+msgid " 个"
+msgstr " items"
+
+msgid " 个 TCP 会话"
+msgstr " TCP sessions"
+
+msgid " 活跃连接"
+msgstr " active connections"
+
+msgid " 级跳板中继"
+msgstr " hops relay"
+
+msgid " 连接"
+msgstr " connections"
+
+msgid " 天"
+msgstr " days"
+
+msgid " 条"
+msgstr " entries"
+
+msgid " 条 | 📁 分组: "
+msgstr " entries | 📁 Group: "
+
+msgid " 条记录"
+msgstr " records"
+
+msgid " 小时"
+msgstr " hours"
+
+msgid " 行输出，支持鼠标划选复制）"
+msgstr " lines output, selection copy supported)"
+
+msgid " Ed25519 (推荐)"
+msgstr "Ed25519 (Recommended)"
+
+msgid "-J <尚未选择启用跳板节点>"
+msgstr "-J <No jump nodes selected yet>"
+
+msgid "» 推荐生成指令"
+msgstr "» Recommended Generated Command"
+
+msgid "(待填写代理地址与端口)"
+msgstr "(Fill proxy address and port)"
+
+msgid "(当前无活动任务 - 点击展开)"
+msgstr "(No active tasks - click to expand)"
+
+msgid "(默认: "
+msgstr "(Default: "
+
+msgid "(远端 SOCKS5 代理网关)"
+msgstr "(Remote SOCKS5 Proxy Gateway)"
+
+msgid "(总进度)"
+msgstr "(Total Progress)"
+
+msgid "(SOCKS5 代理网关)"
+msgstr "(SOCKS5 Proxy Gateway)"
+
+msgid "（共 "
+msgstr "("
+
+msgid "（无屏幕记录）"
+msgstr "(No screen capture recorded)"
+
+msgid "[实验特性] 调节全局壁纸模式下模态弹窗背景透明度 (默认 100% 纯色以防字体重叠)"
+msgstr "[Experimental] Adjust modal opacity in wallpaper mode (default 100% to prevent overlap)"
+
+msgid "[实验特性] 为终端字符渲染叠加复古显像管微弯曲曲面与光栅扫描线特效"
+msgstr "[Experimental] Overlays curved CRT glass curvature and phosphorescent scanlines over terminal glyphs"
+
+msgid "[实验特性] 长耗时命令结束或会话异常断开时向 Windows 系统托盘推送通知"
+msgstr "[Experimental] Send Windows desktop notifications when sessions disconnect or long commands complete"
+
+msgid "[未绑定]"
+msgstr "[Unbound]"
+
+msgid "]，需重启客户端加载生效"
+msgstr "], restart client to apply"
+
+msgid "」的历史快照镜像，可一键无损回退覆盖本地资产"
+msgstr "'s historical snapshot mirror, can be restored losslessly to overwrite local assets"
+
+msgid "」设定个性化专属组合快捷键"
+msgstr "'s custom shortcut key combination"
+
+msgid "#!/bin/bash\\n# 输入脚本内容，支持 {{variable}} 变量模板占位符..."
+msgstr "#!/bin/bash\n# Enter script content, supports {{variable}} template placeholders..."
+
+msgid "↑ 上传速率"
+msgstr "↑ Upload Speed"
+
+msgid "↑ 上传文件"
+msgstr "↑ Upload Files"
+
+msgid "↑ 上传文件到当前目录"
+msgstr "↑ Upload Files to Current Directory"
+
+msgid "↓ 下载速率"
+msgstr "↓ Download Speed"
+
+msgid "↺ 回滚"
+msgstr "↺ Rollback"
+
+msgid "+ 开启新对话"
+msgstr "+ New Chat"
+
+msgid "+ 立即录入"
+msgstr "+ Add Now"
+
+msgid "+ 添加跳板中继主机 (从资产树选择)"
+msgstr "+ Add Jump Relay Host (Select from tree)"
+
+msgid "+ 新建"
+msgstr "+ New"
+
+msgid "+ 新建规则"
+msgstr "+ New Rule"
+
+msgid "~168 KB (微量无感)"
+msgstr "~168 KB (Negligible)"
+
+msgid "⌨️ 终端首选项"
+msgstr "⌨️ Terminal Preferences"
+
+msgid "▤ 常用远程目录书签"
+msgstr "▤ Remote Bookmarks"
+
+msgid "▶ 填入终端"
+msgstr "▶ Paste into Terminal"
+
+msgid "○ 远端端口待监听"
+msgstr "○ Remote Port Pending"
+
+msgid "○ 远端网关待建立"
+msgstr "○ Remote Gateway Pending"
+
+msgid "○ SSH 待建立"
+msgstr "○ SSH Pending"
+
+msgid "● 反向加密隧道已连通"
+msgstr "● Reverse Encrypted Tunnel Connected"
+
+msgid "● 反向解密穿透已连通"
+msgstr "● Reverse Decrypted Penetration Connected"
+
+msgid "● 公网入站流量直达"
+msgstr "● Public Inbound Traffic Direct"
+
+msgid "● 远端 SOCKS5 监听就绪"
+msgstr "● Remote SOCKS5 Listening Ready"
+
+msgid "● SSH 加密已连通"
+msgstr "● SSH Encryption Connected"
+
+msgid "◐ UI & 终端主题"
+msgstr "◐ UI & Terminal Themes"
+
+msgid "☸️ + K8s 重启"
+msgstr "☸️ + K8s Restart"
+
+msgid "⚠️ 恢复默认偏好"
+msgstr "⚠️ Reset Preferences to Defaults"
+
+msgid "⚠️ 目标管线已变更为 ["
+msgstr "⚠️ Target pipeline changed to ["
+
+msgid "⚡ 测试连接"
+msgstr "⚡ Test Connection"
+
+msgid "⚡ 立即批量生成测试代码片段"
+msgstr "⚡ Batch Generate Test Snippets"
+
+msgid "⚡ 立即批量生成测试凭据"
+msgstr "⚡ Batch Generate Test Credentials"
+
+msgid "⚡ 排查当前高 CPU 占用的 Top 进程"
+msgstr "⚡ Inspect top high-CPU processes"
+
+msgid "✎ 当前主机会话专用备忘录 (自动保存)"
+msgstr "✎ Current host session private memo (auto saved)"
+
+msgid "✓ 配置已保存至本地，将在下次启动客户端时生效"
+msgstr "✓ Config saved locally, applies next client launch"
+
+msgid "⤓ 导出全量加密备份文件 (.toml / .json)"
+msgstr "⤓ Export Full Encrypted Backup Archive (.toml / .json)"
+
+msgid "⤓ 立即导出备份包"
+msgstr "⤓ Export Backup Archive Now"
+
+msgid "⤓ 配置备份与迁移"
+msgstr "⤓ Config Backup & Migration"
+
+msgid "🌐 远程主机资产 (Remote Hosts)"
+msgstr "🌐 Remote Hosts"
+
+msgid "🌐 远程主机资产 (Remote SFTP Hosts)"
+msgstr "🌐 Remote SFTP Hosts"
+
+msgid "🌐 远程主机资产 (Remote SSH Hosts)"
+msgstr "🌐 Remote SSH Hosts"
+
+msgid "🎨 色相圆盘取色器..."
+msgstr "🎨 Hue Color Picker..."
+
+msgid "🎨 自定义"
+msgstr "🎨 Custom"
+
+msgid "🐬 + MySQL 慢查询"
+msgstr "🐬 + MySQL Slow Queries"
+
+msgid "🐳 + Docker ps"
+msgstr "🐳 + Docker ps"
+
+msgid "💡 伴随终端：打开对应主机终端时自动打通隧道，所有终端关闭后自动释放端口，避免端口被长期霸占。"
+msgstr "💡 Follow Terminal: Opens tunnel when terminal is active; releases port when closed."
+
+msgid "💡 常驻后台：只要开关开启，随软件启动始终保持后台监听，无论是否连接终端均可使用。"
+msgstr "💡 Resident: Listens in background while enabled, available regardless of whether terminal is open."
+
+msgid "💡 提示: 批量生成测试片段将同步写入 AppStorage 存储层，并在全屏代码片段中心、多层文件夹树与右侧伴生工具栏中实时响应。"
+msgstr "💡 Tip: Batch test snippets will write to AppStorage and sync in real time across drawers and toolbars."
+
+msgid "💡 提示: 批量生成测试凭据将同步写入 AppStorage 存储层，并在凭据中心与左侧凭据抽屉中实时响应。"
+msgstr "💡 Tip: Batch test credentials will sync to AppStorage and appear immediately in credential views."
+
+msgid "💡 提示：点击任意条目即可快速创建并激活新终端会话"
+msgstr "Tip: Click any item to quickly create and activate a new terminal session"
+
+msgid "💡 提示：点击任意远程主机即可自动建立 SFTP 会话并打开文件管理"
+msgstr "Tip: Click any remote host to automatically open SFTP file management"
+
+msgid "💡 图形管线切换已统一集成至偏好设置集中管理，修改后需重启生效"
+msgstr "💡 Pipeline selection is unified in Preferences; restart required after changes"
+
+msgid "💻 本地文件系统 (Local Filesystem)"
+msgstr "💻 Local Filesystem"
+
+msgid "💻 本地终端环境 (Local Shells)"
+msgstr "💻 Local Shell Environments"
+
+msgid "📁 上传目录"
+msgstr "📁 Upload Directory"
+
+msgid "📂 选择文件导入..."
+msgstr "📂 Select File to Import..."
+
+msgid "📄 SSH 私钥"
+msgstr "📄 SSH Private Key"
+
+msgid "📋 复制配置"
+msgstr "📋 Copy Config"
+
+msgid "📜 + RSA 密钥"
+msgstr "📜 + RSA Key"
+
+msgid "📜 代码片段总数: "
+msgstr "📜 Total Snippets: "
+
+msgid "📡 远程主机资产 (Remote SSH Hosts)"
+msgstr "📡 Remote SSH Hosts"
+
+msgid "📥 从外部工具一键导入"
+msgstr "📥 Import from External Tools"
+
+msgid "📥 从外部工具一键迁移 (Termius / Xshell / MobaXterm)"
+msgstr "📥 One-Click Migration from External Tools (Termius / Xshell / MobaXterm)"
+
+msgid "📥 一键扫描并导入本机 ~/.ssh/config"
+msgstr "📥 Scan and Import Local ~/.ssh/config"
+
+msgid "🔄 测试 Nginx 配置语法并平滑重载"
+msgstr "🔄 Test Nginx syntax and reload gracefully"
+
+msgid "🔄 从代码解析同步到表单"
+msgstr "🔄 Parse & Sync to Form"
+
+msgid "🔌 + 端口排查"
+msgstr "🔌 + Port Troubleshoot"
+
+msgid "🔍 扫描并预览主机清单"
+msgstr "🔍 Scan & Preview Host Inventory"
+
+msgid "🔍 搜索代理名称、协议、主机地址、端口..."
+msgstr "🔍 Search proxy name, protocol, host, port..."
+
+msgid "🔍 搜索凭据名称、用户名、加密算法..."
+msgstr "🔍 Search credentials, usernames, algorithms..."
+
+msgid "🔍 统计大于 100MB 的日志文件"
+msgstr "🔍 Find log files larger than 100MB"
+
+msgid "🔍 未检索到匹配的代理通道服务"
+msgstr "🔍 No matching proxy channels found"
+
+msgid "🔍 未检索到匹配的凭据记录"
+msgstr "🔍 No matching credential records found"
+
+msgid "🔐 凭据存储总数: "
+msgstr "🔐 Total Credentials: "
+
+msgid "🔑 + Ed25519 密钥"
+msgstr "🔑 + Ed25519 Key"
+
+msgid "🔑 关联凭据库"
+msgstr "🔑 Saved Credentials"
+
+msgid "🔑 密钥"
+msgstr "🔑 Key"
+
+msgid "🔒 + Root 密码"
+msgstr "🔒 + Root Password"
+
+msgid "🔒 密码"
+msgstr "🔒 Password"
+
+msgid "🔒 账号密码"
+msgstr "🔒 Password"
+
+msgid "🔗 已直接引用隧道中心预设：在「网络与隧道中心」对此跳板串修改节点或顺序时，此主机将自动同步生效，无需手动重新配置！"
+msgstr "Linked to Tunnel Hub preset: Modifications in Tunnel Hub will automatically sync to this host!"
+
+msgid "🔗 引用此预设跳板串"
+msgstr "🔗 Link This Preset Chain"
+
+msgid "🕒 本地最近自动配置快照"
+msgstr "🕒 Recent Automatic Local Configuration Snapshots"
+
+msgid "🛠️ 开发者调试控制台"
+msgstr "🛠️ Developer Debug Console"
+
+msgid "🛠️ 开发者调试控制台 (Developer Debug Panel)"
+msgstr "🛠️ Developer Debug Console (Developer Debug Panel)"
+
+msgid "🛠️ 渲染管线自检与应用操作"
+msgstr "🛠️ Rendering Pipeline Self-Check & Operations"
+
+msgid "🛡️ 查看开放监听端口与防火墙规则"
+msgstr "🛡️ View open listening ports and firewall rules"
+
+msgid "0 ms (静态内联)"
+msgstr "0 ms (Statically Inlined)"
+
+msgid "1. 企业生产全集群预设 (35+ 主机)"
+msgstr "1. Enterprise Production Cluster Preset (35+ Hosts)"
+
+msgid "10 台"
+msgstr "10 Hosts"
+
+msgid "100 台"
+msgstr "100 Hosts"
+
+msgid "120 FPS (8.3ms 极速吞吐)"
+msgstr "120 FPS (8.3ms High Throughput)"
+
+msgid "120Hz 终端吞吐压测"
+msgstr "120Hz Terminal Throughput Test"
+
+msgid "127.0.0.1 或 10.0.0.8"
+msgstr "127.0.0.1 or 10.0.0.8"
+
+msgid "127.0.0.1 或 proxy.example.com"
+msgstr "127.0.0.1 or proxy.example.com"
+
+msgid "1Password 密码管理器内置 SSH 认证代理管道"
+msgstr "1Password built-in SSH authentication agent pipe"
+
+msgid "2. 极简精简数据预设 (3 台主机)"
+msgstr "2. Minimalist Data Preset (3 Hosts)"
+
+msgid "20 台"
+msgstr "20 Hosts"
+
+msgid "3. 超长命名极限测试 (50+ 字符)"
+msgstr "3. Ultra-long Name Stress Test (50+ Chars)"
+
+msgid "30s 双轨走势"
+msgstr "30s Dual-Track Trend"
+
+msgid "30s 走势"
+msgstr "30s Trend"
+
+msgid "35+ 企业全集群"
+msgstr "35+ Enterprise Cluster"
+
+msgid "4. 极深层级嵌套树 (5 级结构)"
+msgstr "4. Deeply Nested Tree Preset (5 Levels)"
+
+msgid "42 / 42 全部已预热常驻"
+msgstr "42 / 42 All Pre-warmed & Resident"
+
+msgid "5. 全告警与离线故障集 (Troubleshooting)"
+msgstr "5. All-Warning & Offline Fault Set (Troubleshooting)"
+
+msgid "50 台"
+msgstr "50 Hosts"
+
+msgid "6 层深嵌套树"
+msgstr "6-Level Nested Tree"
+
+msgid "安全隐私与开发者诊断"
+msgstr "Security, Privacy & Developer Diagnostics"
+
+msgid "安全与高级诊断"
+msgstr "Security & Diagnostics"
+
+msgid "安全只读指令"
+msgstr "Safe Read-Only Command"
+
+msgid "按 ↑↓ 导航  |  Enter 确认  |  Esc 关闭"
+msgstr "↑↓ to navigate  |  Enter to confirm  |  Esc to close"
+
+msgid "按份数"
+msgstr "By Count"
+
+msgid "按间隔时间自动切换下一张壁纸，支持键入数字与单位或快捷选择"
+msgstr "Automatically cycle wallpaper by interval; supports entering values or quick presets"
+
+msgid "按键录制"
+msgstr "Key Recording"
+
+msgid "按钮按下激活底色"
+msgstr "Pressed Background"
+
+msgid "按钮按下激活底色 (pressed-background)"
+msgstr "Pressed Background (pressed-background)"
+
+msgid "按配置策略自动执行主机资产与配置增量快照，并同步至本地或云端容灾节点"
+msgstr "Automatically take incremental snapshots according to policy"
+
+msgid "按天数"
+msgstr "By Days"
+
+msgid "按小时"
+msgstr "By Hours"
+
+msgid "按主机"
+msgstr "By Host"
+
+msgid "伴随终端"
+msgstr "Follow Terminal"
+
+msgid "伴随终端待命中"
+msgstr "Standby (Follow Terminal)"
+
+msgid "伴随终端启闭 (默认)"
+msgstr "Follow Terminal (Default)"
+
+msgid "绑定主机:"
+msgstr "Bound Host:"
+
+msgid "包含超长主机与微服务集群名称，验证平滑横向滚动与动态视口宽度自适应"
+msgstr "Contains ultra-long host and cluster names to verify horizontal scrolling and auto-width"
+
+msgid "包含丢包路由、高延迟网关、断电主机及磁盘故障节点"
+msgstr "Contains packet-loss routes, high latency gateways, powered-off hosts, and disk failures"
+
+msgid "包含生产 Web、K8s 编排、PG/Redis 核心库、大数据与 AI 算力中心"
+msgstr "Contains Production Web, K8s orchestration, PG/Redis, Big Data, and AI compute nodes"
+
+msgid "包含所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则"
+msgstr "Includes all host assets, group tree hierarchy, credentials vault, snippets, and tunnel rules"
+
+msgid "保持主窗口始终位于其他应用窗口最顶层，避免排查故障时频繁切换焦点"
+msgstr "Keep the main window always on top of other applications"
+
+msgid "保存"
+msgstr "Save"
+
+msgid "保存 (下次生效)"
+msgstr "Save (Applies Next Run)"
+
+msgid "保存并创建"
+msgstr "Save & Create"
+
+msgid "保存并创建备份节点"
+msgstr "Save & Create Backup Node"
+
+msgid "保存并立即激活"
+msgstr "Save & Activate"
+
+msgid "保存并立即应用自定义代理配置 (亦可在输入框直接按回车保存)"
+msgstr "Save and apply custom proxy immediately (or press Enter)"
+
+msgid "保存并立即重启"
+msgstr "Save & Restart Now"
+
+msgid "保存代理配置"
+msgstr "Save Proxy Config"
+
+msgid "保存代码片段"
+msgstr "Save Snippet"
+
+msgid "保存端点修改"
+msgstr "Save Endpoint Changes"
+
+msgid "保存后将立即写入存储并在终端打开时自动建立连接"
+msgstr "Saves to storage and automatically connects when terminal opens"
+
+msgid "保存快捷键"
+msgstr "Save Shortcut"
+
+msgid "保存配置"
+msgstr "Save Config"
+
+msgid "保存修改"
+msgstr "Save Changes"
+
+msgid "保存主机配置"
+msgstr "Save Host Config"
+
+msgid "保留 10 份"
+msgstr "Keep 10 snapshots"
+
+msgid "保留 24 小时"
+msgstr "Keep 24 hours"
+
+msgid "保留 30 天"
+msgstr "Keep 30 days"
+
+msgid "保留 5 份"
+msgstr "Keep 5 snapshots"
+
+msgid "保留 7 天"
+msgstr "Keep 7 days"
+
+msgid "保留的终端屏幕历史输出最大行数 (超出上限将平滑舍弃最早输出)"
+msgstr "Maximum scrollback lines kept in memory (earliest output discarded smoothly)"
+
+msgid "保留原始文件属性 (Preserve Attributes & Timestamps)"
+msgstr "Preserve Attributes & Timestamps"
+
+msgid "保留最近 "
+msgstr "Keep last "
+
+msgid "保留最近 10 份"
+msgstr "Keep last 10 copies"
+
+msgid "堡垒机特权 Root 密码"
+msgstr "Bastion Privileged Root Password"
+
+msgid "备份镜像快照列表与还原"
+msgstr "Backup Snapshot Mirror List & Restore"
+
+msgid "备份任务名称 *"
+msgstr "Backup Task Name *"
+
+msgid "备忘与用途说明 (Notes)"
+msgstr "Notes & Description"
+
+msgid "备注说明"
+msgstr "Notes"
+
+msgid "备注说明与业务用途"
+msgstr "Notes & Business Purpose"
+
+msgid "背景壁纸与滚动轮播"
+msgstr "Wallpapers & Slideshow"
+
+msgid "背景磨砂壁纸模式 (Wallpaper & Acrylic)"
+msgstr "Wallpaper & Acrylic Frosted Glass Mode"
+
+msgid "本地"
+msgstr "Local"
+
+msgid "本地 (主目录)"
+msgstr "Local (Home)"
+
+msgid "本地 / 客户端"
+msgstr "Local / Client"
+
+msgid "本地 SOCKS5 网关监听端口 (Local Port)"
+msgstr "Local SOCKS5 Gateway Listen Port (Local Port)"
+
+msgid "本地、远端或动态 SOCKS5 端口转发与穿透"
+msgstr "Local, remote, or dynamic SOCKS5 port forwarding and tunneling"
+
+msgid "本地备份保存目录路径 *"
+msgstr "Local Backup Directory Path *"
+
+msgid "本地磁盘"
+msgstr "Local Disk"
+
+msgid "本地端口 (Local Port)"
+msgstr "Local Port"
+
+msgid "本地端应用 / 客户端"
+msgstr "Local Application / Client"
+
+msgid "本地工作目录 (Local Disk)"
+msgstr "Local Working Directory (Local Disk)"
+
+msgid "本地环境"
+msgstr "Local Environment"
+
+msgid "本地监听绑定 (Local Bind)"
+msgstr "Local Bind Address"
+
+msgid "本地监听地址 (Local Bind)"
+msgstr "Local Bind Address"
+
+msgid "本地监听端口 (Local Port)"
+msgstr "Local Listen Port (Local Port)"
+
+msgid "本地目标服务 (内网端)"
+msgstr "Local Target Service (Intranet)"
+
+msgid "本地目标服务端口 (Local Port)"
+msgstr "Local Target Service Port (Local Port)"
+
+msgid "本地目录"
+msgstr "Local Directory"
+
+msgid "本地凭据保险箱与主密码安全"
+msgstr "Local Credential Vault & Master Password Security"
+
+msgid "本地凭据加密主密码、F12 开发者调试控制台入口与运行时诊断日志级别"
+msgstr "Local credential encryption master password, F12 debug console toggle, and diagnostic logging"
+
+msgid "本地凭据主密码保护 (Master Password)"
+msgstr "Local Credentials Master Password Protection (Master Password)"
+
+msgid "本地全量加密备份/还原、多端容灾备份节点管理 (本地目录 / WebDAV / S3 / Gist / 自建服务) 与镜像版本回退"
+msgstr "Full local encrypted backup/restore, multi-node recovery (Local / WebDAV / S3 / Gist / Self-hosted), and version rollback"
+
+msgid "本地全量加密备份/还原、多端云同步 (WebDAV / Amazon S3 / GitHub Gist / 自建服务器) 与配置快照历史"
+msgstr "Local encrypted backup/restore, multi-backend cloud sync (WebDAV/S3/Gist/Custom) and snapshot history"
+
+msgid "本地全量加密备份与快速还原"
+msgstr "Local Encrypted Backup & Fast Restore"
+
+msgid "本地网络 / 出口网关"
+msgstr "Local Network / Egress Gateway"
+
+msgid "本地网络出口"
+msgstr "Local Network Egress"
+
+msgid "本地文件系统 (Local Filesystem)"
+msgstr "Local Filesystem"
+
+msgid "本地下载存储位置、远程初始目录与隐藏文件显隐过滤"
+msgstr "Local download dir, initial remote path, and hidden files filter"
+
+msgid "本地项: "
+msgstr "Local items: "
+
+msgid "本地正向 (-L)"
+msgstr "Local Forwarding (-L)"
+
+msgid "本地终端"
+msgstr "Local Terminal"
+
+msgid "本地终端不支持端口转发"
+msgstr "Local terminal does not support port forwarding"
+
+msgid "本地终端环境 (Local Shells)"
+msgstr "Local Shell Environments (Local Shells)"
+
+msgid "本地主密码保护、凭据保险箱、剪贴板自动清空、会话审计与开发者诊断"
+msgstr "Master password, credential vault, clipboard clearing, audit logs, and diagnostics"
+
+msgid "必填 · 支持标准 ECMAScript 正则"
+msgstr "Required · Supports standard ECMAScript regex"
+
+msgid "壁纸轮播切换策略 (Rotation Interval)"
+msgstr "Rotation Interval"
+
+msgid "壁纸轮播图库"
+msgstr "Wallpaper Gallery"
+
+msgid "壁纸模式弹窗底板不透明度 (Modal Opacity)"
+msgstr "Modal Opacity in Wallpaper Mode"
+
+msgid "壁纸磨砂不透明度 (Opacity)"
+msgstr "Wallpaper Frosted Opacity"
+
+msgid "壁纸切换动效 (Transition Effect)"
+msgstr "Transition Effect"
+
+msgid "壁纸图库画廊 (Wallpaper Gallery)"
+msgstr "Wallpaper Gallery"
+
+msgid "边框分割线 (border)"
+msgstr "Border Color (border)"
+
+msgid "边框与状态色 (Borders & Status Colors)"
+msgstr "Borders & Status Colors"
+
+msgid "编辑"
+msgstr "Edit"
+
+msgid "编辑 AI 端点端口与模型"
+msgstr "Edit AI Endpoint & Models"
+
+msgid "编辑备份容灾节点"
+msgstr "Edit Backup & Recovery Node"
+
+msgid "编辑出网代理配置"
+msgstr "Edit Outbound Proxy Config"
+
+msgid "编辑代码片段"
+msgstr "Edit Snippet"
+
+msgid "编辑端口转发规则"
+msgstr "Edit Port Forwarding Rule"
+
+msgid "编辑片段配置"
+msgstr "Edit Snippet Config"
+
+msgid "编辑任务配置"
+msgstr "Edit Forwarding Rule Config"
+
+msgid "编辑跳板机配置"
+msgstr "Edit Jump Host Config"
+
+msgid "编辑诊断高亮规则"
+msgstr "Edit Highlighting Rule"
+
+msgid "编辑中"
+msgstr "Editing"
+
+msgid "编辑主机"
+msgstr "Edit Host"
+
+msgid "编辑主机配置 (Edit Host)"
+msgstr "Edit Host Configuration"
+
+msgid "标准 OpenGL 加速"
+msgstr "Standard OpenGL Acceleration"
+
+msgid "标准间距 (spacing-medium)"
+msgstr "Medium Spacing (spacing-medium)"
+
+msgid "标准推荐 (Medium)"
+msgstr "Standard (Medium)"
+
+msgid "标准中圆角 (radius-medium)"
+msgstr "Medium Radius (radius-medium)"
+
+msgid "表面卡片底色 (surface_bg)"
+msgstr "Surface Background (surface_bg)"
+
+msgid "并发性能与带宽流量控制"
+msgstr "Concurrency & Bandwidth Limits"
+
+msgid "捕获通道: 开启"
+msgstr "Capture Channel: On"
+
+msgid "捕获通道: 暂停"
+msgstr "Capture Channel: Paused"
+
+msgid "不限速"
+msgstr "Unlimited"
+
+msgid "采集中"
+msgstr "Collecting..."
+
+msgid "操作"
+msgstr "Actions"
+
+msgid "操作分类"
+msgstr "Operations"
+
+msgid "操作提示与系统通知"
+msgstr "Notifications & Alerts"
+
+msgid "侧边面板底色 (panel_bg)"
+msgstr "Panel Background (panel_bg)"
+
+msgid "侧栏面板底色"
+msgstr "Sidebar Panel Background"
+
+msgid "侧栏面板底色 (panel-background)"
+msgstr "Sidebar Panel Background (panel-background)"
+
+msgid "测试连通性"
+msgstr "Test Connectivity"
+
+msgid "策略说明: 监听配置与主机资产修改事件，发生变更时自动实时触发增量同步"
+msgstr "Policy: Listen for config/host changes and trigger real-time sync"
+
+msgid "策略说明: 仅在设置中心手动点击「立即增量同步」时触发备份"
+msgstr "Policy: Trigger backup only when clicking 'Sync Incrementally Now' manually"
+
+msgid "策略说明: 每隔 1 小时自动进行增量备份与校验"
+msgstr "Policy: Automatically perform incremental backup and verification every hour"
+
+msgid "策略说明: 每天固定时间静默自动备份一次增量快照"
+msgstr "Policy: Silently create an incremental snapshot once a day at a set time"
+
+msgid "策略说明: 软件安全退出时自动生成并推送最新快照"
+msgstr "Policy: Automatically create and push snapshot upon graceful app exit"
+
+msgid "层级树形结构"
+msgstr "Hierarchical Tree"
+
+msgid "查看、检索并自定义高频终端操作、多窗格分屏、会话标签与开发者调试的快捷键位"
+msgstr "View, search, and customize shortcuts for terminal actions, split panes, tabs, and debugging"
+
+msgid "查看并自定义高频终端操作、多窗格分屏与命令面板的快捷操作"
+msgstr "View and customize shortcuts for terminal operations, pane splitting, and command palette"
+
+msgid "常规 (Normal)"
+msgstr "Normal"
+
+msgid "常规与认证"
+msgstr "General & Authentication"
+
+msgid "常用 Agent 快速预设 (点击一键填入管道路径)"
+msgstr "Common Agent Presets (click to autofill pipe path)"
+
+msgid "常用代码片段"
+msgstr "Command Snippets"
+
+msgid "常用代码片段库"
+msgstr "Snippets Library"
+
+msgid "常用预设:"
+msgstr "Common Presets:"
+
+msgid "常驻 (手动关闭)"
+msgstr "Permanent (Manual Close)"
+
+msgid "常驻后台"
+msgstr "Resident Background"
+
+msgid "常驻后台 (随客户端自启)"
+msgstr "Resident Background (Start with client)"
+
+msgid "常驻后台 (随应用自启)"
+msgstr "Resident Background (Start with app)"
+
+msgid "成功"
+msgstr "Success"
+
+msgid "成功/在线状态色"
+msgstr "Success / Online Status"
+
+msgid "成功/在线状态色 (success)"
+msgstr "Success / Online Status (success)"
+
+msgid "持久 (8.0 秒)"
+msgstr "Persistent (8.0s)"
+
+msgid "出网"
+msgstr "Outbound"
+
+msgid "出网代理池 (Proxy Server)"
+msgstr "Outbound Proxy Pool (Proxy Server)"
+
+msgid "出网代理资产 (供主机绑定)"
+msgstr "Outbound Proxy Assets (for host binding)"
+
+msgid "传输队列"
+msgstr "Transfer Queue"
+
+msgid "传输忽略规则黑名单 (Exclusion Patterns)"
+msgstr "Transfer Exclusion Patterns"
+
+msgid "传输进度"
+msgstr "Transfer Progress"
+
+msgid "传输进度与队列"
+msgstr "Transfers & Queue"
+
+msgid "传输时尽可能保留文件的原始 POSIX 读写执行权限与修改时间戳 (mtime/atime)"
+msgstr "Preserve original POSIX permissions and timestamps (mtime/atime) when transferring"
+
+msgid "传输速度"
+msgstr "Transfer Speed"
+
+msgid "传输引擎与冲突策略"
+msgstr "Transfer Engine & Conflict Policies"
+
+msgid "传输与文件管理"
+msgstr "Files & Transfer"
+
+msgid "传输中"
+msgstr "Transferring"
+
+msgid "窗格分屏"
+msgstr "Pane Split"
+
+msgid "窗口"
+msgstr "Window"
+
+msgid "窗口底色 (window_bg)"
+msgstr "Window Background (window_bg)"
+
+msgid "窗口生命周期与防误触"
+msgstr "Window Lifecycle & Protection"
+
+msgid "窗口始终置顶 (Always on Top)"
+msgstr "Always on Top"
+
+msgid "窗口最小化或退出时立即锁定 (Lock on Minimize)"
+msgstr "Lock Immediately on Minimize or Exit"
+
+msgid "创建"
+msgstr "Create"
+
+msgid "创建并保存规则"
+msgstr "Create & Save Rule"
+
+msgid "创建首个会话"
+msgstr "Create First Session"
+
+msgid "创建新的备份容灾节点"
+msgstr "Create Backup & Recovery Node"
+
+msgid "垂直拆分当前窗格"
+msgstr "Split Current Pane Vertically"
+
+msgid "垂直同步与刷新率"
+msgstr "V-Sync & Refresh Rate"
+
+msgid "纯静态中继资产。在主机配置中关联此跳板机后，SSH 会话将自动通过该跳板机穿透内网目标，支持密钥与密码透明跳板代理。"
+msgstr "Static relay asset. When linked in host config, SSH will transparently jump through it."
+
+msgid "纯人工"
+msgstr "Pure Manual"
+
+msgid "纯色无壁纸"
+msgstr "Solid Color (No Wallpaper)"
+
+msgid "磁盘空间 (/dev/sda1)"
+msgstr "Disk Space (/dev/sda1)"
+
+msgid "此文件夹可容纳多个脚本片段与子文件夹。您可从左侧树形列表中直接拖拽代码片段移入此文件夹进行归类。"
+msgstr "This folder holds snippets and subfolders. Drag and drop snippets from left tree to categorize."
+
+msgid "次"
+msgstr "times"
+
+msgid "次像素排版抗锯齿"
+msgstr "Subpixel Typography Anti-aliasing"
+
+msgid "次要文本色 (secondary_fg)"
+msgstr "Secondary Foreground (secondary_fg)"
+
+msgid "次要文本颜色"
+msgstr "Secondary Foreground"
+
+msgid "次要文本颜色 (secondary-foreground)"
+msgstr "Secondary Foreground (secondary-foreground)"
+
+msgid "从本地加密备份包还原资产 (Restore Backup)"
+msgstr "Restore Assets from Encrypted Backup Package"
+
+msgid "从不"
+msgstr "Never"
+
+msgid "从列表中移除"
+msgstr "Remove from List"
+
+msgid "从凭据库或终端复制密码/私钥 30 秒后自动清空系统剪贴板，防止恶意窥探"
+msgstr "Automatically clear system clipboard 30 seconds after copying passwords or private keys"
+
+msgid "从容 (5.0 秒)"
+msgstr "Relaxed (5.0s)"
+
+msgid "从外部工具一键导入"
+msgstr "Import from External Tools"
+
+msgid "从未执行"
+msgstr "Never executed"
+
+msgid "从已保存的主机资产中挑选一台作为跳板节点，添加到链路末尾："
+msgstr "Pick a saved host as a jump node and add it to the end of the chain:"
+
+msgid "从远程 SFTP 下载文件时默认保存的本地文件夹路径 (支持直接输入路径或点击浏览选择)"
+msgstr "Default local destination when downloading files via SFTP"
+
+msgid "从远端拉取覆盖"
+msgstr "Pull Remote & Overwrite"
+
+msgid "存储协议类型 *"
+msgstr "Storage Protocol *"
+
+msgid "存储与交换空间 (多分区阵列)"
+msgstr "Storage & Disks (Multi-partition)"
+
+msgid "错误"
+msgstr "Error"
+
+msgid "错误/危险状态色"
+msgstr "Danger / Error Status"
+
+msgid "错误/危险状态色 (danger)"
+msgstr "Danger / Error Status (danger)"
+
+msgid "打包所有资产与偏好设置，数据经客户端端到端高强度加密保护 (点击后选择保存目录)"
+msgstr "Package all assets and preferences with end-to-end encryption (select destination folder)"
+
+msgid "打开 / 下载"
+msgstr "Open / Download"
+
+msgid "打开 SFTP 传输"
+msgstr "Open SFTP Transfer"
+
+msgid "打开偏好设置中心"
+msgstr "Open Preferences Center"
+
+msgid "打开文件"
+msgstr "Open File"
+
+msgid "大版块间距 (spacing-large)"
+msgstr "Large Spacing (spacing-large)"
+
+msgid "大规模批量造数与压测"
+msgstr "Massive Mock Generation & Stress Testing"
+
+msgid "大文件断点续传支持 (Resume Interrupted Transfers)"
+msgstr "Resume Interrupted Transfers"
+
+msgid "大小"
+msgstr "Size"
+
+msgid "大圆角 (radius-large)"
+msgstr "Large Radius (radius-large)"
+
+msgid "代理"
+msgstr "Proxy"
+
+msgid "代理池"
+msgstr "Proxy Pool"
+
+msgid "代理端口 (Port):"
+msgstr "Proxy Port:"
+
+msgid "代理服务端口 (Port)"
+msgstr "Proxy Service Port (Port)"
+
+msgid "代理服务器地址 (Host / IP):"
+msgstr "Proxy Server Address (Host / IP):"
+
+msgid "代理服务器地址 (IP 或域名)"
+msgstr "Proxy Server Address (IP or Domain)"
+
+msgid "代理服务器身份认证访问密码"
+msgstr "Proxy server password"
+
+msgid "代理服务器身份认证用户名"
+msgstr "Proxy server username"
+
+msgid "代理密码 (Proxy Password)"
+msgstr "Proxy Password"
+
+msgid "代理身份认证 (Proxy Authentication)"
+msgstr "Proxy Authentication"
+
+msgid "代理协议类型"
+msgstr "Proxy Protocol Type"
+
+msgid "代理用户名 (Proxy Username)"
+msgstr "Proxy Username"
+
+msgid "代理资产描述名称"
+msgstr "Proxy Asset Description Name"
+
+msgid "代码片段"
+msgstr "Snippets"
+
+msgid "代码片段调试"
+msgstr "Snippets"
+
+msgid "代码片段库"
+msgstr "Snippets Library"
+
+msgid "代码片段名称 (Title)"
+msgstr "Snippet Title"
+
+msgid "代码片段树形视图"
+msgstr "Snippets Tree View"
+
+msgid "代码片段总数: "
+msgstr "Total Snippets: "
+
+msgid "待机功耗: ~0.0% CPU"
+msgstr "Standby Power: ~0.0% CPU"
+
+msgid "待命中"
+msgstr "Standby"
+
+msgid "待审核"
+msgstr "Pending Review"
+
+msgid "待填写"
+msgstr "Pending"
+
+msgid "单任务上传速率限制 (Upload Speed Limit)"
+msgstr "Upload Speed Limit"
+
+msgid "单任务下载速率限制 (Download Speed Limit)"
+msgstr "Download Speed Limit"
+
+msgid "单位: 次"
+msgstr "Unit: times"
+
+msgid "单位: 秒"
+msgstr "Unit: s"
+
+msgid "单位: Token"
+msgstr "Unit: Tokens"
+
+msgid "单项增删改与状态治理"
+msgstr "Single Item CRUD & Status Governance"
+
+msgid "单张固定"
+msgstr "Static"
+
+msgid "当打开调试面板时实时保持最新日志自动滚动置底"
+msgstr "Keep latest logs automatically scrolled to bottom when debug panel is open"
+
+msgid "当后台存在未断开的 SSH 或本地终端会话时，点击窗口关闭按钮或按 Alt+F4 弹出防误触提示"
+msgstr "Prompt when closing window or pressing Alt+F4 with active SSH or terminal sessions"
+
+msgid "当后台存在未断开的 SSH 或本地终端会话时，点击关闭按钮前弹出安全确认对话框"
+msgstr "Prompt for confirmation before closing if active SSH or local terminal sessions exist"
+
+msgid "当客户端处于闲置无操作状态达设定时间后，自动锁定凭据保险箱"
+msgstr "Auto-lock credential vault when the client is idle for the specified duration"
+
+msgid "当目标目录已存在同名文件时的默认处理规则"
+msgstr "Default behavior when target destination already contains a file with the same name"
+
+msgid "当前: 顶级根目录"
+msgstr "Current: Top-level Root"
+
+msgid "当前: 浅色模式"
+msgstr "Current: Light Mode"
+
+msgid "当前: 深色模式"
+msgstr "Current: Dark Mode"
+
+msgid "当前: 子分组"
+msgstr "Current: Subgroup"
+
+msgid "当前激活"
+msgstr "Currently Active"
+
+msgid "当前激活: "
+msgstr "Active: "
+
+msgid "当前旧密码:"
+msgstr "Current Password:"
+
+msgid "当前列表中未检索到任何记录"
+msgstr "No matching records found in list"
+
+msgid "当前仍有活跃的终端或 SSH 会话正在运行。强行退出将导致远程任务与网络隧道中断，确定要退出吗？"
+msgstr "Active terminal or SSH sessions are running. Forcing exit will disconnect remote tasks and tunnels. Confirm exit?"
+
+msgid "当前未配置跳板机链路 (目标主机采用直连模式)"
+msgstr "No jump host chain configured (Target host uses direct connection)"
+
+msgid "当前应用"
+msgstr "Applied"
+
+msgid "当前映射按键:"
+msgstr "Currently Mapped Key:"
+
+msgid "当前展开可见数:"
+msgstr "Currently Expanded Visible Count:"
+
+msgid "当前主机"
+msgstr "Current Host"
+
+msgid "当前主机暂无专属端口转发规则"
+msgstr "No forwarding rules configured for current host"
+
+msgid "当前主机直接发起 TCP 建立 SSH 握手，不经过任何外部代理。多跳中继请在【跳板机链路】中配置。"
+msgstr "Direct TCP connection without external proxy. Multi-hop relays can be configured in Jump Host Chain."
+
+msgid "当前状态"
+msgstr "Current Status"
+
+msgid "当网络闪断或链路重置时，自动以指数退避算法 (1s, 2s, 4s, 8s...) 尝试静默重连"
+msgstr "Automatically attempt silent reconnect using exponential backoff (1s, 2s, 4s, 8s...) on link resets"
+
+msgid "当终端接收到 ASCII Bell (\\\\a) 时的响应模式"
+msgstr "Response mode when terminal receives an ASCII Bell (\\\\a)"
+
+msgid "导出备份文件..."
+msgstr "Export Backup File..."
+
+msgid "导出当前"
+msgstr "Export Current"
+
+msgid "导出的 SSH 公钥 (可配置于目标机器 authorized_keys)"
+msgstr "Exported SSH Public Key (for target authorized_keys)"
+
+msgid "导出或导入所有主机资产、分组层级树、凭据保管箱、常用代码片段与网络隧道规则"
+msgstr "Export or import all hosts, group trees, credentials, snippets, and tunnel rules"
+
+msgid "导出全量加密备份文件 (.smalux / .json)"
+msgstr "Export Full Encrypted Backup (.smalux / .json)"
+
+msgid "导出完整加密备份包 (.toml)"
+msgstr "Export full encrypted backup archive (.toml)"
+
+msgid "导出完整加密备份包、从系统 OpenSSH 与第三方终端工具一键导入资产、管理本地配置历史快照"
+msgstr "Export encrypted backup archive, import assets from OpenSSH and third-party tools, and manage snapshots"
+
+msgid "导航"
+msgstr "Navigation"
+
+msgid "导入 Termius / Xshell 资产"
+msgstr "Import Termius / Xshell assets"
+
+msgid "导入系统 ~/.ssh/config 主机"
+msgstr "Import hosts from ~/.ssh/config"
+
+msgid "导入整个文件夹"
+msgstr "Import Folder"
+
+msgid "导入主题"
+msgstr "Import Theme"
+
+msgid "登录操作系统时自动启动客户端，方便后台网络隧道与端口转发无缝就绪"
+msgstr "Automatically launch the client upon logging into the OS to keep tunnels and sessions ready"
+
+msgid "登录初始工作目录 (Initial Directory):"
+msgstr "Initial Directory:"
+
+msgid "登录后自动敲入脚本 (Startup Command):"
+msgstr "Startup Command:"
+
+msgid "登录密码"
+msgstr "Login Password"
+
+msgid "登录密码 *"
+msgstr "Login Password *"
+
+msgid "登录密码:"
+msgstr "Password:"
+
+msgid "登录用户名:"
+msgstr "Username:"
+
+msgid "等宽字体: JetBrains Mono / Fira Code"
+msgstr "Monospace: JetBrains Mono / Fira Code"
+
+msgid "等宽字体与排版字号"
+msgstr "Monospace Fonts & Typography"
+
+msgid "等宽字体族 (Font Family)"
+msgstr "Monospace Font Family"
+
+msgid "点击按键徽章或编辑按钮可直接录制新按键；支持冲突检测与随时单项/全局恢复默认"
+msgstr "Click key badge or edit button to record new shortcut; supports conflict detection"
+
+msgid "点击窗口关闭按钮时行为"
+msgstr "Close Window Button Action"
+
+msgid "点击从网络与隧道中心选择已有代理通道..."
+msgstr "Click to select existing proxy channel from Tunnel Hub..."
+
+msgid "点击即时热生效，可预览背景色、前景色、强调色及表面调色板"
+msgstr "Click for instant preview of background, foreground, accent, and surface palette"
+
+msgid "点击可更换归属文件夹"
+msgstr "Click to change folder"
+
+msgid "点击选择关联的 SSH 宿主主机..."
+msgstr "Click to select associated SSH host..."
+
+msgid "点击右上角 + 创建新片段或文件夹"
+msgstr "Click + in top right to create a snippet or folder"
+
+msgid "点击右上角 + 新建会话，或在终端中运行 tmux new -s <name>"
+msgstr "Click + in top right to create session, or run tmux new -s <name> in terminal"
+
+msgid "点击右上角「添加端点端口」即可配置官方 API、代理端口或本地私有模型"
+msgstr "Click 'Add Endpoint' in top right to configure official API, proxy port, or local models"
+
+msgid "点击右上角「新建备份任务」创建本地文件夹同步或云端 WebDAV / S3 / Gist 存储"
+msgstr "Click 'New Backup Task' in top right to create local or cloud WebDAV/S3/Gist storage"
+
+msgid "点击右上角『添加跳板节点 / 预设串』可添加已有主机节点或直接引用隧道中心预设链路"
+msgstr "Click 'Add Jump Node / Preset Chain' above to add host nodes or link presets"
+
+msgid "点击右上开关开启"
+msgstr "Click top right switch to enable"
+
+msgid "调度与保留策略"
+msgstr "Schedule & Retention Policy"
+
+msgid "调节背景壁纸透光度 (推荐 15% ~ 25%，过高可能影响终端可读性)"
+msgstr "Adjust background opacity (recommended 15%-25%; higher may affect readability)"
+
+msgid "调节背景壁纸透光度 (支持鼠标滑块任意拖动、直接键入数值或步进微调)"
+msgstr "Adjust background wallpaper opacity (slider, text input, or step tuning)"
+
+msgid "定位到该文件"
+msgstr "Locate File"
+
+msgid "动态代理"
+msgstr "Dynamic Proxy"
+
+msgid "动态网关 (-D)"
+msgstr "Dynamic Gateway (-D)"
+
+msgid "动态转发 (-D)"
+msgstr "Dynamic Forwarding (-D)"
+
+msgid "独占全屏最大化当前窗格"
+msgstr "Maximize Current Pane to Fullscreen"
+
+msgid "端到端加密与自动同步策略"
+msgstr "End-to-End Encryption & Auto Sync Schedule"
+
+msgid "端到端客户端加密口令 (E2EE Master Key)"
+msgstr "End-to-End Client Encryption Master Key (E2EE)"
+
+msgid "端点名称"
+msgstr "Endpoint Name"
+
+msgid "端口:"
+msgstr "Port:"
+
+msgid "端口转发"
+msgstr "Port Forwarding"
+
+msgid "端口转发 (本地终端不支持使用)"
+msgstr "Port Forwarding (Unavailable for local terminal)"
+
+msgid "端口转发 (Port Forwarding)"
+msgstr "Port Forwarding"
+
+msgid "端口转发工作模式"
+msgstr "Forwarding Mode"
+
+msgid "端口转发与隧道"
+msgstr "Port Forwarding & Tunnels"
+
+msgid "端口转发专用于远程 SSH 隧道网络端口映射。\\n当前终端为本机系统环境，无需建立网络端口转发。"
+msgstr "Port forwarding is dedicated to remote SSH tunnels.\nCurrent terminal is local; port forwarding is not required."
+
+msgid "断开并关闭"
+msgstr "Disconnect & Close"
+
+msgid "断线自动重连"
+msgstr "Auto Reconnect on Disconnect"
+
+msgid "多端多协议云同步矩阵 (Cloud Sync Matrix)"
+msgstr "Multi-Backend Cloud Sync Matrix"
+
+msgid "多级 ProxyJump 穿透链路 (从上至下严格有序):"
+msgstr "Multi-tier ProxyJump Chain (Strict top-to-bottom order):"
+
+msgid "多任务并行工作协程数与单任务上下行传输速率限制"
+msgstr "Concurrent worker threads and single-task bandwidth rate limits"
+
+msgid "多文件批量上传与下载时的并行工作协程数 (范围 1 ~ 16，默认 4)"
+msgstr "Parallel workers for multi-file transfers (1-16, default 4)"
+
+msgid "发起连接"
+msgstr "Connect"
+
+msgid "反向动态 (-R)"
+msgstr "Reverse Dynamic (-R)"
+
+msgid "反向隧道"
+msgstr "Reverse Tunnel"
+
+msgid "返回终端 (ESC)"
+msgstr "Back to Terminal (ESC)"
+
+msgid "返回终端视口"
+msgstr "Back to Terminal Viewport"
+
+msgid "方块 █"
+msgstr "Block █"
+
+msgid "防花屏/低发热/兼容"
+msgstr "Anti-glitch/Cool/Compatible"
+
+msgid "防止意外在生产服务器直接执行复制进来的换行危险命令"
+msgstr "Prevent accidental execution of dangerous multi-line commands on production servers"
+
+msgid "防止针对 SSH 连接的中间人嗅探攻击 (MITM)；未知或指纹变更的主机将触发安全警告"
+msgstr "Guard against MITM attacks on SSH; unknown or changed fingerprints trigger security warnings"
+
+msgid "放弃"
+msgstr "Abandon"
+
+msgid "放行常规启停修改，仅高危破坏指令需确认"
+msgstr "Allow routine commands; require confirmation only for destructive actions"
+
+msgid "放行执行"
+msgstr "Approve & Execute"
+
+msgid "分"
+msgstr "min"
+
+msgid "分屏"
+msgstr "Split Screen"
+
+msgid "分钟"
+msgstr "Minutes"
+
+msgid "分组路径 (支持 / 嵌套，如 生产/k8s):"
+msgstr "Group Path (supports /, e.g. Prod/k8s):"
+
+msgid "份"
+msgstr "copies"
+
+msgid "峰值 22.4 MB/s"
+msgstr "Peak 22.4 MB/s"
+
+msgid "峰值 68%"
+msgstr "Peak 68%"
+
+msgid "服务器 URL / Endpoint / Bucket *"
+msgstr "Server URL / Endpoint / Bucket *"
+
+msgid "辅助运维"
+msgstr "Operations Assistance"
+
+msgid "负载: "
+msgstr "Load: "
+
+msgid "复古 CRT 扫描线显像管着色器 (Retro CRT Shader)"
+msgstr "Retro CRT Scanline Shader"
+
+msgid "复制"
+msgstr "Copy"
+
+msgid "复制 IP"
+msgstr "Copy IP"
+
+msgid "复制 ProxyJump 命令"
+msgstr "Copy ProxyJump Command"
+
+msgid "复制 SSH 命令"
+msgstr "Copy SSH Command"
+
+msgid "复制参数"
+msgstr "Copy Arguments"
+
+msgid "复制成功"
+msgstr "Copied"
+
+msgid "复制代理连接串"
+msgstr "Copy Proxy Connection String"
+
+msgid "复制公钥"
+msgstr "Copy Public Key"
+
+msgid "复制管道"
+msgstr "Copy Pipe"
+
+msgid "复制脚本指令"
+msgstr "Copy Command"
+
+msgid "复制快照"
+msgstr "Copy Snapshot"
+
+msgid "复制密码"
+msgstr "Copy Password"
+
+msgid "复制私钥"
+msgstr "Copy Private Key"
+
+msgid "复制完整路径"
+msgstr "Copy Full Path"
+
+msgid "复制文件路径"
+msgstr "Copy File Path"
+
+msgid "复制选中文本"
+msgstr "Copy Selected Text"
+
+msgid "复制主机地址"
+msgstr "Copy Host Address"
+
+msgid "覆盖 (overwrite)"
+msgstr "Overwrite (overwrite)"
+
+msgid "覆盖并生成"
+msgstr "Overwrite & Generate"
+
+msgid "覆盖现有数据 (未勾选则为追加模式)"
+msgstr "Overwrite existing data (append if unchecked)"
+
+msgid "该会话在建立快照机制前断开，或会话执行过程中未产生屏幕文本输出"
+msgstr "Session disconnected before snapshot or produced no terminal output"
+
+msgid "高级参数设置 (超时 / 上下文 / 重试 / 自定义请求头)"
+msgstr "Advanced Parameters (Timeout / Context / Retries / Headers)"
+
+msgid "高级与终端"
+msgstr "Advanced & Terminal"
+
+msgid "高亮色彩"
+msgstr "Highlight Color"
+
+msgid "高亮色彩 (Highlight Color)"
+msgstr "Highlight Color"
+
+msgid "高亮色彩取色器 · 色相圆盘"
+msgstr "Highlight Color Picker · Hue Wheel"
+
+msgid "高危操作审核"
+msgstr "High-Risk Operation Audit"
+
+msgid "高危破坏性指令执行预警 (Dangerous Command Warning)"
+msgstr "Dangerous Destructive Command Warning"
+
+msgid "告警提示"
+msgstr "Warning Alert"
+
+msgid "告警提示与注意"
+msgstr "Warnings & Notices"
+
+msgid "格式支持 socks5://127.0.0.1:7890 或 http://127.0.0.1:7890"
+msgstr "Supports socks5://127.0.0.1:7890 or http://127.0.0.1:7890"
+
+msgid "个"
+msgstr "items"
+
+msgid "个 TCP 会话"
+msgstr "TCP sessions"
+
+msgid "个版本"
+msgstr "versions"
+
+msgid "个传输任务进行中 - 点击展开"
+msgstr "transfer tasks in progress - click to expand"
+
+msgid "个端点"
+msgstr "endpoints"
+
+msgid "个挂载点"
+msgstr "mountpoints"
+
+msgid "个节点"
+msgstr "nodes"
+
+msgid "个全量矢量资产"
+msgstr "full vector assets"
+
+msgid "个任务"
+msgstr "tasks"
+
+msgid "个性化定制客户端主视觉、配色方案、界面全局字体与背景毛玻璃壁纸"
+msgstr "Personalize client visuals, color palette, global font, and frosted glass wallpaper"
+
+msgid "个性化定制客户端主视觉、终端 ANSI 调色板与背景毛玻璃壁纸"
+msgstr "Customize UI aesthetic, terminal ANSI palette, and acrylic wallpaper"
+
+msgid "个性化定制客户端主视觉与终端 ANSI 调色板，支持自定义创建、导入与导出"
+msgstr "Personalize client visuals and terminal ANSI palettes, supporting custom creation, import, and export"
+
+msgid "根目录 (顶级)"
+msgstr "Root (Top-level)"
+
+msgid "根目录 (顶级文件夹)"
+msgstr "Root (Top-level Folder)"
+
+msgid "根目录 (顶级主机)"
+msgstr "Root (Top-level Hosts)"
+
+msgid "根目录 (作为顶级分组)"
+msgstr "Root (As Top-level Group)"
+
+msgid "跟随系统代理"
+msgstr "Follow System Proxy"
+
+msgid "更改 >"
+msgstr "Change >"
+
+msgid "更改分组 ▼"
+msgstr "Change Group ▼"
+
+msgid "更改凭据 ▼"
+msgstr "Change Credential ▼"
+
+msgid "更换代理"
+msgstr "Change Proxy"
+
+msgid "更换预设串"
+msgstr "Change Preset"
+
+msgid "更新于 "
+msgstr "Updated at "
+
+msgid "更早"
+msgstr "Earlier"
+
+msgid "公网入站"
+msgstr "Public Inbound"
+
+msgid "公钥指纹 (SHA256)"
+msgstr "Public Key Fingerprint (SHA256)"
+
+msgid "公钥指纹已复制至剪贴板"
+msgstr "Public key fingerprint copied to clipboard"
+
+msgid "共 "
+msgstr "Total "
+
+msgid "关闭"
+msgstr "Close"
+
+msgid "关闭 (Fast)"
+msgstr "Fast (Off)"
+
+msgid "关闭当前标签页"
+msgstr "Close Current Tab"
+
+msgid "关闭当前聚焦窗格"
+msgstr "Close Current Focused Pane"
+
+msgid "关闭规则"
+msgstr "Disable Rule"
+
+msgid "关闭含活跃会话窗口时确认"
+msgstr "Confirm Before Closing Active Sessions"
+
+msgid "关闭会话标签页时二次确认 (Confirm Closing Tab)"
+msgstr "Confirm Closing Session Tabs"
+
+msgid "关闭会话标签页时确认 (Confirm Closing Tab)"
+msgstr "Confirm Before Closing Tab"
+
+msgid "关闭其他会话"
+msgstr "Close Other Sessions"
+
+msgid "关闭思考 (Disabled)"
+msgstr "Disable Reasoning (Disabled)"
+
+msgid "关闭正在运行的远程 SSH 或本地终端标签页前弹出安全确认，防止手滑误断开"
+msgstr "Prompt for confirmation before closing active SSH or local terminal tabs to prevent accidental closure"
+
+msgid "关闭主窗口时最小化到系统托盘，持续保持后台网络隧道与 SSH 会话不掉线"
+msgstr "Minimize to system tray on close to keep SSH sessions and tunnels alive"
+
+msgid "关联 SSH 宿主主机"
+msgstr "Associated SSH Host"
+
+msgid "官方浅色日间主题 (Light Day Themes)"
+msgstr "Official Light Day Themes"
+
+msgid "官方深色夜间主题 (Dark Night Themes)"
+msgstr "Official Dark Night Themes"
+
+msgid "管道: "
+msgstr "Pipe: "
+
+msgid "管理多服务商 API 端点端口与模型库、配置全局操作安全审查与专家提示词"
+msgstr "Manage provider API endpoints, models, security review, and expert system prompts"
+
+msgid "管理远程 SFTP 浏览器下载路径、文件传输冲突策略、并发协程与外部编辑器"
+msgstr "Manage remote SFTP download paths, conflict policies, concurrency, and external editors"
+
+msgid "光标交互、回滚与告警"
+msgstr "Cursor Interaction, Scrollback & Bell"
+
+msgid "光标视觉样式、历史输出回滚行数与终端蜂鸣提醒"
+msgstr "Cursor visual style, scrollback buffer lines, and terminal bell alerts"
+
+msgid "归属分组路径 (支持 / 嵌套):"
+msgstr "Group Path (supports /):"
+
+msgid "归属分组路径:"
+msgstr "Group Path:"
+
+msgid "规则备注说明"
+msgstr "Rule Remarks"
+
+msgid "规则备注说明 (Remark)"
+msgstr "Rule Remarks (Remark)"
+
+msgid "规则别名 (Name)"
+msgstr "Rule Alias (Name)"
+
+msgid "规则描述名称"
+msgstr "Rule Description Name"
+
+msgid "规则审核 (确定性级别硬过滤)"
+msgstr "Rule-based Review (Strict Hard Filter)"
+
+msgid "国际化语言环境与底层 GPU 硬件加速光栅化管线"
+msgstr "Language & GPU Hardware Accelerated Pipeline"
+
+msgid "过滤全局 tracing 诊断日志输出阈值 (默认建议设置为 INFO，排查问题时可设为 DEBUG)"
+msgstr "Filter tracing diagnostic log output threshold (INFO recommended; use DEBUG for issues)"
+
+msgid "合成命令预览:"
+msgstr "Rendered Command Preview:"
+
+msgid "核心设置状态实时探针 (Settings Live Inspector)"
+msgstr "Settings Live Inspector"
+
+msgid "核心主前景色"
+msgstr "Primary Foreground"
+
+msgid "核心主前景色 (foreground)"
+msgstr "Primary Foreground (foreground)"
+
+msgid "横向分屏"
+msgstr "Split Horizontally"
+
+msgid "后台持久保活"
+msgstr "Persistent Background Keepalive"
+
+msgid "呼出全局命令调色板"
+msgstr "Open Global Command Palette"
+
+msgid "划词自动复制到剪贴板 (Copy on Select)"
+msgstr "Copy on Select"
+
+msgid "画质与运行指标 (Quality & Telemetry)"
+msgstr "Quality & Telemetry Metrics"
+
+msgid "恢复出厂默认设置"
+msgstr "Restore Factory Defaults"
+
+msgid "恢复初始 (3台)"
+msgstr "Reset to Initial (3 Hosts)"
+
+msgid "恢复默认"
+msgstr "Restore Default"
+
+msgid "恢复默认精选片段"
+msgstr "Reset to Default Curated Snippets"
+
+msgid "恢复默认精选预设"
+msgstr "Reset to Default Curated Presets"
+
+msgid "恢复默认偏好"
+msgstr "Restore Default Preferences"
+
+msgid "恢复默认预设"
+msgstr "Reset to Default Presets"
+
+msgid "恢复推荐默认"
+msgstr "Restore Recommended Defaults"
+
+msgid "会话"
+msgstr "Sessions"
+
+msgid "会话备忘笔记"
+msgstr "Session Notes"
+
+msgid "会话标签"
+msgstr "Session Tabs"
+
+msgid "会话操作安全审计日志 (Session Audit Logging)"
+msgstr "Session Security Audit Logging"
+
+msgid "会话历史详情与终端快照"
+msgstr "Session History Details & Terminal Snapshot"
+
+msgid "会话名称 (Session Name)"
+msgstr "Session Name"
+
+msgid "混合类型"
+msgstr "Mixed Types"
+
+msgid "混合随机"
+msgstr "Mixed Random"
+
+msgid "活跃客户端连接"
+msgstr "Active Client Connections"
+
+msgid "活跃连接"
+msgstr "active connections"
+
+msgid "活跃连接中"
+msgstr "Actively Connected"
+
+msgid "活跃配色主题"
+msgstr "Active Theme"
+
+msgid "活跃配色主题:"
+msgstr "Active Theme:"
+
+msgid "活跃中"
+msgstr "Active"
+
+msgid "基础层次底色 (Background Colors)"
+msgstr "Background Colors"
+
+msgid "基础连接信息"
+msgstr "Basic Connection Info"
+
+msgid "基础描边线宽 (border-width)"
+msgstr "Base Border Width (border-width)"
+
+msgid "基于 Skia 图形引擎的渲染管线 (切换需重启客户端生效)"
+msgstr "Graphics pipeline powered by Skia (Requires restart to take effect)"
+
+msgid "级联跳板主机顺序 (ProxyJump Chain)"
+msgstr "Jump Host Cascade Order (ProxyJump Chain)"
+
+msgid "级跳板中继"
+msgstr "hops relay"
+
+msgid "极简轻量兼容模式"
+msgstr "Minimal Lightweight Mode"
+
+msgid "极客全开压测模式"
+msgstr "Geek Mode (All Features On)"
+
+msgid "集群/核心库"
+msgstr "Cluster/Core-DB"
+
+msgid "集群/k8s"
+msgstr "Cluster/k8s"
+
+msgid "几何尺寸与排版规范 (Metrics [px])"
+msgstr "Metrics & Layout Specification [px]"
+
+msgid "记录所有远程 SSH 主机连接足迹 · 点击卡片操作项可查看会话快照详情或直接发起重连"
+msgstr "Record all SSH connection history; view snapshot details or reconnect directly"
+
+msgid "记录主机硬件配置、日常维护人、业务负责人或常用端口说明..."
+msgstr "Record hardware specs, maintainer, owner, or port details..."
+
+msgid "继承基底 (Base Theme)"
+msgstr "Base Theme"
+
+msgid "继续传输"
+msgstr "Resume Transfer"
+
+msgid "继续使用"
+msgstr "Continue Using"
+
+msgid "加入链路"
+msgstr "Add to Chain"
+
+msgid "兼容遗留设备老旧加密算法 (Legacy Ciphers Fallback)"
+msgstr "Legacy Ciphers Fallback"
+
+msgid "监听中"
+msgstr "Listening"
+
+msgid "剪贴板与操作安全防护"
+msgstr "Clipboard & Operation Safety Guard"
+
+msgid "剪贴板与会话安全"
+msgstr "Clipboard & Session Security"
+
+msgid "检测到动态参数:"
+msgstr "Dynamic Parameters Detected:"
+
+msgid "建立 SFTP 会话时初始打开的远程路径 (如 ~ 用户主目录或 / 根路径)"
+msgstr "Default remote path opened when starting SFTP (e.g., ~ or /)"
+
+msgid "将客户端最小化到系统托盘或切出后台时立即清除内存派生密钥"
+msgstr "Immediately purge derived keys from memory when minimized to system tray or background"
+
+msgid "交换空间 (Swap)"
+msgstr "Swap Space"
+
+msgid "脚本/指令内容 (Command & Script)"
+msgstr "Command & Script Content"
+
+msgid "脚本代码"
+msgstr "Script Code"
+
+msgid "脚本命令:"
+msgstr "Script Command:"
+
+msgid "接口地址 (Base URL)"
+msgstr "Base URL"
+
+msgid "节点「"
+msgstr "Node \""
+
+msgid "解除引用"
+msgstr "Unlink"
+
+msgid "界面排版与全局字体"
+msgstr "Typography & Global Fonts"
+
+msgid "界面全局字体族 (UI Font Family)"
+msgstr "UI Font Family"
+
+msgid "界面显示与图形渲染引擎"
+msgstr "Display & Graphics Engine"
+
+msgid "界面显示语言 (Language)"
+msgstr "UI Display Language (Language)"
+
+msgid "今天"
+msgstr "Today"
+
+msgid "仅手动同步"
+msgstr "Manual Sync Only"
+
+msgid "仅限已知主机 (yes)"
+msgstr "Known Hosts Only (yes)"
+
+msgid "仅终端视口透底"
+msgstr "Terminal Viewport Only"
+
+msgid "仅终端透底"
+msgstr "Terminal Only"
+
+msgid "紧凑间距 (spacing-small)"
+msgstr "Small Spacing (spacing-small)"
+
+msgid "紧凑微圆角 (radius-small)"
+msgstr "Small Radius (radius-small)"
+
+msgid "进程名称"
+msgstr "Process Name"
+
+msgid "进程资源统计"
+msgstr "Process Resource Statistics"
+
+msgid "进入"
+msgstr "Enter"
+
+msgid "进入目录"
+msgstr "Enter Directory"
+
+msgid "进入网络与隧道管理中心"
+msgstr "Go to Network & Tunnels Hub"
+
+msgid "进入网络与隧道管理中心 ➔"
+msgstr "Go to Network & Tunnels Hub ➔"
+
+msgid "进行中"
+msgstr "In Progress"
+
+msgid "禁用 Nagle 延迟算法 (TCP_NODELAY)"
+msgstr "Disable Nagle Algorithm (TCP_NODELAY)"
+
+msgid "禁用弱化文本"
+msgstr "Disabled Foreground"
+
+msgid "禁用弱化文本 (disabled-foreground)"
+msgstr "Disabled Foreground (disabled-foreground)"
+
+msgid "禁止"
+msgstr "Forbidden"
+
+msgid "警告"
+msgstr "Warning"
+
+msgid "警告提示状态色"
+msgstr "Warning Status Color"
+
+msgid "警告提示状态色 (warning)"
+msgstr "Warning Status Color (warning)"
+
+msgid "静态出网代理配置 (SOCKS5 / HTTP / HTTPS)"
+msgstr "Static Outbound Proxy Config (SOCKS5 / HTTP / HTTPS)"
+
+msgid "静态打包图标总数:"
+msgstr "Static Packaged Icons Total:"
+
+msgid "静音关闭 (None)"
+msgstr "Mute (None)"
+
+msgid "镜像创建时间"
+msgstr "Snapshot Created Time"
+
+msgid "镜像数量"
+msgstr "Snapshots"
+
+msgid "就绪"
+msgstr "Ready"
+
+msgid "局部增量重绘 (Damage)"
+msgstr "Partial Repaint (Damage Tracking)"
+
+msgid "聚焦高亮边框"
+msgstr "Focus Highlight Border"
+
+msgid "聚焦高亮边框 (focus-border)"
+msgstr "Focus Highlight Border (focus-border)"
+
+msgid "卡片表面底色"
+msgstr "Card Surface Background"
+
+msgid "卡片表面底色 (surface-background)"
+msgstr "Card Surface Background (surface-background)"
+
+msgid "开发者调试"
+msgstr "Developer Debug"
+
+msgid "开发者调试工作台 (Workbench)"
+msgstr "Developer Debug Workbench"
+
+msgid "开发者调试控制台"
+msgstr "Developer Debug Console"
+
+msgid "开发者调试控制台 (Developer Debug Panel)"
+msgstr "Developer Debug Console (Developer Debug Panel)"
+
+msgid "开发者控制台与底层诊断"
+msgstr "Developer Console & Low-level Diagnostics"
+
+msgid "开机随系统自动启动 (Launch on Boot)"
+msgstr "Launch on System Startup"
+
+msgid "开启 (Always)"
+msgstr "Enabled (Always)"
+
+msgid "开启 (Safe)"
+msgstr "Safe (On)"
+
+msgid "开启的实验特性将实时挂载并显现在偏好设置中，关闭后平滑隐藏"
+msgstr "Enabled experimental features will dynamically show in Preferences, smoothly hiding when disabled"
+
+msgid "开启后，所有 SSH 私钥与连接密码将使用 Argon2id 派生密钥进行高强度 AES-256 加密"
+msgstr "When enabled, all SSH private keys and passwords will be encrypted with AES-256 using Argon2id"
+
+msgid "开启后光标将以 500ms 周期呼吸闪烁，提升视线捕捉辨识度"
+msgstr "Enable 500ms pulsing blink on cursor for better visibility"
+
+msgid "开启后在偏好设置备份页显示云端同步选项，基于端到端加密同步配置与主机资产"
+msgstr "Shows in Backup settings; syncs config and assets with end-to-end encryption"
+
+msgid "开启后在偏好设置通用页显示对应选项，会话断开或长任务结束向 Windows 托盘推流"
+msgstr "Shows in General settings; pushes to Windows Action Center on disconnect or long command finish"
+
+msgid "开启后在偏好设置终端页显示对应选项，为字符渲染叠加微凸显像管与荧光扫描线特效"
+msgstr "Shows in Terminal settings; overlays curved CRT glass and raster scanlines over glyphs"
+
+msgid "开启后在外观主题设置中显现 System 主题卡片，允许跟随操作系统深浅色动态切换"
+msgstr "Show System theme card in Appearance settings, following OS light/dark mode"
+
+msgid "开启后在右侧活动栏显示 Scratchpad 工具抽屉，用于终端划词文本临时收集备忘"
+msgstr "Shows Scratchpad drawer in the right activity bar for temporary text notes"
+
+msgid "开启后在终端右键直接粘贴剪贴板文本（支持按住 Shift 切换快速粘贴与右键菜单）"
+msgstr "Directly paste clipboard text on right-click (hold Shift to toggle between paste and context menu)"
+
+msgid "开启开发者调试控制台 (F12) 与左侧活动栏诊断入口；关闭后仅在 UI 隐藏调试入口，底层调试参数与功能保持生效"
+msgstr "Show DevTools (F12) and ActivityBar entry; if disabled, entries are hidden while debug flags stay active"
+
+msgid "开启上方的「启用自动化备份与容灾调度」开关后，即可配置与调度容灾节点"
+msgstr "Enable the switch above to configure and schedule disaster recovery nodes"
+
+msgid "开启现代化亚克力毛玻璃底衬，支持全局透底或终端视口独立透底"
+msgstr "Enable modern acrylic frosted glass backdrop, supporting global or terminal-only opacity"
+
+msgid "可尝试更换搜索关键字、切换上方分类标签，或关闭弹窗后直接录入"
+msgstr "Try changing search terms, categories, or enter details directly"
+
+msgid "可尝试输入主机名、IP 地址或切换不同的关键字"
+msgstr "Try entering host name, IP address, or alternative keywords"
+
+msgid "可更换搜索关键词，或在网络与代理页面直接手动录入代理信息"
+msgstr "Change search terms or enter proxy details manually"
+
+msgid "可为当前远程主机快速配置本地、远程或动态 SOCKS5 端口转发。"
+msgstr "Configure Local, Remote, or Dynamic SOCKS5 forwarding for the current host."
+
+msgid "可选: 记录映射用途，例如: 测试内网 RDS 数据库访问"
+msgstr "Optional: e.g. Test internal RDS database access"
+
+msgid "可选: 说明该脚本的执行时机与注意事项..."
+msgstr "Optional: Notes on execution prerequisites and precautions..."
+
+msgid "可选：添加代码片段的说明或使用注意事项..."
+msgstr "Optional: Add notes or usage considerations for this snippet..."
+
+msgid "可选密钥口令"
+msgstr "Optional passphrase"
+
+msgid "可用: "
+msgstr "Available: "
+
+msgid "可在此记录转发用途、访问白名单或对应服务文档..."
+msgstr "Notes on usage, access whitelists, or documentation..."
+
+msgid "可在主机配置中单独绑定"
+msgstr "Can be bound in host configuration"
+
+msgid "克隆此主机"
+msgstr "Clone Host"
+
+msgid "客户端启动时自启"
+msgstr "Start on Client Launch"
+
+msgid "空闲"
+msgstr "Idle"
+
+msgid "空闲自动锁定超时 (Auto-lock Timeout)"
+msgstr "Auto-lock Idle Timeout"
+
+msgid "控件边框 (Border):"
+msgstr "Control Border (Border):"
+
+msgid "控件基准高度 (control-height)"
+msgstr "Control Height (control-height)"
+
+msgid "控制底层 GPU 光栅化渲染管线 (切换需重启客户端生效)"
+msgstr "Controls GPU rasterization pipeline (restart required to take effect)"
+
+msgid "控制客户端操作反馈气泡的停留时长与展示行为"
+msgstr "Control toast notification display duration and feedback behavior"
+
+msgid "控制客户端界面语言、启动流程与后台挂起行为"
+msgstr "Configure UI language, launch flow, and background suspension behavior"
+
+msgid "控制右上角操作反馈气泡的自动消隐倒计时，避免复杂提示一闪而过"
+msgstr "Control auto-dismiss countdown for notification toasts to prevent quick disappearance"
+
+msgid "快捷操作清单与自定义按键绑定"
+msgstr "Shortcut List & Keybindings"
+
+msgid "快捷键绑定"
+msgstr "Keybindings"
+
+msgid "快捷键与全局键位映射"
+msgstr "Keybindings & Global Key Mappings"
+
+msgid "快捷命令库"
+msgstr "Command Library"
+
+msgid "快捷预设:"
+msgstr "Quick Presets:"
+
+msgid "快速 (1.5 秒)"
+msgstr "Fast (1.5s)"
+
+msgid "快速调色板:"
+msgstr "Quick Palettes:"
+
+msgid "快速思考 (Low)"
+msgstr "Fast Reasoning (Low)"
+
+msgid "快速添加单台主机"
+msgstr "Quick Add Single Host"
+
+msgid "快速添加新分组"
+msgstr "Quick Add New Group"
+
+msgid "快速添加自定义片段:"
+msgstr "Quick Add Custom Snippet:"
+
+msgid "快速添加自定义凭据:"
+msgstr "Quick Add Custom Credential:"
+
+msgid "快速预设:"
+msgstr "Quick Presets:"
+
+msgid "快速注入高负载全功能测试场景或将应用设置恢复出厂干净初始状态"
+msgstr "Quickly inject high-load testing profiles or reset all application preferences to clean defaults"
+
+msgid "快速注入预设脚本"
+msgstr "Quick Inject Preset Script"
+
+msgid "快照清理与版本保留策略 (Retention Policy)"
+msgstr "Snapshot Cleanup & Retention Policy"
+
+msgid "快照校验哈希"
+msgstr "Snapshot Hash"
+
+msgid "来源: 网络与隧道中心 (JumpHost 预设)"
+msgstr "Source: Tunnel Hub (JumpHost Preset)"
+
+msgid "类型"
+msgstr "Type"
+
+msgid "类型: 密码"
+msgstr "Type: Password"
+
+msgid "类型: 密钥"
+msgstr "Type: Key"
+
+msgid "类型: Agent"
+msgstr "Type: Agent"
+
+msgid "累计出 "
+msgstr "Total Out: "
+
+msgid "累计出站流量 (Tx)"
+msgstr "Total Outbound Traffic (Tx)"
+
+msgid "累计入 "
+msgstr "Total In: "
+
+msgid "累计入站流量 (Rx)"
+msgstr "Total Inbound Traffic (Rx)"
+
+msgid "冷启动桌面客户端时自动聚焦的初始页面"
+msgstr "Initial view automatically focused when client launches"
+
+msgid "离线"
+msgstr "Offline"
+
+msgid "历史对话记录"
+msgstr "Chat History"
+
+msgid "历史记录"
+msgstr "History"
+
+msgid "立即触发所有已启用备份节点的上传与校验任务"
+msgstr "Trigger upload and verification tasks for all enabled backup nodes immediately"
+
+msgid "立即发出每个键盘击键字符包，减少终端光标与字符回显微延迟"
+msgstr "Send keystrokes immediately without buffering to reduce cursor latency"
+
+msgid "立即批量生成主机"
+msgstr "Generate Hosts Now"
+
+msgid "立即推送最新增量快照或从远端拉取覆盖本地资产"
+msgstr "Push latest incremental snapshot or pull from remote to overwrite local assets"
+
+msgid "立即增量同步"
+msgstr "Sync Incrementally Now"
+
+msgid "立即执行全量容灾备份与检测"
+msgstr "Execute Full Backup & Health Check Now"
+
+msgid "立即重启"
+msgstr "Restart Now"
+
+msgid "例如: /data/www 或 /home/work (留空为默认根目录)"
+msgstr "e.g., /data/www or /home/work (Leave empty for default)"
+
+msgid "例如: \\\\b(ERROR|FATAL|CRITICAL)\\\\b"
+msgstr "e.g., \\\\b(ERROR|FATAL|CRITICAL)\\\\b"
+
+msgid "例如: 192.168.1.100 或 ssh.example.com"
+msgstr "e.g., 192.168.1.100 or ssh.example.com"
+
+msgid "例如: 查找大于100MB的日志文件..."
+msgstr "e.g. Find log files larger than 100MB..."
+
+msgid "例如: 个人 NAS WebDAV 每日备份 / 本地机械硬盘归档..."
+msgstr "e.g., Personal NAS WebDAV Daily Backup / Local Archive..."
+
+msgid "例如: 生产-K8s-主节点 (留空则默认使用主机地址)"
+msgstr "e.g., Prod-K8s-Master (Defaults to host address if blank)"
+
+msgid "例如: 生产数据库正向代理"
+msgstr "e.g., Prod Database Forward Proxy"
+
+msgid "例如: C:/Users/.../Downloads"
+msgstr "e.g., C:/Users/.../Downloads"
+
+msgid "例如: DeepSeek 官方 / Ollama 本地 / 硅基流动"
+msgstr "e.g., DeepSeek Official / Ollama Local / SiliconFlow"
+
+msgid "例如: Docker 日志清理、系统健康检查..."
+msgstr "e.g., Clean Docker logs, system health check..."
+
+msgid "例如: MySQL 3306 转发、Redis 映射..."
+msgstr "e.g., MySQL 3306 Forward, Redis Mapping..."
+
+msgid "例如: tmux a || tmux 或 source ~/.bashrc"
+msgstr "e.g., tmux a || tmux or source ~/.bashrc"
+
+msgid "例如: worker-job, compile, dev..."
+msgstr "e.g., worker-job, compile, dev..."
+
+msgid "连接"
+msgstr "Connect"
+
+msgid "连接超时"
+msgstr "Timed Out"
+
+msgid "连接超时时间 (ConnectTimeout):"
+msgstr "Connection Timeout (ConnectTimeout):"
+
+msgid "连接超时与心跳保活探测"
+msgstr "Connection Timeout & Keepalive"
+
+msgid "连接历史"
+msgstr "History"
+
+msgid "连接历史中心"
+msgstr "Connection History Hub"
+
+msgid "连接与断开时间"
+msgstr "Connect & Disconnect Times"
+
+msgid "连接远程主机"
+msgstr "Connect Remote Host"
+
+msgid "连接终端会话"
+msgstr "Attach Session"
+
+msgid "连通失败，请检查 Base URL 与 API Key 是否正确"
+msgstr "Connection failed. Please check Base URL and API Key"
+
+msgid "连通正常 (200 OK, 网络通路良好)"
+msgstr "Connected (200 OK, network route healthy)"
+
+msgid "链路走向: "
+msgstr "Route: "
+
+msgid "两次输入的新密码不一致！"
+msgstr "New passwords do not match!"
+
+msgid "零拦截完全放行，适合本地沙箱与测试容器"
+msgstr "Zero interception, ideal for local sandboxes and test containers"
+
+msgid "浏览..."
+msgstr "Browse..."
+
+msgid "浏览和管理本机磁盘文件目录"
+msgstr "Browse and manage local disk files and directories"
+
+msgid "浏览选择..."
+msgstr "Browse..."
+
+msgid "路径导航与文件浏览器视口"
+msgstr "Paths & File Explorer Viewport"
+
+msgid "轮播间隔:"
+msgstr "Interval:"
+
+msgid "轮询"
+msgstr "Polling"
+
+msgid "每"
+msgstr "Every"
+
+msgid "每次启动"
+msgstr "Every Startup"
+
+msgid "每次询问 (ask)"
+msgstr "Ask Every Time"
+
+msgid "每天定时"
+msgstr "Daily Scheduled"
+
+msgid "每小时"
+msgstr "Every Hour"
+
+msgid "密码"
+msgstr "Password"
+
+msgid "密码 / Secret Key"
+msgstr "Password / Secret Key"
+
+msgid "密码认证可留空"
+msgstr "Leave empty if no password"
+
+msgid "密钥"
+msgstr "Key"
+
+msgid "密钥口令 (Passphrase，无口令可留空):"
+msgstr "Passphrase (Leave empty if none):"
+
+msgid "密钥算法: "
+msgstr "Key Algorithm: "
+
+msgid "密钥算法与生成"
+msgstr "Key Algorithm & Generation"
+
+msgid "免审直达"
+msgstr "Direct Pass (No Review)"
+
+msgid "面板"
+msgstr "Panel"
+
+msgid "面板底色 (Panel):"
+msgstr "Panel Background (Panel):"
+
+msgid "秒"
+msgstr "s"
+
+msgid "秒 (默认 30s)"
+msgstr "seconds (default 30s)"
+
+msgid "秒发送一次保活包"
+msgstr "seconds send a keepalive packet"
+
+msgid "敏感剪贴板自动清除 (Clear Clipboard Timeout)"
+msgstr "Clear Sensitive Clipboard Timeout"
+
+msgid "敏感凭据自动清除、高危破坏性指令预警与会话审计日志"
+msgstr "Automatic clipboard clearing, dangerous command alerts, and session audit logs"
+
+msgid "名称"
+msgstr "Name"
+
+msgid "名称前缀:"
+msgstr "Name Prefix:"
+
+msgid "明度"
+msgstr "Brightness"
+
+msgid "命名管道路径"
+msgstr "Named Pipe Path"
+
+msgid "模拟诊断日志"
+msgstr "Simulate Diagnostic Logs"
+
+msgid "模型库与连通性验证"
+msgstr "Model Library & Connectivity Test"
+
+msgid "默认"
+msgstr "Default"
+
+msgid "默认 (3.0 秒)"
+msgstr "Default (3.0s)"
+
+msgid "默认本地下载目录 (Default Download Dir)"
+msgstr "Default Download Directory"
+
+msgid "默认出站代理模式 (Proxy Mode)"
+msgstr "Default Outbound Proxy Mode"
+
+msgid "默认登录用户名"
+msgstr "Default Login Username"
+
+msgid "默认登录用户名 *"
+msgstr "Default Login Username *"
+
+msgid "默认端口 22"
+msgstr "Default Port 22"
+
+msgid "默认分组"
+msgstr "Default Group"
+
+msgid "默认关闭进程统计 (保持单行探针零性能损耗)"
+msgstr "Disabled by default (maintains zero-overhead single-line probe)"
+
+msgid "默认开启内存种子 Mock 数据；关闭后切换至真实物理存储模式，便于接入其他存储类型进行调试"
+msgstr "Use in-memory seed mock data by default; disable to switch to physical persistent storage"
+
+msgid "默认快捷键:"
+msgstr "Default Shortcut:"
+
+msgid "默认模型"
+msgstr "Default Model"
+
+msgid "默认思考深度档位 (Thinking Effort)"
+msgstr "Thinking Effort Level"
+
+msgid "默认推理模型 (Selected Model)"
+msgstr "Default Reasoning Model"
+
+msgid "默认远程初始工作目录 (Default Remote Dir)"
+msgstr "Default Remote Working Directory"
+
+msgid "目标端口 (Remote Port)"
+msgstr "Remote Port"
+
+msgid "目标服务地址 (Remote Host)"
+msgstr "Remote Host Address"
+
+msgid "目标路径"
+msgstr "Target Path"
+
+msgid "目标远程服务 / 机器"
+msgstr "Target Remote Service / Machine"
+
+msgid "目标主机与身份"
+msgstr "Target Host & Identity"
+
+msgid "目标资产"
+msgstr "Target Asset"
+
+msgid "目录传输时忽略的文件或文件夹 (逗号分隔，如 .git, node_modules, *.tmp)"
+msgstr "Files or folders ignored during transfer (comma-separated, e.g., .git, node_modules, *.tmp)"
+
+msgid "内存"
+msgstr "Memory"
+
+msgid "内存占用 (RAM)"
+msgstr "Memory Usage (RAM)"
+
+msgid "内核原子统计"
+msgstr "Kernel Atomic Stats"
+
+msgid "内网转发直达"
+msgstr "Intranet Forwarding Direct"
+
+msgid "内置编辑器"
+msgstr "Built-in Editor"
+
+msgid "您可前往【网络与隧道中心】组装并保存跳板串，也可直接在上方选择已有主机或手动输入。"
+msgstr "Go to Tunnel Hub to assemble jump chains, or select existing hosts above."
+
+msgid "您可前往【网络与隧道中心】组装跳板串模板，或先在主界面创建跳板主机。"
+msgstr "Go to Tunnel Hub to assemble jump chains, or create a jump host first."
+
+msgid "排查端口占用"
+msgstr "Troubleshoot Port In Use"
+
+msgid "旁路"
+msgstr "Bypass"
+
+msgid "配色主题方案 (Color Theme)"
+msgstr "Color Theme"
+
+msgid "配色主题方案与调色板"
+msgstr "Color Themes & Palette"
+
+msgid "配置 HTTP / SOCKS5 代理节点，供主机统一出网"
+msgstr "Configure HTTP / SOCKS5 proxy node for unified host egress"
+
+msgid "配置 ProxyJump 堡垒机中继，供主机连接时绑定"
+msgstr "Configure ProxyJump bastion relay for host connection binding"
+
+msgid "配置 VT100 字符渲染等宽字体族、光标外观交互、高亮诊断规则与会话缓冲区"
+msgstr "Configure VT100 glyph monospace fonts, cursor interactions, highlight rules and scrollback buffer"
+
+msgid "配置 VT100 字符渲染字模、等宽字体族、光标形态与剪贴板交互行为"
+msgstr "Configure VT100 glyph rasterization, monospace fonts, cursor styles, and clipboard"
+
+msgid "配置本地目录增量快照或远程云端多节点容灾，支持生命周期清理与镜像还原"
+msgstr "Configure local incremental snapshots or remote multi-node cloud recovery with lifecycle policies and restore"
+
+msgid "配置变更审核"
+msgstr "Config Change Audit"
+
+msgid "配置常用运维脚本或命令模板，支持终端一键注入运行"
+msgstr "Configure ops scripts or command templates with one-click injection into terminal"
+
+msgid "配置端口映射"
+msgstr "Configure Port Forwarding"
+
+msgid "配置端口转发通道，随当前主机终端生命周期自动伴生管理"
+msgstr "Configure port forwarding managed with the current terminal lifecycle"
+
+msgid "配置命令交互指示光标的视觉呈现样式"
+msgstr "Configure the visual appearance of the interactive command cursor"
+
+msgid "配置默认出站网络代理、SSH 握手超时、Keepalive 心跳保活与数据流压缩"
+msgstr "Configure outbound proxies, SSH handshake timeout, keepalive heartbeat and stream compression"
+
+msgid "配置默认连接超时、TCP 心跳保活与自动重连退避算法"
+msgstr "Configure default timeout, TCP keepalive heartbeat, and reconnect backoff algorithms"
+
+msgid "配置预设注入与出厂重置 (Presets & Recovery)"
+msgstr "Config Presets & Factory Reset"
+
+msgid "配置正则表达式与终端匹配文本的实时着色样式"
+msgstr "Configure regular expression and real-time text coloring style"
+
+msgid "配置终端屏幕实时上下文协同策略、专家人设提示词与生产环境指令安全护栏"
+msgstr "Configure terminal context awareness, system prompts, and command guardrails"
+
+msgid "批量更新所有端口"
+msgstr "Batch Update All Ports"
+
+msgid "批量修改全量主机在线状态:"
+msgstr "Batch Update All Hosts Status:"
+
+msgid "批量修改与数据治理"
+msgstr "Batch Updates & Data Governance"
+
+msgid "批量重置全量主机端口:"
+msgstr "Batch Reset All Host Ports:"
+
+msgid "批量主机生成"
+msgstr "Batch Host Generation"
+
+msgid "批量主机生成与场景注入"
+msgstr "Batch Host Generation & Scenario Injection"
+
+msgid "批量追加生成"
+msgstr "Batch Append Hosts"
+
+msgid "偏好设置"
+msgstr "Preferences"
+
+msgid "偏好设置中心"
+msgstr "Preferences Center"
+
+msgid "片段标题:"
+msgstr "Snippet Title:"
+
+msgid "片段名称"
+msgstr "Snippet Name"
+
+msgid "品牌强调主色 (accent)"
+msgstr "Accent Color (accent)"
+
+msgid "品牌主题强调色"
+msgstr "Theme Accent Color"
+
+msgid "品牌主题强调色 (accent)"
+msgstr "Theme Accent Color (accent)"
+
+msgid "平滑淡入淡出 (Cross-fade)"
+msgstr "Cross-fade"
+
+msgid "凭据"
+msgstr "Credentials"
+
+msgid "凭据保管"
+msgstr "Credentials"
+
+msgid "凭据保管箱"
+msgstr "Credentials Vault"
+
+msgid "凭据存储总数: "
+msgstr "Total Credentials: "
+
+msgid "凭据管理"
+msgstr "Credentials"
+
+msgid "凭据类型"
+msgstr "Credential Type"
+
+msgid "凭据类型分布:"
+msgstr "Credential Type Distribution:"
+
+msgid "凭据密钥调试"
+msgstr "Credentials"
+
+msgid "凭据名称"
+msgstr "Credential Name"
+
+msgid "凭据名称 *"
+msgstr "Credential Name *"
+
+msgid "凭据名称:"
+msgstr "Credential Name:"
+
+msgid "凭据显示名称 *"
+msgstr "Credential Display Name *"
+
+msgid "屏幕微闪 (Visual)"
+msgstr "Visual Bell (Flash)"
+
+msgid "启动隧道"
+msgstr "Start Tunnel"
+
+msgid "启动与运行策略"
+msgstr "Execution Policy"
+
+msgid "启停与生命周期策略"
+msgstr "Lifecycle Policy"
+
+msgid "启用"
+msgstr "Enabled"
+
+msgid "启用本地凭据主密码保护 (Master Password)"
+msgstr "Enable Master Password Protection"
+
+msgid "启用并设置主密码 (Set Master Password)"
+msgstr "Set Master Password"
+
+msgid "启用传输压缩 (-C)"
+msgstr "Enable Compression (-C)"
+
+msgid "启用规则"
+msgstr "Enable Rule"
+
+msgid "启用链路层 gzip 数据流压缩 (ssh -C)"
+msgstr "Enable Wire Compression (ssh -C)"
+
+msgid "启用自动化备份与容灾调度 (Automatic Backup)"
+msgstr "Enable Automatic Backup & Disaster Recovery Schedule"
+
+msgid "起始 IP 末位:"
+msgstr "Starting IP Last Octet:"
+
+msgid "前景色 (Foreground):"
+msgstr "Foreground (Foreground):"
+
+msgid "前往通用设置修改管线..."
+msgstr "Go to General Settings to change pipeline..."
+
+msgid "浅色"
+msgstr "Light"
+
+msgid "浅色 (Day)"
+msgstr "Day (Light)"
+
+msgid "浅色模式"
+msgstr "Light Mode"
+
+msgid "浅色主题组 (Light Themes):"
+msgstr "Light Themes:"
+
+msgid "强行退出"
+msgstr "Force Exit"
+
+msgid "强制标准 OpenGL 硬件加速管线"
+msgstr "Enforce Standard OpenGL Hardware Acceleration Pipeline"
+
+msgid "强制全屏重绘"
+msgstr "Force Full-Screen Repaint"
+
+msgid "强制重绘"
+msgstr "Force Repaint"
+
+msgid "切换"
+msgstr "Switch"
+
+msgid "切换到 Mock 数据层 (Mock Data Layer)"
+msgstr "Switch to Mock Data Layer"
+
+msgid "切换或保存渲染管线时，同步将后端写入进程 SLINT_BACKEND 环境变量；关闭后仅保存本地配置文件，不修改环境变量"
+msgstr "Write selected backend into SLINT_BACKEND environment variable; if disabled, only saves to local configuration"
+
+msgid "切换客户端界面排版字体，默认查找扫描系统字体与内置高品质设计字体"
+msgstr "Switch UI font; scans system and bundled fonts by default"
+
+msgid "切换图形渲染引擎"
+msgstr "Switch Graphics Engine"
+
+msgid "切换图形渲染引擎需要重启客户端以重新初始化底层 GPU 显卡管线，是否立即重启？"
+msgstr "Switching graphics engine requires restarting the client to reinitialize the GPU pipeline. Restart now?"
+
+msgid "切换展开 / 折叠"
+msgstr "Toggle Expand / Collapse"
+
+msgid "切换至浅色模式"
+msgstr "Switch to Light Mode"
+
+msgid "切换至深色模式"
+msgstr "Switch to Dark Mode"
+
+msgid "清除"
+msgstr "Clear"
+
+msgid "清除解绑"
+msgstr "Unlink"
+
+msgid "清空"
+msgstr "Clear"
+
+msgid "清空历史"
+msgstr "Clear History"
+
+msgid "清空链路"
+msgstr "Clear Chain"
+
+msgid "清空全量数据"
+msgstr "Clear All Data"
+
+msgid "清空日志"
+msgstr "Clear Logs"
+
+msgid "清空所有片段"
+msgstr "Clear All Snippets"
+
+msgid "清空所有凭据"
+msgstr "Clear All Credentials"
+
+msgid "清空所有已完成"
+msgstr "Clear All Completed"
+
+msgid "清空所有用户偏好设置并恢复默认初始状态（不会删除已保存的主机资产）"
+msgstr "Reset all user preference settings to defaults (will not delete saved host assets)"
+
+msgid "清空完成"
+msgstr "Clear Completed"
+
+msgid "清空选择"
+msgstr "Clear Selection"
+
+msgid "清空已完成"
+msgstr "Clear Completed"
+
+msgid "清屏"
+msgstr "Clear Screen"
+
+msgid "清屏并重置视口"
+msgstr "Clear Screen and Reset Viewport"
+
+msgid "请按下 Ctrl / Alt / Shift + 字母数字或功能键 (如 Ctrl+Shift+P)"
+msgstr "Press Ctrl / Alt / Shift + letter, number, or function key (e.g. Ctrl+Shift+P)"
+
+msgid "请尝试其他搜索关键词"
+msgstr "Please try different search keywords"
+
+msgid "请尝试输入其他主机名称、IP 或用户名"
+msgstr "Try typing another host name, IP, or username"
+
+msgid "请从左侧双击主机发起连接，或点击右上角 + 快速新建本地/远程终端"
+msgstr "Double-click a host to connect, or click + to open a new local/remote terminal"
+
+msgid "请从左侧选择凭据以查看详情"
+msgstr "Select a credential on the left to view details"
+
+msgid "请从左侧选择网络规则，或点击 [+ 新建规则] 配置端口转发与跳板堡垒"
+msgstr "Select a network rule on the left, or click [+ New Rule] to configure"
+
+msgid "请点击下方按钮从现有的主机资产树中添加第一跳中继机"
+msgstr "Click button below to add first hop relay from existing hosts"
+
+msgid "请输入 "
+msgstr "Please enter "
+
+msgid "请输入 SSH 密码"
+msgstr "Enter SSH password"
+
+msgid "请输入按键组合 (例如 Ctrl+Shift+T 或 Alt+Enter)..."
+msgstr "Enter key combination (e.g. Ctrl+Shift+T or Alt+Enter)..."
+
+msgid "请输入备注说明（可选）..."
+msgstr "Enter remarks (optional)..."
+
+msgid "请输入分组名称，例如: 微服务集群、测试数据库..."
+msgstr "Enter group name, e.g. Microservices, Test Database..."
+
+msgid "请输入密码..."
+msgstr "Enter password..."
+
+msgid "请输入凭据名称..."
+msgstr "Enter credential name..."
+
+msgid "请输入文件夹名称，例如: Docker部署、运维脚本..."
+msgstr "Enter folder name, e.g., Docker Deployments, Ops Scripts..."
+
+msgid "请输入用户名，例如 root..."
+msgstr "Enter username, e.g., root..."
+
+msgid "请选择..."
+msgstr "Please select..."
+
+msgid "请选择默认推理模型..."
+msgstr "Select default reasoning model..."
+
+msgid "请选择您要创建的资产类型，将为您打开专属配置表单"
+msgstr "Select the asset type to open its configuration form"
+
+msgid "请在上方点击「模拟诊断日志」或在主界面执行操作以捕获 Tracing 事件"
+msgstr "Click 'Simulate Diagnostic Logs' or interact with UI to capture Tracing events"
+
+msgid "请在下方树形结构中点选代码片段的归属文件夹："
+msgstr "Select belonging folder in tree hierarchy below:"
+
+msgid "请在下方树形结构中点选目标归属文件夹（支持多级折叠/展开）："
+msgstr "Select target folder in tree hierarchy below:"
+
+msgid "请在下方树形结构中点选新分组的父级归属（支持多级折叠/展开与双击选定）："
+msgstr "Select the parent group from the tree below (supports multi-level fold/expand and double-click):"
+
+msgid "请在下方资产树中点选要加入跳板链路的中继主机："
+msgstr "Select relay host from tree below to add to jump chain:"
+
+msgid "请在下方资产树中点选用于建立端口转发的 SSH 宿主主机："
+msgstr "Select SSH host from tree below to establish port forwarding:"
+
+msgid "请在中央终端打开会话或连接远程主机\\nAI 将自动挂载主机上下文"
+msgstr "Open a terminal or connect to a host in the center\\nAI will automatically attach host context"
+
+msgid "请在中央终端打开会话或连接远程主机\\ntmux 会话管理将自动关联"
+msgstr "Open a terminal or connect to a remote host\\ntmux session manager will link automatically"
+
+msgid "请在中央终端打开或连接远程主机\\n端口转发规则将自动关联"
+msgstr "Open or connect to a remote host in center terminal\\nPort forwarding rules will link automatically"
+
+msgid "请在中央终端打开或连接远程主机\\nSFTP 远程文件传输将自动唤醒"
+msgstr "Open or connect to a remote host in center terminal\\nSFTP file transfer will attach automatically"
+
+msgid "请在中央终端打开或连接主机\\n实时性能监控将自动唤醒"
+msgstr "Open or connect to a host in center terminal\\nSystem monitor will wake up automatically"
+
+msgid "请在左侧主机列表双击选择主机，或点击右上角「+」连接远程主机"
+msgstr "Double-click a host on the left or click '+' at top right to connect"
+
+msgid "取消"
+msgstr "Cancel"
+
+msgid "全 Agent"
+msgstr "All Agents"
+
+msgid "全部"
+msgstr "All"
+
+msgid "全部告警"
+msgstr "All Warning"
+
+msgid "全部关闭"
+msgstr "Disable All"
+
+msgid "全部恢复默认键位"
+msgstr "Restore All Default Keybindings"
+
+msgid "全部开启"
+msgstr "Enable All"
+
+msgid "全部离线"
+msgstr "All Offline"
+
+msgid "全部在线"
+msgstr "All Online"
+
+msgid "全部主机 (按频次)"
+msgstr "All Hosts (By Frequency)"
+
+msgid "全部主机列表"
+msgstr "All Hosts List"
+
+msgid "全告警"
+msgstr "All Warning"
+
+msgid "全局"
+msgstr "Global"
+
+msgid "全局出站代理与路由"
+msgstr "Global Outbound Proxy & Routing"
+
+msgid "全局代理环境变量预览"
+msgstr "Global Proxy Environment Variables Preview"
+
+msgid "全局导航"
+msgstr "Navigation"
+
+msgid "全局毛玻璃"
+msgstr "Global Acrylic"
+
+msgid "全局毛玻璃磨砂"
+msgstr "Global Acrylic Frosted"
+
+msgid "全局视口与窗口状态实时探针 (Viewport & Window State)"
+msgstr "Global Viewport & Window State Telemetry"
+
+msgid "全局运行时日志输出等级 (Log Level Filter)"
+msgstr "Runtime Log Level Filter"
+
+msgid "全离线"
+msgstr "All Offline"
+
+msgid "全量节点总数:"
+msgstr "Total Nodes:"
+
+msgid "全量卡片总数:"
+msgstr "Total Cards:"
+
+msgid "全量拦截，所有生成指令必须人工确认执行"
+msgstr "Block all; require manual confirmation before executing generated commands"
+
+msgid "全量主机数"
+msgstr "Total Hosts"
+
+msgid "全量主机资产定期快照"
+msgstr "Periodic full host assets snapshot"
+
+msgid "全量状态一键批量变更:"
+msgstr "Batch Change All States:"
+
+msgid "全量总节点"
+msgstr "Total Nodes"
+
+msgid "全密码"
+msgstr "All Passwords"
+
+msgid "全密钥"
+msgstr "All Keys"
+
+msgid "全球基础设施 -> 亚太 -> 杭州可用区 -> 机架 POD -> 刀片计算阵列"
+msgstr "Global Infra -> APAC -> Hangzhou AZ -> Rack POD -> Blade Compute Array"
+
+msgid "全双工 1000 Mbps"
+msgstr "Full Duplex 1000 Mbps"
+
+msgid "全选"
+msgstr "Select All"
+
+msgid "全在线"
+msgstr "All Online"
+
+msgid "权限"
+msgstr "Permissions"
+
+msgid "确定"
+msgstr "OK"
+
+msgid "确定选定"
+msgstr "Select"
+
+msgid "确定选择"
+msgstr "Confirm Selection"
+
+msgid "确定要断开并关闭此会话吗？远程正在运行的任务将被中断。"
+msgstr "Are you sure you want to disconnect and close this session? Remote running tasks will be interrupted."
+
+msgid "确定要断开并关闭此会话吗？远端正在运行的任务将被中断。"
+msgstr "Are you sure you want to disconnect and close this session? Remote tasks will be terminated."
+
+msgid "确认"
+msgstr "Confirm"
+
+msgid "确认保存主密码"
+msgstr "Confirm Save Master Password"
+
+msgid "确认创建"
+msgstr "Create"
+
+msgid "确认关闭终端会话"
+msgstr "Confirm Close Session"
+
+msgid "确认添加"
+msgstr "Confirm Add"
+
+msgid "确认添加单条片段"
+msgstr "Confirm Add Snippet"
+
+msgid "确认添加单条凭据"
+msgstr "Confirm Add Credential"
+
+msgid "确认添加端点"
+msgstr "Confirm Add Endpoint"
+
+msgid "确认添加分组"
+msgstr "Confirm Add Group"
+
+msgid "确认添加主机"
+msgstr "Confirm Add Host"
+
+msgid "确认退出应用程序"
+msgstr "Confirm Exit Application"
+
+msgid "确认新密码:"
+msgstr "Confirm New Password:"
+
+msgid "认证密码 (可选 Password):"
+msgstr "Auth Password (Optional):"
+
+msgid "认证密码 (可选，留空无需认证)"
+msgstr "Auth Password (Optional, blank if none)"
+
+msgid "认证失败"
+msgstr "Auth Failed"
+
+msgid "认证用户名 (可选 Username):"
+msgstr "Auth Username (Optional):"
+
+msgid "认证用户名 (可选，留空无需认证)"
+msgstr "Auth Username (Optional, blank if none)"
+
+msgid "任务名称"
+msgstr "Task Name"
+
+msgid "任意动态网络目标"
+msgstr "Arbitrary Dynamic Network Target"
+
+msgid "如 k8s-node-"
+msgstr "e.g. k8s-node-"
+
+msgid "如 web-prod-01"
+msgstr "e.g. web-prod-01"
+
+msgid "如：Docker 容器运维、K8s 排障..."
+msgstr "e.g. Docker ops, K8s troubleshooting..."
+
+msgid "如果代理服务器需要用户名与密码凭据验证，请开启此项"
+msgstr "Enable if the proxy server requires username and password authentication"
+
+msgid "入网"
+msgstr "Inbound"
+
+msgid "软件退出时"
+msgstr "On App Exit"
+
+msgid "若连续发送心跳探测均未得到服务器响应，判定链路断开的连续重试次数"
+msgstr "Number of consecutive unacknowledged keepalive probes before considering session disconnected"
+
+msgid "色相圆盘取色器"
+msgstr "Hue Color Picker"
+
+msgid "色相圆盘取色器 · "
+msgstr "Hue Color Picker · "
+
+msgid "删除"
+msgstr "Delete"
+
+msgid "删除此分组"
+msgstr "Delete Group"
+
+msgid "删除片段"
+msgstr "Delete Snippet"
+
+msgid "删除凭据"
+msgstr "Delete Credential"
+
+msgid "删除文件夹"
+msgstr "Delete Folder"
+
+msgid "删除远程文件二次安全确认 (Confirm Deletion)"
+msgstr "Confirm Remote File Deletion"
+
+msgid "删除主机"
+msgstr "Delete Host"
+
+msgid "上传"
+msgstr "Upload"
+
+msgid "上传到远程"
+msgstr "Upload to Remote"
+
+msgid "上传文件到此目录..."
+msgstr "Upload Files Here..."
+
+msgid "上传文件夹到此目录..."
+msgstr "Upload Folder Here..."
+
+msgid "上级文件夹 (可选多层嵌套)"
+msgstr "Parent Folder (Multi-level nesting)"
+
+msgid "上行 TX (出网)"
+msgstr "Uplink TX (Out)"
+
+msgid "尚未录入凭据"
+msgstr "No credentials enrolled"
+
+msgid "尚未添加任何跳板主机节点"
+msgstr "No jump host nodes added yet"
+
+msgid "尚未选择主机"
+msgstr "No host selected"
+
+msgid "稍后重启"
+msgstr "Restart Later"
+
+msgid "设为默认"
+msgstr "Set as Default"
+
+msgid "设置客户端界面的全局排版字体（自动发现已安装系统字体与预置高品质字体）"
+msgstr "Set global UI font (automatically detects system fonts and bundled quality typefaces)"
+
+msgid "设置客户端毛玻璃底衬与壁纸图库，支持多图定时轮播与平滑淡入淡出"
+msgstr "Configure acrylic backdrop and wallpaper gallery with scheduled rotation and smooth fading"
+
+msgid "设置客户端主界面展示的默认语言"
+msgstr "Choose the display language for the client user interface"
+
+msgid "设置默认网络出站通道；单个主机高级设置中可单独配置并覆盖此项"
+msgstr "Set default outbound route; can be overridden in individual host advanced settings"
+
+msgid "设置外观调试"
+msgstr "Appearance"
+
+msgid "身份认证方式 (Authentication):"
+msgstr "Authentication Method:"
+
+msgid "深色"
+msgstr "Dark"
+
+msgid "深色 (Night)"
+msgstr "Night (Dark)"
+
+msgid "深色模式"
+msgstr "Dark Mode"
+
+msgid "深色主题组 (Dark Themes):"
+msgstr "Dark Themes:"
+
+msgid "生产 Ed25519 密钥 (带口令)"
+msgstr "Production Ed25519 Key (Passphrase Protected)"
+
+msgid "生产环境指令防御与脱敏说明："
+msgstr "Production Command Guardrails & Desensitization:"
+
+msgid "生产集群/核心库"
+msgstr "Prod-Cluster/Core-DB"
+
+msgid "生成数量:"
+msgstr "Quantity:"
+
+msgid "生效中"
+msgstr "Active"
+
+msgid "剩余可用: "
+msgstr "Available: "
+
+msgid "失败"
+msgstr "Failed"
+
+msgid "时"
+msgstr "h"
+
+msgid "时间"
+msgstr "Time"
+
+msgid "时间流"
+msgstr "Timeline"
+
+msgid "实时日志流"
+msgstr "Live Logs"
+
+msgid "实时同步"
+msgstr "Real-time Sync"
+
+msgid "实时渲染诊断与高频字符吞吐基准压测"
+msgstr "Real-time rendering diagnostics and throughput benchmark stress test"
+
+msgid "实时侦测当前内存配置与持久化状态，免去翻看底层配置文件的繁琐"
+msgstr "Inspects in-memory and persisted configurations in real time without digging into config files"
+
+msgid "实时侦听中"
+msgstr "Listening"
+
+msgid "实验特性与功能显隐门控 (Feature Flags)"
+msgstr "Feature Flags & Lab Controls"
+
+msgid "使用中"
+msgstr "In Use"
+
+msgid "使用主密码对存储在本地的私钥与密码执行 AES-256 加密保护"
+msgstr "Use master password to encrypt locally stored private keys and passwords with AES-256"
+
+msgid "视觉倾向 (Period)"
+msgstr "Period"
+
+msgid "收起并隐藏"
+msgstr "Collapse & Hide"
+
+msgid "手动输入"
+msgstr "Manual Input"
+
+msgid "手动同步"
+msgstr "Manual Sync"
+
+msgid "手动自定义代理"
+msgstr "Custom Manual Proxy"
+
+msgid "首次自动信任 (accept-new)"
+msgstr "Accept New First Time (accept-new)"
+
+msgid "输入代码片段名称..."
+msgstr "Enter snippet name..."
+
+msgid "输入当前旧主密码..."
+msgstr "Enter current master password..."
+
+msgid "输入规则备注，例如: 关键业务日志告警"
+msgstr "Enter rule remarks, e.g., Critical business log alarm"
+
+msgid "输入控件底色"
+msgstr "Input Control Background"
+
+msgid "输入控件底色 (control-background)"
+msgstr "Input Control Background (control-background)"
+
+msgid "输入模型标识，例如 deepseek-coder 或 qwen2.5:14b"
+msgstr "Enter model ID, e.g., deepseek-coder or qwen2.5:14b"
+
+msgid "输入外部程序执行命令 (如 code, notepad++, subl 或完整路径)"
+msgstr "Enter external executable command (e.g., code, notepad++, subl, or full path)"
+
+msgid "输入新主密码..."
+msgstr "Enter new master password..."
+
+msgid "输入主机名、命令或 > 执行操作 (Esc 退出)..."
+msgstr "Type host name, command, or > for actions (Esc to exit)..."
+
+msgid "输入自然语言，自动生成 Linux Shell 指令与参数"
+msgstr "Type natural language to automatically generate Linux Shell commands"
+
+msgid "输入自然语言描述运维目标或提问 (Enter 发送)..."
+msgstr "Describe ops goal or ask question (Enter to send)..."
+
+msgid "鼠标便捷复制粘贴、高危多行告警与会话关闭防误触"
+msgstr "Mouse copy/paste, multi-line warning, and session close protection"
+
+msgid "鼠标右键单击快速粘贴 (Paste on Right Click)"
+msgstr "Paste on Right Click"
+
+msgid "树视口测算宽"
+msgstr "Tree Viewport Computed Width"
+
+msgid "树视口测算宽度:"
+msgstr "Tree Viewport Computed Width:"
+
+msgid "树形层级视图"
+msgstr "Hierarchical Tree View"
+
+msgid "竖线 |"
+msgstr "Bar |"
+
+msgid "数据备份、导入与跨工具迁移"
+msgstr "Data Backup, Import & Cross-Tool Migration"
+
+msgid "数据备份、跨工具迁移与多端容灾"
+msgstr "Data Backup, Migration & Disaster Recovery"
+
+msgid "数据备份、跨工具迁移与多端云同步"
+msgstr "Data Backup, Migration & Cloud Sync"
+
+msgid "数据备份与导入"
+msgstr "Backup & Import"
+
+msgid "数据备份与迁移"
+msgstr "Backup & Migration"
+
+msgid "数据备份与同步"
+msgstr "Backup & Sync"
+
+msgid "数量 (台):"
+msgstr "Count (hosts):"
+
+msgid "刷新"
+msgstr "Refresh"
+
+msgid "刷新当前目录"
+msgstr "Refresh Directory"
+
+msgid "刷新目录"
+msgstr "Refresh Directory"
+
+msgid "双轨实时"
+msgstr "Dual-track Real-time"
+
+msgid "双向同步与全节点容灾调度"
+msgstr "Bidirectional Sync & Multi-Node Disaster Recovery"
+
+msgid "水平拆分当前窗格"
+msgstr "Split Current Pane Horizontally"
+
+msgid "水平视差滚动 (Slide)"
+msgstr "Slide"
+
+msgid "私网穿透"
+msgstr "Private Penetration"
+
+msgid "私钥保护口令 (可选)"
+msgstr "Private Key Passphrase (Optional)"
+
+msgid "私钥保护口令 (Passphrase)"
+msgstr "Key Passphrase"
+
+msgid "私钥解密密码短语 (Passphrase，无密码留空)"
+msgstr "Passphrase (Leave empty if unencrypted)"
+
+msgid "私钥内容 (OpenSSH PEM 格式)"
+msgstr "Private Key Content (OpenSSH PEM format)"
+
+msgid "私钥内容 (OpenSSH PEM 格式) *"
+msgstr "Private Key Content (OpenSSH PEM) *"
+
+msgid "私钥内容 (PEM 文本) 或本地文件路径:"
+msgstr "Private Key Content (PEM) or Local File Path:"
+
+msgid "私钥内容 (Private Key PEM) *"
+msgstr "Private Key PEM *"
+
+msgid "私钥文本已成功复制至系统剪贴板"
+msgstr "Private key text copied to clipboard"
+
+msgid "思考过程 (Deep Thinking)"
+msgstr "Thinking Process"
+
+msgid "搜索..."
+msgstr "Search..."
+
+msgid "搜索本地终端或远程主机 (支持名称 / IP / 分组)..."
+msgstr "Search local shells or remote hosts (by name, IP, group)..."
+
+msgid "搜索操作或按键 (如 新建标签、Ctrl)..."
+msgstr "Search actions or keys (e.g. New Tab, Ctrl)..."
+
+msgid "搜索代码片段、脚本或分组..."
+msgstr "Search snippets, scripts, or groups..."
+
+msgid "搜索代码片段、脚本或文件夹..."
+msgstr "Search snippets, scripts, or folders..."
+
+msgid "搜索片段..."
+msgstr "Search snippets..."
+
+msgid "搜索凭据..."
+msgstr "Search credentials..."
+
+msgid "搜索凭据名称、用户名、指纹..."
+msgstr "Search credential name, username, fingerprint..."
+
+msgid "搜索全部配置项 (字体、壁纸、心跳、备份、快捷键...)"
+msgstr "Search preferences (font, wallpaper, keepalive, backup, keys...)"
+
+msgid "搜索隧道、端口、目标主机..."
+msgstr "Search tunnels, ports, target hosts..."
+
+msgid "搜索主机 (支持名称 / IP / 分组)..."
+msgstr "Search hosts (name / IP / group)..."
+
+msgid "搜索主机、IP或分组..."
+msgstr "Search hosts, IP, or group..."
+
+msgid "宿主: "
+msgstr "Host: "
+
+msgid "随机波动"
+msgstr "Random Fluctuation"
+
+msgid "随机分布"
+msgstr "Random Distribution"
+
+msgid "随机生成强密码"
+msgstr "Generate Strong Password"
+
+msgid "随时验证旧密码并更新客户端主密码"
+msgstr "Verify current password and update client master password anytime"
+
+msgid "随应用启动"
+msgstr "Launch on System Startup"
+
+msgid "隧道中心预设串"
+msgstr "Tunnel Hub Preset Chain"
+
+msgid "隧道中心暂无预设跳板串模板"
+msgstr "No preset jump chains found in Tunnel Hub"
+
+msgid "所属分类文件夹 (Folder)"
+msgstr "Belonging Folder"
+
+msgid "所属上级分组"
+msgstr "Parent Group"
+
+msgid "所属上级分组:"
+msgstr "Parent Group:"
+
+msgid "所属上级文件夹"
+msgstr "Parent Folder"
+
+msgid "所属文件夹"
+msgstr "Folder"
+
+msgid "所属资产分组:"
+msgstr "Asset Group:"
+
+msgid "台"
+msgstr "hosts"
+
+msgid "台主机"
+msgstr "hosts"
+
+msgid "套接字与链路连接"
+msgstr "Sockets & Connection"
+
+msgid "提示"
+msgstr "Notice"
+
+msgid "提示: 既可通过左侧调色板修改，也可直接编辑 TOML 源码保存。"
+msgstr "Tip: You can tune colors using the left palette or directly edit the raw TOML source code."
+
+msgid "提示: 键盘任意击键即可即时替换，按 Esc 取消"
+msgstr "Tip: Press keys to map immediately, press Esc to cancel"
+
+msgid "提示: 若未安装 tmux，可运行 apt install tmux"
+msgstr "Tip: If tmux is not installed, run apt install tmux"
+
+msgid "提示信息停留时间 (Toast Duration)"
+msgstr "Toast Notification Duration"
+
+msgid "提问时自动附带当前主机 OS 发行版与最新终端输出，大幅提升排障精准度"
+msgstr "Include host OS info and recent terminal output in prompts to improve troubleshooting accuracy"
+
+msgid "体积"
+msgstr "Size"
+
+msgid "天"
+msgstr "d"
+
+msgid "添加 AI 端点端口与模型"
+msgstr "Add AI Endpoint & Models"
+
+msgid "添加壁纸图片"
+msgstr "Add Wallpaper"
+
+msgid "添加单张图片"
+msgstr "Add Image"
+
+msgid "添加端点端口"
+msgstr "Add Endpoint"
+
+msgid "添加多张本地壁纸图片，点击切换即时生效，开启轮播后按策略自动切换"
+msgstr "Add multiple local wallpaper images, click to switch immediately, and cycle automatically when slideshow is enabled"
+
+msgid "添加高亮规则"
+msgstr "Add Highlighting Rule"
+
+msgid "添加模型"
+msgstr "Add Model"
+
+msgid "添加跳板机节点 / 导入跳板串"
+msgstr "Add Jump Host Node / Import Chain"
+
+msgid "添加跳板机中继节点"
+msgstr "Add Jump Host Relay Node"
+
+msgid "添加跳板节点 / 预设串"
+msgstr "Add Jump Node / Preset Chain"
+
+msgid "添加跳板中继主机 (从资产树选择)"
+msgstr "Add Jump Relay Host (Select from tree)"
+
+msgid "填充动态参数执行代码片段"
+msgstr "Fill Parameters to Execute Snippet"
+
+msgid "填入"
+msgstr "Fill"
+
+msgid "条"
+msgstr "entries"
+
+msgid "条 | 📁 分组: "
+msgstr "entries | 📁 Group: "
+
+msgid "条记录"
+msgstr "records"
+
+msgid "条交互"
+msgstr "interactions"
+
+msgid "跳板机"
+msgstr "Jump Host"
+
+msgid "跳板机 (JumpHost / Bastion)"
+msgstr "Jump Host (JumpHost / Bastion)"
+
+msgid "跳板机 / 堡垒机全局链 (Default Jump Host)"
+msgstr "Default Jump Host Chain"
+
+msgid "跳板机链路"
+msgstr "Jump Host Chain"
+
+msgid "跳板机链路描述名称"
+msgstr "Jump Chain Description Name"
+
+msgid "跳板级联"
+msgstr "Jump Cascade"
+
+msgid "跳板中继资产 (供主机绑定)"
+msgstr "Jump Relay Assets (for host binding)"
+
+msgid "跳过 (skip)"
+msgstr "Skip (skip)"
+
+msgid "停止传输"
+msgstr "Stop Transfer"
+
+msgid "停止隧道"
+msgstr "Stop Tunnel"
+
+msgid "通用分割描边"
+msgstr "General Divider Border"
+
+msgid "通用分割描边 (border)"
+msgstr "General Divider Border (border)"
+
+msgid "通用与窗口"
+msgstr "General & Window"
+
+msgid "通用与窗口交互"
+msgstr "General & Window Interactions"
+
+msgid "通知信息状态色"
+msgstr "Info Status Color"
+
+msgid "通知信息状态色 (info)"
+msgstr "Info Status Color (info)"
+
+msgid "同名文件传输冲突解决、大文件断点续传与 POSIX 权限保留"
+msgstr "File conflict resolution, resumed transfers, and POSIX permissions"
+
+msgid "统计时长"
+msgstr "Total Duration"
+
+msgid "统一出网代理资产。可在 SSH 会话建立、SFTP 文件传输或内网穿透时绑定该代理池节点，实现网络环境安全隔离与统一外发。"
+msgstr "Unified proxy pool. Can be bound during SSH handshake, SFTP, or port forwarding."
+
+msgid "透底壁纸 / 弹窗底板:"
+msgstr "Wallpaper / Modal Opacity:"
+
+msgid "透底壁纸状态"
+msgstr "Backdrop Wallpaper State"
+
+msgid "透底显示模式 (Display Mode)"
+msgstr "Display Mode"
+
+msgid "图标物理规格 (icon-size)"
+msgstr "Icon Size (icon-size)"
+
+msgid "图形渲染管线"
+msgstr "Pipeline"
+
+msgid "图形渲染监控"
+msgstr "Rendering Telemetry"
+
+msgid "图形渲染引擎 (Graphics Engine)"
+msgstr "Graphics Engine"
+
+msgid "图形渲染引擎运行时监控 (Rendering Telemetry Monitor)"
+msgstr "Rendering Engine Telemetry Monitor"
+
+msgid "推荐"
+msgstr "Recommended"
+
+msgid "推荐指令"
+msgstr "Recommended Commands"
+
+msgid "退出应用"
+msgstr "Exit Application"
+
+msgid "退出应用时确认活跃连接 (Confirm Before Exit)"
+msgstr "Confirm Before Exit When Active"
+
+msgid "脱离"
+msgstr "Detach"
+
+msgid "外部编辑器与过滤排除规则"
+msgstr "External Editor & Exclusion Filters"
+
+msgid "外部代理"
+msgstr "External Agent"
+
+msgid "外观视效与主题定制"
+msgstr "Appearance & Theme Customization"
+
+msgid "外观与视效"
+msgstr "Appearance"
+
+msgid "外观与主题配色"
+msgstr "Appearance & Color Themes"
+
+msgid "外置网络代理模式 (Network Proxy Mode):"
+msgstr "Network Proxy Mode:"
+
+msgid "完整 ProxyJump 级联链路"
+msgstr "Complete ProxyJump Cascading Chain"
+
+msgid "完整查看私钥"
+msgstr "View Full Key"
+
+msgid "网络超链接 URL"
+msgstr "Network Hyperlink URL"
+
+msgid "网络传输与 SSH 链路策略"
+msgstr "Network Transport & SSH Connection Policies"
+
+msgid "网络抖动自动重试次数"
+msgstr "Max Network Retry Attempts"
+
+msgid "网络规则重构前自动安全快照"
+msgstr "Automatic safety snapshot before network rules refactoring"
+
+msgid "网络连接与代理"
+msgstr "Network & Proxy"
+
+msgid "网络闪断、Wi-Fi 切换或休眠恢复后使用指数退避算法自动静默恢复连接"
+msgstr "Automatically recover connection using exponential backoff after sleep or network drops"
+
+msgid "网络双轨吞吐 ("
+msgstr "Network Dual-channel Throughput ("
+
+msgid "网络隧道"
+msgstr "Tunnels"
+
+msgid "网络异常断线自动重连 (Auto Reconnect)"
+msgstr "Auto Reconnect on Network Failure"
+
+msgid "网络与 SSH"
+msgstr "Network & SSH"
+
+msgid "网络与代理"
+msgstr "Network & Proxy"
+
+msgid "网络与隧道"
+msgstr "Tunnels"
+
+msgid "网络与隧道中心"
+msgstr "Network & Tunnels Hub"
+
+msgid "网络直连模式 (Direct Connection)"
+msgstr "Direct Connection"
+
+msgid "网络中断或任务暂停后自动从断点位置恢复传输，避免大文件重传"
+msgstr "Automatically resume file transfer from breakpoint after network interruption"
+
+msgid "危险区：恢复出厂设置 (Factory Reset)"
+msgstr "Danger Zone: Factory Reset (Factory Reset)"
+
+msgid "危险区域 (Danger Zone)"
+msgstr "Danger Zone"
+
+msgid "为「"
+msgstr "for \""
+
+msgid "未打开远程 SFTP 会话"
+msgstr "No Remote SFTP Session Open"
+
+msgid "未导入私钥"
+msgstr "Private Key Not Imported"
+
+msgid "未分组"
+msgstr "Ungrouped"
+
+msgid "未关联主机 (直连网关)"
+msgstr "No Host Associated (Direct Gateway)"
+
+msgid "未激活"
+msgstr "Inactive"
+
+msgid "未检测到 tmux 会话"
+msgstr "No tmux sessions detected"
+
+msgid "未连接终端"
+msgstr "Disconnected"
+
+msgid "未连接主机"
+msgstr "No Connected Host"
+
+msgid "未命名片段"
+msgstr "Unnamed Snippet"
+
+msgid "未命名主机"
+msgstr "Unnamed Host"
+
+msgid "未配置交换区"
+msgstr "No swap space configured"
+
+msgid "未配置远端"
+msgstr "Remote Not Configured"
+
+msgid "未匹配到凭据"
+msgstr "No credential matched"
+
+msgid "未设置用户"
+msgstr "User Not Set"
+
+msgid "未生成指纹"
+msgstr "Fingerprint Not Generated"
+
+msgid "未选定凭据"
+msgstr "No credential selected"
+
+msgid "未选择凭据 (点击选择 密钥 / 密码 / Agent)"
+msgstr "No credential selected (Click to choose Key / Password / Agent)"
+
+msgid "未找到匹配的本地终端或远程主机"
+msgstr "No matching local terminals or remote hosts found"
+
+msgid "未找到匹配的历史记录"
+msgstr "No matching history records found"
+
+msgid "未找到匹配的命令或主机"
+msgstr "No matching commands or hosts found"
+
+msgid "未找到匹配的凭据记录"
+msgstr "No matching credential records found"
+
+msgid "未找到匹配的远程主机"
+msgstr "No matching remote hosts found"
+
+msgid "未找到匹配的主机连接记录"
+msgstr "No matching host connection records found"
+
+msgid "文件传输队列与实时任务"
+msgstr "File Transfer Queue & Live Tasks"
+
+msgid "文件存在重名冲突策略 (Conflict Resolution)"
+msgstr "File Conflict Resolution Policy"
+
+msgid "文件大小"
+msgstr "File Size"
+
+msgid "文件管理"
+msgstr "File Manager"
+
+msgid "文件管理器"
+msgstr "File Explorer"
+
+msgid "文件夹分组信息"
+msgstr "Folder Group Info"
+
+msgid "文件夹名称"
+msgstr "Folder Name"
+
+msgid "文件与 SFTP"
+msgstr "Files & SFTP"
+
+msgid "文字与交互强调 (Foreground & Accent)"
+msgstr "Foreground & Accent"
+
+msgid "我 (Operator)"
+msgstr "Me (Operator)"
+
+msgid "我的自定义主题 (My Custom Themes)"
+msgstr "My Custom Themes"
+
+msgid "无密码留空"
+msgstr "Leave empty if no password"
+
+msgid "无匹配"
+msgstr "No Match"
+
+msgid "无认证可留空"
+msgstr "Leave empty if unauthenticated"
+
+msgid "无限制"
+msgstr "Unlimited"
+
+msgid "无效"
+msgstr "Invalid"
+
+msgid "无需认证留空"
+msgstr "Leave empty if unauthenticated"
+
+msgid "物理内存 (RAM)"
+msgstr "Physical Memory (RAM)"
+
+msgid "系统蜂鸣 (Audible)"
+msgstr "Audible Bell"
+
+msgid "系统级桌面气泡通知 (Desktop Push)"
+msgstr "OS Desktop Notifications (Desktop Push)"
+
+msgid "系统级桌面托盘气泡通知 (OS Desktop Notification)"
+msgstr "OS Desktop Notification (Desktop Push)"
+
+msgid "系统监控"
+msgstr "System Monitor"
+
+msgid "系统默认程序"
+msgstr "System Default"
+
+msgid "系统未挂载交换文件"
+msgstr "No swap file mounted"
+
+msgid "下划线 _"
+msgstr "Underline _"
+
+msgid "下行 RX (入网)"
+msgstr "Downlink RX (In)"
+
+msgid "下载"
+msgstr "Download"
+
+msgid "下载到本地"
+msgstr "Download to Local"
+
+msgid "显示跟随系统 (System) 实验性主题"
+msgstr "Show System Theme (Experimental)"
+
+msgid "显示隐藏文件与点文件 (Show Hidden Files)"
+msgstr "Show Hidden & Dotfiles"
+
+msgid "现代 Vulkan 超低开销显卡直通"
+msgstr "Modern Vulkan Ultra-low Overhead GPU Passthrough"
+
+msgid "现代 Vulkan 极速管线"
+msgstr "Modern Vulkan Pipeline"
+
+msgid "现在"
+msgstr "Now"
+
+msgid "限制单任务上传带宽，避免占满网络上行导致其他终端交互卡顿"
+msgstr "Limit single-task upload bandwidth to prevent saturation"
+
+msgid "限制单任务下载带宽，保证网络均衡"
+msgstr "Limit single-task download bandwidth to ensure network balance"
+
+msgid "向下分屏"
+msgstr "Split Down"
+
+msgid "向右分屏"
+msgstr "Split Right"
+
+msgid "向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开"
+msgstr "Send periodic empty packets to remote host to prevent idle disconnects by firewalls or NAT"
+
+msgid "向远程主机定期发送空数据包，防止因云防火墙或 NAT 映射空闲超时而被强行断开 (0 为禁用)"
+msgstr "Periodically send dummy packets to keep firewalls/NATs from dropping idle connections (0 to disable)"
+
+msgid "项"
+msgstr "Items"
+
+msgid "项凭据 · 实时保护"
+msgstr "credentials · live protected"
+
+msgid "小时"
+msgstr "Hours"
+
+msgid "协议安全策略与数据流压缩"
+msgstr "Protocol Security Policy & Compression"
+
+msgid "协议模式"
+msgstr "Protocol Mode"
+
+msgid "心跳保活间隔 (ServerAliveInterval):"
+msgstr "Keepalive Interval (ServerAliveInterval):"
+
+msgid "心跳保活最大丢失阈值 (ServerAliveCountMax)"
+msgstr "Max Keepalive Packet Loss (ServerAliveCountMax)"
+
+msgid "新窗口"
+msgstr "New Window"
+
+msgid "新分组名称:"
+msgstr "New Group Name:"
+
+msgid "新建"
+msgstr "New"
+
+msgid "新建 tmux 会话"
+msgstr "New tmux Session"
+
+msgid "新建备份任务"
+msgstr "New Backup Task"
+
+msgid "新建出网代理配置"
+msgstr "New Outbound Proxy Config"
+
+msgid "新建代码片段"
+msgstr "New Snippet"
+
+msgid "新建代码片段文件夹"
+msgstr "New Snippet Folder"
+
+msgid "新建端口转发规则"
+msgstr "New Port Forwarding Rule"
+
+msgid "新建分组"
+msgstr "New Group"
+
+msgid "新建片段到此处"
+msgstr "New Snippet Here"
+
+msgid "新建凭据"
+msgstr "New Credential"
+
+msgid "新建跳板机配置"
+msgstr "New Jump Host Config"
+
+msgid "新建网络与隧道规则"
+msgstr "New Network & Tunnel Rule"
+
+msgid "新建文件"
+msgstr "New File"
+
+msgid "新建文件夹"
+msgstr "New Folder"
+
+msgid "新建诊断高亮规则"
+msgstr "New Highlighting Rule"
+
+msgid "新建终端会话"
+msgstr "New Terminal Session"
+
+msgid "新建终端会话 Tab"
+msgstr "New Terminal Session Tab"
+
+msgid "新建主机"
+msgstr "New Host"
+
+msgid "新建主机端口转发规则"
+msgstr "New Port Forwarding Rule"
+
+msgid "新建主机分组"
+msgstr "New Host Group"
+
+msgid "新建主机配置 (Create Host)"
+msgstr "New Host Configuration"
+
+msgid "新建主题"
+msgstr "New Theme"
+
+msgid "新建专属主题"
+msgstr "New Custom Theme"
+
+msgid "新建子分组"
+msgstr "New Subgroup"
+
+msgid "新建子片段"
+msgstr "New Child Snippet"
+
+msgid "新建子文件夹"
+msgstr "New Subfolder"
+
+msgid "新密码不能为空！"
+msgstr "New password cannot be empty!"
+
+msgid "新主密码:"
+msgstr "New Password:"
+
+msgid "行"
+msgstr "lines"
+
+msgid "修改常用运维脚本指令内容与注入执行配置"
+msgstr "Modify ops script content and execution config"
+
+msgid "修改此备份节点配置..."
+msgstr "Edit Backup Node Config..."
+
+msgid "修改当前备份节点的存储端点、认证凭据、同步策略与快照生命周期"
+msgstr "Modify storage endpoint, credentials, sync policy, and lifecycle for this node"
+
+msgid "修改后将同步更新全站各处代码片段列表"
+msgstr "Changes will update snippet lists across the client"
+
+msgid "修改时间"
+msgstr "Modified Time"
+
+msgid "修改正则表达式与终端匹配文本的实时着色样式"
+msgstr "Modify regular expression and real-time text coloring style"
+
+msgid "修改主密码 (Change Master Password)"
+msgstr "Change Master Password"
+
+msgid "修改主密码..."
+msgstr "Change Master Password..."
+
+msgid "悬停底色 (hover_bg)"
+msgstr "Hover Background (hover_bg)"
+
+msgid "选取上级"
+msgstr "Select Parent"
+
+msgid "选择 SSH 宿主"
+msgstr "Select SSH Host"
+
+msgid "选择备份包还原..."
+msgstr "Select Backup File to Restore..."
+
+msgid "选择本机已导出的 .smalux / .json 备份文件，无损恢复全部主机资产与凭据"
+msgstr "Select exported .smalux / .json file to losslessly restore all hosts and credentials"
+
+msgid "选择并打开文件会话"
+msgstr "Select and Open File Session"
+
+msgid "选择纯色无壁纸、仅终端视口透底或全局亚克力毛玻璃磨砂"
+msgstr "Choose solid background, terminal-only translucency, or global acrylic frosted glass"
+
+msgid "选择关联 SSH 宿主主机"
+msgstr "Select Associated SSH Host"
+
+msgid "选择轮播壁纸更替时的视效动画"
+msgstr "Select visual animation effect for wallpaper transitions"
+
+msgid "选择目标所属分组"
+msgstr "Select Target Group"
+
+msgid "选择凭据 ▼"
+msgstr "Select Credential ▼"
+
+msgid "选择凭据资产 (Select Credential)"
+msgstr "Select Credential"
+
+msgid "选择全局 UI 与终端调色板（实时热生效）"
+msgstr "Choose global UI and terminal palette (applies instantly in real-time)"
+
+msgid "选择使用客户端内置轻量编辑器、系统默认程序关联或外部命令行程序"
+msgstr "Choose between built-in lightweight editor, system default association, or custom CLI program"
+
+msgid "选择所属分类文件夹"
+msgstr "Select Belonging Folder"
+
+msgid "选择所属上级分组"
+msgstr "Select Parent Group"
+
+msgid "选择所属上级文件夹 / 分组"
+msgstr "Select Parent Folder / Group"
+
+msgid "选择所属文件夹"
+msgstr "Select Folder"
+
+msgid "选择网络与隧道中心已有代理"
+msgstr "Select Existing Proxy from Tunnel Hub"
+
+msgid "选择颜色"
+msgstr "Select Color"
+
+msgid "选择已有主机"
+msgstr "Select Existing Host"
+
+msgid "选择直连、跟随操作系统系统代理或指定全局 SOCKS5 / HTTP 代理"
+msgstr "Select direct connection, system proxy, or custom SOCKS5 / HTTP proxy"
+
+msgid "选择终端光栅化渲染等宽字体 (建议预装 Nerd Font 图标字体)"
+msgstr "Select monospace font for terminal rasterization (Nerd Font recommended)"
+
+msgid "选择左侧代码片段进行查看或编辑"
+msgstr "Select a snippet on the left to view or edit"
+
+msgid "选中项目底色"
+msgstr "Selected Item Background"
+
+msgid "选中项目底色 (selected-background)"
+msgstr "Selected Item Background (selected-background)"
+
+msgid "选中项前景色"
+msgstr "Selected Item Foreground"
+
+msgid "选中项前景色 (selected-foreground)"
+msgstr "Selected Item Foreground (selected-foreground)"
+
+msgid "渲染管线同步写入环境变量 (Sync SLINT_BACKEND)"
+msgstr "Sync SLINT_BACKEND Environment Variable"
+
+msgid "压缩所有终端文本输出与 SFTP 传输数据流，显著提升跨国网络与低带宽连接速度"
+msgstr "Compress terminal output and SFTP streams, improving throughput on high-latency links"
+
+msgid "严格每次询问 (ask)"
+msgstr "Always Ask (Strict)"
+
+msgid "验证小数据量下的空状态呈现、滚动条隐藏及轻量加载表现"
+msgstr "Verifies empty state, scrollbar hiding, and lightweight loading under small datasets"
+
+msgid "一键场景预设:"
+msgstr "Scenario Presets:"
+
+msgid "一键还原"
+msgstr "One-Click Restore"
+
+msgid "一键获取模型"
+msgstr "Fetch Models"
+
+msgid "一键切换"
+msgstr "One-Click Switch"
+
+msgid "一键扫描并导入本机 ~/.ssh/config"
+msgstr "Scan and Import Local ~/.ssh/config"
+
+msgid "一键生成密钥对"
+msgstr "Generate Keypair"
+
+msgid "一键注入执行"
+msgstr "Inject & Execute"
+
+msgid "一站式配置 API 端点、拉取模型库、测试连通性与高级网络参数"
+msgstr "Configure API endpoints, fetch models, test connectivity, and adjust network params"
+
+msgid "移除记录"
+msgstr "Remove Record"
+
+msgid "移动"
+msgstr "Move"
+
+msgid "移入此分组"
+msgstr "Move into this group"
+
+msgid "移至根目录 (顶级)"
+msgstr "Move to root (Top-level)"
+
+msgid "移至根目录 (未分组)"
+msgstr "Move to root (Ungrouped)"
+
+msgid "已绑定当前主机 · 专属规则"
+msgstr "Bound to Current Host · Dedicated Rule"
+
+msgid "已保存"
+msgstr "Saved"
+
+msgid "已放弃"
+msgstr "Abandoned"
+
+msgid "已放行"
+msgstr "Approved"
+
+msgid "已复制 ✓"
+msgstr "Copied ✓"
+
+msgid "已复制 OpenSSH ProxyJump 参数"
+msgstr "OpenSSH ProxyJump arguments copied"
+
+msgid "已复制出网代理连接串"
+msgstr "Outbound proxy connection string copied"
+
+msgid "已复制代理环境变量配置"
+msgstr "Proxy environment variables copied"
+
+msgid "已复制公钥"
+msgstr "Public key copied"
+
+msgid "已复制私钥"
+msgstr "Private key copied"
+
+msgid "已复制指纹"
+msgstr "Fingerprint copied"
+
+msgid "已挂起 / 停止"
+msgstr "Suspended / Stopped"
+
+msgid "已关闭"
+msgstr "Closed"
+
+msgid "已激活"
+msgstr "Active"
+
+msgid "已配置的 AI 端点端口"
+msgstr "Configured AI Endpoints"
+
+msgid "已配置的备份节点与同步任务"
+msgstr "Configured Backup Nodes & Sync Tasks"
+
+msgid "已启用 (Partial Repaint / 0% 待机功耗)"
+msgstr "Enabled (Partial Repaint / 0% Standby Power)"
+
+msgid "已受主密码保护 (AES-256)"
+msgstr "Protected by Master Password (AES-256)"
+
+msgid "已停止"
+msgstr "Stopped"
+
+msgid "已完成"
+msgstr "Completed"
+
+msgid "已选: "
+msgstr "Selected: "
+
+msgid "已选中: "
+msgstr "Selected: "
+
+msgid "已执行"
+msgstr "Executed"
+
+msgid "已自定义 (默认: "
+msgstr "Customized (Default: "
+
+msgid "以下为在【网络与隧道中心】预先组装配置好的有序跳板串模板："
+msgstr "Preset jump chains pre-configured in Network & Tunnel Hub:"
+
+msgid "异常断线恢复与自动重试"
+msgstr "Auto-Reconnect & Retry"
+
+msgid "异常中断"
+msgstr "Aborted"
+
+msgid "引用隧道中心代理"
+msgstr "Reference Tunnel Hub Proxy"
+
+msgid "应用代理设置 (Apply Proxy Settings)"
+msgstr "Apply Proxy Settings"
+
+msgid "应用启动时默认视图 (Startup View)"
+msgstr "Startup View"
+
+msgid "应用在每次执行批量导入、大改动或升级前自动保存本地轻量快照，支持随时一键无损回滚"
+msgstr "App automatically saves lightweight snapshots before imports or major edits for lossless rollback"
+
+msgid "永久保留"
+msgstr "Keep Forever"
+
+msgid "永久不清理"
+msgstr "Never delete"
+
+msgid "用户"
+msgstr "User"
+
+msgid "用户名 / Access Key"
+msgstr "Username / Access Key"
+
+msgid "用户名: "
+msgstr "User: "
+
+msgid "用途说明与备注 (Description)"
+msgstr "Description & Notes"
+
+msgid "由 AI 结合上下文自主决策，风险附带说明"
+msgstr "AI decides autonomously based on context, with risk explanations"
+
+msgid "由代理服务器远程解析 DNS"
+msgstr "Remote DNS Resolution via Proxy"
+
+msgid "预估显存总占用:"
+msgstr "Estimated VRAM Footprint:"
+
+msgid "预设凭据单项注入"
+msgstr "Preset Credential Injection"
+
+msgid "源路径 (文件名 / 目录)"
+msgstr "Source Path (File / Folder)"
+
+msgid "远程"
+msgstr "Remote"
+
+msgid "远程 SOCKS5 端口 (Port)"
+msgstr "Remote SOCKS5 Port"
+
+msgid "远程 SOCKS5 网关监听端口 (Remote Port)"
+msgstr "Remote SOCKS5 Gateway Listen Port (Remote Port)"
+
+msgid "远程反向 (-R)"
+msgstr "Remote Forwarding (-R)"
+
+msgid "远程公网监听端口 (Remote Port)"
+msgstr "Remote Public Listen Port (Remote Port)"
+
+msgid "远程公网入口 (监听端)"
+msgstr "Remote Public Inbound (Listener)"
+
+msgid "远程监听地址 (Remote Bind)"
+msgstr "Remote Bind Address"
+
+msgid "远程文件双击打开方式 (Remote File Editor)"
+msgstr "Remote File Double-click Action"
+
+msgid "远程文件双击打开方式、外部自定义编辑器与同步忽略规则黑名单"
+msgstr "Double-click open action, external editor, and sync ignore rules"
+
+msgid "远程项: "
+msgstr "Remote items: "
+
+msgid "远程主机资产 (Remote Hosts)"
+msgstr "Remote Host Assets (Remote Hosts)"
+
+msgid "远程主机资产 (Remote SFTP Hosts)"
+msgstr "Remote Host Assets (Remote SFTP Hosts)"
+
+msgid "远程主机资产 (Remote SSH Hosts)"
+msgstr "Remote Host Assets (Remote SSH Hosts)"
+
+msgid "远端"
+msgstr "Remote"
+
+msgid "远端 DNS 解析"
+msgstr "Remote DNS Resolution"
+
+msgid "远端:"
+msgstr "Remote:"
+
+msgid "远端: "
+msgstr "Remote: "
+
+msgid "远端目标服务端口 (Remote Port)"
+msgstr "Remote Target Service Port (Remote Port)"
+
+msgid "远端应用 (客户端)"
+msgstr "Remote Application (Client)"
+
+msgid "远端应用 (SOCKS5 客户端)"
+msgstr "Remote App (SOCKS5 Client)"
+
+msgid "约束大模型的角色人设、输出格式、安全红线与针对 Linux 终端的回复规范"
+msgstr "Define model persona, output format, safety guardrails, and Linux terminal response guidelines"
+
+msgid "云端多端加密备份与同步原型 (Cloud Sync Prototype)"
+msgstr "Cloud Sync Prototype"
+
+msgid "云同步后端协议 (Cloud Sync Backend)"
+msgstr "Cloud Sync Backend Protocol"
+
+msgid "允许首次通过主密码解锁后，使用系统指纹或面容识别快捷解锁"
+msgstr "Allow Windows Hello (fingerprint/face) unlock after initial master password entry"
+
+msgid "允许协商 3DES、Diffie-Hellman Group 1 等已弃用算法（仅建议调试陈旧网络设备时开启）"
+msgstr "Allow deprecated algorithms like 3DES, DH Group 1 (only recommended for legacy network appliances)"
+
+msgid "允许携带终端屏幕上下文 (Context-Aware)"
+msgstr "Allow Terminal Screen Context (Context-Aware)"
+
+msgid "运维诊断关键字与正则高亮 (Diagnostic Keywords & Regex Highlighting)"
+msgstr "Diagnostic Keywords & Regex Highlighting"
+
+msgid "运维专家系统提示词 (System Prompt)"
+msgstr "Ops Expert System Prompt"
+
+msgid "运行: "
+msgstr "Run: "
+
+msgid "运行: {} 天  |  进程: {}"
+msgstr "Uptime: {} days  |  Procs: {}"
+
+msgid "运行时磁盘 I/O 开销:"
+msgstr "Runtime Disk I/O Overhead:"
+
+msgid "运行时日志自动滚动通道 (Auto-scroll Log Channel)"
+msgstr "Auto-scroll Log Channel"
+
+msgid "运行中"
+msgstr "Running"
+
+msgid "再次输入新主密码..."
+msgstr "Re-enter new master password..."
+
+msgid "在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc, .env)"
+msgstr "Show files beginning with a dot in SFTP file tree (e.g., .bashrc, .env)"
+
+msgid "在「主机」页面双击主机发起远程连接后将自动记录"
+msgstr "Double-click a host on the Hosts page to connect; records will appear here"
+
+msgid "在「主机管理」中双击任意远程主机发起连接后，将自动在此沉淀连接足迹"
+msgstr "Connect to any remote host in Host Management to log connection history here"
+
+msgid "在本地安全加密记录所有终端连接历史、高危操作命令时间戳与审计踪迹"
+msgstr "Securely record terminal session history, timestamps of critical commands, and audit trail locally"
+
+msgid "在此输入代码片段或 Shell 脚本内容 (支持 {{var}} 动态参数占位符)..."
+msgstr "Enter snippet or Shell script here (supports {{var}} dynamic parameter placeholders)..."
+
+msgid "在此组新建主机"
+msgstr "New Host in Group"
+
+msgid "在当前活动远程主机上创建独立的后台会话，断开 SSH 也将持久保活。"
+msgstr "Create background sessions on active remote host, persisting even when SSH disconnects."
+
+msgid "在发起 SSH 握手或 TCP 套接字建立时的最大等待时间"
+msgstr "Maximum waiting time when establishing SSH handshake or TCP sockets"
+
+msgid "在发起 SSH 握手或 TCP 套接字建立时的最大等待时限 (秒)"
+msgstr "Max timeout when initiating SSH handshake or TCP socket connection (seconds)"
+
+msgid "在界面中显示调试控制台入口 (Show Developer Tools in UI)"
+msgstr "Show Developer Tools in UI"
+
+msgid "在图库中自动按间隔时间循环播放下一张壁纸"
+msgstr "Automatically cycle through gallery wallpapers at specified intervals"
+
+msgid "在线"
+msgstr "Online"
+
+msgid "在线终端: "
+msgstr "Online Terminals: "
+
+msgid "在远程服务器上删除文件或目录前弹出模态弹窗二次核验，防止误操作"
+msgstr "Show confirmation modal before deleting remote files or directories"
+
+msgid "在终端历史缓冲区查找"
+msgstr "Find in Terminal History Buffer"
+
+msgid "在终端视口右击直接粘贴当前系统剪贴板文本"
+msgstr "Right-click anywhere inside the terminal viewport to instantly paste clipboard text"
+
+msgid "在终端视口中用鼠标选中文字时，立即自动复制，无需手动按快捷键"
+msgstr "Automatically copy selected text in terminal viewport without pressing shortcut keys"
+
+msgid "在终端长命令执行完毕、文件传输成功或网络隧道自动重连时弹出系统通知"
+msgstr "Show desktop alerts when long commands finish, transfers succeed, or tunnels reconnect"
+
+msgid "在终端中输入 rm -rf, mkfs, reboot, fdisk 等危险命令时突出高亮警示"
+msgstr "Highlight dangerous commands like rm -rf, mkfs, reboot, fdisk with visible warning alerts"
+
+msgid "在主界面左侧活动栏显示调试控制台入口，并允许快捷键 F12 唤出诊断抓取器"
+msgstr "Show debug console entry on the left activity bar and enable F12 to invoke diagnostic capture"
+
+msgid "在左侧栏显示调试入口并开启诊断抓取"
+msgstr "Show debug entry in left sidebar and enable diagnostic capture"
+
+msgid "暂停传输"
+msgstr "Pause Transfer"
+
+msgid "暂无代码片段"
+msgstr "No snippets found"
+
+msgid "暂无进行中的文件传输任务"
+msgstr "No file transfers in progress"
+
+msgid "暂无可用的跳板主机资产"
+msgstr "No available jump host assets"
+
+msgid "暂无可用模型，请先在上方添加或获取模型"
+msgstr "No models available. Please add or fetch models above"
+
+msgid "暂无历史连接记录"
+msgstr "No connection history yet"
+
+msgid "暂无连接记录"
+msgstr "No connection records"
+
+msgid "暂无连接历史"
+msgstr "No connection history"
+
+msgid "暂无模型，请点击上方「一键获取模型」或手动添加"
+msgstr "No models. Click 'Fetch Models' above or add manually"
+
+msgid "暂无配置的 AI 端点"
+msgstr "No AI endpoints configured"
+
+msgid "暂无配置的备份任务节点"
+msgstr "No backup task nodes configured"
+
+msgid "暂无凭据记录"
+msgstr "No credential records"
+
+msgid "暂无实时诊断日志事件"
+msgstr "No live diagnostic log events"
+
+msgid "暂无数据"
+msgstr "No data available"
+
+msgid "暂无文件传输任务 (直接拖拽左/右侧文件或目录即可触发实时上传/下载)"
+msgstr "No active transfers (drag and drop files/folders to trigger upload/download)"
+
+msgid "暂无已保存凭据"
+msgstr "No saved credentials yet"
+
+msgid "暂无已导入的壁纸，请点击上方按钮添加单张图片或导入整个文件夹"
+msgstr "No imported wallpapers. Click above to add single images or import a folder"
+
+msgid "暂无已生成的镜像快照 (首次备份将在调度周期到达或点击立即同步后产生)"
+msgstr "No snapshots generated yet (first backup will be generated on schedule or manual trigger)"
+
+msgid "暂无终端屏幕输出快照"
+msgstr "No terminal screen output snapshot"
+
+msgid "暂无主机资产，请先在主机面板中添加主机"
+msgstr "No host assets yet. Please add a host in the hosts panel first"
+
+msgid "粘贴"
+msgstr "Paste"
+
+msgid "粘贴 -----BEGIN OPENSSH PRIVATE KEY----- 或输入本地文件绝对路径 (如 C:\\\\Users\\\\user\\\\.ssh\\\\id_ed25519)"
+msgstr "Paste -----BEGIN OPENSSH PRIVATE KEY----- or enter local absolute path"
+
+msgid "粘贴多行或含回车命令时前置告警"
+msgstr "Warn Before Pasting Multi-line or Enter Commands"
+
+msgid "粘贴剪贴板内容"
+msgstr "Paste Clipboard Content"
+
+msgid "展开并显示"
+msgstr "Expand & Show"
+
+msgid "展开可见节点"
+msgstr "Expanded Visible Nodes"
+
+msgid "张"
+msgstr "items"
+
+msgid "长耗时命令结束或会话异常断开时向 Windows 系统托盘推送通知 (直接在此控制生效)"
+msgstr "Notify Windows system tray when long commands finish or sessions drop"
+
+msgid "账号密码"
+msgstr "Account & Password"
+
+msgid "遮挡私钥"
+msgstr "Mask Key"
+
+msgid "针对无公网 IP 的隔离内网，配置全局统一前置跳板节点 (支持多级 ProxyJump 链)"
+msgstr "Configure global jump host for isolated intranets (supports multi-tier ProxyJump chains)"
+
+msgid "正常退出"
+msgstr "Exited Normally"
+
+msgid "正向隧道"
+msgstr "Forward Tunnel"
+
+msgid "正在测试..."
+msgstr "Testing..."
+
+msgid "正在挂载主机上下文、研判系统日志并规划执行命令..."
+msgstr "Mounting host context, analyzing logs, and planning commands..."
+
+msgid "正在获取..."
+msgstr "Fetching..."
+
+msgid "正在监听键盘按键... 请直接在键盘按下组合键"
+msgstr "Listening for keyboard input... Press your key combo"
+
+msgid "正在探活..."
+msgstr "Testing connection..."
+
+msgid "正在向目标 Base URL 与接口发送探活请求..."
+msgstr "Sending health check request to target Base URL..."
+
+msgid "正则表达式 (Pattern)"
+msgstr "Regular Expression (Pattern)"
+
+msgid "支持 {{var}} 动态参数注入"
+msgstr "Supports {{var}} dynamic parameter injection"
+
+msgid "支持导入标准 TOML 或 Windows Terminal 配色，或基于当前主题派生新主题"
+msgstr "Supports importing standard TOML or Windows Terminal color schemes, or deriving new themes from the current one"
+
+msgid "支持多端点/多端口配置（官方接口、代理端口、本地 Ollama 等），表格化展示与一键无缝热切换"
+msgstr "Support multi-endpoint/port configuration (Official, Proxy, Ollama, etc.) with hot-switching"
+
+msgid "支持根据正则表达式对终端输出中的关键错误、告警与状态实时着色"
+msgstr "Colorize key errors, warnings, and states in terminal output using regular expressions"
+
+msgid "支持将资产库定时或实时同步至本地存储盘、私有 WebDAV、S3 或自建服务器"
+msgstr "Support scheduled or real-time sync to local storage, WebDAV, S3, or self-hosted servers"
+
+msgid "支持解析并批量导入从其他桌面终端软件导出的 .json、.tsv 或会话配置文件"
+msgstr "Supports parsing and batch importing .json, .tsv, or session configs exported from other terminals"
+
+msgid "支持实时表单调色、沙盒窗口渲染验证与标准 TOML 源码双向同步"
+msgstr "Real-time palette tuning, sandbox window preview, and bi-directional TOML code synchronization"
+
+msgid "支持添加单张或直接导入整个文件夹中的图片，点击条目即选即换，支持自动轮播"
+msgstr "Support adding single images or importing folders; click to apply, with auto-cycling"
+
+msgid "支持拖拽调序、跨分组归类与参数化变量 {{var}}"
+msgstr "Supports drag-and-drop reordering, nesting, and parameterized {{var}}"
+
+msgid "支持自定义创建、导入、导出与一键实时无损热切换"
+msgstr "Support custom creation, import, export, and one-click lossless hot-switching"
+
+msgid "执行"
+msgstr "Execute"
+
+msgid "执行成功"
+msgstr "Executed Successfully"
+
+msgid "执行成功与确认"
+msgstr "Success & Confirmations"
+
+msgid "直发终端"
+msgstr "Send to Terminal"
+
+msgid "直接键入文本后点击右下角保存"
+msgstr "Type text directly and click Save in bottom right"
+
+msgid "直连"
+msgstr "Direct"
+
+msgid "直连 (禁用代理)"
+msgstr "Direct (No Proxy)"
+
+msgid "直连 (无代理)"
+msgstr "Direct (No Proxy)"
+
+msgid "直连网关"
+msgstr "Direct Gateway"
+
+msgid "只读探测自动跑，配置与文件变更强制拦截"
+msgstr "Run read-only probes automatically; strictly intercept config and file changes"
+
+msgid "只读巡检"
+msgstr "Read-only Inspection"
+
+msgid "指针悬停微亮底色"
+msgstr "Hover Background"
+
+msgid "指针悬停微亮底色 (hover-background)"
+msgstr "Hover Background (hover-background)"
+
+msgid "致命错误"
+msgstr "Fatal Error"
+
+msgid "致命错误与失败"
+msgstr "Fatal Errors & Failures"
+
+msgid "智能检测 URL 并支持点击跳转 (Clickable URLs)"
+msgstr "Clickable URL Detection"
+
+msgid "智能审核 (大模型认知推理)"
+msgstr "Intelligent Review (LLM Reasoning)"
+
+msgid "智能生成 Shell 指令、自动化排查故障与日志诊断"
+msgstr "Intelligent Shell command generation, automated troubleshooting, and log diagnostics"
+
+msgid "智能识别与运维诊断高亮规则"
+msgstr "Intelligent Keywords & Diagnostics Highlighting Rules"
+
+msgid "置顶"
+msgstr "Pinned"
+
+msgid "置顶常用"
+msgstr "Pinned"
+
+msgid "置顶悬浮、安全断开防呆确认与系统托盘常驻"
+msgstr "Always on top, close confirmation, and system tray integration"
+
+msgid "中继节点"
+msgstr "Relay Nodes"
+
+msgid "中间资产"
+msgstr "Relay Asset"
+
+msgid "中央终端视口"
+msgstr "Central Terminal Viewport"
+
+msgid "终端"
+msgstr "Terminal"
+
+msgid "终端侧边临时便签划词板 (Terminal Scratchpad)"
+msgstr "Terminal Scratchpad"
+
+msgid "终端仿真类型 (TERM 环境量):"
+msgstr "Terminal Emulation (TERM):"
+
+msgid "终端蜂鸣报警模式 (Terminal Bell)"
+msgstr "Terminal Bell Mode"
+
+msgid "终端复古 CRT 扫描线着色器 (Terminal CRT Shader)"
+msgstr "Terminal Retro CRT Shader"
+
+msgid "终端光标呼吸闪烁 (Cursor Blinking)"
+msgstr "Terminal Cursor Blinking"
+
+msgid "终端光标交互形态 (Cursor Style)"
+msgstr "Terminal Cursor Style"
+
+msgid "终端光栅化管线"
+msgstr "Terminal Rasterizer Pipeline"
+
+msgid "终端交互"
+msgstr "Terminal Interaction"
+
+msgid "终端内识别到 http:// 与 https:// 链接时高亮下划线，点击自动调用系统默认浏览器打开"
+msgstr "Underline http:// and https:// URLs in terminal; click to open with system browser"
+
+msgid "终端屏幕历史回滚行数 (Scrollback Buffer)"
+msgstr "Scrollback Buffer Lines"
+
+msgid "终端首选项"
+msgstr "Terminal"
+
+msgid "终端输出快照"
+msgstr "Terminal Screen Snapshot"
+
+msgid "终端透底"
+msgstr "Terminal Transparency"
+
+msgid "终端网页链接点击跳转与运维诊断关键字突出显示"
+msgstr "Clickable terminal URLs and diagnostic keyword highlighting"
+
+msgid "终端引擎排版"
+msgstr "Terminal Typography"
+
+msgid "终端引擎与排版首选项"
+msgstr "Terminal Engine & Typography Preferences"
+
+msgid "终端字号大小 (Font Size)"
+msgstr "Terminal Font Size"
+
+msgid "重命名"
+msgstr "Rename"
+
+msgid "重新传输"
+msgstr "Retry Transfer"
+
+msgid "重新上传"
+msgstr "Retry Upload"
+
+msgid "重新生成密钥对"
+msgstr "Regenerate Keypair"
+
+msgid "重新生成随机密码"
+msgstr "Regenerate Random Password"
+
+msgid "重新下载"
+msgstr "Retry Download"
+
+msgid "重置本地偏好设置与清除临时状态（不会删除已保存的主机资产）"
+msgstr "Reset local preferences and clear temporary cache (will not delete host assets)"
+
+msgid "重置与清空:"
+msgstr "Reset & Clear:"
+
+msgid "主窗口底色"
+msgstr "Window Background"
+
+msgid "主窗口底色 (window-background)"
+msgstr "Window Background (window-background)"
+
+msgid "主窗口置顶"
+msgstr "Window Always-on-Top"
+
+msgid "主窗口置顶状态:"
+msgstr "Always on Top:"
+
+msgid "主机"
+msgstr "Hosts"
+
+msgid "主机备忘与备注 (Notes):"
+msgstr "Notes:"
+
+msgid "主机别名 (选填):"
+msgstr "Host Alias (Optional):"
+
+msgid "主机地址 (IP / 域名):"
+msgstr "Host Address (IP / Domain):"
+
+msgid "主机端口转发"
+msgstr "Host Port Forwarding"
+
+msgid "主机管理"
+msgstr "Hosts"
+
+msgid "主机密钥防篡改验证策略 (StrictHostKeyChecking)"
+msgstr "Strict Host Key Checking Policy"
+
+msgid "主机密钥指纹检查、链路层实时压缩与老旧算法兼容"
+msgstr "Host key fingerprint check, wire compression, and legacy cipher support"
+
+msgid "主机名:"
+msgstr "Host Name:"
+
+msgid "主机名称"
+msgstr "Host Name"
+
+msgid "主机名称:"
+msgstr "Host Name:"
+
+msgid "主机实时监控"
+msgstr "Live Host Monitor"
+
+msgid "主机数: "
+msgstr "Hosts: "
+
+msgid "主机资产"
+msgstr "Host Assets"
+
+msgid "主机资产调试"
+msgstr "Host Assets"
+
+msgid "主密码管理 (Manage Master Password)"
+msgstr "Master Password Management"
+
+msgid "主密码用于生成 Argon2id 派生密钥，对存储在本地的所有 SSH 私钥、主机登录凭据进行全量 AES-256 加密。应用不存储明文且不支持找回，请务必妥善牢记！"
+msgstr "Master password generates an Argon2id key to encrypt all SSH keys and credentials with AES-256. It cannot be recovered if lost!"
+
+msgid "主密码长度至少需为 6 位！"
+msgstr "Master password must be at least 6 characters!"
+
+msgid "主前景色 (foreground)"
+msgstr "Foreground (foreground)"
+
+msgid "主色强调 (Accent):"
+msgstr "Accent Color (Accent):"
+
+msgid "主题画廊 (Theme Gallery)"
+msgstr "Theme Gallery"
+
+msgid "主题名称 (Name)"
+msgstr "Theme Name"
+
+msgid "主题配色体系测试 (当前生效: "
+msgstr "Theme Palette Matrix Test (Active: "
+
+msgid "主题配色体系快测 (当前: "
+msgstr "Quick Theme Switch (Active: "
+
+msgid "主题切换与外观治理 (当前: "
+msgstr "Theme Switch & Appearance (Current: "
+
+msgid "主题设计与定制工坊 (Theme Studio)"
+msgstr "Theme Studio (Custom Themes)"
+
+msgid "主题生态管理 (Theme Actions)"
+msgstr "Theme Actions"
+
+msgid "注：此处设置的代理仅针对当前主机有效，完全独立于网络与隧道中心。"
+msgstr "Note: This proxy only applies to the current host and is independent of Tunnel Hub."
+
+msgid "注入并运行"
+msgstr "Inject & Run"
+
+msgid "注入场景"
+msgstr "Inject Scenario"
+
+msgid "注入终端后直接自动回车执行"
+msgstr "Auto-execute with Enter after injecting into terminal"
+
+msgid "状态"
+msgstr "Status"
+
+msgid "状态: "
+msgstr "Status: "
+
+msgid "状态: 完美锐利渲染"
+msgstr "Status: Crisp Sharp Rendering"
+
+msgid "状态: 自适应高刷匹配"
+msgstr "Status: Adaptive High Refresh Rate"
+
+msgid "状态分配策略:"
+msgstr "Status Distribution Policy:"
+
+msgid "桌面气泡消息通知"
+msgstr "Desktop Toast Notifications"
+
+msgid "字符像素栅格大小 (默认 13px，可无级微调)"
+msgstr "Character pixel raster size (default 13px, smoothly adjustable)"
+
+msgid "字符像素栅格大小 (支持直接输入或步进微调，默认 13px)"
+msgstr "Character pixel grid size (direct input or fine tuning, default 13px)"
+
+msgid "字号: 13px  |  光标: 闪烁块状"
+msgstr "Size: 13px  |  Cursor: Blinking Block"
+
+msgid "自定义"
+msgstr "Custom"
+
+msgid "自定义程序"
+msgstr "Custom Program"
+
+msgid "自定义代理"
+msgstr "Custom Proxy"
+
+msgid "自定义代理服务器与端口 (Proxy Server)"
+msgstr "Custom Proxy Server & Port"
+
+msgid "自定义规则"
+msgstr "Custom Rules"
+
+msgid "自定义快捷键"
+msgstr "Custom Shortcuts"
+
+msgid "自定义请求头 (Custom HTTP Headers)"
+msgstr "Custom HTTP Headers"
+
+msgid "自定义上限:"
+msgstr "Custom Limit:"
+
+msgid "自定义外部编辑器程序路径 (Editor Executable)"
+msgstr "Custom External Editor Executable"
+
+msgid "自定义行数:"
+msgstr "Custom Lines:"
+
+msgid "自定义终端外观、网络连接、快捷键与全量数据备份策略"
+msgstr "Customize terminal look, network, shortcuts, and full backups"
+
+msgid "自动备份同步策略"
+msgstr "Auto-Backup Sync Policy"
+
+msgid "自动关联隧道中心已保存的代理服务，中心配置更新时多主机自动同步生效"
+msgstr "Automatically links to saved proxies in Tunnel Hub; updates sync across hosts"
+
+msgid "自动化备份与多端容灾节点管理"
+msgstr "Automated Backup & Multi-node Disaster Recovery"
+
+msgid "自动化备份与多端容灾已处于停用状态"
+msgstr "Automatic backup and disaster recovery is currently disabled"
+
+msgid "自动解析本地 OpenSSH 配置文件，识别 Host 别名、IP 地址、端口与私钥 IdentityFile"
+msgstr "Automatically parse local OpenSSH config for Host aliases, IPs, ports, and IdentityFiles"
+
+msgid "自动识别终端输出中的状态代码、IPv4 地址、URL 链接并按照正则表达式规则着色"
+msgstr "Highlight status codes, IPv4 addresses, and URLs in terminal output using regex patterns"
+
+msgid "自动重命名 (rename)"
+msgstr "Auto-rename (rename)"
+
+msgid "自动追加回车执行"
+msgstr "Auto Append Enter to Execute"
+
+msgid "自建"
+msgstr "Self-hosted"
+
+msgid "自建备份服务 ★"
+msgstr "Custom Backup Server ★"
+
+msgid "自建备份服务器 API 端点 (Server Endpoint URL)"
+msgstr "Custom Backup Server API Endpoint URL"
+
+msgid "自建服务端"
+msgstr "Self-hosted Server"
+
+msgid "纵向分屏"
+msgstr "Split Vertically"
+
+msgid "最大上下文窗口限制"
+msgstr "Max Context Window Limit"
+
+msgid "最大深度推理 (High)"
+msgstr "Max Reasoning Depth (High)"
+
+msgid "最后备份时间"
+msgstr "Last Backup"
+
+msgid "最长执行时长 / 请求超时"
+msgstr "Max Request Timeout"
+
+msgid "昨天"
+msgstr "Yesterday"
+
+msgid "作者 (Author)"
+msgstr "Author"
+
+msgid "AES-256 加密保管库"
+msgstr "AES-256 Encrypted Vault"
+
+msgid "Agent 标识"
+msgstr "Agent Identifier"
+
+msgid "Agent 管道路径 *"
+msgstr "Agent Pipe Path *"
+
+msgid "AI 回复"
+msgstr "AI Response"
+
+msgid "AI 接口端点与端口配置 (API Endpoints)"
+msgstr "AI API Endpoints & Port Configuration"
+
+msgid "AI 深度思考中 (CoT 推理)..."
+msgstr "AI Deep Thinking (Chain-of-Thought)..."
+
+msgid "AI 已就绪"
+msgstr "AI Ready"
+
+msgid "AI 运维副驾驶"
+msgstr "AI Ops Copilot"
+
+msgid "AI 运维环境协同与专家人设 (Context & System Prompt)"
+msgstr "AI Ops Context & System Prompt"
+
+msgid "AI 终端助手"
+msgstr "AI Assistant"
+
+msgid "AI 助手与大模型"
+msgstr "AI Assistant"
+
+msgid "AI 助手与运维大模型配置"
+msgstr "AI Assistant & Ops LLM Configuration"
+
+msgid "AI 自主审核"
+msgstr "Autonomous AI Review"
+
+msgid "API 接口地址 (Base URL)"
+msgstr "API Base URL"
+
+msgid "API 密钥 (API Key)"
+msgstr "API Key"
+
+msgid "API 请求协议模式"
+msgstr "API Protocol Mode"
+
+msgid "Attached (活跃中)"
+msgstr "Attached (Active)"
+
+msgid "Bitwarden / Vaultwarden 桌面端托管 SSH 代理"
+msgstr "Bitwarden / Vaultwarden desktop managed SSH agent"
+
+msgid "CI/CD RSA-4096 密钥"
+msgstr "CI/CD RSA-4096 Key"
+
+msgid "CPU 负载"
+msgstr "CPU Load"
+
+msgid "CPU 核心算力"
+msgstr "CPU Cores"
+
+msgid "CPU 软件安全渲染"
+msgstr "CPU Software Safe Rendering"
+
+msgid "CPU 软件渲染"
+msgstr "CPU Software"
+
+msgid "CPU 实时走势 (30s 动态波形)"
+msgstr "CPU Real-time Trend (30s Waveform)"
+
+msgid "CPU 使用率"
+msgstr "CPU Usage"
+
+msgid "D3D/DWM 硬件加速"
+msgstr "D3D/DWM Hardware Acceleration"
+
+msgid "Detached (已挂起)"
+msgstr "Detached (Suspended)"
+
+msgid "DirectWrite / FreeType 次像素抗锯齿"
+msgstr "DirectWrite / FreeType Subpixel Anti-aliasing"
+
+msgid "DirectX/DWM 硬件自动加速"
+msgstr "DirectX/DWM Hardware Acceleration"
+
+msgid "Docker 容器健康列表"
+msgstr "Docker Container Health List"
+
+msgid "Ed25519 (推荐)"
+msgstr "Ed25519 (Recommended)"
+
+msgid "fontdue SIMD 矢量光栅化 + Alacritty VT100 状态机"
+msgstr "fontdue SIMD Vector Rasterizer + Alacritty VT100 State Machine"
+
+msgid "Gist ID (留空则新建公开/私有 Gist)"
+msgstr "Gist ID (Leave empty to create new public/private Gist)"
+
+msgid "GitHub 个人访问令牌 (PAT) *"
+msgstr "GitHub Personal Access Token (PAT) *"
+
+msgid "GitHub Light (纯白明亮)"
+msgstr "GitHub Light (Clean White)"
+
+msgid "GnuPG / YubiKey 智能卡 SSH 认证代理管道"
+msgstr "GnuPG / YubiKey Smart Card SSH agent pipe"
+
+msgid "GPU 后端管线"
+msgstr "GPU Backend Pipeline"
+
+msgid "GPU 纹理缓存池状态:"
+msgstr "GPU Texture Cache Status:"
+
+msgid "GPU 硬件加速 (DirectX / OpenGL / Vulkan)"
+msgstr "GPU Hardware Acceleration (DirectX / OpenGL / Vulkan)"
+
+msgid "GUI 布局与数据探针指标"
+msgstr "GUI Layout & Data Probes"
+
+msgid "GUI 渲染核心"
+msgstr "GUI Renderer Core"
+
+msgid "HTTP / HTTPS / SOCKS5 静态出网代理资产"
+msgstr "HTTP / HTTPS / SOCKS5 Static Outbound Proxy Assets"
+
+msgid "HTTP 代理"
+msgstr "HTTP Proxy"
+
+msgid "HTTPS 代理"
+msgstr "HTTPS Proxy"
+
+msgid "IP 地址"
+msgstr "IP Address"
+
+msgid "IP 地址:"
+msgstr "IP Address:"
+
+msgid "IP 前缀网段:"
+msgstr "IP Prefix Subnet:"
+
+msgid "IPv4 地址"
+msgstr "IPv4 Address"
+
+msgid "IPv4 主机地址"
+msgstr "IPv4 Host Address"
+
+msgid "K8s 重启 Deployment"
+msgstr "K8s Restart Deployment"
+
+msgid "KeePassXC 本地密码库 SSH Agent 代理"
+msgstr "KeePassXC local database SSH Agent proxy"
+
+msgid "MySQL 活跃长事务"
+msgstr "MySQL Active Long Transactions"
+
+msgid "OpenAI Chat 模式 (/v1/chat/completions)"
+msgstr "OpenAI Chat Mode (/v1/chat/completions)"
+
+msgid "OpenAI Responses 模式 (/v1/responses)"
+msgstr "OpenAI Responses Mode (/v1/responses)"
+
+msgid "OpenSSH ProxyJump (-J) 堡垒中继资产"
+msgstr "OpenSSH ProxyJump (-J) Bastion Relay Assets"
+
+msgid "OpenSSH ProxyJump 级联调用参数预览 (-J)"
+msgstr "OpenSSH ProxyJump Arguments Preview (-J)"
+
+msgid "PuTTY / WinSCP Pageant 经典认证协议代理"
+msgstr "PuTTY / WinSCP Pageant authentication agent"
+
+msgid "SFTP 传输"
+msgstr "SFTP Transfer"
+
+msgid "SFTP 文件传输"
+msgstr "SFTP File Transfer"
+
+msgid "SFTP 远程传输"
+msgstr "SFTP Remote Transfer"
+
+msgid "SFTP 最大并发传输连接数 (Transfer Concurrency)"
+msgstr "SFTP Max Transfer Concurrency"
+
+msgid "SIMD 纯 CPU 光栅化 (0 显卡依赖)"
+msgstr "SIMD Pure CPU Rasterization (Zero GPU Dependency)"
+
+msgid "Skia 2D (Google Chrome / Flutter 同款)"
+msgstr "Skia 2D (Google Chrome / Flutter Equivalent)"
+
+msgid "Skia 原生图形渲染管线矩阵 (Google Skia Pipelines)"
+msgstr "Skia Native Graphics Pipeline Matrix (Google Skia Pipelines)"
+
+msgid "Skia Auto (官方推荐)"
+msgstr "Skia Auto (Recommended)"
+
+msgid "Skia CPU 纯软解"
+msgstr "Skia CPU Pure Software Rasterizer"
+
+msgid "Skia GPU (自动)"
+msgstr "Skia GPU (Auto)"
+
+msgid "Skia OpenGL"
+msgstr "Skia OpenGL"
+
+msgid "smalux - 现代 Rust SSH 终端工作台"
+msgstr "smalux - Modern Rust SSH Terminal Workbench"
+
+msgid "Smalux-SSH 内置高危指令拦截器（如 rm -rf /、mkfs、dd、重分区与格式化指令），即使审核策略设为宽松放行，高危命令亦会触发二级模态确认；同时所有向远端 AI 发送的上下文均自动剔除私钥与连接凭据。"
+msgstr "Smalux-SSH built-in risk interceptor safeguards critical commands (e.g., rm -rf /, mkfs, dd). Sensitive credentials and keys are always stripped before sending context to LLMs."
+
+msgid "SOCKS5 代理"
+msgstr "SOCKS5 Proxy"
+
+msgid "SOCKS5 网关端口 (Port)"
+msgstr "SOCKS5 Gateway Port"
+
+msgid "Solarized Light (暖黄护眼)"
+msgstr "Solarized Light (Warm Eye-care)"
+
+msgid "SSH 代理 / 管道"
+msgstr "SSH Agent / Pipe"
+
+msgid "SSH 端口:"
+msgstr "SSH Port:"
+
+msgid "SSH 公钥已复制至剪贴板"
+msgstr "SSH public key copied to clipboard"
+
+msgid "SSH 连接超时时间 (Connection Timeout)"
+msgstr "SSH Connection Timeout"
+
+msgid "SSH 密钥对"
+msgstr "SSH Key Pair"
+
+msgid "SSH 宿主 (SOCKS5 监听端)"
+msgstr "SSH Host (SOCKS5 Listener)"
+
+msgid "SSH 宿主服务器 / 跳板机"
+msgstr "SSH Host Server / Jump Host"
+
+msgid "SSH Agent"
+msgstr "SSH Agent"
+
+msgid "SVG 矢量资产预热与显存池 (Resource Atlas)"
+msgstr "SVG Vector Asset Pre-warming & VRAM Pool (Resource Atlas)"
+
+msgid "Tab关闭二次确认"
+msgstr "Confirm Tab Close"
+
+msgid "Tab关闭二次确认:"
+msgstr "Confirm Close Tab:"
+
+msgid "TCP 握手时限、定期 Keepalive 心跳探测包与防空闲断开"
+msgstr "TCP handshake timeout, periodic Keepalive probes, and idle protection"
+
+msgid "TCP 心跳保活探测间隔 (ServerAliveInterval)"
+msgstr "TCP Keepalive Heartbeat Interval (ServerAliveInterval)"
+
+msgid "tmux 会话管理"
+msgstr "tmux Sessions"
+
+msgid "tmux 会话列表"
+msgstr "tmux Session List"
+
+msgid "tmux 免记快捷操作"
+msgstr "tmux Shortcuts"
+
+msgid "TOML 主题配置源码 (支持双向实时修改与解析)"
+msgstr "TOML Theme Configuration (Bi-directional Code Editor)"
+
+msgid "UI 设计令牌 (Design Tokens) 探针"
+msgstr "UI Design Tokens Probes"
+
+msgid "VT100 字符渲染等宽字体与像素字模尺寸"
+msgstr "VT100 monospace font and glyph size for terminal rendering"
+
+msgid "Windows 内置 OpenSSH Authentication Agent 服务管道"
+msgstr "Windows built-in OpenSSH Authentication Agent service pipe"
+
+msgid "Windows Hello / 生物识别快捷解锁 (Biometric Unlock)"
+msgstr "Windows Hello / Biometric Quick Unlock"
+

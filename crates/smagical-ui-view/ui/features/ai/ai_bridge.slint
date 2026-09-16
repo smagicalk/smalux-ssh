@@ -1,0 +1,102 @@
+/// AI 运维副驾驶领域状态与交互单例总线 (AiBridge)
+/// 严格遵循单主机独立会话模型 (Per-Host Isolated Session)，每台主机拥有独立的对话历史与状态。
+
+export struct AiChatMessage {
+    id: string,
+    sender: string,               // "user" | "assistant"
+    content: string,
+    thinking-content: string,
+    is-thinking-expanded: bool,
+    suggested-cmd: string,
+    cmd-risk-level: string,       // "low" | "medium" | "high"
+    audit-status: string,         // "pending" | "approved" | "rejected" | "executed"
+    audit-reason: string,         // AI 通过或需要手动的决策理由说明
+    timestamp: string,
+}
+
+export struct AiHistorySession {
+    id: string,
+    title: string,
+    message-count: int,
+    updated-time: string,
+}
+
+export global AiBridge {
+    // 当前聚焦主机的对话流与历史
+    in-out property <[AiChatMessage]> messages: [];
+    in-out property <[AiHistorySession]> history-sessions: [];
+    in-out property <string> input-text: "";
+    // 模型数据层
+    in-out property <[string]> available-models: [
+        "DeepSeek-R1",
+        "Claude 3.7 Sonnet",
+        "GPT-4o",
+        "Qwen 2.5 72B",
+        "Llama 3.3 70B"
+    ];
+    in-out property <string> selected-model: "DeepSeek-R1";
+
+    // 模式数据层 (思考模式)
+    in-out property <[string]> available-modes: [
+        "深度思考 (CoT)",
+        "常规推理 (Fast)",
+        "极速响应 (Flash)"
+    ];
+    in-out property <string> thinking-degree: "深度思考 (CoT)";
+
+    // 扁平化安全审核策略体系 (4 档规则过滤 + 1 档 AI 语义认知自审)
+    // 纯人工: 100% 规则强行拦截，必须逐条人工核准确认
+    // 只读巡检: 仅放行只读探测指令 (cat/ls/ps/df 等)，写操作全部拦截确认 (推荐默认)
+    // 辅助运维: 常规启停与配置变更自动放行，仅高危破坏性操作 (rm/mkfs/reboot) 拦截确认
+    // 免审直达: 零拦截完全放行，直接打入终端执行，适合本地沙箱与测试容器
+    // AI自审: 大模型感知当前主机环境与上下文，自主研判是否需要用户确认并附带风险说明
+    in-out property <[string]> available-audit-policies: [
+        "纯人工",
+        "只读巡检",
+        "辅助运维",
+        "免审直达",
+        "AI自审"
+    ];
+    in-out property <string> audit-policy: "只读巡检";
+
+    // 兼容旧属性 (向后兼容)
+    in-out property <[string]> available-audit-modes: [
+        "人工",
+        "自动",
+        "AI"
+    ];
+    in-out property <string> audit-mode: "自动";
+    in-out property <[string]> available-auto-audit-levels: [
+        "拒绝",
+        "安全",
+        "警告",
+        "危险"
+    ];
+    in-out property <string> auto-audit-level: "安全";
+
+    in-out property <bool> is-generating: false;
+
+    // 当前伴生的主机上下文
+    in-out property <string> active-host-id: "";
+    in-out property <string> active-host-name: "";
+    in-out property <bool> has-active-host: false;
+
+    // 交互回调
+    callback send-message(string /* content */, string /* model */, string /* thinking */, string /* audit */);
+    callback apply-suggested-cmd(string /* cmd */);
+    callback inject-and-run-cmd(string /* cmd */);
+    callback new-session();
+    callback switch-session(string /* id */);
+    callback delete-session(string /* id */);
+    callback clear-current-session();
+    callback sync-host-ai-session();
+
+    callback model-selected(string /* model */);
+    callback mode-selected(string /* mode */);
+    callback audit-policy-selected(string /* policy */);
+    callback audit-selected(string /* audit */);
+    callback auto-audit-level-selected(string /* level */);
+    callback copy-command(string /* cmd */);
+    callback update-message-audit(string /* msg-id */, string /* status */);
+    callback toggle-thinking-expanded(string /* msg-id */);
+}

@@ -1,0 +1,526 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { ThemeOption, ThemeRow } from "../../views/left_drawers/settings_drawer.slint";
+
+export struct KeywordHighlightRule {
+    id: string,
+    pattern: string,
+    remark: string,
+    color-hex: string,
+    rule-color: color,
+    enabled: bool,
+}
+
+export struct SettingKeybindingItem {
+    id: string,
+    action-name: string,
+    category: string,
+    primary-key: string,
+    secondary-key: string,
+    default-key: string,
+    is-customized: bool,
+}
+
+export struct SettingSnapshotItem {
+    id: string,
+    timestamp: string,
+    description: string,
+    host-count: int,
+    cred-count: int,
+}
+
+export struct AiEndpointProfile {
+    id: string,
+    name: string,
+    base-url: string,
+    api-key: string,
+    api-mode: string, // "chat" | "response"
+    selected-model: string,
+    models-csv: string,
+    is-active: bool,
+    status-text: string,
+    thinking-degree: string,
+    timeout-secs: int,
+    max-context: int,
+    max-retries: int,
+    custom-headers: string,
+    temperature: string,
+}
+
+export struct BackupTaskItem {
+    id: string,
+    name: string,
+    backup-type: string,     // "local" | "webdav" | "s3" | "gist" | "self_hosted"
+    last-backup-time: string,
+    snapshot-count: int,
+    strategy: string,        // "manual" | "hourly" | "daily" | "on_exit"
+    enabled: bool,
+    endpoint: string,
+    retention: string,
+}
+
+export struct BackupSnapshotEntry {
+    id: string,
+    task-id: string,
+    timestamp: string,
+    size-str: string,
+    remark: string,
+    hash: string,
+}
+
+/// 偏好设置中心领域桥接单例 (Settings Domain Bridge)
+/// 统管设置中心全部状态、数据模型与交互回调，彻底终结跨层属性穿透
+export global SettingsBridge {
+    // -------------------------------------------------------------------------
+    // 页面导航与全局状态
+    // -------------------------------------------------------------------------
+    in-out property <string> active-category: "general";
+    in-out property <string> search-query: "";
+    in-out property <bool> is-dark-mode: true;
+    in-out property <string> current-theme-id: "builtin.ui.darcula";
+
+    // -------------------------------------------------------------------------
+    // 1. 常规与启动行为 (General)
+    // -------------------------------------------------------------------------
+    in-out property <string> setting-language: "zh-CN";
+    in-out property <string> active-rendering-pipeline: "winit-skia";
+    in-out property <string> setting-close-action: "tray";
+    in-out property <bool> setting-confirm-close-tab: false;
+    in-out property <bool> setting-confirm-close-active: false;
+    in-out property <bool> setting-always-on-top: false;
+    in-out property <bool> setting-start-on-boot: false;
+    in-out property <string> setting-data-dir: "AppData/Local/smalux-ssh";
+    in-out property <string> setting-toast-duration: "3";
+
+    // -------------------------------------------------------------------------
+    // 2. 外观与壁纸 (Appearance)
+    // -------------------------------------------------------------------------
+    in property <[ThemeOption]> themes: [];
+    in property <[ThemeOption]> custom-themes: [];
+    in property <[ThemeOption]> dark-themes: [];
+    in property <[ThemeOption]> light-themes: [];
+    in property <[ThemeRow]> custom-theme-rows: [];
+    in property <[ThemeRow]> dark-theme-rows: [];
+    in property <[ThemeRow]> light-theme-rows: [];
+    in property <int> custom-themes-count: 0;
+    in property <int> dark-themes-count: 0;
+    in property <int> light-themes-count: 0;
+    in-out property <string> theme-filter-category: "all";
+    in-out property <string> setting-wallpaper-mode: "none";
+    in-out property <string> setting-wallpaper-path: "";
+    in-out property <float> setting-wallpaper-opacity: 0.20;
+    in-out property <float> setting-modal-opacity: 1.0;
+    in-out property <[string]> setting-wallpaper-list: [];
+    in-out property <int> setting-wallpaper-active-index: 0;
+    in-out property <string> setting-wallpaper-slideshow: "none";
+    in-out property <string> setting-wallpaper-transition: "fade";
+    in-out property <string> slideshow-number-input: "0";
+    in-out property <string> slideshow-unit-input: "off";
+    in-out property <string> setting-ui-font: "系统默认 (System Default)";
+    in property <[string]> available-ui-fonts: ["系统默认 (System Default)", "Microsoft YaHei UI", "Segoe UI", "PingFang SC", "Inter", "JetBrains Mono", "Fira Code", "Cascadia Code", "Consolas"];
+
+    // -------------------------------------------------------------------------
+    // 3. 终端排版与特效 (Terminal)
+    // -------------------------------------------------------------------------
+    in-out property <string> setting-terminal-font: "JetBrains Mono";
+    in-out property <int> setting-terminal-font-size: 13;
+    in-out property <string> setting-cursor-style: "block";
+    in-out property <bool> setting-cursor-blink: true;
+    in-out property <int> setting-scrollback-lines: 10000;
+    in-out property <string> scrollback-input: "10000";
+    in-out property <bool> setting-copy-on-select: false;
+    in-out property <bool> setting-paste-on-right-click: false;
+    in-out property <bool> setting-warn-multiline-paste: true;
+    in-out property <string> setting-bell-style: "visual";
+    in-out property <bool> setting-terminal-url-click: true;
+    in-out property <bool> setting-terminal-highlight-keywords: true;
+    in-out property <string> setting-terminal-custom-keywords: "error,failed,fatal,warning,warn,success,ok,done";
+    in-out property <bool> flag-terminal-crt-shader: false;
+    in-out property <bool> setting-terminal-crt: false;
+    in-out property <[KeywordHighlightRule]> terminal-keyword-rules: [
+        { id: "kw_err", pattern: "\\b(ERROR|FATAL|CRITICAL|Failed|Error)\\b", remark: @tr("致命错误与失败"), color-hex: "#EF4444", rule-color: #EF4444, enabled: true },
+        { id: "kw_warn", pattern: "\\b(WARN|WARNING|Warning|Warn)\\b", remark: @tr("告警提示与注意"), color-hex: "#F59E0B", rule-color: #F59E0B, enabled: true },
+        { id: "kw_ok", pattern: "\\b(SUCCESS|OK|Finished|Done)\\b", remark: @tr("执行成功与确认"), color-hex: "#10B981", rule-color: #10B981, enabled: true },
+        { id: "kw_url", pattern: "https?://[^\\s/$.?#].[^\\s]*", remark: @tr("网络超链接 URL"), color-hex: "#3B82F6", rule-color: #3B82F6, enabled: true },
+        { id: "kw_ip", pattern: "\\b\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\b", remark: @tr("IPv4 主机地址"), color-hex: "#8B5CF6", rule-color: #8B5CF6, enabled: true },
+    ];
+
+    // -------------------------------------------------------------------------
+    // 4. 网络与 SSH 设置 (Network & SSH)
+    // -------------------------------------------------------------------------
+    in-out property <string> setting-global-proxy-mode: "direct";
+    in-out property <string> setting-global-proxy-server: "";
+    in-out property <bool> setting-global-proxy-auth: false;
+    in-out property <string> setting-global-proxy-user: "";
+    in-out property <string> setting-global-proxy-pass: "";
+    in-out property <int> setting-connect-timeout: 10;
+    in-out property <int> setting-keepalive-interval: 30;
+    in-out property <int> setting-keepalive-count-max: 3;
+    in-out property <string> setting-host-key-policy: "ask";
+    in-out property <bool> setting-tcp-nodelay: true;
+    in-out property <bool> setting-compression: false;
+    in-out property <bool> setting-auto-reconnect: true;
+    in-out property <bool> setting-legacy-ciphers: false;
+
+    // -------------------------------------------------------------------------
+    // 5. 传输与文件管理 (Files & SFTP)
+    // -------------------------------------------------------------------------
+    in-out property <string> setting-sftp-default-local: "~";
+    in-out property <string> setting-sftp-default-remote: "/home";
+    in-out property <bool> setting-sftp-show-hidden: false;
+    in-out property <bool> setting-sftp-confirm-delete: true;
+    in-out property <string> setting-sftp-conflict-policy: "ask";
+    in-out property <int> setting-sftp-concurrency: 3;
+    in-out property <string> setting-sftp-upload-limit: "unlimited";
+    in-out property <string> upload-limit-num: "0";
+    in-out property <string> upload-limit-unit: "off";
+    in-out property <string> setting-sftp-download-limit: "unlimited";
+    in-out property <string> download-limit-num: "0";
+    in-out property <string> download-limit-unit: "off";
+    in-out property <bool> setting-sftp-resume: true;
+    in-out property <bool> setting-sftp-preserve-attributes: true;
+    in-out property <string> setting-sftp-editor-mode: "internal";
+    in-out property <string> setting-sftp-custom-editor: "";
+    in-out property <string> setting-sftp-exclude-patterns: ".git,node_modules,*.tmp";
+
+    // -------------------------------------------------------------------------
+    // 6. 快捷键映射 (Shortcuts)
+    // -------------------------------------------------------------------------
+    in-out property <[SettingKeybindingItem]> setting-keybindings: [];
+    in-out property <[SettingKeybindingItem]> keybindings: [];
+    in-out property <string> keybindings-search: "";
+    in-out property <string> keybindings-filter-category: "all";
+    in-out property <string> editing-keybinding-id: "";
+    in-out property <bool> is-keybinding-modal-open: false;
+    in-out property <string> modal-keybinding-id: "";
+    in-out property <string> modal-keybinding-name: "";
+    in-out property <string> modal-keybinding-key: "";
+
+    // -------------------------------------------------------------------------
+    // 7. 数据备份与迁移 (Backup & Storage)
+    // -------------------------------------------------------------------------
+    in-out property <string> setting-backup-master-mode: "off";
+    in-out property <bool> setting-backup-auto-enabled: true;
+    in-out property <bool> setting-backup-local-enabled: true;
+    in-out property <bool> setting-backup-cloud-enabled: false;
+    in-out property <[BackupTaskItem]> backup-tasks: [];
+    in-out property <[BackupSnapshotEntry]> current-task-snapshots: [];
+    in-out property <bool> is-create-backup-modal-open: false;
+    in-out property <bool> is-edit-backup-modal-mode: false;
+    in-out property <string> backup-modal-edit-id: "";
+    in-out property <string> backup-modal-form-name: "";
+    in-out property <string> backup-modal-form-type: "local";
+    in-out property <string> backup-modal-form-endpoint: "";
+    in-out property <string> backup-modal-form-user: "";
+    in-out property <string> backup-modal-form-pass: "";
+    in-out property <string> backup-modal-form-strategy: "daily";
+    in-out property <string> backup-modal-form-retention-val: "10";
+    in-out property <string> backup-modal-form-retention-unit: "copies";
+    in-out property <string> backup-modal-form-retention-summary: @tr("保留最近 10 份");
+    in-out property <bool> is-snapshots-modal-open: false;
+    in-out property <string> active-snapshot-task-id: "";
+    in-out property <string> active-snapshot-task-name: "";
+    in-out property <string> setting-cloud-sync-backend: "none";
+    in-out property <string> setting-cloud-sync-interval: "manual";
+    in-out property <string> setting-cloud-e2ee-pass: "";
+    in-out property <string> setting-webdav-url: "";
+    in-out property <string> setting-webdav-user: "";
+    in-out property <string> setting-webdav-pass: "";
+    in-out property <string> setting-webdav-dir: "/smalux_backup";
+    in-out property <string> setting-s3-endpoint: "";
+    in-out property <string> setting-s3-bucket: "";
+    in-out property <string> setting-s3-region: "us-east-1";
+    in-out property <string> setting-s3-key-id: "";
+    in-out property <string> setting-s3-access-key: "";
+    in-out property <string> setting-gist-id: "";
+    in-out property <string> setting-gist-token: "";
+    in-out property <string> setting-custom-sync-url: "";
+    in-out property <string> setting-custom-sync-client-id: "";
+    in-out property <string> setting-custom-sync-token: "";
+    in-out property <[SettingSnapshotItem]> setting-snapshot-list: [];
+    in-out property <[SettingSnapshotItem]> snapshot-history: [];
+
+    // -------------------------------------------------------------------------
+    // 7. AI 助手配置与大模型推理 (AI Copilot)
+    // -------------------------------------------------------------------------
+    // 多端口/端点表格列表数据
+    in-out property <[AiEndpointProfile]> setting-ai-endpoints: [
+        {
+            id: "ep-deepseek",
+            name: "DeepSeek 官方",
+            base-url: "https://api.deepseek.com/v1",
+            api-key: "",
+            api-mode: "chat",
+            selected-model: "deepseek-reasoner",
+            models-csv: "deepseek-reasoner, deepseek-chat",
+            is-active: true,
+            status-text: "已连接",
+            thinking-degree: "medium",
+            timeout-secs: 60,
+            max-context: 32768,
+            max-retries: 2,
+            custom-headers: "",
+            temperature: "0.3",
+        },
+        {
+            id: "ep-claude",
+            name: "Claude (Anthropic)",
+            base-url: "https://api.anthropic.com/v1",
+            api-key: "",
+            api-mode: "chat",
+            selected-model: "claude-3-7-sonnet-20250219",
+            models-csv: "claude-3-7-sonnet-20250219, claude-3-5-sonnet-20241022",
+            is-active: false,
+            status-text: "未激活",
+            thinking-degree: "medium",
+            timeout-secs: 60,
+            max-context: 65536,
+            max-retries: 2,
+            custom-headers: "",
+            temperature: "0.3",
+        },
+        {
+            id: "ep-openai",
+            name: "OpenAI 官方",
+            base-url: "https://api.openai.com/v1",
+            api-key: "",
+            api-mode: "chat",
+            selected-model: "gpt-4o",
+            models-csv: "gpt-4o, gpt-4o-mini, o1, o3-mini",
+            is-active: false,
+            status-text: "未激活",
+            thinking-degree: "medium",
+            timeout-secs: 60,
+            max-context: 32768,
+            max-retries: 2,
+            custom-headers: "",
+            temperature: "0.3",
+        },
+        {
+            id: "ep-ollama",
+            name: "Ollama 本地",
+            base-url: "http://localhost:11434/v1",
+            api-key: "",
+            api-mode: "chat",
+            selected-model: "qwen2.5:14b",
+            models-csv: "qwen2.5:14b, deepseek-r1:14b, llama3.3:latest",
+            is-active: false,
+            status-text: "本地端点",
+            thinking-degree: "low",
+            timeout-secs: 120,
+            max-context: 16384,
+            max-retries: 1,
+            custom-headers: "",
+            temperature: "0.2",
+        }
+    ];
+    in-out property <string> active-endpoint-id: "ep-deepseek";
+
+    // 当前端点基础连接信息 (与选中端点严格联动同步)
+    in-out property <string> setting-ai-provider: "deepseek";
+    in-out property <string> setting-ai-base-url: "https://api.deepseek.com/v1";
+    in-out property <string> setting-ai-api-key: "";
+    in-out property <string> setting-ai-model: "deepseek-reasoner";
+
+    // 当前端点模型列表 (支持下拉单选、一键获取、手动添加与删除)
+    in-out property <[string]> setting-ai-current-models: [
+        "deepseek-reasoner",
+        "deepseek-chat"
+    ];
+    in-out property <string> setting-ai-new-model-input: "";
+    in-out property <bool> setting-ai-is-fetching-models: false;
+
+    // 弹窗状态 (添加/编辑 AI 端点端口 - 包含基础、模型库与高级配置)
+    in-out property <bool> is-ai-endpoint-modal-open: false;
+    in-out property <bool> is-ai-endpoint-editing: false;
+    in-out property <string> modal-endpoint-id: "";
+    in-out property <string> modal-endpoint-name: "";
+    in-out property <string> modal-endpoint-base-url: "";
+    in-out property <string> modal-endpoint-api-key: "";
+    in-out property <string> modal-endpoint-api-mode: "chat"; // "chat" | "response"
+    in-out property <string> modal-endpoint-selected-model: "";
+    in-out property <string> modal-endpoint-models: "";
+    in-out property <[string]> modal-endpoint-models-list: ["deepseek-reasoner", "deepseek-chat"];
+    in-out property <string> modal-endpoint-new-model-input: "";
+    in-out property <string> modal-endpoint-thinking-degree: "medium"; // "disabled" | "low" | "medium" | "high"
+    in-out property <int> modal-endpoint-timeout-secs: 60;
+    in-out property <string> modal-endpoint-timeout-secs-input: "60";
+    in-out property <int> modal-endpoint-max-context: 32768;
+    in-out property <string> modal-endpoint-max-context-input: "32768";
+    in-out property <int> modal-endpoint-max-retries: 2;
+    in-out property <string> modal-endpoint-max-retries-input: "2";
+    in-out property <string> modal-endpoint-custom-headers: "";
+    in-out property <string> modal-endpoint-temperature: "0.3";
+    in-out property <bool> modal-endpoint-show-advanced: false;
+    in-out property <bool> modal-endpoint-is-fetching-models: false;
+    in-out property <string> modal-endpoint-test-status: "idle"; // "idle" | "testing" | "success" | "failed"
+    in-out property <string> modal-endpoint-test-message: "";
+    in-out property <int> modal-endpoint-active-dropdown: 0; // 0: none, 1: api-mode, 2: selected-model, 3: thinking
+
+    // 独立高级参数 (与 API 端口无关，全局统一生效)
+    in-out property <int> setting-ai-max-context: 32768;            // 最大上下文长度 (Tokens)
+    in-out property <string> setting-ai-max-context-input: "32768";
+    in-out property <int> setting-ai-timeout-secs: 60;              // 最长执行时长 / 请求超时 (秒)
+    in-out property <string> setting-ai-timeout-secs-input: "60";
+    in-out property <int> setting-ai-max-retries: 2;                // 失败尝试重试次数
+    in-out property <string> setting-ai-max-retries-input: "2";
+    in-out property <string> setting-ai-auto-audit-level: "安全"; // 自动审核安全级别 (拒绝 | 安全 | 警告 | 危险)
+    in-out property <string> setting-ai-custom-headers: "";         // 自定义请求头 (Key: Value)
+    in-out property <float> setting-ai-temperature: 0.3;
+    in-out property <string> setting-ai-temperature-input: "0.3";
+    in-out property <int> setting-ai-max-tokens: 4096;
+    in-out property <string> setting-ai-thinking-budget: "medium";  // 标准化思考档位
+    in-out property <int> setting-ai-thinking-budget-tokens: 4096;  // 自定义思考 Token 预算
+    in-out property <string> setting-ai-system-prompt: "你是一名精通 Linux/Unix 操作系统内核、网络拓扑与现代运维架构的高级 SRE 运维专家。遵循生产安全第一原则，始终输出语法严谨、带有防御性容错参数的 Shell 指令，主动识别与规避高危操作风险，并在生成复杂命令时简明解释其参数逻辑。";
+    in-out property <string> setting-ai-audit-mode: "risky_only";
+    in-out property <bool> setting-ai-context-aware: true;
+    in-out property <string> setting-ai-test-status: "idle";
+    in-out property <string> setting-ai-test-message: "";
+
+    // -------------------------------------------------------------------------
+    // 8. 安全隐私与诊断 (Security)
+    // -------------------------------------------------------------------------
+    in-out property <bool> setting-master-password-enabled: false;
+    in-out property <string> setting-master-password-mask: "••••••••";
+    in-out property <string> setting-auto-lock-timeout: "never";
+    in-out property <bool> setting-lock-on-minimize: false;
+    in-out property <bool> setting-biometric-unlock: false;
+    in-out property <bool> setting-mask-sensitive-data: true;
+    in-out property <bool> setting-clear-clipboard-timeout: true;
+    in-out property <bool> setting-confirm-dangerous-commands: true;
+    in-out property <bool> setting-session-audit-logging: false;
+    in-out property <bool> setting-debug-enabled: false;
+    in-out property <bool> setting-debug-log-channel: true;
+    in-out property <string> setting-log-level: "INFO";
+
+    // -------------------------------------------------------------------------
+    // 弹窗状态 (Modals)
+    // -------------------------------------------------------------------------
+    in-out property <bool> is-add-keyword-modal-open: false;
+    in-out property <string> new-rule-pattern: "";
+    in-out property <string> new-rule-remark: "";
+    in-out property <string> new-rule-color: "#EF4444";
+    in-out property <color> new-rule-slint-color: #EF4444;
+    in-out property <bool> is-editing-keyword-rule: false;
+    in-out property <string> editing-keyword-rule-id: "";
+    in-out property <bool> is-keyword-color-wheel-open: false;
+    in-out property <brush> color-picker-hue-brush: #EF4444;
+    in-out property <brush> color-picker-preview-brush: #EF4444;
+    in-out property <float> color-picker-brightness: 1.0;
+    in-out property <float> color-picker-indicator-x: 90.0;
+    in-out property <float> color-picker-indicator-y: 90.0;
+    in-out property <string> color-picker-hex: "#EF4444";
+
+    in-out property <bool> is-master-pwd-modal-open: false;
+    in-out property <string> master-pwd-old: "";
+    in-out property <string> master-pwd-new: "";
+    in-out property <string> master-pwd-confirm: "";
+    in-out property <string> master-pwd-error-msg: "";
+
+    // -------------------------------------------------------------------------
+    // 操作回调
+    // -------------------------------------------------------------------------
+    callback switch-language(string);
+    callback switch-rendering-pipeline(string);
+    callback change-close-action(string);
+    callback toggle-always-on-top(bool);
+    callback toggle-start-on-boot(bool);
+    callback toggle-confirm-close-tab(bool);
+    callback toggle-confirm-close-active(bool);
+    callback change-toast-duration(string);
+    callback switch-theme(string);
+    callback toggle-dark-mode();
+    callback create-custom-theme();
+    callback import-theme();
+    callback export-current-theme();
+    callback delete-custom-theme(string);
+    callback change-wallpaper(string, string, float);
+    callback change-modal-opacity(float);
+    callback add-wallpaper();
+    callback add-wallpaper-folder();
+    callback remove-wallpaper(int);
+    callback select-wallpaper(int);
+    callback set-wallpaper-slideshow(string, string);
+    callback change-ui-font(string);
+    callback change-terminal-font(string, int);
+    callback change-cursor-style(string);
+    callback change-cursor-blink(bool);
+    callback change-scrollback-lines(int);
+    callback apply-scrollback-input(string);
+    callback change-copy-on-select(bool);
+    callback change-paste-on-right-click(bool);
+    callback change-warn-multiline-paste(bool);
+    callback change-bell-style(string);
+    callback change-terminal-url-click(bool);
+    callback change-terminal-highlight-keywords(bool);
+    callback change-terminal-custom-keywords(string);
+    callback toggle-terminal-crt(bool);
+    callback add-keyword-rule(string, string, string);
+    callback update-keyword-rule(string, string, string, string);
+    callback delete-keyword-rule(string);
+    callback toggle-keyword-rule(string, bool);
+    callback open-keyword-color-wheel();
+    callback color-picker-hex-changed(string);
+    callback color-wheel-coord-picked(float, float);
+    callback color-wheel-brightness-picked(float);
+    callback change-global-proxy(string, string, bool, string, string);
+    callback change-host-key-policy(string);
+    callback change-network-handshake(int, int, int);
+    callback change-tcp-nodelay(bool);
+    callback save-proxy-settings(string, string, bool, string, string);
+    callback test-proxy-connectivity(string, string);
+    callback export-backup-archive(bool);
+    callback set-upload-limit-speed(string, string);
+    callback set-download-limit-speed(string, string);
+    callback scan-and-import-openssh();
+    callback import-external-file();
+    callback import-external-assets();
+    callback rollback-snapshot(string);
+    callback factory-reset-settings();
+    callback toggle-debug-enabled(bool);
+    callback set-master-password(string, string);
+    callback reset-master-password();
+    callback browse-sftp-download-dir();
+    callback change-sftp-download-dir(string);
+    callback change-sftp-concurrency(int);
+    callback update-keybinding(string, string);
+    callback reset-keybinding(string);
+    callback reset-all-keybindings();
+    callback clear-keybinding(string);
+    pure callback format-keybinding-event(string, bool, bool, bool, bool) -> string;
+    callback set-backup-master-mode(string);
+    callback toggle-backup-auto(bool);
+    callback toggle-backup-local(bool);
+    callback toggle-backup-cloud(bool);
+    callback browse-backup-local-dir();
+    callback toggle-backup-task-enabled(string, bool);
+    callback delete-backup-task(string);
+    callback open-task-snapshots(string, string);
+    callback restore-from-snapshot(string, string);
+    callback open-create-backup-modal();
+    callback open-edit-backup-task(string);
+    callback save-new-backup-task(string, string, string, string, string, string, string);
+    callback update-backup-task(string, string, string, string, string, string, string, string);
+    callback trigger-instant-backup();
+    callback trigger-restore-remote();
+    callback set-log-level(string);
+    callback test-ai-connection();
+    callback save-ai-settings();
+    callback reset-ai-system-prompt();
+    callback switch-ai-provider(string);
+    callback switch-ai-endpoint(string /* id */);
+    callback open-add-ai-endpoint-modal();
+    callback open-edit-ai-endpoint-modal(string /* id */);
+    callback save-ai-endpoint-modal();
+    callback delete-ai-endpoint(string /* id */);
+    callback modal-fetch-models();
+    callback modal-add-model(string /* model_name */);
+    callback modal-remove-model(string /* model_name */);
+    callback modal-select-model(string /* model_name */);
+    callback modal-test-connection();
+    callback fetch-endpoint-models();
+    callback add-model-to-current(string /* model_name */);
+    callback remove-model-from-current(string /* model_name */);
+    callback select-current-model(string /* model_name */);
+    callback change-ai-auto-audit-level(string /* level */);
+    callback close-settings();
+}

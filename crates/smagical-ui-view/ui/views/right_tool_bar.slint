@@ -1,0 +1,73 @@
+import { AppTheme } from "../themes/app-theme.slint";
+import { ActionBarItem } from "../components/action-bar-item.slint";
+import { TunnelsBridge } from "../features/tunnels/tunnels_bridge.slint";
+
+/// 动态右侧伴生工具栏项数据结构
+export struct RightToolBarItemData {
+    id: string,
+    icon-name: string,
+    tooltip: string,
+    badge-count: int,
+    shortcut: string,
+}
+
+/// 最右侧 48px 动态伴生工具图标栏 (Dynamic Right Tool Bar)
+export component RightToolBar inherits Rectangle {
+    /// 当前激活的伴生工具 ID (例如: "monitor", "sftp", "snippets", "tmux", "tunnel", "ai")
+    in property <string> active-tool: "monitor";
+    /// 动态工具项列表
+    in property <[RightToolBarItemData]> tools: [];
+
+    /// 当用户点击右侧工具图标时触发的回调事件
+    callback tool-clicked(string /* tool_id */);
+
+    // 纯函数：根据图标标识与激活状态解析 SVG 矢量资产
+    pure function resolve-icon(name: string, is-active: bool) -> image {
+        if name == "activity" { return @image-url("../assets/icons/activity.svg"); }
+        if name == "folder" {
+            return is-active ? @image-url("../assets/icons/folder-open.svg") : @image-url("../assets/icons/folder.svg");
+        }
+        if name == "code" { return @image-url("../assets/icons/code.svg"); }
+        if name == "layout-grid" { return @image-url("../assets/icons/layout-grid.svg"); }
+        if name == "tunnel" { return @image-url("../assets/icons/tunnel.svg"); }
+        if name == "sparkles" { return @image-url("../assets/icons/sparkles.svg"); }
+        if name == "terminal" { return @image-url("../assets/icons/terminal.svg"); }
+        if name == "info" { return @image-url("../assets/icons/info-circle.svg"); }
+        return @image-url("../assets/icons/activity.svg");
+    }
+
+    // 纯函数：动态适配端口转发在本地会话下的特殊提示
+    pure function resolve-tooltip(id: string, default-tooltip: string, is-local: bool) -> string {
+        if id == "tunnel" && is-local {
+            return @tr("端口转发 (本地终端不支持使用)");
+        }
+        return default-tooltip;
+    }
+
+    width: 48px;
+    background: AppTheme.panel-background;
+
+    // 左侧 1px 分割线
+    Rectangle {
+        x: 0px;
+        width: 1px;
+        height: 100%;
+        background: AppTheme.border;
+    }
+
+    VerticalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+        alignment: start;
+
+        for item in root.tools: ActionBarItem {
+            icon: root.resolve-icon(item.icon-name, root.active-tool == item.id);
+            tooltip: root.resolve-tooltip(item.id, item.tooltip, TunnelsBridge.is-local-terminal);
+            is-active: root.active-tool == item.id;
+            clicked => { root.tool-clicked(item.id); }
+        }
+    }
+}

@@ -34,6 +34,7 @@ pub struct NotificationManager {
     toasts: Rc<RefCell<Vec<ToastNotification>>>,
     window: slint::Weak<AppWindow>,
     position: Rc<RefCell<String>>,
+    duration_preset: Rc<RefCell<String>>,
 }
 
 impl NotificationManager {
@@ -43,6 +44,24 @@ impl NotificationManager {
             toasts: Rc::new(RefCell::new(Vec::new())),
             window,
             position: Rc::new(RefCell::new("top-right".to_string())),
+            duration_preset: Rc::new(RefCell::new("3".to_string())),
+        }
+    }
+
+    /// 设置提示信息停留时间预设 ("1.5", "3", "5", "8", "never")
+    pub fn set_duration_preset(&self, preset: &str) {
+        *self.duration_preset.borrow_mut() = preset.to_string();
+    }
+
+    /// 获取当前基础停留毫秒数 (0 为常驻手动关闭)
+    pub fn base_duration_ms(&self) -> u64 {
+        match self.duration_preset.borrow().as_str() {
+            "1.5" => 1500,
+            "3" => 3000,
+            "5" => 5000,
+            "8" => 8000,
+            "never" | "0" => 0,
+            _ => 3000,
         }
     }
 
@@ -83,58 +102,64 @@ impl NotificationManager {
         }
     }
 
-    /// 快捷显示成功通知 (默认 2200ms)
+    /// 快捷显示成功通知 (遵循用户设定的停留时间)
     pub fn success(&self, title: impl Into<String>, message: impl Into<String>) {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
+        let base_ms = self.base_duration_ms();
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "success".into(),
             position: self.position.borrow().clone(),
-            duration_ms: 2200,
+            duration_ms: base_ms,
             closable: true,
         });
     }
 
-    /// 快捷显示消息通知 (默认 2000ms)
+    /// 快捷显示消息通知 (遵循用户设定的停留时间)
     pub fn info(&self, title: impl Into<String>, message: impl Into<String>) {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
+        let base_ms = self.base_duration_ms();
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "info".into(),
             position: self.position.borrow().clone(),
-            duration_ms: 2000,
+            duration_ms: base_ms,
             closable: true,
         });
     }
 
-    /// 快捷显示警告通知 (默认 2800ms)
+    /// 快捷显示警告通知 (在基础时间上适当多停留 500ms)
     pub fn warning(&self, title: impl Into<String>, message: impl Into<String>) {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
+        let base_ms = self.base_duration_ms();
+        let duration_ms = if base_ms == 0 { 0 } else { base_ms + 500 };
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "warning".into(),
             position: self.position.borrow().clone(),
-            duration_ms: 2800,
+            duration_ms,
             closable: true,
         });
     }
 
-    /// 快捷显示错误通知 (默认 3000ms)
+    /// 快捷显示错误通知 (在基础时间上额外多停留 1000ms 便于阅读诊断报错)
     pub fn error(&self, title: impl Into<String>, message: impl Into<String>) {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
+        let base_ms = self.base_duration_ms();
+        let duration_ms = if base_ms == 0 { 0 } else { base_ms + 1000 };
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "error".into(),
             position: self.position.borrow().clone(),
-            duration_ms: 3000,
+            duration_ms,
             closable: true,
         });
     }
@@ -183,11 +208,7 @@ mod tests {
 
     #[test]
     fn test_notification_manager_lifecycle() {
-        let mgr = NotificationManager {
-            toasts: Rc::new(RefCell::new(Vec::new())),
-            window: slint::Weak::default(),
-            position: Rc::new(RefCell::new("top-right".to_string())),
-        };
+        let mgr = NotificationManager::new(slint::Weak::default());
 
         // 1. 弹出消息
         mgr.info("提示", "这是一条测试消息");
@@ -211,6 +232,37 @@ mod tests {
         // 4. 清空所有通知
         mgr.clear_all();
         assert_eq!(mgr.toasts.borrow().len(), 0);
+    }
+
+    #[test]
+    fn test_notification_duration_presets() {
+        let mgr = NotificationManager::new(slint::Weak::default());
+        assert_eq!(mgr.base_duration_ms(), 3000);
+
+        mgr.set_duration_preset("1.5");
+        assert_eq!(mgr.base_duration_ms(), 1500);
+
+        mgr.set_duration_preset("5");
+        assert_eq!(mgr.base_duration_ms(), 5000);
+
+        mgr.set_duration_preset("8");
+        assert_eq!(mgr.base_duration_ms(), 8000);
+
+        mgr.set_duration_preset("never");
+        assert_eq!(mgr.base_duration_ms(), 0);
+
+        mgr.info("常驻", "常驻消息");
+        assert_eq!(mgr.toasts.borrow()[0].duration_ms, 0);
+
+        mgr.warning("常驻告警", "常驻告警消息");
+        assert_eq!(mgr.toasts.borrow()[1].duration_ms, 0);
+
+        mgr.set_duration_preset("3");
+        mgr.warning("普通告警", "普通告警消息");
+        assert_eq!(mgr.toasts.borrow()[2].duration_ms, 3500);
+
+        mgr.error("普通错误", "普通错误消息");
+        assert_eq!(mgr.toasts.borrow()[3].duration_ms, 4000);
     }
 }
 

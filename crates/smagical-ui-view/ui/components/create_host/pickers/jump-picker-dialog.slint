@@ -1,0 +1,446 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { AppButton } from "../../base/app-button.slint";
+import { JumpHostOptionData, PresetJumpChainData } from "../../../features/hosts/hosts_model.slint";
+
+export { JumpHostOptionData, PresetJumpChainData }
+
+export component JumpPickerDialog inherits Rectangle {
+    in property <bool> is-open: false;
+    in property <[JumpHostOptionData]> jump-host-options: [];
+    in property <[PresetJumpChainData]> preset-jump-chains: [];
+    in-out property <string> jump-picker-tab: "hosts"; // "hosts" | "presets"
+    in-out property <string> jump-search-query: "";
+
+    callback close();
+    callback select-host(string /* id */, string /* name */, string /* address */, int /* port */);
+    callback select-preset(string /* id */, string /* name */, string /* summary */, int /* hop_count */);
+
+    if is-open: Rectangle {
+        width: 100%;
+        height: 100%;
+        background: #000000bf; // 叠层半透明暗色遮罩
+        z: 118;
+
+        TouchArea { }
+
+        Rectangle {
+            width: 520px;
+            height: 480px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            border-radius: AppTheme.radius-large;
+            background: AppTheme.modal-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+            clip: true;
+
+            TouchArea { }
+
+            VerticalLayout {
+                width: 100%;
+                height: 100%;
+                padding: 16px;
+                spacing: 12px;
+
+                // 顶部标题与关闭
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 26px;
+
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        VerticalLayout {
+                            alignment: center;
+                            Image {
+                                source: @image-url("../../../assets/icons/zap.svg");
+                                width: 16px;
+                                height: 16px;
+                                image-fit: contain;
+                                colorize: AppTheme.accent;
+                            }
+                        }
+
+                        Text {
+                            text: @tr("添加跳板机节点 / 导入跳板串");
+                            font-size: 13px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    Rectangle {
+                        width: 24px;
+                        height: 24px;
+                        border-radius: 4px;
+                        background: jump-close-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                        jump-close-touch := TouchArea {
+                            clicked => { root.close(); }
+                            mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../../../assets/icons/window-close.svg");
+                            width: 10px;
+                            height: 10px;
+                            image-fit: contain;
+                            colorize: jump-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
+                        }
+                    }
+                }
+
+                // 三段切换胶囊 (选择已有主机 / 隧道中心预设跳板串)
+                Rectangle {
+                    height: 32px;
+                    border-radius: 6px;
+                    background: AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: AppTheme.border;
+
+                    HorizontalLayout {
+                        padding: 3px;
+                        spacing: 4px;
+
+                        // 选项 1: 选择已有主机
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: root.jump-picker-tab == "hosts" ? AppTheme.surface-background : (jtab1-touch.has-hover ? AppTheme.hover-background : transparent);
+                            border-width: root.jump-picker-tab == "hosts" ? 1px : 0px;
+                            border-color: root.jump-picker-tab == "hosts" ? AppTheme.border : transparent;
+
+                            jtab1-touch := TouchArea {
+                                clicked => { root.jump-picker-tab = "hosts"; }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                alignment: center;
+                                Text {
+                                    text: @tr("选择已有主机");
+                                    font-size: 11px;
+                                    font-weight: root.jump-picker-tab == "hosts" ? 700 : 500;
+                                    color: root.jump-picker-tab == "hosts" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // 选项 2: 隧道中心预设串
+                        Rectangle {
+                            horizontal-stretch: 1;
+                            border-radius: 4px;
+                            background: root.jump-picker-tab == "presets" ? AppTheme.surface-background : (jtab2-touch.has-hover ? AppTheme.hover-background : transparent);
+                            border-width: root.jump-picker-tab == "presets" ? 1px : 0px;
+                            border-color: root.jump-picker-tab == "presets" ? AppTheme.border : transparent;
+
+                            jtab2-touch := TouchArea {
+                                clicked => { root.jump-picker-tab = "presets"; }
+                                mouse-cursor: pointer;
+                            }
+
+                            HorizontalLayout {
+                                alignment: center;
+                                spacing: 4px;
+
+                                Text {
+                                    text: @tr("隧道中心预设串");
+                                    font-size: 11px;
+                                    font-weight: root.jump-picker-tab == "presets" ? 700 : 500;
+                                    color: root.jump-picker-tab == "presets" ? AppTheme.accent : AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 内容区
+                // 分类 1: 选择已有主机
+                if root.jump-picker-tab == "hosts": VerticalLayout {
+                    spacing: 8px;
+                    vertical-stretch: 1;
+
+                    Text {
+                        text: @tr("从已保存的主机资产中挑选一台作为跳板节点，添加到链路末尾：");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground;
+                    }
+
+                    Flickable {
+                        vertical-stretch: 1;
+                        min-height: 280px;
+                        viewport-height: max(self.height, jump-hosts-container.preferred-height);
+
+                        jump-hosts-container := VerticalLayout {
+                            alignment: start;
+                            spacing: 4px;
+                            padding-right: 2px;
+
+                            // 空状态提示
+                            if root.jump-host-options.length == 0: Rectangle {
+                                height: 180px;
+                                border-radius: AppTheme.radius-medium;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 6px;
+
+                                    Text {
+                                        text: @tr("暂无可用的跳板主机资产");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                        horizontal-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: @tr("您可前往【网络与隧道中心】组装跳板串模板，或先在主界面创建跳板主机。");
+                                        font-size: 10px;
+                                        color: AppTheme.disabled-foreground;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
+
+                            for jh in root.jump-host-options: Rectangle {
+                                height: 44px;
+                                border-radius: 4px;
+                                background: jh-item-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: jh-item-touch.has-hover ? AppTheme.accent : AppTheme.border;
+
+                                jh-item-touch := TouchArea {
+                                    clicked => {
+                                        root.select-host(jh.id, jh.name, jh.address, jh.port);
+                                    }
+                                    mouse-cursor: pointer;
+                                }
+
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    spacing: 10px;
+                                    alignment: space-between;
+
+                                    HorizontalLayout {
+                                        spacing: 10px;
+                                        alignment: start;
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Image {
+                                                source: @image-url("../../../assets/icons/server.svg");
+                                                width: 16px;
+                                                height: 16px;
+                                                image-fit: contain;
+                                                colorize: jh-item-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                                            }
+                                        }
+
+                                        VerticalLayout {
+                                            alignment: center;
+                                            spacing: 2px;
+
+                                            Text {
+                                                text: jh.name;
+                                                font-size: 12px;
+                                                font-weight: 600;
+                                                color: jh-item-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
+                                            }
+
+                                            Text {
+                                                text: jh.address + ":" + jh.port;
+                                                font-size: 10px;
+                                                color: AppTheme.secondary-foreground;
+                                            }
+                                        }
+                                    }
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        Rectangle {
+                                            height: 22px;
+                                            border-radius: 3px;
+                                            background: jh-item-touch.has-hover ? AppTheme.accent : AppTheme.surface-background;
+                                            border-width: 1px;
+                                            border-color: AppTheme.border;
+
+                                             HorizontalLayout {
+                                                padding-left: 8px;
+                                                padding-right: 8px;
+                                                Text {
+                                                    text: @tr("加入链路");
+                                                    font-size: 10px;
+                                                    font-weight: 600;
+                                                    color: jh-item-touch.has-hover ? #ffffff : AppTheme.secondary-foreground;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 分类 2: 隧道中心预设跳板串
+                if root.jump-picker-tab == "presets": VerticalLayout {
+                    spacing: 8px;
+                    vertical-stretch: 1;
+
+                    Text {
+                        text: @tr("以下为在【网络与隧道中心】预先组装配置好的有序跳板串模板：");
+                        font-size: 11px;
+                        color: AppTheme.secondary-foreground;
+                    }
+
+                    Flickable {
+                        vertical-stretch: 1;
+                        min-height: 280px;
+                        viewport-height: max(self.height, preset-chains-container.preferred-height);
+
+                        preset-chains-container := VerticalLayout {
+                            alignment: start;
+                            spacing: 6px;
+                            padding-right: 2px;
+
+                            // 空状态提示
+                            if root.preset-jump-chains.length == 0: Rectangle {
+                                height: 180px;
+                                border-radius: AppTheme.radius-medium;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                VerticalLayout {
+                                    alignment: center;
+                                    spacing: 6px;
+
+                                    Text {
+                                        text: @tr("隧道中心暂无预设跳板串模板");
+                                        font-size: 11px;
+                                        font-weight: 600;
+                                        color: AppTheme.secondary-foreground;
+                                        horizontal-alignment: center;
+                                    }
+
+                                    Text {
+                                        text: @tr("您可前往【网络与隧道中心】组装并保存跳板串，也可直接在上方选择已有主机或手动输入。");
+                                        font-size: 10px;
+                                        color: AppTheme.disabled-foreground;
+                                        horizontal-alignment: center;
+                                    }
+                                }
+                            }
+
+                            for chain in root.preset-jump-chains: Rectangle {
+                                height: 58px;
+                                border-radius: 4px;
+                                background: AppTheme.control-background;
+                                border-width: 1px;
+                                border-color: AppTheme.border;
+
+                                HorizontalLayout {
+                                    padding-left: 12px;
+                                    padding-right: 12px;
+                                    spacing: 10px;
+                                    alignment: space-between;
+
+                                    VerticalLayout {
+                                        alignment: center;
+                                        spacing: 3px;
+                                        horizontal-stretch: 1;
+
+                                        HorizontalLayout {
+                                            spacing: 6px;
+                                            alignment: start;
+
+                                            Text {
+                                                text: chain.name;
+                                                font-size: 12px;
+                                                font-weight: 700;
+                                                color: AppTheme.foreground;
+                                                vertical-alignment: center;
+                                            }
+                                        }
+
+                                        Text {
+                                            text: chain.summary != "" ? chain.summary : @tr("完整 ProxyJump 级联链路");
+                                            font-size: 10px;
+                                            color: AppTheme.secondary-foreground;
+                                            overflow: elide;
+                                        }
+                                    }
+
+                                    HorizontalLayout {
+                                        spacing: 6px;
+                                        alignment: end;
+
+                                        // 🔗 引用此预设跳板串 (动态同步)
+                                        VerticalLayout {
+                                            alignment: center;
+                                            Rectangle {
+                                                height: 28px;
+                                                border-radius: 4px;
+                                                background: ref-preset-touch.has-hover ? AppTheme.accent.darker(10%) : AppTheme.accent;
+
+                                                ref-preset-touch := TouchArea {
+                                                    clicked => {
+                                                        root.select-preset(chain.id, chain.name, chain.summary, chain.hop_count);
+                                                    }
+                                                    mouse-cursor: pointer;
+                                                }
+
+                                                HorizontalLayout {
+                                                    padding-left: 10px;
+                                                    padding-right: 10px;
+                                                    spacing: 4px;
+                                                    alignment: center;
+
+                                                    Text {
+                                                        text: @tr("🔗 引用此预设跳板串");
+                                                        font-size: 11px;
+                                                        font-weight: 700;
+                                                        color: #ffffff;
+                                                        vertical-alignment: center;
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // 底部边框分割线与关闭按钮
+                Rectangle {
+                    height: 1px;
+                    background: AppTheme.border;
+                }
+
+                HorizontalLayout {
+                    alignment: end;
+                    height: 32px;
+
+                    AppButton {
+                        text: @tr("关闭");
+                        variant: "secondary";
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+        }
+    }
+}

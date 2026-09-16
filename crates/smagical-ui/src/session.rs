@@ -105,7 +105,7 @@ pub(crate) fn sync_active_session_ui(
     is_split: bool,
 ) {
     let tb = w.global::<TerminalBridge>();
-    if pane_groups.is_empty() {
+    let (h_id, h_name) = if pane_groups.is_empty() {
         tb.set_tabs(slint::ModelRc::default());
         tb.set_active_session_tab("".into());
         tb.set_has_active_session(false);
@@ -117,6 +117,7 @@ pub(crate) fn sync_active_session_ui(
         tb.set_active_host_status("offline".into());
         tb.set_is_split(false);
         tb.set_split_count(1);
+        (String::new(), String::new())
     } else {
         let active_group = pane_groups
             .iter()
@@ -124,6 +125,7 @@ pub(crate) fn sync_active_session_ui(
             .or_else(|| pane_groups.first())
             .unwrap();
 
+        let mut res = (String::new(), String::new());
         if let Some(active_sess) = active_group.get_active_session() {
             let tab_model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(active_group.to_tab_data_list())));
             tb.set_tabs(tab_model);
@@ -135,11 +137,15 @@ pub(crate) fn sync_active_session_ui(
             tb.set_active_host_address(active_sess.host_address.clone().into());
             tb.set_active_host_ping_ms(active_sess.ping_ms);
             tb.set_active_host_status(active_sess.host_status.clone().into());
+            res = (active_sess.host_id.clone(), active_sess.host_name.clone());
         }
         tb.set_active_pane_id(active_group.pane_id.clone().into());
         tb.set_is_split(is_split);
         tb.set_split_count(pane_groups.len() as i32);
-    }
+        res
+    };
+
+    crate::handlers::right_drawer_handlers::sync_right_drawers_on_session_change(w, &h_id, &h_name);
 }
 
 /// 将当前聚焦的终端活跃上下文同步至 CoreState，并自动触发全局 `TerminalFocusChangedEvent` 广播。

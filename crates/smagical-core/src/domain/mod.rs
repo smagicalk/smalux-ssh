@@ -30,7 +30,7 @@ pub use history::{HistoryRecord, SessionSnapshotConfig};
 pub use host::{HostRecord, HostStatus};
 pub use credential::{CredentialRecord, CredentialType};
 pub use snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable};
-pub use tunnel::{TunnelRecord, TunnelType};
+pub use tunnel::{TunnelRecord, TunnelRunMode, TunnelType};
 pub use config::AppConfigRecord;
 pub use activity_bar::{ActivityBarItem, ActivityBarRegistry};
 pub use navigation::{NavigationRequest, NavigationRouter};

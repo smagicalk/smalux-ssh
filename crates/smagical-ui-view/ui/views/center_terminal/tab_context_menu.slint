@@ -1,0 +1,106 @@
+// =============================================================================
+// 文件名称: tab_context_menu.slint
+// 模块功能: 终端 Tab 标签页专属右键快捷操作上下文菜单 (Tab Context Menu)
+// 核心设计: 提供复制会话 IP/连接地址、向右/向下分屏、关闭当前会话与关闭其他会话等操作
+// =============================================================================
+
+import { AppTheme } from "../../themes/app-theme.slint";
+import { ContextMenuItem, ContextMenuContainer } from "../../components/context-menu.slint";
+
+/// 终端 Tab 标签页右键快捷上下文菜单
+export component TabContextMenu inherits ContextMenuContainer {
+    /// 当前窗格是否支持分屏 (仅当拥有 > 1 个 Tab 时支持分屏)
+    in property <bool> can-split: true;
+    /// 是否支持关闭其他会话 (仅当拥有 > 1 个 Tab 时支持)
+    in property <bool> can-close-others: true;
+
+    /// 复制当前 Tab 主机 IP / 连接地址回调
+    callback copy-ip();
+    /// 向右切分当前 Tab 窗格回调
+    callback split-right();
+    /// 向下切分当前 Tab 窗格回调
+    callback split-down();
+    /// 关闭当前选中的 Tab 回调
+    callback close-tab();
+    /// 关闭除当前 Tab 以外的其他会话回调
+    callback close-others();
+    /// 关闭右键菜单遮罩回调
+    callback close-menu();
+
+    menu-width: 168px;
+    menu-height: 148px;
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 1px;
+
+        // 1. 复制 IP (Copy IP)
+        ContextMenuItem {
+            item-id: "copy_ip";
+            title: @tr("复制 IP");
+            icon: @image-url("../../assets/icons/copy.svg");
+            clicked(id) => {
+                root.copy-ip();
+                root.close-menu();
+            }
+        }
+
+        // 分割线
+        ContextMenuItem { is-separator: true; }
+
+        // 2. 向右分屏 (Split Right)
+        ContextMenuItem {
+            item-id: "split_right";
+            title: @tr("向右分屏");
+            icon: @image-url("../../assets/icons/split-v.svg");
+            shortcut: "Ctrl+D";
+            is-disabled: !root.can-split;
+            clicked(id) => {
+                root.split-right();
+                root.close-menu();
+            }
+        }
+
+        // 3. 向下分屏 (Split Down)
+        ContextMenuItem {
+            item-id: "split_down";
+            title: @tr("向下分屏");
+            icon: @image-url("../../assets/icons/split-h.svg");
+            shortcut: "Ctrl+E";
+            is-disabled: !root.can-split;
+            clicked(id) => {
+                root.split-down();
+                root.close-menu();
+            }
+        }
+
+        // 分割线
+        ContextMenuItem { is-separator: true; }
+
+        // 4. 关闭当前会话 (Close Tab)
+        ContextMenuItem {
+            item-id: "close";
+            title: @tr("关闭");
+            icon: @image-url("../../assets/icons/window-close.svg");
+            shortcut: "Ctrl+W";
+            is-danger: true;
+            clicked(id) => {
+                root.close-tab();
+                root.close-menu();
+            }
+        }
+
+        // 5. 关闭其他会话 (Close Other Tabs)
+        ContextMenuItem {
+            item-id: "close_others";
+            title: @tr("关闭其他会话");
+            icon: @image-url("../../assets/icons/trash.svg");
+            is-disabled: !root.can-close-others;
+            clicked(id) => {
+                root.close-others();
+                root.close-menu();
+            }
+        }
+    }
+}
+

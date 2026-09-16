@@ -19,6 +19,9 @@ pub struct AppConfigRecord {
     pub confirm_close_active: bool,
     /// 自定义资产数据存放物理目录
     pub custom_data_dir: String,
+    /// 全局操作提示气泡停留时长 ("1.5", "3", "5", "8", "never")，默认 "3"
+    #[serde(default = "default_toast_duration")]
+    pub toast_duration: String,
 
     /// 当前激活生效的 UI 配色主题 ID (如 "builtin.ui.darcula")
     pub theme_id: String,
@@ -238,9 +241,10 @@ impl Default for AppConfigRecord {
             startup_view: "terminal".to_string(),
             close_action: "tray".to_string(),
             start_on_boot: false,
-            confirm_close_tab: true,
-            confirm_close_active: true,
+            confirm_close_tab: false,
+            confirm_close_active: false,
             custom_data_dir: String::new(),
+            toast_duration: default_toast_duration(),
 
             // 外观
             theme_id: "builtin.ui.darcula".to_string(),
@@ -431,4 +435,8 @@ fn default_sync_interval() -> String {
 
 fn default_auto_lock() -> String {
     "never".to_string()
+}
+
+fn default_toast_duration() -> String {
+    "3".to_string()
 }

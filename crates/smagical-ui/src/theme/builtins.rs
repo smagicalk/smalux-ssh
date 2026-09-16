@@ -3,126 +3,126 @@ use smagical_core::theme::{LoadedTheme, ThemeError, ThemeRepository, ThemeServic
 const UI_PRESETS: &[(&str, &str)] = &[
     (
         "builtin.ui.darcula",
-        include_str!("../../ui/themes/presets/ui/darcula.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/darcula.toml"),
     ),
     (
         "builtin.ui.system",
-        include_str!("../../ui/themes/presets/ui/system.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/system.toml"),
     ),
     (
         "builtin.ui.light",
-        include_str!("../../ui/themes/presets/ui/light.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/light.toml"),
     ),
     (
         "builtin.ui.one-dark",
-        include_str!("../../ui/themes/presets/ui/one-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/one-dark.toml"),
     ),
     (
         "builtin.ui.nord",
-        include_str!("../../ui/themes/presets/ui/nord.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/nord.toml"),
     ),
     (
         "builtin.ui.github-light",
-        include_str!("../../ui/themes/presets/ui/github-light.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/github-light.toml"),
     ),
     (
         "builtin.ui.github-dark",
-        include_str!("../../ui/themes/presets/ui/github-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/github-dark.toml"),
     ),
     (
         "builtin.ui.monokai",
-        include_str!("../../ui/themes/presets/ui/monokai.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/monokai.toml"),
     ),
     (
         "builtin.ui.solarized-light",
-        include_str!("../../ui/themes/presets/ui/solarized-light.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/solarized-light.toml"),
     ),
     (
         "builtin.ui.solarized-dark",
-        include_str!("../../ui/themes/presets/ui/solarized-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/solarized-dark.toml"),
     ),
     (
         "builtin.ui.catppuccin-latte",
-        include_str!("../../ui/themes/presets/ui/catppuccin-latte.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/catppuccin-latte.toml"),
     ),
     (
         "builtin.ui.catppuccin-mocha",
-        include_str!("../../ui/themes/presets/ui/catppuccin-mocha.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/catppuccin-mocha.toml"),
     ),
     (
         "builtin.ui.tokyo-night",
-        include_str!("../../ui/themes/presets/ui/tokyo-night.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/tokyo-night.toml"),
     ),
     (
         "builtin.ui.rose-pine-dawn",
-        include_str!("../../ui/themes/presets/ui/rose-pine-dawn.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/rose-pine-dawn.toml"),
     ),
     (
         "builtin.ui.rose-pine",
-        include_str!("../../ui/themes/presets/ui/rose-pine.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/ui/rose-pine.toml"),
     ),
 ];
 
 const TERMINAL_PRESETS: &[(&str, &str)] = &[
     (
         "builtin.terminal.darcula",
-        include_str!("../../ui/themes/presets/terminal/darcula.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/darcula.toml"),
     ),
     (
         "builtin.terminal.dracula",
-        include_str!("../../ui/themes/presets/terminal/dracula.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/dracula.toml"),
     ),
     (
         "builtin.terminal.one-dark",
-        include_str!("../../ui/themes/presets/terminal/one-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/one-dark.toml"),
     ),
     (
         "builtin.terminal.nord",
-        include_str!("../../ui/themes/presets/terminal/nord.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/nord.toml"),
     ),
     (
         "builtin.terminal.solarized-dark",
-        include_str!("../../ui/themes/presets/terminal/solarized-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/solarized-dark.toml"),
     ),
     (
         "builtin.terminal.solarized-light",
-        include_str!("../../ui/themes/presets/terminal/solarized-light.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/solarized-light.toml"),
     ),
     (
         "builtin.terminal.gruvbox-dark",
-        include_str!("../../ui/themes/presets/terminal/gruvbox-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/gruvbox-dark.toml"),
     ),
     (
         "builtin.terminal.tokyo-night",
-        include_str!("../../ui/themes/presets/terminal/tokyo-night.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/tokyo-night.toml"),
     ),
     (
         "builtin.terminal.catppuccin-mocha",
-        include_str!("../../ui/themes/presets/terminal/catppuccin-mocha.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/catppuccin-mocha.toml"),
     ),
     (
         "builtin.terminal.github-light",
-        include_str!("../../ui/themes/presets/terminal/github-light.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/github-light.toml"),
     ),
     (
         "builtin.terminal.github-dark",
-        include_str!("../../ui/themes/presets/terminal/github-dark.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/github-dark.toml"),
     ),
     (
         "builtin.terminal.monokai",
-        include_str!("../../ui/themes/presets/terminal/monokai.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/monokai.toml"),
     ),
     (
         "builtin.terminal.catppuccin-latte",
-        include_str!("../../ui/themes/presets/terminal/catppuccin-latte.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/catppuccin-latte.toml"),
     ),
     (
         "builtin.terminal.rose-pine-dawn",
-        include_str!("../../ui/themes/presets/terminal/rose-pine-dawn.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/rose-pine-dawn.toml"),
     ),
     (
         "builtin.terminal.rose-pine",
-        include_str!("../../ui/themes/presets/terminal/rose-pine.toml"),
+        include_str!("../../../smagical-ui-view/ui/themes/presets/terminal/rose-pine.toml"),
     ),
 ];
 

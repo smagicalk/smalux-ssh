@@ -1,0 +1,11 @@
+import { SystemMetricsData } from "../../views/right_drawers/monitor_drawer.slint";
+
+/// 主机实时监控领域状态单例总线 (MonitorBridge)
+/// 负责将后台定期探针指标安全同步至 UI，并在无主机或失焦时实现惰性休眠。
+export global MonitorBridge {
+    in-out property <SystemMetricsData> metrics;
+    in-out property <bool> has-active-host: false;
+    in-out property <bool> is-sampling: false;
+
+    callback refresh-metrics();
+}
