@@ -29,24 +29,25 @@ impl MockSnippetRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl SnippetRepository for MockSnippetRepository {
-    fn list_all(&self) -> StorageResult<Vec<SnippetRecord>> {
+    async fn list_all(&self) -> StorageResult<Vec<SnippetRecord>> {
         let read_guard = self.snippets.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.clone())
     }
 
-    fn list_by_group(&self, group_id: Option<&str>) -> StorageResult<Vec<SnippetRecord>> {
-        let all = self.list_all()?;
+    async fn list_by_group(&self, group_id: Option<&str>) -> StorageResult<Vec<SnippetRecord>> {
+        let all = self.list_all().await?;
         Ok(all.into_iter().filter(|s| s.parent_group_id.as_deref() == group_id).collect())
     }
 
-    fn get_by_id(&self, id: &str) -> StorageResult<Option<SnippetRecord>> {
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<SnippetRecord>> {
         let read_guard = self.snippets.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().find(|s| s.id == id).cloned())
     }
 
-    fn search(&self, query: &str) -> StorageResult<Vec<SnippetRecord>> {
-        let all = self.list_all()?;
+    async fn search(&self, query: &str) -> StorageResult<Vec<SnippetRecord>> {
+        let all = self.list_all().await?;
         if query.trim().is_empty() {
             return Ok(all);
         }
@@ -60,7 +61,7 @@ impl SnippetRepository for MockSnippetRepository {
         }).collect())
     }
 
-    fn save(&self, record: &SnippetRecord) -> StorageResult<()> {
+    async fn save(&self, record: &SnippetRecord) -> StorageResult<()> {
         let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|s| s.id == record.id) {
             write_guard[pos] = record.clone();
@@ -71,7 +72,7 @@ impl SnippetRepository for MockSnippetRepository {
         Ok(())
     }
 
-    fn save_batch(&self, records: &[SnippetRecord]) -> StorageResult<()> {
+    async fn save_batch(&self, records: &[SnippetRecord]) -> StorageResult<()> {
         let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         for rec in records {
             if let Some(pos) = write_guard.iter().position(|s| s.id == rec.id) {
@@ -83,7 +84,7 @@ impl SnippetRepository for MockSnippetRepository {
         Ok(())
     }
 
-    fn delete(&self, id: &str) -> StorageResult<bool> {
+    async fn delete(&self, id: &str) -> StorageResult<bool> {
         let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|s| s.id == id) {
             write_guard.remove(pos);
@@ -94,7 +95,7 @@ impl SnippetRepository for MockSnippetRepository {
         }
     }
 
-    fn toggle_favorite(&self, id: &str) -> StorageResult<bool> {
+    async fn toggle_favorite(&self, id: &str) -> StorageResult<bool> {
         let mut write_guard = self.snippets.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(snip) = write_guard.iter_mut().find(|s| s.id == id) {
             snip.is_favorite = !snip.is_favorite;
@@ -104,17 +105,17 @@ impl SnippetRepository for MockSnippetRepository {
         }
     }
 
-    fn list_groups(&self) -> StorageResult<Vec<SnippetGroupRecord>> {
+    async fn list_groups(&self) -> StorageResult<Vec<SnippetGroupRecord>> {
         let read_guard = self.groups.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.clone())
     }
 
-    fn get_group_by_id(&self, id: &str) -> StorageResult<Option<SnippetGroupRecord>> {
+    async fn get_group_by_id(&self, id: &str) -> StorageResult<Option<SnippetGroupRecord>> {
         let read_guard = self.groups.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().find(|g| g.id == id).cloned())
     }
 
-    fn save_group(&self, group: &SnippetGroupRecord) -> StorageResult<()> {
+    async fn save_group(&self, group: &SnippetGroupRecord) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|g| g.id == group.id) {
             write_guard[pos] = group.clone();
@@ -124,7 +125,7 @@ impl SnippetRepository for MockSnippetRepository {
         Ok(())
     }
 
-    fn delete_group(&self, id: &str) -> StorageResult<bool> {
+    async fn delete_group(&self, id: &str) -> StorageResult<bool> {
         let mut g_write = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = g_write.iter().position(|g| g.id == id) {
             let removed = g_write.remove(pos);
@@ -143,7 +144,7 @@ impl SnippetRepository for MockSnippetRepository {
         }
     }
 
-    fn set_group_expanded(&self, id: &str, expanded: bool) -> StorageResult<()> {
+    async fn set_group_expanded(&self, id: &str, expanded: bool) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(g) = write_guard.iter_mut().find(|g| g.id == id) {
             g.is_expanded = expanded;
@@ -151,7 +152,7 @@ impl SnippetRepository for MockSnippetRepository {
         Ok(())
     }
 
-    fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()> {
+    async fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         let target_level = if let Some(p_id) = new_parent_id {
             write_guard.iter().find(|g| g.id == p_id).map(|g| g.level + 1).unwrap_or(0)

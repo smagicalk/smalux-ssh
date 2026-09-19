@@ -2,6 +2,38 @@
 //!
 //! 将 Slint 前端捕获的字符、修饰键（Ctrl, Alt, Shift）与特殊功能键精确翻译为 ANSI / VT100 / xterm 控制转义序列。
 
+/// 判断当前按键文本是否属于单独按下的修饰键或系统状态锁定键 (如 Shift, Ctrl, Alt, CapsLock, NumLock 等)。
+pub fn is_standalone_modifier(text: &str) -> bool {
+    if text.is_empty() {
+        return true;
+    }
+    let first_char = match text.chars().next() {
+        Some(c) => c,
+        None => return true,
+    };
+    if matches!(first_char, '\u{0010}'..='\u{0017}') {
+        return true;
+    }
+    matches!(
+        text,
+        "Shift"
+            | "ShiftR"
+            | "Control"
+            | "ControlR"
+            | "Alt"
+            | "AltGr"
+            | "AltR"
+            | "Meta"
+            | "MetaR"
+            | "CapsLock"
+            | "NumLock"
+            | "ScrollLock"
+            | "Menu"
+            | "Pause"
+            | "PrintScreen"
+    )
+}
+
 /// 将 Slint 键盘事件文本与修饰键状态编码为发送至 PTY 的原始 ANSI 字节序列。
 ///
 /// # 参数
@@ -19,31 +51,11 @@ pub fn encode_key_event(text: &str, is_ctrl: bool, _is_shift: bool, is_alt: bool
 
     // 0. 过滤纯修饰键、状态锁定键与系统无打印特殊控制码 (例如单独按下 Shift, Ctrl, Alt, CapsLock, NumLock 等)
     // 注意：组合键（如 Ctrl+C）此时 text 为 "c"，不会被拦截；只有单独按下了修饰键本身时才会过滤
-    let first_char = text.chars().next().unwrap();
-    if matches!(first_char, '\u{0010}'..='\u{0017}') {
+    if is_standalone_modifier(text) {
         return Vec::new();
     }
 
-    if matches!(
-        text,
-        "Shift"
-            | "ShiftR"
-            | "Control"
-            | "ControlR"
-            | "Alt"
-            | "AltGr"
-            | "AltR"
-            | "Meta"
-            | "MetaR"
-            | "CapsLock"
-            | "NumLock"
-            | "ScrollLock"
-            | "Menu"
-            | "Pause"
-            | "PrintScreen"
-    ) {
-        return Vec::new();
-    }
+    let first_char = text.chars().next().unwrap();
 
     // 1. 处理 Ctrl 组合键 (Ctrl+A ~ Ctrl+Z 及 ASCII 控制符)
     if is_ctrl {

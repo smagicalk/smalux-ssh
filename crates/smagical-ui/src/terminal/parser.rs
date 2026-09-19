@@ -30,12 +30,21 @@ impl Dimensions for TermDimensions {
     }
 }
 
-/// 空事件接收器，用于满足 alacritty_terminal 的 EventListener trait 约束。
-#[derive(Clone, Copy, Debug, Default)]
-pub struct TerminalEventListener;
+/// 终端事件接收器，用于捕获 alacritty_terminal 回传给 PTY 的控制序列 (如光标位置报告 CPR 等)。
+#[derive(Clone, Debug, Default)]
+pub struct TerminalEventListener {
+    pty_tx: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
+}
 
 impl EventListener for TerminalEventListener {
-    fn send_event(&self, _event: Event) {}
+    fn send_event(&self, event: Event) {
+        if let Event::PtyWrite(text) = event {
+            tracing::debug!(target: "smagical_ui::terminal", "向 PTY 回写控制序列 (CPR 等): {:?}", text);
+            if let Ok(mut guard) = self.pty_tx.lock() {
+                guard.push(text);
+            }
+        }
+    }
 }
 
 /// 工业级 Alacritty 终端状态机封装。
@@ -48,6 +57,8 @@ pub struct TerminalParser {
     dirty: bool,
     /// 鼠标划选的屏幕坐标选区 `Some(((start_col, start_row), (end_col, end_row)))`
     selection: Option<((usize, usize), (usize, usize))>,
+    /// PTY 响应缓冲区 (如 CPR 光标报告)
+    pty_out: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 impl TerminalParser {
@@ -62,8 +73,13 @@ impl TerminalParser {
             screen_lines: rows as usize,
         };
 
+        let pty_out = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let listener = TerminalEventListener {
+            pty_tx: std::sync::Arc::clone(&pty_out),
+        };
+
         let config = Config::default();
-        let term = Term::new(config, &dimensions, TerminalEventListener);
+        let term = Term::new(config, &dimensions, listener);
         let processor = Processor::new();
 
         Self {
@@ -71,6 +87,16 @@ impl TerminalParser {
             processor,
             dirty: true,
             selection: None,
+            pty_out,
+        }
+    }
+
+    /// 提取待向 PTY 写回的协议控制序列 (如 CPR 光标响应)。
+    pub fn take_pty_writes(&self) -> Vec<String> {
+        if let Ok(mut guard) = self.pty_out.lock() {
+            std::mem::take(&mut *guard)
+        } else {
+            Vec::new()
         }
     }
 

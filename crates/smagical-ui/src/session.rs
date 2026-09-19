@@ -176,43 +176,52 @@ pub(crate) fn sync_active_session_to_core(
 /// 会话退出异步持久化守护与应用退出等待守卫。
 #[derive(Clone, Default)]
 pub(crate) struct SessionPersistenceGuard {
-    pending_handles: std::sync::Arc<std::sync::Mutex<Vec<std::thread::JoinHandle<()>>>>,
+    pending_handles: std::sync::Arc<std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>>,
 }
 
 impl SessionPersistenceGuard {
-    /// 派发一个异步后台会话历史与快照持久化任务
-    pub(crate) fn spawn<F>(&self, task: F)
+    /// 派发一个异步后台会话历史与快照持久化任务 (基于 Tokio 异步任务池，0 系统线程开销)
+    pub(crate) fn spawn_async<F>(&self, task: F)
     where
-        F: FnOnce() + Send + 'static,
+        F: std::future::Future<Output = ()> + Send + 'static,
     {
-        if let Ok(handle) = std::thread::Builder::new()
-            .name("session-history-flusher".into())
-            .spawn(task)
-            && let Ok(mut list) = self.pending_handles.lock()
-        {
-            list.retain(|h| !h.is_finished());
-            list.push(handle);
+        match tokio::runtime::Handle::try_current() {
+            Ok(handle) => {
+                let join_handle = handle.spawn(task);
+                if let Ok(mut list) = self.pending_handles.lock() {
+                    list.retain(|h| !h.is_finished());
+                    list.push(join_handle);
+                }
+            }
+            Err(_) => {
+                crate::async_util::spawn_async(task);
+            }
         }
-
     }
 
-    /// 应用即将退出时：阻塞等待所有未完成的后台持久化落盘任务（带最大超时保护）
+
+    /// 应用即将退出时：等待所有未完成的后台持久化落盘任务（带最大超时保护）
     pub(crate) fn flush_and_wait(&self, timeout: std::time::Duration) {
-        let start = std::time::Instant::now();
         let handles = if let Ok(mut list) = self.pending_handles.lock() {
             std::mem::take(&mut *list)
         } else {
             Vec::new()
         };
 
-        for h in handles {
-            let elapsed = start.elapsed();
-            if elapsed >= timeout {
-                tracing::warn!(target: "smagical_ui::session", "会话后台持久化等待超时");
-                break;
-            }
-            let _ = h.join();
+        if handles.is_empty() {
+            return;
         }
+
+        crate::async_util::block_on(async move {
+            let join_all_fut = async {
+                for h in handles {
+                    let _ = h.await;
+                }
+            };
+            if tokio::time::timeout(timeout, join_all_fut).await.is_err() {
+                tracing::warn!(target: "smagical_ui::session", "会话后台持久化等待超时");
+            }
+        });
     }
 }
 

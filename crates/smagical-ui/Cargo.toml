@@ -27,6 +27,10 @@ smagical-ui-view = { path = "../smagical-ui-view" }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 winit = { version = "0.30", default-features = false }
 rfd = "0.17.2"
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+reqwest = { workspace = true }
+futures-util = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

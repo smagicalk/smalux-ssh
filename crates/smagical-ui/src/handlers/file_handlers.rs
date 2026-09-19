@@ -57,7 +57,7 @@ pub(crate) fn map_transfer_task_to_ui(t: &TransferTask) -> SlintTransferItemData
 /// 构造文件会话选择弹窗的主机列表 (支持实时过滤)
 pub(crate) fn build_file_launcher_hosts(ctx: &AppContext, query: &str) -> Vec<SlintHostItemData> {
     let q = query.trim().to_lowercase();
-    let tree = ctx.master_tree.borrow();
+    let tree = ctx.master_tree.read().unwrap();
     tree.iter()
         .filter(|n| {
             if n.is_group {
@@ -129,6 +129,16 @@ fn scan_folder_recursive(dir: &std::path::Path) -> (usize, u64, Vec<(String, Pat
 
     walk(dir, dir, &mut file_count, &mut total_bytes, &mut sub_items);
     (file_count, total_bytes, sub_items)
+}
+
+/// 异步扫描本地目录，将耗时文件系统 IO 派发至 Tokio 阻塞线程池执行 (杜绝大目录冻结 UI)
+#[allow(dead_code)]
+pub async fn scan_local_directory_async(dir_path: PathBuf) -> std::io::Result<Vec<FileItemData>> {
+    tokio::task::spawn_blocking(move || {
+        scan_local_directory(&dir_path)
+    })
+    .await
+    .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
 }
 
 /// 仅同步左侧本地 Tab 列表 (用于拖拽重排等无需全量扫描的轻量操作)
@@ -782,9 +792,13 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 return;
             }
 
-            // 查询主机元数据并新建右侧远程 Tab
-            let (h_name, h_addr) = if let Ok(Some(h)) = ctx_open_host.core_state.storage().hosts().get_by_id(&h_id) {
-                (h.name, format!("{}:{}", h.address, h.port))
+            // 查询主机元数据并新建右侧远程 Tab (优先从内存 master_tree 中快速读取)
+            let tree = ctx_open_host.master_tree.read().unwrap();
+            let target_node = tree.iter().find(|n| n.id == h_id && !n.is_group).cloned();
+            drop(tree);
+
+            let (h_name, h_addr) = if let Some(n) = target_node {
+                (n.name, if n.port > 0 { format!("{}:{}", n.address, n.port) } else { n.address })
             } else {
                 (format!("Host ({})", h_id), "127.0.0.1:22".into())
             };
@@ -1100,14 +1114,16 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     fb.on_upload_file(move || {
         let is_en = window_weak.upgrade().map(|w| w.global::<WindowBridge>().get_current_language() == "en-US").unwrap_or(false);
         let w_weak = window_weak.clone();
-        std::thread::spawn(move || {
+        crate::async_util::spawn_async(async move {
             let dialog_title = if is_en { "Select files to upload (multiple selection supported)" } else { "选择要上传的文件 (支持多选)" };
-            let picked = rfd::FileDialog::new()
-                .set_title(dialog_title)
-                .pick_files();
+            let picked = tokio::task::spawn_blocking(move || {
+                rfd::FileDialog::new()
+                    .set_title(dialog_title)
+                    .pick_files()
+            }).await.unwrap_or(None);
             if let Some(files) = picked {
                 if files.is_empty() { return; }
-                slint::invoke_from_event_loop(move || {
+                let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = w_weak.upgrade() {
                         FILE_APP_CTX.with(|cell| {
                             if let Some(ctx_up) = cell.borrow().as_ref() {
@@ -1144,7 +1160,7 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                             }
                         });
                     }
-                }).ok();
+                });
             }
         });
     });
@@ -1154,14 +1170,19 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
     fb.on_upload_folder(move || {
         let is_en = window_weak_folder.upgrade().map(|w| w.global::<WindowBridge>().get_current_language() == "en-US").unwrap_or(false);
         let w_weak = window_weak_folder.clone();
-        std::thread::spawn(move || {
+        crate::async_util::spawn_async(async move {
             let dialog_title = if is_en { "Select folder to upload" } else { "选择要上传的文件夹" };
-            let picked = rfd::FileDialog::new()
-                .set_title(dialog_title)
-                .pick_folder();
+            let picked = tokio::task::spawn_blocking(move || {
+                rfd::FileDialog::new()
+                    .set_title(dialog_title)
+                    .pick_folder()
+            }).await.unwrap_or(None);
             if let Some(dir_path) = picked {
-                let (file_count, total_bytes, sub_items) = scan_folder_recursive(&dir_path);
-                slint::invoke_from_event_loop(move || {
+                let (file_count, total_bytes, sub_items) = tokio::task::spawn_blocking({
+                    let dir_path = dir_path.clone();
+                    move || scan_folder_recursive(&dir_path)
+                }).await.unwrap_or_default();
+                let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = w_weak.upgrade() {
                         FILE_APP_CTX.with(|cell| {
                             if let Some(ctx_up) = cell.borrow().as_ref() {
@@ -1216,11 +1237,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                                     });
                                 }
                                 drop(tasks);
+                                w.global::<FilesBridge>().set_is_transfer_queue_expanded(true);
                                 sync_file_explorer_ui(&w, ctx_up);
                             }
                         });
                     }
-                }).ok();
+                });
             }
         });
     });
@@ -1596,43 +1618,77 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                 "create_folder" => {
                     if !is_remote {
                         let parent = if is_dir { std::path::PathBuf::from(&p_str) } else { std::path::PathBuf::from(&p_str).parent().unwrap_or(std::path::Path::new(".")).to_path_buf() };
-                        let mut target = parent.join("新建文件夹");
-                        let mut counter = 1;
-                        while target.exists() {
-                            target = parent.join(format!("新建文件夹 ({})", counter));
-                            counter += 1;
-                        }
-                        let ok = std::fs::create_dir_all(&target).is_ok();
-                        ctx_file_act.core_state.events().dispatch(&FileOperationCompletedEvent {
-                            action: "create_folder".into(),
-                            is_remote: false,
-                            path: target.to_string_lossy().to_string(),
-                            success: ok,
+                        let events = ctx_file_act.core_state.events().clone();
+                        let w_weak = w.as_weak();
+                        crate::async_util::spawn_async(async move {
+                            let (target, ok) = tokio::task::spawn_blocking(move || {
+                                let mut target = parent.join("新建文件夹");
+                                let mut counter = 1;
+                                while target.exists() {
+                                    target = parent.join(format!("新建文件夹 ({})", counter));
+                                    counter += 1;
+                                }
+                                let ok = std::fs::create_dir_all(&target).is_ok();
+                                (target, ok)
+                            }).await.unwrap_or_else(|_| (std::path::PathBuf::new(), false));
+
+                            events.dispatch(&FileOperationCompletedEvent {
+                                action: "create_folder".into(),
+                                is_remote: false,
+                                path: target.to_string_lossy().to_string(),
+                                success: ok,
+                            });
+
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = w_weak.upgrade() {
+                                    FILE_APP_CTX.with(|cell| {
+                                        if let Some(ctx_ref) = cell.borrow().as_ref() {
+                                            let cur_p = ctx_ref.local_current_path.borrow().clone();
+                                            refresh_local_path(ctx_ref, &cur_p);
+                                            sync_file_explorer_ui(&w, ctx_ref);
+                                        }
+                                    });
+                                }
+                            });
                         });
-                        let cur_p = ctx_file_act.local_current_path.borrow().clone();
-                        refresh_local_path(&ctx_file_act, &cur_p);
-                        sync_file_explorer_ui(&w, &ctx_file_act);
                     }
                 }
                 "create_file" => {
                     if !is_remote {
                         let parent = if is_dir { std::path::PathBuf::from(&p_str) } else { std::path::PathBuf::from(&p_str).parent().unwrap_or(std::path::Path::new(".")).to_path_buf() };
-                        let mut target = parent.join("新建文本文档.txt");
-                        let mut counter = 1;
-                        while target.exists() {
-                            target = parent.join(format!("新建文本文档 ({}).txt", counter));
-                            counter += 1;
-                        }
-                        let ok = std::fs::File::create(&target).is_ok();
-                        ctx_file_act.core_state.events().dispatch(&FileOperationCompletedEvent {
-                            action: "create_file".into(),
-                            is_remote: false,
-                            path: target.to_string_lossy().to_string(),
-                            success: ok,
+                        let events = ctx_file_act.core_state.events().clone();
+                        let w_weak = w.as_weak();
+                        crate::async_util::spawn_async(async move {
+                            let (target, ok) = tokio::task::spawn_blocking(move || {
+                                let mut target = parent.join("新建文本文档.txt");
+                                let mut counter = 1;
+                                while target.exists() {
+                                    target = parent.join(format!("新建文本文档 ({}).txt", counter));
+                                    counter += 1;
+                                }
+                                let ok = std::fs::File::create(&target).is_ok();
+                                (target, ok)
+                            }).await.unwrap_or_else(|_| (std::path::PathBuf::new(), false));
+
+                            events.dispatch(&FileOperationCompletedEvent {
+                                action: "create_file".into(),
+                                is_remote: false,
+                                path: target.to_string_lossy().to_string(),
+                                success: ok,
+                            });
+
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = w_weak.upgrade() {
+                                    FILE_APP_CTX.with(|cell| {
+                                        if let Some(ctx_ref) = cell.borrow().as_ref() {
+                                            let cur_p = ctx_ref.local_current_path.borrow().clone();
+                                            refresh_local_path(ctx_ref, &cur_p);
+                                            sync_file_explorer_ui(&w, ctx_ref);
+                                        }
+                                    });
+                                }
+                            });
                         });
-                        let cur_p = ctx_file_act.local_current_path.borrow().clone();
-                        refresh_local_path(&ctx_file_act, &cur_p);
-                        sync_file_explorer_ui(&w, &ctx_file_act);
                     }
                 }
                 "delete" => {
@@ -1645,23 +1701,44 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
                     }
 
                     if !is_remote {
-                        let ok = if is_dir {
-                            std::fs::remove_dir_all(&p_str).is_ok()
-                        } else {
-                            std::fs::remove_file(&p_str).is_ok()
-                        };
-                        ctx_file_act.core_state.events().dispatch(&FileOperationCompletedEvent {
-                            action: "delete".into(),
-                            is_remote: false,
-                            path: p_str.clone(),
-                            success: ok,
+                        let events = ctx_file_act.core_state.events().clone();
+                        let p_str_clone = p_str.clone();
+                        let n_str_clone = n_str.clone();
+                        let w_weak = w.as_weak();
+                        crate::async_util::spawn_async(async move {
+                            let ok = tokio::task::spawn_blocking({
+                                let p_str = p_str_clone.clone();
+                                move || {
+                                    if is_dir {
+                                        std::fs::remove_dir_all(&p_str).is_ok()
+                                    } else {
+                                        std::fs::remove_file(&p_str).is_ok()
+                                    }
+                                }
+                            }).await.unwrap_or(false);
+
+                            events.dispatch(&FileOperationCompletedEvent {
+                                action: "delete".into(),
+                                is_remote: false,
+                                path: p_str_clone,
+                                success: ok,
+                            });
+
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = w_weak.upgrade() {
+                                    FILE_APP_CTX.with(|cell| {
+                                        if let Some(ctx_ref) = cell.borrow().as_ref() {
+                                            if ok {
+                                                ctx_ref.notify_info("已删除", format!("已删除: {}", n_str_clone));
+                                            }
+                                            let cur_p = ctx_ref.local_current_path.borrow().clone();
+                                            refresh_local_path(ctx_ref, &cur_p);
+                                            sync_file_explorer_ui(&w, ctx_ref);
+                                        }
+                                    });
+                                }
+                            });
                         });
-                        if ok {
-                            ctx_file_act.notify_info("已删除", format!("已删除: {}", n_str));
-                        }
-                        let cur_p = ctx_file_act.local_current_path.borrow().clone();
-                        refresh_local_path(&ctx_file_act, &cur_p);
-                        sync_file_explorer_ui(&w, &ctx_file_act);
                     }
                 }
                 "refresh" => {
@@ -1769,14 +1846,12 @@ pub(crate) fn register_file_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             // 查询主机元数据
-            let tree = ctx_open_fhost.master_tree.borrow();
+            let tree = ctx_open_fhost.master_tree.read().unwrap();
             let target_node = tree.iter().find(|n| n.id == hid && !n.is_group).cloned();
             drop(tree);
 
             let (h_name, h_addr) = if let Some(n) = target_node {
                 (n.name, if n.port > 0 { format!("{}:{}", n.address, n.port) } else { n.address })
-            } else if let Ok(Some(h)) = ctx_open_fhost.core_state.storage().hosts().get_by_id(&hid) {
-                (h.name, format!("{}:{}", h.address, h.port))
             } else {
                 (format!("Host ({})", hid), "127.0.0.1:22".into())
             };

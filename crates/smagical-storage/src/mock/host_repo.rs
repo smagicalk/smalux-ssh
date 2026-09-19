@@ -31,23 +31,24 @@ impl MockHostRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl HostRepository for MockHostRepository {
-    fn list_all(&self) -> StorageResult<Vec<HostRecord>> {
+    async fn list_all(&self) -> StorageResult<Vec<HostRecord>> {
         let read_guard = self.hosts.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.clone())
     }
 
-    fn get_by_id(&self, id: &str) -> StorageResult<Option<HostRecord>> {
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<HostRecord>> {
         let read_guard = self.hosts.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().find(|h| h.id == id).cloned())
     }
 
-    fn list_by_credential(&self, credential_id: &str) -> StorageResult<Vec<HostRecord>> {
+    async fn list_by_credential(&self, credential_id: &str) -> StorageResult<Vec<HostRecord>> {
         let read_guard = self.hosts.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().filter(|h| h.credential_id.as_deref() == Some(credential_id)).cloned().collect())
     }
 
-    fn save(&self, host: &HostRecord) -> StorageResult<()> {
+    async fn save(&self, host: &HostRecord) -> StorageResult<()> {
         let mut write_guard = self.hosts.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|h| h.id == host.id) {
             write_guard[pos] = host.clone();
@@ -58,7 +59,7 @@ impl HostRepository for MockHostRepository {
         Ok(())
     }
 
-    fn save_batch(&self, hosts: &[HostRecord]) -> StorageResult<()> {
+    async fn save_batch(&self, hosts: &[HostRecord]) -> StorageResult<()> {
         let mut write_guard = self.hosts.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         for host in hosts {
             if let Some(pos) = write_guard.iter().position(|h| h.id == host.id) {
@@ -71,7 +72,7 @@ impl HostRepository for MockHostRepository {
         Ok(())
     }
 
-    fn delete(&self, id: &str) -> StorageResult<bool> {
+    async fn delete(&self, id: &str) -> StorageResult<bool> {
         let mut write_guard = self.hosts.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|h| h.id == id) {
             let removed = write_guard.remove(pos);
@@ -82,7 +83,7 @@ impl HostRepository for MockHostRepository {
         }
     }
 
-    fn update_list_order(&self, ordered_ids: &[String]) -> StorageResult<()> {
+    async fn update_list_order(&self, ordered_ids: &[String]) -> StorageResult<()> {
         let mut write_guard = self.hosts.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         let mut reordered = Vec::with_capacity(write_guard.len());
         

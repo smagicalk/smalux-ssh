@@ -26,6 +26,9 @@ pub(crate) mod debug_ui;
 /// UI 事件回调与业务路由层。
 pub(crate) mod handlers;
 
+/// 集中式状态管理与增量渲染中枢。
+pub(crate) mod store;
+
 /// 开发者调试控制面板、场景预设与 Tracing 全局日志模块。
 pub mod debug;
 pub use debug::*;
@@ -48,11 +51,15 @@ pub(crate) mod tunnel_daemon;
 pub mod pipeline_config;
 /// 桌面系统托盘常驻守护与交互服务模块。
 pub mod tray;
+/// 异步运行时与同步阻塞调度工具。
+pub mod async_util;
+pub use async_util::{block_on, spawn_async};
 
 
 use std::cell::RefCell;
 use std::collections::HashSet;
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use slint::ComponentHandle;
 use smagical_core::CoreState;
@@ -60,8 +67,9 @@ use theme::{apply_theme_by_id, initialize_theme_service};
 
 use debug_ui::sync_ui_debug_logs;
 use handlers::{register_all_handlers, AppContext};
+use session::sync_active_session_ui;
 use tree_model::{
-    build_group_options, build_raw_tree_from_storage, build_visible_tree_nodes,
+    build_cards_from_records, build_group_options, build_raw_tree, build_visible_tree_nodes,
     calculate_max_tree_width,
 };
 
@@ -128,7 +136,35 @@ pub fn run() -> Result<(), slint::PlatformError> {
     // 初始化 CoreState 核心状态引擎 (通过依赖注入传入 MockStorage 预设种子存储)
     let storage = std::sync::Arc::new(smagical_storage::MockStorage::new_seeded());
     let core_state = Rc::new(CoreState::with_storage(storage, true));
-    let initial_config = core_state.storage().config().get().unwrap_or_default();
+
+    // -------------------------------------------------------------------------
+    // 冷启动数据统一异步并发加载 (0 阻塞，全量 I/O 并发拉取)
+    // -------------------------------------------------------------------------
+    let app_storage = core_state.storage();
+    let (
+        config_res,
+        groups_res,
+        hosts_res,
+        credentials_res,
+        snippet_groups_res,
+        snippets_res,
+    ) = async_util::block_on(async {
+        tokio::join!(
+            app_storage.config().get(),
+            app_storage.groups().list_all(),
+            app_storage.hosts().list_all(),
+            app_storage.credentials().list_all(),
+            app_storage.snippets().list_groups(),
+            app_storage.snippets().list_all(),
+        )
+    });
+
+    let initial_config = config_res.unwrap_or_default();
+    let all_groups = groups_res.unwrap_or_default();
+    let all_hosts = hosts_res.unwrap_or_default();
+    let all_credentials = credentials_res.unwrap_or_default();
+    let all_snippet_groups = snippet_groups_res.unwrap_or_default();
+    let all_snippets = snippets_res.unwrap_or_default();
 
     // -------------------------------------------------------------------------
     // 国际化语言环境初始化 (根据持久化配置生效 Slint 捆绑翻译与 UI 语言)
@@ -197,77 +233,49 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
 
 
-    // 从存储层读取初始主控树形结构与分组生成器
-    let initial_tree = build_raw_tree_from_storage(core_state.storage().as_ref());
-    let master_tree = Rc::new(RefCell::new(initial_tree));
+    // 从存储层读取初始主控树形结构与分组生成器 (利用冷启动并发缓存数据纯内存快速构建)
+    let initial_tree = build_raw_tree(&all_groups, &all_hosts, &all_credentials);
+    let master_tree = Arc::new(RwLock::new(initial_tree));
 
     // 从存储层初始化树形结构折叠状态 (读取所有 is_expanded == true 的分组)
-    let initial_expanded: HashSet<String> = core_state
-        .storage()
-        .groups()
-        .list_all()
-        .unwrap_or_default()
-        .into_iter()
+    let initial_expanded: HashSet<String> = all_groups
+        .iter()
         .filter(|g| g.is_expanded)
-        .map(|g| g.id)
+        .map(|g| g.id.clone())
         .collect();
-    let expanded_groups = Rc::new(RefCell::new(initial_expanded));
+    let expanded_groups = Arc::new(RwLock::new(initial_expanded));
 
-    let search_query = Rc::new(RefCell::new(String::new()));
+    let search_query = Arc::new(RwLock::new(String::new()));
 
     // 动态初始化上级分组选择器展开状态：从存储中读取所有顶级分组（parent_id 为 None）
     let mut initial_selector_expanded = HashSet::from(["root".to_string()]);
-    core_state
-        .storage()
-        .groups()
-        .list_all()
-        .unwrap_or_default()
-        .into_iter()
+    all_groups
+        .iter()
         .filter(|g| g.parent_id.is_none())
         .for_each(|g| {
-            initial_selector_expanded.insert(g.id);
+            initial_selector_expanded.insert(g.id.clone());
         });
-    let selector_expanded_groups = Rc::new(RefCell::new(initial_selector_expanded));
+    let selector_expanded_groups = Arc::new(RwLock::new(initial_selector_expanded));
 
     // 初始渲染上级分组选项数据
     let hb = window.global::<HostsBridge>();
     let initial_options =
-        build_group_options(&master_tree.borrow(), &selector_expanded_groups.borrow());
+        build_group_options(&master_tree.read().unwrap(), &selector_expanded_groups.read().unwrap());
     hb.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(
         initial_options,
     ))));
 
     // 初始渲染树形节点
     let initial_nodes =
-        build_visible_tree_nodes(&master_tree.borrow(), &expanded_groups.borrow());
+        build_visible_tree_nodes(&master_tree.read().unwrap(), &expanded_groups.read().unwrap());
     hb.set_tree_content_width(calculate_max_tree_width(&initial_nodes));
     hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(
         initial_nodes,
     ))));
 
-    // 从存储层初始渲染卡片列表
-    let all_hosts = core_state.storage().hosts().list_all().unwrap_or_default();
-    let all_groups = core_state.storage().groups().list_all().unwrap_or_default();
-    let initial_cards: Vec<HostItemData> = all_hosts
-        .into_iter()
-        .map(|h| {
-            let group_name = h
-                .parent_group_id
-                .as_deref()
-                .and_then(|p_id| all_groups.iter().find(|g| g.id == p_id).map(|g| g.name.clone()))
-                .unwrap_or_else(|| "未分组".to_string());
-            HostItemData {
-                id: h.id.into(),
-                name: h.name.into(),
-                address: h.address.into(),
-                port: h.port as i32,
-                group: group_name.into(),
-                status: h.status.to_string().into(),
-                ping_ms: h.ping_ms,
-            }
-        })
-        .collect();
-    let master_cards = Rc::new(RefCell::new(initial_cards.clone()));
+    // 从冷启动并发缓存数据初始渲染卡片列表 (纯内存 0 I/O)
+    let initial_cards = build_cards_from_records(&all_hosts, &all_groups);
+    let master_cards = Arc::new(RwLock::new(initial_cards.clone()));
     hb.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(
         initial_cards.clone(),
     ))));
@@ -313,17 +321,17 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let notifications = notification_service::NotificationManager::new(window.as_weak());
     notifications.set_duration_preset(&initial_config.toast_duration);
 
-    // 代码片段树形与多层层级初始状态
-    let initial_snippet_master = snippet_tree_model::build_raw_snippet_tree_from_storage(core_state.storage().as_ref());
+    // 代码片段树形与多层层级初始状态 (利用冷启动并发缓存数据纯内存快速构建)
+    let initial_snippet_master = snippet_tree_model::build_raw_snippet_tree(&all_snippet_groups, &all_snippets);
     let mut initial_snippet_expanded = HashSet::new();
-    core_state.storage().snippets().list_groups().unwrap_or_default()
-        .into_iter()
+    all_snippet_groups
+        .iter()
         .for_each(|g| {
             if g.is_expanded {
-                initial_snippet_expanded.insert(g.id);
+                initial_snippet_expanded.insert(g.id.clone());
             }
         });
-    let master_snippet_tree = Rc::new(RefCell::new(initial_snippet_master));
+    let master_snippet_tree = std::sync::Arc::new(std::sync::RwLock::new(initial_snippet_master));
     let expanded_snippet_groups = Rc::new(RefCell::new(initial_snippet_expanded));
     let snippet_search_query = Rc::new(RefCell::new(String::new()));
 
@@ -336,9 +344,20 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let wallpaper_preload_timer = Rc::new(RefCell::new(None));
     let wallpaper_cache = Rc::new(RefCell::new(std::collections::HashMap::new()));
 
+    let host_store = Arc::new(crate::store::HostStore::from_arcs(
+        Arc::clone(&master_tree),
+        Arc::clone(&master_cards),
+        Arc::clone(&expanded_groups),
+        Arc::clone(&selector_expanded_groups),
+        Arc::clone(&search_query),
+    ));
+    let ui_store = Arc::new(crate::store::UiStore::from_host_store(Arc::clone(&host_store)));
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state: Rc::clone(&core_state),
+        ui_store,
+        host_store,
         master_tree,
 
         master_cards,
@@ -478,6 +497,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let mut pane_pixel_buffers: std::collections::HashMap<String, slint::SharedPixelBuffer<slint::Rgba8Pixel>> = std::collections::HashMap::new();
     let mut pane_rendered_images: std::collections::HashMap<String, slint::Image> = std::collections::HashMap::new();
     let mut pane_tab_models: std::collections::HashMap<String, (Vec<TabData>, slint::ModelRc<TabData>)> = std::collections::HashMap::new();
+    let mut last_hist_size = -1i32;
+    let mut last_scroll_off = -1i32;
 
     render_timer.start(
 
@@ -493,6 +514,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
                 let is_split = global_split_tree_timer.borrow().is_some();
                 let mut terminals = active_terminals_timer.borrow_mut();
                 let mut renderer_opt = terminal_renderer_timer.borrow_mut();
+                let mut status_change: Option<(String, String)> = None;
 
                 if !is_split {
                     // 1. 单屏模式：泵送并渲染主视口
@@ -504,17 +526,25 @@ pub fn run() -> Result<(), slint::PlatformError> {
                         let ui_rows = tb.get_terminal_rows() as u16;
 
                         if let Some(instance) = terminals.get_mut(&active_id) {
-                            if instance.size.cols != ui_cols || instance.size.rows != ui_rows {
+                            // 仅在获取到合理的有效视口行列尺寸时才触发底层 PTY resize，杜绝 0 尺寸 ConPTY 震荡
+                            if ui_cols >= 10 && ui_rows >= 5 && (instance.size.cols != ui_cols || instance.size.rows != ui_rows) {
                                 let _ = instance.resize(ui_cols, ui_rows);
                             }
 
                             let has_new_output = instance.poll_output();
                             let is_dirty = instance.parser.take_dirty();
 
+                            let cur_st = instance.current_status();
+                            if active_sess.host_status != cur_st {
+                                status_change = Some((active_id.clone(), cur_st.to_string()));
+                            }
+
                             if let Some(renderer) = renderer_opt.as_mut() {
                                 let (cw, ch) = renderer.cell_size();
-                                let img_w = (ui_cols as u32 * cw + renderer.padding_x * 2).max(100);
-                                let img_h = (ui_rows as u32 * ch + renderer.padding_y * 2).max(60);
+                                let render_cols = if ui_cols >= 10 { ui_cols } else { instance.size.cols };
+                                let render_rows = if ui_rows >= 5 { ui_rows } else { instance.size.rows };
+                                let img_w = (render_cols as u32 * cw + renderer.padding_x * 2).max(100);
+                                let img_h = (render_rows as u32 * ch + renderer.padding_y * 2).max(60);
 
                                 let mut buf = match primary_buffer.take() {
                                     Some(b) if b.width() == img_w && b.height() == img_h => b,
@@ -533,8 +563,16 @@ pub fn run() -> Result<(), slint::PlatformError> {
                             }
 
                             let (hist_size, scroll_off) = instance.scroll_info();
-                            tb.set_history_size(hist_size as i32);
-                            tb.set_scroll_offset(scroll_off as i32);
+                            let h_i = hist_size as i32;
+                            let s_i = scroll_off as i32;
+                            if last_hist_size != h_i {
+                                tb.set_history_size(h_i);
+                                last_hist_size = h_i;
+                            }
+                            if last_scroll_off != s_i {
+                                tb.set_scroll_offset(s_i);
+                                last_scroll_off = s_i;
+                            }
                         }
                     }
                 } else {
@@ -580,6 +618,11 @@ pub fn run() -> Result<(), slint::PlatformError> {
                                     let has_new_output = instance.poll_output();
                                     let is_dirty = instance.parser.take_dirty();
 
+                                    let cur_st = instance.current_status();
+                                    if active_sess.host_status != cur_st {
+                                        status_change = Some((active_sess.session_id.clone(), cur_st.to_string()));
+                                    }
+
                                     let img_w = (target_cols as u32 * cw + renderer.padding_x * 2).max(50);
                                     let img_h = (target_rows as u32 * ch + renderer.padding_y * 2).max(30);
 
@@ -604,8 +647,14 @@ pub fn run() -> Result<(), slint::PlatformError> {
                                 hist_size = hs as i32;
                                 scroll_off = so as i32;
                                 if pl.pane_id == active_pid {
-                                    tb.set_history_size(hist_size);
-                                    tb.set_scroll_offset(scroll_off);
+                                    if last_hist_size != hist_size {
+                                        tb.set_history_size(hist_size);
+                                        last_hist_size = hist_size;
+                                    }
+                                    if last_scroll_off != scroll_off {
+                                        tb.set_scroll_offset(scroll_off);
+                                        last_scroll_off = scroll_off;
+                                    }
                                 }
                             }
 
@@ -664,6 +713,24 @@ pub fn run() -> Result<(), slint::PlatformError> {
                             .collect();
                         update_model_in_place(&splitters_model_timer, splitters_data);
                     }
+                }
+
+                drop(terminals);
+                drop(renderer_opt);
+                drop(groups);
+
+                if let Some((target_sess_id, new_status)) = status_change {
+                    let mut groups_mut = pane_groups_timer.borrow_mut();
+                    for grp in groups_mut.iter_mut() {
+                        for t in grp.tabs.iter_mut() {
+                            if t.session_id == target_sess_id {
+                                t.host_status = new_status.clone();
+                            }
+                        }
+                    }
+                    let act_pid = active_pane_id_timer.borrow().clone();
+                    let is_split_now = global_split_tree_timer.borrow().is_some();
+                    sync_active_session_ui(&w, &groups_mut, &act_pid, is_split_now);
                 }
             }
         },

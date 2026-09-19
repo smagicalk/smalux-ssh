@@ -428,6 +428,7 @@ mod tests {
     use super::*;
 
     struct DummyStorage;
+    #[async_trait::async_trait]
     impl AppStorage for DummyStorage {
         fn hosts(&self) -> &dyn crate::storage::HostRepository { unimplemented!() }
         fn groups(&self) -> &dyn crate::storage::GroupRepository { unimplemented!() }
@@ -436,8 +437,8 @@ mod tests {
         fn snippets(&self) -> &dyn crate::storage::SnippetRepository { unimplemented!() }
         fn tunnels(&self) -> &dyn crate::storage::TunnelRepository { unimplemented!() }
         fn config(&self) -> &dyn crate::storage::ConfigRepository { unimplemented!() }
-        fn reload(&self) -> crate::storage::StorageResult<()> { Ok(()) }
-        fn flush(&self) -> crate::storage::StorageResult<()> { Ok(()) }
+        async fn reload(&self) -> crate::storage::StorageResult<()> { Ok(()) }
+        async fn flush(&self) -> crate::storage::StorageResult<()> { Ok(()) }
     }
 
     fn create_test_state() -> CoreState {

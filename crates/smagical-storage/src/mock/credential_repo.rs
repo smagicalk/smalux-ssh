@@ -45,8 +45,9 @@ impl MockCredentialRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl CredentialRepository for MockCredentialRepository {
-    fn list_all(&self) -> StorageResult<Vec<CredentialRecord>> {
+    async fn list_all(&self) -> StorageResult<Vec<CredentialRecord>> {
         let read_guard = self.credentials.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         let hosts_guard = self.hosts.as_ref().and_then(|h| h.read().ok());
         let list = read_guard.iter().map(|c| {
@@ -59,12 +60,12 @@ impl CredentialRepository for MockCredentialRepository {
         Ok(list)
     }
 
-    fn list_by_type(&self, cred_type: CredentialType) -> StorageResult<Vec<CredentialRecord>> {
-        let all = self.list_all()?;
+    async fn list_by_type(&self, cred_type: CredentialType) -> StorageResult<Vec<CredentialRecord>> {
+        let all = self.list_all().await?;
         Ok(all.into_iter().filter(|c| c.cred_type == cred_type).collect())
     }
 
-    fn get_by_id(&self, id: &str) -> StorageResult<Option<CredentialRecord>> {
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<CredentialRecord>> {
         let read_guard = self.credentials.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(c) = read_guard.iter().find(|c| c.id == id) {
             let mut cred = c.clone();
@@ -79,8 +80,8 @@ impl CredentialRepository for MockCredentialRepository {
         }
     }
 
-    fn search(&self, query: &str) -> StorageResult<Vec<CredentialRecord>> {
-        let all = self.list_all()?;
+    async fn search(&self, query: &str) -> StorageResult<Vec<CredentialRecord>> {
+        let all = self.list_all().await?;
         if query.trim().is_empty() {
             return Ok(all);
         }
@@ -94,7 +95,7 @@ impl CredentialRepository for MockCredentialRepository {
         }).collect())
     }
 
-    fn get_bound_hosts(&self, id: &str) -> StorageResult<Vec<String>> {
+    async fn get_bound_hosts(&self, id: &str) -> StorageResult<Vec<String>> {
         if let Some(ref hosts_lock) = self.hosts {
             let h_list = hosts_lock.read().map_err(|e| StorageError::Backend(e.to_string()))?;
             Ok(h_list.iter().filter(|h| h.credential_id.as_deref() == Some(id)).map(|h| h.id.clone()).collect())
@@ -103,7 +104,7 @@ impl CredentialRepository for MockCredentialRepository {
         }
     }
 
-    fn save(&self, record: &CredentialRecord) -> StorageResult<()> {
+    async fn save(&self, record: &CredentialRecord) -> StorageResult<()> {
         let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|c| c.id == record.id) {
             write_guard[pos] = record.clone();
@@ -114,7 +115,7 @@ impl CredentialRepository for MockCredentialRepository {
         Ok(())
     }
 
-    fn save_batch(&self, records: &[CredentialRecord]) -> StorageResult<()> {
+    async fn save_batch(&self, records: &[CredentialRecord]) -> StorageResult<()> {
         let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         for rec in records {
             if let Some(pos) = write_guard.iter().position(|c| c.id == rec.id) {
@@ -126,7 +127,7 @@ impl CredentialRepository for MockCredentialRepository {
         Ok(())
     }
 
-    fn delete(&self, id: &str) -> StorageResult<bool> {
+    async fn delete(&self, id: &str) -> StorageResult<bool> {
         let mut write_guard = self.credentials.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|c| c.id == id) {
             write_guard.remove(pos);

@@ -44,49 +44,46 @@ impl LauncherPrewarmService {
             *flag = true;
         }
 
-        std::thread::Builder::new()
-            .name("launcher-prewarmer".into())
-            .spawn(move || {
-                tracing::debug!(target: "smagical_ui::launcher", "开始在后台工作线程异步预热启动器主机数据...");
+        crate::async_util::spawn_async(async move {
+            tracing::debug!(target: "smagical_ui::launcher", "开始在后台异步预热启动器主机数据...");
 
-                let all_hosts = storage.hosts().list_all().unwrap_or_default();
-                let all_groups = storage.groups().list_all().unwrap_or_default();
+            let all_hosts = storage.hosts().list_all().await.unwrap_or_default();
+            let all_groups = storage.groups().list_all().await.unwrap_or_default();
 
-                let prewarmed_cards: Vec<HostItemData> = all_hosts
-                    .into_iter()
-                    .map(|h| {
-                        let group_name = h
-                            .parent_group_id
-                            .as_deref()
-                            .and_then(|p_id| all_groups.iter().find(|g| g.id == p_id).map(|g| g.name.clone()))
-                            .unwrap_or_else(|| "未分组".to_string());
-                        HostItemData {
-                            id: h.id.into(),
-                            name: h.name.into(),
-                            address: h.address.into(),
-                            port: h.port as i32,
-                            group: group_name.into(),
-                            status: h.status.to_string().into(),
-                            ping_ms: h.ping_ms,
-                        }
-                    })
-                    .collect();
-
-                tracing::debug!(target: "smagical_ui::launcher", "启动器主机数据预热完成，共 {} 台主机，正在异步回推 UI 事件循环...", prewarmed_cards.len());
-
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(w) = window_weak.upgrade() {
-                        w.global::<crate::generated::WindowBridge>().set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(
-                            slint::VecModel::from(prewarmed_cards),
-                        )));
+            let prewarmed_cards: Vec<HostItemData> = all_hosts
+                .into_iter()
+                .map(|h| {
+                    let group_name = h
+                        .parent_group_id
+                        .as_deref()
+                        .and_then(|p_id| all_groups.iter().find(|g| g.id == p_id).map(|g| g.name.clone()))
+                        .unwrap_or_else(|| "未分组".to_string());
+                    HostItemData {
+                        id: h.id.into(),
+                        name: h.name.into(),
+                        address: h.address.into(),
+                        port: h.port as i32,
+                        group: group_name.into(),
+                        status: h.status.to_string().into(),
+                        ping_ms: h.ping_ms,
                     }
-                });
+                })
+                .collect();
 
-                if let Ok(mut flag) = prewarming_flag.write() {
-                    *flag = false;
+            tracing::debug!(target: "smagical_ui::launcher", "启动器主机数据预热完成，共 {} 台主机，正在异步回推 UI 事件循环...", prewarmed_cards.len());
+
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(w) = window_weak.upgrade() {
+                    w.global::<crate::generated::WindowBridge>().set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(
+                        slint::VecModel::from(prewarmed_cards),
+                    )));
                 }
-            })
-            .ok();
+            });
+
+            if let Ok(mut flag) = prewarming_flag.write() {
+                *flag = false;
+            }
+        });
     }
 
     /// 绑定启动器预热至全局事件分发系统

@@ -26,26 +26,27 @@ impl MockConfigRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl ConfigRepository for MockConfigRepository {
-    fn get(&self) -> StorageResult<AppConfigRecord> {
+    async fn get(&self) -> StorageResult<AppConfigRecord> {
         let guard = self.config.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(guard.clone())
     }
 
-    fn save(&self, config: &AppConfigRecord) -> StorageResult<()> {
+    async fn save(&self, config: &AppConfigRecord) -> StorageResult<()> {
         let mut guard = self.config.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         *guard = config.clone();
         Ok(())
     }
 
-    fn reset_to_default(&self) -> StorageResult<AppConfigRecord> {
+    async fn reset_to_default(&self) -> StorageResult<AppConfigRecord> {
         let mut guard = self.config.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         let default_config = AppConfigRecord::default();
         *guard = default_config.clone();
         Ok(default_config)
     }
 
-    fn update(&self, mutate: Box<dyn FnOnce(&mut AppConfigRecord) + Send>) -> StorageResult<AppConfigRecord> {
+    async fn update(&self, mutate: Box<dyn for<'a> FnOnce(&'a mut AppConfigRecord) + Send>) -> StorageResult<AppConfigRecord> {
         let mut guard = self.config.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         mutate(&mut *guard);
         Ok(guard.clone())

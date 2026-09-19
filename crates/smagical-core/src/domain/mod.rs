@@ -24,6 +24,8 @@ pub mod snippet;
 pub mod tunnel;
 /// 全局偏好与系统配置模型。
 pub mod config;
+/// 原生纯 Rust 异步流式 AI 交互与端点服务模型。
+pub mod ai;
 
 pub use group::GroupRecord;
 pub use history::{HistoryRecord, SessionSnapshotConfig};
@@ -40,6 +42,10 @@ pub use file_item::{
     format_file_size, format_file_time, generate_mock_remote_directory, scan_local_directory,
     FileItemData, FileTabSession, LocalFileTabSession, RemoteFileTabSession, TransferDirection,
     TransferStatus, TransferTask,
+};
+pub use ai::{
+    assess_command_risk, extract_shell_command, parse_sse_line, AiChatMessage, AiChatRequest,
+    AiClient, AiEndpointConfig, AiError, AiRole, AiStreamChunk, AiTestResult,
 };
 
 

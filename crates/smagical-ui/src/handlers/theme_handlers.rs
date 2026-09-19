@@ -421,9 +421,10 @@ pub fn schedule_wallpaper_preload(
     let p = std::path::PathBuf::from(&next_path);
     let target_path = next_path.clone();
 
-    // 真正 100% 在后台工作线程执行 I/O 读取、图片解码与高分降采样
-    std::thread::spawn(move || {
-        if let Some((raw_bytes, rw, rh)) = decode_and_resize_to_raw(&p) {
+    // 真正 100% 在后台异步工作池执行 I/O 读取、图片解码与高分降采样
+    crate::async_util::spawn_async(async move {
+        let decoded = tokio::task::spawn_blocking(move || decode_and_resize_to_raw(&p)).await.unwrap_or(None);
+        if let Some((raw_bytes, rw, rh)) = decoded {
             if let Ok(mut raw_c) = WALLPAPER_RAW_CACHE.lock() {
                 if raw_c.len() >= 4 {
                     if let Some(oldest) = raw_c.keys().next().cloned() {
@@ -436,8 +437,8 @@ pub fn schedule_wallpaper_preload(
     });
 }
 
-fn is_en(core_state: &smagical_core::CoreState) -> bool {
-    core_state.storage().config().get().map(|c| c.language == "en-US").unwrap_or(false)
+fn is_en(window_weak: &slint::Weak<AppWindow>) -> bool {
+    window_weak.upgrade().map(|w| w.global::<WindowBridge>().get_current_language() == "en-US").unwrap_or(false)
 }
 
 /// Update theme color field and refresh TOML
@@ -951,7 +952,6 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let themes_ref = Rc::clone(&ctx.themes);
     let repo_ref = ctx.theme_repo.clone();
     let notif = ctx.notifications.clone();
-    let core_state_import = ctx.core_state.clone();
     sb.on_import_theme(move || {
         if let Some(path) = pick_theme_file() {
             match std::fs::read_to_string(&path) {
@@ -1010,7 +1010,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                                 Some((theme_id, theme_name))
                             }
                             Err(e) => {
-                                if is_en(&core_state_import) {
+                                if is_en(&window_weak) {
                                     notif.error("Import Failed", &format!("Invalid theme format: {}", e));
                                 } else {
                                     notif.error("导入主题失败", &format!("主题格式不合法: {}", e));
@@ -1023,7 +1023,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     if let Some((theme_id, theme_name)) = switch_target {
                         if let Some(w) = window_weak.upgrade() {
                             w.global::<WindowBridge>().invoke_switch_theme(theme_id.as_ref().into());
-                            if is_en(&core_state_import) {
+                            if is_en(&window_weak) {
                                 notif.success("Theme Imported", &format!("Theme '{}' activated!", theme_name));
                             } else {
                                 notif.success("主题导入成功", &format!("主题「{}」已成功导入并激活！", theme_name));
@@ -1032,7 +1032,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     }
                 }
                 Err(e) => {
-                    if is_en(&core_state_import) {
+                    if is_en(&window_weak) {
                         notif.error("Read Failed", &format!("{}", e));
                     } else {
                         notif.error("读取失败", &format!("无法读取主题文件: {}", e));
@@ -1048,7 +1048,6 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let window_weak = window.as_weak();
     let themes_ref = Rc::clone(&ctx.themes);
     let notif = ctx.notifications.clone();
-    let core_state_export = ctx.core_state.clone();
     sb.on_export_current_theme(move || {
         if let Some(w) = window_weak.upgrade() {
             let active_id = w.global::<WindowBridge>().get_current_theme_id().to_string();
@@ -1058,7 +1057,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 let toml_str = match service.export_ui_toml(def) {
                     Ok(s) => s,
                     Err(e) => {
-                        if is_en(&core_state_export) {
+                        if is_en(&window_weak) {
                             notif.error("Export Failed", &format!("Encoding error: {}", e));
                         } else {
                             notif.error("导出失败", &format!("TOML 编码异常: {}", e));
@@ -1071,7 +1070,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 if let Some(save_path) = pick_save_theme_file(&default_filename) {
                     match std::fs::write(&save_path, &toml_str) {
                         Ok(()) => {
-                            if is_en(&core_state_export) {
+                            if is_en(&window_weak) {
                                 notif.success(
                                     "Theme Exported",
                                     &format!("Saved to:\n{}", save_path.display()),
@@ -1084,7 +1083,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                             }
                         }
                         Err(e) => {
-                            if is_en(&core_state_export) {
+                            if is_en(&window_weak) {
                                 notif.error("Write Failed", &format!("{}", e));
                             } else {
                                 notif.error("写入失败", &format!("无法保存文件: {}", e));
@@ -1093,7 +1092,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     }
                 }
             } else {
-                if is_en(&core_state_export) {
+                if is_en(&window_weak) {
                     notif.warning("Theme Not Found", &format!("Could not find theme [{}]", active_id));
                 } else {
                     notif.warning("未找到主题", &format!("无法找到指定主题 [{}]", active_id));
@@ -1109,7 +1108,6 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let themes_ref = Rc::clone(&ctx.themes);
     let repo_ref = ctx.theme_repo.clone();
     let notif = ctx.notifications.clone();
-    let core_state_del = ctx.core_state.clone();
     sb.on_delete_custom_theme(move |id| {
         let id_str = id.as_str();
         if let Some(w) = window_weak.upgrade() {
@@ -1130,7 +1128,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 w.global::<WindowBridge>().invoke_switch_theme("builtin.ui.darcula".into());
             }
 
-            if is_en(&core_state_del) {
+            if is_en(&window_weak) {
                 notif.info("Theme Removed", &format!("Deleted theme '{}'", id_str));
             } else {
                 notif.info("主题已删除", &format!("已成功移除主题「{}」", id_str));
@@ -1162,10 +1160,13 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
                 *active_idx_ref.borrow_mut() = new_idx;
 
-                let _ = core_state_wp_add.storage().config().update(Box::new(move |c| {
-                    c.wallpaper_list = wps_clone;
-                    c.wallpaper_active_index = new_idx;
-                }));
+                let storage = core_state_wp_add.storage().clone();
+                crate::async_util::spawn_async(async move {
+                    let _ = storage.config().update(Box::new(move |c| {
+                        c.wallpaper_list = wps_clone;
+                        c.wallpaper_active_index = new_idx;
+                    })).await;
+                });
 
                 w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
                 w.global::<SettingsBridge>().set_setting_wallpaper_active_index(new_idx as i32);
@@ -1178,7 +1179,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 let op = wb.get_global_wallpaper_opacity();
                 wb.invoke_set_wallpaper(apply_mode.into(), path_str.clone().into(), op);
 
-                if is_en(&core_state_wp_add) {
+                if is_en(&window_weak) {
                     notif.success("Wallpaper Added", "Successfully loaded image to wallpaper gallery!");
                 } else {
                     notif.success("壁纸添加成功", "已成功将图片添加到壁纸图库！");
@@ -1199,7 +1200,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
         if let Some(folder_path) = pick_folder() {
             let found_images = scan_images_in_folder(&folder_path);
             if found_images.is_empty() {
-                if is_en(&core_state_wp_folder) {
+                if is_en(&window_weak) {
                     notif.warning("No Images Found", "No supported images (*.png, *.jpg, *.jpeg, *.webp, *.bmp) in selected folder.");
                 } else {
                     notif.warning("未找到壁纸图片", "所选文件夹内未检测到支持的图片文件 (*.png, *.jpg, *.jpeg, *.webp, *.bmp)");
@@ -1226,7 +1227,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 };
 
                 if !is_new {
-                    if is_en(&core_state_wp_folder) {
+                    if is_en(&window_weak) {
                         notif.info("Notice", "Selected folder is already in gallery.");
                     } else {
                         notif.info("提示", "所选文件夹已存在于壁纸库中");
@@ -1236,10 +1237,13 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
                 *active_idx_ref.borrow_mut() = effective_idx;
 
-                let _ = core_state_wp_folder.storage().config().update(Box::new(move |c| {
-                    c.wallpaper_list = wps_clone;
-                    c.wallpaper_active_index = effective_idx;
-                }));
+                let storage = core_state_wp_folder.storage().clone();
+                crate::async_util::spawn_async(async move {
+                    let _ = storage.config().update(Box::new(move |c| {
+                        c.wallpaper_list = wps_clone;
+                        c.wallpaper_active_index = effective_idx;
+                    })).await;
+                });
 
                 w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
                 w.global::<SettingsBridge>().set_setting_wallpaper_active_index(effective_idx as i32);
@@ -1254,7 +1258,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     wb.invoke_set_wallpaper(apply_mode.into(), first_image_path.as_str().into(), op);
                 }
 
-                if is_en(&core_state_wp_folder) {
+                if is_en(&window_weak) {
                     notif.success("Folder Added", &format!("Added folder with {} images to gallery!", found_images.len()));
                 } else {
                     notif.success("壁纸文件夹导入成功", &format!("已成功将文件夹（含 {} 张图片）加入壁纸库！", found_images.len()));
@@ -1298,10 +1302,13 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
             if let Some((next_active, is_empty, next_path, slint_strings, wps_clone)) = remove_result {
                 *active_idx_ref.borrow_mut() = next_active;
 
-                let _ = core_state_wp_rm.storage().config().update(Box::new(move |c| {
-                    c.wallpaper_list = wps_clone;
-                    c.wallpaper_active_index = next_active;
-                }));
+                let storage = core_state_wp_rm.storage().clone();
+                crate::async_util::spawn_async(async move {
+                    let _ = storage.config().update(Box::new(move |c| {
+                        c.wallpaper_list = wps_clone;
+                        c.wallpaper_active_index = next_active;
+                    })).await;
+                });
 
                 w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
                 w.global::<SettingsBridge>().set_setting_wallpaper_active_index(next_active as i32);
@@ -1316,7 +1323,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     wb.invoke_set_wallpaper(cur_mode.as_str().into(), next_path.as_str().into(), op);
                 }
 
-                if is_en(&core_state_wp_rm) {
+                if is_en(&window_weak) {
                     notif.info("Wallpaper Removed", "Removed image from gallery.");
                 } else {
                     notif.info("壁纸已移除", "已从壁纸图库中移除该图片");
@@ -1403,10 +1410,13 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
         let int_clone = interval_str.to_string();
         let trans_clone = transition_str.to_string();
-        let _ = core_state_wp_slide.storage().config().update(Box::new(move |c| {
-            c.wallpaper_slideshow_interval = int_clone;
-            c.wallpaper_transition_effect = trans_clone;
-        }));
+        let storage = core_state_wp_slide.storage().clone();
+        crate::async_util::spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.wallpaper_slideshow_interval = int_clone;
+                c.wallpaper_transition_effect = trans_clone;
+            })).await;
+        });
 
         let duration_secs: Option<u64> = if interval_str == "none" || interval_str.is_empty() || interval_str == "off" || interval_str == "startup" {
             None
@@ -1477,19 +1487,19 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 },
             );
             *timer_ref.borrow_mut() = Some(timer);
-            if is_en(&core_state_wp_slide) {
+            if is_en(&window_weak) {
                 notif.info("Slideshow Started", &format!("Wallpaper will change every {}", interval_str));
             } else {
                 notif.info("轮播已开启", &format!("壁纸将每隔 {} 自动轮播更替", interval_str));
             }
         } else if interval_str == "startup" {
-            if is_en(&core_state_wp_slide) {
+            if is_en(&window_weak) {
                 notif.info("Startup Slideshow", "Wallpaper will rotate randomly on startup.");
             } else {
                 notif.info("开机轮播已开启", "每次客户端启动时将随机切换一张新壁纸");
             }
         } else {
-            if is_en(&core_state_wp_slide) {
+            if is_en(&window_weak) {
                 notif.info("Slideshow Stopped", "Wallpaper rotation stopped.");
             } else {
                 notif.info("轮播已关闭", "已停止壁纸自动轮播更替");

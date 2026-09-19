@@ -2,14 +2,16 @@
 //!
 //! 包含多级分组嵌套维护、无环拓扑防呆校验、平滑调序与动态视口宽度计算。
 
-use std::net::ToSocketAddrs;
+use std::collections::HashSet;
 use std::rc::Rc;
-use slint::ComponentHandle;
+use std::sync::{Arc, RwLock};
+use slint::{ComponentHandle, Model};
 use smagical_core::event::{
-    HostAssetChangedEvent, HostGroupToggledEvent, HostSearchFilteredEvent, HostTreeReorderedEvent,
-    TerminalSessionEvent,
+    HostAssetChangedEvent, HostGroupToggledEvent, HostTreeReorderedEvent, TerminalSessionEvent,
 };
-use smagical_core::GroupRecord;
+use smagical_core::{AppStorage, CredentialRecord, CredentialType, GroupRecord, HostRecord, HostStatus};
+use crate::async_util::spawn_async;
+use crate::store::diff::{compute_card_diff, compute_tree_diff};
 
 use crate::generated::{
     AppWindow, CredentialOptionData, FilesBridge, GroupOptionData, HostItemData, HostTreeNode, HostsBridge,
@@ -19,12 +21,26 @@ use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, TerminalSessionInfo};
 use crate::terminal::TerminalInstance;
 use crate::tree_model::{
-    build_group_options, build_raw_tree_from_storage, build_search_tree_nodes,
+    build_cards_from_records, build_group_options, build_raw_tree, build_search_tree_nodes,
     build_visible_tree_nodes, calculate_max_tree_width, move_and_reorder_raw_node, RawTreeNode,
 };
 
 fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
     let hb = w.global::<HostsBridge>();
+    let current_tree = hb.get_tree_nodes();
+    let current_count = current_tree.row_count();
+    let mut old_nodes = Vec::with_capacity(current_count);
+    for i in 0..current_count {
+        if let Some(n) = current_tree.row_data(i) {
+            old_nodes.push(n);
+        }
+    }
+
+    let diffs = compute_tree_diff(&old_nodes, nodes);
+    if diffs.is_empty() {
+        return;
+    }
+
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(nodes.to_vec())));
     let width = calculate_max_tree_width(nodes);
     hb.set_tree_nodes(model);
@@ -33,6 +49,20 @@ fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
 
 fn sync_hosts_bridge_cards(w: &AppWindow, cards: &[HostItemData]) {
     let hb = w.global::<HostsBridge>();
+    let current_cards = hb.get_hosts();
+    let current_count = current_cards.row_count();
+    let mut old_cards = Vec::with_capacity(current_count);
+    for i in 0..current_count {
+        if let Some(c) = current_cards.row_data(i) {
+            old_cards.push(c);
+        }
+    }
+
+    let diffs = compute_card_diff(&old_cards, cards);
+    if diffs.is_empty() {
+        return;
+    }
+
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(cards.to_vec())));
     hb.set_hosts(model);
 }
@@ -73,6 +103,68 @@ fn sync_hosts_bridge_create_host_jump_chain(w: &AppWindow, chain: &[JumpHopItemD
     hb.set_create_host_jump_chain(model);
 }
 
+#[allow(dead_code)]
+fn render_hosts_ui(
+    w: &AppWindow,
+    tree: &[RawTreeNode],
+    cards: &[HostItemData],
+    expanded: &HashSet<String>,
+    selector_expanded: &HashSet<String>,
+    search_query: &str,
+) {
+    let q = search_query.trim();
+    let visible_nodes = if q.is_empty() {
+        build_visible_tree_nodes(tree, expanded)
+    } else {
+        build_search_tree_nodes(tree, q)
+    };
+    sync_hosts_bridge_tree(w, &visible_nodes);
+
+    let display_cards: Vec<HostItemData> = if q.is_empty() {
+        cards.to_vec()
+    } else {
+        let q_lower = q.to_lowercase();
+        cards.iter().filter(|h| {
+            h.name.to_lowercase().contains(&q_lower)
+                || h.address.to_lowercase().contains(&q_lower)
+                || h.group.to_lowercase().contains(&q_lower)
+        }).cloned().collect()
+    };
+    sync_hosts_bridge_cards(w, &display_cards);
+
+    let group_options = build_group_options(tree, selector_expanded);
+    sync_hosts_bridge_options(w, &group_options);
+}
+
+async fn sync_ui_hosts_async(
+    storage: &dyn AppStorage,
+    master_tree: &Arc<RwLock<Vec<RawTreeNode>>>,
+    master_cards: &Arc<RwLock<Vec<HostItemData>>>,
+    expanded: &Arc<RwLock<HashSet<String>>>,
+    selector_expanded: &Arc<RwLock<HashSet<String>>>,
+    search_query: &Arc<RwLock<String>>,
+    window_weak: slint::Weak<AppWindow>,
+) {
+    let groups = storage.groups().list_all().await.unwrap_or_default();
+    let hosts = storage.hosts().list_all().await.unwrap_or_default();
+    let credentials = storage.credentials().list_all().await.unwrap_or_default();
+
+    let new_tree = build_raw_tree(&groups, &hosts, &credentials);
+    let new_cards = build_cards_from_records(&hosts, &groups);
+
+    *master_tree.write().unwrap() = new_tree.clone();
+    *master_cards.write().unwrap() = new_cards.clone();
+
+    let exp = expanded.read().unwrap().clone();
+    let sel = selector_expanded.read().unwrap().clone();
+    let q = search_query.read().unwrap().clone();
+
+    let _ = slint::invoke_from_event_loop(move || {
+        if let Some(w) = window_weak.upgrade() {
+            render_hosts_ui(&w, &new_tree, &new_cards, &exp, &sel, &q);
+        }
+    });
+}
 
 /// 注册主机资产管理相关交互回调。
 ///
@@ -88,66 +180,43 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 支持在新建主机或新建分组弹窗的下拉树形选择框内收缩或展开某个父级节点。
     let window_weak = window.as_weak();
-    let master_tree_toggle_opt = Rc::clone(&ctx.master_tree);
-    let selector_expanded_clone = Rc::clone(&ctx.selector_expanded_groups);
+    let host_store_selector = Arc::clone(&ctx.host_store);
     hb.on_toggle_selector_group(move |id| {
         if let Some(w) = window_weak.upgrade() {
-            let mut set = selector_expanded_clone.borrow_mut();
-            let id_str = id.to_string();
-            if set.contains(&id_str) {
-                set.remove(&id_str);
-            } else {
-                set.insert(id_str);
-            }
-            let tree = master_tree_toggle_opt.borrow();
+            host_store_selector.toggle_selector_group(&id);
+            let tree = host_store_selector.master_tree.read().unwrap();
+            let set = host_store_selector.selector_expanded_groups.read().unwrap();
             let next_options = build_group_options(&tree, &set);
             sync_hosts_bridge_options(&w, &next_options);
         }
     });
 
     // -------------------------------------------------------------------------
-    // 2. 侧边栏树形结构分组折叠 / 展开回调
+    // 2. 侧边栏树形结构分组折叠 / 展开回调 (优化点 1 & 2：集中式 Store 管理 + 后台并发更新)
     // -------------------------------------------------------------------------
-    // 点击左侧主机树中的某个文件夹节点时触发，切换展开状态并同步持久化至 AppStorage。
+    // 点击左侧主机树中的某个文件夹节点时触发，切换展开状态并异步持久化至 AppStorage (0ms UI 阻塞)。
     let window_weak = window.as_weak();
-    let master_tree_toggle = Rc::clone(&ctx.master_tree);
-    let expanded_toggle = Rc::clone(&ctx.expanded_groups);
-    let search_query_toggle = Rc::clone(&ctx.search_query);
+    let host_store_toggle = Arc::clone(&ctx.host_store);
     let core_state_toggle = Rc::clone(&ctx.core_state);
     hb.on_toggle_group(move |id| {
-        if let Some(w) = window_weak.upgrade() {
-            let mut set = expanded_toggle.borrow_mut();
-            let id_str = id.to_string();
-            let is_expanding = if set.contains(&id_str) {
-                set.remove(&id_str);
-                false
-            } else {
-                set.insert(id_str.clone());
-                true
-            };
+        let id_str = id.to_string();
+        let is_expanding = host_store_toggle.toggle_group(&id_str);
 
-            // 同步持久化分组折叠/展开状态至存储层
-            let _ = core_state_toggle.storage().groups().set_expanded(&id_str, is_expanding);
+        // 异步持久化分组折叠/展开状态至存储层 (0ms 阻塞 UI 线程)
+        let storage = core_state_toggle.storage();
+        let id_for_storage = id_str.clone();
+        spawn_async(async move {
+            let _ = storage.groups().set_expanded(&id_for_storage, is_expanding).await;
+        });
 
-            // 显式派发分组折叠/展开事件
-            core_state_toggle.events().dispatch(&HostGroupToggledEvent {
-                group_id: id_str.clone(),
-                is_expanded: is_expanding,
-            });
+        // 显式派发分组折叠/展开事件
+        core_state_toggle.events().dispatch(&HostGroupToggledEvent {
+            group_id: id_str,
+            is_expanded: is_expanding,
+        });
 
-
-            let tree = master_tree_toggle.borrow();
-            let q = search_query_toggle.borrow().clone();
-            let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &set)
-            } else {
-                build_search_tree_nodes(&tree, &q)
-            };
-            sync_hosts_bridge_tree(&w, &next_nodes);
-
-            let gname = tree.iter().find(|n| n.id == id_str).map(|n| n.name.as_str()).unwrap_or(id_str.as_str());
-            tracing::debug!(target: "smagical_ui::tree", "{}分组: {} (已同步存储层)", if is_expanding { "展开" } else { "折叠" }, gname);
-        }
+        // 下沉至后台并发计算最新可见节点与字宽，并增量 Diff 更新界面
+        host_store_toggle.schedule_tree_refresh(window_weak.clone());
     });
 
     // -------------------------------------------------------------------------
@@ -155,11 +224,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 鼠标拖拽松开后触发：支持树形层级物理迁移与卡片列表视觉调序双模式。
     let window_weak = window.as_weak();
-    let master_tree_move = Rc::clone(&ctx.master_tree);
-    let master_cards_move = Rc::clone(&ctx.master_cards);
-    let expanded_move = Rc::clone(&ctx.expanded_groups);
-    let selector_expanded_move = Rc::clone(&ctx.selector_expanded_groups);
-    let search_query_move = Rc::clone(&ctx.search_query);
+    let master_tree_move = Arc::clone(&ctx.master_tree);
+    let master_cards_move = Arc::clone(&ctx.master_cards);
+    let expanded_move = Arc::clone(&ctx.expanded_groups);
+    let selector_expanded_move = Arc::clone(&ctx.selector_expanded_groups);
+    let search_query_move = Arc::clone(&ctx.search_query);
     let core_state_move = Rc::clone(&ctx.core_state);
     hb.on_move_node(move |src_id, target_id, drop_position| {
         if let Some(w) = window_weak.upgrade() {
@@ -168,10 +237,9 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             let pos_str = drop_position.to_string();
             let view_mode = w.global::<HostsBridge>().get_hosts_view_mode().to_string();
 
-
             // 1. 卡片平铺列表模式 (Card View Mode): 纯视觉显示排序调整，绝对锁定所属分组 (parent_id/group) 不变
             if view_mode == "card" {
-                let mut cards = master_cards_move.borrow_mut();
+                let mut cards = master_cards_move.write().unwrap();
                 if let (Some(src_idx), Some(tgt_idx)) = (
                     cards.iter().position(|c| c.id == src_str.as_str()),
                     cards.iter().position(|c| c.id == target_str.as_str()),
@@ -189,23 +257,27 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     let tgt_name = cards.get(tgt_idx.min(cards.len().saturating_sub(1))).map(|c| c.name.to_string()).unwrap_or_default();
                     cards.insert(final_pos, item);
 
-                    // 同步列表排序至存储层
+                    // 异步同步列表排序至存储层 (0ms UI 阻塞)
                     let ordered_ids: Vec<String> = cards.iter().map(|c| c.id.to_string()).collect();
-                    let _ = core_state_move.storage().hosts().update_list_order(&ordered_ids);
+                    let storage = core_state_move.storage();
+                    spawn_async(async move {
+                        let _ = storage.hosts().update_list_order(&ordered_ids).await;
+                    });
 
-                    let q = search_query_move.borrow().clone();
+                    let q = search_query_move.read().unwrap().clone();
                     let display_cards: Vec<HostItemData> = if q.is_empty() {
                         cards.clone()
                     } else {
+                        let q_lower = q.to_lowercase();
                         cards.iter().filter(|h| {
-                            h.name.to_lowercase().contains(&q)
-                                || h.address.to_lowercase().contains(&q)
-                                || h.group.to_lowercase().contains(&q)
+                            h.name.to_lowercase().contains(&q_lower)
+                                || h.address.to_lowercase().contains(&q_lower)
+                                || h.group.to_lowercase().contains(&q_lower)
                         }).cloned().collect()
                     };
                     sync_hosts_bridge_cards(&w, &display_cards);
 
-                    tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已同步存储层)", item_name, tgt_name);
+                    tracing::info!(target: "smagical_ui::hosts", "成功调整列表模式主机展示顺序: [{}] 排在 [{}] 之后 (分组保持锁定，已异步同步存储层)", item_name, tgt_name);
                     core_state_move.events().dispatch(&HostTreeReorderedEvent {
                         source_id: src_str.clone(),
                         target_id: target_str.clone(),
@@ -213,16 +285,15 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     });
                 }
                 return;
-
             }
 
             // 2. 树形层级模式 (Tree View Mode): 物理资产层级结构与文件夹迁移
-            let mut tree = master_tree_move.borrow_mut();
+            let mut tree = master_tree_move.write().unwrap();
 
             match move_and_reorder_raw_node(&mut tree, &src_str, &target_str, &pos_str) {
                 Ok((src_name, target_name)) => {
                     // 如果移动到了具体分组内部，自动将该目标分组及其祖先加入展开集合
-                    let mut exp = expanded_move.borrow_mut();
+                    let mut exp = expanded_move.write().unwrap();
                     if pos_str == "inside" && !target_str.is_empty() {
                         let mut curr = target_str.clone();
                         while !curr.is_empty() {
@@ -236,7 +307,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     }
 
                     // 刷新树形视图与选择器选项
-                    let q = search_query_move.borrow().clone();
+                    let q = search_query_move.read().unwrap().clone();
                     let next_nodes = if q.is_empty() {
                         build_visible_tree_nodes(&tree, &exp)
                     } else {
@@ -244,20 +315,23 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     };
                     sync_hosts_bridge_tree(&w, &next_nodes);
 
-                    let next_options = build_group_options(&tree, &selector_expanded_move.borrow());
+                    let next_options = build_group_options(&tree, &selector_expanded_move.read().unwrap());
                     sync_hosts_bridge_options(&w, &next_options);
 
-                    // 同步树形结构迁移至存储层 (Host or Group)
+                    // 异步同步树形结构迁移至存储层 (Host or Group) (0ms UI 阻塞)
                     if let Some(moved_node) = tree.iter().find(|n| n.id == src_str) {
-                        if moved_node.is_group {
-                            let _ = core_state_move.storage().groups().move_group(
-                                &src_str,
-                                if moved_node.parent_id.is_empty() { None } else { Some(&moved_node.parent_id) },
-                            );
-                        } else if let Some(mut host_rec) = core_state_move.storage().hosts().get_by_id(&src_str).ok().flatten() {
-                            host_rec.parent_group_id = if moved_node.parent_id.is_empty() { None } else { Some(moved_node.parent_id.clone()) };
-                            let _ = core_state_move.storage().hosts().save(&host_rec);
-                        }
+                        let storage = core_state_move.storage();
+                        let src_str_bg = src_str.clone();
+                        let moved_is_group = moved_node.is_group;
+                        let moved_parent_id = if moved_node.parent_id.is_empty() { None } else { Some(moved_node.parent_id.clone()) };
+                        spawn_async(async move {
+                            if moved_is_group {
+                                let _ = storage.groups().move_group(&src_str_bg, moved_parent_id.as_deref()).await;
+                            } else if let Ok(Some(mut host_rec)) = storage.hosts().get_by_id(&src_str_bg).await {
+                                host_rec.parent_group_id = moved_parent_id;
+                                let _ = storage.hosts().save(&host_rec).await;
+                            }
+                        });
                     }
 
                     // 树形模式下移动了主机：同步更新列表模式中的所属分组徽章，同时保留用户在列表模式下的自定义相对排序
@@ -271,7 +345,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                         "未分组".to_string()
                     };
 
-                    let mut cards = master_cards_move.borrow_mut();
+                    let mut cards = master_cards_move.write().unwrap();
                     for card in cards.iter_mut() {
                         if card.id == src_str.as_str() {
                             card.group = new_group_name.clone().into();
@@ -281,15 +355,16 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     let display_cards: Vec<HostItemData> = if q.is_empty() {
                         cards.clone()
                     } else {
+                        let q_lower = q.to_lowercase();
                         cards.iter().filter(|h| {
-                            h.name.to_lowercase().contains(&q)
-                                || h.address.to_lowercase().contains(&q)
-                                || h.group.to_lowercase().contains(&q)
+                            h.name.to_lowercase().contains(&q_lower)
+                                || h.address.to_lowercase().contains(&q_lower)
+                                || h.group.to_lowercase().contains(&q_lower)
                         }).cloned().collect()
                     };
                     sync_hosts_bridge_cards(&w, &display_cards);
 
-                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已同步存储层)", src_name, pos_str, target_name);
+                    tracing::info!(target: "smagical_ui::hosts", "成功调序/移动树节点 [{}] (模式: {}, 目标: [{}], 已异步同步存储层)", src_name, pos_str, target_name);
                     core_state_move.events().dispatch(&HostTreeReorderedEvent {
                         source_id: src_str.clone(),
                         target_id: target_str.clone(),
@@ -309,10 +384,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 鼠标在列表中拖拽悬停移动时触发，用于实时计算目标节点是否合法并计算高亮吸附下划线/边框位置。
     let window_weak = window.as_weak();
-    let master_tree_hover = Rc::clone(&ctx.master_tree);
-    let master_cards_hover = Rc::clone(&ctx.master_cards);
-    let expanded_hover = Rc::clone(&ctx.expanded_groups);
-    let search_hover = Rc::clone(&ctx.search_query);
+    let master_tree_hover = Arc::clone(&ctx.master_tree);
+    let master_cards_hover = Arc::clone(&ctx.master_cards);
+    let expanded_hover = Arc::clone(&ctx.expanded_groups);
+    let search_hover = Arc::clone(&ctx.search_query);
     hb.on_request_drag_hover(move |src_id, target_idx, _offset_in_row| {
         if let Some(w) = window_weak.upgrade() {
             let hb = w.global::<HostsBridge>();
@@ -321,7 +396,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
 
             // 1. 卡片模式悬停判定
             if view_mode == "card" {
-                let cards = master_cards_hover.borrow();
+                let cards = master_cards_hover.read().unwrap();
                 let idx = target_idx as usize;
                 if idx < cards.len() {
                     let tgt_id = cards[idx].id.to_string();
@@ -346,10 +421,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             // 2. 树形模式悬停判定
-            let tree = master_tree_hover.borrow();
-            let q = search_hover.borrow().clone();
+            let tree = master_tree_hover.read().unwrap();
+            let q = search_hover.read().unwrap().clone();
             let visible_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_hover.borrow())
+                build_visible_tree_nodes(&tree, &expanded_hover.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
@@ -422,12 +497,12 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 5. 新建分组模态对话框提交回调
     // -------------------------------------------------------------------------
-    // 接收弹窗输入的分组名称与指定父级 ID，在树中创建分组并同步持久化到 AppStorage。
+    // 接收弹窗输入的分组名称与指定父级 ID，在树中创建分组并异步持久化到 AppStorage (0ms UI 阻塞)。
     let window_weak = window.as_weak();
-    let master_tree_create = Rc::clone(&ctx.master_tree);
-    let expanded_create = Rc::clone(&ctx.expanded_groups);
-    let selector_expanded_create = Rc::clone(&ctx.selector_expanded_groups);
-    let search_query_create = Rc::clone(&ctx.search_query);
+    let master_tree_create = Arc::clone(&ctx.master_tree);
+    let expanded_create = Arc::clone(&ctx.expanded_groups);
+    let selector_expanded_create = Arc::clone(&ctx.selector_expanded_groups);
+    let search_query_create = Arc::clone(&ctx.search_query);
     let next_group_id = Rc::clone(&ctx.next_session_num);
     let core_state_create = Rc::clone(&ctx.core_state);
     hb.on_create_group(move |parent_id, name| {
@@ -442,7 +517,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             *counter += 1;
             let new_id = format!("grp-custom-{}", *counter);
 
-            let mut tree = master_tree_create.borrow_mut();
+            let mut tree = master_tree_create.write().unwrap();
 
             // 如果指定了父分组，计算层级与父 ID
             let (target_parent_id, level) = if !p_id.is_empty() && p_id != "root" {
@@ -466,15 +541,19 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 status: "online".to_string(),
                 ping_ms: 0,
                 item_count: 0,
+                effective_username: None,
             };
 
-            // 同步新增分组至底层存储层
+            // 异步新增分组至底层存储层 (0ms UI 阻塞)
             let group_rec = if target_parent_id.is_empty() {
                 GroupRecord::root(new_id.clone(), g_name.clone())
             } else {
                 GroupRecord::child(new_id.clone(), g_name.clone(), target_parent_id.clone(), level)
             };
-            let _ = core_state_create.storage().groups().save(&group_rec);
+            let storage = core_state_create.storage();
+            spawn_async(async move {
+                let _ = storage.groups().save(&group_rec).await;
+            });
 
             // 智能定位插入位置：插入到同父节点的子项末尾，或追加到分组后
             let mut insert_pos = tree.len();
@@ -489,82 +568,44 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     insert_pos = idx + 1;
                 }
                 // 确保父节点处于展开状态，以便立刻看见新建的分组
-                expanded_create.borrow_mut().insert(target_parent_id.clone());
-                selector_expanded_create.borrow_mut().insert(target_parent_id);
+                expanded_create.write().unwrap().insert(target_parent_id.clone());
+                selector_expanded_create.write().unwrap().insert(target_parent_id);
             }
             // 新创建的分组自身默认展开
-            expanded_create.borrow_mut().insert(new_id);
+            expanded_create.write().unwrap().insert(new_id);
 
             tree.insert(insert_pos, new_group_node);
 
             // 刷新弹窗中的上级分组列表选项
-            let next_options = build_group_options(&tree, &selector_expanded_create.borrow());
+            let next_options = build_group_options(&tree, &selector_expanded_create.read().unwrap());
             sync_hosts_bridge_options(&w, &next_options);
 
             // 刷新主界面树形结构
-            let q = search_query_create.borrow().clone();
+            let q = search_query_create.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_create.borrow())
+                build_visible_tree_nodes(&tree, &expanded_create.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
             sync_hosts_bridge_tree(&w, &next_nodes);
 
-            tracing::info!(target: "smagical_ui::tree", "创建新分组: {} (上级: {}, 已同步存储层)", g_name, if p_id.is_empty() { "根目录" } else { &p_id });
+            tracing::info!(target: "smagical_ui::tree", "创建新分组: {} (上级: {}, 已异步同步存储层)", g_name, if p_id.is_empty() { "根目录" } else { &p_id });
         }
     });
 
     // -------------------------------------------------------------------------
-    // 6. 主机实时搜索过滤回调
+    // 6. 主机实时搜索过滤回调 (优化点 1 & 4：下沉至 Tokio 后台并发计算 + 增量比对 Diff，0ms 阻塞 UI)
     // -------------------------------------------------------------------------
-    // 当在左侧抽屉搜索框中键入字符时，双向联动过滤树形视图与卡片列表，同时保持各自排布顺序。
     let window_weak = window.as_weak();
-    let master_tree_filter = Rc::clone(&ctx.master_tree);
-    let master_cards_filter = Rc::clone(&ctx.master_cards);
-    let expanded_clone = Rc::clone(&ctx.expanded_groups);
-    let search_query_filter = Rc::clone(&ctx.search_query);
-    let core_state_filter = Rc::clone(&ctx.core_state);
+    let host_store_filter = Arc::clone(&ctx.host_store);
+    let event_dispatcher_filter = ctx.core_state.event_manager().global().clone();
     hb.on_search_changed(move |query| {
-        if let Some(w) = window_weak.upgrade() {
-            let q = query.trim().to_lowercase();
-            *search_query_filter.borrow_mut() = q.clone();
-
-            // 1. 动态过滤树形节点
-            let tree = master_tree_filter.borrow();
-            let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_clone.borrow())
-            } else {
-                build_search_tree_nodes(&tree, &q)
-            };
-            sync_hosts_bridge_tree(&w, &next_nodes);
-
-            // 2. 动态过滤卡片列表 (基于当前 master_cards 列表及用户自定义排序)
-            let cards = master_cards_filter.borrow();
-            let filtered_cards: Vec<HostItemData> = cards
-                .iter()
-                .filter(|h| {
-                    if q.is_empty() {
-                        true
-                    } else {
-                        h.name.to_lowercase().contains(&q)
-                            || h.address.to_lowercase().contains(&q)
-                            || h.group.to_lowercase().contains(&q)
-                    }
-                })
-                .cloned()
-                .collect();
-            sync_hosts_bridge_cards(&w, &filtered_cards);
-
-            core_state_filter.events().dispatch(&HostSearchFilteredEvent {
-                query: q.clone(),
-                match_count: filtered_cards.len(),
-            });
-
-            if !q.is_empty() {
-                tracing::debug!(target: "smagical_ui::search", "过滤主机资产: '{}'", q);
-            }
-        }
-
+        let q = query.trim().to_string();
+        host_store_filter.schedule_search_compute(
+            q,
+            window_weak.clone(),
+            Some(Arc::clone(&event_dispatcher_filter)),
+        );
     });
 
     // -------------------------------------------------------------------------
@@ -574,7 +615,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 双击树形或卡片列表中的某个主机（或选择本地 Shell）时触发，分配会话 ID 并激活新 Tab。
     let window_weak = window.as_weak();
-    let master_tree_open = Rc::clone(&ctx.master_tree);
+    let master_tree_open = Arc::clone(&ctx.master_tree);
     let pane_groups_open = Rc::clone(&ctx.pane_groups);
     let active_pane_id_open = Rc::clone(&ctx.active_pane_id);
     let global_split_tree_open = Rc::clone(&ctx.global_split_tree);
@@ -608,8 +649,25 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
                 let session_name = format!("{} #{}", base_name, total_sess_count + 1);
 
-                if let Ok(instance) = TerminalInstance::spawn_local(sess_id.clone(), &h_id, session_name.clone(), 120, 32) {
-                    active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
+                let spawn_res = TerminalInstance::spawn_local(sess_id.clone(), &h_id, session_name.clone(), 120, 32)
+                    .or_else(|e| {
+                        tracing::warn!(target: "smagical_ui::terminal", "启动指定 Shell [{}] 失败: {:?}，尝试回退系统 PowerShell...", h_id, e);
+                        TerminalInstance::spawn_local(sess_id.clone(), "local-powershell", session_name.clone(), 120, 32)
+                    })
+                    .or_else(|e| {
+                        tracing::warn!(target: "smagical_ui::terminal", "回退系统 PowerShell 失败: {:?}，尝试最后回退 CMD...", e);
+                        TerminalInstance::spawn_local(sess_id.clone(), "local-cmd", session_name.clone(), 120, 32)
+                    });
+
+                match spawn_res {
+                    Ok(instance) => {
+                        active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
+                    }
+                    Err(err) => {
+                        tracing::error!(target: "smagical_ui::terminal", "本地终端全部启动候选均失败: {:?}", err);
+                        ctx_open.notify_error("终端启动失败", format!("无法创建本地终端进程: {}", err));
+                        return;
+                    }
                 }
 
                 let info = TerminalSessionInfo {
@@ -623,7 +681,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 };
                 (sess_id, info)
             } else {
-                let tree = master_tree_open.borrow();
+                let tree = master_tree_open.read().unwrap();
                 let Some(host_node) = tree.iter().find(|n| n.id == h_id && !n.is_group) else {
                     return;
                 };
@@ -638,20 +696,8 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
                 let session_name = format!("{} #{}", host_node.name, total_sess_count + 1);
 
-                // 查询主机是否有关联凭据，获取用户名（优先使用凭据，无凭据或未设时回退使用主机直录账号）
-                let username_opt = if let Ok(Some(host_rec)) = ctx_open.core_state.storage().hosts().get_by_id(&h_id) {
-                    if let Some(ref cred_id) = host_rec.credential_id {
-                        if let Ok(Some(cred)) = ctx_open.core_state.storage().credentials().get_by_id(cred_id) {
-                            cred.username.or(host_rec.username)
-                        } else {
-                            host_rec.username
-                        }
-                    } else {
-                        host_rec.username
-                    }
-                } else {
-                    None
-                };
+                // 纯内存 0ms 获取有效用户名（优先使用凭据，无凭据或未设时回退使用主机直录账号）
+                let username_opt = host_node.effective_username.clone();
 
                 let instance_res = TerminalInstance::spawn_ssh(
                     sess_id.clone(),
@@ -662,7 +708,8 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     120,
                     32,
                 )
-                .or_else(|_| {
+                .or_else(|e| {
+                    tracing::warn!(target: "smagical_ui::terminal", "SSH 会话启动失败: {:?}，回退本地终端...", e);
                     TerminalInstance::spawn_local(
                         sess_id.clone(),
                         "local-powershell",
@@ -670,10 +717,26 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                         120,
                         32,
                     )
+                    .or_else(|_| {
+                        TerminalInstance::spawn_local(
+                            sess_id.clone(),
+                            "local-cmd",
+                            session_name.clone(),
+                            120,
+                            32,
+                        )
+                    })
                 });
 
-                if let Ok(instance) = instance_res {
-                    active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
+                match instance_res {
+                    Ok(instance) => {
+                        active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
+                    }
+                    Err(err) => {
+                        tracing::error!(target: "smagical_ui::terminal", "终端会话创建失败: {:?}", err);
+                        ctx_open.notify_error("连接失败", format!("无法创建终端会话: {}", err));
+                        return;
+                    }
                 }
 
                 let info = TerminalSessionInfo {
@@ -770,8 +833,8 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak_open_host_modal = window.as_weak();
     let core_state_open_host_modal = Rc::clone(&ctx.core_state);
-    let master_tree_open_host_modal = Rc::clone(&ctx.master_tree);
-    let selector_expanded_open_host_modal = Rc::clone(&ctx.selector_expanded_groups);
+    let master_tree_open_host_modal = Arc::clone(&ctx.master_tree);
+    let selector_expanded_open_host_modal = Arc::clone(&ctx.selector_expanded_groups);
     let create_host_jump_chain = Rc::new(std::cell::RefCell::new(Vec::<JumpHopItemData>::new()));
     let create_host_jump_chain_open = Rc::clone(&create_host_jump_chain);
 
@@ -790,12 +853,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             hb.set_form_host_address("".into());
             hb.set_form_host_port_str("22".into());
             hb.set_form_parent_id(p_id.clone().into());
+            let tree = master_tree_open_host_modal.read().unwrap();
             let p_name = if p_id == "root" {
                 "根目录 (顶级主机)".to_string()
             } else {
-                core_state_open_host_modal.storage().groups().get_by_id(&p_id).ok().flatten()
-                    .map(|g| g.name)
-                    .unwrap_or_else(|| "根目录 (顶级主机)".to_string())
+                tree.iter().find(|n| n.id == p_id && n.is_group).map(|n| n.name.clone()).unwrap_or_else(|| "根目录 (顶级主机)".to_string())
             };
             hb.set_form_parent_name(p_name.into());
             hb.set_form_auth_type("credential".into());
@@ -825,90 +887,93 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
             hb.set_form_preset_jump_summary("".into());
             hb.set_form_preset_jump_hop_count(0);
 
-            // 2. 同步最新分组树形选项
-            let tree = master_tree_open_host_modal.borrow();
-            let expanded_set = selector_expanded_open_host_modal.borrow();
+            // 2. 同步最新分组树形选项 (纯内存 0ms)
+            let expanded_set = selector_expanded_open_host_modal.read().unwrap();
             let group_options = build_group_options(&tree, &expanded_set);
             sync_hosts_bridge_options(&w, &group_options);
 
-            // 3. 读取并同步凭据库选项
-            if let Ok(creds) = core_state_open_host_modal.storage().credentials().list_all() {
-                let cred_options: Vec<CredentialOptionData> = creds.into_iter().map(|c| {
-                    CredentialOptionData {
-                        id: c.id.into(),
-                        name: c.name.into(),
-                        username: c.username.unwrap_or_else(|| "root".to_string()).into(),
-                        cred_type: c.cred_type.to_string().into(),
-                        algorithm: c.algorithm.into(),
+            // 3. 从内存树同步可用跳板主机列表 (纯内存 0ms)
+            let jump_options: Vec<JumpHostOptionData> = tree.iter()
+                .filter(|n| !n.is_group)
+                .map(|h| JumpHostOptionData {
+                    id: h.id.clone().into(),
+                    name: h.name.clone().into(),
+                    address: h.address.clone().into(),
+                    port: h.port,
+                })
+                .collect();
+            sync_hosts_bridge_jump_hosts(&w, &jump_options);
+
+            // 4. 异步拉取凭据库与网络隧道/代理配置 (0ms UI 阻塞)
+            let storage = core_state_open_host_modal.storage();
+            let w_weak = w.as_weak();
+            spawn_async(async move {
+                let creds = storage.credentials().list_all().await.unwrap_or_default();
+                let tunnels = storage.tunnels().list_all().await.unwrap_or_default();
+
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(win) = w_weak.upgrade() {
+                        let cred_options: Vec<CredentialOptionData> = creds.into_iter().map(|c| {
+                            CredentialOptionData {
+                                id: c.id.into(),
+                                name: c.name.into(),
+                                username: c.username.unwrap_or_else(|| "root".to_string()).into(),
+                                cred_type: c.cred_type.to_string().into(),
+                                algorithm: c.algorithm.into(),
+                            }
+                        }).collect();
+                        sync_hosts_bridge_credentials(&win, &cred_options);
+
+                        let preset_chains: Vec<PresetJumpChainData> = tunnels.iter()
+                            .filter(|t| t.tunnel_type == smagical_core::TunnelType::JumpHost)
+                            .map(|t| {
+                                let hops_str = t.jump_chain.iter()
+                                    .map(|h| format!("{},{},{},{}", h.host_id, h.host_name, h.host_address, h.host_port))
+                                    .collect::<Vec<_>>()
+                                    .join(";");
+                                PresetJumpChainData {
+                                    id: t.id.clone().into(),
+                                    name: t.name.clone().into(),
+                                    summary: t.route_summary().into(),
+                                    hop_count: t.jump_chain.len() as i32,
+                                    hops_serialized: hops_str.into(),
+                                }
+                            })
+                            .collect();
+                        sync_hosts_bridge_preset_jump_chains(&win, &preset_chains);
+
+                        let proxies: Vec<ProxyOptionData> = tunnels.iter()
+                            .filter(|t| t.tunnel_type == smagical_core::TunnelType::ProxyServer || t.tunnel_type == smagical_core::TunnelType::Dynamic)
+                            .map(|t| {
+                                let proto = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
+                                    "SOCKS5".to_string()
+                                } else if !t.proxy_proto.is_empty() {
+                                    t.proxy_proto.to_uppercase()
+                                } else {
+                                    "SOCKS5".to_string()
+                                };
+                                let (host, port) = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
+                                    let h = if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
+                                    (h, t.local_port as i32)
+                                } else {
+                                    let h = if !t.remote_host.is_empty() { t.remote_host.clone() } else if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
+                                    let p = if t.remote_port > 0 { t.remote_port as i32 } else { t.local_port as i32 };
+                                    (h, p)
+                                };
+                                ProxyOptionData {
+                                    id: t.id.clone().into(),
+                                    name: t.name.clone().into(),
+                                    proto: proto.into(),
+                                    host: host.into(),
+                                    port,
+                                    username: t.proxy_username.clone().into(),
+                                }
+                            })
+                            .collect();
+                        sync_hosts_bridge_proxies(&win, &proxies);
                     }
-                }).collect();
-                sync_hosts_bridge_credentials(&w, &cred_options);
-            }
-
-            // 4. 读取并同步可用跳板主机列表
-            if let Ok(hosts) = core_state_open_host_modal.storage().hosts().list_all() {
-                let jump_options: Vec<JumpHostOptionData> = hosts.into_iter().map(|h| {
-                    JumpHostOptionData {
-                        id: h.id.into(),
-                        name: h.name.into(),
-                        address: h.address.into(),
-                        port: h.port as i32,
-                    }
-                }).collect();
-                sync_hosts_bridge_jump_hosts(&w, &jump_options);
-            }
-
-            // 5. 从网络与隧道中心读取组好的跳板串列表 (TunnelType::JumpHost)
-            if let Ok(tunnels) = core_state_open_host_modal.storage().tunnels().list_all() {
-                let preset_chains: Vec<PresetJumpChainData> = tunnels.iter()
-                    .filter(|t| t.tunnel_type == smagical_core::TunnelType::JumpHost)
-                    .map(|t| {
-                        let hops_str = t.jump_chain.iter()
-                            .map(|h| format!("{},{},{},{}", h.host_id, h.host_name, h.host_address, h.host_port))
-                            .collect::<Vec<_>>()
-                            .join(";");
-                        PresetJumpChainData {
-                            id: t.id.clone().into(),
-                            name: t.name.clone().into(),
-                            summary: t.route_summary().into(),
-                            hop_count: t.jump_chain.len() as i32,
-                            hops_serialized: hops_str.into(),
-                        }
-                    })
-                    .collect();
-                sync_hosts_bridge_preset_jump_chains(&w, &preset_chains);
-
-                // 6. 从网络与隧道中心读取已有代理配置 (TunnelType::ProxyServer 或 Dynamic)
-                let proxies: Vec<ProxyOptionData> = tunnels.iter()
-                    .filter(|t| t.tunnel_type == smagical_core::TunnelType::ProxyServer || t.tunnel_type == smagical_core::TunnelType::Dynamic)
-                    .map(|t| {
-                        let proto = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
-                            "SOCKS5".to_string()
-                        } else if !t.proxy_proto.is_empty() {
-                            t.proxy_proto.to_uppercase()
-                        } else {
-                            "SOCKS5".to_string()
-                        };
-                        let (host, port) = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
-                            let h = if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
-                            (h, t.local_port as i32)
-                        } else {
-                            let h = if !t.remote_host.is_empty() { t.remote_host.clone() } else if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
-                            let p = if t.remote_port > 0 { t.remote_port as i32 } else { t.local_port as i32 };
-                            (h, p)
-                        };
-                        ProxyOptionData {
-                            id: t.id.clone().into(),
-                            name: t.name.clone().into(),
-                            proto: proto.into(),
-                            host: host.into(),
-                            port,
-                            username: t.proxy_username.clone().into(),
-                        }
-                    })
-                    .collect();
-                sync_hosts_bridge_proxies(&w, &proxies);
-            }
+                });
+            });
 
             // 7. 重置当前跳板机链路
             create_host_jump_chain_open.borrow_mut().clear();
@@ -933,226 +998,238 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak_edit_modal = window.as_weak();
     let core_state_edit_modal = Rc::clone(&ctx.core_state);
-    let master_tree_edit_modal = Rc::clone(&ctx.master_tree);
-    let selector_expanded_edit_modal = Rc::clone(&ctx.selector_expanded_groups);
+    let master_tree_edit_modal = Arc::clone(&ctx.master_tree);
+    let selector_expanded_edit_modal = Arc::clone(&ctx.selector_expanded_groups);
     let create_host_jump_chain_edit = Rc::clone(&create_host_jump_chain);
     let notifications_edit_modal = ctx.notifications.clone();
 
     hb.on_open_edit_host_modal(move |host_id| {
-        if let Some(w) = window_weak_edit_modal.upgrade() {
-            let h_id = host_id.to_string();
-            let host_opt = core_state_edit_modal.storage().hosts().get_by_id(&h_id).ok().flatten();
+        create_host_jump_chain_edit.borrow_mut().clear();
+        let h_id = host_id.to_string();
+        let storage = core_state_edit_modal.storage();
+        let window_weak = window_weak_edit_modal.clone();
+        let master_tree = Arc::clone(&master_tree_edit_modal);
+        let selector_expanded = Arc::clone(&selector_expanded_edit_modal);
+        let notifications = notifications_edit_modal.clone();
+
+        spawn_async(async move {
+            let host_opt = storage.hosts().get_by_id(&h_id).await.ok().flatten();
             let host = match host_opt {
                 Some(h) => h,
                 None => {
-                    notifications_edit_modal.error("打开失败", format!("未找到主机 [{}] 的记录", h_id));
+                    let _ = slint::invoke_from_event_loop(move || {
+                        notifications.error("打开失败", format!("未找到主机 [{}] 的记录", h_id));
+                    });
                     return;
                 }
             };
 
-            let hb = w.global::<HostsBridge>();
-            hb.set_test_connection_status("idle".into());
-            hb.set_test_connection_message("".into());
-
-            // 1. 设置为编辑模式并绑定原主机 ID
-            hb.set_is_edit_mode(true);
-            hb.set_editing_host_id(host.id.clone().into());
-
-            // 2. 解析回显所属分组
-            let (parent_id, parent_name) = if let Some(ref pid) = host.parent_group_id {
-                let name = core_state_edit_modal.storage().groups().get_by_id(pid).ok().flatten()
-                    .map(|g| g.name)
-                    .unwrap_or_else(|| "根目录 (顶级主机)".to_string());
-                (pid.clone(), name)
+            // 异步查询上级分组、关联凭据、跳板隧道、全量凭据/隧道 (0ms 阻塞 UI)
+            let parent_name = if let Some(ref pid) = host.parent_group_id {
+                storage.groups().get_by_id(pid).await.ok().flatten().map(|g| g.name).unwrap_or_else(|| "根目录 (顶级主机)".to_string())
             } else {
-                ("root".to_string(), "根目录 (顶级主机)".to_string())
+                "根目录 (顶级主机)".to_string()
             };
-            hb.set_create_host_default_parent(parent_id.clone().into());
-            hb.set_form_parent_id(parent_id.into());
-            hb.set_form_parent_name(parent_name.into());
 
-            // 3. 常规信息回显
-            hb.set_form_host_name(host.name.clone().into());
-            hb.set_form_host_address(host.address.clone().into());
-            hb.set_form_host_port_str(host.port.to_string().into());
-
-            // 4. 凭据与认证模式回显
-            let (cred_id, cred_name, cred_user, cred_type, cred_alg) = if let Some(ref cid) = host.credential_id {
-                if let Ok(Some(c)) = core_state_edit_modal.storage().credentials().get_by_id(cid) {
-                    (
-                        c.id,
-                        c.name,
-                        c.username.unwrap_or_else(|| "root".to_string()),
-                        c.cred_type.to_string(),
-                        c.algorithm,
-                    )
+            let cred_info = if let Some(ref cid) = host.credential_id {
+                if let Ok(Some(c)) = storage.credentials().get_by_id(cid).await {
+                    (c.id, c.name, c.username.unwrap_or_else(|| "root".to_string()), c.cred_type.to_string(), c.algorithm)
                 } else {
                     (cid.clone(), cid.clone(), "root".to_string(), "password".to_string(), "Password".to_string())
                 }
             } else {
                 (String::new(), String::new(), String::new(), String::new(), String::new())
             };
-            hb.set_form_cred_id(cred_id.into());
-            hb.set_form_cred_name(cred_name.into());
-            hb.set_form_cred_user(cred_user.into());
-            hb.set_form_cred_type(cred_type.into());
-            hb.set_form_cred_alg(cred_alg.into());
 
-            let at = if host.auth_type.is_empty() {
-                if host.credential_id.is_some() {
-                    "credential".to_string()
-                } else if host.key_data.is_some() {
-                    "key".to_string()
-                } else {
-                    "password".to_string()
-                }
-            } else {
-                host.auth_type.clone()
-            };
-            hb.set_form_auth_type(at.into());
-            hb.set_form_auth_username(host.username.clone().unwrap_or_else(|| "root".to_string()).into());
-            hb.set_form_auth_password(host.password.clone().unwrap_or_default().into());
-            hb.set_form_auth_key_username(host.username.clone().unwrap_or_else(|| "root".to_string()).into());
-            hb.set_form_auth_key_data(host.key_data.clone().unwrap_or_default().into());
-            hb.set_form_auth_key_passphrase(host.key_passphrase.clone().unwrap_or_default().into());
-
-            // 5. 代理配置回显
-            let (proxy_mode, custom_proto, custom_host, custom_port_str, custom_user, custom_pass) =
-                if let Some(ref ptype) = host.proxy_type {
-                    (
-                        "custom".to_string(),
-                        ptype.clone(),
-                        host.proxy_host.clone().unwrap_or_default(),
-                        host.proxy_port.map(|p| p.to_string()).unwrap_or_default(),
-                        host.proxy_username.clone().unwrap_or_default(),
-                        host.proxy_password.clone().unwrap_or_default(),
-                    )
-                } else {
-                    ("direct".to_string(), "socks5".to_string(), String::new(), String::new(), String::new(), String::new())
-                };
-            hb.set_form_proxy_mode(proxy_mode.into());
-            hb.set_form_custom_proxy_proto(custom_proto.into());
-            hb.set_form_custom_proxy_host(custom_host.into());
-            hb.set_form_custom_proxy_port_str(custom_port_str.into());
-            hb.set_form_custom_proxy_username(custom_user.into());
-            hb.set_form_custom_proxy_password(custom_pass.into());
-
-            // 6. 高级参数回显
-            hb.set_form_keepalive_str(host.keepalive_interval.to_string().into());
-            hb.set_form_initial_dir(host.initial_dir.clone().unwrap_or_default().into());
-            hb.set_form_startup_cmd(host.startup_cmd.clone().unwrap_or_default().into());
-            hb.set_form_term_type(host.term_type.clone().unwrap_or_else(|| "xterm-256color".to_string()).into());
-            hb.set_form_notes(host.notes.clone().into());
-
-            // 7. 跳板链路预设回显
-            create_host_jump_chain_edit.borrow_mut().clear();
-            if let Some(ref jsummary) = host.jump_chain_summary {
+            let preset_tun_info = if let Some(ref jsummary) = host.jump_chain_summary {
                 if jsummary.starts_with("preset:") {
                     let pid = jsummary.trim_start_matches("preset:");
-                    hb.set_form_preset_jump_id(pid.into());
-                    if let Ok(Some(tun)) = core_state_edit_modal.storage().tunnels().get_by_id(pid) {
-                        let summary = tun.route_summary();
-                        let hop_count = tun.jump_chain.len() as i32;
-                        hb.set_form_preset_jump_name(tun.name.into());
-                        hb.set_form_preset_jump_summary(summary.into());
-                        hb.set_form_preset_jump_hop_count(hop_count);
+                    if let Ok(Some(tun)) = storage.tunnels().get_by_id(pid).await {
+                        let route_sum = tun.route_summary();
+                        let hop_len = tun.jump_chain.len() as i32;
+                        Some((pid.to_string(), tun.name, route_sum, hop_len))
+                    } else {
+                        Some((pid.to_string(), String::new(), String::new(), 0))
                     }
                 } else {
-                    hb.set_form_preset_jump_id("".into());
-                    hb.set_form_preset_jump_name("".into());
-                    hb.set_form_preset_jump_summary("".into());
-                    hb.set_form_preset_jump_hop_count(0);
+                    None
                 }
             } else {
-                hb.set_form_preset_jump_id("".into());
-                hb.set_form_preset_jump_name("".into());
-                hb.set_form_preset_jump_summary("".into());
-                hb.set_form_preset_jump_hop_count(0);
-            }
-            sync_hosts_bridge_create_host_jump_chain(&w, &[]);
+                None
+            };
 
-            // 8. 同步下拉选项数据
-            {
-                let tree = master_tree_edit_modal.borrow();
-                let expanded_set = selector_expanded_edit_modal.borrow();
-                let group_options = build_group_options(&tree, &expanded_set);
-                sync_hosts_bridge_options(&w, &group_options);
-            }
-            if let Ok(creds) = core_state_edit_modal.storage().credentials().list_all() {
-                let cred_options: Vec<CredentialOptionData> = creds.into_iter().map(|c| {
-                    CredentialOptionData {
-                        id: c.id.into(),
-                        name: c.name.into(),
-                        username: c.username.unwrap_or_else(|| "root".to_string()).into(),
-                        cred_type: c.cred_type.to_string().into(),
-                        algorithm: c.algorithm.into(),
-                    }
-                }).collect();
-                sync_hosts_bridge_credentials(&w, &cred_options);
-            }
-            if let Ok(hosts) = core_state_edit_modal.storage().hosts().list_all() {
-                let jump_options: Vec<JumpHostOptionData> = hosts.into_iter().map(|h| {
-                    JumpHostOptionData {
-                        id: h.id.into(),
-                        name: h.name.into(),
-                        address: h.address.into(),
-                        port: h.port as i32,
-                    }
-                }).collect();
-                sync_hosts_bridge_jump_hosts(&w, &jump_options);
-            }
-            if let Ok(tunnels) = core_state_edit_modal.storage().tunnels().list_all() {
-                let preset_chains: Vec<PresetJumpChainData> = tunnels.iter()
-                    .filter(|t| t.tunnel_type == smagical_core::TunnelType::JumpHost)
-                    .map(|t| {
-                        let hops_str = t.jump_chain.iter()
-                            .map(|h| format!("{},{},{},{}", h.host_id, h.host_name, h.host_address, h.host_port))
-                            .collect::<Vec<_>>()
-                            .join(";");
-                        PresetJumpChainData {
-                            id: t.id.clone().into(),
-                            name: t.name.clone().into(),
-                            summary: t.route_summary().into(),
-                            hop_count: t.jump_chain.len() as i32,
-                            hops_serialized: hops_str.into(),
-                        }
-                    })
-                    .collect();
-                sync_hosts_bridge_preset_jump_chains(&w, &preset_chains);
+            let creds = storage.credentials().list_all().await.unwrap_or_default();
+            let tunnels = storage.tunnels().list_all().await.unwrap_or_default();
 
-                let proxies: Vec<ProxyOptionData> = tunnels.iter()
-                    .filter(|t| t.tunnel_type == smagical_core::TunnelType::ProxyServer || t.tunnel_type == smagical_core::TunnelType::Dynamic)
-                    .map(|t| {
-                        let proto = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
-                            "SOCKS5".to_string()
-                        } else if !t.proxy_proto.is_empty() {
-                            t.proxy_proto.to_uppercase()
+            let _ = slint::invoke_from_event_loop(move || {
+                if let Some(w) = window_weak.upgrade() {
+                    let hb = w.global::<HostsBridge>();
+                    hb.set_test_connection_status("idle".into());
+                    hb.set_test_connection_message("".into());
+
+                    // 1. 设置为编辑模式并绑定原主机 ID
+                    hb.set_is_edit_mode(true);
+                    hb.set_editing_host_id(host.id.clone().into());
+
+                    // 2. 解析回显所属分组
+                    let parent_id = host.parent_group_id.clone().unwrap_or_else(|| "root".to_string());
+                    hb.set_create_host_default_parent(parent_id.clone().into());
+                    hb.set_form_parent_id(parent_id.into());
+                    hb.set_form_parent_name(parent_name.into());
+
+                    // 3. 常规信息回显
+                    hb.set_form_host_name(host.name.clone().into());
+                    hb.set_form_host_address(host.address.clone().into());
+                    hb.set_form_host_port_str(host.port.to_string().into());
+
+                    // 4. 凭据与认证模式回显
+                    let (cred_id, cred_name, cred_user, cred_type, cred_alg) = cred_info;
+                    hb.set_form_cred_id(cred_id.into());
+                    hb.set_form_cred_name(cred_name.into());
+                    hb.set_form_cred_user(cred_user.into());
+                    hb.set_form_cred_type(cred_type.into());
+                    hb.set_form_cred_alg(cred_alg.into());
+
+                    let at = if host.auth_type.is_empty() {
+                        if host.credential_id.is_some() {
+                            "credential".to_string()
+                        } else if host.key_data.is_some() {
+                            "key".to_string()
                         } else {
-                            "SOCKS5".to_string()
-                        };
-                        let (host, port) = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
-                            let h = if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
-                            (h, t.local_port as i32)
-                        } else {
-                            let h = if !t.remote_host.is_empty() { t.remote_host.clone() } else if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
-                            let p = if t.remote_port > 0 { t.remote_port as i32 } else { t.local_port as i32 };
-                            (h, p)
-                        };
-                        ProxyOptionData {
-                            id: t.id.clone().into(),
-                            name: t.name.clone().into(),
-                            proto: proto.into(),
-                            host: host.into(),
-                            port,
-                            username: t.proxy_username.clone().into(),
+                            "password".to_string()
                         }
-                    })
-                    .collect();
-                sync_hosts_bridge_proxies(&w, &proxies);
-            }
+                    } else {
+                        host.auth_type.clone()
+                    };
+                    hb.set_form_auth_type(at.into());
+                    hb.set_form_auth_username(host.username.clone().unwrap_or_else(|| "root".to_string()).into());
+                    hb.set_form_auth_password(host.password.clone().unwrap_or_default().into());
+                    hb.set_form_auth_key_username(host.username.clone().unwrap_or_else(|| "root".to_string()).into());
+                    hb.set_form_auth_key_data(host.key_data.clone().unwrap_or_default().into());
+                    hb.set_form_auth_key_passphrase(host.key_passphrase.clone().unwrap_or_default().into());
 
-            hb.set_is_create_host_modal_open(true);
-        }
+                    // 5. 代理配置回显
+                    let (proxy_mode, custom_proto, custom_host, custom_port_str, custom_user, custom_pass) =
+                        if let Some(ref ptype) = host.proxy_type {
+                            (
+                                "custom".to_string(),
+                                ptype.clone(),
+                                host.proxy_host.clone().unwrap_or_default(),
+                                host.proxy_port.map(|p| p.to_string()).unwrap_or_default(),
+                                host.proxy_username.clone().unwrap_or_default(),
+                                host.proxy_password.clone().unwrap_or_default(),
+                            )
+                        } else {
+                            ("direct".to_string(), "socks5".to_string(), String::new(), String::new(), String::new(), String::new())
+                        };
+                    hb.set_form_proxy_mode(proxy_mode.into());
+                    hb.set_form_custom_proxy_proto(custom_proto.into());
+                    hb.set_form_custom_proxy_host(custom_host.into());
+                    hb.set_form_custom_proxy_port_str(custom_port_str.into());
+                    hb.set_form_custom_proxy_username(custom_user.into());
+                    hb.set_form_custom_proxy_password(custom_pass.into());
+
+                    // 6. 高级参数回显
+                    hb.set_form_keepalive_str(host.keepalive_interval.to_string().into());
+                    hb.set_form_initial_dir(host.initial_dir.clone().unwrap_or_default().into());
+                    hb.set_form_startup_cmd(host.startup_cmd.clone().unwrap_or_default().into());
+                    hb.set_form_term_type(host.term_type.clone().unwrap_or_else(|| "xterm-256color".to_string()).into());
+                    hb.set_form_notes(host.notes.clone().into());
+
+                    // 7. 跳板链路预设回显
+                    if let Some((pid, name, summary, hop_count)) = preset_tun_info {
+                        hb.set_form_preset_jump_id(pid.into());
+                        hb.set_form_preset_jump_name(name.into());
+                        hb.set_form_preset_jump_summary(summary.into());
+                        hb.set_form_preset_jump_hop_count(hop_count);
+                    } else {
+                        hb.set_form_preset_jump_id("".into());
+                        hb.set_form_preset_jump_name("".into());
+                        hb.set_form_preset_jump_summary("".into());
+                        hb.set_form_preset_jump_hop_count(0);
+                    }
+                    sync_hosts_bridge_create_host_jump_chain(&w, &[]);
+
+                    // 8. 同步下拉选项数据 (纯内存 0ms)
+                    let tree = master_tree.read().unwrap();
+                    let expanded_set = selector_expanded.read().unwrap();
+                    let group_options = build_group_options(&tree, &expanded_set);
+                    sync_hosts_bridge_options(&w, &group_options);
+
+                    let cred_options: Vec<CredentialOptionData> = creds.into_iter().map(|c| {
+                        CredentialOptionData {
+                            id: c.id.into(),
+                            name: c.name.into(),
+                            username: c.username.unwrap_or_else(|| "root".to_string()).into(),
+                            cred_type: c.cred_type.to_string().into(),
+                            algorithm: c.algorithm.into(),
+                        }
+                    }).collect();
+                    sync_hosts_bridge_credentials(&w, &cred_options);
+
+                    let jump_options: Vec<JumpHostOptionData> = tree.iter()
+                        .filter(|n| !n.is_group)
+                        .map(|h| JumpHostOptionData {
+                            id: h.id.clone().into(),
+                            name: h.name.clone().into(),
+                            address: h.address.clone().into(),
+                            port: h.port,
+                        })
+                        .collect();
+                    sync_hosts_bridge_jump_hosts(&w, &jump_options);
+
+                    let preset_chains: Vec<PresetJumpChainData> = tunnels.iter()
+                        .filter(|t| t.tunnel_type == smagical_core::TunnelType::JumpHost)
+                        .map(|t| {
+                            let hops_str = t.jump_chain.iter()
+                                .map(|h| format!("{},{},{},{}", h.host_id, h.host_name, h.host_address, h.host_port))
+                                .collect::<Vec<_>>()
+                                .join(";");
+                            PresetJumpChainData {
+                                id: t.id.clone().into(),
+                                name: t.name.clone().into(),
+                                summary: t.route_summary().into(),
+                                hop_count: t.jump_chain.len() as i32,
+                                hops_serialized: hops_str.into(),
+                            }
+                        })
+                        .collect();
+                    sync_hosts_bridge_preset_jump_chains(&w, &preset_chains);
+
+                    let proxies: Vec<ProxyOptionData> = tunnels.iter()
+                        .filter(|t| t.tunnel_type == smagical_core::TunnelType::ProxyServer || t.tunnel_type == smagical_core::TunnelType::Dynamic)
+                        .map(|t| {
+                            let proto = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
+                                "SOCKS5".to_string()
+                            } else if !t.proxy_proto.is_empty() {
+                                t.proxy_proto.to_uppercase()
+                            } else {
+                                "SOCKS5".to_string()
+                            };
+                            let (host, port) = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
+                                let h = if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
+                                (h, t.local_port as i32)
+                            } else {
+                                let h = if !t.remote_host.is_empty() { t.remote_host.clone() } else if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
+                                let p = if t.remote_port > 0 { t.remote_port as i32 } else { t.local_port as i32 };
+                                (h, p)
+                            };
+                            ProxyOptionData {
+                                id: t.id.clone().into(),
+                                name: t.name.clone().into(),
+                                proto: proto.into(),
+                                host: host.into(),
+                                port,
+                                username: t.proxy_username.clone().into(),
+                            }
+                        })
+                        .collect();
+                    sync_hosts_bridge_proxies(&w, &proxies);
+
+                    hb.set_is_create_host_modal_open(true);
+                }
+            });
+        });
     });
 
 
@@ -1267,50 +1344,56 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
         let window_weak_filter_cred = window.as_weak();
         let core_state_filter_cred = Rc::clone(&ctx.core_state);
         hb.on_filter_create_host_credentials(move |category, query| {
-            if let Some(w) = window_weak_filter_cred.upgrade() {
-                let cat_str = category.to_string().trim().to_lowercase();
-                let q_str = query.to_string().trim().to_lowercase();
+            let cat_str = category.to_string().trim().to_lowercase();
+            let q_str = query.to_string().trim().to_lowercase();
+            let storage = core_state_filter_cred.storage();
+            let window_weak = window_weak_filter_cred.clone();
 
-                if let Ok(creds) = core_state_filter_cred.storage().credentials().list_all() {
-                    let filtered: Vec<CredentialOptionData> = creds
-                        .into_iter()
-                        .filter(|c| {
-                            // 1. 分类匹配
-                            let type_str = c.cred_type.to_string().to_lowercase();
-                            let matches_cat = match cat_str.as_str() {
-                                "" | "all" => true,
-                                "key" => type_str == "key",
-                                "password" => type_str == "password",
-                                "agent" => type_str == "agent",
-                                _ => true,
-                            };
-                            if !matches_cat {
-                                return false;
-                            }
+            spawn_async(async move {
+                let creds = storage.credentials().list_all().await.unwrap_or_default();
+                let filtered: Vec<CredentialOptionData> = creds
+                    .into_iter()
+                    .filter(|c| {
+                        // 1. 分类匹配
+                        let type_str = c.cred_type.to_string().to_lowercase();
+                        let matches_cat = match cat_str.as_str() {
+                            "" | "all" => true,
+                            "key" => type_str == "key",
+                            "password" => type_str == "password",
+                            "agent" => type_str == "agent",
+                            _ => true,
+                        };
+                        if !matches_cat {
+                            return false;
+                        }
 
-                            // 2. 搜索关键字匹配 (名称、用户名、算法、ID)
-                            if q_str.is_empty() {
-                                true
-                            } else {
-                                c.name.to_lowercase().contains(&q_str)
-                                    || c.username.as_deref().unwrap_or("").to_lowercase().contains(&q_str)
-                                    || c.algorithm.to_lowercase().contains(&q_str)
-                                    || c.id.to_lowercase().contains(&q_str)
-                            }
-                        })
-                        .map(|c| CredentialOptionData {
-                            id: c.id.into(),
-                            name: c.name.into(),
-                            username: c.username.unwrap_or_else(|| "root".to_string()).into(),
-                            cred_type: c.cred_type.to_string().into(),
-                            algorithm: c.algorithm.into(),
-                        })
-                        .collect();
+                        // 2. 搜索关键字匹配 (名称、用户名、算法、ID)
+                        if q_str.is_empty() {
+                            true
+                        } else {
+                            c.name.to_lowercase().contains(&q_str)
+                                || c.username.as_deref().unwrap_or("").to_lowercase().contains(&q_str)
+                                || c.algorithm.to_lowercase().contains(&q_str)
+                                || c.id.to_lowercase().contains(&q_str)
+                        }
+                    })
+                    .map(|c| CredentialOptionData {
+                        id: c.id.into(),
+                        name: c.name.into(),
+                        username: c.username.unwrap_or_else(|| "root".to_string()).into(),
+                        cred_type: c.cred_type.to_string().into(),
+                        algorithm: c.algorithm.into(),
+                    })
+                    .collect();
 
-                    sync_hosts_bridge_credentials(&w, &filtered);
-                    tracing::debug!(target: "smagical_ui::hosts", "新建主机弹窗凭据检索: 分类='{}', 关键字='{}', 匹配条数={}", cat_str, q_str, filtered.len());
-                }
-            }
+                let match_count = filtered.len();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        sync_hosts_bridge_credentials(&w, &filtered);
+                    }
+                });
+                tracing::debug!(target: "smagical_ui::hosts", "新建主机弹窗凭据检索: 分类='{}', 关键字='{}', 匹配条数={}", cat_str, q_str, match_count);
+            });
         });
     }
 
@@ -1321,55 +1404,63 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
         let window_weak_filter_proxy = window.as_weak();
         let core_state_filter_proxy = Rc::clone(&ctx.core_state);
         hb.on_filter_create_host_proxies(move |query| {
-            if let Some(w) = window_weak_filter_proxy.upgrade() {
-                let q_str = query.to_string().trim().to_lowercase();
-                if let Ok(tunnels) = core_state_filter_proxy.storage().tunnels().list_all() {
-                    let filtered: Vec<ProxyOptionData> = tunnels
-                        .into_iter()
-                        .filter(|t| t.tunnel_type == smagical_core::TunnelType::ProxyServer || t.tunnel_type == smagical_core::TunnelType::Dynamic)
-                        .filter_map(|t| {
-                            let proto = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
-                                "SOCKS5".to_string()
-                            } else if !t.proxy_proto.is_empty() {
-                                t.proxy_proto.to_uppercase()
-                            } else {
-                                "SOCKS5".to_string()
-                            };
-                            let (host, port) = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
-                                let h = if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
-                                (h, t.local_port as i32)
-                            } else {
-                                let h = if !t.remote_host.is_empty() { t.remote_host.clone() } else if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
-                                let p = if t.remote_port > 0 { t.remote_port as i32 } else { t.local_port as i32 };
-                                (h, p)
-                            };
-                            let matches = if q_str.is_empty() {
-                                true
-                            } else {
-                                t.name.to_lowercase().contains(&q_str)
-                                    || proto.to_lowercase().contains(&q_str)
-                                    || host.to_lowercase().contains(&q_str)
-                                    || port.to_string().contains(&q_str)
-                                    || t.proxy_username.to_lowercase().contains(&q_str)
-                            };
-                            if matches {
-                                Some(ProxyOptionData {
-                                    id: t.id.clone().into(),
-                                    name: t.name.clone().into(),
-                                    proto: proto.into(),
-                                    host: host.into(),
-                                    port,
-                                    username: t.proxy_username.clone().into(),
-                                })
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    sync_hosts_bridge_proxies(&w, &filtered);
-                    tracing::debug!(target: "smagical_ui::hosts", "新建主机弹窗代理检索: 关键字='{}', 匹配条数={}", q_str, filtered.len());
-                }
-            }
+            let q_str = query.to_string().trim().to_lowercase();
+            let storage = core_state_filter_proxy.storage();
+            let window_weak = window_weak_filter_proxy.clone();
+
+            spawn_async(async move {
+                let tunnels = storage.tunnels().list_all().await.unwrap_or_default();
+                let filtered: Vec<ProxyOptionData> = tunnels
+                    .into_iter()
+                    .filter(|t| t.tunnel_type == smagical_core::TunnelType::ProxyServer || t.tunnel_type == smagical_core::TunnelType::Dynamic)
+                    .filter_map(|t| {
+                        let proto = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
+                            "SOCKS5".to_string()
+                        } else if !t.proxy_proto.is_empty() {
+                            t.proxy_proto.to_uppercase()
+                        } else {
+                            "SOCKS5".to_string()
+                        };
+                        let (host, port) = if t.tunnel_type == smagical_core::TunnelType::Dynamic {
+                            let h = if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
+                            (h, t.local_port as i32)
+                        } else {
+                            let h = if !t.remote_host.is_empty() { t.remote_host.clone() } else if !t.local_bind.is_empty() { t.local_bind.clone() } else { "127.0.0.1".to_string() };
+                            let p = if t.remote_port > 0 { t.remote_port as i32 } else { t.local_port as i32 };
+                            (h, p)
+                        };
+                        let matches = if q_str.is_empty() {
+                            true
+                        } else {
+                            t.name.to_lowercase().contains(&q_str)
+                                || proto.to_lowercase().contains(&q_str)
+                                || host.to_lowercase().contains(&q_str)
+                                || port.to_string().contains(&q_str)
+                                || t.proxy_username.to_lowercase().contains(&q_str)
+                        };
+                        if matches {
+                            Some(ProxyOptionData {
+                                id: t.id.clone().into(),
+                                name: t.name.clone().into(),
+                                proto: proto.into(),
+                                host: host.into(),
+                                port,
+                                username: t.proxy_username.clone().into(),
+                            })
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+
+                let match_count = filtered.len();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        sync_hosts_bridge_proxies(&w, &filtered);
+                    }
+                });
+                tracing::debug!(target: "smagical_ui::hosts", "新建主机弹窗代理检索: 关键字='{}', 匹配条数={}", q_str, match_count);
+            });
         });
     }
 
@@ -1399,54 +1490,48 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 );
 
                 let window_weak_bg = window_weak_test.clone();
-                std::thread::Builder::new()
-                    .name("smalux-tcp-ping".to_string())
-                    .spawn(move || {
-                        let target = format!("{}:{}", addr_str, port_num);
-                        let start = std::time::Instant::now();
-                        let timeout = std::time::Duration::from_secs(5);
+                crate::async_util::spawn_async(async move {
+                    let target = format!("{}:{}", addr_str, port_num);
+                    let start = std::time::Instant::now();
+                    let timeout = std::time::Duration::from_secs(5);
 
-                        let result = match target.to_socket_addrs() {
-                            Ok(mut addrs) => {
-                                if let Some(sock_addr) = addrs.next() {
-                                    std::net::TcpStream::connect_timeout(&sock_addr, timeout)
-                                } else {
-                                    let not_found_msg = if is_en { "Unable to resolve host address" } else { "无法解析域名地址" };
-                                    Err(std::io::Error::new(std::io::ErrorKind::NotFound, not_found_msg))
+                    let result = match tokio::time::timeout(timeout, tokio::net::TcpStream::connect(&target)).await {
+                        Ok(Ok(_stream)) => Ok(()),
+                        Ok(Err(err)) => Err(err),
+                        Err(_) => Err(std::io::Error::new(
+                            std::io::ErrorKind::TimedOut,
+                            if is_en { "Connection timed out (5s)" } else { "连接超时 (5秒)" },
+                        )),
+                    };
+
+                    let elapsed = start.elapsed().as_millis();
+
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(win) = window_weak_bg.upgrade() {
+                            let bridge = win.global::<HostsBridge>();
+                            match result {
+                                Ok(()) => {
+                                    bridge.set_test_connection_status("success".into());
+                                    let msg = if is_en {
+                                        format!("Connection successful ({}ms)", elapsed)
+                                    } else {
+                                        format!("连接成功 ({}ms)", elapsed)
+                                    };
+                                    bridge.set_test_connection_message(msg.into());
+                                }
+                                Err(err) => {
+                                    bridge.set_test_connection_status("error".into());
+                                    let msg = if is_en {
+                                        format!("Handshake failed: {}", err)
+                                    } else {
+                                        format!("握手失败: {}", err)
+                                    };
+                                    bridge.set_test_connection_message(msg.into());
                                 }
                             }
-                            Err(e) => Err(e),
-                        };
-
-                        let elapsed = start.elapsed().as_millis();
-
-                        let _ = slint::invoke_from_event_loop(move || {
-                            if let Some(win) = window_weak_bg.upgrade() {
-                                let bridge = win.global::<HostsBridge>();
-                                match result {
-                                    Ok(_stream) => {
-                                        bridge.set_test_connection_status("success".into());
-                                        let msg = if is_en {
-                                            format!("Connection successful ({}ms)", elapsed)
-                                        } else {
-                                            format!("连接成功 ({}ms)", elapsed)
-                                        };
-                                        bridge.set_test_connection_message(msg.into());
-                                    }
-                                    Err(err) => {
-                                        bridge.set_test_connection_status("error".into());
-                                        let msg = if is_en {
-                                            format!("Handshake failed: {}", err)
-                                        } else {
-                                            format!("握手失败: {}", err)
-                                        };
-                                        bridge.set_test_connection_message(msg.into());
-                                    }
-                                }
-                            }
-                        });
-                    })
-                    .ok();
+                        }
+                    });
+                });
             }
         });
     }
@@ -1457,10 +1542,11 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak_submit = window.as_weak();
         let core_state_submit = Rc::clone(&ctx.core_state);
-        let master_tree_submit = Rc::clone(&ctx.master_tree);
-        let master_cards_submit = Rc::clone(&ctx.master_cards);
-        let expanded_submit = Rc::clone(&ctx.expanded_groups);
-        let selector_expanded_submit = Rc::clone(&ctx.selector_expanded_groups);
+        let master_tree_submit = Arc::clone(&ctx.master_tree);
+        let master_cards_submit = Arc::clone(&ctx.master_cards);
+        let expanded_submit = Arc::clone(&ctx.expanded_groups);
+        let selector_expanded_submit = Arc::clone(&ctx.selector_expanded_groups);
+        let search_query_submit = Arc::clone(&ctx.search_query);
         let notifications_submit = ctx.notifications.clone();
 
         hb.on_submit_create_host(move |
@@ -1513,16 +1599,6 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     format!("host-{}", uuid::Uuid::new_v4())
                 };
 
-                let (existing_sort, existing_status, existing_ping) = if is_edit {
-                    if let Ok(Some(orig)) = core_state_submit.storage().hosts().get_by_id(&target_host_id) {
-                        (orig.sort_order, orig.status, orig.ping_ms)
-                    } else {
-                        (0, smagical_core::HostStatus::Online, 0)
-                    }
-                } else {
-                    (0, smagical_core::HostStatus::Online, 0)
-                };
-
                 // 处理身份认证信息与凭据关联
                 let auth_type_str = auth_type.to_string();
                 let user_str = username.to_string().trim().to_string();
@@ -1536,6 +1612,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 let final_key_data = if key_str.is_empty() { None } else { Some(key_str.clone()) };
                 let final_key_pass = if pass_str.is_empty() { None } else { Some(pass_str.clone()) };
 
+                let mut new_cred_rec: Option<CredentialRecord> = None;
                 if auth_type_str == "credential" {
                     let cid = credential_id.to_string();
                     if !cid.is_empty() {
@@ -1544,10 +1621,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 } else if auth_type_str == "password" {
                     if save_to_credentials && (!pwd_str.is_empty() || !user_str.is_empty()) {
                         let cred_id = format!("cred-{}", uuid::Uuid::new_v4());
-                        let cred_rec = smagical_core::CredentialRecord {
+                        new_cred_rec = Some(CredentialRecord {
                             id: cred_id.clone(),
                             name: format!("{}-密码凭据", final_name),
-                            cred_type: smagical_core::CredentialType::Password,
+                            cred_type: CredentialType::Password,
                             algorithm: "Password".to_string(),
                             username: final_username.clone(),
                             secret_data: pwd_str,
@@ -1558,17 +1635,16 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                             created_at: "刚刚".to_string(),
                             updated_at: "刚刚".to_string(),
                             notes: format!("关联主机 [{}]", final_name),
-                        };
-                        let _ = core_state_submit.storage().credentials().save(&cred_rec);
+                        });
                         final_cred_id = Some(cred_id);
                     }
                 } else if auth_type_str == "key" {
                     if save_to_credentials && !key_str.is_empty() {
                         let cred_id = format!("cred-{}", uuid::Uuid::new_v4());
-                        let cred_rec = smagical_core::CredentialRecord {
+                        new_cred_rec = Some(CredentialRecord {
                             id: cred_id.clone(),
                             name: format!("{}-私钥凭据", final_name),
-                            cred_type: smagical_core::CredentialType::Key,
+                            cred_type: CredentialType::Key,
                             algorithm: "SSH Key".to_string(),
                             username: final_username.clone(),
                             secret_data: key_str,
@@ -1579,8 +1655,7 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                             created_at: "刚刚".to_string(),
                             updated_at: "刚刚".to_string(),
                             notes: format!("关联主机 [{}]", final_name),
-                        };
-                        let _ = core_state_submit.storage().credentials().save(&cred_rec);
+                        });
                         final_cred_id = Some(cred_id);
                     }
                 }
@@ -1616,120 +1691,125 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 let ttype_str = term_type.to_string().trim().to_string();
                 let final_term_type = if ttype_str.is_empty() { Some("xterm-256color".to_string()) } else { Some(ttype_str) };
 
-                // 写入持久化存储引擎 (MockStorage)
-                let host_rec = smagical_core::HostRecord {
-                    id: target_host_id.clone(),
-                    name: final_name.clone(),
-                    address: addr_str.clone(),
-                    port: port_u16,
-                    parent_group_id: final_parent_id.clone(),
-                    credential_id: final_cred_id.clone(),
-                    status: existing_status,
-                    ping_ms: existing_ping,
-                    sort_order: existing_sort,
-                    notes: notes.to_string(),
+                // 异步写入持久化存储引擎 (0ms UI 阻塞)
+                let storage = core_state_submit.storage();
+                let events = core_state_submit.events().clone();
+                let master_tree = Arc::clone(&master_tree_submit);
+                let master_cards = Arc::clone(&master_cards_submit);
+                let expanded = Arc::clone(&expanded_submit);
+                let selector_expanded = Arc::clone(&selector_expanded_submit);
+                let search_query = Arc::clone(&search_query_submit);
+                let window_weak = window_weak_submit.clone();
+                let notifications = notifications_submit.clone();
+                let final_name_clone = final_name.clone();
+                let notes_str = notes.to_string();
 
-                    auth_type: auth_type_str,
-                    username: final_username,
-                    password: final_password,
-                    key_data: final_key_data,
-                    key_passphrase: final_key_pass,
-
-                    proxy_type: final_proxy_type,
-                    proxy_host: final_proxy_host,
-                    proxy_port: final_proxy_port,
-                    proxy_username: final_proxy_user,
-                    proxy_password: final_proxy_pass,
-
-                    jump_chain_summary: final_jump_chain,
-
-                    keepalive_interval: keepalive_val,
-                    connect_timeout: 10,
-                    initial_dir: final_initial_dir,
-                    startup_cmd: final_startup_cmd,
-                    term_type: final_term_type,
-                };
-
-                if let Err(e) = core_state_submit.storage().hosts().save(&host_rec) {
-                    notifications_submit.error("保存失败", format!("写入存储层受限: {}", e));
-                    return;
-                }
-
-                // 派发 HostAssetChangedEvent 事件
-                core_state_submit.events().dispatch(&HostAssetChangedEvent {
-                    host_id: target_host_id.clone(),
-                    name: final_name.clone(),
-                    address: addr_str.clone(),
-                    credential_id: final_cred_id,
-                    action: if is_edit { "updated".to_string() } else { "created".to_string() },
-                });
-
-                // 从数据层（SSOT）重新完整构建整棵树与各分组子项计数 (item_count)
-                let new_raw_tree = build_raw_tree_from_storage(core_state_submit.storage().as_ref());
-                *master_tree_submit.borrow_mut() = new_raw_tree;
-
-                // 如果属于某个分组，自动将该目标分组及其祖先加入展开集合，保证新建主机立即可见
-                if let Some(ref pid) = final_parent_id {
-                    let mut exp = expanded_submit.borrow_mut();
-                    let mut curr = pid.clone();
-                    let tree = master_tree_submit.borrow();
-                    while !curr.is_empty() {
-                        exp.insert(curr.clone());
-                        if let Some(p) = tree.iter().find(|n| n.id == curr) {
-                            curr = p.parent_id.clone();
+                spawn_async(async move {
+                    let (existing_sort, existing_status, existing_ping) = if is_edit {
+                        if let Ok(Some(orig)) = storage.hosts().get_by_id(&target_host_id).await {
+                            (orig.sort_order, orig.status, orig.ping_ms)
                         } else {
-                            break;
+                            (0, HostStatus::Online, 0)
+                        }
+                    } else {
+                        (0, HostStatus::Online, 0)
+                    };
+
+                    if let Some(cred_rec) = new_cred_rec {
+                        let _ = storage.credentials().save(&cred_rec).await;
+                    }
+
+                    let host_rec = HostRecord {
+                        id: target_host_id.clone(),
+                        name: final_name_clone.clone(),
+                        address: addr_str.clone(),
+                        port: port_u16,
+                        parent_group_id: final_parent_id.clone(),
+                        credential_id: final_cred_id.clone(),
+                        status: existing_status,
+                        ping_ms: existing_ping,
+                        sort_order: existing_sort,
+                        notes: notes_str,
+
+                        auth_type: auth_type_str,
+                        username: final_username,
+                        password: final_password,
+                        key_data: final_key_data,
+                        key_passphrase: final_key_pass,
+
+                        proxy_type: final_proxy_type,
+                        proxy_host: final_proxy_host,
+                        proxy_port: final_proxy_port,
+                        proxy_username: final_proxy_user,
+                        proxy_password: final_proxy_pass,
+
+                        jump_chain_summary: final_jump_chain,
+
+                        keepalive_interval: keepalive_val,
+                        connect_timeout: 10,
+                        initial_dir: final_initial_dir,
+                        startup_cmd: final_startup_cmd,
+                        term_type: final_term_type,
+                    };
+
+                    if let Err(e) = storage.hosts().save(&host_rec).await {
+                        let _ = slint::invoke_from_event_loop(move || {
+                            notifications.error("保存失败", format!("写入存储层受限: {}", e));
+                        });
+                        return;
+                    }
+
+                    // 派发 HostAssetChangedEvent 事件
+                    events.dispatch(&HostAssetChangedEvent {
+                        host_id: target_host_id.clone(),
+                        name: final_name_clone.clone(),
+                        address: addr_str,
+                        credential_id: final_cred_id,
+                        action: if is_edit { "updated".to_string() } else { "created".to_string() },
+                    });
+
+                    // 如果属于某个分组，自动将该目标分组及其祖先加入展开集合，保证新建主机立即可见
+                    if let Some(ref pid) = final_parent_id {
+                        let mut exp = expanded.write().unwrap();
+                        let mut curr = pid.clone();
+                        let tree = master_tree.read().unwrap();
+                        while !curr.is_empty() {
+                            exp.insert(curr.clone());
+                            if let Some(p) = tree.iter().find(|n| n.id == curr) {
+                                curr = p.parent_id.clone();
+                            } else {
+                                break;
+                            }
                         }
                     }
-                }
 
-                // 基于最新数据层同步更新平铺卡片列表
-                let all_hosts = core_state_submit.storage().hosts().list_all().unwrap_or_default();
-                let all_groups = core_state_submit.storage().groups().list_all().unwrap_or_default();
-                let new_cards: Vec<HostItemData> = all_hosts.iter().map(|h| {
-                    let g_name = if let Some(ref pid) = h.parent_group_id {
-                        all_groups.iter().find(|g| g.id == *pid).map(|g| g.name.clone()).unwrap_or_else(|| "根目录".to_string())
-                    } else {
-                        "根目录".to_string()
-                    };
-                    HostItemData {
-                        id: h.id.clone().into(),
-                        name: h.name.clone().into(),
-                        address: h.address.clone().into(),
-                        port: h.port as i32,
-                        group: g_name.into(),
-                        status: h.status.to_string().into(),
-                        ping_ms: h.ping_ms,
-                    }
-                }).collect();
-                *master_cards_submit.borrow_mut() = new_cards;
+                    // 异步重新组装并渲染 UI
+                    sync_ui_hosts_async(
+                        storage.as_ref(),
+                        &master_tree,
+                        &master_cards,
+                        &expanded,
+                        &selector_expanded,
+                        &search_query,
+                        window_weak.clone(),
+                    ).await;
 
-                // 同步刷新 UI 树形视图、卡片列表与选择器下拉选项
-                let tree = master_tree_submit.borrow();
-                let expanded_set = expanded_submit.borrow();
-                let selector_set = selector_expanded_submit.borrow();
-
-                let visible_nodes = build_visible_tree_nodes(&tree, &expanded_set);
-                sync_hosts_bridge_tree(&w, &visible_nodes);
-
-                let cards = master_cards_submit.borrow();
-                sync_hosts_bridge_cards(&w, &cards);
-
-                let group_options = build_group_options(&tree, &selector_set);
-                sync_hosts_bridge_options(&w, &group_options);
-
-                // 关闭弹窗并重置编辑状态，推送成功全局气泡通知
-                let hb = w.global::<HostsBridge>();
-                hb.set_is_create_host_modal_open(false);
-                hb.set_is_edit_mode(false);
-                hb.set_editing_host_id("".into());
-                if is_edit {
-                    notifications_submit.success("修改主机成功", format!("主机 [{}] 配置已成功更新", final_name));
-                    tracing::info!(target: "smagical_ui::hosts", "成功修改主机配置: {} ({})", final_name, target_host_id);
-                } else {
-                    notifications_submit.success("创建主机成功", format!("主机 [{}] 已成功保存至资产列表", final_name));
-                    tracing::info!(target: "smagical_ui::hosts", "成功创建新主机记录: {} ({})", final_name, target_host_id);
-                }
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            let hb = w.global::<HostsBridge>();
+                            hb.set_is_create_host_modal_open(false);
+                            hb.set_is_edit_mode(false);
+                            hb.set_editing_host_id("".into());
+                            if is_edit {
+                                notifications.success("修改主机成功", format!("主机 [{}] 配置已成功更新", final_name_clone));
+                                tracing::info!(target: "smagical_ui::hosts", "成功修改主机配置: {} ({})", final_name_clone, target_host_id);
+                            } else {
+                                notifications.success("创建主机成功", format!("主机 [{}] 已成功保存至资产列表", final_name_clone));
+                                tracing::info!(target: "smagical_ui::hosts", "成功创建新主机记录: {} ({})", final_name_clone, target_host_id);
+                            }
+                        }
+                    });
+                });
             }
         });
     }
@@ -1779,29 +1859,41 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     // 17. 右键菜单 - 克隆主机记录
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let master_tree_clone = Rc::clone(&ctx.master_tree);
-    let master_cards_clone = Rc::clone(&ctx.master_cards);
-    let expanded_clone = Rc::clone(&ctx.expanded_groups);
-    let selector_expanded_clone = Rc::clone(&ctx.selector_expanded_groups);
+    let master_tree_clone = Arc::clone(&ctx.master_tree);
+    let master_cards_clone = Arc::clone(&ctx.master_cards);
+    let expanded_clone = Arc::clone(&ctx.expanded_groups);
+    let selector_expanded_clone = Arc::clone(&ctx.selector_expanded_groups);
+    let search_query_clone = Arc::clone(&ctx.search_query);
     let core_state_clone = Rc::clone(&ctx.core_state);
     let notifications_clone = ctx.notifications.clone();
     hb.on_clone_host(move |host_id| {
-        if let Some(w) = window_weak.upgrade() {
-            let hid = host_id.to_string();
-            let storage = core_state_clone.storage();
-            if let Ok(Some(orig)) = storage.hosts().get_by_id(&hid) {
+        let hid = host_id.to_string();
+        let storage = core_state_clone.storage();
+        let events = core_state_clone.events().clone();
+        let master_tree = Arc::clone(&master_tree_clone);
+        let master_cards = Arc::clone(&master_cards_clone);
+        let expanded = Arc::clone(&expanded_clone);
+        let selector_expanded = Arc::clone(&selector_expanded_clone);
+        let search_query = Arc::clone(&search_query_clone);
+        let window_weak_bg = window_weak.clone();
+        let notifications = notifications_clone.clone();
+
+        spawn_async(async move {
+            if let Ok(Some(orig)) = storage.hosts().get_by_id(&hid).await {
                 let new_id = format!("host-{}", uuid::Uuid::new_v4().simple());
                 let cloned_name = format!("{} (副本)", orig.name);
                 let mut cloned_rec = orig.clone();
                 cloned_rec.id = new_id.clone();
                 cloned_rec.name = cloned_name.clone();
                 cloned_rec.sort_order += 1;
-                if let Err(e) = storage.hosts().save(&cloned_rec) {
-                    notifications_clone.error("克隆失败", format!("保存至数据层受限: {}", e));
+                if let Err(e) = storage.hosts().save(&cloned_rec).await {
+                    let _ = slint::invoke_from_event_loop(move || {
+                        notifications.error("克隆失败", format!("保存至数据层受限: {}", e));
+                    });
                     return;
                 }
 
-                core_state_clone.events().dispatch(&HostAssetChangedEvent {
+                events.dispatch(&HostAssetChangedEvent {
                     host_id: new_id.clone(),
                     name: cloned_name.clone(),
                     address: cloned_rec.address.clone(),
@@ -1809,80 +1901,79 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                     action: "cloned".to_string(),
                 });
 
-                // 重新同步树与卡片
-                let new_raw_tree = build_raw_tree_from_storage(storage.as_ref());
-                *master_tree_clone.borrow_mut() = new_raw_tree;
+                // 异步刷新树与卡片 (0ms UI 阻塞)
+                sync_ui_hosts_async(
+                    storage.as_ref(),
+                    &master_tree,
+                    &master_cards,
+                    &expanded,
+                    &selector_expanded,
+                    &search_query,
+                    window_weak_bg,
+                ).await;
 
-                let all_hosts = storage.hosts().list_all().unwrap_or_default();
-                let all_groups = storage.groups().list_all().unwrap_or_default();
-                let new_cards: Vec<HostItemData> = all_hosts.iter().map(|h| {
-                    let g_name = if let Some(ref pid) = h.parent_group_id {
-                        all_groups.iter().find(|g| g.id == *pid).map(|g| g.name.clone()).unwrap_or_else(|| "根目录".to_string())
-                    } else {
-                        "根目录".to_string()
-                    };
-                    HostItemData {
-                        id: h.id.clone().into(),
-                        name: h.name.clone().into(),
-                        address: h.address.clone().into(),
-                        port: h.port as i32,
-                        group: g_name.into(),
-                        status: h.status.to_string().into(),
-                        ping_ms: h.ping_ms,
-                    }
-                }).collect();
-                *master_cards_clone.borrow_mut() = new_cards;
-
-                let tree = master_tree_clone.borrow();
-                let exp = expanded_clone.borrow();
-                let sel = selector_expanded_clone.borrow();
-                let visible = build_visible_tree_nodes(&tree, &exp);
-                sync_hosts_bridge_tree(&w, &visible);
-                let cards = master_cards_clone.borrow();
-                sync_hosts_bridge_cards(&w, &cards);
-                let options = build_group_options(&tree, &sel);
-                sync_hosts_bridge_options(&w, &options);
-
-                notifications_clone.success("克隆主机成功", format!("主机 [{}] 已成功创建副本", cloned_name));
+                let _ = slint::invoke_from_event_loop(move || {
+                    notifications.success("克隆主机成功", format!("主机 [{}] 已成功创建副本", cloned_name));
+                });
             }
-        }
+        });
     });
 
     // -------------------------------------------------------------------------
     // 18. 右键菜单 - 删除主机或分组节点
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let master_tree_del = Rc::clone(&ctx.master_tree);
-    let master_cards_del = Rc::clone(&ctx.master_cards);
-    let expanded_del = Rc::clone(&ctx.expanded_groups);
-    let selector_expanded_del = Rc::clone(&ctx.selector_expanded_groups);
+    let master_tree_del = Arc::clone(&ctx.master_tree);
+    let master_cards_del = Arc::clone(&ctx.master_cards);
+    let expanded_del = Arc::clone(&ctx.expanded_groups);
+    let selector_expanded_del = Arc::clone(&ctx.selector_expanded_groups);
+    let search_query_del = Arc::clone(&ctx.search_query);
     let core_state_del = Rc::clone(&ctx.core_state);
     let notifications_del = ctx.notifications.clone();
     hb.on_delete_node(move |target_id, is_group| {
-        if let Some(w) = window_weak.upgrade() {
-            let tid = target_id.to_string();
-            let storage = core_state_del.storage();
+        let tid = target_id.to_string();
+        let storage = core_state_del.storage();
+        let events = core_state_del.events().clone();
+        let master_tree = Arc::clone(&master_tree_del);
+        let master_cards = Arc::clone(&master_cards_del);
+        let expanded = Arc::clone(&expanded_del);
+        let selector_expanded = Arc::clone(&selector_expanded_del);
+        let search_query = Arc::clone(&search_query_del);
+        let window_weak_bg = window_weak.clone();
+        let notifications = notifications_del.clone();
+
+        spawn_async(async move {
             if is_group {
                 // 删除分组前，将其直属主机移入根目录，避免数据孤儿
-                if let Ok(hosts) = storage.hosts().list_all() {
+                if let Ok(hosts) = storage.hosts().list_all().await {
                     for mut h in hosts {
                         if h.parent_group_id.as_deref() == Some(&tid) {
                             h.parent_group_id = None;
-                            let _ = storage.hosts().save(&h);
+                            let _ = storage.hosts().save(&h).await;
                         }
                     }
                 }
-                let _ = storage.groups().delete(&tid);
-                expanded_del.borrow_mut().remove(&tid);
-                selector_expanded_del.borrow_mut().remove(&tid);
+                let _ = storage.groups().delete(&tid).await;
+                expanded.write().unwrap().remove(&tid);
+                selector_expanded.write().unwrap().remove(&tid);
 
-                notifications_del.success("删除成功", "分组已删除，内部主机已安全移至根目录");
+                let _ = slint::invoke_from_event_loop({
+                    let n = notifications.clone();
+                    move || {
+                        n.success("删除成功", "分组已删除，内部主机已安全移至根目录");
+                    }
+                });
             } else {
-                let _ = storage.hosts().delete(&tid);
-                notifications_del.success("删除成功", "目标主机资产已从列表中移除");
+                let _ = storage.hosts().delete(&tid).await;
+                let _ = slint::invoke_from_event_loop({
+                    let n = notifications.clone();
+                    move || {
+                        n.success("删除成功", "目标主机资产已从列表中移除");
+                    }
+                });
             }
 
-            core_state_del.events().dispatch(&HostAssetChangedEvent {
+            events.dispatch(&HostAssetChangedEvent {
                 host_id: tid.clone(),
                 name: "".to_string(),
                 address: "".to_string(),
@@ -1890,39 +1981,16 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 action: "deleted".to_string(),
             });
 
-            // 重新同步树与卡片
-            let new_raw_tree = build_raw_tree_from_storage(storage.as_ref());
-            *master_tree_del.borrow_mut() = new_raw_tree;
-
-            let all_hosts = storage.hosts().list_all().unwrap_or_default();
-            let all_groups = storage.groups().list_all().unwrap_or_default();
-            let new_cards: Vec<HostItemData> = all_hosts.iter().map(|h| {
-                let g_name = if let Some(ref pid) = h.parent_group_id {
-                    all_groups.iter().find(|g| g.id == *pid).map(|g| g.name.clone()).unwrap_or_else(|| "根目录".to_string())
-                } else {
-                    "根目录".to_string()
-                };
-                HostItemData {
-                    id: h.id.clone().into(),
-                    name: h.name.clone().into(),
-                    address: h.address.clone().into(),
-                    port: h.port as i32,
-                    group: g_name.into(),
-                    status: h.status.to_string().into(),
-                    ping_ms: h.ping_ms,
-                }
-            }).collect();
-            *master_cards_del.borrow_mut() = new_cards;
-
-            let tree = master_tree_del.borrow();
-            let exp = expanded_del.borrow();
-            let sel = selector_expanded_del.borrow();
-            let visible = build_visible_tree_nodes(&tree, &exp);
-            sync_hosts_bridge_tree(&w, &visible);
-            let cards = master_cards_del.borrow();
-            sync_hosts_bridge_cards(&w, &cards);
-            let options = build_group_options(&tree, &sel);
-            sync_hosts_bridge_options(&w, &options);
-        }
+            // 异步刷新树与卡片 (0ms UI 阻塞)
+            sync_ui_hosts_async(
+                storage.as_ref(),
+                &master_tree,
+                &master_cards,
+                &expanded,
+                &selector_expanded,
+                &search_query,
+                window_weak_bg,
+            ).await;
+        });
     });
 }

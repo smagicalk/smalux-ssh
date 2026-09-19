@@ -228,6 +228,11 @@ impl PtyProcess {
         }
     }
 
+    /// 获取子进程退出状态 (若子进程已结束则返回 Some(status)，仍在运行中返回 None)。
+    pub fn exit_status(&mut self) -> Option<portable_pty::ExitStatus> {
+        self.child.try_wait().unwrap_or_default()
+    }
+
     /// 强制终止子进程生命周期。
     pub fn kill(&mut self) -> Result<()> {
         self.child.kill().context("终止 PTY 子进程失败")?;

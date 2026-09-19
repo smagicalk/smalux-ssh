@@ -231,6 +231,11 @@ export component TerminalViewport inherits Rectangle {
 
             // 2.1 键盘按键与焦点捕捉层 (捕获字符与修饰键并统一转发至 Rust 后端状态机)
             terminal-focus := FocusScope {
+                property <string> current-tab: root.active-tab-id;
+                changed current-tab => {
+                    self.focus();
+                }
+
                 key-pressed(event) => {
                     // 全局快捷键: 关闭当前标签页 (Ctrl+W)
                     if event.modifiers.control && (event.text == "w" || event.text == "W" || event.text == "\u{0017}") {

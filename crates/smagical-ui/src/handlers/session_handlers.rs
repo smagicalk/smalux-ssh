@@ -99,20 +99,21 @@ fn execute_close_session(
     let collapsed = ctx.collapsed_history_groups.borrow().clone();
     let id_owned = id_str.to_string();
 
-    ctx.persistence_guard.spawn(move || {
+    ctx.persistence_guard.spawn_async(async move {
         if let Some((lines_count, snap_text)) = snapshot_opt {
             let hist_id = format!("hist-{}", id_owned);
-            let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500);
-            if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id) {
+            let _ = storage_async.history().save_snapshot(&hist_id, &snap_text, 500).await;
+            if let Ok(Some(mut h)) = storage_async.history().get_by_id(&hist_id).await {
                 h.record_snapshot(lines_count);
-                let _ = storage_async.history().save(&h);
+                let _ = storage_async.history().save(&h).await;
             }
         }
+        let all_records = storage_async.history().list_all().await.unwrap_or_default();
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w_ui) = window_weak_async.upgrade() {
-                crate::handlers::history_handlers::sync_ui_history_from_state(
+                crate::handlers::history_handlers::render_history_ui(
                     &w_ui,
-                    storage_async.as_ref(),
+                    &all_records,
                     &search_q,
                     &view_mode,
                     &collapsed,
@@ -413,22 +414,23 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                 let view_mode = ctx_close_others.history_view_mode.borrow().clone();
                 let collapsed = ctx_close_others.collapsed_history_groups.borrow().clone();
 
-                ctx_close_others.persistence_guard.spawn(move || {
+                ctx_close_others.persistence_guard.spawn_async(async move {
                     for (rem_id, snap_opt) in persist_items {
                         if let Some((lines_count, snap)) = snap_opt {
                             let hist_id = format!("hist-{}", rem_id);
-                            let _ = storage_async.history().save_snapshot(&hist_id, &snap, 500);
-                            if let Ok(Some(mut hist)) = storage_async.history().get_by_id(&hist_id) {
+                            let _ = storage_async.history().save_snapshot(&hist_id, &snap, 500).await;
+                            if let Ok(Some(mut hist)) = storage_async.history().get_by_id(&hist_id).await {
                                 hist.record_snapshot(lines_count);
-                                let _ = storage_async.history().save(&hist);
+                                let _ = storage_async.history().save(&hist).await;
                             }
                         }
                     }
+                    let all_records = storage_async.history().list_all().await.unwrap_or_default();
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(w_ui) = window_weak_async.upgrade() {
-                            crate::handlers::history_handlers::sync_ui_history_from_state(
+                            crate::handlers::history_handlers::render_history_ui(
                                 &w_ui,
-                                storage_async.as_ref(),
+                                &all_records,
                                 &search_q,
                                 &view_mode,
                                 &collapsed,
@@ -673,7 +675,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4. 快速新建会话中心实时关键词搜索过滤回调
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let master_tree_launcher = Rc::clone(&ctx.master_tree);
+    let master_tree_launcher = std::sync::Arc::clone(&ctx.master_tree);
     let cached_shells_launcher = std::sync::Arc::clone(&ctx.cached_shells);
     window.global::<WindowBridge>().on_filter_launcher(move |query| {
         if let Some(w) = window_weak.upgrade() {
@@ -703,7 +705,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             };
             w.global::<WindowBridge>().set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(filtered_locals))));
 
-            let tree = master_tree_launcher.borrow();
+            let tree = master_tree_launcher.read().unwrap();
             let filtered_hosts: Vec<HostItemData> = tree
                 .iter()
                 .filter(|n| {
@@ -760,20 +762,76 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_input = Rc::clone(&ctx.pane_groups);
     let active_pane_id_input = Rc::clone(&ctx.active_pane_id);
     let active_terminals_input = Rc::clone(&ctx.active_terminals);
+    let global_split_tree_input = Rc::clone(&ctx.global_split_tree);
+    let window_weak_input = window.as_weak();
     tb.on_terminal_key_input(move |text, is_ctrl, is_shift, is_alt| {
         let active_pid = active_pane_id_input.borrow().clone();
         let groups = pane_groups_input.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
             && let Some(active_sess) = g.get_active_session()
         {
+            let active_sess_id = active_sess.session_id.clone();
             let mut terminals = active_terminals_input.borrow_mut();
-            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+            if let Some(instance) = terminals.get_mut(&active_sess_id) {
                 if is_shift && (text == "\u{0012}" || text == "PageUp") {
                     instance.scroll_page_up();
                     return;
                 }
                 if is_shift && (text == "\u{0013}" || text == "PageDown") {
                     instance.scroll_page_down();
+                    return;
+                }
+
+                // 处理会话退出/断联态下的按键拦截与原地重新连接
+                if let crate::terminal::instance::SessionState::Exited { exited_at, .. } = &instance.state {
+                    // 1. 若为快捷键 Ctrl+W，放行交由关闭标签页快捷键处理
+                    if is_ctrl && (text == "w" || text == "W" || text == "\u{0017}") {
+                        return;
+                    }
+                    // 2. 400ms 冷却防误触：避免用户在敲 exit 回车时连击误触发重连
+                    if exited_at.elapsed() < std::time::Duration::from_millis(400) {
+                        return;
+                    }
+                    // 3. 过滤单按的纯修饰键 (Shift/Ctrl/Alt/CapsLock/NumLock 等)
+                    if crate::terminal::key_encoder::is_standalone_modifier(text.as_str()) {
+                        return;
+                    }
+                    // 4. 执行原地重新连接
+                    let reconn_res = instance.reconnect();
+                    drop(terminals);
+                    drop(groups);
+
+                    match reconn_res {
+                        Ok(()) => {
+                            tracing::info!(target: "smagical_ui::terminal", "终端会话 [{}] 原地重新连接成功", active_sess_id);
+                            let mut groups_mut = pane_groups_input.borrow_mut();
+                            for grp in groups_mut.iter_mut() {
+                                for t in grp.tabs.iter_mut() {
+                                    if t.session_id == active_sess_id {
+                                        t.host_status = "online".to_string();
+                                    }
+                                }
+                            }
+                            if let Some(w) = window_weak_input.upgrade() {
+                                let is_split = global_split_tree_input.borrow().is_some();
+                                sync_active_session_ui(&w, &groups_mut, &active_pid, is_split);
+                            }
+                        }
+                        Err(err) => {
+                            tracing::error!(target: "smagical_ui::terminal", "终端会话 [{}] 原地重新连接失败: {:?}", active_sess_id, err);
+                            let mut terminals = active_terminals_input.borrow_mut();
+                            if let Some(inst) = terminals.get_mut(&active_sess_id) {
+                                inst.parser.process(
+                                    format!(
+                                        "\r\n\x1b[31;1m[✖ 重新连接失败: {}]\x1b[0m\r\n\x1b[90m按任意键再次重试，或按 Ctrl+W 关闭标签页\x1b[0m\r\n",
+                                        err
+                                    )
+                                    .as_bytes(),
+                                );
+                                inst.parser.mark_dirty();
+                            }
+                        }
+                    }
                     return;
                 }
 
@@ -942,7 +1000,7 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_sel = Rc::clone(&ctx.pane_groups);
     let active_pane_id_sel = Rc::clone(&ctx.active_pane_id);
     let active_terminals_sel = Rc::clone(&ctx.active_terminals);
-    let core_state_sel = ctx.core_state.clone();
+    let window_weak_sel = window.as_weak();
     tb.on_terminal_selection_changed(move |sc, sr, ec, er, has_sel| {
         let active_pid = active_pane_id_sel.borrow().clone();
         let groups = pane_groups_sel.borrow();
@@ -953,13 +1011,15 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
                 if has_sel && sc >= 0 && sr >= 0 && ec >= 0 && er >= 0 {
                     instance.parser.set_selection((sc as usize, sr as usize), (ec as usize, er as usize));
-                    if let Ok(cfg) = core_state_sel.storage().config().get() {
-                        if cfg.copy_on_select {
-                            let text = instance.parser.copy_selection_text();
-                            if !text.is_empty() {
-                                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                                    let _ = clipboard.set_text(text);
-                                }
+                    let copy_on_select = window_weak_sel
+                        .upgrade()
+                        .map(|w| w.global::<SettingsBridge>().get_setting_copy_on_select())
+                        .unwrap_or(false);
+                    if copy_on_select {
+                        let text = instance.parser.copy_selection_text();
+                        if !text.is_empty() {
+                            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                                let _ = clipboard.set_text(text);
                             }
                         }
                     }
@@ -976,8 +1036,8 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_paste = Rc::clone(&ctx.pane_groups);
     let active_pane_id_paste = Rc::clone(&ctx.active_pane_id);
     let active_terminals_paste = Rc::clone(&ctx.active_terminals);
-    let core_state_paste = ctx.core_state.clone();
     let notif_paste = ctx.notifications.clone();
+    let window_weak_paste = window.as_weak();
     tb.on_terminal_paste(move || {
         let active_pid = active_pane_id_paste.borrow().clone();
         let groups = pane_groups_paste.borrow();
@@ -985,15 +1045,17 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             && let Some(active_sess) = g.get_active_session()
         {
             if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
-                if let Ok(cfg) = core_state_paste.storage().config().get() {
-                    if cfg.warn_on_multiline_paste && (text.contains('\n') || text.contains('\r')) {
-                        let lines_count = text.lines().count();
-                        if lines_count > 1 {
-                            notif_paste.warning(
-                                "多行安全粘贴提示",
-                                &format!("已向终端安全写入包含 {} 行的命令/文本", lines_count),
-                            );
-                        }
+                let warn_multiline = window_weak_paste
+                    .upgrade()
+                    .map(|w| w.global::<SettingsBridge>().get_setting_warn_multiline_paste())
+                    .unwrap_or(true);
+                if warn_multiline && (text.contains('\n') || text.contains('\r')) {
+                    let lines_count = text.lines().count();
+                    if lines_count > 1 {
+                        notif_paste.warning(
+                            "多行安全粘贴提示",
+                            &format!("已向终端安全写入包含 {} 行的命令/文本", lines_count),
+                        );
                     }
                 }
                 let mut terminals = active_terminals_paste.borrow_mut();
@@ -1117,17 +1179,14 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
             if let Some(idx) = groups.iter().position(|g| g.pane_id == pid) {
                 let closed_group = groups.remove(idx);
                 let mut terminals = active_terminals_close_id.borrow_mut();
+                let mut snapshots_to_persist = Vec::new();
                 for t in closed_group.tabs {
                     if let Some(mut inst) = terminals.remove(&t.session_id) {
                         let snap = inst.snapshot_text(500);
                         let _ = inst.pty.kill();
                         let hist_id = format!("hist-{}", t.session_id);
                         if !snap.trim().is_empty() {
-                            let _ = ctx_close_pane_id.core_state.storage().history().save_snapshot(&hist_id, &snap, 500);
-                            if let Ok(Some(mut hist)) = ctx_close_pane_id.core_state.storage().history().get_by_id(&hist_id) {
-                                hist.record_snapshot(snap.lines().count() as u32);
-                                let _ = ctx_close_pane_id.core_state.storage().history().save(&hist);
-                            }
+                            snapshots_to_persist.push((hist_id, snap.lines().count() as u32, snap));
                         }
                         let remaining_host_tabs = groups.iter().flat_map(|g| g.tabs.iter()).filter(|other| other.host_id == t.host_id).count();
                         ctx_close_pane_id.core_state.events().dispatch(&TerminalSessionEvent {
@@ -1137,8 +1196,34 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                         });
                     }
                 }
-                crate::handlers::history_handlers::sync_ui_history(&w, &ctx_close_pane_id);
 
+                let storage_async = ctx_close_pane_id.core_state.storage().clone();
+                let window_weak_async = w.as_weak();
+                let search_q = ctx_close_pane_id.history_search_query.borrow().clone();
+                let view_mode = ctx_close_pane_id.history_view_mode.borrow().clone();
+                let collapsed = ctx_close_pane_id.collapsed_history_groups.borrow().clone();
+
+                ctx_close_pane_id.persistence_guard.spawn_async(async move {
+                    for (hist_id, lines_count, snap) in snapshots_to_persist {
+                        let _ = storage_async.history().save_snapshot(&hist_id, &snap, 500).await;
+                        if let Ok(Some(mut hist)) = storage_async.history().get_by_id(&hist_id).await {
+                            hist.record_snapshot(lines_count);
+                            let _ = storage_async.history().save(&hist).await;
+                        }
+                    }
+                    let all_records = storage_async.history().list_all().await.unwrap_or_default();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w_ui) = window_weak_async.upgrade() {
+                            crate::handlers::history_handlers::render_history_ui(
+                                &w_ui,
+                                &all_records,
+                                &search_q,
+                                &view_mode,
+                                &collapsed,
+                            );
+                        }
+                    });
+                });
             }
 
             if let Some(tree) = split_tree.as_mut() {

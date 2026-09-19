@@ -27,10 +27,15 @@ pub use event::{
     TerminalSplitChangedEvent, ThemeChangedEvent, ThemeModeToggledEvent,
     TunnelBeforeDeleteEvent, TunnelBeforeSaveEvent, TunnelDeletedEvent,
     TunnelMetricsTickEvent, TunnelSavedEvent, TunnelStateChangedEvent, WindowStateChangedEvent,
+    AiStreamChunkEvent, AiStreamCompleteEvent, AiStreamErrorEvent,
 };
 
 pub use domain::{
     activity_bar::{ActivityBarItem, ActivityBarRegistry},
+    ai::{
+        assess_command_risk, extract_shell_command, parse_sse_line, AiChatMessage, AiChatRequest,
+        AiClient, AiEndpointConfig, AiError, AiRole, AiStreamChunk, AiTestResult,
+    },
     file_item::{
         format_file_size, format_file_time, generate_mock_remote_directory, scan_local_directory,
         FileItemData, FileTabSession, LocalFileTabSession, RemoteFileTabSession, TransferDirection,

@@ -73,6 +73,7 @@ impl MockStorage {
     }
 }
 
+#[async_trait::async_trait]
 impl AppStorage for MockStorage {
 
     fn hosts(&self) -> &dyn HostRepository {
@@ -103,12 +104,12 @@ impl AppStorage for MockStorage {
         &self.config_repo
     }
 
-    fn reload(&self) -> StorageResult<()> {
+    async fn reload(&self) -> StorageResult<()> {
         tracing::debug!(target: "smagical_core::storage", "MockStorage 内存重新加载请求 (无操作)");
         Ok(())
     }
 
-    fn flush(&self) -> StorageResult<()> {
+    async fn flush(&self) -> StorageResult<()> {
         tracing::debug!(target: "smagical_core::storage", "MockStorage 内存刷盘请求 (无操作)");
         Ok(())
     }
@@ -126,63 +127,63 @@ mod tests {
         tunnel::TunnelType,
     };
 
-    #[test]
-    fn test_mock_storage_seeded_data() {
+    #[tokio::test]
+    async fn test_mock_storage_seeded_data() {
         let storage = MockStorage::new_seeded();
         
-        let groups = storage.groups().list_all().unwrap();
+        let groups = storage.groups().list_all().await.unwrap();
         assert_eq!(groups.len(), 6);
         assert_eq!(groups[0].name, "生产集群 (Production)");
 
-        let hosts = storage.hosts().list_all().unwrap();
+        let hosts = storage.hosts().list_all().await.unwrap();
         assert_eq!(hosts.len(), 10);
         assert_eq!(hosts[0].name, "prod-server-01");
     }
 
-    #[test]
-    fn test_mock_storage_host_crud() {
+    #[tokio::test]
+    async fn test_mock_storage_host_crud() {
         let storage = MockStorage::new();
-        assert_eq!(storage.hosts().list_all().unwrap().len(), 0);
+        assert_eq!(storage.hosts().list_all().await.unwrap().len(), 0);
 
         let new_host = HostRecord::new("h1", "Host 1", "127.0.0.1", 22);
-        storage.hosts().save(&new_host).unwrap();
+        storage.hosts().save(&new_host).await.unwrap();
 
-        assert_eq!(storage.hosts().list_all().unwrap().len(), 1);
-        let found = storage.hosts().get_by_id("h1").unwrap().unwrap();
+        assert_eq!(storage.hosts().list_all().await.unwrap().len(), 1);
+        let found = storage.hosts().get_by_id("h1").await.unwrap().unwrap();
         assert_eq!(found.name, "Host 1");
 
-        let deleted = storage.hosts().delete("h1").unwrap();
+        let deleted = storage.hosts().delete("h1").await.unwrap();
         assert!(deleted);
-        assert_eq!(storage.hosts().list_all().unwrap().len(), 0);
+        assert_eq!(storage.hosts().list_all().await.unwrap().len(), 0);
     }
 
-    #[test]
-    fn test_mock_storage_list_reordering() {
+    #[tokio::test]
+    async fn test_mock_storage_list_reordering() {
         let storage = MockStorage::new();
-        storage.hosts().save(&HostRecord::new("1", "H1", "1.1.1.1", 22)).unwrap();
-        storage.hosts().save(&HostRecord::new("2", "H2", "2.2.2.2", 22)).unwrap();
-        storage.hosts().save(&HostRecord::new("3", "H3", "3.3.3.3", 22)).unwrap();
+        storage.hosts().save(&HostRecord::new("1", "H1", "1.1.1.1", 22)).await.unwrap();
+        storage.hosts().save(&HostRecord::new("2", "H2", "2.2.2.2", 22)).await.unwrap();
+        storage.hosts().save(&HostRecord::new("3", "H3", "3.3.3.3", 22)).await.unwrap();
 
         // 调整顺序为: 3, 1, 2
-        storage.hosts().update_list_order(&["3".to_string(), "1".to_string(), "2".to_string()]).unwrap();
+        storage.hosts().update_list_order(&["3".to_string(), "1".to_string(), "2".to_string()]).await.unwrap();
 
-        let hosts = storage.hosts().list_all().unwrap();
+        let hosts = storage.hosts().list_all().await.unwrap();
         assert_eq!(hosts[0].id, "3");
         assert_eq!(hosts[1].id, "1");
         assert_eq!(hosts[2].id, "2");
     }
 
-    #[test]
-    fn test_mock_storage_history_crud_and_pin() {
+    #[tokio::test]
+    async fn test_mock_storage_history_crud_and_pin() {
         let storage = MockStorage::new_seeded();
-        let history = storage.history().list_all().unwrap();
+        let history = storage.history().list_all().await.unwrap();
         assert_eq!(history.len(), 10);
         // 置顶项排在最前
         assert!(history[0].is_pinned);
         assert!(history[1].is_pinned);
 
         // 验证种子中已包含终端屏幕快照
-        let snap1 = storage.history().get_snapshot("hist-seed-1").unwrap();
+        let snap1 = storage.history().get_snapshot("hist-seed-1").await.unwrap();
         assert!(snap1.is_some());
         assert!(snap1.unwrap().contains("prod-server-01"));
 
@@ -196,41 +197,41 @@ mod tests {
             "root".to_string(),
             1725020000,
         );
-        storage.history().save(&new_hist).unwrap();
+        storage.history().save(&new_hist).await.unwrap();
 
-        let list_after_save = storage.history().list_all().unwrap();
+        let list_after_save = storage.history().list_all().await.unwrap();
         assert_eq!(list_after_save.len(), 11);
 
         // 切换置顶
-        let pinned = storage.history().toggle_pin("test-hist-1").unwrap();
+        let pinned = storage.history().toggle_pin("test-hist-1").await.unwrap();
         assert!(pinned);
 
         // 验证置顶后排序
-        let list_after_pin = storage.history().list_all().unwrap();
+        let list_after_pin = storage.history().list_all().await.unwrap();
         assert!(list_after_pin[0].is_pinned);
 
         // 标记关闭
         new_hist.mark_closed(1725020600);
-        storage.history().save(&new_hist).unwrap();
-        let fetched = storage.history().get_by_id("test-hist-1").unwrap().unwrap();
+        storage.history().save(&new_hist).await.unwrap();
+        let fetched = storage.history().get_by_id("test-hist-1").await.unwrap().unwrap();
         assert_eq!(fetched.exit_status, "success");
         assert_eq!(fetched.duration_secs, 600);
 
         // 删除记录
-        let deleted = storage.history().delete("test-hist-1").unwrap();
+        let deleted = storage.history().delete("test-hist-1").await.unwrap();
         assert!(deleted);
-        assert_eq!(storage.history().list_all().unwrap().len(), 10);
+        assert_eq!(storage.history().list_all().await.unwrap().len(), 10);
 
         // 清空（保留置顶）
-        storage.history().clear_all(true).unwrap();
-        let remaining = storage.history().list_all().unwrap();
+        storage.history().clear_all(true).await.unwrap();
+        let remaining = storage.history().list_all().await.unwrap();
         assert_eq!(remaining.len(), 2); // 仅剩 2 个种子置顶项
         assert!(remaining.iter().all(|r| r.is_pinned));
     }
 
 
-    #[test]
-    fn test_mock_storage_session_snapshot() {
+    #[tokio::test]
+    async fn test_mock_storage_session_snapshot() {
         let storage = MockStorage::new();
         let mut hist = HistoryRecord::new_ssh(
             "hist-snap-1".to_string(),
@@ -244,9 +245,9 @@ mod tests {
 
         // 模拟多行终端屏幕输出
         let raw_output = "line 1: welcome\nline 2: login success\nline 3: ls -la\nline 4: output 1\nline 5: exit 0";
-        storage.history().save_snapshot("hist-snap-1", raw_output, 3).unwrap(); // 限制最多保留 3 行
+        storage.history().save_snapshot("hist-snap-1", raw_output, 3).await.unwrap(); // 限制最多保留 3 行
 
-        let snapshot = storage.history().get_snapshot("hist-snap-1").unwrap().unwrap();
+        let snapshot = storage.history().get_snapshot("hist-snap-1").await.unwrap().unwrap();
         let lines: Vec<&str> = snapshot.lines().collect();
         assert_eq!(lines.len(), 3);
         assert_eq!(lines[0], "line 3: ls -la");
@@ -254,20 +255,20 @@ mod tests {
         assert_eq!(lines[2], "line 5: exit 0");
 
         hist.record_snapshot(3);
-        storage.history().save(&hist).unwrap();
+        storage.history().save(&hist).await.unwrap();
 
-        let fetched = storage.history().get_by_id("hist-snap-1").unwrap().unwrap();
+        let fetched = storage.history().get_by_id("hist-snap-1").await.unwrap().unwrap();
         assert!(fetched.has_snapshot);
         assert_eq!(fetched.snapshot_lines, 3);
 
         // 删除历史会话，快照应自动关联清除
-        storage.history().delete("hist-snap-1").unwrap();
-        let snap_after_del = storage.history().get_snapshot("hist-snap-1").unwrap();
+        storage.history().delete("hist-snap-1").await.unwrap();
+        let snap_after_del = storage.history().get_snapshot("hist-snap-1").await.unwrap();
         assert!(snap_after_del.is_none());
     }
 
-    #[test]
-    fn test_mock_storage_local_shell_history() {
+    #[tokio::test]
+    async fn test_mock_storage_local_shell_history() {
         let storage = MockStorage::new();
         let local_hist = HistoryRecord::new_local(
             "hist-local-1".to_string(),
@@ -276,19 +277,19 @@ mod tests {
             "PowerShell 7 (pwsh)".to_string(),
             1725020000,
         );
-        storage.history().save(&local_hist).unwrap();
+        storage.history().save(&local_hist).await.unwrap();
 
-        let list = storage.history().list_all().unwrap();
+        let list = storage.history().list_all().await.unwrap();
         assert_eq!(list.len(), 1);
         assert_eq!(list[0].session_type, "local");
         assert_eq!(list[0].host_id.as_deref(), Some("local-powershell"));
         assert_eq!(list[0].address, "Local (PowerShell 7)");
     }
 
-    #[test]
-    fn test_mock_storage_credential_crud() {
+    #[tokio::test]
+    async fn test_mock_storage_credential_crud() {
         let storage = MockStorage::new_seeded();
-        let list = storage.credentials().list_all().unwrap();
+        let list = storage.credentials().list_all().await.unwrap();
         assert_eq!(list.len(), 6);
 
         // 新增凭据
@@ -302,11 +303,11 @@ mod tests {
             Some("SHA256:11223344".to_string()),
             "单元测试专供",
         );
-        storage.credentials().save(&new_cred).unwrap();
-        assert_eq!(storage.credentials().list_all().unwrap().len(), 7);
+        storage.credentials().save(&new_cred).await.unwrap();
+        assert_eq!(storage.credentials().list_all().await.unwrap().len(), 7);
 
         // 查询单条
-        let fetched = storage.credentials().get_by_id("cred-test-key").unwrap().unwrap();
+        let fetched = storage.credentials().get_by_id("cred-test-key").await.unwrap().unwrap();
         assert_eq!(fetched.name, "测试 Ed25519 凭据");
         assert_eq!(fetched.cred_type, CredentialType::Key);
         assert_eq!(fetched.fingerprint.as_deref(), Some("SHA256:11223344"));
@@ -314,113 +315,113 @@ mod tests {
         // 更新单条
         let mut updated = fetched;
         updated.name = "已重命名测试凭据".to_string();
-        storage.credentials().save(&updated).unwrap();
-        assert_eq!(storage.credentials().get_by_id("cred-test-key").unwrap().unwrap().name, "已重命名测试凭据");
+        storage.credentials().save(&updated).await.unwrap();
+        assert_eq!(storage.credentials().get_by_id("cred-test-key").await.unwrap().unwrap().name, "已重命名测试凭据");
 
         // 删除单条
-        let deleted = storage.credentials().delete("cred-test-key").unwrap();
+        let deleted = storage.credentials().delete("cred-test-key").await.unwrap();
         assert!(deleted);
-        assert_eq!(storage.credentials().list_all().unwrap().len(), 6);
+        assert_eq!(storage.credentials().list_all().await.unwrap().len(), 6);
 
         // 验证凭据与主机相互引用与查询
         // 1. 根据凭据查关联主机
-        let prod_hosts = storage.hosts().list_by_credential("cred-prod-ed25519").unwrap();
+        let prod_hosts = storage.hosts().list_by_credential("cred-prod-ed25519").await.unwrap();
         assert_eq!(prod_hosts.len(), 3);
         assert_eq!(prod_hosts[0].id, "1");
 
         // 2. 根据凭据查关联主机 ID
-        let bound_ids = storage.credentials().get_bound_hosts("cred-prod-ed25519").unwrap();
+        let bound_ids = storage.credentials().get_bound_hosts("cred-prod-ed25519").await.unwrap();
         assert_eq!(bound_ids.len(), 3);
         assert!(bound_ids.contains(&"1".to_string()));
         assert!(bound_ids.contains(&"2".to_string()));
         assert!(bound_ids.contains(&"host-k8s-w1".to_string()));
 
         // 3. 动态引用计数验证
-        let cred_prod = storage.credentials().get_by_id("cred-prod-ed25519").unwrap().unwrap();
+        let cred_prod = storage.credentials().get_by_id("cred-prod-ed25519").await.unwrap().unwrap();
         assert_eq!(cred_prod.bound_host_count, 3);
 
         // 4. 按类型分类查询
-        let agent_creds = storage.credentials().list_by_type(CredentialType::Agent).unwrap();
+        let agent_creds = storage.credentials().list_by_type(CredentialType::Agent).await.unwrap();
         assert_eq!(agent_creds.len(), 3);
 
         // 5. 模糊搜索
-        let search_results = storage.credentials().search("1Password").unwrap();
+        let search_results = storage.credentials().search("1Password").await.unwrap();
         assert_eq!(search_results.len(), 1);
         assert_eq!(search_results[0].id, "cred-1pwd-agent");
     }
 
-    #[test]
-    fn test_mock_storage_snippets_and_groups_crud() {
+    #[tokio::test]
+    async fn test_mock_storage_snippets_and_groups_crud() {
         let storage = MockStorage::new_seeded();
 
         // 1. 验证预设种子
-        let groups = storage.snippets().list_groups().unwrap();
-        let snippets = storage.snippets().list_all().unwrap();
+        let groups = storage.snippets().list_groups().await.unwrap();
+        let snippets = storage.snippets().list_all().await.unwrap();
         assert_eq!(groups.len(), 5);
         assert_eq!(snippets.len(), 10);
 
         // 2. 按分组过滤
-        let docker_snippets = storage.snippets().list_by_group(Some("sgrp-docker")).unwrap();
+        let docker_snippets = storage.snippets().list_by_group(Some("sgrp-docker")).await.unwrap();
         assert_eq!(docker_snippets.len(), 3);
 
         // 3. 搜索
-        let search_res = storage.snippets().search("restart").unwrap();
+        let search_res = storage.snippets().search("restart").await.unwrap();
         assert_eq!(search_res.len(), 1);
         assert_eq!(search_res[0].id, "snip-k8s-restart");
 
         // 4. 星标切换
-        let fav_before = storage.snippets().get_by_id("snip-docker-prune").unwrap().unwrap().is_favorite;
+        let fav_before = storage.snippets().get_by_id("snip-docker-prune").await.unwrap().unwrap().is_favorite;
         assert!(!fav_before);
-        let fav_after = storage.snippets().toggle_favorite("snip-docker-prune").unwrap();
+        let fav_after = storage.snippets().toggle_favorite("snip-docker-prune").await.unwrap();
         assert!(fav_after);
-        assert!(storage.snippets().get_by_id("snip-docker-prune").unwrap().unwrap().is_favorite);
+        assert!(storage.snippets().get_by_id("snip-docker-prune").await.unwrap().unwrap().is_favorite);
 
         // 5. 新建与删除片段
         let new_snip = SnippetRecord::new("snip-test", "测试脚本", "echo 'hello'", "bash");
-        storage.snippets().save(&new_snip).unwrap();
-        assert_eq!(storage.snippets().list_all().unwrap().len(), 11);
-        storage.snippets().delete("snip-test").unwrap();
-        assert_eq!(storage.snippets().list_all().unwrap().len(), 10);
+        storage.snippets().save(&new_snip).await.unwrap();
+        assert_eq!(storage.snippets().list_all().await.unwrap().len(), 11);
+        storage.snippets().delete("snip-test").await.unwrap();
+        assert_eq!(storage.snippets().list_all().await.unwrap().len(), 10);
 
         // 6. 新建与移动分组
         let new_grp = SnippetGroupRecord::child("sgrp-test-child", "子分组", "sgrp-docker", 1);
-        storage.snippets().save_group(&new_grp).unwrap();
-        assert_eq!(storage.snippets().list_groups().unwrap().len(), 6);
-        storage.snippets().delete_group("sgrp-test-child").unwrap();
-        assert_eq!(storage.snippets().list_groups().unwrap().len(), 5);
+        storage.snippets().save_group(&new_grp).await.unwrap();
+        assert_eq!(storage.snippets().list_groups().await.unwrap().len(), 6);
+        storage.snippets().delete_group("sgrp-test-child").await.unwrap();
+        assert_eq!(storage.snippets().list_groups().await.unwrap().len(), 5);
     }
 
-    #[test]
-    fn test_mock_storage_tunnels_crud_and_status() {
+    #[tokio::test]
+    async fn test_mock_storage_tunnels_crud_and_status() {
         let storage = MockStorage::new_seeded();
 
         // 1. 种子加载校验
-        let tunnels = storage.tunnels().list_all().unwrap();
+        let tunnels = storage.tunnels().list_all().await.unwrap();
         assert_eq!(tunnels.len(), 6);
 
         // 2. 按类型过滤
-        let locals = storage.tunnels().list_by_type(TunnelType::Local).unwrap();
+        let locals = storage.tunnels().list_by_type(TunnelType::Local).await.unwrap();
         assert_eq!(locals.len(), 2);
-        let remotes = storage.tunnels().list_by_type(TunnelType::Remote).unwrap();
+        let remotes = storage.tunnels().list_by_type(TunnelType::Remote).await.unwrap();
         assert_eq!(remotes.len(), 1);
-        let proxies = storage.tunnels().list_by_type(TunnelType::ProxyServer).unwrap();
+        let proxies = storage.tunnels().list_by_type(TunnelType::ProxyServer).await.unwrap();
         assert_eq!(proxies.len(), 1);
 
         // 3. 搜索过滤
-        let search_mysql = storage.tunnels().search("mysql").unwrap();
+        let search_mysql = storage.tunnels().search("mysql").await.unwrap();
         assert_eq!(search_mysql.len(), 1);
         assert_eq!(search_mysql[0].id, "tun-mysql-prod");
 
         // 4. 启停状态切换
-        let is_running = storage.tunnels().get_by_id("tun-webhook-dev").unwrap().unwrap().is_running;
+        let is_running = storage.tunnels().get_by_id("tun-webhook-dev").await.unwrap().unwrap().is_running;
         assert!(!is_running);
-        storage.tunnels().set_running("tun-webhook-dev", true).unwrap();
-        let is_running_after = storage.tunnels().get_by_id("tun-webhook-dev").unwrap().unwrap().is_running;
+        storage.tunnels().set_running("tun-webhook-dev", true).await.unwrap();
+        let is_running_after = storage.tunnels().get_by_id("tun-webhook-dev").await.unwrap().unwrap().is_running;
         assert!(is_running_after);
 
         // 5. 流量更新
-        storage.tunnels().update_metrics("tun-webhook-dev", 2, 1024, 2048).unwrap();
-        let updated = storage.tunnels().get_by_id("tun-webhook-dev").unwrap().unwrap();
+        storage.tunnels().update_metrics("tun-webhook-dev", 2, 1024, 2048).await.unwrap();
+        let updated = storage.tunnels().get_by_id("tun-webhook-dev").await.unwrap().unwrap();
         assert_eq!(updated.active_connections, 2);
         assert!(updated.total_bytes_in >= 1024);
 
@@ -428,20 +429,20 @@ mod tests {
         let mut new_tun = updated.clone();
         new_tun.id = "tun-temp-test".to_string();
         new_tun.name = "临时测试隧道".to_string();
-        storage.tunnels().save(&new_tun).unwrap();
-        assert_eq!(storage.tunnels().list_all().unwrap().len(), 7);
+        storage.tunnels().save(&new_tun).await.unwrap();
+        assert_eq!(storage.tunnels().list_all().await.unwrap().len(), 7);
 
-        let deleted = storage.tunnels().delete("tun-temp-test").unwrap();
+        let deleted = storage.tunnels().delete("tun-temp-test").await.unwrap();
         assert!(deleted);
-        assert_eq!(storage.tunnels().list_all().unwrap().len(), 6);
+        assert_eq!(storage.tunnels().list_all().await.unwrap().len(), 6);
     }
 
-    #[test]
-    fn test_mock_storage_config_crud_and_update() {
+    #[tokio::test]
+    async fn test_mock_storage_config_crud_and_update() {
         let storage = MockStorage::new_seeded();
 
         // 1. 读取初始默认配置
-        let cfg = storage.config().get().unwrap();
+        let cfg = storage.config().get().await.unwrap();
         assert_eq!(cfg.language, "zh-CN");
         assert_eq!(cfg.theme_id, "builtin.ui.darcula");
         assert_eq!(cfg.font_size, 13.0);
@@ -452,18 +453,18 @@ mod tests {
             c.font_size = 15.0;
             c.theme_id = "builtin.ui.one-dark".to_string();
             c.flag_desktop_notifications = true;
-        })).unwrap();
+        })).await.unwrap();
         assert_eq!(updated.font_size, 15.0);
         assert_eq!(updated.theme_id, "builtin.ui.one-dark");
         assert!(updated.flag_desktop_notifications);
 
         // 3. 读取验证
-        let fresh = storage.config().get().unwrap();
+        let fresh = storage.config().get().await.unwrap();
         assert_eq!(fresh.font_size, 15.0);
         assert_eq!(fresh.theme_id, "builtin.ui.one-dark");
 
         // 4. 重置回默认值
-        let reset = storage.config().reset_to_default().unwrap();
+        let reset = storage.config().reset_to_default().await.unwrap();
         assert_eq!(reset.font_size, 13.0);
         assert_eq!(reset.theme_id, "builtin.ui.darcula");
         assert!(!reset.flag_desktop_notifications);

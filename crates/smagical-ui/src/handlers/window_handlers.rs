@@ -11,6 +11,7 @@ use smagical_core::event::{
 };
 use theme::apply_theme_by_id;
 
+use crate::async_util::spawn_async;
 use crate::generated::{AppWindow, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use crate::{theme, AppTheme};
@@ -121,10 +122,13 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                         source: "switch_theme".into(),
                     });
                     let id_for_cfg = normalized_id.to_string();
-                    let _ = core_state_theme.storage().config().update(Box::new(move |c| {
-                        c.theme_id = id_for_cfg;
-                        c.is_dark_mode = !is_light;
-                    }));
+                    let storage = core_state_theme.storage();
+                    spawn_async(async move {
+                        let _ = storage.config().update(Box::new(move |c| {
+                            c.theme_id = id_for_cfg;
+                            c.is_dark_mode = !is_light;
+                        })).await;
+                    });
                     tracing::info!(target: "smagical_ui::theme", "切换应用配色主题: {} ({})", name, normalized_id);
 
                 }
@@ -200,9 +204,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 new_val: if enabled { "true" } else { "false" }.into(),
                 source: "toggle_debug_enabled".into(),
             });
-            let _ = core_state_debug.storage().config().update(Box::new(move |c| {
-                c.debug_enabled = enabled;
-            }));
+            let storage = core_state_debug.storage();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.debug_enabled = enabled;
+                })).await;
+            });
             tracing::info!(target: "smagical_ui::settings", "开发者调试控制台已{}", if enabled { "开启" } else { "关闭" });
         }
     });
@@ -379,9 +386,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     window.global::<SettingsBridge>().on_toggle_start_on_boot(move |enabled| {
         if let Some(w) = window_weak.upgrade() {
             w.global::<SettingsBridge>().set_setting_start_on_boot(enabled);
-            let _ = core_state_boot.storage().config().update(Box::new(move |c| {
-                c.start_on_boot = enabled;
-            }));
+            let storage = core_state_boot.storage();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.start_on_boot = enabled;
+                })).await;
+            });
             match set_autostart_enabled(enabled) {
                 Ok(()) => {
                     if enabled {
@@ -407,9 +417,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     window.global::<SettingsBridge>().on_toggle_confirm_close_active(move |enabled| {
         if let Some(w) = window_weak.upgrade() {
             w.global::<SettingsBridge>().set_setting_confirm_close_active(enabled);
-            let _ = core_state_confirm.storage().config().update(Box::new(move |c| {
-                c.confirm_close_active = enabled;
-            }));
+            let storage = core_state_confirm.storage();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.confirm_close_active = enabled;
+                })).await;
+            });
             tracing::info!(target: "smagical_ui::settings", "退出时活跃会话防呆确认设置为: {}", enabled);
         }
     });
@@ -622,10 +635,13 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             w.global::<WindowBridge>().set_terminal_font_family(font_str.into());
             w.global::<WindowBridge>().set_terminal_font_size(size);
             let font_for_cfg = font_str.to_string();
-            let _ = core_state_font.storage().config().update(Box::new(move |c| {
-                c.font_family = font_for_cfg;
-                c.font_size = size;
-            }));
+            let storage = core_state_font.storage();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.font_family = font_for_cfg;
+                    c.font_size = size;
+                })).await;
+            });
 
             if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
                 let font_bytes = crate::terminal::renderer::find_font_by_name(font_str);
@@ -679,7 +695,6 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let renderer_clone = Rc::clone(&ctx.terminal_renderer);
     let active_terminals_clone = Rc::clone(&ctx.active_terminals);
-    let core_state_wp = ctx.core_state.clone();
     let wallpaper_cache_ref = Rc::clone(&ctx.wallpaper_cache);
     let wallpaper_preload_timer_ref = Rc::clone(&ctx.wallpaper_preload_timer);
     let wallpapers_ref = Rc::clone(&ctx.wallpapers);
@@ -690,14 +705,14 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             let mut path_str = image_path.as_str().to_string();
             let op = if opacity <= 0.0 { 0.20 } else { opacity.min(1.0) };
 
-            // 若传入路径为空，自动从持久化配置或当前壁纸列表中寻找当前激活的壁纸
+            // 若传入路径为空，自动从内存态壁纸列表与当前索引中极速读取（0ms 纯内存）
             if path_str.is_empty() || !std::path::Path::new(&path_str).exists() {
-                if let Ok(cfg) = core_state_wp.storage().config().get() {
-                    if !cfg.wallpaper_path.is_empty() && std::path::Path::new(&cfg.wallpaper_path).exists() {
-                        path_str = cfg.wallpaper_path;
-                    } else if !cfg.wallpaper_list.is_empty() && cfg.wallpaper_active_index < cfg.wallpaper_list.len() {
-                        path_str = cfg.wallpaper_list[cfg.wallpaper_active_index].clone();
-                    }
+                let wps = wallpapers_ref.borrow();
+                let idx = *active_idx_ref.borrow();
+                if !wps.is_empty() && idx < wps.len() && std::path::Path::new(&wps[idx]).exists() {
+                    path_str = wps[idx].clone();
+                } else if let Some(first) = wps.iter().find(|p| std::path::Path::new(p).exists()) {
+                    path_str = first.clone();
                 }
             }
 
@@ -772,8 +787,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 let path_to_load = path_str.clone();
                 let mode_bg = mode_str.to_string();
 
-                std::thread::spawn(move || {
-                    if let Some(pixel_buffer) = crate::handlers::theme_handlers::load_pixel_buffer_fast(&path_to_load) {
+                crate::async_util::spawn_async(async move {
+                    let pixel_buffer_opt = tokio::task::spawn_blocking(move || {
+                        crate::handlers::theme_handlers::load_pixel_buffer_fast(&path_to_load)
+                    }).await.unwrap_or(None);
+
+                    if let Some(pixel_buffer) = pixel_buffer_opt {
                         let _ = slint::invoke_from_event_loop(move || {
                             if let Some(w) = window_weak_bg.upgrade() {
                                 let img = slint::Image::from_rgba8(pixel_buffer);

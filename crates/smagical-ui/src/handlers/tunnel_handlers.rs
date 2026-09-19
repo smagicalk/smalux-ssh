@@ -120,18 +120,14 @@ pub(crate) fn load_tunnel_into_bridge(tb: &TunnelsBridge, tun: &TunnelRecord) {
     tb.set_form_proxy_password(tun.proxy_password.clone().into());
 }
 
-/// 同步并刷新 UI 网络隧道与代理规则列表
-pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
-    let all_tunnels = ctx.core_state.storage().tunnels().list_all().unwrap_or_default();
-
-    let cat = ctx.tunnel_filter_category.borrow().clone();
-    let query = ctx.tunnel_search_query.borrow().trim().to_lowercase();
-
+/// 纯 UI 渲染函数：根据全量隧道记录列表、分类与搜索关键词，过滤并装载到 Slint TunnelsBridge
+pub(crate) fn render_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRecord], cat: &str, query: &str) {
+    let query_lower = query.trim().to_lowercase();
     let filtered: Vec<TunnelItemData> = all_tunnels
-        .into_iter()
+        .iter()
         .filter(|t| {
             // 1. 分类过滤
-            let match_cat = match cat.as_str() {
+            let match_cat = match cat {
                 "all" => true,
                 "forward" => matches!(t.tunnel_type, TunnelType::Local | TunnelType::Remote | TunnelType::Dynamic | TunnelType::ReverseDynamic),
                 "jump" => matches!(t.tunnel_type, TunnelType::JumpHost),
@@ -143,18 +139,18 @@ pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
             }
 
             // 2. 关键词模糊搜索
-            if query.is_empty() {
+            if query_lower.is_empty() {
                 true
             } else {
-                t.name.to_lowercase().contains(&query)
-                    || t.remote_host.to_lowercase().contains(&query)
-                    || t.local_port.to_string().contains(&query)
-                    || t.remote_port.to_string().contains(&query)
-                    || t.ssh_host_name.to_lowercase().contains(&query)
-                    || t.notes.to_lowercase().contains(&query)
+                t.name.to_lowercase().contains(&query_lower)
+                    || t.remote_host.to_lowercase().contains(&query_lower)
+                    || t.local_port.to_string().contains(&query_lower)
+                    || t.remote_port.to_string().contains(&query_lower)
+                    || t.ssh_host_name.to_lowercase().contains(&query_lower)
+                    || t.notes.to_lowercase().contains(&query_lower)
             }
         })
-        .map(|t| convert_tunnel_to_item_data(&t))
+        .map(|t| convert_tunnel_to_item_data(t))
         .collect();
 
     let t_model = ModelRc::new(VecModel::from(filtered.clone()));
@@ -170,13 +166,13 @@ pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
         if let Some(first) = filtered.first() {
             let first_id = first.id.to_string();
             tb.set_active_tunnel_id(first_id.clone().into());
-            if let Ok(Some(tun)) = ctx.core_state.storage().tunnels().get_by_id(&first_id) {
-                load_tunnel_into_bridge(&tb, &tun);
+            if let Some(tun) = all_tunnels.iter().find(|t| t.id == first_id) {
+                load_tunnel_into_bridge(&tb, tun);
             }
         }
     } else {
         // 当前查看的规则仍在列表中，同步更新其运行态与流量等实时信息，确保状态立即可见
-        if let Ok(Some(tun)) = ctx.core_state.storage().tunnels().get_by_id(&current_id) {
+        if let Some(tun) = all_tunnels.iter().find(|t| t.id == current_id) {
             let (traffic_in, traffic_out) = tun.formatted_traffic();
             tb.set_form_is_running(tun.is_running);
             tb.set_form_enabled(tun.enabled);
@@ -188,8 +184,34 @@ pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
     }
 }
 
-/// 同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 TunnelsBridge
-pub(crate) fn sync_ui_host_tunnels(window: &AppWindow, ctx: &AppContext) {
+/// 异步从存储层拉取隧道记录并更新 Slint TunnelsBridge
+pub(crate) fn sync_ui_tunnels_async(
+    window_weak: slint::Weak<AppWindow>,
+    storage: std::sync::Arc<dyn smagical_core::AppStorage>,
+    cat: String,
+    query: String,
+) {
+    crate::async_util::spawn_async(async move {
+        let all_tunnels = storage.tunnels().list_all().await.unwrap_or_default();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = window_weak.upgrade() {
+                render_tunnels_ui(&w, &all_tunnels, &cat, &query);
+            }
+        });
+    });
+}
+
+/// 同步更新 Slint 网络隧道与代理规则列表 (非阻塞发起异步查询)
+pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
+    let window_weak = window.as_weak();
+    let storage = ctx.core_state.storage().clone();
+    let cat = ctx.tunnel_filter_category.borrow().clone();
+    let query = ctx.tunnel_search_query.borrow().clone();
+    sync_ui_tunnels_async(window_weak, storage, cat, query);
+}
+
+/// 纯 UI 渲染函数：同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 TunnelsBridge
+pub(crate) fn render_host_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRecord]) {
     let term_b = window.global::<TerminalBridge>();
     let host_id = term_b.get_active_host_id().to_string();
     let host_name = term_b.get_active_host_name().to_string();
@@ -216,9 +238,8 @@ pub(crate) fn sync_ui_host_tunnels(window: &AppWindow, ctx: &AppContext) {
     }
 
     // 3. 针对远程 SSH 主机会话，查询归属于该主机的端口转发规则
-    let all_tunnels = ctx.core_state.storage().tunnels().list_all().unwrap_or_default();
     let host_tunnels: Vec<TunnelItemData> = all_tunnels
-        .into_iter()
+        .iter()
         .filter(|t| {
             // 仅端口转发 (Local / Remote / Dynamic / ReverseDynamic)，跳板与代理不作为主机的本地转发
             let is_forward = matches!(t.tunnel_type, TunnelType::Local | TunnelType::Remote | TunnelType::Dynamic | TunnelType::ReverseDynamic);
@@ -236,12 +257,34 @@ pub(crate) fn sync_ui_host_tunnels(window: &AppWindow, ctx: &AppContext) {
             }
             false
         })
-        .map(|t| convert_tunnel_to_item_data(&t))
+        .map(|t| convert_tunnel_to_item_data(t))
         .collect();
 
     tb.set_active_host_name(host_name.into());
     tb.set_active_host_id(host_id.into());
     tb.set_host_tunnels(ModelRc::new(VecModel::from(host_tunnels)));
+}
+
+/// 异步从存储层拉取隧道记录并同步当前活动终端主机专属的端口转发规则
+pub(crate) fn sync_ui_host_tunnels_async(
+    window_weak: slint::Weak<AppWindow>,
+    storage: std::sync::Arc<dyn smagical_core::AppStorage>,
+) {
+    crate::async_util::spawn_async(async move {
+        let all_tunnels = storage.tunnels().list_all().await.unwrap_or_default();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = window_weak.upgrade() {
+                render_host_tunnels_ui(&w, &all_tunnels);
+            }
+        });
+    });
+}
+
+/// 同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 TunnelsBridge
+pub(crate) fn sync_ui_host_tunnels(window: &AppWindow, ctx: &AppContext) {
+    let window_weak = window.as_weak();
+    let storage = ctx.core_state.storage().clone();
+    sync_ui_host_tunnels_async(window_weak, storage);
 }
 
 /// 注册所有网络隧道相关 UI 回调 (全部挂载至 TunnelsBridge 领域总线)
@@ -284,10 +327,9 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                     host_id = tb.get_active_host_id().to_string();
                 }
                 if host_id.is_empty() && !host_name.is_empty() {
-                    if let Ok(hosts) = ctx.core_state.storage().hosts().list_all() {
-                        if let Some(h) = hosts.iter().find(|h| h.name == host_name) {
-                            host_id = h.id.clone();
-                        }
+                    let tree = ctx.master_tree.read().unwrap();
+                    if let Some(h) = tree.iter().find(|n| !n.is_group && n.name == host_name) {
+                        host_id = h.id.clone();
                     }
                 }
 
@@ -348,9 +390,19 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 tb.set_is_create_mode(false);
                 tb.set_is_editing(false);
 
-                if let Ok(Some(tun)) = ctx.core_state.storage().tunnels().get_by_id(&id) {
-                    load_tunnel_into_bridge(&tb, &tun);
-                }
+                let id_str = id.to_string();
+                let storage = ctx.core_state.storage();
+                let w_weak = w_handle.clone();
+                crate::async_util::spawn_async(async move {
+                    if let Ok(Some(tun)) = storage.tunnels().get_by_id(&id_str).await {
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = w_weak.upgrade() {
+                                let tb = w.global::<TunnelsBridge>();
+                                load_tunnel_into_bridge(&tb, &tun);
+                            }
+                        });
+                    }
+                });
             }
         });
     }
@@ -361,67 +413,105 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         let w_handle = window.as_weak();
         let toggle_handler = move |id: slint::SharedString, explicit_target: Option<bool>| {
             let id_str = id.to_string();
-            if let Ok(Some(mut tun)) = ctx.core_state.storage().tunnels().get_by_id(&id_str) {
-                let target_enabled = explicit_target.unwrap_or(!tun.enabled);
-                tun.enabled = target_enabled;
+            let storage = ctx.core_state.storage();
+            let events = ctx.core_state.events().clone();
+            let connected_hosts: std::collections::HashSet<String> = ctx
+                .pane_groups
+                .borrow()
+                .iter()
+                .flat_map(|g| g.tabs.iter())
+                .map(|t| t.host_id.clone())
+                .collect();
+            let w_weak = w_handle.clone();
 
-                if target_enabled {
-                    // 规则被启用：依据运行策略决定是否立即拉起底层监听
-                    match tun.run_mode {
-                        TunnelRunMode::FollowApp => {
-                            let started = TunnelDaemonService::try_start_tunnel(&ctx.core_state.storage(), &tun);
-                            tun.is_running = started;
-                            if !started {
-                                ctx.notify_warning("启动异常", format!("'{}' 端口 {}:{} 建立失败，保持待命状态", tun.name, tun.local_bind, tun.local_port));
-                            }
-                        }
-                        TunnelRunMode::FollowTerminal => {
-                            // 检查关联的主机终端当前是否处于打开/连接状态
-                            let is_host_connected = if let Some(ref hid) = tun.ssh_host_id {
-                                ctx.pane_groups.borrow().iter().flat_map(|g| g.tabs.iter()).any(|t| &t.host_id == hid)
-                            } else {
-                                false
-                            };
+            crate::async_util::spawn_async(async move {
+                if let Ok(Some(mut tun)) = storage.tunnels().get_by_id(&id_str).await {
+                    let target_enabled = explicit_target.unwrap_or(!tun.enabled);
+                    tun.enabled = target_enabled;
+                    let mut warn_msg: Option<String> = None;
 
-                            if is_host_connected {
-                                let started = TunnelDaemonService::try_start_tunnel(&ctx.core_state.storage(), &tun);
+                    if target_enabled {
+                        // 规则被启用：依据运行策略决定是否立即拉起底层监听
+                        match tun.run_mode {
+                            TunnelRunMode::FollowApp => {
+                                let started = TunnelDaemonService::try_start_tunnel(&storage, &tun).await;
                                 tun.is_running = started;
                                 if !started {
-                                    ctx.notify_warning("启动异常", format!("'{}' 端口 {}:{} 建立失败", tun.name, tun.local_bind, tun.local_port));
+                                    warn_msg = Some(format!(
+                                        "'{}' 端口 {}:{} 建立失败，保持待命状态",
+                                        tun.name, tun.local_bind, tun.local_port
+                                    ));
                                 }
-                            } else {
-                                // 伴随终端模式：主机终端未开，进入待命中 (Standby) 状态
-                                tun.is_running = false;
-                                let _ = ctx.core_state.storage().tunnels().set_running(&id_str, false);
+                            }
+                            TunnelRunMode::FollowTerminal => {
+                                // 检查关联的主机终端当前是否处于打开/连接状态
+                                let is_host_connected = tun
+                                    .ssh_host_id
+                                    .as_ref()
+                                    .map(|hid| connected_hosts.contains(hid))
+                                    .unwrap_or(false);
+
+                                if is_host_connected {
+                                    let started = TunnelDaemonService::try_start_tunnel(&storage, &tun).await;
+                                    tun.is_running = started;
+                                    if !started {
+                                        warn_msg = Some(format!(
+                                            "'{}' 端口 {}:{} 建立失败",
+                                            tun.name, tun.local_bind, tun.local_port
+                                        ));
+                                    }
+                                } else {
+                                    // 伴随终端模式：主机终端未开，进入待命中 (Standby) 状态
+                                    tun.is_running = false;
+                                    let _ = storage.tunnels().set_running(&id_str, false).await;
+                                }
                             }
                         }
+                    } else {
+                        // 规则被停用：释放端口，停止监听
+                        TunnelDaemonService::stop_tunnel(&storage, &id_str).await;
+                        tun.is_running = false;
                     }
-                } else {
-                    // 规则被停用：释放端口，停止监听
-                    TunnelDaemonService::stop_tunnel(&ctx.core_state.storage(), &id_str);
-                    tun.is_running = false;
+
+                    // 保存持久化
+                    let _ = storage.tunnels().save(&tun).await;
+
+                    events.dispatch(&TunnelStateChangedEvent {
+                        tunnel_id: id_str.clone(),
+                        is_running: tun.is_running,
+                    });
+
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = w_weak.upgrade() {
+                            if let Some(msg) = warn_msg {
+                                let wb = w.global::<crate::generated::WindowBridge>();
+                                let toast = crate::generated::ToastItemData {
+                                    id: format!("toast-{}", uuid::Uuid::new_v4()).into(),
+                                    title: "启动异常".into(),
+                                    message: msg.into(),
+                                    level: "warning".into(),
+                                    position: wb.get_toast_position(),
+                                    duration_ms: 3500,
+                                    closable: true,
+                                };
+                                let cur = wb.get_toasts();
+                                let mut all: Vec<crate::generated::ToastItemData> =
+                                    (0..cur.row_count()).filter_map(|i| cur.row_data(i)).collect();
+                                all.push(toast);
+                                wb.set_toasts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all))));
+                            }
+                            let tb = w.global::<TunnelsBridge>();
+                            let active_id = tb.get_active_tunnel_id().to_string();
+                            let form_id = tb.get_form_id().to_string();
+                            if active_id == id_str || form_id == id_str {
+                                tb.set_form_enabled(tun.enabled);
+                                tb.set_form_is_running(tun.is_running);
+                            }
+                            tb.invoke_sync_host_tunnels();
+                        }
+                    });
                 }
-
-                // 保存持久化
-                let _ = ctx.core_state.storage().tunnels().save(&tun);
-
-                ctx.core_state.events().dispatch(&TunnelStateChangedEvent {
-                    tunnel_id: id_str.clone(),
-                    is_running: tun.is_running,
-                });
-
-                if let Some(w) = w_handle.upgrade() {
-                    let tb = w.global::<TunnelsBridge>();
-                    let active_id = tb.get_active_tunnel_id().to_string();
-                    let form_id = tb.get_form_id().to_string();
-                    if active_id == id_str || form_id == id_str {
-                        tb.set_form_enabled(tun.enabled);
-                        tb.set_form_is_running(tun.is_running);
-                    }
-                    sync_ui_tunnels(&w, &ctx);
-                    sync_ui_host_tunnels(&w, &ctx);
-                }
-            }
+            });
         };
 
         let t_toggle = {
@@ -574,13 +664,22 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 let tb = w.global::<TunnelsBridge>();
                 tb.set_is_create_mode(false);
                 tb.set_is_editing(false);
-                let all = ctx.core_state.storage().tunnels().list_all().unwrap_or_default();
-                if let Some(first) = all.first() {
-                    tb.set_active_tunnel_id(first.id.clone().into());
-                    load_tunnel_into_bridge(&tb, first);
-                } else {
-                    tb.set_active_tunnel_id("".into());
-                }
+                let storage = ctx.core_state.storage();
+                let w_weak = w_handle.clone();
+                crate::async_util::spawn_async(async move {
+                    let all = storage.tunnels().list_all().await.unwrap_or_default();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = w_weak.upgrade() {
+                            let tb = w.global::<TunnelsBridge>();
+                            if let Some(first) = all.first() {
+                                tb.set_active_tunnel_id(first.id.clone().into());
+                                load_tunnel_into_bridge(&tb, first);
+                            } else {
+                                tb.set_active_tunnel_id("".into());
+                            }
+                        }
+                    });
+                });
             }
         });
     }
@@ -604,9 +703,18 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 let tb = w.global::<TunnelsBridge>();
                 tb.set_is_editing(false);
                 let id = tb.get_active_tunnel_id().to_string();
-                if let Ok(Some(tun)) = ctx.core_state.storage().tunnels().get_by_id(&id) {
-                    load_tunnel_into_bridge(&tb, &tun);
-                }
+                let storage = ctx.core_state.storage();
+                let w_weak = w_handle.clone();
+                crate::async_util::spawn_async(async move {
+                    if let Ok(Some(tun)) = storage.tunnels().get_by_id(&id).await {
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = w_weak.upgrade() {
+                                let tb = w.global::<TunnelsBridge>();
+                                load_tunnel_into_bridge(&tb, &tun);
+                            }
+                        });
+                    }
+                });
             }
         });
     }
@@ -639,26 +747,6 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 if name_str.trim().is_empty() {
                     ctx.notify_warning("保存失败", "规则名称不能为空");
                     return;
-                }
-
-                // 检查旧配置是否存在，且是否正在运行
-                let old_record = ctx.core_state.storage().tunnels().get_by_id(&id_str).ok().flatten();
-                let is_new = old_record.is_none();
-
-                // 【核心要求：修改时先关闭旧通道】
-                if let Some(ref old_tun) = old_record {
-                    if old_tun.is_running {
-                        TunnelDaemonService::stop_tunnel(&ctx.core_state.storage(), &old_tun.id);
-                        ctx.core_state.events().dispatch(&TunnelStateChangedEvent {
-                            tunnel_id: old_tun.id.clone(),
-                            is_running: false,
-                        });
-                        tracing::info!(
-                            target: "smalux::tunnel",
-                            "热重载：编辑修改前已先关闭旧通道 [{}] 释放端口 {}:{}",
-                            old_tun.id, old_tun.local_bind, old_tun.local_port
-                        );
-                    }
                 }
 
                 let parsed_type: TunnelType = t_type.as_str().parse().unwrap_or(TunnelType::Local);
@@ -696,43 +784,15 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                     (String::new(), String::new(), String::new())
                 };
 
-                let mut record = TunnelRecord {
-                    id: id_str.clone(),
-                    name: name_str.clone(),
-                    tunnel_type: parsed_type,
-                    ssh_host_id: if h_id.trim().is_empty() { None } else { Some(h_id) },
-                    ssh_host_name: h_name,
-                    local_bind: if l_bind.trim().is_empty() { "127.0.0.1".to_string() } else { l_bind },
-                    local_port: l_port,
-                    remote_host: final_remote_host,
-                    remote_port: r_port,
-                    jump_chain: jump_hops,
-                    enabled: form_enabled,
-                    is_running: false,
-                    run_mode: parsed_run_mode,
-                    auto_start: auto_s,
-                    auto_reconnect: auto_r,
-                    remote_dns: r_dns,
-                    compression: comp,
-                    active_connections: 0,
-                    total_bytes_in: old_record.as_ref().map(|o| o.total_bytes_in).unwrap_or(0),
-                    total_bytes_out: old_record.as_ref().map(|o| o.total_bytes_out).unwrap_or(0),
-                    proxy_proto,
-                    proxy_username,
-                    proxy_password,
-                    notes,
-                    updated_at: "刚刚".to_string(),
-                };
-
-                let jump_host_ids: Vec<String> = record.jump_chain.iter().map(|h| h.host_id.clone()).collect();
+                let jump_host_ids: Vec<String> = jump_hops.iter().map(|h| h.host_id.clone()).collect();
                 let before_save = TunnelBeforeSaveEvent::new(
-                    &record.id,
-                    &record.name,
-                    record.tunnel_type.as_str(),
-                    &record.local_bind,
-                    record.local_port,
-                    &record.remote_host,
-                    record.remote_port,
+                    &id_str,
+                    &name_str,
+                    parsed_type.as_str(),
+                    if l_bind.trim().is_empty() { "127.0.0.1" } else { &l_bind },
+                    l_port,
+                    &final_remote_host,
+                    r_port,
                     jump_host_ids,
                 );
                 ctx.core_state.events().dispatch(&before_save);
@@ -741,67 +801,137 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                     return;
                 }
 
-                if let Ok(()) = ctx.core_state.storage().tunnels().save(&record) {
-                    ctx.core_state.events().dispatch(&TunnelSavedEvent {
-                        tunnel_id: id_str.clone(),
-                        name: name_str,
-                        tunnel_type: parsed_type.to_string(),
-                        is_new,
-                    });
+                let connected_hosts: std::collections::HashSet<String> = ctx
+                    .pane_groups
+                    .borrow()
+                    .iter()
+                    .flat_map(|g| g.tabs.iter())
+                    .map(|t| t.host_id.clone())
+                    .collect();
 
-                    // 【核心要求：根据更改后的内容和开关状态重新拉起】
-                    let mut actually_started = false;
-                    if record.enabled {
-                        match record.run_mode {
-                            TunnelRunMode::FollowApp => {
-                                actually_started = TunnelDaemonService::try_start_tunnel(&ctx.core_state.storage(), &record);
-                                if actually_started {
-                                    record.is_running = true;
-                                }
-                            }
-                            TunnelRunMode::FollowTerminal => {
-                                let is_host_connected = if let Some(ref hid) = record.ssh_host_id {
-                                    ctx.pane_groups.borrow().iter().flat_map(|g| g.tabs.iter()).any(|t| &t.host_id == hid)
-                                } else {
-                                    false
-                                };
-                                if is_host_connected {
-                                    actually_started = TunnelDaemonService::try_start_tunnel(&ctx.core_state.storage(), &record);
+                let storage = ctx.core_state.storage();
+                let events = ctx.core_state.events().clone();
+                let notif = ctx.notifications.clone();
+                let cat = ctx.tunnel_filter_category.borrow().clone();
+                let query = ctx.tunnel_search_query.borrow().clone();
+                let w_weak = w_handle.clone();
+
+                crate::async_util::spawn_async(async move {
+                    // 检查旧配置是否存在，且是否正在运行
+                    let old_record = storage.tunnels().get_by_id(&id_str).await.ok().flatten();
+                    let is_new = old_record.is_none();
+
+                    // 【核心要求：修改时先关闭旧通道】
+                    if let Some(ref old_tun) = old_record {
+                        if old_tun.is_running {
+                            TunnelDaemonService::stop_tunnel(&storage, &old_tun.id).await;
+                            events.dispatch(&TunnelStateChangedEvent {
+                                tunnel_id: old_tun.id.clone(),
+                                is_running: false,
+                            });
+                            tracing::info!(
+                                target: "smalux::tunnel",
+                                "热重载：编辑修改前已先关闭旧通道 [{}] 释放端口 {}:{}",
+                                old_tun.id, old_tun.local_bind, old_tun.local_port
+                            );
+                        }
+                    }
+
+                    let mut record = TunnelRecord {
+                        id: id_str.clone(),
+                        name: name_str.clone(),
+                        tunnel_type: parsed_type,
+                        ssh_host_id: if h_id.trim().is_empty() { None } else { Some(h_id) },
+                        ssh_host_name: h_name,
+                        local_bind: if l_bind.trim().is_empty() { "127.0.0.1".to_string() } else { l_bind },
+                        local_port: l_port,
+                        remote_host: final_remote_host,
+                        remote_port: r_port,
+                        jump_chain: jump_hops,
+                        enabled: form_enabled,
+                        is_running: false,
+                        run_mode: parsed_run_mode,
+                        auto_start: auto_s,
+                        auto_reconnect: auto_r,
+                        remote_dns: r_dns,
+                        compression: comp,
+                        active_connections: 0,
+                        total_bytes_in: old_record.as_ref().map(|o| o.total_bytes_in).unwrap_or(0),
+                        total_bytes_out: old_record.as_ref().map(|o| o.total_bytes_out).unwrap_or(0),
+                        proxy_proto,
+                        proxy_username,
+                        proxy_password,
+                        notes,
+                        updated_at: "刚刚".to_string(),
+                    };
+
+                    if let Ok(()) = storage.tunnels().save(&record).await {
+                        events.dispatch(&TunnelSavedEvent {
+                            tunnel_id: id_str.clone(),
+                            name: name_str,
+                            tunnel_type: parsed_type.to_string(),
+                            is_new,
+                        });
+
+                        // 【核心要求：根据更改后的内容和开关状态重新拉起】
+                        let mut actually_started = false;
+                        if record.enabled {
+                            match record.run_mode {
+                                TunnelRunMode::FollowApp => {
+                                    actually_started = TunnelDaemonService::try_start_tunnel(&storage, &record).await;
                                     if actually_started {
                                         record.is_running = true;
                                     }
                                 }
+                                TunnelRunMode::FollowTerminal => {
+                                    let is_host_connected = record.ssh_host_id.as_ref()
+                                        .map(|hid| connected_hosts.contains(hid))
+                                        .unwrap_or(false);
+                                    if is_host_connected {
+                                        actually_started = TunnelDaemonService::try_start_tunnel(&storage, &record).await;
+                                        if actually_started {
+                                            record.is_running = true;
+                                        }
+                                    }
+                                }
                             }
                         }
-                    }
 
-                    if record.is_running {
-                        ctx.core_state.events().dispatch(&TunnelStateChangedEvent {
-                            tunnel_id: id_str.clone(),
-                            is_running: true,
-                        });
-                    }
-
-                    if record.enabled {
-                        if actually_started {
-                            ctx.notify_success("保存并生效", format!("'{}' 配置已更新，新通道已建立监听", record.name));
-                        } else if record.run_mode == TunnelRunMode::FollowTerminal {
-                            ctx.notify_success("保存成功", format!("'{}' 配置已更新并处于待命状态，将在打开终端时自动激活", record.name));
-                        } else {
-                            ctx.notify_warning("配置已保存", format!("'{}' 端口 {}:{} 建立监听失败，请检查端口占用", record.name, record.local_bind, record.local_port));
+                        if record.is_running {
+                            events.dispatch(&TunnelStateChangedEvent {
+                                tunnel_id: id_str.clone(),
+                                is_running: true,
+                            });
                         }
-                    } else {
-                        ctx.notify_info("保存成功", format!("'{}' 规则已保存（处于停用关闭状态）", record.name));
-                    }
 
-                    tb.set_is_create_mode(false);
-                    tb.set_is_editing(false);
-                    tb.set_is_create_host_tunnel_modal_open(false);
-                    tb.set_active_tunnel_id(id_str.into());
-                    load_tunnel_into_bridge(&tb, &record);
-                    sync_ui_tunnels(&w, &ctx);
-                    sync_ui_host_tunnels(&w, &ctx);
-                }
+                        if record.enabled {
+                            if actually_started {
+                                notif.success("保存并生效", format!("'{}' 配置已更新，新通道已建立监听", record.name));
+                            } else if record.run_mode == TunnelRunMode::FollowTerminal {
+                                notif.success("保存成功", format!("'{}' 配置已更新并处于待命状态，将在打开终端时自动激活", record.name));
+                            } else {
+                                notif.warning("配置已保存", format!("'{}' 端口 {}:{} 建立监听失败，请检查端口占用", record.name, record.local_bind, record.local_port));
+                            }
+                        } else {
+                            notif.info("保存成功", format!("'{}' 规则已保存（处于停用关闭状态）", record.name));
+                        }
+
+                        let record_clone = record.clone();
+                        let w_weak_invoke = w_weak.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = w_weak_invoke.upgrade() {
+                                let tb = w.global::<TunnelsBridge>();
+                                tb.set_is_create_mode(false);
+                                tb.set_is_editing(false);
+                                tb.set_is_create_host_tunnel_modal_open(false);
+                                tb.set_active_tunnel_id(id_str.into());
+                                load_tunnel_into_bridge(&tb, &record_clone);
+                            }
+                        });
+                        sync_ui_tunnels_async(w_weak.clone(), storage.clone(), cat, query);
+                        sync_ui_host_tunnels_async(w_weak, storage);
+                    }
+                });
             }
         });
     }
@@ -812,36 +942,47 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         let w_handle = window.as_weak();
         tb.on_delete_tunnel(move |id| {
             let id_str = id.to_string();
+            let storage = ctx.core_state.storage();
+            let events = ctx.core_state.events().clone();
+            let notif = ctx.notifications.clone();
+            let cat = ctx.tunnel_filter_category.borrow().clone();
+            let query = ctx.tunnel_search_query.borrow().clone();
+            let w_weak = w_handle.clone();
 
-            // 删除前审查守卫 (运行中的规则禁止误删)
-            let is_running = ctx.core_state.storage().tunnels().get_by_id(&id_str)
-                .ok().flatten().map(|t| t.is_running).unwrap_or(false);
-            let before_del = TunnelBeforeDeleteEvent::new(&id_str, is_running);
-            ctx.core_state.events().dispatch(&before_del);
-            if before_del.is_aborted() {
-                ctx.notify_warning("删除拦截", before_del.abort_reason().unwrap_or_else(|| "运行中的规则禁止删除".to_string()));
-                return;
-            }
-
-            if let Ok(true) = ctx.core_state.storage().tunnels().delete(&id_str) {
-                ctx.core_state.events().dispatch(&TunnelDeletedEvent {
-                    tunnel_id: id_str,
-                });
-                ctx.notify_success("删除成功", "已从网络配置库中移除该规则");
-
-                if let Some(w) = w_handle.upgrade() {
-                    let tb = w.global::<TunnelsBridge>();
-                    let all = ctx.core_state.storage().tunnels().list_all().unwrap_or_default();
-                    if let Some(first) = all.first() {
-                        tb.set_active_tunnel_id(first.id.clone().into());
-                        load_tunnel_into_bridge(&tb, first);
-                    } else {
-                        tb.set_active_tunnel_id("".into());
-                    }
-                    sync_ui_tunnels(&w, &ctx);
-                    sync_ui_host_tunnels(&w, &ctx);
+            crate::async_util::spawn_async(async move {
+                // 删除前审查守卫 (运行中的规则禁止误删)
+                let is_running = storage.tunnels().get_by_id(&id_str)
+                    .await.ok().flatten().map(|t| t.is_running).unwrap_or(false);
+                let before_del = TunnelBeforeDeleteEvent::new(&id_str, is_running);
+                events.dispatch(&before_del);
+                if before_del.is_aborted() {
+                    notif.warning("删除拦截", before_del.abort_reason().unwrap_or_else(|| "运行中的规则禁止删除".to_string()));
+                    return;
                 }
-            }
+
+                if let Ok(true) = storage.tunnels().delete(&id_str).await {
+                    events.dispatch(&TunnelDeletedEvent {
+                        tunnel_id: id_str,
+                    });
+                    notif.success("删除成功", "已从网络配置库中移除该规则");
+
+                    let all = storage.tunnels().list_all().await.unwrap_or_default();
+                    let w_weak_invoke = w_weak.clone();
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = w_weak_invoke.upgrade() {
+                            let tb = w.global::<TunnelsBridge>();
+                            if let Some(first) = all.first() {
+                                tb.set_active_tunnel_id(first.id.clone().into());
+                                load_tunnel_into_bridge(&tb, first);
+                            } else {
+                                tb.set_active_tunnel_id("".into());
+                            }
+                        }
+                    });
+                    sync_ui_tunnels_async(w_weak.clone(), storage.clone(), cat, query);
+                    sync_ui_host_tunnels_async(w_weak, storage);
+                }
+            });
         });
     }
 
@@ -849,13 +990,18 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let ctx = ctx.clone();
         tb.on_copy_ssh_command(move |id| {
-            if let Ok(Some(tun)) = ctx.core_state.storage().tunnels().get_by_id(&id) {
-                let cmd = tun.generate_ssh_command(&tun.ssh_host_name, "root");
-                if let Ok(mut clip) = arboard::Clipboard::new() {
-                    let _ = clip.set_text(&cmd);
-                    ctx.notify_success("复制成功", format!("已将 '{}' 的 SSH 命令复制到剪贴板", tun.name));
+            let id_str = id.to_string();
+            let storage = ctx.core_state.storage();
+            let notif = ctx.notifications.clone();
+            crate::async_util::spawn_async(async move {
+                if let Ok(Some(tun)) = storage.tunnels().get_by_id(&id_str).await {
+                    let cmd = tun.generate_ssh_command(&tun.ssh_host_name, "root");
+                    if let Ok(mut clip) = arboard::Clipboard::new() {
+                        let _ = clip.set_text(&cmd);
+                        notif.success("复制成功", format!("已将 '{}' 的 SSH 命令复制到剪贴板", tun.name));
+                    }
                 }
-            }
+            });
         });
     }
 

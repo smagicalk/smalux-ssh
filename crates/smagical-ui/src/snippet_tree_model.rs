@@ -27,6 +27,10 @@ pub struct RawSnippetTreeNode {
     pub item_count: i32,
     /// 脚本语言 (Bash, Python 等)
     pub language: String,
+    /// 脚本/指令具体代码内容
+    pub content: String,
+    /// 描述说明
+    pub description: String,
     /// 是否自动发送回车执行
     pub auto_execute: bool,
     /// 是否星标置顶
@@ -35,14 +39,15 @@ pub struct RawSnippetTreeNode {
     pub sort_order: i32,
 }
 
-/// 从 AppStorage 构建全量平铺树结构数据
-pub fn build_raw_snippet_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawSnippetTreeNode> {
+/// 根据分组和代码片段记录纯数据构建全量平铺树结构数据 (纯内存计算，0 I/O)
+pub fn build_raw_snippet_tree(
+    groups: &[smagical_core::domain::snippet::SnippetGroupRecord],
+    snippets: &[smagical_core::domain::snippet::SnippetRecord],
+) -> Vec<RawSnippetTreeNode> {
     let mut raw_nodes = Vec::new();
-    let groups = storage.snippets().list_groups().unwrap_or_default();
-    let snippets = storage.snippets().list_all().unwrap_or_default();
 
     // 1. 注入文件夹分组节点
-    for g in &groups {
+    for g in groups {
         let p_id = g.parent_id.as_deref().unwrap_or("root").to_string();
 
         let child_group_count = groups.iter()
@@ -62,6 +67,8 @@ pub fn build_raw_snippet_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawS
             has_children: (child_group_count + child_snippet_count) > 0,
             item_count: (child_group_count + child_snippet_count) as i32,
             language: String::new(),
+            content: String::new(),
+            description: String::new(),
             auto_execute: false,
             is_favorite: false,
             sort_order: g.sort_order,
@@ -69,7 +76,7 @@ pub fn build_raw_snippet_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawS
     }
 
     // 2. 注入代码片段实体节点
-    for s in &snippets {
+    for s in snippets {
         let p_id = s.parent_group_id.as_deref().unwrap_or("root").to_string();
         let level = if p_id == "root" {
             0
@@ -87,6 +94,8 @@ pub fn build_raw_snippet_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawS
             has_children: false,
             item_count: 0,
             language: s.language.clone(),
+            content: s.content.clone(),
+            description: s.description.clone(),
             auto_execute: s.auto_execute,
             is_favorite: s.is_favorite,
             sort_order: s.sort_order,
@@ -96,6 +105,15 @@ pub fn build_raw_snippet_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawS
     sort_snippet_tree_hierarchy(&mut raw_nodes);
     raw_nodes
 }
+
+/// 异步从 AppStorage 构建全量平铺树结构数据 (0ms UI 阻塞)
+#[allow(dead_code)]
+pub async fn build_raw_snippet_tree_from_storage_async(storage: &dyn AppStorage) -> Vec<RawSnippetTreeNode> {
+    let groups = storage.snippets().list_groups().await.unwrap_or_default();
+    let snippets = storage.snippets().list_all().await.unwrap_or_default();
+    build_raw_snippet_tree(&groups, &snippets)
+}
+
 
 /// 对多层嵌套树进行深度优先遍历 (DFS) 排序：分组在前，星标片段靠前
 pub fn sort_snippet_tree_hierarchy(tree: &mut Vec<RawSnippetTreeNode>) {
@@ -384,8 +402,10 @@ pub fn build_search_snippet_tree_nodes(
     result
 }
 
-/// 构建分组选择下拉列表项数据
-pub fn build_snippet_group_options(storage: &dyn AppStorage) -> Vec<GroupOptionData> {
+/// 根据分组记录集合构建弹窗中的上级分组下拉选项列表 (纯内存计算)
+pub fn build_snippet_group_options_from_records(
+    groups: &[smagical_core::domain::snippet::SnippetGroupRecord],
+) -> Vec<GroupOptionData> {
     let mut options = vec![
         GroupOptionData {
             id: "root".into(),
@@ -397,14 +417,13 @@ pub fn build_snippet_group_options(storage: &dyn AppStorage) -> Vec<GroupOptionD
         }
     ];
 
-    let groups = storage.snippets().list_groups().unwrap_or_default();
     for g in groups {
         let prefix = "  ".repeat(g.level as usize);
         options.push(GroupOptionData {
             id: g.id.clone().into(),
             name: format!("{}📁 {}", prefix, g.name).into(),
             level: g.level as i32 + 1,
-            parent_id: g.parent_id.unwrap_or_default().into(),
+            parent_id: g.parent_id.as_deref().unwrap_or_default().into(),
             has_children: false,
             is_expanded: false,
         });
@@ -413,15 +432,28 @@ pub fn build_snippet_group_options(storage: &dyn AppStorage) -> Vec<GroupOptionD
     options
 }
 
+/// 异步从 AppStorage 构建分组下拉选项 (0ms UI 阻塞)
+#[allow(dead_code)]
+pub async fn build_snippet_group_options_async(storage: &dyn AppStorage) -> Vec<GroupOptionData> {
+    let groups = storage.snippets().list_groups().await.unwrap_or_default();
+    build_snippet_group_options_from_records(&groups)
+}
+
+/// 构建分组选择下拉列表项数据 (同步兼容入口)
+#[allow(dead_code)]
+pub fn build_snippet_group_options(storage: &dyn AppStorage) -> Vec<GroupOptionData> {
+    crate::async_util::block_on(build_snippet_group_options_async(storage))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use smagical_storage::MockStorage;
 
-    #[test]
-    fn test_snippet_tree_model_building_and_expansion() {
+    #[tokio::test]
+    async fn test_snippet_tree_model_building_and_expansion() {
         let storage = MockStorage::new_seeded();
-        let master = build_raw_snippet_tree_from_storage(&storage);
+        let master = build_raw_snippet_tree_from_storage_async(&storage).await;
         assert!(!master.is_empty());
 
         // 默认展开所有顶级分组
@@ -437,10 +469,10 @@ mod tests {
         assert_eq!(searched.len(), 2); // 包含 sgrp-docker (祖先) 与 snip-docker-prune (清理悬空镜像与未用卷)
     }
 
-    #[test]
-    fn test_move_snippet_node_inside_group_and_to_root() {
+    #[tokio::test]
+    async fn test_move_snippet_node_inside_group_and_to_root() {
         let storage = MockStorage::new_seeded();
-        let mut master = build_raw_snippet_tree_from_storage(&storage);
+        let mut master = build_raw_snippet_tree_from_storage_async(&storage).await;
 
         // 1. 将 snip-docker-ps (原本在 sgrp-docker 下) 移动至 sgrp-k8s 内部
         let res = move_and_reorder_raw_snippet_node(&mut master, "snip-docker-ps", "sgrp-k8s", "inside");

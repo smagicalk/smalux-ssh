@@ -2,8 +2,7 @@
 //!
 //! 提供非阻塞、多方位堆叠、自动倒计时消隐与手动关闭的轻量通知机制。
 
-use std::cell::RefCell;
-use std::rc::Rc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use slint::ComponentHandle;
@@ -31,31 +30,31 @@ pub struct ToastNotification {
 /// 全局通知管理器
 #[derive(Clone)]
 pub struct NotificationManager {
-    toasts: Rc<RefCell<Vec<ToastNotification>>>,
+    toasts: Arc<Mutex<Vec<ToastNotification>>>,
     window: slint::Weak<AppWindow>,
-    position: Rc<RefCell<String>>,
-    duration_preset: Rc<RefCell<String>>,
+    position: Arc<Mutex<String>>,
+    duration_preset: Arc<Mutex<String>>,
 }
 
 impl NotificationManager {
     /// 创建并初始化全局通知管理器实例
     pub fn new(window: slint::Weak<AppWindow>) -> Self {
         Self {
-            toasts: Rc::new(RefCell::new(Vec::new())),
+            toasts: Arc::new(Mutex::new(Vec::new())),
             window,
-            position: Rc::new(RefCell::new("top-right".to_string())),
-            duration_preset: Rc::new(RefCell::new("3".to_string())),
+            position: Arc::new(Mutex::new("top-right".to_string())),
+            duration_preset: Arc::new(Mutex::new("3".to_string())),
         }
     }
 
     /// 设置提示信息停留时间预设 ("1.5", "3", "5", "8", "never")
     pub fn set_duration_preset(&self, preset: &str) {
-        *self.duration_preset.borrow_mut() = preset.to_string();
+        *self.duration_preset.lock().unwrap() = preset.to_string();
     }
 
     /// 获取当前基础停留毫秒数 (0 为常驻手动关闭)
     pub fn base_duration_ms(&self) -> u64 {
-        match self.duration_preset.borrow().as_str() {
+        match self.duration_preset.lock().unwrap().as_str() {
             "1.5" => 1500,
             "3" => 3000,
             "5" => 5000,
@@ -67,10 +66,14 @@ impl NotificationManager {
 
     /// 设置默认通知展示方位
     pub fn set_position(&self, position: &str) {
-        *self.position.borrow_mut() = position.to_string();
-        if let Some(w) = self.window.upgrade() {
-            w.global::<WindowBridge>().set_toast_position(position.into());
-        }
+        *self.position.lock().unwrap() = position.to_string();
+        let pos_str = position.to_string();
+        let window = self.window.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = window.upgrade() {
+                w.global::<WindowBridge>().set_toast_position(pos_str.into());
+            }
+        });
     }
 
     /// 显示自定义气泡通知
@@ -79,7 +82,7 @@ impl NotificationManager {
         let duration_ms = toast.duration_ms;
 
         {
-            let mut list = self.toasts.borrow_mut();
+            let mut list = self.toasts.lock().unwrap();
             if let Some(pos) = list.iter().position(|t| t.id == toast_id) {
                 list[pos] = toast;
             } else {
@@ -96,8 +99,10 @@ impl NotificationManager {
         if duration_ms > 0 {
             let manager = self.clone();
             let id_clone = toast_id.clone();
-            slint::Timer::single_shot(Duration::from_millis(duration_ms), move || {
-                manager.close(&id_clone);
+            let _ = slint::invoke_from_event_loop(move || {
+                slint::Timer::single_shot(Duration::from_millis(duration_ms), move || {
+                    manager.close(&id_clone);
+                });
             });
         }
     }
@@ -106,12 +111,13 @@ impl NotificationManager {
     pub fn success(&self, title: impl Into<String>, message: impl Into<String>) {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
         let base_ms = self.base_duration_ms();
+        let position = self.position.lock().unwrap().clone();
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "success".into(),
-            position: self.position.borrow().clone(),
+            position,
             duration_ms: base_ms,
             closable: true,
         });
@@ -121,12 +127,13 @@ impl NotificationManager {
     pub fn info(&self, title: impl Into<String>, message: impl Into<String>) {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
         let base_ms = self.base_duration_ms();
+        let position = self.position.lock().unwrap().clone();
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "info".into(),
-            position: self.position.borrow().clone(),
+            position,
             duration_ms: base_ms,
             closable: true,
         });
@@ -137,12 +144,13 @@ impl NotificationManager {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
         let base_ms = self.base_duration_ms();
         let duration_ms = if base_ms == 0 { 0 } else { base_ms + 500 };
+        let position = self.position.lock().unwrap().clone();
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "warning".into(),
-            position: self.position.borrow().clone(),
+            position,
             duration_ms,
             closable: true,
         });
@@ -153,12 +161,13 @@ impl NotificationManager {
         let id = format!("toast-{}", uuid::Uuid::new_v4());
         let base_ms = self.base_duration_ms();
         let duration_ms = if base_ms == 0 { 0 } else { base_ms + 1000 };
+        let position = self.position.lock().unwrap().clone();
         self.show(ToastNotification {
             id,
             title: title.into(),
             message: message.into(),
             level: "error".into(),
-            position: self.position.borrow().clone(),
+            position,
             duration_ms,
             closable: true,
         });
@@ -166,7 +175,7 @@ impl NotificationManager {
 
     /// 手动关闭指定通知
     pub fn close(&self, id: &str) {
-        let mut list = self.toasts.borrow_mut();
+        let mut list = self.toasts.lock().unwrap();
         let before_len = list.len();
         list.retain(|t| t.id != id);
         if list.len() != before_len {
@@ -177,28 +186,31 @@ impl NotificationManager {
 
     /// 清空所有通知
     pub fn clear_all(&self) {
-        self.toasts.borrow_mut().clear();
+        self.toasts.lock().unwrap().clear();
         self.sync_ui();
     }
 
     /// 同步当前通知列表至 Slint UI
     fn sync_ui(&self) {
-        if let Some(w) = self.window.upgrade() {
-            let list = self.toasts.borrow();
-            let ui_toasts: Vec<ToastItemData> = list
-                .iter()
-                .map(|t| ToastItemData {
-                    id: t.id.clone().into(),
-                    title: t.title.clone().into(),
-                    message: t.message.clone().into(),
-                    level: t.level.clone().into(),
-                    position: t.position.clone().into(),
-                    duration_ms: t.duration_ms as i32,
-                    closable: t.closable,
-                })
-                .collect();
-            w.global::<WindowBridge>().set_toasts(slint::ModelRc::from(Rc::new(slint::VecModel::from(ui_toasts))));
-        }
+        let list = self.toasts.lock().unwrap().clone();
+        let window = self.window.clone();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = window.upgrade() {
+                let ui_toasts: Vec<ToastItemData> = list
+                    .into_iter()
+                    .map(|t| ToastItemData {
+                        id: t.id.into(),
+                        title: t.title.into(),
+                        message: t.message.into(),
+                        level: t.level.into(),
+                        position: t.position.into(),
+                        duration_ms: t.duration_ms as i32,
+                        closable: t.closable,
+                    })
+                    .collect();
+                w.global::<WindowBridge>().set_toasts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(ui_toasts))));
+            }
+        });
     }
 }
 
@@ -212,26 +224,26 @@ mod tests {
 
         // 1. 弹出消息
         mgr.info("提示", "这是一条测试消息");
-        assert_eq!(mgr.toasts.borrow().len(), 1);
-        assert_eq!(mgr.toasts.borrow()[0].level, "info");
-        assert_eq!(mgr.toasts.borrow()[0].title, "提示");
+        assert_eq!(mgr.toasts.lock().unwrap().len(), 1);
+        assert_eq!(mgr.toasts.lock().unwrap()[0].level, "info");
+        assert_eq!(mgr.toasts.lock().unwrap()[0].title, "提示");
 
         // 2. 连续推入直到超过最大限制 5 条
         for i in 1..=6 {
             mgr.success(format!("成功 {}", i), "完成");
         }
-        assert_eq!(mgr.toasts.borrow().len(), 5);
-        assert_eq!(mgr.toasts.borrow().last().unwrap().title, "成功 6");
+        assert_eq!(mgr.toasts.lock().unwrap().len(), 5);
+        assert_eq!(mgr.toasts.lock().unwrap().last().unwrap().title, "成功 6");
 
         // 3. 关闭指定通知
-        let target_id = mgr.toasts.borrow()[0].id.clone();
+        let target_id = mgr.toasts.lock().unwrap()[0].id.clone();
         mgr.close(&target_id);
-        assert_eq!(mgr.toasts.borrow().len(), 4);
-        assert!(mgr.toasts.borrow().iter().all(|t| t.id != target_id));
+        assert_eq!(mgr.toasts.lock().unwrap().len(), 4);
+        assert!(mgr.toasts.lock().unwrap().iter().all(|t| t.id != target_id));
 
         // 4. 清空所有通知
         mgr.clear_all();
-        assert_eq!(mgr.toasts.borrow().len(), 0);
+        assert_eq!(mgr.toasts.lock().unwrap().len(), 0);
     }
 
     #[test]
@@ -252,17 +264,17 @@ mod tests {
         assert_eq!(mgr.base_duration_ms(), 0);
 
         mgr.info("常驻", "常驻消息");
-        assert_eq!(mgr.toasts.borrow()[0].duration_ms, 0);
+        assert_eq!(mgr.toasts.lock().unwrap()[0].duration_ms, 0);
 
         mgr.warning("常驻告警", "常驻告警消息");
-        assert_eq!(mgr.toasts.borrow()[1].duration_ms, 0);
+        assert_eq!(mgr.toasts.lock().unwrap()[1].duration_ms, 0);
 
         mgr.set_duration_preset("3");
         mgr.warning("普通告警", "普通告警消息");
-        assert_eq!(mgr.toasts.borrow()[2].duration_ms, 3500);
+        assert_eq!(mgr.toasts.lock().unwrap()[2].duration_ms, 3500);
 
         mgr.error("普通错误", "普通错误消息");
-        assert_eq!(mgr.toasts.borrow()[3].duration_ms, 4000);
+        assert_eq!(mgr.toasts.lock().unwrap()[3].duration_ms, 4000);
     }
 }
 

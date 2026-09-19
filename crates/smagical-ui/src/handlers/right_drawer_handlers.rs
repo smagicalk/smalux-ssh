@@ -227,7 +227,7 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                 let thinking_str = thinking.to_string();
                 let audit_str = audit.to_string();
 
-                let (h_id, h_name, auto_audit_level, abort_flag) = DRAWER_STATE.with(|state_cell| {
+                let (h_id, h_name, auto_audit_level, abort_flag, ai_msg_id) = DRAWER_STATE.with(|state_cell| {
                     let mut state = state_cell.borrow_mut();
                     let raw_id = state.current_host_id.clone();
                     let active_term_id = w.global::<TerminalBridge>().get_active_host_id().to_string();
@@ -262,8 +262,23 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                         timestamp: "刚刚".into(),
                     };
 
+                    let ai_msg_id = format!("ai-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
+                    let placeholder_ai_msg = AiChatMessage {
+                        id: ai_msg_id.clone().into(),
+                        sender: "assistant".into(),
+                        content: "".into(),
+                        thinking_content: "".into(),
+                        is_thinking_expanded: true,
+                        suggested_cmd: "".into(),
+                        cmd_risk_level: "low".into(),
+                        audit_status: "pending".into(),
+                        audit_reason: "".into(),
+                        timestamp: "思考中...".into(),
+                    };
+
                     let session = state.ai_sessions.entry(h_id.clone()).or_insert_with(|| HostAiSession::new(&h_id, &h_name));
                     session.messages.push(user_msg);
+                    session.messages.push(placeholder_ai_msg);
                     session.selected_model = model_str.clone();
                     session.thinking_degree = thinking_str.clone();
                     session.audit_policy = audit_str.clone();
@@ -281,70 +296,309 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
 
                     let auto_audit_level = session.auto_audit_level.clone();
                     sync_ai_for_host_inner(&w, &mut state, &h_id, &h_name);
-                    (h_id, h_name, auto_audit_level, Some(abort_flag))
+                    (h_id, h_name, auto_audit_level, Some(abort_flag), ai_msg_id)
                 });
 
                 if let Some(abort_flag) = abort_flag {
                     w.global::<AiBridge>().set_input_text("".into());
 
-                    // 异步模拟大模型推理 (1.4 秒后返回针对该主机的建议与指令)
-                    let w_weak_timer = w.as_weak();
+                    // 从 Settings 读取端点配置
+                    let sb = w.global::<SettingsBridge>();
+                    let ep_base_url = sb.get_setting_ai_base_url().trim().to_string();
+                    let ep_api_key = sb.get_setting_ai_api_key().trim().to_string();
+                    let ep_temp = sb.get_setting_ai_temperature();
+                    let ep_headers = sb.get_setting_ai_custom_headers().trim().to_string();
+                    let ep_timeout = sb.get_setting_ai_timeout_secs() as u64;
+                    let ep_system_prompt = sb.get_setting_ai_system_prompt().trim().to_string();
+                    let ep_model = if !model_str.is_empty() { model_str.clone() } else { sb.get_setting_ai_model().trim().to_string() };
+
+                    let w_weak_stream = w.as_weak();
                     let content_str = content.to_string();
-                    let h_id_timer = h_id.clone();
-                    let h_name_timer = h_name.clone();
+                    let h_id_task = h_id.clone();
+                    let h_name_task = h_name.clone();
                     let m_str = model_str.clone();
                     let t_str = thinking_str.clone();
                     let a_str = audit_str.clone();
                     let auto_lvl_str = auto_audit_level.clone();
 
-                    slint::Timer::single_shot(std::time::Duration::from_millis(1400), move || {
+                    let is_real_llm = !ep_api_key.is_empty() || ep_base_url.contains("localhost") || ep_base_url.contains("127.0.0.1") || ep_base_url.contains("11434");
+
+                    crate::async_util::spawn_async(async move {
                         if abort_flag.load(Ordering::SeqCst) {
-                            tracing::info!(target: "smagical_ui::ai", "AI 生成任务已被终端销毁熔断取消");
+                            tracing::info!(target: "smagical_ui::ai", "AI 生成任务在启动前已被熔断取消");
                             return;
                         }
 
-                        let (suggested_cmd, risk_level, audit_status, audit_reason, thinking_text, reply_text) =
-                            generate_ai_devops_response(&h_name_timer, &content_str, &m_str, &t_str, &a_str, &auto_lvl_str);
+                        if is_real_llm {
+                            // 1. 真实远端/本地大模型原生纯 Rust SSE 流式推理
+                            let client_cfg = smagical_core::AiEndpointConfig {
+                                base_url: ep_base_url,
+                                api_key: ep_api_key,
+                                model: ep_model.clone(),
+                                temperature: ep_temp,
+                                timeout_secs: if ep_timeout == 0 { 60 } else { ep_timeout },
+                                custom_headers: if ep_headers.is_empty() { None } else { Some(ep_headers) },
+                            };
 
-                        let is_executed = audit_status == "executed";
-                        let cmd_to_run = suggested_cmd.clone();
-
-                        let ai_reply = AiChatMessage {
-                            id: format!("ai-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis()).into(),
-                            sender: "assistant".into(),
-                            content: reply_text.into(),
-                            thinking_content: thinking_text.into(),
-                            is_thinking_expanded: true,
-                            suggested_cmd: suggested_cmd.into(),
-                            cmd_risk_level: risk_level.into(),
-                            audit_status: audit_status.into(),
-                            audit_reason: audit_reason.into(),
-                            timestamp: "刚刚".into(),
-                        };
-
-                        DRAWER_STATE.with(|state_cell| {
-                            let mut state = state_cell.borrow_mut();
-                            if let Some(session) = state.ai_sessions.get_mut(&h_id_timer) {
-                                session.messages.push(ai_reply);
-                                session.is_generating = false;
+                            let mut req_messages = Vec::new();
+                            if !ep_system_prompt.is_empty() {
+                                req_messages.push(smagical_core::AiChatMessage::system(ep_system_prompt));
                             }
+                            req_messages.push(smagical_core::AiChatMessage::user(content_str.clone()));
 
-                            // 如果用户当前聚焦在该主机或未绑定具体主机，刷新 UI；若已切去别机，保存在缓冲区
-                            if let Some(w2) = w_weak_timer.upgrade() {
-                                if state.current_host_id == h_id_timer
-                                    || state.current_host_id.is_empty()
-                                    || h_id_timer == "default"
-                                    || state.current_host_id == "default"
-                                {
-                                    sync_ai_for_host_inner(&w2, &mut state, &h_id_timer, &h_name_timer);
-                                    // 自动执行模式下，直接注入当前活动终端并回车执行
-                                    if is_executed && !cmd_to_run.is_empty() {
-                                        let cmd_with_nl = format!("{}\n", cmd_to_run);
-                                        w2.global::<TerminalBridge>().invoke_send_snippet(cmd_with_nl.into());
+                            let chat_req = smagical_core::AiChatRequest {
+                                model: ep_model,
+                                messages: req_messages,
+                                stream: true,
+                                temperature: Some(ep_temp),
+                                max_tokens: None,
+                            };
+
+                            let client = match smagical_core::AiClient::new(client_cfg) {
+                                Ok(c) => c,
+                                Err(e) => {
+                                    tracing::error!(target: "smagical_ui::ai", "创建 AI Client 失败: {:?}", e);
+                                    return;
+                                }
+                            };
+
+                            match client.stream_chat(chat_req).await {
+                                Ok(mut rx) => {
+                                    let mut full_content = String::new();
+                                    let mut full_thinking = String::new();
+                                    let mut is_completed = false;
+
+                                    while let Some(chunk_res) = rx.recv().await {
+                                        if abort_flag.load(Ordering::SeqCst) {
+                                            tracing::info!(target: "smagical_ui::ai", "AI 流式生成已熔断取消");
+                                            break;
+                                        }
+
+                                        match chunk_res {
+                                            Ok(chunk) => {
+                                                full_content.push_str(&chunk.delta_content);
+                                                full_thinking.push_str(&chunk.delta_thinking);
+                                                if chunk.is_final {
+                                                    is_completed = true;
+                                                }
+
+                                                let extracted = smagical_core::extract_shell_command(&full_content).unwrap_or_default();
+                                                let (risk, reason) = if !extracted.is_empty() {
+                                                    smagical_core::assess_command_risk(&extracted)
+                                                } else {
+                                                    ("low", "")
+                                                };
+
+                                                let audit_status = match a_str.as_str() {
+                                                    "纯人工" => "pending",
+                                                    "只读巡检" => if risk == "low" { "approved" } else { "pending" },
+                                                    "辅助运维" => if risk != "high" { "approved" } else { "pending" },
+                                                    "免审直达" => "executed",
+                                                    "AI自审" => "approved",
+                                                    _ => "pending",
+                                                };
+
+                                                let is_exec = audit_status == "executed" && is_completed;
+                                                let cmd_to_run = extracted.clone();
+
+                                                let w_up = w_weak_stream.clone();
+                                                let h_id_copy = h_id_task.clone();
+                                                let h_name_copy = h_name_task.clone();
+                                                let content_copy = full_content.clone();
+                                                let thinking_copy = full_thinking.clone();
+                                                let cmd_copy = extracted.clone();
+                                                let msg_id_copy = ai_msg_id.clone();
+                                                let status_copy = audit_status.to_string();
+                                                let reason_copy = reason.to_string();
+                                                let risk_copy = risk.to_string();
+
+                                                let _ = slint::invoke_from_event_loop(move || {
+                                                    DRAWER_STATE.with(|state_cell| {
+                                                        let mut state = state_cell.borrow_mut();
+                                                        if let Some(sess) = state.ai_sessions.get_mut(&h_id_copy) {
+                                                            if let Some(msg) = sess.messages.iter_mut().find(|m| m.id == msg_id_copy) {
+                                                                msg.content = content_copy.into();
+                                                                msg.thinking_content = thinking_copy.into();
+                                                                msg.suggested_cmd = cmd_copy.into();
+                                                                msg.cmd_risk_level = risk_copy.into();
+                                                                msg.audit_status = status_copy.into();
+                                                                msg.audit_reason = reason_copy.into();
+                                                                msg.timestamp = if is_completed { "刚刚".into() } else { "思考中...".into() };
+                                                            }
+                                                            if is_completed {
+                                                                sess.is_generating = false;
+                                                            }
+                                                        }
+
+                                                        if let Some(w2) = w_up.upgrade() {
+                                                            if state.current_host_id == h_id_copy || state.current_host_id.is_empty() || state.current_host_id == "default" {
+                                                                sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                                                if is_exec && !cmd_to_run.is_empty() {
+                                                                    let cmd_with_nl = format!("{}\n", cmd_to_run);
+                                                                    w2.global::<TerminalBridge>().invoke_send_snippet(cmd_with_nl.into());
+                                                                }
+                                                            }
+                                                        }
+                                                    });
+                                                });
+                                            }
+                                            Err(err) => {
+                                                tracing::warn!(target: "smagical_ui::ai", "流式接收异常: {:?}", err);
+                                                let err_text = format!("流式生成异常中断: {}", err);
+                                                let w_up = w_weak_stream.clone();
+                                                let h_id_copy = h_id_task.clone();
+                                                let h_name_copy = h_name_task.clone();
+                                                let msg_id_copy = ai_msg_id.clone();
+                                                let _ = slint::invoke_from_event_loop(move || {
+                                                    DRAWER_STATE.with(|state_cell| {
+                                                        let mut state = state_cell.borrow_mut();
+                                                        if let Some(sess) = state.ai_sessions.get_mut(&h_id_copy) {
+                                                            if let Some(msg) = sess.messages.iter_mut().find(|m| m.id == msg_id_copy) {
+                                                                if msg.content.is_empty() {
+                                                                    msg.content = err_text.into();
+                                                                }
+                                                                msg.timestamp = "异常中断".into();
+                                                            }
+                                                            sess.is_generating = false;
+                                                        }
+                                                        if let Some(w2) = w_up.upgrade() {
+                                                            sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                                        }
+                                                    });
+                                                });
+                                                break;
+                                            }
+                                        }
                                     }
                                 }
+                                Err(err) => {
+                                    tracing::error!(target: "smagical_ui::ai", "发起 AI 会话失败: {:?}", err);
+                                    let err_text = format!("连接 AI 端点失败: {}\n请在「设置 - AI 助手」中检查 API 接口地址与 API Key 凭据配置。", err);
+                                    let w_up = w_weak_stream.clone();
+                                    let h_id_copy = h_id_task.clone();
+                                    let h_name_copy = h_name_task.clone();
+                                    let msg_id_copy = ai_msg_id.clone();
+                                    let _ = slint::invoke_from_event_loop(move || {
+                                        DRAWER_STATE.with(|state_cell| {
+                                            let mut state = state_cell.borrow_mut();
+                                            if let Some(sess) = state.ai_sessions.get_mut(&h_id_copy) {
+                                                if let Some(msg) = sess.messages.iter_mut().find(|m| m.id == msg_id_copy) {
+                                                    msg.content = err_text.into();
+                                                    msg.timestamp = "连接失败".into();
+                                                }
+                                                sess.is_generating = false;
+                                            }
+                                            if let Some(w2) = w_up.upgrade() {
+                                                sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                            }
+                                        });
+                                    });
+                                }
                             }
-                        });
+                        } else {
+                            // 2. 本地高保真打字机流式输出模拟 (带完整的 DeepSeek-R1 思考链、建议命令提取与安全审核)
+                            let (suggested_cmd, risk_level, audit_status, audit_reason, thinking_text, reply_text) =
+                                generate_ai_devops_response(&h_name_task, &content_str, &m_str, &t_str, &a_str, &auto_lvl_str);
+
+                            let is_executed = audit_status == "executed";
+                            let cmd_to_run = suggested_cmd.clone();
+
+                            // 2.1 逐字符流式输出思考过程 (CoT)
+                            let mut current_thinking = String::new();
+                            let thinking_chars: Vec<char> = thinking_text.chars().collect();
+                            for chunk in thinking_chars.chunks(6) {
+                                if abort_flag.load(Ordering::SeqCst) {
+                                    return;
+                                }
+                                for c in chunk {
+                                    current_thinking.push(*c);
+                                }
+                                let w_up = w_weak_stream.clone();
+                                let h_id_copy = h_id_task.clone();
+                                let h_name_copy = h_name_task.clone();
+                                let thinking_copy = current_thinking.clone();
+                                let msg_id_copy = ai_msg_id.clone();
+
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    DRAWER_STATE.with(|state_cell| {
+                                        let mut state = state_cell.borrow_mut();
+                                        if let Some(sess) = state.ai_sessions.get_mut(&h_id_copy) {
+                                            if let Some(msg) = sess.messages.iter_mut().find(|m| m.id == msg_id_copy) {
+                                                msg.thinking_content = thinking_copy.into();
+                                                msg.timestamp = "思考中...".into();
+                                            }
+                                        }
+                                        if let Some(w2) = w_up.upgrade() {
+                                            if state.current_host_id == h_id_copy || state.current_host_id.is_empty() || state.current_host_id == "default" {
+                                                sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                            }
+                                        }
+                                    });
+                                });
+                                tokio::time::sleep(tokio::time::Duration::from_millis(18)).await;
+                            }
+
+                            // 2.2 逐字符流式输出正文回复并挂载命令
+                            let mut current_reply = String::new();
+                            let reply_chars: Vec<char> = reply_text.chars().collect();
+                            let total_chunks = (reply_chars.len() + 4) / 5;
+                            let mut chunk_idx = 0;
+
+                            for chunk in reply_chars.chunks(5) {
+                                if abort_flag.load(Ordering::SeqCst) {
+                                    return;
+                                }
+                                for c in chunk {
+                                    current_reply.push(*c);
+                                }
+                                chunk_idx += 1;
+                                let is_final = chunk_idx >= total_chunks;
+
+                                let w_up = w_weak_stream.clone();
+                                let h_id_copy = h_id_task.clone();
+                                let h_name_copy = h_name_task.clone();
+                                let reply_copy = current_reply.clone();
+                                let thinking_copy = thinking_text.clone();
+                                let cmd_copy = if is_final { suggested_cmd.clone() } else { String::new() };
+                                let risk_copy = risk_level.clone();
+                                let status_copy = audit_status.clone();
+                                let reason_copy = audit_reason.clone();
+                                let msg_id_copy = ai_msg_id.clone();
+                                let cmd_exec = cmd_to_run.clone();
+
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    DRAWER_STATE.with(|state_cell| {
+                                        let mut state = state_cell.borrow_mut();
+                                        if let Some(sess) = state.ai_sessions.get_mut(&h_id_copy) {
+                                            if let Some(msg) = sess.messages.iter_mut().find(|m| m.id == msg_id_copy) {
+                                                msg.content = reply_copy.into();
+                                                msg.thinking_content = thinking_copy.into();
+                                                if is_final {
+                                                    msg.suggested_cmd = cmd_copy.into();
+                                                    msg.cmd_risk_level = risk_copy.into();
+                                                    msg.audit_status = status_copy.into();
+                                                    msg.audit_reason = reason_copy.into();
+                                                    msg.timestamp = "刚刚".into();
+                                                }
+                                            }
+                                            if is_final {
+                                                sess.is_generating = false;
+                                            }
+                                        }
+                                        if let Some(w2) = w_up.upgrade() {
+                                            if state.current_host_id == h_id_copy || state.current_host_id.is_empty() || state.current_host_id == "default" {
+                                                sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                                if is_final && is_executed && !cmd_exec.is_empty() {
+                                                    let cmd_with_nl = format!("{}\n", cmd_exec);
+                                                    w2.global::<TerminalBridge>().invoke_send_snippet(cmd_with_nl.into());
+                                                }
+                                            }
+                                        }
+                                    });
+                                });
+                                tokio::time::sleep(tokio::time::Duration::from_millis(20)).await;
+                            }
+                        }
                     });
                 }
             }

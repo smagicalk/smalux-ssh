@@ -4,15 +4,19 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 use slint::{ComponentHandle, Model};
 use smagical_core::event::ConfigChangedEvent;
 use smagical_core::AppStorage;
+use crate::async_util::spawn_async;
 use crate::debug::{
     generate_batch_hosts, get_preset_by_id, BatchGenerateConfig,
 };
 
 use crate::debug_ui::sync_ui_debug_logs;
 use crate::generated::{AppTheme, AppWindow, CredentialsBridge, DebugBridge, HostItemData, HostsBridge, SettingsBridge, WindowBridge};
+use crate::handlers::credential_handlers::sync_credentials_ui_async;
+use crate::handlers::snippet_handlers::sync_ui_snippets_async;
 use crate::handlers::AppContext;
 use crate::tree_model::{
     build_group_options, build_search_tree_nodes, build_visible_tree_nodes,
@@ -35,10 +39,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 支持按前缀、数量、起始 IP、目标分组与状态模式快速生成大规模主机资产，支持“追加 (Append)”或“覆盖 (Overwrite)”。
     let window_weak = window.as_weak();
-    let master_tree_bg = Rc::clone(&ctx.master_tree);
-    let expanded_bg = Rc::clone(&ctx.expanded_groups);
-    let selector_bg = Rc::clone(&ctx.selector_expanded_groups);
-    let search_bg = Rc::clone(&ctx.search_query);
+    let master_tree_bg = Arc::clone(&ctx.master_tree);
+    let expanded_bg = Arc::clone(&ctx.expanded_groups);
+    let selector_bg = Arc::clone(&ctx.selector_expanded_groups);
+    let search_bg = Arc::clone(&ctx.search_query);
     db.on_batch_generate(move |prefix, count_str, ip_prefix, start_ip_str, port_str, group, status_mode, overwrite| {
 
         if let Some(w) = window_weak.upgrade() {
@@ -77,10 +81,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 .collect();
 
             if overwrite {
-                *master_tree_bg.borrow_mut() = new_tree.clone();
+                *master_tree_bg.write().unwrap() = new_tree.clone();
                 w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
             } else {
-                let mut current_tree = master_tree_bg.borrow_mut();
+                let mut current_tree = master_tree_bg.write().unwrap();
                 let (leaf_gid, leaf_lvl, _leaf_name) = ensure_raw_group_hierarchy(&mut current_tree, &grp_str);
                 
                 // 将新生成的 host 节点挂入已存在/新建的叶子分组
@@ -100,20 +104,24 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             // 展开新增的分组
-            for n in &new_tree {
-                if n.is_group {
-                    expanded_bg.borrow_mut().insert(n.id.clone());
-                    selector_bg.borrow_mut().insert(n.id.clone());
+            {
+                let mut exp = expanded_bg.write().unwrap();
+                let mut sel = selector_bg.write().unwrap();
+                for n in &new_tree {
+                    if n.is_group {
+                        exp.insert(n.id.clone());
+                        sel.insert(n.id.clone());
+                    }
                 }
             }
 
-            let tree = master_tree_bg.borrow();
-            let opts = build_group_options(&tree, &selector_bg.borrow());
+            let tree = master_tree_bg.read().unwrap();
+            let opts = build_group_options(&tree, &selector_bg.read().unwrap());
             w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
-            let q = search_bg.borrow().clone();
+            let q = search_bg.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_bg.borrow())
+                build_visible_tree_nodes(&tree, &expanded_bg.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
@@ -130,32 +138,34 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 支持将所有主机一键切换为 "all_online" (全在线), "all_offline" (全离线), "all_warning" (全告警) 或 "mixed" (混合)。
     let window_weak = window.as_weak();
-    let master_tree_bs = Rc::clone(&ctx.master_tree);
-    let expanded_bs = Rc::clone(&ctx.expanded_groups);
-    let search_bs = Rc::clone(&ctx.search_query);
-    let core_state_bs = Rc::clone(&ctx.core_state);
+    let master_tree_bs = Arc::clone(&ctx.master_tree);
+    let expanded_bs = Arc::clone(&ctx.expanded_groups);
+    let search_bs = Arc::clone(&ctx.search_query);
+    let storage_bs = ctx.core_state.storage();
     db.on_batch_update_status(move |status_mode| {
         if let Some(w) = window_weak.upgrade() {
             let st = status_mode.as_str();
-            let mut tree = master_tree_bs.borrow_mut();
-            for (i, node) in tree.iter_mut().enumerate() {
-                if !node.is_group {
-                    let (s, ping) = match st {
-                        "all_online" | "online" => ("online", 18),
-                        "all_offline" | "offline" => ("offline", 0),
-                        "all_warning" | "warning" => ("warning", 160),
-                        _ => {
-                            if i % 3 == 0 {
-                                ("warning", 135)
-                            } else if i % 4 == 0 {
-                                ("offline", 0)
-                            } else {
-                                ("online", 20)
+            {
+                let mut tree = master_tree_bs.write().unwrap();
+                for (i, node) in tree.iter_mut().enumerate() {
+                    if !node.is_group {
+                        let (s, ping) = match st {
+                            "all_online" | "online" => ("online", 18),
+                            "all_offline" | "offline" => ("offline", 0),
+                            "all_warning" | "warning" => ("warning", 160),
+                            _ => {
+                                if i % 3 == 0 {
+                                    ("warning", 135)
+                                } else if i % 4 == 0 {
+                                    ("offline", 0)
+                                } else {
+                                    ("online", 20)
+                                }
                             }
-                        }
-                    };
-                    node.status = s.to_string();
-                    node.ping_ms = ping;
+                        };
+                        node.status = s.to_string();
+                        node.ping_ms = ping;
+                    }
                 }
             }
 
@@ -181,24 +191,29 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
             w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
-            // 同步批量状态更新至存储层
-            if let Ok(stored_hosts) = core_state_bs.storage().hosts().list_all() {
-                let updated: Vec<smagical_core::HostRecord> = stored_hosts.into_iter().map(|mut h| {
-                    let new_status = match st {
-                        "all_online" | "online" => smagical_core::HostStatus::Online,
-                        "all_offline" | "offline" => smagical_core::HostStatus::Offline,
-                        "all_warning" | "warning" => smagical_core::HostStatus::Warning,
-                        _ => smagical_core::HostStatus::Online,
-                    };
-                    h.status = new_status;
-                    h
-                }).collect();
-                let _ = core_state_bs.storage().hosts().save_batch(&updated);
-            }
+            // 异步批量状态更新至存储层 (0ms UI 阻塞)
+            let storage = storage_bs.clone();
+            let st_owned = st.to_string();
+            spawn_async(async move {
+                if let Ok(stored_hosts) = storage.hosts().list_all().await {
+                    let updated: Vec<smagical_core::HostRecord> = stored_hosts.into_iter().map(|mut h| {
+                        let new_status = match st_owned.as_str() {
+                            "all_online" | "online" => smagical_core::HostStatus::Online,
+                            "all_offline" | "offline" => smagical_core::HostStatus::Offline,
+                            "all_warning" | "warning" => smagical_core::HostStatus::Warning,
+                            _ => smagical_core::HostStatus::Online,
+                        };
+                        h.status = new_status;
+                        h
+                    }).collect();
+                    let _ = storage.hosts().save_batch(&updated).await;
+                }
+            });
 
-            let q = search_bs.borrow().clone();
+            let tree = master_tree_bs.read().unwrap();
+            let q = search_bs.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_bs.borrow())
+                build_visible_tree_nodes(&tree, &expanded_bs.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
@@ -215,16 +230,18 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 一键修改全量主机的 SSH 连接端口 (例如由 22 切换为 2222)。
     let window_weak = window.as_weak();
-    let master_tree_bp = Rc::clone(&ctx.master_tree);
-    let expanded_bp = Rc::clone(&ctx.expanded_groups);
-    let search_bp = Rc::clone(&ctx.search_query);
+    let master_tree_bp = Arc::clone(&ctx.master_tree);
+    let expanded_bp = Arc::clone(&ctx.expanded_groups);
+    let search_bp = Arc::clone(&ctx.search_query);
     db.on_batch_update_port(move |new_port_str| {
         if let Some(w) = window_weak.upgrade() {
             let new_port = new_port_str.as_str().parse::<i32>().unwrap_or(22);
-            let mut tree = master_tree_bp.borrow_mut();
-            for node in tree.iter_mut() {
-                if !node.is_group {
-                    node.port = new_port;
+            {
+                let mut tree = master_tree_bp.write().unwrap();
+                for node in tree.iter_mut() {
+                    if !node.is_group {
+                        node.port = new_port;
+                    }
                 }
             }
 
@@ -235,9 +252,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
             w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
-            let q = search_bp.borrow().clone();
+            let tree = master_tree_bp.read().unwrap();
+            let q = search_bp.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_bp.borrow())
+                build_visible_tree_nodes(&tree, &expanded_bp.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
@@ -254,10 +272,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 注入内置标准测试数据集 (如: "deep_nested" 6级深度树, "massive_100" 百台机器, "minimal" 精简集合)。
     let window_weak = window.as_weak();
-    let master_tree_inj = Rc::clone(&ctx.master_tree);
-    let expanded_inj = Rc::clone(&ctx.expanded_groups);
-    let selector_inj = Rc::clone(&ctx.selector_expanded_groups);
-    let search_inj = Rc::clone(&ctx.search_query);
+    let master_tree_inj = Arc::clone(&ctx.master_tree);
+    let expanded_inj = Arc::clone(&ctx.expanded_groups);
+    let selector_inj = Arc::clone(&ctx.selector_expanded_groups);
+    let search_inj = Arc::clone(&ctx.search_query);
     db.on_inject_preset(move |preset_id| {
 
         if let Some(w) = window_weak.upgrade() {
@@ -277,12 +295,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 })
                 .collect();
 
-            *master_tree_inj.borrow_mut() = new_tree.clone();
+            *master_tree_inj.write().unwrap() = new_tree.clone();
             w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
 
             // 预设注入后展开所有顶级及二级分组
-            let mut exp = expanded_inj.borrow_mut();
-            let mut sel = selector_inj.borrow_mut();
+            let mut exp = expanded_inj.write().unwrap();
+            let mut sel = selector_inj.write().unwrap();
             exp.clear();
             sel.clear();
             for n in &new_tree {
@@ -295,7 +313,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             let opts = build_group_options(&new_tree, &sel);
             w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
-            let q = search_inj.borrow().clone();
+            let q = search_inj.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
                 build_visible_tree_nodes(&new_tree, &exp)
             } else {
@@ -314,11 +332,11 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 支持直接指定斜杠嵌套路径（如: "集群/k8s-master"），自动创建父级分组并同步保存至存储层。
     let window_weak = window.as_weak();
-    let master_tree_qh = Rc::clone(&ctx.master_tree);
-    let expanded_qh = Rc::clone(&ctx.expanded_groups);
-    let selector_qh = Rc::clone(&ctx.selector_expanded_groups);
-    let search_qh = Rc::clone(&ctx.search_query);
-    let core_state_qh = Rc::clone(&ctx.core_state);
+    let master_tree_qh = Arc::clone(&ctx.master_tree);
+    let expanded_qh = Arc::clone(&ctx.expanded_groups);
+    let selector_qh = Arc::clone(&ctx.selector_expanded_groups);
+    let search_qh = Arc::clone(&ctx.search_query);
+    let storage_qh = ctx.core_state.storage();
     let next_hid = Rc::new(RefCell::new(100));
     db.on_quick_add_host(move |name, ip, port_str, group| {
         if let Some(w) = window_weak.upgrade() {
@@ -332,14 +350,16 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             *counter += 1;
             let new_id = format!("custom-host-{}", *counter);
 
-            let mut tree = master_tree_qh.borrow_mut();
+            let mut tree = master_tree_qh.write().unwrap();
 
             let (parent_id, level, display_grp) = if !h_grp.is_empty() {
                 let (pid, lvl, name) = ensure_raw_group_hierarchy(&mut tree, &h_grp);
+                let mut exp = expanded_qh.write().unwrap();
+                let mut sel = selector_qh.write().unwrap();
                 for n in tree.iter() {
                     if n.is_group {
-                        expanded_qh.borrow_mut().insert(n.id.clone());
-                        selector_qh.borrow_mut().insert(n.id.clone());
+                        exp.insert(n.id.clone());
+                        sel.insert(n.id.clone());
                     }
                 }
                 (pid, lvl + 1, name)
@@ -358,11 +378,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 status: "online".to_string(),
                 ping_ms: 22,
                 item_count: 0,
+                effective_username: None,
             };
 
             tree.push(node);
 
-            // 同步新增主机至存储层，避免与 storage 双真相来源分叉
+            // 异步同步新增主机至存储层，避免与 storage 双真相来源分叉 (0ms UI 阻塞)
             let host_rec = smagical_core::HostRecord {
                 id: new_id.clone(),
                 name: h_name.clone(),
@@ -376,14 +397,17 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 notes: String::new(),
                 ..Default::default()
             };
-            let _ = core_state_qh.storage().hosts().save(&host_rec);
+            let storage = storage_qh.clone();
+            spawn_async(async move {
+                let _ = storage.hosts().save(&host_rec).await;
+            });
 
-            let opts = build_group_options(&tree, &selector_qh.borrow());
+            let opts = build_group_options(&tree, &selector_qh.read().unwrap());
             w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
-            let q = search_qh.borrow().clone();
+            let q = search_qh.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_qh.borrow())
+                build_visible_tree_nodes(&tree, &expanded_qh.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
@@ -414,31 +438,35 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 支持按多级路径直接创建嵌套分组（如: "华东/上海/开发环境"）。
     let window_weak = window.as_weak();
-    let master_tree_qg = Rc::clone(&ctx.master_tree);
-    let expanded_qg = Rc::clone(&ctx.expanded_groups);
-    let selector_qg = Rc::clone(&ctx.selector_expanded_groups);
-    let search_qg = Rc::clone(&ctx.search_query);
+    let master_tree_qg = Arc::clone(&ctx.master_tree);
+    let expanded_qg = Arc::clone(&ctx.expanded_groups);
+    let selector_qg = Arc::clone(&ctx.selector_expanded_groups);
+    let search_qg = Arc::clone(&ctx.search_query);
     db.on_quick_add_group(move |name, _parent| {
         if let Some(w) = window_weak.upgrade() {
             let g_name = name.trim().to_string();
             if g_name.is_empty() { return; }
 
-            let mut tree = master_tree_qg.borrow_mut();
+            let mut tree = master_tree_qg.write().unwrap();
             let (_leaf_id, _leaf_lvl, _leaf_name) = ensure_raw_group_hierarchy(&mut tree, &g_name);
 
-            for n in tree.iter() {
-                if n.is_group {
-                    expanded_qg.borrow_mut().insert(n.id.clone());
-                    selector_qg.borrow_mut().insert(n.id.clone());
+            {
+                let mut exp = expanded_qg.write().unwrap();
+                let mut sel = selector_qg.write().unwrap();
+                for n in tree.iter() {
+                    if n.is_group {
+                        exp.insert(n.id.clone());
+                        sel.insert(n.id.clone());
+                    }
                 }
             }
 
-            let opts = build_group_options(&tree, &selector_qg.borrow());
+            let opts = build_group_options(&tree, &selector_qg.read().unwrap());
             w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
 
-            let q = search_qg.borrow().clone();
+            let q = search_qg.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
-                build_visible_tree_nodes(&tree, &expanded_qg.borrow())
+                build_visible_tree_nodes(&tree, &expanded_qg.read().unwrap())
             } else {
                 build_search_tree_nodes(&tree, &q)
             };
@@ -455,22 +483,25 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 一键清空内存树形缓存、列表模型并彻底清空存储层中所有主机与分组记录。
     let window_weak = window.as_weak();
-    let master_tree_clr = Rc::clone(&ctx.master_tree);
-    let core_state_clr = Rc::clone(&ctx.core_state);
+    let master_tree_clr = Arc::clone(&ctx.master_tree);
+    let storage_clr = ctx.core_state.storage();
     db.on_clear_all_data(move || {
         if let Some(w) = window_weak.upgrade() {
-            master_tree_clr.borrow_mut().clear();
+            master_tree_clr.write().unwrap().clear();
             w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostTreeNode>::new()))));
             w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostItemData>::new()))));
             w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::GroupOptionData>::new()))));
             w.global::<HostsBridge>().set_tree_content_width(240.0_f32);
-            // 同步清空存储层
-            if let Ok(hosts) = core_state_clr.storage().hosts().list_all() {
-                for h in &hosts { let _ = core_state_clr.storage().hosts().delete(&h.id); }
-            }
-            if let Ok(groups) = core_state_clr.storage().groups().list_all() {
-                for g in &groups { let _ = core_state_clr.storage().groups().delete(&g.id); }
-            }
+            // 异步清空存储层 (0ms UI 阻塞)
+            let storage = storage_clr.clone();
+            spawn_async(async move {
+                if let Ok(hosts) = storage.hosts().list_all().await {
+                    for h in &hosts { let _ = storage.hosts().delete(&h.id).await; }
+                }
+                if let Ok(groups) = storage.groups().list_all().await {
+                    for g in &groups { let _ = storage.groups().delete(&g.id).await; }
+                }
+            });
             tracing::warn!(target: "smagical_debug::data", "全量主机与分组数据已被清空");
             sync_ui_debug_logs(&w);
         }
@@ -481,9 +512,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     // 将内存数据模型与界面重置恢复至系统内置默认数据集 (Minimal 预设)。
     let window_weak = window.as_weak();
-    let master_tree_rst = Rc::clone(&ctx.master_tree);
-    let expanded_rst = Rc::clone(&ctx.expanded_groups);
-    let selector_rst = Rc::clone(&ctx.selector_expanded_groups);
+    let master_tree_rst = Arc::clone(&ctx.master_tree);
+    let expanded_rst = Arc::clone(&ctx.expanded_groups);
+    let selector_rst = Arc::clone(&ctx.selector_expanded_groups);
     db.on_reset_default_data(move || {
         if let Some(w) = window_weak.upgrade() {
             let (def_tree_raw, def_cards_raw) = get_preset_by_id("minimal");
@@ -501,11 +532,11 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 })
                 .collect();
 
-            *master_tree_rst.borrow_mut() = def_tree.clone();
+            *master_tree_rst.write().unwrap() = def_tree.clone();
             w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(def_cards))));
 
-            let mut exp = expanded_rst.borrow_mut();
-            let mut sel = selector_rst.borrow_mut();
+            let mut exp = expanded_rst.write().unwrap();
+            let mut sel = selector_rst.write().unwrap();
             exp.clear();
             sel.clear();
             for n in &def_tree {
@@ -693,20 +724,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 14. 批量生成凭据测试数据
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let core_state_bg_cred = ctx.core_state.clone();
+    let storage_bg_cred = ctx.core_state.storage();
     let notif_bg_cred = ctx.notifications.clone();
     db.on_batch_generate_credentials(move |count_str, mode_str, overwrite| {
         if let Some(w) = window_weak.upgrade() {
             let count = count_str.as_str().parse::<usize>().unwrap_or(10).max(1);
             let mode = mode_str.to_string();
-
-            if overwrite {
-                if let Ok(existing) = core_state_bg_cred.storage().credentials().list_all() {
-                    for c in existing {
-                        let _ = core_state_bg_cred.storage().credentials().delete(&c.id);
-                    }
-                }
-            }
 
             let mut batch_records = Vec::with_capacity(count);
             for i in 1..=count {
@@ -772,12 +795,28 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 batch_records.push(rec);
             }
 
-            let _ = core_state_bg_cred.storage().credentials().save_batch(&batch_records);
+            let storage = storage_bg_cred.clone();
+            let window_weak_bg = window_weak.clone();
+            let notif = notif_bg_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
             let cat = bridge.get_credential_filter_category().to_string();
             let q = bridge.get_credential_search_query().to_string();
-            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_bg_cred, &cat, &q);
-            notif_bg_cred.success("批量凭据生成完成", &format!("成功注入 {} 条测试凭据数据", count));
+
+            spawn_async(async move {
+                if overwrite {
+                    if let Ok(existing) = storage.credentials().list_all().await {
+                        for c in existing {
+                            let _ = storage.credentials().delete(&c.id).await;
+                        }
+                    }
+                }
+
+                let _ = storage.credentials().save_batch(&batch_records).await;
+                sync_credentials_ui_async(window_weak_bg, storage, cat, q);
+                let _ = slint::invoke_from_event_loop(move || {
+                    notif.success("批量凭据生成完成", &format!("成功注入 {} 条测试凭据数据", count));
+                });
+            });
         }
     });
 
@@ -785,7 +824,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 15. 快捷添加单条测试凭据
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let core_state_qa_cred = ctx.core_state.clone();
+    let storage_qa_cred = ctx.core_state.storage();
     let notif_qa_cred = ctx.notifications.clone();
     db.on_quick_add_credential(move |ctype, name, data| {
         if let Some(w) = window_weak.upgrade() {
@@ -851,12 +890,20 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 },
             };
 
-            let _ = core_state_qa_cred.storage().credentials().save(&rec);
+            let storage = storage_qa_cred.clone();
+            let window_weak_bg = window_weak.clone();
+            let notif = notif_qa_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
             let cat = bridge.get_credential_filter_category().to_string();
             let q = bridge.get_credential_search_query().to_string();
-            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_qa_cred, &cat, &q);
-            notif_qa_cred.success("凭据添加成功", &format!("已成功注入: {}", c_name));
+
+            spawn_async(async move {
+                let _ = storage.credentials().save(&rec).await;
+                sync_credentials_ui_async(window_weak_bg, storage, cat, q);
+                let _ = slint::invoke_from_event_loop(move || {
+                    notif.success("凭据添加成功", &format!("已成功注入: {}", c_name));
+                });
+            });
         }
     });
 
@@ -864,16 +911,10 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 16. 恢复默认凭据预设
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let core_state_rst_cred = ctx.core_state.clone();
+    let storage_rst_cred = ctx.core_state.storage();
     let notif_rst_cred = ctx.notifications.clone();
     db.on_reset_default_credentials(move || {
         if let Some(w) = window_weak.upgrade() {
-            if let Ok(existing) = core_state_rst_cred.storage().credentials().list_all() {
-                for c in existing {
-                    let _ = core_state_rst_cred.storage().credentials().delete(&c.id);
-                }
-            }
-
             let default_creds = vec![
                 smagical_core::CredentialRecord {
                     id: "cred-prod-ed25519".to_string(),
@@ -967,12 +1008,26 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 },
             ];
 
-            let _ = core_state_rst_cred.storage().credentials().save_batch(&default_creds);
+            let storage = storage_rst_cred.clone();
+            let window_weak_bg = window_weak.clone();
+            let notif = notif_rst_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
             let cat = bridge.get_credential_filter_category().to_string();
             let q = bridge.get_credential_search_query().to_string();
-            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_rst_cred, &cat, &q);
-            notif_rst_cred.success("预设恢复完成", "已重新载入 6 项精选预设凭据");
+
+            spawn_async(async move {
+                if let Ok(existing) = storage.credentials().list_all().await {
+                    for c in existing {
+                        let _ = storage.credentials().delete(&c.id).await;
+                    }
+                }
+
+                let _ = storage.credentials().save_batch(&default_creds).await;
+                sync_credentials_ui_async(window_weak_bg, storage, cat, q);
+                let _ = slint::invoke_from_event_loop(move || {
+                    notif.success("预设恢复完成", "已重新载入 6 项精选预设凭据");
+                });
+            });
         }
     });
 
@@ -980,21 +1035,29 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 17. 清空所有凭据
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let core_state_clr_cred = ctx.core_state.clone();
+    let storage_clr_cred = ctx.core_state.storage();
     let notif_clr_cred = ctx.notifications.clone();
     db.on_clear_credentials(move || {
         if let Some(w) = window_weak.upgrade() {
-            if let Ok(existing) = core_state_clr_cred.storage().credentials().list_all() {
-                for c in existing {
-                    let _ = core_state_clr_cred.storage().credentials().delete(&c.id);
-                }
-            }
-
+            let storage = storage_clr_cred.clone();
+            let window_weak_bg = window_weak.clone();
+            let notif = notif_clr_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
             let cat = bridge.get_credential_filter_category().to_string();
             let q = bridge.get_credential_search_query().to_string();
-            crate::handlers::credential_handlers::sync_credentials_ui(&w, &core_state_clr_cred, &cat, &q);
-            notif_clr_cred.info("凭据已清空", "所有凭据数据已从存储层完全清除");
+
+            spawn_async(async move {
+                if let Ok(existing) = storage.credentials().list_all().await {
+                    for c in existing {
+                        let _ = storage.credentials().delete(&c.id).await;
+                    }
+                }
+
+                sync_credentials_ui_async(window_weak_bg, storage, cat, q);
+                let _ = slint::invoke_from_event_loop(move || {
+                    notif.info("凭据已清空", "所有凭据数据已从存储层完全清除");
+                });
+            });
         }
     });
 
@@ -1003,17 +1066,14 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let ctx = ctx.clone();
+        let storage_snip = ctx.core_state.storage();
+        let master_cache = Arc::clone(&ctx.master_snippet_tree);
+        let search_query_ref = Rc::clone(&ctx.snippet_search_query);
+        let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
+        let notif = ctx.notifications.clone();
         db.on_batch_generate_snippets(move |count_str, overwrite| {
-            if let Some(w) = window_weak.upgrade() {
+            if window_weak.upgrade().is_some() {
                 let count = count_str.as_str().parse::<usize>().unwrap_or(10).min(100);
-                if overwrite {
-                    if let Ok(existing) = ctx.core_state.storage().snippets().list_all() {
-                        for s in existing {
-                            let _ = ctx.core_state.storage().snippets().delete(&s.id);
-                        }
-                    }
-                }
 
                 let mut new_snippets = Vec::new();
                 for i in 1..=count {
@@ -1033,9 +1093,28 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                     new_snippets.push(snip);
                 }
 
-                let _ = ctx.core_state.storage().snippets().save_batch(&new_snippets);
-                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
-                ctx.notify_success("代码片段生成完毕", format!("已生成 {} 条测试代码片段并写入存储库", count));
+                let storage = storage_snip.clone();
+                let master_cache = Arc::clone(&master_cache);
+                let search_q = search_query_ref.borrow().clone();
+                let exp = expanded_ref.borrow().clone();
+                let window_weak_bg = window_weak.clone();
+                let notif = notif.clone();
+
+                spawn_async(async move {
+                    if overwrite {
+                        if let Ok(existing) = storage.snippets().list_all().await {
+                            for s in existing {
+                                let _ = storage.snippets().delete(&s.id).await;
+                            }
+                        }
+                    }
+
+                    let _ = storage.snippets().save_batch(&new_snippets).await;
+                    sync_ui_snippets_async(window_weak_bg, storage, master_cache, search_q, exp);
+                    let _ = slint::invoke_from_event_loop(move || {
+                        notif.success("代码片段生成完毕", format!("已生成 {} 条测试代码片段并写入存储库", count));
+                    });
+                });
             }
         });
     }
@@ -1045,9 +1124,13 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let ctx = ctx.clone();
+        let storage_snip = ctx.core_state.storage();
+        let master_cache = Arc::clone(&ctx.master_snippet_tree);
+        let search_query_ref = Rc::clone(&ctx.snippet_search_query);
+        let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
+        let notif = ctx.notifications.clone();
         db.on_quick_add_snippet(move |title, lang, cmd| {
-            if let Some(w) = window_weak.upgrade() {
+            if window_weak.upgrade().is_some() {
                 let new_id = format!("snip-quick-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
                 let snip = smagical_core::SnippetRecord {
                     id: new_id,
@@ -1063,9 +1146,21 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                     updated_at: "刚刚".to_string(),
                 };
 
-                let _ = ctx.core_state.storage().snippets().save(&snip);
-                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
-                ctx.notify_success("片段添加成功", format!("已注入单条测试片段: '{}'", snip.title));
+                let storage = storage_snip.clone();
+                let master_cache = Arc::clone(&master_cache);
+                let search_q = search_query_ref.borrow().clone();
+                let exp = expanded_ref.borrow().clone();
+                let window_weak_bg = window_weak.clone();
+                let notif = notif.clone();
+                let snip_title = snip.title.clone();
+
+                spawn_async(async move {
+                    let _ = storage.snippets().save(&snip).await;
+                    sync_ui_snippets_async(window_weak_bg, storage, master_cache, search_q, exp);
+                    let _ = slint::invoke_from_event_loop(move || {
+                        notif.success("片段添加成功", format!("已注入单条测试片段: '{}'", snip_title));
+                    });
+                });
             }
         });
     }
@@ -1075,20 +1170,35 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let ctx = ctx.clone();
+        let storage_snip = ctx.core_state.storage();
+        let master_cache = Arc::clone(&ctx.master_snippet_tree);
+        let search_query_ref = Rc::clone(&ctx.snippet_search_query);
+        let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
+        let notif = ctx.notifications.clone();
         db.on_reset_default_snippets(move || {
-            if let Some(w) = window_weak.upgrade() {
-                let default_storage = smagical_storage::MockStorage::new_seeded();
-                if let Ok(groups) = default_storage.snippets().list_groups() {
-                    for g in groups {
-                        let _ = ctx.core_state.storage().snippets().save_group(&g);
+            if window_weak.upgrade().is_some() {
+                let storage = storage_snip.clone();
+                let master_cache = Arc::clone(&master_cache);
+                let search_q = search_query_ref.borrow().clone();
+                let exp = expanded_ref.borrow().clone();
+                let window_weak_bg = window_weak.clone();
+                let notif = notif.clone();
+
+                spawn_async(async move {
+                    let default_storage = smagical_storage::MockStorage::new_seeded();
+                    if let Ok(groups) = default_storage.snippets().list_groups().await {
+                        for g in groups {
+                            let _ = storage.snippets().save_group(&g).await;
+                        }
                     }
-                }
-                if let Ok(snippets) = default_storage.snippets().list_all() {
-                    let _ = ctx.core_state.storage().snippets().save_batch(&snippets);
-                }
-                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
-                ctx.notify_success("重置完成", "已恢复 5 个层级分组与 10 条精选代码片段预设");
+                    if let Ok(snippets) = default_storage.snippets().list_all().await {
+                        let _ = storage.snippets().save_batch(&snippets).await;
+                    }
+                    sync_ui_snippets_async(window_weak_bg, storage, master_cache, search_q, exp);
+                    let _ = slint::invoke_from_event_loop(move || {
+                        notif.success("重置完成", "已恢复 5 个层级分组与 10 条精选代码片段预设");
+                    });
+                });
             }
         });
     }
@@ -1098,16 +1208,31 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let ctx = ctx.clone();
+        let storage_snip = ctx.core_state.storage();
+        let master_cache = Arc::clone(&ctx.master_snippet_tree);
+        let search_query_ref = Rc::clone(&ctx.snippet_search_query);
+        let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
+        let notif = ctx.notifications.clone();
         db.on_clear_snippets(move || {
-            if let Some(w) = window_weak.upgrade() {
-                if let Ok(existing) = ctx.core_state.storage().snippets().list_all() {
-                    for s in existing {
-                        let _ = ctx.core_state.storage().snippets().delete(&s.id);
+            if window_weak.upgrade().is_some() {
+                let storage = storage_snip.clone();
+                let master_cache = Arc::clone(&master_cache);
+                let search_q = search_query_ref.borrow().clone();
+                let exp = expanded_ref.borrow().clone();
+                let window_weak_bg = window_weak.clone();
+                let notif = notif.clone();
+
+                spawn_async(async move {
+                    if let Ok(existing) = storage.snippets().list_all().await {
+                        for s in existing {
+                            let _ = storage.snippets().delete(&s.id).await;
+                        }
                     }
-                }
-                crate::handlers::snippet_handlers::sync_ui_snippets(&w, &ctx);
-                ctx.notify_info("代码片段已清空", "所有代码片段数据已从存储层完全清除");
+                    sync_ui_snippets_async(window_weak_bg, storage, master_cache, search_q, exp);
+                    let _ = slint::invoke_from_event_loop(move || {
+                        notif.info("代码片段已清空", "所有代码片段数据已从存储层完全清除");
+                    });
+                });
             }
         });
     }
@@ -1118,7 +1243,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
-        let core_state_flag = ctx.core_state.clone();
+        let storage_flag = ctx.core_state.storage();
         db.on_toggle_feature_flag(move |flag_name, enabled| {
             let f = flag_name.as_str();
             let label = match f {
@@ -1140,15 +1265,18 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 notif.info("实验特性已隐藏", &format!("已在主界面与设置中关闭并隐藏「{}」", label));
             }
             let f_str = f.to_string();
-            let _ = core_state_flag.storage().config().update(Box::new(move |c| {
-                match f_str.as_str() {
-                    "desktop_notifications" => c.flag_desktop_notifications = enabled,
-                    "terminal_crt_shader" => c.flag_terminal_crt_shader = enabled,
-                    "cloud_sync" => c.flag_cloud_sync = enabled,
-                    "terminal_scratchpad" => c.flag_terminal_scratchpad = enabled,
-                    _ => {}
-                }
-            }));
+            let storage = storage_flag.clone();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    match f_str.as_str() {
+                        "desktop_notifications" => c.flag_desktop_notifications = enabled,
+                        "terminal_crt_shader" => c.flag_terminal_crt_shader = enabled,
+                        "cloud_sync" => c.flag_cloud_sync = enabled,
+                        "terminal_scratchpad" => c.flag_terminal_scratchpad = enabled,
+                        _ => {}
+                    }
+                })).await;
+            });
             if let Some(w) = window_weak.upgrade() {
                 match f {
                     "desktop_notifications" => w.global::<DebugBridge>().set_flag_desktop_notifications(enabled),
@@ -1246,9 +1374,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
-        let core_state_reset = ctx.core_state.clone();
+        let storage_reset = ctx.core_state.storage();
         db.on_reset_all_settings(move || {
-            let _ = core_state_reset.storage().config().reset_to_default();
+            let storage = storage_reset.clone();
+            spawn_async(async move {
+                let _ = storage.config().reset_to_default().await;
+            });
             if let Some(w) = window_weak.upgrade() {
                 w.global::<DebugBridge>().set_flag_desktop_notifications(false);
                 w.global::<DebugBridge>().set_flag_terminal_crt_shader(false);
@@ -1335,7 +1466,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     }
     {
         let window_weak = window.as_weak();
-        let core_state_opacity = ctx.core_state.clone();
+        let storage_opacity = ctx.core_state.storage();
         db.on_change_modal_opacity(move |op| {
             let clamped = op.clamp(0.20, 1.0);
             if let Some(w) = window_weak.upgrade() {
@@ -1343,9 +1474,12 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 let theme_global = w.global::<AppTheme>();
                 theme_global.set_modal_opacity(clamped);
             }
-            let _ = core_state_opacity.storage().config().update(Box::new(move |c| {
-                c.modal_opacity = clamped;
-            }));
+            let storage = storage_opacity.clone();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.modal_opacity = clamped;
+                })).await;
+            });
         });
     }
     {

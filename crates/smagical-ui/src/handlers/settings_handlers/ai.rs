@@ -425,64 +425,20 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             sb.set_modal_endpoint_is_fetching_models(true);
             let w_weak = w.as_weak();
 
-            std::thread::spawn(move || {
-                let mut endpoint_url = base_url.clone();
-                if endpoint_url.ends_with('/') {
-                    endpoint_url.push_str("models");
-                } else if !endpoint_url.ends_with("/models") {
-                    endpoint_url.push_str("/models");
-                }
+            let endpoint_cfg = smagical_core::AiEndpointConfig {
+                base_url,
+                api_key,
+                model: String::new(),
+                temperature: 0.3,
+                timeout_secs: 8,
+                custom_headers: if custom_headers.is_empty() { None } else { Some(custom_headers) },
+            };
 
-                let mut cmd = std::process::Command::new("curl.exe");
-                cmd.args(["-s", "--max-time", "8", "-X", "GET", &endpoint_url]);
-                if !api_key.is_empty() {
-                    cmd.args(["-H", &format!("Authorization: Bearer {}", api_key)]);
-                }
-                if !custom_headers.is_empty() {
-                    for h in custom_headers.split(',') {
-                        let t = h.trim();
-                        if !t.is_empty() {
-                            cmd.args(["-H", t]);
-                        }
-                    }
-                }
-
-                let mut discovered = Vec::new();
-                if let Ok(output) = cmd.output() {
-                    if output.status.success() {
-                        let body = String::from_utf8_lossy(&output.stdout);
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
-                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
-                                for item in arr {
-                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-                                        discovered.push(id.to_string());
-                                    }
-                                }
-                            } else if let Some(arr) = val.get("models").and_then(|m| m.as_array()) {
-                                for item in arr {
-                                    if let Some(name) = item.get("name").and_then(|n| n.as_str()) {
-                                        discovered.push(name.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if discovered.is_empty() {
-                    let lower = base_url.to_lowercase();
-                    if lower.contains("deepseek") {
-                        discovered = vec!["deepseek-reasoner".to_string(), "deepseek-chat".to_string(), "deepseek-coder".to_string()];
-                    } else if lower.contains("anthropic") || lower.contains("claude") {
-                        discovered = vec!["claude-3-7-sonnet-20250219".to_string(), "claude-3-5-sonnet-20241022".to_string()];
-                    } else if lower.contains("openai") {
-                        discovered = vec!["gpt-4o".to_string(), "gpt-4o-mini".to_string(), "o1".to_string(), "o3-mini".to_string()];
-                    } else if lower.contains("ollama") || lower.contains("11434") {
-                        discovered = vec!["qwen2.5:14b".to_string(), "deepseek-r1:14b".to_string(), "llama3.3:latest".to_string()];
-                    } else {
-                        discovered = vec!["deepseek-reasoner".to_string(), "deepseek-chat".to_string()];
-                    }
-                }
+            crate::async_util::spawn_async(async move {
+                let discovered = match smagical_core::AiClient::new(endpoint_cfg) {
+                    Ok(client) => client.fetch_models().await.unwrap_or_default(),
+                    Err(_) => Vec::new(),
+                };
 
                 let discovered_copy = discovered.clone();
                 let _ = slint::invoke_from_event_loop(move || {
@@ -522,49 +478,28 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             sb.set_modal_endpoint_test_message("正在发起握手探活...".into());
             let w_weak = w.as_weak();
 
-            std::thread::spawn(move || {
-                let mut endpoint_url = base_url.clone();
-                if endpoint_url.ends_with('/') {
-                    endpoint_url.push_str("models");
-                } else if !endpoint_url.ends_with("/models") {
-                    endpoint_url.push_str("/models");
-                }
+            let endpoint_cfg = smagical_core::AiEndpointConfig {
+                base_url,
+                api_key,
+                model: String::new(),
+                temperature: 0.3,
+                timeout_secs: 8,
+                custom_headers: if custom_headers.is_empty() { None } else { Some(custom_headers) },
+            };
 
-                let start_time = std::time::Instant::now();
-                let mut cmd = std::process::Command::new("curl.exe");
-                cmd.args(["-s", "-w", "\n%{http_code}", "--max-time", "6", "-X", "GET", &endpoint_url]);
-                if !api_key.is_empty() {
-                    cmd.args(["-H", &format!("Authorization: Bearer {}", api_key)]);
-                }
-                if !custom_headers.is_empty() {
-                    for h in custom_headers.split(',') {
-                        let t = h.trim();
-                        if !t.is_empty() {
-                            cmd.args(["-H", t]);
-                        }
-                    }
-                }
-
-                let elapsed_ms = start_time.elapsed().as_millis();
-                let (status, msg) = match cmd.output() {
-                    Ok(output) => {
-                        let out_str = String::from_utf8_lossy(&output.stdout);
-                        let http_code = out_str.lines().last().unwrap_or("").trim();
-                        if http_code == "200" || http_code == "404" || http_code == "401" || output.status.success() {
-                            if http_code == "401" {
-                                ("failed", format!("认证失败 (401 Unauthorized), 请检查 API Key (耗时 {}ms)", elapsed_ms))
-                            } else {
-                                ("success", format!("连通正常 (HTTP {}, 延迟 {}ms)", if http_code.is_empty() { "200" } else { http_code }, elapsed_ms))
-                            }
-                        } else {
-                            ("failed", format!("连接返回状态码: {} (耗时 {}ms)", http_code, elapsed_ms))
-                        }
-                    }
-                    Err(e) => ("failed", format!("探活失败: {}", e)),
+            crate::async_util::spawn_async(async move {
+                let test_res = match smagical_core::AiClient::new(endpoint_cfg) {
+                    Ok(client) => client.test_connection().await,
+                    Err(e) => smagical_core::AiTestResult {
+                        success: false,
+                        latency_ms: 0,
+                        status_code: 0,
+                        message: format!("客户端初始化失败: {}", e),
+                    },
                 };
 
-                let status_s = status.to_string();
-                let msg_s = msg.clone();
+                let status_s = if test_res.success { "success" } else { "failed" };
+                let msg_s = test_res.message;
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(win) = w_weak.upgrade() {
                         let sb = win.global::<SettingsBridge>();
@@ -666,84 +601,20 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             sb.set_setting_ai_is_fetching_models(true);
             let w_weak = w.as_weak();
 
-            std::thread::spawn(move || {
-                let mut endpoint_url = base_url.clone();
-                if endpoint_url.ends_with('/') {
-                    endpoint_url.push_str("models");
-                } else if !endpoint_url.ends_with("/models") {
-                    endpoint_url.push_str("/models");
-                }
+            let endpoint_cfg = smagical_core::AiEndpointConfig {
+                base_url,
+                api_key,
+                model: String::new(),
+                temperature: 0.3,
+                timeout_secs: 8,
+                custom_headers: if custom_headers.is_empty() { None } else { Some(custom_headers) },
+            };
 
-                let mut cmd = std::process::Command::new("curl.exe");
-                cmd.args(["-s", "--max-time", "8", "-X", "GET", &endpoint_url]);
-                if !api_key.is_empty() {
-                    cmd.args(["-H", &format!("Authorization: Bearer {}", api_key)]);
-                }
-                if !custom_headers.is_empty() {
-                    for h in custom_headers.split(',') {
-                        let t = h.trim();
-                        if !t.is_empty() {
-                            cmd.args(["-H", t]);
-                        }
-                    }
-                }
-
-                let mut discovered_models = Vec::new();
-                if let Ok(output) = cmd.output() {
-                    if output.status.success() {
-                        let body = String::from_utf8_lossy(&output.stdout);
-                        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&body) {
-                            if let Some(arr) = val.get("data").and_then(|d| d.as_array()) {
-                                for item in arr {
-                                    if let Some(id) = item.get("id").and_then(|i| i.as_str()) {
-                                        discovered_models.push(id.to_string());
-                                    }
-                                }
-                            } else if let Some(arr) = val.get("models").and_then(|m| m.as_array()) {
-                                for item in arr {
-                                    if let Some(name) = item.get("name").and_then(|n| n.as_str()) {
-                                        discovered_models.push(name.to_string());
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if discovered_models.is_empty() {
-                    let lower = base_url.to_lowercase();
-                    if lower.contains("deepseek") {
-                        discovered_models = vec![
-                            "deepseek-reasoner".to_string(),
-                            "deepseek-chat".to_string(),
-                            "deepseek-coder".to_string(),
-                        ];
-                    } else if lower.contains("anthropic") || lower.contains("claude") {
-                        discovered_models = vec![
-                            "claude-3-7-sonnet-20250219".to_string(),
-                            "claude-3-5-sonnet-20241022".to_string(),
-                            "claude-3-5-haiku-20241022".to_string(),
-                        ];
-                    } else if lower.contains("openai") {
-                        discovered_models = vec![
-                            "gpt-4o".to_string(),
-                            "gpt-4o-mini".to_string(),
-                            "o1".to_string(),
-                            "o3-mini".to_string(),
-                        ];
-                    } else if lower.contains("ollama") || lower.contains("11434") {
-                        discovered_models = vec![
-                            "qwen2.5:14b".to_string(),
-                            "deepseek-r1:14b".to_string(),
-                            "llama3.3:latest".to_string(),
-                        ];
-                    } else {
-                        discovered_models = vec![
-                            "default-model".to_string(),
-                            "deepseek-reasoner".to_string(),
-                        ];
-                    }
-                }
+            crate::async_util::spawn_async(async move {
+                let discovered_models = match smagical_core::AiClient::new(endpoint_cfg) {
+                    Ok(client) => client.fetch_models().await.unwrap_or_default(),
+                    Err(_) => Vec::new(),
+                };
 
                 let models_to_save = discovered_models.clone();
                 let _ = slint::invoke_from_event_loop(move || {

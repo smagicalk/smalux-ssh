@@ -26,18 +26,19 @@ impl MockGroupRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl GroupRepository for MockGroupRepository {
-    fn list_all(&self) -> StorageResult<Vec<GroupRecord>> {
+    async fn list_all(&self) -> StorageResult<Vec<GroupRecord>> {
         let read_guard = self.groups.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.clone())
     }
 
-    fn get_by_id(&self, id: &str) -> StorageResult<Option<GroupRecord>> {
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<GroupRecord>> {
         let read_guard = self.groups.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().find(|g| g.id == id).cloned())
     }
 
-    fn save(&self, group: &GroupRecord) -> StorageResult<()> {
+    async fn save(&self, group: &GroupRecord) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|g| g.id == group.id) {
             write_guard[pos] = group.clone();
@@ -48,7 +49,7 @@ impl GroupRepository for MockGroupRepository {
         Ok(())
     }
 
-    fn delete(&self, id: &str) -> StorageResult<bool> {
+    async fn delete(&self, id: &str) -> StorageResult<bool> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = write_guard.iter().position(|g| g.id == id) {
             let removed = write_guard.remove(pos);
@@ -59,7 +60,7 @@ impl GroupRepository for MockGroupRepository {
         }
     }
 
-    fn set_expanded(&self, id: &str, expanded: bool) -> StorageResult<()> {
+    async fn set_expanded(&self, id: &str, expanded: bool) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(g) = write_guard.iter_mut().find(|g| g.id == id) {
             g.is_expanded = expanded;
@@ -70,7 +71,7 @@ impl GroupRepository for MockGroupRepository {
         }
     }
 
-    fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()> {
+    async fn move_group(&self, id: &str, new_parent_id: Option<&str>) -> StorageResult<()> {
         let mut write_guard = self.groups.write().map_err(|e| StorageError::Backend(e.to_string()))?;
 
         let new_parent_str = new_parent_id.map(|s| s.to_string());

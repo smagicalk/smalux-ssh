@@ -680,3 +680,40 @@ pub struct TunnelMetricsTickEvent {
     pub active_connections: usize,
 }
 
+/// AI 流式响应数据块到达事件 (包含增量正文或增量思考推理过程)。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiStreamChunkEvent {
+    /// 伴随的主机 ID 或会话 ID。
+    pub session_id: String,
+    /// 增量正文 Token 片段。
+    pub delta_content: String,
+    /// 增量思考/推理 Token 片段 (CoT)。
+    pub delta_thinking: String,
+    /// 是否为终结数据块。
+    pub is_final: bool,
+}
+
+/// AI 流式推理完成事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiStreamCompleteEvent {
+    /// 伴随的主机 ID 或会话 ID。
+    pub session_id: String,
+    /// 完整回复正文。
+    pub full_content: String,
+    /// 完整思考过程 (CoT)。
+    pub full_thinking: String,
+    /// 提取出的推荐指令 (如有)。
+    pub suggested_cmd: String,
+    /// 结束原因 (如 "stop", "length")。
+    pub finish_reason: String,
+}
+
+/// AI 请求或流式传输异常事件。
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AiStreamErrorEvent {
+    /// 伴随的主机 ID 或会话 ID。
+    pub session_id: String,
+    /// 错误详细信息。
+    pub error_message: String,
+}
+

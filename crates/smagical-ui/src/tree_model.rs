@@ -11,7 +11,7 @@ use crate::generated::{GroupOptionData, HostTreeNode};
 /// 原始树形节点数据结构 (Raw Tree Node)
 ///
 /// 内部核心状态模型，用于完整表达主机管理中所有的分组节点与主机实例节点。
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct RawTreeNode {
     /// 节点的全局唯一 ID (如: "grp-prod"、"host-k8s-w1")
     pub(crate) id: String,
@@ -33,6 +33,8 @@ pub(crate) struct RawTreeNode {
     pub(crate) ping_ms: i32,
     /// 分组下包含的直属子项总数量 (含子分组 + 直属主机，仅分组节点有效)
     pub(crate) item_count: i32,
+    /// 快速登录生效用户名 (经凭据与主机配置计算解析得出的有效用户)
+    pub(crate) effective_username: Option<String>,
 }
 
 impl From<DebugRawNode> for RawTreeNode {
@@ -48,6 +50,7 @@ impl From<DebugRawNode> for RawTreeNode {
             status: n.status,
             ping_ms: n.ping_ms,
             item_count: n.item_count,
+            effective_username: None,
         }
     }
 }
@@ -109,6 +112,7 @@ pub(crate) fn ensure_raw_group_hierarchy(tree: &mut Vec<RawTreeNode>, path: &str
                 status: "online".to_string(),
                 ping_ms: 0,
                 item_count: 0,
+                effective_username: None,
             });
             current_parent_id = grp_id;
             current_level = idx as i32;
@@ -327,19 +331,12 @@ pub(crate) fn sort_tree_hierarchy(tree: &[RawTreeNode]) -> Vec<RawTreeNode> {
     result
 }
 
-/// 从底层存储门面 (AppStorage) 构建 UI 层专用的全量原始树形节点列表。
-///
-/// 递归从根节点开始装载所有分组与主机记录，自动计算直属子项总数 (含直属子分组 + 直属主机)。
-///
-/// # 参数
-/// - `storage`: 底层存储门面特征对象引用
-///
-/// # 返回值
-/// 构建并完成 DFS 排序的 `Vec<RawTreeNode>` 原始树节点全量集合
-pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTreeNode> {
-    let groups = storage.groups().list_all().unwrap_or_default();
-    let hosts = storage.hosts().list_all().unwrap_or_default();
-
+/// 纯内存装配全量主机/分组树结构数据 (0ms UI 阻塞，无任何 I/O 耗时)
+pub(crate) fn build_raw_tree(
+    groups: &[GroupRecord],
+    hosts: &[HostRecord],
+    credentials: &[smagical_core::CredentialRecord],
+) -> Vec<RawTreeNode> {
     let mut result = Vec::new();
 
     fn insert_children(
@@ -347,6 +344,7 @@ pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTr
         level: i32,
         groups: &[GroupRecord],
         hosts: &[HostRecord],
+        credentials: &[smagical_core::CredentialRecord],
         out: &mut Vec<RawTreeNode>,
     ) {
         let current_groups: Vec<&GroupRecord> = groups
@@ -378,9 +376,10 @@ pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTr
                 status: "online".to_string(),
                 ping_ms: 0,
                 item_count: (child_group_count + child_host_count) as i32,
+                effective_username: None,
             });
 
-            insert_children(Some(&g.id), level + 1, groups, hosts, out);
+            insert_children(Some(&g.id), level + 1, groups, hosts, credentials, out);
         }
 
         let current_hosts: Vec<&HostRecord> = hosts
@@ -392,6 +391,16 @@ pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTr
             .collect();
 
         for h in current_hosts {
+            let eff_user = if let Some(ref cid) = h.credential_id {
+                if let Some(c) = credentials.iter().find(|c| &c.id == cid) {
+                    c.username.clone().or_else(|| h.username.clone())
+                } else {
+                    h.username.clone()
+                }
+            } else {
+                h.username.clone()
+            };
+
             out.push(RawTreeNode {
                 id: h.id.clone(),
                 name: h.name.clone(),
@@ -403,12 +412,46 @@ pub(crate) fn build_raw_tree_from_storage(storage: &dyn AppStorage) -> Vec<RawTr
                 status: h.status.to_string(),
                 ping_ms: h.ping_ms,
                 item_count: 0,
+                effective_username: eff_user,
             });
         }
     }
 
-    insert_children(None, 0, &groups, &hosts, &mut result);
+    insert_children(None, 0, groups, hosts, credentials, &mut result);
     sort_tree_hierarchy(&result)
+}
+
+/// 异步从底层存储门面构建全量原始树形节点列表 (0ms 阻塞 UI 线程)
+#[allow(dead_code)]
+pub(crate) async fn build_raw_tree_from_storage_async(storage: &dyn AppStorage) -> Vec<RawTreeNode> {
+    let groups = storage.groups().list_all().await.unwrap_or_default();
+    let hosts = storage.hosts().list_all().await.unwrap_or_default();
+    let credentials = storage.credentials().list_all().await.unwrap_or_default();
+    build_raw_tree(&groups, &hosts, &credentials)
+}
+
+
+/// 纯内存生成平铺卡片列表数据
+pub(crate) fn build_cards_from_records(
+    hosts: &[HostRecord],
+    groups: &[GroupRecord],
+) -> Vec<crate::generated::HostItemData> {
+    hosts.iter().map(|h| {
+        let g_name = if let Some(ref pid) = h.parent_group_id {
+            groups.iter().find(|g| g.id == *pid).map(|g| g.name.clone()).unwrap_or_else(|| "根目录".to_string())
+        } else {
+            "根目录".to_string()
+        };
+        crate::generated::HostItemData {
+            id: h.id.clone().into(),
+            name: h.name.clone().into(),
+            address: h.address.clone().into(),
+            port: h.port as i32,
+            group: g_name.into(),
+            status: h.status.to_string().into(),
+            ping_ms: h.ping_ms,
+        }
+    }).collect()
 }
 
 /// 构建新建分组/主机弹窗中的“上级分组选择器”树形扁平数据模型。
@@ -621,6 +664,7 @@ mod tests {
                 status: "online".into(),
                 ping_ms: 0,
                 item_count: 2,
+                effective_username: None,
             },
             RawTreeNode {
                 id: "grp-a-sub".into(),
@@ -633,6 +677,7 @@ mod tests {
                 status: "online".into(),
                 ping_ms: 0,
                 item_count: 1,
+                effective_username: None,
             },
             RawTreeNode {
                 id: "host-1".into(),
@@ -645,6 +690,7 @@ mod tests {
                 status: "online".into(),
                 ping_ms: 10,
                 item_count: 0,
+                effective_username: None,
             },
             RawTreeNode {
                 id: "grp-b".into(),
@@ -657,6 +703,7 @@ mod tests {
                 status: "online".into(),
                 ping_ms: 0,
                 item_count: 0,
+                effective_username: None,
             },
             RawTreeNode {
                 id: "host-root".into(),
@@ -669,6 +716,7 @@ mod tests {
                 status: "online".into(),
                 ping_ms: 5,
                 item_count: 0,
+                effective_username: None,
             },
         ]
     }

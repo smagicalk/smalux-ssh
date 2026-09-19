@@ -825,33 +825,30 @@ fn fallback_resolve_command(shell_id: &str) -> portable_pty::CommandBuilder {
     }
 }
 
-/// 启动本地终端异步探测服务 (在后台工作线程中异步探测所有本地终端，0 毫秒阻塞主 UI 线程)
+/// 启动本地终端异步探测服务 (在后台异步工作池中探测所有本地终端，0 毫秒阻塞主 UI 线程)
 pub fn start_local_shell_discovery(
     cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
     window_weak: slint::Weak<crate::generated::AppWindow>,
 ) {
-    std::thread::Builder::new()
-        .name("local-shell-detector".into())
-        .spawn(move || {
-            tracing::info!(target: "smagical_ui::local_shells", "开始在后台异步探测本地 Shell 终端环境...");
-            let detected = detect_local_shells();
-            tracing::info!(target: "smagical_ui::local_shells", "后台探测完成，发现 {} 个有效本地终端环境", detected.len());
+    crate::async_util::spawn_async(async move {
+        tracing::info!(target: "smagical_ui::local_shells", "开始在后台异步探测本地 Shell 终端环境...");
+        let detected = tokio::task::spawn_blocking(detect_local_shells).await.unwrap_or_default();
+        tracing::info!(target: "smagical_ui::local_shells", "后台探测完成，发现 {} 个有效本地终端环境", detected.len());
 
-            // 1. 更新内存共享缓存
-            if let Ok(mut write_guard) = cached_shells.write() {
-                *write_guard = detected.clone();
+        // 1. 更新内存共享缓存
+        if let Ok(mut write_guard) = cached_shells.write() {
+            *write_guard = detected.clone();
+        }
+
+        // 2. 异步回推到 UI 事件循环，就地更新 Slint 启动器数据模型
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = window_weak.upgrade() {
+                w.global::<crate::generated::WindowBridge>().set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(
+                    slint::VecModel::from(detected),
+                )));
             }
-
-            // 2. 异步回推到 UI 事件循环，就地更新 Slint 启动器数据模型
-            let _ = slint::invoke_from_event_loop(move || {
-                if let Some(w) = window_weak.upgrade() {
-                    w.global::<crate::generated::WindowBridge>().set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(
-                        slint::VecModel::from(detected),
-                    )));
-                }
-            });
-        })
-        .ok();
+        });
+    });
 }
 
 #[cfg(test)]

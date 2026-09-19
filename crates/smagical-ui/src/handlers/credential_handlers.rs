@@ -4,6 +4,7 @@
 //! 通过 `CoreState::events()` (通用强类型事件分发器 `EventDispatcher`) 显式广播领域事件，驱动跨模块协同与安全审计。
 
 use std::rc::Rc;
+use std::sync::Arc;
 use slint::{ComponentHandle, ModelRc, VecModel};
 use smagical_core::domain::credential::{CredentialRecord, CredentialType};
 use smagical_core::event::{
@@ -11,7 +12,7 @@ use smagical_core::event::{
     CredentialSecretCopiedEvent, CredentialSelectedEvent, KeyGeneratedEvent,
     PasswordGeneratedEvent,
 };
-use smagical_core::CoreState;
+use smagical_core::{AppStorage, CoreState};
 
 use crate::generated::{AppWindow, CredentialItemData, CredentialsBridge};
 use crate::handlers::AppContext;
@@ -41,7 +42,7 @@ pub(crate) fn load_credential_into_form(window: &AppWindow, cred: &CredentialRec
     bridge.set_credential_form_updated_at(cred.updated_at.clone().into());
 }
 
-/// 清空右侧表单并置为新建模式
+/// 重置右侧详情面板为新建空白模式
 pub(crate) fn clear_form_for_create(window: &AppWindow) {
     tracing::debug!(target: "smagical_ui::credentials", "凭据表单置为新建模式");
     let bridge = window.global::<CredentialsBridge>();
@@ -61,14 +62,13 @@ pub(crate) fn clear_form_for_create(window: &AppWindow) {
     bridge.set_credential_form_updated_at("".into());
 }
 
-/// 将存储层凭据数据同步更新至 Slint UI
-pub(crate) fn sync_credentials_ui(
+/// 根据内存中的凭据列表渲染 Slint UI
+pub(crate) fn render_credentials_ui(
     window: &AppWindow,
-    core_state: &CoreState,
+    all_creds: &[CredentialRecord],
     filter_cat: &str,
     search_q: &str,
 ) {
-    let all_creds = core_state.storage().credentials().list_all().unwrap_or_default();
     let query_lower = search_q.trim().to_lowercase();
 
     let filtered_records: Vec<CredentialRecord> = all_creds
@@ -144,6 +144,38 @@ pub(crate) fn sync_credentials_ui(
     bridge.set_credential_search_query(search_q.into());
 }
 
+/// 异步将存储层凭据数据同步更新至 Slint UI (0ms UI 阻塞)
+pub(crate) fn sync_credentials_ui_async(
+    window_weak: slint::Weak<AppWindow>,
+    storage: Arc<dyn AppStorage>,
+    filter_cat: String,
+    search_q: String,
+) {
+    crate::async_util::spawn_async(async move {
+        let all_creds = storage.credentials().list_all().await.unwrap_or_default();
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = window_weak.upgrade() {
+                render_credentials_ui(&w, &all_creds, &filter_cat, &search_q);
+            }
+        });
+    });
+}
+
+/// 凭据数据同步更新便捷入口
+pub(crate) fn sync_credentials_ui(
+    window: &AppWindow,
+    core_state: &CoreState,
+    filter_cat: &str,
+    search_q: &str,
+) {
+    sync_credentials_ui_async(
+        window.as_weak(),
+        core_state.storage().clone(),
+        filter_cat.to_string(),
+        search_q.to_string(),
+    );
+}
+
 /// 注册所有凭据相关交互回调 (纯 MVVM 直连 CredentialsBridge)
 pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext) {
     let bridge = window.global::<CredentialsBridge>();
@@ -154,26 +186,32 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     sync_credentials_ui(window, &ctx.core_state, "all", "");
 
     // -------------------------------------------------------------------------
-    // 2. 选中凭据回调 (加载并回显至右侧详情面板，派发选中事件)
+    // 2. 选中凭据回调 (异步加载并回显至右侧详情面板，派发选中事件)
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let core_state_sel = ctx.core_state.clone();
     bridge.on_select_credential(move |id| {
-        if let Some(w) = window_weak.upgrade() {
-            let id_str = id.to_string();
-            if let Ok(Some(cred)) = core_state_sel.storage().credentials().get_by_id(&id_str) {
+        let id_str = id.to_string();
+        let storage = core_state_sel.storage().clone();
+        let events = core_state_sel.events().clone();
+        let window_weak = window_weak.clone();
+        crate::async_util::spawn_async(async move {
+            if let Ok(Some(cred)) = storage.credentials().get_by_id(&id_str).await {
                 tracing::info!(
                     target: "smagical_ui::credentials",
                     "用户选中凭据: ID=[{}], Name='{}', 类型={:?}",
                     cred.id, cred.name, cred.cred_type
                 );
-                // 显式派发凭据选中事件
-                core_state_sel.events().dispatch(&CredentialSelectedEvent {
+                events.dispatch(&CredentialSelectedEvent {
                     cred_id: id_str.clone(),
                 });
-                load_credential_into_form(&w, &cred);
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        load_credential_into_form(&w, &cred);
+                    }
+                });
             }
-        }
+        });
     });
 
     // -------------------------------------------------------------------------
@@ -210,14 +248,27 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             let active_id = bridge.get_active_credential_id().to_string();
             bridge.set_is_credential_create_mode(false);
             bridge.set_is_credential_editing(false);
-            if let Ok(Some(cred)) = core_state_cancel.storage().credentials().get_by_id(&active_id) {
-                load_credential_into_form(&w, &cred);
-                return;
-            }
-            // 若无有效选中项，回退加载首条凭据
-            if let Some(first) = core_state_cancel.storage().credentials().list_all().ok().and_then(|all| all.into_iter().next()) {
-                load_credential_into_form(&w, &first);
-            }
+
+            let storage = core_state_cancel.storage().clone();
+            let window_weak = window_weak.clone();
+            crate::async_util::spawn_async(async move {
+                if let Ok(Some(cred)) = storage.credentials().get_by_id(&active_id).await {
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            load_credential_into_form(&w, &cred);
+                        }
+                    });
+                    return;
+                }
+                // 若无有效选中项，回退加载首条凭据
+                if let Some(first) = storage.credentials().list_all().await.ok().and_then(|all| all.into_iter().next()) {
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            load_credential_into_form(&w, &first);
+                        }
+                    });
+                }
+            });
         }
     });
 
@@ -245,9 +296,18 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             let active_id = bridge.get_active_credential_id().to_string();
             tracing::debug!(target: "smagical_ui::credentials", "取消编辑凭据并回滚: ID=[{}]", active_id);
             bridge.set_is_credential_editing(false);
-            if let Ok(Some(cred)) = core_state_ce.storage().credentials().get_by_id(&active_id) {
-                load_credential_into_form(&w, &cred);
-            }
+
+            let storage = core_state_ce.storage().clone();
+            let window_weak = window_weak.clone();
+            crate::async_util::spawn_async(async move {
+                if let Ok(Some(cred)) = storage.credentials().get_by_id(&active_id).await {
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w) = window_weak.upgrade() {
+                            load_credential_into_form(&w, &cred);
+                        }
+                    });
+                }
+            });
         }
     });
 
@@ -295,51 +355,62 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             };
 
             let is_new = id.is_empty();
-            let _ = core_state_save.storage().credentials().save(&record);
-
-            if is_new {
-                tracing::info!(
-                    target: "smagical_ui::credentials",
-                    "新建凭据保存成功: ID=[{}], Name='{}', 类型={:?}, 算法='{}'",
-                    id_str, name_str, ctype, algorithm
-                );
-                // 显式派发保存事件至事件总线
-                core_state_save.events().dispatch(&CredentialSavedEvent {
-                    cred_id: id_str.clone(),
-                    name: name_str.clone(),
-                    cred_type: ctype,
-                    algorithm: algorithm.to_string(),
-                    username: user_opt,
-                    fingerprint: fp_opt,
-                    is_new: true,
-                });
-                notif_save.success("凭据创建成功", format!("凭据 [{}] 已保存至本地保管库", name_str));
-            } else {
-                tracing::info!(
-                    target: "smagical_ui::credentials",
-                    "更新凭据保存成功: ID=[{}], Name='{}', 算法='{}'",
-                    id_str, name_str, algorithm
-                );
-                // 显式派发更新事件至事件总线
-                core_state_save.events().dispatch(&CredentialSavedEvent {
-                    cred_id: id_str.clone(),
-                    name: name_str.clone(),
-                    cred_type: ctype,
-                    algorithm: algorithm.to_string(),
-                    username: user_opt,
-                    fingerprint: fp_opt,
-                    is_new: false,
-                });
-                notif_save.success("凭据更新成功", format!("凭据 [{}] 已成功保存修改", name_str));
-            }
+            let storage = core_state_save.storage().clone();
+            let events = core_state_save.events().clone();
+            let window_weak = window_weak.clone();
+            let notif = notif_save.clone();
 
             bridge.set_is_credential_create_mode(false);
             bridge.set_active_credential_id(id_str.clone().into());
             load_credential_into_form(&w, &record);
 
-            let cat = bridge.get_credential_filter_category();
-            let q = bridge.get_credential_search_query();
-            sync_credentials_ui(&w, &core_state_save, &cat, &q);
+            let cat = bridge.get_credential_filter_category().to_string();
+            let q = bridge.get_credential_search_query().to_string();
+
+            crate::async_util::spawn_async(async move {
+                let _ = storage.credentials().save(&record).await;
+
+                if is_new {
+                    tracing::info!(
+                        target: "smagical_ui::credentials",
+                        "新建凭据保存成功: ID=[{}], Name='{}', 类型={:?}, 算法='{}'",
+                        id_str, name_str, ctype, algorithm
+                    );
+                    events.dispatch(&CredentialSavedEvent {
+                        cred_id: id_str.clone(),
+                        name: name_str.clone(),
+                        cred_type: ctype,
+                        algorithm: algorithm.to_string(),
+                        username: user_opt,
+                        fingerprint: fp_opt,
+                        is_new: true,
+                    });
+                    notif.success("凭据创建成功", format!("凭据 [{}] 已保存至本地保管库", name_str));
+                } else {
+                    tracing::info!(
+                        target: "smagical_ui::credentials",
+                        "更新凭据保存成功: ID=[{}], Name='{}', 算法='{}'",
+                        id_str, name_str, algorithm
+                    );
+                    events.dispatch(&CredentialSavedEvent {
+                        cred_id: id_str.clone(),
+                        name: name_str.clone(),
+                        cred_type: ctype,
+                        algorithm: algorithm.to_string(),
+                        username: user_opt,
+                        fingerprint: fp_opt,
+                        is_new: false,
+                    });
+                    notif.success("凭据更新成功", format!("凭据 [{}] 已成功保存修改", name_str));
+                }
+
+                let all_creds = storage.credentials().list_all().await.unwrap_or_default();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        render_credentials_ui(&w, &all_creds, &cat, &q);
+                    }
+                });
+            });
         }
     });
 
@@ -352,32 +423,46 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     bridge.on_delete_credential(move |id| {
         if let Some(w) = window_weak.upgrade() {
             let id_str = id.to_string();
-            let _ = core_state_del.storage().credentials().delete(&id_str);
-            tracing::warn!(target: "smagical_ui::credentials", "删除凭据: ID=[{}]", id_str);
-            // 显式广播凭据删除事件
-            core_state_del.events().dispatch(&CredentialDeletedEvent {
-                cred_id: id_str.clone(),
-            });
-            notif_del.info("凭据已删除", "指定凭据已从本地保管库中安全清除");
-
             let bridge = w.global::<CredentialsBridge>();
             bridge.set_active_credential_id("".into());
-            let cat = bridge.get_credential_filter_category();
-            let q = bridge.get_credential_search_query();
-            sync_credentials_ui(&w, &core_state_del, &cat, &q);
+            let cat = bridge.get_credential_filter_category().to_string();
+            let q = bridge.get_credential_search_query().to_string();
+
+            let storage = core_state_del.storage().clone();
+            let events = core_state_del.events().clone();
+            let window_weak = window_weak.clone();
+            let notif = notif_del.clone();
+
+            crate::async_util::spawn_async(async move {
+                let _ = storage.credentials().delete(&id_str).await;
+                tracing::warn!(target: "smagical_ui::credentials", "删除凭据: ID=[{}]", id_str);
+                events.dispatch(&CredentialDeletedEvent {
+                    cred_id: id_str.clone(),
+                });
+                notif.info("凭据已删除", "指定凭据已从本地保管库中安全清除");
+
+                let all_creds = storage.credentials().list_all().await.unwrap_or_default();
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Some(w) = window_weak.upgrade() {
+                        render_credentials_ui(&w, &all_creds, &cat, &q);
+                    }
+                });
+            });
         }
     });
 
     // -------------------------------------------------------------------------
     // 9. 复制机密信息 (公钥 / 密码 / 管道) 回调 (派发安全审计事件)
     // -------------------------------------------------------------------------
-    let window_weak = window.as_weak();
     let core_state_copy = ctx.core_state.clone();
     let notif_copy = ctx.notifications.clone();
     bridge.on_copy_secret_to_clipboard(move |id, _field| {
-        if let Some(_w) = window_weak.upgrade() {
-            let id_str = id.to_string();
-            if let Ok(Some(cred)) = core_state_copy.storage().credentials().get_by_id(&id_str) {
+        let id_str = id.to_string();
+        let storage = core_state_copy.storage().clone();
+        let events = core_state_copy.events().clone();
+        let notif = notif_copy.clone();
+        crate::async_util::spawn_async(async move {
+            if let Ok(Some(cred)) = storage.credentials().get_by_id(&id_str).await {
                 let (copy_content, copy_type, is_sensitive, tip_title, tip_msg) = match cred.cred_type {
                     CredentialType::Key => {
                         let text = cred.public_key.unwrap_or_else(|| cred.secret_data.clone());
@@ -388,27 +473,28 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
                     CredentialType::Certificate => (cred.secret_data.clone(), CredentialCopyType::PublicKey, false, "已复制证书", "证书内容已成功复制至剪贴板"),
                 };
 
-                if let Ok(mut clipboard) = arboard::Clipboard::new() {
-                    let _ = clipboard.set_text(copy_content);
-                    tracing::info!(
-                        target: "smagical_ui::credentials",
-                        "复制凭据机密: ID=[{}], Name='{}', 类型={:?}, 敏感={}",
-                        cred.id, cred.name, copy_type, is_sensitive
-                    );
-                    // 显式广播敏感机密提取安全审计事件
-                    core_state_copy.events().dispatch(&CredentialSecretCopiedEvent {
-                        cred_id: cred.id.clone(),
-                        name: cred.name.clone(),
-                        copy_type,
-                        is_sensitive,
-                    });
-                    notif_copy.success(tip_title, tip_msg);
-                } else {
-                    tracing::error!(target: "smagical_ui::credentials", "访问系统剪贴板失败");
-                    notif_copy.warning("剪贴板受限", "无法访问操作系统剪贴板服务");
-                }
+                let _ = slint::invoke_from_event_loop(move || {
+                    if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                        let _ = clipboard.set_text(copy_content);
+                        tracing::info!(
+                            target: "smagical_ui::credentials",
+                            "复制凭据机密: ID=[{}], Name='{}', 类型={:?}, 敏感={}",
+                            cred.id, cred.name, copy_type, is_sensitive
+                        );
+                        events.dispatch(&CredentialSecretCopiedEvent {
+                            cred_id: cred.id.clone(),
+                            name: cred.name.clone(),
+                            copy_type,
+                            is_sensitive,
+                        });
+                        notif.success(tip_title, tip_msg);
+                    } else {
+                        tracing::error!(target: "smagical_ui::credentials", "访问系统剪贴板失败");
+                        notif.warning("剪贴板受限", "无法访问操作系统剪贴板服务");
+                    }
+                });
             }
-        }
+        });
     });
 
     // -------------------------------------------------------------------------

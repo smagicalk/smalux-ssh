@@ -19,6 +19,7 @@ pub(crate) mod window_handlers;
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use std::sync::{Arc, RwLock};
 
 use smagical_core::theme::ThemeService;
 use smagical_core::{CoreState, FileItemData};
@@ -36,16 +37,21 @@ use crate::tree_model::RawTreeNode;
 pub(crate) struct AppContext {
     /// 核心状态与底层存储引擎门面 (CoreState & Storage)
     pub core_state: Rc<CoreState>,
+    /// 集中式 UI 顶层状态仓储 (UiStore)
+    #[allow(dead_code)]
+    pub ui_store: Arc<crate::store::UiStore>,
+    /// 集中式主机状态仓储 (HostStore)
+    pub host_store: Arc<crate::store::HostStore>,
     /// 内存全量主机/分组树形节点镜像缓存 (Master Tree)
-    pub master_tree: Rc<RefCell<Vec<RawTreeNode>>>,
+    pub master_tree: Arc<RwLock<Vec<RawTreeNode>>>,
     /// 内存全量卡片模式主机列表数据缓存 (Master Cards)
-    pub master_cards: Rc<RefCell<Vec<HostItemData>>>,
+    pub master_cards: Arc<RwLock<Vec<HostItemData>>>,
     /// 树形视图当前已展开的分组 ID 集合 (Expanded Group IDs)
-    pub expanded_groups: Rc<RefCell<HashSet<String>>>,
+    pub expanded_groups: Arc<RwLock<HashSet<String>>>,
     /// 新建/编辑主机弹窗中上级分组树选择器已展开的分组 ID 集合
-    pub selector_expanded_groups: Rc<RefCell<HashSet<String>>>,
+    pub selector_expanded_groups: Arc<RwLock<HashSet<String>>>,
     /// 侧边栏主机搜索栏当前输入的过滤关键词 (Search Query)
-    pub search_query: Rc<RefCell<String>>,
+    pub search_query: Arc<RwLock<String>>,
     /// 运行中的终端底层会话实例表 (Session ID -> TerminalInstance)
     pub active_terminals: Rc<RefCell<HashMap<String, TerminalInstance>>>,
 
@@ -112,7 +118,7 @@ pub(crate) struct AppContext {
     pub notifications: crate::notification_service::NotificationManager,
 
     /// 内存全量代码片段树形节点镜像缓存
-    pub master_snippet_tree: Rc<RefCell<Vec<crate::snippet_tree_model::RawSnippetTreeNode>>>,
+    pub master_snippet_tree: std::sync::Arc<std::sync::RwLock<Vec<crate::snippet_tree_model::RawSnippetTreeNode>>>,
     /// 代码片段树当前已展开的分组 ID 集合
     pub expanded_snippet_groups: Rc<RefCell<HashSet<String>>>,
     /// 代码片段搜索关键词

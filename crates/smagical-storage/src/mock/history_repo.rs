@@ -40,8 +40,9 @@ impl MockHistoryRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl HistoryRepository for MockHistoryRepository {
-    fn list_all(&self) -> StorageResult<Vec<HistoryRecord>> {
+    async fn list_all(&self) -> StorageResult<Vec<HistoryRecord>> {
         let read_guard = self.history.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         let mut list = read_guard.clone();
         // 默认排序：置顶在最前，其余按 connected_at 倒序排列
@@ -52,36 +53,44 @@ impl HistoryRepository for MockHistoryRepository {
         Ok(list)
     }
 
-    fn get_by_id(&self, id: &str) -> StorageResult<Option<HistoryRecord>> {
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<HistoryRecord>> {
         let read_guard = self.history.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.iter().find(|h| h.id == id).cloned())
     }
 
-    fn save(&self, record: &HistoryRecord) -> StorageResult<()> {
-        let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
-        if let Some(pos) = write_guard.iter().position(|h| h.id == record.id) {
-            write_guard[pos] = record.clone();
-        } else {
-            write_guard.push(record.clone());
-        }
-        // 限制最大 500 条容量上限（超量时淘汰最早的非置顶记录）
-        if write_guard.len() > 500
-            && let Some(oldest_idx) = write_guard
-                .iter()
-                .enumerate()
-                .filter(|(_, r)| !r.is_pinned)
-                .min_by_key(|(_, r)| r.connected_at)
-                .map(|(idx, _)| idx)
-        {
-            let removed = write_guard.remove(oldest_idx);
-            let _ = self.delete_snapshot(&removed.id);
+    async fn save(&self, record: &HistoryRecord) -> StorageResult<()> {
+        let snapshot_to_delete = {
+            let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+            if let Some(pos) = write_guard.iter().position(|h| h.id == record.id) {
+                write_guard[pos] = record.clone();
+            } else {
+                write_guard.push(record.clone());
+            }
+            // 限制最大 500 条容量上限（超量时淘汰最早的非置顶记录）
+            if write_guard.len() > 500
+                && let Some(oldest_idx) = write_guard
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, r)| !r.is_pinned)
+                    .min_by_key(|(_, r)| r.connected_at)
+                    .map(|(idx, _)| idx)
+            {
+                let removed = write_guard.remove(oldest_idx);
+                Some(removed.id)
+            } else {
+                None
+            }
+        };
+
+        if let Some(ref rem_id) = snapshot_to_delete {
+            let _ = self.delete_snapshot(rem_id).await;
         }
 
         tracing::debug!(target: "smagical_storage::mock", "MockStorage 保存历史记录: {} ({})", record.title, record.address);
         Ok(())
     }
 
-    fn save_batch(&self, records: &[HistoryRecord]) -> StorageResult<()> {
+    async fn save_batch(&self, records: &[HistoryRecord]) -> StorageResult<()> {
         let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         for record in records {
             if let Some(pos) = write_guard.iter().position(|h| h.id == record.id) {
@@ -94,19 +103,26 @@ impl HistoryRepository for MockHistoryRepository {
         Ok(())
     }
 
-    fn delete(&self, id: &str) -> StorageResult<bool> {
-        let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
-        if let Some(pos) = write_guard.iter().position(|h| h.id == id) {
-            let removed = write_guard.remove(pos);
-            let _ = self.delete_snapshot(id);
-            tracing::info!(target: "smagical_storage::mock", "MockStorage 删除历史记录: {} ({})", removed.title, id);
+    async fn delete(&self, id: &str) -> StorageResult<bool> {
+        let removed = {
+            let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
+            if let Some(pos) = write_guard.iter().position(|h| h.id == id) {
+                Some(write_guard.remove(pos))
+            } else {
+                None
+            }
+        };
+
+        if let Some(rem) = removed {
+            let _ = self.delete_snapshot(id).await;
+            tracing::info!(target: "smagical_storage::mock", "MockStorage 删除历史记录: {} ({})", rem.title, id);
             Ok(true)
         } else {
             Ok(false)
         }
     }
 
-    fn clear_all(&self, keep_pinned: bool) -> StorageResult<()> {
+    async fn clear_all(&self, keep_pinned: bool) -> StorageResult<()> {
         let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if keep_pinned {
             let unpinned_ids: Vec<String> = write_guard.iter().filter(|h| !h.is_pinned).map(|h| h.id.clone()).collect();
@@ -126,7 +142,7 @@ impl HistoryRepository for MockHistoryRepository {
         Ok(())
     }
 
-    fn toggle_pin(&self, id: &str) -> StorageResult<bool> {
+    async fn toggle_pin(&self, id: &str) -> StorageResult<bool> {
         let mut write_guard = self.history.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(h) = write_guard.iter_mut().find(|h| h.id == id) {
             h.is_pinned = !h.is_pinned;
@@ -137,7 +153,7 @@ impl HistoryRepository for MockHistoryRepository {
         }
     }
 
-    fn save_snapshot(&self, history_id: &str, content: &str, max_lines: usize) -> StorageResult<()> {
+    async fn save_snapshot(&self, history_id: &str, content: &str, max_lines: usize) -> StorageResult<()> {
         let truncated_content = if max_lines > 0 {
             let lines: Vec<&str> = content.lines().collect();
             if lines.len() > max_lines {
@@ -155,12 +171,12 @@ impl HistoryRepository for MockHistoryRepository {
         Ok(())
     }
 
-    fn get_snapshot(&self, history_id: &str) -> StorageResult<Option<String>> {
+    async fn get_snapshot(&self, history_id: &str) -> StorageResult<Option<String>> {
         let read_guard = self.snapshots.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(read_guard.get(history_id).cloned())
     }
 
-    fn delete_snapshot(&self, history_id: &str) -> StorageResult<bool> {
+    async fn delete_snapshot(&self, history_id: &str) -> StorageResult<bool> {
         let mut write_guard = self.snapshots.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(write_guard.remove(history_id).is_some())
     }

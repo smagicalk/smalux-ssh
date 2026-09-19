@@ -26,23 +26,24 @@ impl MockTunnelRepository {
     }
 }
 
+#[async_trait::async_trait]
 impl TunnelRepository for MockTunnelRepository {
-    fn list_all(&self) -> StorageResult<Vec<TunnelRecord>> {
+    async fn list_all(&self) -> StorageResult<Vec<TunnelRecord>> {
         let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(guard.clone())
     }
 
-    fn list_by_type(&self, tunnel_type: TunnelType) -> StorageResult<Vec<TunnelRecord>> {
+    async fn list_by_type(&self, tunnel_type: TunnelType) -> StorageResult<Vec<TunnelRecord>> {
         let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(guard.iter().filter(|t| t.tunnel_type == tunnel_type).cloned().collect())
     }
 
-    fn get_by_id(&self, id: &str) -> StorageResult<Option<TunnelRecord>> {
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<TunnelRecord>> {
         let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         Ok(guard.iter().find(|t| t.id == id).cloned())
     }
 
-    fn search(&self, query: &str) -> StorageResult<Vec<TunnelRecord>> {
+    async fn search(&self, query: &str) -> StorageResult<Vec<TunnelRecord>> {
         let q = query.trim().to_lowercase();
         let guard = self.tunnels.read().map_err(|e| StorageError::Backend(e.to_string()))?;
         if q.is_empty() {
@@ -59,7 +60,7 @@ impl TunnelRepository for MockTunnelRepository {
         }).cloned().collect())
     }
 
-    fn save(&self, record: &TunnelRecord) -> StorageResult<()> {
+    async fn save(&self, record: &TunnelRecord) -> StorageResult<()> {
         let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(pos) = guard.iter().position(|t| t.id == record.id) {
             guard[pos] = record.clone();
@@ -69,21 +70,21 @@ impl TunnelRepository for MockTunnelRepository {
         Ok(())
     }
 
-    fn save_batch(&self, records: &[TunnelRecord]) -> StorageResult<()> {
+    async fn save_batch(&self, records: &[TunnelRecord]) -> StorageResult<()> {
         for r in records {
-            self.save(r)?;
+            self.save(r).await?;
         }
         Ok(())
     }
 
-    fn delete(&self, id: &str) -> StorageResult<bool> {
+    async fn delete(&self, id: &str) -> StorageResult<bool> {
         let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         let len_before = guard.len();
         guard.retain(|t| t.id != id);
         Ok(guard.len() < len_before)
     }
 
-    fn set_running(&self, id: &str, is_running: bool) -> StorageResult<bool> {
+    async fn set_running(&self, id: &str, is_running: bool) -> StorageResult<bool> {
         let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(t) = guard.iter_mut().find(|t| t.id == id) {
             t.is_running = is_running;
@@ -98,7 +99,7 @@ impl TunnelRepository for MockTunnelRepository {
         }
     }
 
-    fn update_metrics(&self, id: &str, active_conn: usize, bytes_in: u64, bytes_out: u64) -> StorageResult<()> {
+    async fn update_metrics(&self, id: &str, active_conn: usize, bytes_in: u64, bytes_out: u64) -> StorageResult<()> {
         let mut guard = self.tunnels.write().map_err(|e| StorageError::Backend(e.to_string()))?;
         if let Some(t) = guard.iter_mut().find(|t| t.id == id) {
             t.active_connections = active_conn;
