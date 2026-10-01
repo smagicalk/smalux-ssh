@@ -5,15 +5,17 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
-build = "build.rs"
 
 [dependencies]
 slint.workspace = true
+smagical-ui-common = { path = "../ui/common" }
+smagical-ui-kernel = { path = "../ui/kernel" }
+plugin-hosts = { path = "../ui/plugins/hosts" }
+plugin-session-tools = { path = "../ui/plugins/session_tools" }
+plugin-snippets = { path = "../ui/plugins/snippets" }
+plugin-tunnels = { path = "../ui/plugins/tunnels" }
 
 [lib]
 test = false
 doctest = false
 bench = false
-
-[build-dependencies]
-slint-build.workspace = true

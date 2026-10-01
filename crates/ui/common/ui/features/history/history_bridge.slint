@@ -1,0 +1,61 @@
+/// 历史会话单项数据结构
+export struct HistoryItemData {
+    id: string,
+    host-id: string,
+    title: string,
+    address: string,
+    username: string,
+    session-type: string,       // "ssh" | "local"
+    time-text: string,          // "10m 前", "18:32", "昨天"
+    duration-text: string,      // "42m", "1h 15m", "2s"
+    exit-status: string,        // "active", "success", "timeout", "auth_failed", "error"
+    error-msg: string,
+    is-pinned: bool,
+    connect-count: int,
+    subtitle: string,
+}
+
+/// 历史会话分组数据结构 (时间线分组或置顶分组)
+export struct HistoryGroupData {
+    group-id: string,           // "pinned", "today", "yesterday", "earlier", "all_hosts"
+    group-name: string,         // "置顶常用", "今天 (Today)", "昨天 (Yesterday)", "更早 (Earlier)", "全部主机"
+    item-count: int,
+    is-collapsed: bool,
+    items: [HistoryItemData],
+}
+
+/// 连接历史记录领域全局状态总线 (History Bridge)
+export global HistoryBridge {
+    // 列表与分组
+    in-out property <[HistoryGroupData]> history-groups: [];
+    in-out property <int> total-count: 0;
+    in-out property <string> view-mode: "timeline"; // "timeline" | "hosts"
+    in-out property <string> search-query: "";
+
+    // 详情与快照模态窗口
+    in-out property <bool> is-detail-open: false;
+    in-out property <string> detail-id: "";
+    in-out property <string> detail-title: "";
+    in-out property <string> detail-address: "";
+    in-out property <string> detail-user: "";
+    in-out property <string> detail-type: "ssh";
+    in-out property <string> detail-connected-time: "";
+    in-out property <string> detail-disconnected-time: "";
+    in-out property <string> detail-duration: "";
+    in-out property <string> detail-exit-status: "success";
+    in-out property <string> detail-error-msg: "";
+    in-out property <string> detail-snapshot: "";
+    in-out property <int> detail-snapshot-lines: 0;
+
+    callback reconnect(string /* id */);
+    callback reconnect-split(string /* id */);
+    callback show-detail(string /* id */);
+    callback delete-item(string /* id */);
+    callback clear-all();
+    callback toggle-pin(string /* id */);
+    callback toggle-group(string /* group_id */);
+    callback search-changed(string /* query */);
+    callback switch-view-mode(string /* mode */);
+    callback copy-log(string /* content */);
+    callback close-detail();
+}

@@ -1,0 +1,55 @@
+import { AppTheme } from "../../themes/app-theme.slint";
+import { AppIconButton } from "../base/app-icon-button.slint";
+
+/// 标准化左侧抽屉通用脚手架 (AppLeftDrawerScaffold)
+export component AppLeftDrawerScaffold inherits Rectangle {
+    in property <string> title: "";
+    in property <bool> is-open: true;
+    in property <length> drawer-width: 280px;
+
+    callback close-requested();
+
+    width: root.is-open ? root.drawer-width : 0px;
+    background: AppTheme.panel-background;
+    clip: true;
+
+    animate width { duration: 180ms; easing: ease-out; }
+
+    VerticalLayout {
+        padding: 0px;
+        spacing: 0px;
+
+        // 统一抽屉头部 (Title + Close Button)
+        Rectangle {
+            height: 40px;
+
+            HorizontalLayout {
+                padding-left: 12px;
+                padding-right: 8px;
+                alignment: space-between;
+
+                Text {
+                    text: root.title;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+
+                AppIconButton {
+                    icon: @image-url("../../assets/icons/close.svg");
+                    clicked => { root.close-requested(); }
+                }
+            }
+
+            Rectangle {
+                y: parent.height - 1px;
+                height: 1px;
+                background: AppTheme.border;
+            }
+        }
+
+        // 统一内容区域插槽
+        @children
+    }
+}

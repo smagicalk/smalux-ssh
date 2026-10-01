@@ -586,6 +586,7 @@ mod tests {
             "127.0.0.1".to_string(),
             22,
             Some("root".to_string()),
+            None,
             Box::new(client_stream),
             80,
             24,

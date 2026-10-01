@@ -1,0 +1,22 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { StatusDot } from "@common/components/status-dot.slint";
+
+/// 底部全局状态栏 (Status Bar)
+export component StatusBar inherits Rectangle {
+    in property <int> active-sessions-count: 2;
+    in property <string> ping-display: "21ms";
+    in property <string> encoding: "UTF-8";
+    in property <string> grid-size: "136x42";
+    in property <string> net-rate: "↑ 1.4MB/s ↓ 5.2MB/s";
+    in property <string> current-theme-name: "Darcula";
+    in property <bool> is-debug-open: false;
+
+    callback toggle-debug-panel();
+
+    height: 0px;
+    visible: false;
+
+
+    // 内部组件暂时取消显示
+
+}

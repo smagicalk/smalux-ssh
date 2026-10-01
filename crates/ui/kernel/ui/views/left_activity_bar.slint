@@ -1,0 +1,93 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { ActionBarItem } from "@common/components/action-bar-item.slint";
+
+import { ActivityBarItemData } from "@common/features/window/window_bridge.slint";
+export { ActivityBarItemData }
+
+/// 最左侧 48px 动态活动图标栏组件 (Dynamic Left Activity Bar)
+export component LeftActivityBar inherits Rectangle {
+    /// 当前选中的激活 Tab 模块 ID (例如: "hosts", "credentials", "history", "snippets", "settings", "debug")
+    in property <string> active-tab: "hosts";
+    /// 顶部主功能动态菜单项列表
+    in property <[ActivityBarItemData]> top-items: [];
+    /// 底部系统/设置动态菜单项列表
+    in property <[ActivityBarItemData]> bottom-items: [];
+    /// 当前是否处于深色模式 (用于更新底部日/夜间切换图标)
+    in-out property <bool> is-dark-mode: true;
+
+    /// 当用户点击任意顶级 Tab 图标时触发的回调事件，参数为 tab_id 字符串
+    callback tab-clicked(string /* tab_id */);
+    /// 当用户点击底部深浅色切换图标时触发的回调事件
+    callback toggle-color-mode();
+
+    // 纯函数：映射图标标识至编译期静态内联 SVG 资产
+    pure function resolve-icon(name: string) -> image {
+        if name == "server" { return @image-url("../assets/icons/server.svg"); }
+        if name == "key" { return @image-url("../assets/icons/key.svg"); }
+        if name == "clock" { return @image-url("../assets/icons/clock.svg"); }
+        if name == "terminal" { return @image-url("../assets/icons/terminal.svg"); }
+        if name == "folder" { return @image-url("../assets/icons/folder.svg"); }
+        if name == "tunnel" { return @image-url("../assets/icons/tunnel.svg"); }
+        if name == "archive" { return @image-url("../assets/icons/archive.svg"); }
+        if name == "settings" { return @image-url("../assets/icons/settings.svg"); }
+        if name == "bug" { return @image-url("../assets/icons/bug.svg"); }
+        if name == "zap" { return @image-url("../assets/icons/zap.svg"); }
+        if name == "sparkles" { return @image-url("../assets/icons/sparkles.svg"); }
+        if name == "code" { return @image-url("../assets/icons/code.svg"); }
+        return @image-url("../assets/icons/server.svg");
+    }
+
+    width: 48px;
+    background: AppTheme.panel-background;
+
+    // 右侧 1px 分割线
+    Rectangle {
+        x: parent.width - 1px;
+        width: 1px;
+        height: 100%;
+        background: AppTheme.border;
+    }
+
+    VerticalLayout {
+        padding-top: 10px;
+        padding-bottom: 10px;
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+        alignment: space-between;
+
+        // 上半区 (动态数据驱动渲染主功能项)
+        VerticalLayout {
+            spacing: 6px;
+            alignment: center;
+
+            for item in root.top-items: ActionBarItem {
+                icon: root.resolve-icon(item.icon-name);
+                tooltip: item.tooltip;
+                is-active: root.active-tab == item.id;
+                clicked => { root.tab-clicked(item.id); }
+            }
+        }
+
+        // 下半区 (动态数据驱动渲染系统设置项 + 外观切换)
+        VerticalLayout {
+            spacing: 6px;
+            alignment: center;
+
+            for item in root.bottom-items: ActionBarItem {
+                icon: root.resolve-icon(item.icon-name);
+                tooltip: item.tooltip;
+                is-active: root.active-tab == item.id;
+                clicked => { root.tab-clicked(item.id); }
+            }
+
+            // 固有深浅色外观切换开关
+            ActionBarItem {
+                icon: root.is-dark-mode ? @image-url("../assets/icons/moon.svg") : @image-url("../assets/icons/sun.svg");
+                tooltip: root.is-dark-mode ? @tr("切换至浅色模式") : @tr("切换至深色模式");
+                is-active: false;
+                clicked => { root.toggle-color-mode(); }
+            }
+        }
+    }
+}

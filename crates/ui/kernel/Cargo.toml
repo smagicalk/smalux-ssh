@@ -1,0 +1,24 @@
+[package]
+name = "smagical-ui-kernel"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+build = "build.rs"
+
+[dependencies]
+slint.workspace = true
+smagical-ui-common = { path = "../common" }
+plugin-hosts = { path = "../plugins/hosts" }
+plugin-session-tools = { path = "../plugins/session_tools" }
+plugin-snippets = { path = "../plugins/snippets" }
+plugin-tunnels = { path = "../plugins/tunnels" }
+
+[lib]
+test = false
+doctest = false
+bench = false
+
+[build-dependencies]
+slint-build.workspace = true

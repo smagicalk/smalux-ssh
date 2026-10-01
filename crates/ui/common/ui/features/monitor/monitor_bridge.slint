@@ -1,0 +1,103 @@
+/// 单个监控进程数据模型 (支持可选采样与排行榜展示)
+export struct MonitorProcessItem {
+    pid: int,
+    name: string,
+    user: string,
+    cpu-pct: string,
+    mem-pct: string,
+}
+
+/// 单个物理磁盘分区数据模型 (支持 1 到多个物理挂载点)
+export struct DiskPartitionItem {
+    name: string,           // 分区别名 (如 "系统根盘", "数据盘", "备份挂载")
+    mount-point: string,    // 挂载路径 (如 "/", "/data", "/mnt/backup")
+    filesystem: string,     // 设备路径 (如 "/dev/nvme0n1p2", "/dev/sdb1")
+    used: string,           // 已用空间 (如 "176 GB")
+    total: string,          // 总容量 (如 "500 GB")
+    free: string,           // 剩余可用 (如 "324 GB")
+    usage-pct: float,       // 使用率浮点值 0.0 ~ 1.0 (如 0.352)
+    inode-pct: string,      // Inode 占用率 (如 "14%")
+}
+
+/// 系统实时指标数据模型 (纯轻量内核原子计数器提取，零性能开销)
+export struct SystemMetricsData {
+    // 1. 主机基础与环境概览
+    host-name: string,
+    host-ip: string,
+    os-name: string,
+    virt-type: string,      // 虚拟化类型 (如 "KVM 虚机", "物理机", "Docker")
+    uptime: string,
+    load-avg: string,       // 1/5/15 min 负载
+    fd-usage: string,       // 系统文件句柄 (如 "2,840 / 104万 (0.3%)")
+    tasks-threads: string,  // 运行与总线程 (如 "3 活跃 / 248 线程")
+    active-users: int,      // 当前在线 SSH 终端会话数
+
+    // 2. CPU 算力负载
+    cpu-usage: float,
+    cpu-cores: int,
+    cpu-freq: string,
+    cpu-temp: string,
+    cpu-user-pct: string,   // 用户态 %
+    cpu-sys-pct: string,    // 内核态 %
+    cpu-iowait-pct: string, // 磁盘等待 %iowait
+    cpu-steal-pct: string,  // 虚机超售偷取 %steal
+
+    // 3. 物理内存 (RAM) 独立指标
+    ram-usage: float,
+    ram-used: string,
+    ram-total: string,
+    ram-available: string,
+    ram-cached: string,
+    ram-free: string,
+
+    // 4. 虚拟交换空间 (Swap) 独立指标
+    swap-enabled: bool,
+    swap-usage: float,
+    swap-used: string,
+    swap-total: string,
+    swap-free: string,
+    swap-status-text: string,
+
+    // 5. 网络接口与套接字连接
+    net-interface: string,
+    net-rx-rate: string,
+    net-tx-rate: string,
+    net-total-rx: string,
+    net-total-tx: string,
+    tcp-inuse: int,         // TCP 活跃已建立连接数
+    tcp-tw: int,            // TCP TIME_WAIT 回收数
+    udp-inuse: int,         // UDP 活跃套接字数
+    net-drops: int,         // 累计丢包数
+    net-errs: int,          // 累计错包数
+
+    // 6. 探针诊断
+    ping-ms: int,
+    probe-latency-ms: int,
+    last-update-time: string,
+    poll-interval: string,
+
+    // 7. 动态时序走势波形 (SVG Path Commands)
+    cpu-sparkline-area: string,
+    cpu-sparkline-line: string,
+    net-rx-sparkline-area: string,
+    net-rx-sparkline-line: string,
+    net-tx-sparkline-area: string,
+    net-tx-sparkline-line: string,
+
+    // 兼容历史字段
+    memory-usage: float,
+    disk-usage: float,
+    uptime-days: int,
+    process-count: int,
+}
+
+
+/// 主机实时监控领域状态单例总线 (MonitorBridge)
+/// 负责将后台定期探针指标安全同步至 UI，并在无主机或失焦时实现惰性休眠。
+export global MonitorBridge {
+    in-out property <SystemMetricsData> metrics;
+    in-out property <bool> has-active-host: false;
+    in-out property <bool> is-sampling: false;
+
+    callback refresh-metrics();
+}

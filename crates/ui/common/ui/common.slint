@@ -1,0 +1,76 @@
+import { AppTheme, AppColorScheme } from "themes/app-theme.slint";
+export { Palette } from "std-widgets.slint";
+export { AppTheme, AppColorScheme } from "themes/app-theme.slint";
+
+// 全局共享基础组件库模型与组件
+export { SegmentItemData } from "shared/base/app-segmented-control.slint";
+export { DropdownItemData } from "shared/base/app-dropdown.slint";
+export { ColorSwatchItem } from "shared/base/app-color-picker.slint";
+export { TabStripItem } from "shared/composite/app-tab-strip.slint";
+export { ContextMenuItemData } from "shared/composite/app-context-menu.slint";
+export { TableColumn } from "shared/composite/app-data-table.slint";
+export { ThemeOption, ThemeRow, KeywordHighlightRule, SettingSnapshotItem, BackupTaskItem } from "features/settings/settings_bridge.slint";
+
+// 基础组件
+export { AppButton } from "shared/base/app-button.slint";
+export { AppIconButton } from "shared/base/app-icon-button.slint";
+export { AppTextInput } from "shared/base/app-text-input.slint";
+export { AppTextArea } from "shared/base/app-text-area.slint";
+export { AppPasswordInput } from "shared/base/app-password-input.slint";
+export { AppFormInput } from "shared/base/app-form-input.slint";
+export { AppFormItem } from "shared/base/app-form-item.slint";
+export { AppSwitch } from "shared/base/app-switch.slint";
+export { AppSegmentedControl } from "shared/base/app-segmented-control.slint";
+export { AppDropdown } from "shared/base/app-dropdown.slint";
+export { AppColorPicker } from "shared/base/app-color-picker.slint";
+export { AppNumberStepper } from "shared/base/app-number-stepper.slint";
+export { AppCard } from "shared/base/app-card.slint";
+export { AppEmptyState } from "shared/base/app-empty-state.slint";
+export { AppBadge, AppKeyCap } from "shared/base/app-badge.slint";
+export { AppFilterPillGroup, FilterPillItem } from "shared/base/app-filter-pill-group.slint";
+export { AppVScrollBar, AppHScrollBar } from "components/base/app-scroll-bar.slint";
+export { StatusDot } from "components/status-dot.slint";
+export { SearchInput } from "components/search-input.slint";
+export { ProgressBar } from "components/progress-bar.slint";
+export { ToastItemData, ToastContainer } from "components/toast.slint";
+
+// 脚手架
+export { AppModalScaffold } from "shared/scaffolds/app-modal-scaffold.slint";
+export { AppLeftDrawerScaffold } from "shared/scaffolds/app-left-drawer-scaffold.slint";
+export { AppFormRow } from "shared/scaffolds/app-form-row.slint";
+export { AppMasterDetailScaffold } from "shared/scaffolds/app-master-detail-scaffold.slint";
+export { AppPageScaffold } from "shared/scaffolds/app-page-scaffold.slint";
+export { AppWorkbenchCard } from "shared/scaffolds/app-workbench-card.slint";
+
+// 领域状态单例总线 (Domain State Bridges)
+import { SettingsBridge } from "features/settings/settings_bridge.slint";
+import { ThemeEditorBridge } from "features/theme_editor/theme_editor_bridge.slint";
+import { DebugBridge } from "features/debug/debug_bridge.slint";
+import { HostsBridge } from "features/hosts/hosts_bridge.slint";
+import { TerminalBridge } from "features/terminal/terminal_bridge.slint";
+import { FilesBridge } from "features/file_explorer/file_explorer_bridge.slint";
+import { CredentialsBridge } from "features/credentials/credentials_bridge.slint";
+import { SnippetsBridge } from "features/snippets/snippets_bridge.slint";
+import { TunnelsBridge } from "features/tunnels/tunnels_bridge.slint";
+import { HistoryBridge } from "features/history/history_bridge.slint";
+import { WindowBridge } from "features/window/window_bridge.slint";
+import { AiBridge, AiChatMessage, AiHistorySession } from "features/ai/ai_bridge.slint";
+import { MonitorBridge } from "features/monitor/monitor_bridge.slint";
+
+export {
+    SettingsBridge,
+    ThemeEditorBridge,
+    DebugBridge,
+    HostsBridge,
+    TerminalBridge,
+    FilesBridge,
+    CredentialsBridge,
+    SnippetsBridge,
+    TunnelsBridge,
+    HistoryBridge,
+    WindowBridge,
+    AiBridge,
+    MonitorBridge,
+    AiChatMessage,
+    AiHistorySession,
+}
