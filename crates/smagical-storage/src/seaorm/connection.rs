@@ -52,8 +52,7 @@ pub async fn init_schema(db: &DatabaseConnection) -> Result<(), DbErr> {
         ($entity:expr) => {{
             let mut stmt = schema.create_table_from_entity($entity);
             stmt.if_not_exists();
-            let statement = backend.build(&stmt);
-            db.execute(statement).await?;
+            db.execute(&stmt).await?;
         }};
     }
 

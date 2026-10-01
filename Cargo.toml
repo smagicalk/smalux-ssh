@@ -38,10 +38,10 @@ slint = { version = "1.18.1", default-features = false, features = [
     "renderer-skia-opengl",
     "unstable-winit-030",
 ] }
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.13", features = ["json", "stream"] }
 futures-util = "0.3"
-sha2 = "0.10"
-hmac = "0.12"
+sha2 = "0.11"
+hmac = "0.13"
 chrono = { version = "0.4", features = ["serde"] }
 
 slint-build = "1.18.1"
@@ -59,6 +59,34 @@ async-trait = "0.1.89"
 winit = { version = "0.30", default-features = false }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
 rfd = "0.17.2"
+
+# 数据库与密码学安全栈 (升级至最新 SeaORM 2.0 / AES-GCM 0.11 / Argon2 0.6 / Base64 0.23 / Rand 0.10)
+sea-orm = { version = "2.0", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
+aes-gcm = "0.11"
+argon2 = "0.6"
+base64 = "0.23"
+rand = "0.10"
+log = "0.4"
+
+# SSH 协议栈
+russh = { version = "0.63", default-features = false, features = ["flate2", "ring", "rsa"] }
+russh-sftp = "3.0"
+ssh-key = { version = "0.7.0-rc.11", features = ["ed25519", "rsa", "ecdsa", "p256", "getrandom", "std"] }
+
+# CLI 控制台 TUI 栈
+ratatui = "0.30"
+crossterm = { version = "0.29", features = ["event-stream"] }
+rpassword = "7.5"
+
+# Windows 原生平台支持
+windows-sys = { version = "0.61", features = [
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_Foundation",
+    "Win32_Graphics_Gdi",
+    "Win32_System_LibraryLoader",
+    "Win32_System_Registry",
+] }
 
 [profile.dev]
 # 降低局部变量调试符号（保留 panic 行号与堆栈追踪），显著降低 PDB 体积和 MSVC 磁盘写入耗时

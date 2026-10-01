@@ -90,7 +90,7 @@ pub fn compute_sha256(data: &[u8]) -> String {
     format!("sha256:{}", hex_encode(&result))
 }
 
-fn hex_encode(bytes: &[u8]) -> String {
+pub(crate) fn hex_encode(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{:02x}", b)).collect()
 }
 

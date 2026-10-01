@@ -3,11 +3,11 @@
 //! 实现轻量纯 Rust AWS SigV4 认证签名，不引入庞大 AWS SDK。
 
 use async_trait::async_trait;
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use reqwest::{Client, StatusCode};
 use sha2::{Digest, Sha256};
 
-use super::{BackupDriver, RemoteSnapshotInfo};
+use super::{hex_encode, BackupDriver, RemoteSnapshotInfo};
 
 type HmacSha256 = Hmac<Sha256>;
 
@@ -45,7 +45,7 @@ impl S3BackupDriver {
     fn sha256_hex(data: &[u8]) -> String {
         let mut hasher = Sha256::new();
         hasher.update(data);
-        format!("{:x}", hasher.finalize())
+        hex_encode(&hasher.finalize())
     }
 
     fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {

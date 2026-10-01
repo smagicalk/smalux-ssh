@@ -3,13 +3,13 @@
 //! 基于 Argon2id (RFC 9106) 内存硬化 KDF 与 AES-256-GCM 认证加密构建。
 //! 支持金丝雀魔数校验 (Canary Verification)、信封加密 (Envelope Encryption) 与密文版本追踪。
 
-use aes_gcm::aead::{Aead, KeyInit, OsRng};
+use aes_gcm::aead::{Aead, KeyInit};
 use aes_gcm::{Aes256Gcm, Nonce};
 use anyhow::{anyhow, Context, Result};
 use argon2::{Algorithm, Argon2, Params, Version};
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine;
-use rand::RngCore;
+use rand::RngExt;
 
 pub mod vault;
 pub use vault::VaultManager;
@@ -29,14 +29,14 @@ impl CryptoService {
     /// 生成 32 字节真随机 Salt
     pub fn generate_salt() -> [u8; 32] {
         let mut salt = [0u8; 32];
-        OsRng.fill_bytes(&mut salt);
+        rand::rng().fill(&mut salt);
         salt
     }
 
     /// 生成 32 字节真随机数据加密密钥 (DEK)
     pub fn generate_dek() -> [u8; 32] {
         let mut dek = [0u8; 32];
-        OsRng.fill_bytes(&mut dek);
+        rand::rng().fill(&mut dek);
         dek
     }
 
@@ -68,11 +68,11 @@ impl CryptoService {
             .map_err(|e| anyhow!("初始化 AES-256-GCM 密码机失败: {}", e))?;
 
         let mut nonce_bytes = [0u8; 12];
-        OsRng.fill_bytes(&mut nonce_bytes);
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        rand::rng().fill(&mut nonce_bytes);
+        let nonce = Nonce::from(nonce_bytes);
 
         let ciphertext = cipher
-            .encrypt(nonce, plaintext)
+            .encrypt(&nonce, plaintext)
             .map_err(|e| anyhow!("AES-256-GCM 加密失败: {}", e))?;
 
         let nonce_b64 = BASE64.encode(nonce_bytes);
@@ -99,7 +99,7 @@ impl CryptoService {
         if nonce_bytes.len() != 12 {
             return Err(anyhow!("Nonce 长度不符合 12 字节标准"));
         }
-        let nonce = Nonce::from_slice(&nonce_bytes);
+        let nonce = Nonce::try_from(nonce_bytes.as_slice()).map_err(|e| anyhow!("无效的 Nonce 格式: {}", e))?;
 
         let cipher_bytes = BASE64.decode(parts[3]).context("Base64 解码 Ciphertext 失败")?;
 
@@ -107,7 +107,7 @@ impl CryptoService {
             .map_err(|e| anyhow!("初始化 AES-256-GCM 密码机失败: {}", e))?;
 
         let plaintext = cipher
-            .decrypt(nonce, cipher_bytes.as_ref())
+            .decrypt(&nonce, cipher_bytes.as_ref())
             .map_err(|_| anyhow!("解密校验失败 (密钥错误或密文被篡改)"))?;
 
         Ok((version, plaintext))

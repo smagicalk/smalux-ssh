@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, PaginatorTrait, QueryFilter, QueryOrder, Set,
 };
 use smagical_core::domain::credential::{CredentialRecord, CredentialType};
 use smagical_core::storage::{CredentialRepository, StorageError, StorageResult};

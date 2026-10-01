@@ -18,16 +18,16 @@ async-trait = { workspace = true }
 tokio = { workspace = true, features = ["full"] }
 directories.workspace = true
 
-# SeaORM 数据持久化引擎 (默认启用 SQLite，已具备通用类型抽象)
-sea-orm = { version = "1.1", features = ["sqlx-sqlite", "runtime-tokio-rustls", "macros"] }
-log = "0.4"
-chrono = { version = "0.4", features = ["serde"] }
+# SeaORM 数据持久化引擎与时间
+sea-orm = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true }
 
-# 加密与金丝雀安全保险库 (纯 Rust 零外部 C 依赖)
-aes-gcm = "0.10"
-argon2 = "0.5"
-base64 = "0.22"
-rand = "0.8"
+# 加密与金丝雀安全保险库
+aes-gcm = { workspace = true }
+argon2 = { workspace = true }
+base64 = { workspace = true }
+rand = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

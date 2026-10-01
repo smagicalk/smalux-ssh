@@ -2,7 +2,7 @@
 
 use async_trait::async_trait;
 use sea_orm::{
-    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, QueryOrder, Set,
+    ActiveModelTrait, ColumnTrait, DatabaseConnection, EntityTrait, ExprTrait, QueryFilter, QueryOrder, Set,
 };
 use smagical_core::domain::tunnel::{TunnelRecord, TunnelType};
 use smagical_core::storage::{StorageError, StorageResult, TunnelRepository};
