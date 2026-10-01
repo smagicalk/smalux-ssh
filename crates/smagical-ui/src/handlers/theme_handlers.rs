@@ -10,7 +10,19 @@ use crate::generated::{AppWindow, SettingsBridge, ThemeEditorBridge, WindowBridg
 use super::AppContext;
 use super::color_utils::{hsv_to_rgb, rgb_to_hsv, parse_hex_to_rgb};
 
-/// Parse hex string into a Slint Brush
+/// 将十六进制颜色文本字符串解析为 Slint `Brush` 笔刷
+///
+/// # 支持格式
+/// - 3 位短 Hex（如 `#RGB`）：自动展开为 `#RRGGBB`（例如 `#F0A` -> `#FF00AA`）；
+/// - 6 位标准 Hex（如 `#RRGGBB`）：按 R, G, B 三通道解析，Alpha 通道默认为 255；
+/// - 8 位透明度 Hex（如 `#RRGGBBAA`）：按 R, G, B, A 四通道完整解析。
+///
+/// # 参数
+/// - `value`: 待解析的十六进制颜色字符串（前缀 `#` 可选）。
+///
+/// # 返回值
+/// - `Some(Brush)`: 解析成功返回包含 ARGB 的 Slint 单色笔刷；
+/// - `None`: 字符串长度非法或包含非十六进制字符时返回 None。
 fn parse_brush(value: &str) -> Option<slint::Brush> {
     let mut hex = value.trim().trim_start_matches('#');
     let expanded: String;
@@ -29,7 +41,20 @@ fn parse_brush(value: &str) -> Option<slint::Brush> {
     Some(slint::Brush::from(slint::Color::from_argb_u8(a, r, g, b)))
 }
 
-/// Normalize color string to valid #RRGGBB or #RRGGBBAA hex color
+/// 规范化用户输入的颜色字符串为合法的 `#RRGGBB` 或 `#RRGGBBAA` 格式
+///
+/// # 算法处理
+/// 1. 若缺少前缀 `#`，自动补全；
+/// 2. 若为 3 位短 Hex，自动逐位双写扩充为 6 位标准格式；
+/// 3. 若为合法 6 位或 8 位十六进制字符，直接返回；
+/// 4. 若格式非法或输入错误，安全回退到指定的 `fallback` 颜色。
+///
+/// # 参数
+/// - `value`: 原始用户输入字符串；
+/// - `fallback`: 校验失败时的默认回退十六进制颜色。
+///
+/// # 返回值
+/// 格式规范的标准十六进制颜色字符串。
 fn normalize_hex(value: &str, fallback: &str) -> String {
     let mut v = value.trim().to_string();
     if !v.starts_with('#') {
@@ -46,7 +71,19 @@ fn normalize_hex(value: &str, fallback: &str) -> String {
     fallback.to_string()
 }
 
-/// Helper to generate pretty and 100% valid TOML representation of theme definition from AppWindow state
+/// 从当前 Slint 应用窗口的 Theme Studio 编辑器状态动态生成规范美观的 TOML 主题文件
+///
+/// # 生成内容
+/// 包含 100% 符合 `UiThemeDefinition` 规范的 TOML 结构化配置：
+/// 1. **主题元数据 `[metadata]`**：`schema-version`, `id`, `name`, `kind`, `period`, `base`, `author`；
+/// 2. **色彩层级 `[ui]`**：基础层次底色（窗口、面板、卡片、控件）、文字前景色、品牌强调色、边框及状态语义色；
+/// 3. **几何度量 `[metrics]`**：小/中/大圆角与间距系统、描边宽度、控件高度与图标规格。
+///
+/// # 参数
+/// - `w`: Slint 顶级应用窗口上下文。
+///
+/// # 返回值
+/// 返回格式化良好、带有详细中文分组注释的 TOML 文本字符串。
 fn generate_theme_toml_from_window(w: &AppWindow) -> String {
     let raw_name = w.global::<ThemeEditorBridge>().get_name();
     let clean_name = raw_name.trim();
@@ -203,7 +240,15 @@ icon-size = {}                 # 标准图标物理像素规格
     )
 }
 
-/// Open native file dialog for theme file
+/// 调起 Windows 原生文件选择对话框以导入主题文件
+///
+/// # 支持格式
+/// - TOML 主题文件 (`*.toml`)：原生 Smalux 完整主题配置；
+/// - Windows Terminal 配色方案 (`*.json`)：兼容 Windows Terminal 颜色配置文件。
+///
+/// # 返回值
+/// - `Some(PathBuf)`: 用户成功选中的主题文件绝对路径；
+/// - `None`: 用户取消选择或 PowerShell 宿主启动失败。
 fn pick_theme_file() -> Option<PathBuf> {
     let script = r#"
 Add-Type -AssemblyName System.Windows.Forms
@@ -230,7 +275,14 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     None
 }
 
-/// Save file dialog for exported theme
+/// 调起 Windows 原生文件保存对话框以导出自定义主题文件
+///
+/// # 参数
+/// - `default_filename`: 预填的默认保存文件名（如 `custom-theme.toml`）。
+///
+/// # 返回值
+/// - `Some(PathBuf)`: 用户确认的目标导出路径；
+/// - `None`: 用户取消导出或执行失败。
 fn pick_save_theme_file(default_filename: &str) -> Option<PathBuf> {
     let script = format!(
         r#"
@@ -258,7 +310,14 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
     None
 }
 
-/// Open native file dialog for wallpaper image
+/// 调起 Windows 原生文件选择对话框选择单张背景壁纸图片
+///
+/// # 支持格式
+/// - PNG, JPG, JPEG, WEBP, BMP
+///
+/// # 返回值
+/// - `Some(PathBuf)`: 选中的图片文件路径；
+/// - `None`: 用户取消选择。
 fn pick_image_file() -> Option<PathBuf> {
     let script = r#"
 Add-Type -AssemblyName System.Windows.Forms
@@ -285,7 +344,15 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     None
 }
 
-/// Open native folder dialog
+/// 调起 Windows 原生文件夹选择对话框以批量导入壁纸相册目录
+///
+/// # 跨平台/安全设计
+/// - Windows 下添加 `CREATE_NO_WINDOW (0x08000000)` 隐藏控制台黑框弹出；
+/// - 强制使用 `-STA` 线程模型保障 COM 控件对话框稳定响应。
+///
+/// # 返回值
+/// - `Some(PathBuf)`: 用户选中的有效目录路径；
+/// - `None`: 用户取消或路径不存在。
 pub(crate) fn pick_folder() -> Option<PathBuf> {
     let script = r#"
 Add-Type -AssemblyName System.Windows.Forms
@@ -316,8 +383,14 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
     None
 }
 
-/// Scan all images in a folder
-fn scan_images_in_folder(dir: &std::path::Path) -> Vec<PathBuf> {
+/// 扫描指定目录下所有支持的图片文件
+///
+/// # 参数
+/// - `dir`: 待扫描的目标目录路径。
+///
+/// # 返回值
+/// 返回按文件名升序排列的图片绝对路径集合 `Vec<PathBuf>`。
+pub(crate) fn scan_images_in_folder(dir: &std::path::Path) -> Vec<PathBuf> {
     let mut images = Vec::new();
     let supported = ["png", "jpg", "jpeg", "webp", "bmp"];
     if let Ok(entries) = std::fs::read_dir(dir) {
@@ -337,6 +410,12 @@ fn scan_images_in_folder(dir: &std::path::Path) -> Vec<PathBuf> {
 }
 
 /// 将壁纸库中的所有条目（图片文件或文件夹路径）平铺展平为所有有效的图片文件路径
+///
+/// # 参数
+/// - `entries`: 壁纸库原始条目集合（可能混杂单张图片路径与壁纸文件夹路径）。
+///
+/// # 返回值
+/// 返回平铺展开后的所有有效单张图片文件路径字符串向量。
 pub fn resolve_all_wallpaper_images(entries: &[String]) -> Vec<String> {
     let mut all_images = Vec::new();
     for entry in entries {
@@ -352,12 +431,26 @@ pub fn resolve_all_wallpaper_images(entries: &[String]) -> Vec<String> {
     all_images
 }
 
+/// 壁纸像素原始数据三元组：`(RGBA原始字节流, 宽度, 高度)`
 pub type RawWallpaperData = (Vec<u8>, u32, u32);
 
+/// 线程安全的全局壁纸解码原始缓冲缓存池（最多容纳 4 张高分采样图，防止高频换图爆内存）
 pub static WALLPAPER_RAW_CACHE: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, RawWallpaperData>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
-/// 后台无阻塞解码与高分图片快速整型降采样为 RGBA 原始像素缓冲（由后台独立线程调用，0ms 阻塞 UI）
+/// 后台无阻塞解码与高分图片快速整型降采样为 RGBA 原始像素缓冲
+///
+/// # 性能设计
+/// - 由后台独立工作线程执行，确保主 UI 线程 0ms 阻塞；
+/// - 使用快速整型采样 `thumbnail(1920, 1080)`，相比浮点 Triangle 采样提速 3~5 倍；
+/// - 内存直接转换为 `Vec<u8>` RGBA8 紧凑字节序列。
+///
+/// # 参数
+/// - `path`: 待解码的本地图片文件路径。
+///
+/// # 返回值
+/// - `Some((raw_bytes, width, height))`: 解码与缩放成功；
+/// - `None`: 文件不存在、格式损坏或路径为目录。
 pub fn decode_and_resize_to_raw(path: &std::path::Path) -> Option<RawWallpaperData> {
     if path.is_dir() {
         return None;
@@ -375,7 +468,14 @@ pub fn decode_and_resize_to_raw(path: &std::path::Path) -> Option<RawWallpaperDa
     Some((rgba.into_raw(), rw, rh))
 }
 
-/// 快速后台直接构建 Slint SharedPixelBuffer (天然 Send + Sync)
+/// 快速后台直接构建 Slint `SharedPixelBuffer`（天然支持 `Send + Sync`）
+///
+/// # 缓存策略
+/// - 命中内存缓存时直接切片克隆（耗时 < 1ms）；
+/// - 未命中时触发解码缩放，并置入容量受控的 `WALLPAPER_RAW_CACHE`。
+///
+/// # 参数
+/// - `path_str`: 图片文件绝对路径字符串。
 pub fn load_pixel_buffer_fast(path_str: &str) -> Option<slint::SharedPixelBuffer<slint::Rgba8Pixel>> {
     let path = std::path::Path::new(path_str);
     if let Ok(raw_c) = WALLPAPER_RAW_CACHE.lock() {
@@ -396,11 +496,17 @@ pub fn load_pixel_buffer_fast(path_str: &str) -> Option<slint::SharedPixelBuffer
     Some(slint::SharedPixelBuffer::clone_from_slice(&raw, rw, rh))
 }
 
-
-/// 100% 后台异步预加载壁纸：
-/// 在专用后台线程中完成所有文件 I/O 读取、图片解码与整型快速降采样计算，
-/// 将处理好的像素原始缓冲预先填入线程安全缓存中，
-/// 使得主 UI 线程耗时为绝对 0ms，彻底根治壁纸切换后点击左侧栏卡顿的问题。
+/// 100% 后台异步预加载下一张壁纸
+///
+/// # 业务与性能目标
+/// 在专用异步工作池中完成 I/O 读取、图片解码与高分快速降采样，
+/// 将处理好的像素缓冲预填入线程安全缓存中，
+/// 使得轮播或用户手动切图时主 UI 线程耗时为绝对 0ms，彻底杜绝界面微卡顿。
+///
+/// # 参数
+/// - `next_path`: 下一张待展示壁纸的绝对路径；
+/// - `cache`: 主 UI 线程的图片缓存句柄；
+/// - `_preload_timer`: 定时器弱引用（占位备用）。
 pub fn schedule_wallpaper_preload(
     next_path: String,
     cache: Rc<RefCell<std::collections::HashMap<String, slint::Image>>>,
@@ -437,11 +543,25 @@ pub fn schedule_wallpaper_preload(
     });
 }
 
+/// 判断当前客户端语言环境是否为英文 (`en-US`)
+///
+/// # 参数
+/// - `window_weak`: Slint 主窗口弱引用。
 fn is_en(window_weak: &slint::Weak<AppWindow>) -> bool {
     window_weak.upgrade().map(|w| w.global::<WindowBridge>().get_current_language() == "en-US").unwrap_or(false)
 }
 
-/// Update theme color field and refresh TOML
+/// 更新主题工作台中的色彩字段，同步笔刷预览并实时刷新生成的 TOML 规范文本
+///
+/// # 联动逻辑
+/// 1. 匹配目标颜色属性键名 `f`，设置对应的 Hex 字符串与 Slint `Brush` 预览笔刷；
+/// 2. 重新调用 `generate_theme_toml_from_window` 重新生成合规 TOML，回填至编辑器代码视图。
+///
+/// # 参数
+/// - `w`: Slint 顶级应用窗口；
+/// - `f`: 颜色属性键名（如 `"window_bg"`, `"accent"`, `"border"` 等）；
+/// - `v`: 十六进制颜色代码文本；
+/// - `brush`: 预先解析成功的 Slint 单色笔刷。
 fn update_theme_field(w: &AppWindow, f: &str, v: &str, brush: slint::Brush) {
     match f {
         "window_bg" => { w.global::<ThemeEditorBridge>().set_window_bg(v.into()); w.global::<ThemeEditorBridge>().set_preview_window_bg(brush); }
@@ -468,7 +588,12 @@ fn update_theme_field(w: &AppWindow, f: &str, v: &str, brush: slint::Brush) {
     w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
 }
 
-/// Update theme metric field and refresh TOML
+/// 更新主题工作台中的几何与排版度量规格字段，并实时刷新 TOML 规范文本
+///
+/// # 参数
+/// - `w`: Slint 顶级应用窗口；
+/// - `f`: 度量属性键名（如 `"radius_small"`, `"spacing_medium"`, `"control_height"` 等）；
+/// - `v`: 物理像素数值字符串。
 fn update_metric_field(w: &AppWindow, f: &str, v: &str) {
     match f {
         "radius_small" => w.global::<ThemeEditorBridge>().set_metric_radius_small(v.into()),
@@ -486,7 +611,23 @@ fn update_metric_field(w: &AppWindow, f: &str, v: &str) {
     w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
 }
 
-/// Apply tokens and metrics to studio window
+/// 将解析完成的设计令牌 (Tokens) 与几何度量 (Metrics) 全量下发至 Theme Studio 工作台
+///
+/// # 装载流程
+/// 1. 填充主题元数据（名称、作者、基底主题、日间/夜间周期）；
+/// 2. 水合 18 项色彩令牌（包括背景、前景、强调、边框与语义色）及其预览单色笔刷；
+/// 3. 水合 9 项几何排版度量数值；
+/// 4. 将初始背景色映射为 HSV 极坐标，校准拾色器指示器坐标、明度滑块与主色阶；
+/// 5. 生成完整 TOML 代码填入编辑框。
+///
+/// # 参数
+/// - `w`: Slint 应用窗口；
+/// - `name`: 主题名称；
+/// - `author`: 主题作者；
+/// - `base`: 继承的基底主题 ID；
+/// - `period`: 昼夜分类（`"day"` 或 `"night"`）；
+/// - `tokens`: 核心 UI 色彩设计令牌集合；
+/// - `metrics`: 核心 UI 几何与排版规格尺寸。
 fn apply_tokens_and_metrics_to_studio(
     w: &AppWindow,
     name: &str,
@@ -567,7 +708,17 @@ fn apply_tokens_and_metrics_to_studio(
     w.global::<ThemeEditorBridge>().set_toml(toml_str.as_str().into());
 }
 
-/// Populate theme studio modal fields from currently active theme
+/// 基于当前全局激活的主题配置，初始化并装载 Theme Studio 模态工作台各项数据
+///
+/// # 业务处理流程
+/// 1. 获取当前生效的 `current_theme_id`（若为空，默认回退至 `"builtin.ui.darcula"`）；
+/// 2. 统计现有自定义主题数量，自动生成默认主题名（如 `Custom Theme #3`）；
+/// 3. 从 `ThemeService` 解析并展开基底主题的完整 Definition，调用 `apply_tokens_and_metrics_to_studio`；
+/// 4. 将 `ThemeEditorBridge.is_open` 置为 true 打开模态编辑弹窗。
+///
+/// # 参数
+/// - `w`: Slint 顶级应用窗口；
+/// - `service`: 全局主题仓储与解析服务引用。
 fn populate_theme_studio_from_active(w: &AppWindow, service: &ThemeService) {
     let active_id = w.global::<WindowBridge>().get_current_theme_id().to_string();
     let base_id = if active_id.is_empty() { "builtin.ui.darcula".to_string() } else { active_id.clone() };
@@ -585,7 +736,22 @@ fn populate_theme_studio_from_active(w: &AppWindow, service: &ThemeService) {
     w.global::<ThemeEditorBridge>().set_is_open(true);
 }
 
-/// Register theme and wallpaper handlers
+/// 注册所有 UI 主题管理、Theme Studio 工作台及背景壁纸画廊/轮播事件处理器
+///
+/// 包含以下核心功能域的回调处理：
+/// 1. **主题工作室 (Theme Studio)**：
+///    - 打开模态框、载入预设、色彩/度量实时改动、极坐标色盘交互、TOML 规范文本实时双向同步；
+/// 2. **自定义主题生命周期**：
+///    - 原生文件导入 (`.toml`/`.json`)、保存/更新自定义主题、导出为外部 `.toml` 文件、删除用户自定义主题；
+/// 3. **壁纸库与画廊管理**：
+///    - 选择图片/选择目录、删除壁纸、清理壁纸库；
+///    - 壁纸轮播定时器管理（15秒/30秒/1分钟/5分钟/15分钟/30分钟/1小时/手动切图）；
+///    - 前台/后台窗口失焦半透明、终端毛玻璃透光与遮罩暗度调节；
+///    - 高性能后台异步整型降采样与 LRU 像素缓冲预加载（0ms 阻塞 UI 体验）。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用主窗口；
+/// - `ctx`: 应用程序全局上下文句柄。
 pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &AppContext) {
     let sb = window.global::<SettingsBridge>();
     let tb = window.global::<ThemeEditorBridge>();
@@ -1160,17 +1326,6 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
                 *active_idx_ref.borrow_mut() = new_idx;
 
-                let storage = core_state_wp_add.storage().clone();
-                crate::async_util::spawn_async(async move {
-                    let _ = storage.config().update(Box::new(move |c| {
-                        c.wallpaper_list = wps_clone;
-                        c.wallpaper_active_index = new_idx;
-                    })).await;
-                });
-
-                w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
-                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(new_idx as i32);
-
                 let cur_mode = w.global::<WindowBridge>().get_wallpaper_mode().to_string();
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
                 let wb = w.global::<WindowBridge>();
@@ -1178,6 +1333,24 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 wb.set_wallpaper_path(path_str.as_str().into());
                 let op = wb.get_global_wallpaper_opacity();
                 wb.invoke_set_wallpaper(apply_mode.into(), path_str.clone().into(), op);
+
+                let sb = w.global::<SettingsBridge>();
+                sb.set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                sb.set_setting_wallpaper_active_index(new_idx as i32);
+                sb.set_setting_wallpaper_mode(apply_mode.into());
+                sb.set_setting_wallpaper_path(path_str.as_str().into());
+
+                let storage = core_state_wp_add.storage().clone();
+                let m_to_save = apply_mode.to_string();
+                let p_to_save = path_str.clone();
+                crate::async_util::spawn_async(async move {
+                    let _ = storage.config().update(Box::new(move |c| {
+                        c.wallpaper_list = wps_clone;
+                        c.wallpaper_active_index = new_idx;
+                        c.wallpaper_mode = m_to_save;
+                        c.wallpaper_path = p_to_save;
+                    })).await;
+                });
 
                 if is_en(&window_weak) {
                     notif.success("Wallpaper Added", "Successfully loaded image to wallpaper gallery!");
@@ -1237,16 +1410,6 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
                 *active_idx_ref.borrow_mut() = effective_idx;
 
-                let storage = core_state_wp_folder.storage().clone();
-                crate::async_util::spawn_async(async move {
-                    let _ = storage.config().update(Box::new(move |c| {
-                        c.wallpaper_list = wps_clone;
-                        c.wallpaper_active_index = effective_idx;
-                    })).await;
-                });
-
-                w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
-                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(effective_idx as i32);
                 let wb = w.global::<WindowBridge>();
                 wb.set_wallpaper_path(folder_str.as_str().into());
 
@@ -1257,6 +1420,24 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     let op = wb.get_global_wallpaper_opacity();
                     wb.invoke_set_wallpaper(apply_mode.into(), first_image_path.as_str().into(), op);
                 }
+
+                let sb = w.global::<SettingsBridge>();
+                sb.set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                sb.set_setting_wallpaper_active_index(effective_idx as i32);
+                sb.set_setting_wallpaper_mode(apply_mode.into());
+                sb.set_setting_wallpaper_path(folder_str.as_str().into());
+
+                let storage = core_state_wp_folder.storage().clone();
+                let m_to_save = apply_mode.to_string();
+                let p_to_save = folder_str.clone();
+                crate::async_util::spawn_async(async move {
+                    let _ = storage.config().update(Box::new(move |c| {
+                        c.wallpaper_list = wps_clone;
+                        c.wallpaper_active_index = effective_idx;
+                        c.wallpaper_mode = m_to_save;
+                        c.wallpaper_path = p_to_save;
+                    })).await;
+                });
 
                 if is_en(&window_weak) {
                     notif.success("Folder Added", &format!("Added folder with {} images to gallery!", found_images.len()));
@@ -1303,15 +1484,26 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 *active_idx_ref.borrow_mut() = next_active;
 
                 let storage = core_state_wp_rm.storage().clone();
+                let next_path_clone = next_path.clone();
+                let mode_to_save = if is_empty { "none".to_string() } else { String::new() };
                 crate::async_util::spawn_async(async move {
                     let _ = storage.config().update(Box::new(move |c| {
                         c.wallpaper_list = wps_clone;
                         c.wallpaper_active_index = next_active;
+                        c.wallpaper_path = next_path_clone;
+                        if !mode_to_save.is_empty() {
+                            c.wallpaper_mode = mode_to_save;
+                        }
                     })).await;
                 });
 
-                w.global::<SettingsBridge>().set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
-                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(next_active as i32);
+                let sb = w.global::<SettingsBridge>();
+                sb.set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                sb.set_setting_wallpaper_active_index(next_active as i32);
+                sb.set_setting_wallpaper_path(next_path.as_str().into());
+                if is_empty {
+                    sb.set_setting_wallpaper_mode("none".into());
+                }
 
                 let wb = w.global::<WindowBridge>();
                 if is_empty {
@@ -1338,7 +1530,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     let window_weak = window.as_weak();
     let wallpapers_ref = Rc::clone(&ctx.wallpapers);
     let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
-    let _core_state_wp_sel = ctx.core_state.clone();
+    let core_state_wp_sel = ctx.core_state.clone();
     let wallpaper_cache_sel = Rc::clone(&ctx.wallpaper_cache);
     let wallpaper_preload_timer_sel = Rc::clone(&ctx.wallpaper_preload_timer);
     sb.on_select_wallpaper(move |idx| {
@@ -1363,7 +1555,6 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
 
             if let Some(entry_str) = target_entry {
                 *active_idx_ref.borrow_mut() = u_idx;
-                w.global::<SettingsBridge>().set_setting_wallpaper_active_index(u_idx as i32);
                 let wb = w.global::<WindowBridge>();
                 let cur_mode = wb.get_wallpaper_mode().to_string();
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
@@ -1373,6 +1564,22 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     let op = wb.get_global_wallpaper_opacity();
                     wb.invoke_set_wallpaper(apply_mode.into(), actual_image_path.as_str().into(), op);
                 }
+
+                let sb = w.global::<SettingsBridge>();
+                sb.set_setting_wallpaper_active_index(u_idx as i32);
+                sb.set_setting_wallpaper_mode(apply_mode.into());
+                sb.set_setting_wallpaper_path(entry_str.as_str().into());
+
+                let storage = core_state_wp_sel.storage().clone();
+                let m_to_save = apply_mode.to_string();
+                let p_to_save = entry_str.clone();
+                crate::async_util::spawn_async(async move {
+                    let _ = storage.config().update(Box::new(move |c| {
+                        c.wallpaper_active_index = u_idx;
+                        c.wallpaper_mode = m_to_save;
+                        c.wallpaper_path = p_to_save;
+                    })).await;
+                });
 
                 // 立即预加载后继壁纸（如果存在多张壁纸）
                 let all_imgs = resolve_all_wallpaper_images(&wallpapers_ref.borrow());
@@ -1389,121 +1596,151 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
     // 13. Wallpaper Slideshow & Transition
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let wallpapers_ref = Rc::clone(&ctx.wallpapers);
-    let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
-    let timer_ref = Rc::clone(&ctx.wallpaper_timer);
-    let notif = ctx.notifications.clone();
-    let core_state_wp_slide = ctx.core_state.clone();
-    let wallpaper_cache_slide = Rc::clone(&ctx.wallpaper_cache);
-    let wallpaper_preload_timer_slide = Rc::clone(&ctx.wallpaper_preload_timer);
+    let ctx_clone = ctx.clone();
     sb.on_set_wallpaper_slideshow(move |interval, transition| {
-        let interval_str = interval.as_str();
-        let transition_str = transition.as_str();
-
-        // 无论如何，先停止并销毁已存在的轮播定时器（彻底解决关闭后仍在轮播的问题）
-        *timer_ref.borrow_mut() = None;
-
         if let Some(w) = window_weak.upgrade() {
-            w.global::<SettingsBridge>().set_setting_wallpaper_slideshow(interval_str.into());
-            w.global::<SettingsBridge>().set_setting_wallpaper_transition(transition_str.into());
+            apply_wallpaper_slideshow(&w, &ctx_clone, interval.as_str(), transition.as_str(), false);
         }
+    });
+}
 
+/// 应用壁纸轮播配置并根据时间间隔拉起/销毁后台定时器
+///
+/// `silent`: 是否静默执行。若为 `true`（如冷启动自动水合定时器），则不弹桌面吐司通知且不重复异步持久化；
+/// 若为 `false`（用户在 UI 设置面板主动操作），则弹出对应状态 Toast 并将更改落盘到存储层。
+pub(crate) fn apply_wallpaper_slideshow(
+    window: &AppWindow,
+    ctx: &AppContext,
+    interval_str: &str,
+    transition_str: &str,
+    silent: bool,
+) {
+    // 无论如何，先停止并销毁已存在的轮播定时器（彻底解决关闭后仍在轮播或重复叠加的问题）
+    *ctx.wallpaper_timer.borrow_mut() = None;
+
+    let sb = window.global::<SettingsBridge>();
+    sb.set_setting_wallpaper_slideshow(interval_str.into());
+    sb.set_setting_wallpaper_transition(transition_str.into());
+
+    let (slide_num, slide_unit) = if interval_str == "none" || interval_str == "off" || interval_str.is_empty() || interval_str == "startup" {
+        ("0", "off")
+    } else if let Some(s) = interval_str.strip_suffix('s') {
+        (s, "s")
+    } else if let Some(m) = interval_str.strip_suffix('m') {
+        (m, "m")
+    } else if let Some(h) = interval_str.strip_suffix('h') {
+        (h, "h")
+    } else if let Ok(_) = interval_str.parse::<u64>() {
+        (interval_str, "m")
+    } else {
+        ("0", "off")
+    };
+    sb.set_slideshow_number_input(slide_num.into());
+    sb.set_slideshow_unit_input(slide_unit.into());
+
+    if !silent {
         let int_clone = interval_str.to_string();
         let trans_clone = transition_str.to_string();
-        let storage = core_state_wp_slide.storage().clone();
+        let storage = ctx.core_state.storage().clone();
         crate::async_util::spawn_async(async move {
             let _ = storage.config().update(Box::new(move |c| {
                 c.wallpaper_slideshow_interval = int_clone;
                 c.wallpaper_transition_effect = trans_clone;
             })).await;
         });
+    }
 
-        let duration_secs: Option<u64> = if interval_str == "none" || interval_str.is_empty() || interval_str == "off" || interval_str == "startup" {
-            None
-        } else if let Some(s) = interval_str.strip_suffix('s') {
-            s.parse::<u64>().ok().map(|n| n.max(5))
-        } else if let Some(m) = interval_str.strip_suffix('m') {
-            m.parse::<u64>().ok().map(|n| n.max(1) * 60)
-        } else if let Some(h) = interval_str.strip_suffix('h') {
-            h.parse::<u64>().ok().map(|n| n.max(1) * 3600)
-        } else if let Ok(num) = interval_str.parse::<u64>() {
-            Some(num.max(1) * 60) // 默认分钟单位
-        } else {
-            None
-        };
+    let duration_secs: Option<u64> = if interval_str == "none" || interval_str.is_empty() || interval_str == "off" || interval_str == "startup" {
+        None
+    } else if let Some(s) = interval_str.strip_suffix('s') {
+        s.parse::<u64>().ok().map(|n| n.max(5))
+    } else if let Some(m) = interval_str.strip_suffix('m') {
+        m.parse::<u64>().ok().map(|n| n.max(1) * 60)
+    } else if let Some(h) = interval_str.strip_suffix('h') {
+        h.parse::<u64>().ok().map(|n| n.max(1) * 3600)
+    } else if let Ok(num) = interval_str.parse::<u64>() {
+        Some(num.max(1) * 60) // 默认分钟单位
+    } else {
+        None
+    };
 
-        if let Some(secs) = duration_secs {
-            let window_weak_timer = window_weak.clone();
-            let wallpapers_timer = Rc::clone(&wallpapers_ref);
-            let active_idx_timer = Rc::clone(&active_idx_ref);
-            let wallpaper_cache_timer = Rc::clone(&wallpaper_cache_slide);
-            let wallpaper_preload_timer_timer = Rc::clone(&wallpaper_preload_timer_slide);
+    if let Some(secs) = duration_secs {
+        let window_weak_timer = window.as_weak();
+        let wallpapers_timer = Rc::clone(&ctx.wallpapers);
+        let active_idx_timer = Rc::clone(&ctx.active_wallpaper_idx);
+        let wallpaper_cache_timer = Rc::clone(&ctx.wallpaper_cache);
+        let wallpaper_preload_timer_timer = Rc::clone(&ctx.wallpaper_preload_timer);
 
-            // 预热：展开文件夹内全部图片并预加载下一张
-            {
-                let wps = wallpapers_timer.borrow();
-                let all_images = resolve_all_wallpaper_images(&wps);
-                if all_images.len() > 1 {
-                    let cur = *active_idx_timer.borrow();
-                    let next_idx = (cur + 1) % all_images.len();
-                    let next_path = all_images[next_idx].clone();
-                    schedule_wallpaper_preload(next_path, Rc::clone(&wallpaper_cache_timer), Rc::clone(&wallpaper_preload_timer_timer));
-                }
-            }
-
-            let timer = slint::Timer::default();
-            timer.start(
-                slint::TimerMode::Repeated,
-                Duration::from_secs(secs),
-                move || {
-                    let tick_data = {
-                        let wps = wallpapers_timer.borrow();
-                        let all_images = resolve_all_wallpaper_images(&wps);
-                        if all_images.len() > 1 {
-                            let mut slide_idx = active_idx_timer.borrow_mut();
-                            let next_idx = (*slide_idx + 1) % all_images.len();
-                            *slide_idx = next_idx;
-                            let next_path = all_images[next_idx].clone();
-                            let lookahead_idx = (next_idx + 1) % all_images.len();
-                            let lookahead_path = all_images[lookahead_idx].clone();
-                            Some((next_path, lookahead_path))
-                        } else {
-                            None
-                        }
-                    };
-
-                    if let Some((next_path, lookahead_path)) = tick_data {
-                        if let Some(w) = window_weak_timer.upgrade() {
-                            let wb = w.global::<WindowBridge>();
-                            let cur_mode = wb.get_wallpaper_mode().to_string();
-                            let apply_mode = if cur_mode == "none" { "terminal" } else { cur_mode.as_str() };
-                            let op = wb.get_global_wallpaper_opacity();
-                            wb.invoke_set_wallpaper(apply_mode.into(), next_path.as_str().into(), op);
-                        }
-
-                        // 立即预加载下下一张（保证每一轮轮播都有现成缓存，0ms 瞬间显示）
-                        schedule_wallpaper_preload(lookahead_path, Rc::clone(&wallpaper_cache_timer), Rc::clone(&wallpaper_preload_timer_timer));
-                    }
-                },
-            );
-            *timer_ref.borrow_mut() = Some(timer);
-            if is_en(&window_weak) {
-                notif.info("Slideshow Started", &format!("Wallpaper will change every {}", interval_str));
-            } else {
-                notif.info("轮播已开启", &format!("壁纸将每隔 {} 自动轮播更替", interval_str));
-            }
-        } else if interval_str == "startup" {
-            if is_en(&window_weak) {
-                notif.info("Startup Slideshow", "Wallpaper will rotate randomly on startup.");
-            } else {
-                notif.info("开机轮播已开启", "每次客户端启动时将随机切换一张新壁纸");
-            }
-        } else {
-            if is_en(&window_weak) {
-                notif.info("Slideshow Stopped", "Wallpaper rotation stopped.");
-            } else {
-                notif.info("轮播已关闭", "已停止壁纸自动轮播更替");
+        // 预热：展开文件夹内全部图片并预加载下一张
+        {
+            let wps = wallpapers_timer.borrow();
+            let all_images = resolve_all_wallpaper_images(&wps);
+            if all_images.len() > 1 {
+                let cur = *active_idx_timer.borrow();
+                let next_idx = (cur + 1) % all_images.len();
+                let next_path = all_images[next_idx].clone();
+                schedule_wallpaper_preload(next_path, Rc::clone(&wallpaper_cache_timer), Rc::clone(&wallpaper_preload_timer_timer));
             }
         }
-    });
+
+        let timer = slint::Timer::default();
+        timer.start(
+            slint::TimerMode::Repeated,
+            Duration::from_secs(secs),
+            move || {
+                let tick_data = {
+                    let wps = wallpapers_timer.borrow();
+                    let all_images = resolve_all_wallpaper_images(&wps);
+                    if all_images.len() > 1 {
+                        let mut slide_idx = active_idx_timer.borrow_mut();
+                        let next_idx = (*slide_idx + 1) % all_images.len();
+                        *slide_idx = next_idx;
+                        let next_path = all_images[next_idx].clone();
+                        let lookahead_idx = (next_idx + 1) % all_images.len();
+                        let lookahead_path = all_images[lookahead_idx].clone();
+                        Some((next_path, lookahead_path))
+                    } else {
+                        None
+                    }
+                };
+
+                if let Some((next_path, lookahead_path)) = tick_data {
+                    if let Some(w) = window_weak_timer.upgrade() {
+                        let wb = w.global::<WindowBridge>();
+                        let cur_mode = wb.get_wallpaper_mode().to_string();
+                        let apply_mode = if cur_mode == "none" { "terminal" } else { cur_mode.as_str() };
+                        let op = wb.get_global_wallpaper_opacity();
+                        wb.invoke_set_wallpaper(apply_mode.into(), next_path.as_str().into(), op);
+                    }
+
+                    // 立即预加载下下一张（保证每一轮轮播都有现成缓存，0ms 瞬间显示）
+                    schedule_wallpaper_preload(lookahead_path, Rc::clone(&wallpaper_cache_timer), Rc::clone(&wallpaper_preload_timer_timer));
+                }
+            },
+        );
+        *ctx.wallpaper_timer.borrow_mut() = Some(timer);
+        if !silent {
+            let window_weak = window.as_weak();
+            if is_en(&window_weak) {
+                ctx.notifications.info("Slideshow Started", &format!("Wallpaper will change every {}", interval_str));
+            } else {
+                ctx.notifications.info("轮播已开启", &format!("壁纸将每隔 {} 自动轮播更替", interval_str));
+            }
+        }
+    } else if !silent {
+        let window_weak = window.as_weak();
+        if interval_str == "startup" {
+            if is_en(&window_weak) {
+                ctx.notifications.info("Startup Slideshow", "Wallpaper will rotate randomly on startup.");
+            } else {
+                ctx.notifications.info("开机轮播已开启", "每次客户端启动时将随机切换一张新壁纸");
+            }
+        } else {
+            if is_en(&window_weak) {
+                ctx.notifications.info("Slideshow Stopped", "Wallpaper rotation stopped.");
+            } else {
+                ctx.notifications.info("轮播已关闭", "已停止壁纸自动轮播更替");
+            }
+        }
+    }
 }

@@ -11,7 +11,17 @@ use crate::generated::{AppWindow, HistoryBridge, HistoryGroupData, HistoryItemDa
 use crate::handlers::AppContext;
 
 
-/// 将 Unix 秒时间戳格式化为本地可读的具体日期时间字符串 (格式: "YYYY-MM-DD HH:MM:SS")
+/// 将 Unix 秒时间戳格式化为本地可读的具体日期时间字符串 (格式: `"YYYY-MM-DD HH:MM:SS"`)
+///
+/// # 算法原理
+/// 采用纯整数数学运算实现公历 (Gregorian) 历法计算，无需引入庞大的外部第三方时间库，
+/// 默认添加 8 小时偏移按北京时间 (CST, UTC+8) 显示。
+///
+/// # 参数
+/// - `timestamp`: 自 Unix Epoch (1970-01-01 00:00:00 UTC) 以来的秒数。若为 0 返回 `"-"`。
+///
+/// # 返回值
+/// 固定长度的标准格式日期时间字符串。
 pub(crate) fn format_datetime(timestamp: u64) -> String {
     if timestamp == 0 {
         return "-".to_string();
@@ -37,7 +47,13 @@ pub(crate) fn format_datetime(timestamp: u64) -> String {
     format!("{:04}-{:02}-{:02} {:02}:{:02}:{:02}", y, m, d, hours, minutes, seconds)
 }
 
-/// 将 Unix 秒时间戳格式化为具体时间字符串 (格式: "HH:MM:SS")
+/// 将 Unix 秒时间戳格式化为纯时分秒字符串 (格式: `"HH:MM:SS"`)
+///
+/// # 参数
+/// - `timestamp`: Unix 时间戳秒数。
+///
+/// # 返回值
+/// 时分秒字符串。
 pub(crate) fn format_time_only(timestamp: u64) -> String {
     if timestamp == 0 {
         return "-".to_string();
@@ -50,9 +66,16 @@ pub(crate) fn format_time_only(timestamp: u64) -> String {
     format!("{:02}:{:02}:{:02}", hours, minutes, seconds)
 }
 
-/// 格式化持续时长文本 (如 "42m", "1h 15m", "2s")
+/// 将持续秒数格式化为人类直观可读的紧凑时长文本
+///
+/// # 格式规则
+/// - `< 60s`: 显示 `"42s"`；
+/// - `< 3600s`: 显示 `"42m"` 或 `"42m 15s"`；
+/// - `>= 3600s`: 显示 `"1h"` 或 `"1h 15m"`。
+///
+/// # 参数
+/// - `secs`: 持续时间（秒）。
 pub(crate) fn format_duration(secs: u64) -> String {
-
     if secs == 0 {
         "1s".to_string()
     } else if secs < 60 {
@@ -68,7 +91,18 @@ pub(crate) fn format_duration(secs: u64) -> String {
     }
 }
 
-/// 将单个历史记录实体转换为 Slint UI 数据项
+/// 将领域层单个历史记录实体转换为 Slint UI 数据项
+///
+/// # 处理细节
+/// 1. 解析连接时间与断开时间；
+/// 2. 状态码语义化转义（如 `active` -> `"🟢 活跃中"`, `auth_failed` -> `"🟠 认证失败"` 等，支持中英双语）；
+/// 3. 副标题动态拼接：按聚合模式或时间流模式区分展示频次或连接生命周期。
+///
+/// # 参数
+/// - `r`: 原始会话历史记录实体引用；
+/// - `_now`: 当前系统时间戳秒数；
+/// - `is_aggregated`: 是否为主机聚合模式（显示累计频次与累计时长）；
+/// - `is_en`: 是否为英文界面语言环境。
 fn map_history_item(r: &HistoryRecord, _now: u64, is_aggregated: bool, is_en: bool) -> HistoryItemData {
     let conn_dt = format_datetime(r.connected_at);
     let disc_time = if let Some(disc) = r.disconnected_at {
@@ -132,8 +166,22 @@ fn map_history_item(r: &HistoryRecord, _now: u64, is_aggregated: bool, is_en: bo
     }
 }
 
-
-/// 纯 UI 渲染函数：根据历史记录列表、搜索关键词、视图模式与折叠状态，组装并刷新 Slint HistoryBridge
+/// 纯 UI 渲染函数：根据历史记录列表、搜索关键词、视图模式与折叠状态，组装并刷新 Slint `HistoryBridge`
+///
+/// # 视图呈现模式
+/// 1. **按主机聚合模式 (`view_mode == "hosts"`)**：
+///    - 以 `username@address` 作为聚合键去重，累加连接次数与时长；
+///    - 优先将已置顶的主机排在顶部，随后按连接频次与最后连接时间降序排序。
+/// 2. **时间流模式 (`view_mode == "timeline"`)**：
+///    - 划分为四个时间区间分组：已置顶 (`pinned`)、今天 (`today`)、昨天 (`yesterday`) 与更早历史 (`earlier`)；
+///    - 每一分组支持独立折叠记忆。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `all_records`: 全量会话历史记录实体切片；
+/// - `search_q`: 模糊搜索关键词；
+/// - `view_mode`: 视图模式（`"hosts"` 或 `"timeline"`）；
+/// - `collapsed_set`: 当前处于折叠状态的分组 ID 集合。
 pub(crate) fn render_history_ui(
     window: &AppWindow,
     all_records: &[HistoryRecord],

@@ -101,6 +101,8 @@ export component FileExplorerView inherits Rectangle {
     in property <bool> local-can-go-forward: FilesBridge.local-can-go-forward;
     in property <bool> remote-can-go-back: FilesBridge.remote-can-go-back;
     in property <bool> remote-can-go-forward: FilesBridge.remote-can-go-forward;
+    in property <bool> local-can-go-up: FilesBridge.local-can-go-up;
+    in property <bool> remote-can-go-up: FilesBridge.remote-can-go-up;
 
     // -------------------------------------------------------------------------
     // 菜单展开逻辑
@@ -177,6 +179,7 @@ export component FileExplorerView inherits Rectangle {
                 selected-id <=> root.selected-local-id;
                 can-go-back: root.local-can-go-back;
                 can-go-forward: root.local-can-go-forward;
+                can-go-up: root.local-can-go-up;
                 is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
                 pane-offset-x: 0px;
                 other-current-path: root.remote-current-path;
@@ -254,6 +257,10 @@ export component FileExplorerView inherits Rectangle {
             FileBrowserPane {
                 horizontal-stretch: 1.0 - root.split-ratio;
                 is-remote: true;
+                is-connecting: FilesBridge.is-remote-connecting;
+                is-loading: FilesBridge.is-remote-loading;
+                is-error: FilesBridge.is-remote-error;
+                error-msg: FilesBridge.remote-error-msg;
                 tabs: root.remote-tabs;
                 active-tab-id <=> root.active-remote-tab-id;
                 current-path <=> root.remote-current-path;
@@ -261,6 +268,7 @@ export component FileExplorerView inherits Rectangle {
                 selected-id <=> root.selected-remote-id;
                 can-go-back: root.remote-can-go-back;
                 can-go-forward: root.remote-can-go-forward;
+                can-go-up: root.remote-can-go-up;
                 is-transfer-queue-expanded <=> root.is-transfer-queue-expanded;
                 pane-offset-x: (root.width - 5px) * root.split-ratio + 5px;
                 other-current-path: root.local-current-path;
@@ -306,6 +314,8 @@ export component FileExplorerView inherits Rectangle {
         TransferQueueDrawer {
             transfer-tasks: root.transfer-tasks;
             is-expanded <=> root.is-transfer-queue-expanded;
+            queue-height <=> FilesBridge.transfer-queue-height;
+            max-queue-height: Math.max(120px, root.height - 150px);
             local-files-count: root.local-files.length;
             remote-files-count: root.remote-files.length;
 
@@ -313,7 +323,7 @@ export component FileExplorerView inherits Rectangle {
             clear-completed => { FilesBridge.clear-completed-transfers(); }
             toggle-task-expand(id) => { FilesBridge.toggle-transfer-expand(id); }
             request-transfer-menu(mx, local_my, tid, st, dir) => {
-                root.open_transfer_menu(mx, (root.height - 180px) + local_my, tid, st, dir);
+                root.open_transfer_menu(mx, (root.height - self.height) + local_my, tid, st, dir);
             }
         }
     }

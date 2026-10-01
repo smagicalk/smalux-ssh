@@ -168,16 +168,17 @@ import { AppPasswordInput } from "../../../shared/base/app-password-input.slint"
                         text: @tr("确认保存主密码");
                         variant: "primary";
                         clicked => {
-                            if SettingsBridge.master-pwd-new == "" {
+                            if SettingsBridge.setting-master-password-enabled && SettingsBridge.master-pwd-old == "" {
+                                SettingsBridge.master-pwd-error-msg = @tr("请输入当前旧主密码！");
+                            } else if SettingsBridge.master-pwd-new == "" {
                                 SettingsBridge.master-pwd-error-msg = @tr("新密码不能为空！");
                             } else if SettingsBridge.master-pwd-new != SettingsBridge.master-pwd-confirm {
                                 SettingsBridge.master-pwd-error-msg = @tr("两次输入的新密码不一致！");
                             } else if SettingsBridge.master-pwd-new.character-count < 6 {
                                 SettingsBridge.master-pwd-error-msg = @tr("主密码长度至少需为 6 位！");
                             } else {
-                                SettingsBridge.setting-master-password-enabled = true;
                                 SettingsBridge.master-pwd-error-msg = "";
-                                SettingsBridge.is-master-pwd-modal-open = false;
+                                SettingsBridge.set-master-password(SettingsBridge.master-pwd-old, SettingsBridge.master-pwd-new);
                             }
                         }
                     }

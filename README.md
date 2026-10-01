@@ -11,7 +11,7 @@
 - 🌲 **无限层级资产管理**：支持多层级主机与文件夹分组管理，支持级联折叠/展开、超宽节点横向平滑拖拽滚动与实时模糊搜索；
 - 🗄️ **解耦存储抽象层**：核心层定义 `AppStorage` / `HostRepository` / `GroupRepository` 标准 CRUD Trait 体系，内置内存种子引擎 `MockStorage`，便于无缝接入 SQLite、JSON 文件或云端存储；
 - 🐚 **跨平台本地 Shell 动态探测**：启动时自动扫描并缓存当前系统的 PowerShell 7、Windows PowerShell、WSL、Git Bash、CMD、Bash、Zsh、Fish、Nushell 等终端环境，支持一键新建本地会话；
-- 🏛️ **工业级终端渲染引擎**：基于 `alacritty_terminal` 状态机内核与像素位图双缓冲光栅化管线，支持 10 万行回滚、智能 Reflow、24-bit TrueColor 与全屏 TUI 应用；
+- 🏛️ **工业级终端渲染引擎**：基于 `alacritty_terminal` 状态机内核与像素位图双缓冲光栅化管线，支持 10 万行回滚、智能 Reflow、24-bit TrueColor、智能 URL 识别/手型指针与浏览器直达、字形伽马笔画补强与全屏 TUI 应用；
 - 🛠️ **开发者调试工作台 (Debug Workbench)**：内置 `smagical-debug` crate，提供全系统 Tracing 实时滚动日志抽屉、海量资产批量生成引擎、场景预设（K8s 集群/微服务/大规模压测）一键注入与快速状态模拟；
 - ⚙️ **全能偏好设置中心 (Settings Center)**：提供常规启动/窗口、外观与壁纸轮播、终端排版 (光标/回滚/CRT滤镜/关键字高亮规则矩阵)、网络代理与超时、多端云同步矩阵 (本地快照/S3/WebDAV/Gist)、主密码安全加解密防护以及快捷键绑定矩阵等 8 大核心维度；
 - 🌐 **现代化网络隧道工作台 (Tunnels & Proxy)**：原生集成端口转发（本地/远程/动态 SOCKS5 网关）、多跳跳板机堡垒链路以及静态出网代理节点，支持可视化拓扑连接与实时速率波形监测；
@@ -20,7 +20,7 @@
 - 📂 **高复用独立组件库**：抽离 `GroupTreeSelector`（树形选择器）、`CreateGroupModal`（新建分组弹窗）、`CommandPalette`（全局指令面板）等组件；
 - 🎨 **专业动态主题系统**：内置 15+ 套经典配色预设（Darcula, Catppuccin, Monokai, Nord, One Dark, Dracula, GitHub 等），支持深色/浅色一键平滑无缝热切换与 Windows Terminal 配色导入；
 - 🌐 **多语言国际化 (i18n)**：全界面文案采用 Slint `@tr(...)` 与 gettext `.po` 体系管理；
-- ⌨️ **极客生产力**：集成 `Ctrl+K` 全局快速启动面板、多终端按键广播、快捷指令片段发送及系统资源实时监控。
+- ⌨️ **极客生产力**：集成断线原地免密静默重连、SSH 阶段化流式诊断输出、`Ctrl+K` 全局快速启动面板、多终端按键广播、快捷指令片段发送及系统资源实时监控。
 
 ---
 
@@ -44,42 +44,48 @@
 
 ---
 
-## 🏗️ 架构与 Workspace 模块分层
+### 🏗️ 架构与 Workspace 模块分层
 
-仓库采用 Rust Cargo Workspace 多 crate 分层解耦架构：
+仓库采用 Rust Cargo Workspace 多 crate 分层解耦架构，严格遵循职责分离与纯 Rust 自研原则：
 
 ```text
 smalux-ssh/
 ├── crates/
-│   ├── smagical-core/          # 核心领域模型与业务逻辑层 (纯 Rust，无 UI 依赖)
-│   │   ├── src/
-│   │   │   ├── domain/         # 主机 (HostRecord, HostStatus)、分组 (GroupRecord) 领域实体
-│   │   │   ├── state/          # 核心应用状态 (CoreState)，持有 Arc<dyn AppStorage>
-│   │   │   ├── storage/        # 存储抽象 Trait (HostRepository, GroupRepository, AppStorage) & MockStorage
-│   │   │   └── theme/          # 主题元数据模型、TOML 解析器、校验器与仓库实现
-│   │   └── Cargo.toml
+│   ├── smagical-core/          # 核心业务领域实体、状态引擎与仓储契约层 (纯 Rust，无 UI/平台外部工具依赖)
+│   │   ├── domain/             # 主机、凭据、分组、隧道、片段、历史、AI 客户端 (SSE 流式)、文件等 13 个实体
+│   │   ├── event/              # 强类型泛型事件分发总线与全生命周期拦截守护机制 (30+ 领域事件)
+│   │   ├── storage/            # 7 大仓储 Trait 契约与 AppStorage 聚合门面 (含保险库生命周期契约)
+│   │   ├── state/              # 全局状态中枢 CoreState (统一调度存储热插拔、事件总线、动态路由)
+│   │   └── theme/              # 主题领域模型、WCAG 对比度校验与多级继承解析引擎
 │   │
-│   ├── smagical-debug/         # 开发者调试与测试支撑 crate
-│   │   ├── src/
-│   │   │   ├── tracing_layer.rs# 全局 Tracing 日志收集、内存环形缓冲与按天滚动持久化
-│   │   │   ├── batch.rs        # 批量资产生成器 (BatchGenerateConfig)
-│   │   │   ├── presets.rs      # 场景预设引擎 (Minimal, K8s, Microservices, Stress 100+)
-│   │   │   ├── inspector.rs    # 树形节点自适应宽度测量与调试工具
-│   │   │   └── models.rs       # 调试通用轻量节点模型 (DebugRawNode)
-│   │   └── Cargo.toml
+│   ├── smagical-ssh/           # 纯 Rust SSH/SFTP 协议协议栈与密钥/监控引擎 (独立跨平台，可无缝用于 CLI/GUI)
+│   │   ├── keygen.rs           # 原生 Ed25519 / RSA-4096 / ECDSA SSH 密钥对生成与 PEM/OpenSSH 格式化
+│   │   ├── importer.rs         # 原生纯 Rust OpenSSH ~/.ssh/config 导入解析器
+│   │   ├── ssh_config.rs       # 统一 SSH 连接参数拼装与安全收敛 (SshLaunchConfig)
+│   │   ├── sftp.rs             # 纯 Rust SFTP 文件传输客户端契约与自研驱动
+│   │   └── monitor.rs          # 远程主机 CPU/内存/网络实时指标采集监控引擎
 │   │
-│   └── smagical-ui/            # 桌面 UI 展示与交互装配层 (基于 Slint UI)
-│       ├── src/
-│       │   ├── lib.rs          # 桌面应用入口与顶层视口挂载
-│       │   ├── handlers/       # 1:1 镜像领域交互服务集群 (settings, files, tunnels, credentials...)
-│       │   ├── terminal/       # 终端 PTY 进程驱动、光栅化渲染器与分屏树
-│       │   └── theme/          # 运行时主题动态注入与样式令牌绑定
-│       ├── ui/
-│       │   ├── main.slint      # 顶层极简主窗口路由器 (AppWindow)
-│       │   ├── shared/         # 全工程通用共享组件库 (base 原子控件, scaffolds 脚手架, feedback)
-│       │   ├── features/       # 特性优先独立领域包 (settings, file_manager, tunnels, credentials...)
-│       │   └── themes/         # 主题样式规范与设计 Token 资产
-│       └── Cargo.toml
+│   ├── smagical-storage/       # 数据持久化与存储实现层 (工业级安全保险库 + SQLite 物理数据库 + 仿真 Mock)
+│   │   ├── crypto/             # AES-256-GCM + Argon2id 安全保险库 (信封加密、金丝雀校验、敏感内存抹零)
+│   │   ├── entities/           # SeaORM 关系型实体映射 (11 张数据表 Schema)
+│   │   ├── seaorm/             # 基于 SQLite 的 SeaORM 物理仓储实现 (自动 DDL 建表与数据迁移)
+│   │   ├── mock/               # 基于读写锁的高性能并发内存仿真仓储 (预装 6 组 10 主机真实种子数据)
+│   │   └── storage_mode.rs     # 跨进程存储模式首选项治理 (~/.config/smalux-ssh/storage_mode.txt)
+│   │
+│   ├── smagical-ui-view/       # 纯 Slint 声明式界面视图库与强类型生成代码 (DSL、组件库与 Bridge 单例)
+│   │   ├── ui/main.slint       # 全局主窗口总装与根视口路由器
+│   │   ├── ui/shared/          # 全工程通用共享组件库 (base 原子控件、composite 复合控件、scaffolds 脚手架)
+│   │   ├── ui/features/        # 领域内聚特性包 (专属 HostsBridge, TerminalBridge, SettingsBridge 等)
+│   │   ├── ui/views/           # 顶层工作区页面与左右活动/辅助抽屉
+│   │   └── ui/themes/          # 设计令牌 AppTheme 与 15+ 套终端/界面主题 TOML 预设
+│   │
+│   └── smagical-ui/            # 桌面客户端业务组装与控制中枢 (终端渲染引擎、Handlers 集群、系统托盘)
+│       ├── terminal/           # 纯 Rust 软光栅终端引擎 (ConPTY/OpenPTY, Parser, fontdue CPU 着色, SplitTree)
+│       ├── handlers/           # 1:1 领域事件处理器集群 (主机、会话、凭据、隧道、文件、设置、主题)
+│       ├── store/              # 树形资产增量 Diff 算法与 UI 状态缓存 (消除界面全量刷新闪烁)
+│       ├── theme/              # 运行时主题动态热注入 (无需重启即时平滑换肤)
+│       ├── debug/              # Tracing 全局日志环形缓冲区与开发者控制台
+│       └── local_shells.rs     # 跨平台本地 Shell 环境探测与启动参数预设
 └── README.md
 ```
 
@@ -131,10 +137,10 @@ flowchart TD
     ViewportView -->|键盘转义字节 / 窗口尺寸重采样 Resize| ConPTY
 ```
 
-### 5 大核心优化机制
+### 8 大核心优化机制与交互架构
 
 1. **字形点阵 LRU 缓存池 (Glyph Atlas Cache)**：
-   - 基于 `swash` 的字形缓存池，字符首次出现时光栅化点阵存入哈希表，后续命中直接内存块拷贝（Fast `memcpy` Blit）；
+   - 基于 `fontdue` 的等宽字形缓存池，字符首次出现时光栅化点阵存入哈希表，后续命中直接内存块拷贝（Fast `memcpy` Blit）；
    - 整屏 4800 个字符合成耗时从 `15ms` 降低至 **`< 0.8ms`**，命中率高达 **`99.8%`**。
 2. **双缓冲零开销交换 (Zero-Copy Double Buffering)**：
    - 预分配 Front Buffer 与 Back Buffer 两块 `SharedPixelBuffer<Rgba8Pixel>` 交替翻转，渲染全程**零堆内存分配（Zero Allocation）**。
@@ -143,7 +149,16 @@ flowchart TD
 4. **ANSI 16 色与 24-bit TrueColor 真彩色管线**：
    - 深度联动 `smagical-core` 现有的 15+ 套终端配色预设（Darcula, Nord, Monokai 等），支持 1677 万真彩色平滑渲染。
 5. **工业级选区与 Text Reflow**：
-   - 窗口缩放文字智能折行重排；原生支持双击选词、三击选行、方块选区与 URL 超链接跳转。
+   - 窗口缩放文字智能折行重排；原生支持双击选词、三击选行、方块选区与拖拽自动复制。
+6. **智能 URL 识别、悬浮手型光标与浏览器一键直达 (Smart & Clickable URLs)**：
+   - 字符网格坐标反查超链接，鼠标移入 URL 范围自动无缝切换为手指光标 (`pointer`)；
+   - 单击链接直接调用跨平台浏览器安全打开（Windows 深度整合 `rundll32 FileProtocolHandler` 规避命令行转义截断）；完美解耦拖拽划选与单击直达。
+7. **高清晰对比度渲染与字形笔画饱满度增强 (Crystal-Clear Text & Stem Darkening)**：
+   - 彻底优化终端字符对比度，默认暗黑前景色提升至高清晰高亮的 `#F0F2F5` / `#E4E6EB`；
+   - 引入伽马笔画补强算法，消除由于次像素透明度导致的边缘发暗发虚问题，达到媲美本地现代 IDE 的锐利字体质感。
+8. **阶段化流式诊断输出与断线原地免密重连 (Zero-Prompt Reconnect & Stream Diagnostics)**：
+   - 主机连接全过程（TCP、跳板机跃点、代理穿透、TOFU 密钥验真、公钥/密码认证）以 VT100 原生彩色字符流直出视口；
+   - 终端断线或网络重置后，按任意键原地自动免密重连；PTY 管道读取线程具备跨分片滑动窗口，自动应答中英文密码/口令提示符，实现零人工介入的静默重连。
 
 ---
 
@@ -204,7 +219,7 @@ cargo run -p smagical-ui
 # 全 Workspace 严格静态检查 (0 警告)
 cargo clippy --workspace --all-targets -- -D warnings
 
-# 全 Workspace 自动化单元测试 (42 项测试全部通过)
+# 全 Workspace 自动化单元测试 (110+ 项测试全部通过)
 cargo test --workspace
 ```
 

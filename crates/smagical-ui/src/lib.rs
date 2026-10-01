@@ -47,13 +47,27 @@ pub(crate) mod right_panel_service;
 pub mod notification_service;
 /// 网络隧道与出网代理全局后台常驻守护服务模块。
 pub(crate) mod tunnel_daemon;
+/// 容灾备份与多端快照同步全局后台常驻守护服务模块。
+pub mod backup_daemon;
 /// 图形渲染管线本地持久化配置与启动分发模块。
 pub mod pipeline_config;
 /// 桌面系统托盘常驻守护与交互服务模块。
 pub mod tray;
+/// 存储后端模式本地持久化配置模块。
+pub mod storage_config;
 /// 异步运行时与同步阻塞调度工具。
 pub mod async_util;
 pub use async_util::{block_on, spawn_async};
+/// SSH 密钥对现场生成器。
+pub mod keygen;
+/// 第三方终端资产迁移与格式导入解析器。
+pub mod importer;
+/// 远程 SFTP 与 SSH 文件系统操作模块。
+pub mod sftp;
+/// 远程 Linux 系统性能监控指标探针引擎。
+pub mod monitor;
+/// 会话操作安全审计日志服务。
+pub mod audit_logger;
 
 
 use std::cell::RefCell;
@@ -133,9 +147,46 @@ pub fn run() -> Result<(), slint::PlatformError> {
     sync_ui_debug_logs(&window);
 
 
-    // 初始化 CoreState 核心状态引擎 (通过依赖注入传入 MockStorage 预设种子存储)
-    let storage = std::sync::Arc::new(smagical_storage::MockStorage::new_seeded());
-    let core_state = Rc::new(CoreState::with_storage(storage, true));
+    // 根据本地持久化配置加载存储模式 (未配置或默认启用物理持久化 SQLite 引擎)
+    let is_mock_pref = storage_config::get_persisted_storage_mode()
+        .map(|m| m == "mock")
+        .unwrap_or(false);
+
+    let (storage, is_mock): (std::sync::Arc<dyn smagical_core::storage::AppStorage>, bool) = if is_mock_pref {
+        tracing::info!(target: "smagical_ui::storage", "依据本地持久化配置加载: [MockStorage] 内存种子存储");
+        (std::sync::Arc::new(smagical_storage::MockStorage::new_seeded()), true)
+    } else {
+        match async_util::block_on(smagical_storage::SeaOrmStorage::open_default()) {
+            Ok(s) => {
+                tracing::info!(target: "smagical_ui::storage", "成功初始化物理持久化数据库: [SeaOrmStorage] SQLite 引擎");
+                (std::sync::Arc::new(s), false)
+            }
+            Err(e) => {
+                tracing::error!(target: "smagical_ui::storage", "打开物理 SQLite 数据库失败: {:?}，自动回退至内存种子存储", e);
+                (std::sync::Arc::new(smagical_storage::MockStorage::new_seeded()), true)
+            }
+        }
+    };
+    let core_state = Rc::new(CoreState::with_storage(storage, is_mock));
+    let mut native_sftp_driver = None;
+    if !is_mock {
+        let session_driver = std::sync::Arc::new(smagical_ssh::RusshSessionDriver::new());
+        let sftp_driver = std::sync::Arc::new(smagical_ssh::RusshSftpDriver::new());
+        native_sftp_driver = Some(std::sync::Arc::clone(&sftp_driver));
+        let tunnel_driver = std::sync::Arc::new(smagical_ssh::RusshTunnelDriver::new());
+        let keygen_service = std::sync::Arc::new(smagical_ssh::NativeKeygenService::new());
+        let metrics_driver = std::sync::Arc::new(smagical_ssh::RusshMetricsDriver::with_ssh_service(
+            std::sync::Arc::clone(&session_driver) as _,
+        ));
+
+        core_state.set_ssh_service(session_driver);
+        core_state.set_sftp_service(sftp_driver);
+        core_state.set_tunnel_service(tunnel_driver);
+        core_state.set_keygen_service(keygen_service);
+        core_state.set_metrics_service(metrics_driver);
+        tracing::info!(target: "smagical_ui::services", "成功装配 smagical-ssh 纯 Rust 原生协议驱动与网络服务簇");
+    }
+    window.global::<DebugBridge>().set_use_mock_storage(is_mock);
 
     // -------------------------------------------------------------------------
     // 冷启动数据统一异步并发加载 (0 阻塞，全量 I/O 并发拉取)
@@ -196,27 +247,29 @@ pub fn run() -> Result<(), slint::PlatformError> {
 
 
 
-    // 启动本地终端异步探测服务 (0ms 阻塞主线程)
-    local_shells::start_local_shell_discovery(
+    // 注册本地终端异步探测服务 (跟随 AppBootEvent 引导生命周期自启)
+    let shell_discovery = std::sync::Arc::new(local_shells::LocalShellDiscoveryService::new(
         std::sync::Arc::clone(&cached_shells),
         window.as_weak(),
-    );
+    ));
+    shell_discovery.register(core_state.event_manager());
 
-    // 注册启动器资产数据后台异步预热服务
+    // 注册启动器资产数据后台异步预热服务 (跟随 AppReadyEvent 首帧就绪)
     let prewarm_service = std::sync::Arc::new(launcher_prewarm::LauncherPrewarmService::new(
         core_state.storage().clone(),
         window.as_weak(),
     ));
     prewarm_service.register(core_state.event_manager());
 
-    // 注册网络隧道与代理全局后台常驻守护服务 (处理跟随整个应用的全局自启与退出注销)
+    // 注册网络隧道与代理全局后台常驻守护服务 (跟随 AppReadyEvent 首帧就绪与 AppBeforeExitEvent 退出注销)
     let tunnel_daemon = std::sync::Arc::new(tunnel_daemon::TunnelDaemonService::new(
         core_state.storage().clone(),
+        core_state.tunnels().clone(),
         window.as_weak(),
     ));
     tunnel_daemon.register(core_state.event_manager());
 
-    // 触发全局应用启动事件
+    // 触发全局应用引导启动事件 (触发 Shell 探测等引导期后台服务)
     core_state.events().dispatch(&smagical_core::AppBootEvent);
 
     // 初始化并启动系统托盘常驻守护服务 (支持最小化到托盘、右键菜单快捷操作与呼出唤醒)
@@ -353,6 +406,14 @@ pub fn run() -> Result<(), slint::PlatformError> {
     ));
     let ui_store = Arc::new(crate::store::UiStore::from_host_store(Arc::clone(&host_store)));
 
+    // 注册容灾备份与多端快照同步全局后台常驻守护服务 (跟随 AppReadyEvent、资产变动与 AppBeforeExitEvent)
+    let backup_daemon = std::sync::Arc::new(backup_daemon::BackupDaemonService::new(
+        core_state.storage().clone(),
+        window.as_weak(),
+        notifications.clone(),
+    ));
+    backup_daemon.clone().register(core_state.event_manager());
+
     // 构造全局应用上下文
     let ctx = AppContext {
         core_state: Rc::clone(&core_state),
@@ -405,6 +466,8 @@ pub fn run() -> Result<(), slint::PlatformError> {
         tunnel_search_query,
         tunnel_filter_category,
         tray_active: Rc::new(RefCell::new(_tray_service.is_some())),
+        backup_daemon: Arc::clone(&backup_daemon),
+        sftp_driver: native_sftp_driver,
     };
 
     // 初始同步历史会话抽屉、双盘文件浏览器、代码片段中心与网络隧道中枢数据
@@ -418,17 +481,26 @@ pub fn run() -> Result<(), slint::PlatformError> {
     // 统一挂载所有区域的回调事件处理器
     register_all_handlers(&window, &ctx);
 
-    // 同步底层配置仓储 (ConfigRepository) 状态至 Slint 界面
+    // 同步底层配置仓储 (ConfigRepository) 全量状态至 Slint SettingsBridge 视图模型
     let wb = window.global::<WindowBridge>();
     let sb = window.global::<SettingsBridge>();
-    sb.set_setting_close_action(initial_config.close_action.as_str().into());
-    window.global::<SettingsBridge>().set_setting_start_on_boot(initial_config.start_on_boot);
-    window.global::<SettingsBridge>().set_setting_confirm_close_tab(initial_config.confirm_close_tab);
-    window.global::<SettingsBridge>().set_setting_confirm_close_active(initial_config.confirm_close_active);
-    window.global::<SettingsBridge>().set_setting_toast_duration(initial_config.toast_duration.as_str().into());
-    window.global::<SettingsBridge>().set_setting_copy_on_select(initial_config.copy_on_select);
-    window.global::<SettingsBridge>().set_setting_paste_on_right_click(initial_config.paste_on_right_click);
-    window.global::<SettingsBridge>().set_setting_warn_multiline_paste(initial_config.warn_on_multiline_paste);
+    handlers::settings_handlers::apply_config_to_settings_bridge(&sb, &initial_config);
+    let ai_b = window.global::<crate::generated::AiBridge>();
+    ai_b.set_available_models(sb.get_setting_ai_current_models());
+    ai_b.set_selected_model(sb.get_setting_ai_model());
+
+    // 检查本地凭据保险库冷启动锁定状态 (若开启主密码且未解锁，呼出全屏解锁遮罩)
+    handlers::settings_handlers::check_vault_lock_on_boot(&window, &ctx);
+
+    // 初始化会话操作安全审计状态
+    crate::audit_logger::set_audit_enabled(initial_config.session_audit_logging);
+
+    // 启动空闲超时自动锁定保险库后台守护任务
+    handlers::settings_handlers::start_auto_lock_monitor(
+        window.as_weak(),
+        core_state.storage().clone(),
+        ctx.notifications.clone(),
+    );
 
     wb.set_current_theme_id(initial_config.theme_id.as_str().into());
     wb.set_is_dark_mode(initial_config.is_dark_mode);
@@ -437,6 +509,10 @@ pub fn run() -> Result<(), slint::PlatformError> {
     wb.set_terminal_font_family(initial_config.font_family.as_str().into());
     wb.set_terminal_font_size(initial_config.font_size);
     if let Some(ref mut r) = *terminal_renderer.borrow_mut() {
+        let is_light = !initial_config.is_dark_mode || initial_config.theme_id.contains("light");
+        if is_light {
+            r.update_palette(terminal::TerminalPalette::light());
+        }
         r.set_cursor_style(&initial_config.cursor_style);
         r.set_cursor_blink(initial_config.cursor_blink);
         if let Some(bytes) = terminal::renderer::find_font_by_name(&initial_config.font_family) {
@@ -445,32 +521,75 @@ pub fn run() -> Result<(), slint::PlatformError> {
     }
 
     wb.set_is_debug_enabled(initial_config.debug_enabled);
-    window.global::<DebugBridge>().set_flag_desktop_notifications(initial_config.flag_desktop_notifications);
-    window.global::<DebugBridge>().set_flag_terminal_crt_shader(initial_config.flag_terminal_crt_shader);
-    window.global::<DebugBridge>().set_flag_cloud_sync(initial_config.flag_cloud_sync);
-    window.global::<DebugBridge>().set_flag_terminal_scratchpad(initial_config.flag_terminal_scratchpad);
+    let dbg_bridge = window.global::<DebugBridge>();
+    dbg_bridge.set_flag_desktop_notifications(initial_config.flag_desktop_notifications);
+    dbg_bridge.set_flag_terminal_crt_shader(initial_config.flag_terminal_crt_shader);
+    dbg_bridge.set_flag_cloud_sync(initial_config.flag_cloud_sync);
+    dbg_bridge.set_flag_terminal_scratchpad(initial_config.flag_terminal_scratchpad);
 
-    // 同步壁纸状态至全局 AppTheme 令牌
+    // 同步壁纸状态至全局 AppTheme 令牌与 WindowBridge
     let theme_global = window.global::<AppTheme>();
     theme_global.set_wallpaper_mode(initial_config.wallpaper_mode.as_str().into());
     theme_global.set_wallpaper_opacity(initial_config.wallpaper_opacity);
     theme_global.set_modal_opacity(initial_config.modal_opacity);
-    window.global::<SettingsBridge>().set_setting_modal_opacity(initial_config.modal_opacity);
+
+    wb.set_wallpaper_mode(initial_config.wallpaper_mode.as_str().into());
+    wb.set_global_wallpaper_opacity(initial_config.wallpaper_opacity);
+    wb.set_terminal_wallpaper_opacity(initial_config.wallpaper_opacity);
+    wb.set_wallpaper_path(initial_config.wallpaper_path.as_str().into());
 
     // 壁纸画廊数据与初始渲染
+    let mut initial_wp_path = initial_config.wallpaper_path.clone();
     if !initial_config.wallpaper_list.is_empty() {
-        let slint_strings: Vec<slint::SharedString> = initial_config.wallpaper_list.iter().map(|s| s.as_str().into()).collect();
-        window.global::<SettingsBridge>().set_setting_wallpaper_list(slint::ModelRc::new(slint::VecModel::from(slint_strings)));
-        window.global::<SettingsBridge>().set_setting_wallpaper_active_index(initial_config.wallpaper_active_index as i32);
-        if initial_config.wallpaper_active_index < initial_config.wallpaper_list.len() {
-            let wp_path = &initial_config.wallpaper_list[initial_config.wallpaper_active_index];
-            wb.invoke_set_wallpaper(
-                initial_config.wallpaper_mode.as_str().into(),
-                wp_path.as_str().into(),
-                initial_config.wallpaper_opacity,
-            );
+        let mut active_idx = initial_config.wallpaper_active_index;
+        // 若配置为 startup 开机轮播模式，冷启动时随机轮换一张新壁纸
+        if initial_config.wallpaper_slideshow_interval == "startup" && initial_config.wallpaper_list.len() > 1 {
+            let seed = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() as usize;
+            let rand_offset = (seed % (initial_config.wallpaper_list.len() - 1)) + 1;
+            active_idx = (initial_config.wallpaper_active_index + rand_offset) % initial_config.wallpaper_list.len();
+            *ctx.active_wallpaper_idx.borrow_mut() = active_idx;
+            sb.set_setting_wallpaper_active_index(active_idx as i32);
+
+            let storage_wp = core_state.storage().clone();
+            crate::async_util::spawn_async(async move {
+                let _ = storage_wp.config().update(Box::new(move |c| {
+                    c.wallpaper_active_index = active_idx;
+                })).await;
+            });
+        }
+
+        if active_idx < initial_config.wallpaper_list.len() {
+            let wp_entry = &initial_config.wallpaper_list[active_idx];
+            let p = std::path::Path::new(wp_entry);
+            let actual_path = if p.is_dir() {
+                handlers::theme_handlers::resolve_all_wallpaper_images(&[wp_entry.clone()])
+                    .into_iter()
+                    .next()
+                    .unwrap_or_else(|| wp_entry.clone())
+            } else {
+                wp_entry.clone()
+            };
+            initial_wp_path = actual_path;
         }
     }
+
+    wb.invoke_set_wallpaper(
+        initial_config.wallpaper_mode.as_str().into(),
+        initial_wp_path.as_str().into(),
+        initial_config.wallpaper_opacity,
+    );
+
+    // 冷启动恢复壁纸轮播后台定时器（静默生效：不弹 Toast，不重复落盘）
+    handlers::theme_handlers::apply_wallpaper_slideshow(
+        &window,
+        &ctx,
+        initial_config.wallpaper_slideshow_interval.as_str(),
+        initial_config.wallpaper_transition_effect.as_str(),
+        true,
+    );
 
 
 
@@ -486,6 +605,7 @@ pub fn run() -> Result<(), slint::PlatformError> {
     // 启动 120Hz (8ms) 超流畅终端位图渲染与 PTY 异步流输出泵送定时器
     let render_timer = slint::Timer::default();
     let window_weak = window.as_weak();
+    let ctx_timer = ctx.clone();
     let active_terminals_timer = Rc::clone(&active_terminals);
     let terminal_renderer_timer = Rc::clone(&terminal_renderer);
     let pane_groups_timer = Rc::clone(&pane_groups);
@@ -501,11 +621,92 @@ pub fn run() -> Result<(), slint::PlatformError> {
     let mut last_scroll_off = -1i32;
 
     render_timer.start(
-
         slint::TimerMode::Repeated,
         std::time::Duration::from_millis(8),
         move || {
             if let Some(w) = window_weak.upgrade() {
+                // 0. 消费后台异步连接阶段输出与进度日志，写入对应终端视口字符流
+                if let Ok(mut logs) = crate::handlers::host_handlers::PENDING_TERMINAL_LOGS.try_lock() {
+                    if !logs.is_empty() {
+                        let items: Vec<_> = logs.drain(..).collect();
+                        drop(logs);
+                        let mut terminals = active_terminals_timer.borrow_mut();
+                        for (sess_id, msg) in items {
+                            if let Some(inst) = terminals.get_mut(&sess_id) {
+                                inst.parser.process(msg.as_bytes());
+                                inst.parser.mark_dirty();
+                            }
+                        }
+                    }
+                }
+
+                // 1. 消费后台异步完成的 SSH 握手连接任务，挂载终端实例并更新指示灯状态为 online/error
+                if let Ok(mut pending) = crate::handlers::host_handlers::PENDING_SSH_CONNECTIONS.try_lock() {
+                    if !pending.is_empty() {
+                        let items: Vec<_> = pending.drain(..).collect();
+                        drop(pending);
+                        for (sess_id, res, launch_cfg_opt) in items {
+                            match res {
+                                Ok(mut ready_instance) => {
+                                    let mut terminals = active_terminals_timer.borrow_mut();
+                                    if let Some(existing) = terminals.get_mut(&sess_id) {
+                                        existing.pty = ready_instance.pty;
+                                        existing.key_guard = ready_instance.key_guard;
+                                        existing.target = ready_instance.target;
+                                        let _ = existing.pty.resize(existing.size);
+                                        let ok_msg = "\x1b[32m[smalux] 连接成功!\x1b[0m\r\n\r\n".as_bytes();
+                                        existing.parser.process(ok_msg);
+                                        existing.parser.mark_dirty();
+                                    } else {
+                                        let ok_msg = "\x1b[32m[smalux] 连接成功!\x1b[0m\r\n\r\n".as_bytes();
+                                        ready_instance.parser.process(ok_msg);
+                                        ready_instance.parser.mark_dirty();
+                                        terminals.insert(sess_id.clone(), ready_instance);
+                                    }
+                                    let mut groups = pane_groups_timer.borrow_mut();
+                                    for g in groups.iter_mut() {
+                                        if let Some(t) = g.tabs.iter_mut().find(|t| t.session_id == sess_id) {
+                                            t.host_status = "online".to_string();
+                                        }
+                                    }
+                                    let active_pid = active_pane_id_timer.borrow().clone();
+                                    let is_split = global_split_tree_timer.borrow().is_some();
+                                    session::sync_active_session_ui(&w, &groups, &active_pid, is_split);
+                                    session::sync_active_session_to_core(&groups, &active_pid, &ctx_timer.core_state);
+                                    tracing::info!(target: "smagical_ui::session", "后台异步 SSH 连接就绪挂载: {}", sess_id);
+                                }
+                                Err(err) => {
+                                    let mut terminals = active_terminals_timer.borrow_mut();
+                                    if let Some(existing) = terminals.get_mut(&sess_id) {
+                                        if let Some(cfg) = launch_cfg_opt {
+                                            if let crate::terminal::instance::TerminalTarget::Ssh { ref mut config, .. } = existing.target {
+                                                *config = Some(cfg);
+                                            }
+                                        }
+                                        let fail_msg = format!("\x1b[31m[smalux] 连接失败: {}\x1b[0m\r\n", err);
+                                        existing.parser.process(fail_msg.as_bytes());
+                                        existing.parser.mark_dirty();
+                                        existing.state = crate::terminal::instance::SessionState::Exited {
+                                            reason: crate::terminal::instance::SessionExitReason::Disconnected,
+                                            exited_at: std::time::Instant::now(),
+                                        };
+                                    }
+                                    let mut groups = pane_groups_timer.borrow_mut();
+                                    for g in groups.iter_mut() {
+                                        if let Some(t) = g.tabs.iter_mut().find(|t| t.session_id == sess_id) {
+                                            t.host_status = "error".to_string();
+                                        }
+                                    }
+                                    let active_pid = active_pane_id_timer.borrow().clone();
+                                    let is_split = global_split_tree_timer.borrow().is_some();
+                                    session::sync_active_session_ui(&w, &groups, &active_pid, is_split);
+                                    ctx_timer.notify_error("SSH 连接失败", err);
+                                }
+                            }
+                        }
+                    }
+                }
+
                 let groups = pane_groups_timer.borrow();
                 if groups.is_empty() {
                     return;

@@ -136,7 +136,7 @@ export component DebugSettingsTab inherits ScrollView {
     in-out property <bool> flag-cloud-sync: false;
     in-out property <bool> flag-terminal-scratchpad: false;
     in-out property <bool> flag-sync-pipeline-env: true;
-    in-out property <bool> use-mock-storage: true;
+    in-out property <bool> use-mock-storage: false;
     in-out property <bool> show-system-theme: false;
     in property <string> current-theme-name: "Darcula";
     in property <bool> is-dark-mode: true;
@@ -263,8 +263,10 @@ export component DebugSettingsTab inherits ScrollView {
                 // 特性行 0: 切换到 Mock 数据层
                 FlagItemRow {
                     title: @tr("切换到 Mock 数据层 (Mock Data Layer)");
-                    subtitle: @tr("默认开启内存种子 Mock 数据；关闭后切换至真实物理存储模式，便于接入其他存储类型进行调试");
-                    badge: "STORAGE";
+                    subtitle: root.use-mock-storage ?
+                        @tr("【当前：Mock 内存模式】操作仅保存在内存中，重启后不落盘；关闭开关切回真实物理数据库") :
+                        @tr("【当前：真实 SQLite 数据库】所有主机、分组与凭据已实时持久化落盘；开启开关切换至 Mock 模式");
+                    badge: root.use-mock-storage ? "MOCK" : "SQLITE";
                     checked: root.use-mock-storage;
                     toggled(c) => {
                         root.use-mock-storage = c;

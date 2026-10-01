@@ -24,14 +24,17 @@ export component SnippetRunModal inherits Rectangle {
     callback param_changed(int /* index */, string /* val */);
 
     if root.is_open: Rectangle {
-        background: #000000.transparentize(0.5);
+        width: 100%;
+        height: 100%;
+        background: #000000a6;
 
         // 阻止点击穿透
         TouchArea { }
 
         Rectangle {
             width: 480px;
-            max-height: 520px;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
             border-radius: AppTheme.radius-large;
             background: AppTheme.surface-background;
             border-width: 1px;
@@ -40,54 +43,60 @@ export component SnippetRunModal inherits Rectangle {
             drop-shadow-color: #000000.transparentize(0.4);
 
             VerticalLayout {
-                padding: 20px;
-                spacing: 16px;
+                padding: 18px;
+                spacing: 12px;
 
-                // 1. 顶部标题
+                // 1. 顶部标题栏 (左侧标题与图标，右上角独立关闭按钮)
                 HorizontalLayout {
-                    alignment: center;
-                    spacing: 8px;
+                    alignment: space-between;
+                    height: 28px;
 
-                    Text {
-                        text: "⚡";
-                        font-size: 16px;
-                        vertical-alignment: center;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        alignment: start;
+
+                        Text {
+                            text: "⚡";
+                            font-size: 16px;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: @tr("填充动态参数执行代码片段");
+                            font-size: 14px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
                     }
 
-                    Text {
-                        text: @tr("填充动态参数执行代码片段");
-                        font-size: 14px;
-                        font-weight: 700;
-                        color: AppTheme.foreground;
-                        vertical-alignment: center;
-                    }
-
-                    Rectangle { horizontal-stretch: 1; }
-
+                    // 右上角关闭按钮
                     Rectangle {
                         width: 24px;
                         height: 24px;
                         border-radius: AppTheme.radius-small;
                         background: close-touch.has-hover ? AppTheme.hover-background : transparent;
 
-                        Text {
-                            text: "✕";
-                            font-size: 12px;
-                            color: AppTheme.secondary-foreground;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
-                        }
-
                         close-touch := TouchArea {
                             clicked => { root.cancel(); }
                             mouse-cursor: pointer;
+                        }
+
+                        Image {
+                            source: @image-url("../assets/icons/window-close.svg");
+                            width: 11px;
+                            height: 11px;
+                            image-fit: contain;
+                            colorize: close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                            x: (parent.width - self.width) / 2;
+                            y: (parent.height - self.height) / 2;
                         }
                     }
                 }
 
                 // 2. 片段信息
                 Rectangle {
-                    height: 32px;
+                    height: 30px;
                     border-radius: AppTheme.radius-medium;
                     background: AppTheme.control-background;
 
@@ -95,10 +104,16 @@ export component SnippetRunModal inherits Rectangle {
                         padding-left: 10px;
                         padding-right: 10px;
                         spacing: 6px;
-                        alignment: center;
+                        alignment: start;
 
                         Text {
-                            text: "📄 " + root.snippet_title;
+                            text: "📄";
+                            font-size: 11px;
+                            vertical-alignment: center;
+                        }
+
+                        Text {
+                            text: @tr("目标代码片段: ") + root.snippet_title;
                             font-size: 11px;
                             font-weight: 600;
                             color: AppTheme.foreground;
@@ -108,9 +123,9 @@ export component SnippetRunModal inherits Rectangle {
                     }
                 }
 
-                // 3. 参数填报表单
+                // 3. 参数填报表单 (动态自适应高度，杜绝多余空白，超出220px启用滚动条)
                 Rectangle {
-                    max-height: 200px;
+                    height: root.params_list.length == 0 ? 36px : Math.min(220px, Math.max(52px, list-content.preferred-height));
                     clip: true;
 
                     scroll-area := Flickable {
@@ -120,6 +135,17 @@ export component SnippetRunModal inherits Rectangle {
 
                         list-content := VerticalLayout {
                             spacing: 10px;
+
+                            if root.params_list.length == 0: HorizontalLayout {
+                                alignment: center;
+                                height: 36px;
+                                Text {
+                                    text: @tr("该代码片段无需配置动态参数，可直接运行");
+                                    font-size: 11px;
+                                    color: AppTheme.secondary-foreground;
+                                    vertical-alignment: center;
+                                }
+                            }
 
                             for param[idx] in root.params_list: VerticalLayout {
                                 spacing: 4px;

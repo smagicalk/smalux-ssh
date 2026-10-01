@@ -4,7 +4,13 @@
 
 
 
-use crate::domain::{config::AppConfigRecord, group::GroupRecord, history::HistoryRecord, host::HostRecord};
+use crate::domain::{
+    backup::{BackupSnapshotRecord, BackupTaskRecord},
+    config::AppConfigRecord,
+    group::GroupRecord,
+    history::HistoryRecord,
+    host::HostRecord,
+};
 
 /// 存储操作统一结果类型
 pub type StorageResult<T> = Result<T, StorageError>;
@@ -228,6 +234,57 @@ pub trait ConfigRepository: Send + Sync {
     async fn update(&self, mutate: Box<dyn for<'a> FnOnce(&'a mut AppConfigRecord) + Send>) -> StorageResult<AppConfigRecord>;
 }
 
+/// 容灾备份任务仓储接口契约
+#[async_trait::async_trait]
+pub trait BackupTaskRepository: Send + Sync {
+    /// 获取全部备份任务列表
+    async fn list_all(&self) -> StorageResult<Vec<BackupTaskRecord>>;
+
+    /// 根据唯一 ID 查询单条备份任务记录
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<BackupTaskRecord>>;
+
+    /// 保存或更新备份任务
+    async fn save(&self, task: &BackupTaskRecord) -> StorageResult<()>;
+
+    /// 删除指定备份任务
+    async fn delete(&self, id: &str) -> StorageResult<bool>;
+
+    /// 切换或更新启用状态
+    async fn set_enabled(&self, id: &str, enabled: bool) -> StorageResult<bool>;
+
+    /// 更新执行状态、最后备份时间、快照数量
+    async fn update_status(
+        &self,
+        id: &str,
+        status: &str,
+        error: &str,
+        last_backup_time: &str,
+        snapshot_count: u32,
+    ) -> StorageResult<()>;
+}
+
+/// 容灾备份镜像快照仓储接口契约
+#[async_trait::async_trait]
+pub trait BackupSnapshotRepository: Send + Sync {
+    /// 按所属备份任务获取快照列表 (按时间倒序)
+    async fn list_by_task(&self, task_id: &str) -> StorageResult<Vec<BackupSnapshotRecord>>;
+
+    /// 根据唯一 ID 查询快照记录
+    async fn get_by_id(&self, id: &str) -> StorageResult<Option<BackupSnapshotRecord>>;
+
+    /// 保存快照元数据记录
+    async fn save(&self, snapshot: &BackupSnapshotRecord) -> StorageResult<()>;
+
+    /// 删除单条快照记录
+    async fn delete(&self, id: &str) -> StorageResult<bool>;
+
+    /// 删除指定任务下的全部快照
+    async fn delete_by_task(&self, task_id: &str) -> StorageResult<usize>;
+
+    /// 按保留策略清理超出数量的旧快照，返回被删除的快照记录列表 (以便物理存储同步清理)
+    async fn prune_old_snapshots(&self, task_id: &str, keep_count: usize) -> StorageResult<Vec<BackupSnapshotRecord>>;
+}
+
 /// 聚合存储服务门面契约
 #[async_trait::async_trait]
 pub trait AppStorage: Send + Sync {
@@ -252,10 +309,49 @@ pub trait AppStorage: Send + Sync {
     /// 全局系统与偏好配置仓储句柄
     fn config(&self) -> &dyn ConfigRepository;
 
+    /// 容灾备份任务仓储句柄
+    fn backup_tasks(&self) -> &dyn BackupTaskRepository;
+
+    /// 容灾备份快照仓储句柄
+    fn backup_snapshots(&self) -> &dyn BackupSnapshotRepository;
+
     /// 强制从物理介质重新加载数据
     async fn reload(&self) -> StorageResult<()>;
 
     /// 强制将内存缓冲数据持久化刷盘
     async fn flush(&self) -> StorageResult<()>;
+
+    /// 查询保险库当前是否处于解锁就绪状态 (默认无锁返回 true)
+    fn is_vault_unlocked(&self) -> bool {
+        true
+    }
+
+    /// 立即锁定保险库并将内存敏感密钥抹零
+    fn lock_vault(&self) {}
+
+    /// 查询当前是否设置了自定义主密码 (而非默认硬件/种子)
+    async fn has_custom_master_password(&self) -> StorageResult<bool> {
+        Ok(false)
+    }
+
+    /// 使用主密码解锁保险库并挂载 DEK (返回 true 表示解锁成功，false 表示密码错误)
+    async fn unlock_vault(&self, _password: &str) -> StorageResult<bool> {
+        Ok(true)
+    }
+
+    /// 修改或设置安全主密码 (old_password_opt 为 None 表示从默认无密模式首次升级)
+    async fn change_master_password(
+        &self,
+        _old_password_opt: Option<&str>,
+        _new_password: &str,
+        _hint: &str,
+    ) -> StorageResult<()> {
+        Ok(())
+    }
+
+    /// 移除自定义主密码，恢复默认无感开箱即用模式 (需验证当前密码)
+    async fn remove_master_password(&self, _current_password: &str) -> StorageResult<()> {
+        Ok(())
+    }
 }
 

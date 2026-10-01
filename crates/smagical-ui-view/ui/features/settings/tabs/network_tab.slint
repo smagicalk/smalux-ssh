@@ -352,7 +352,10 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                             subtitle: @tr("压缩所有终端文本输出与 SFTP 传输数据流，显著提升跨国网络与低带宽连接速度");
                                             SettingsSwitch {
                                                 checked: SettingsBridge.setting-compression;
-                                                toggled(c) => { SettingsBridge.setting-compression = c; }
+                                                toggled(c) => {
+                                                    SettingsBridge.setting-compression = c;
+                                                    SettingsBridge.change-compression(c);
+                                                }
                                             }
                                         }
 
@@ -362,7 +365,10 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                             show-border: false;
                                             SettingsSwitch {
                                                 checked: SettingsBridge.setting-legacy-ciphers;
-                                                toggled(c) => { SettingsBridge.setting-legacy-ciphers = c; }
+                                                toggled(c) => {
+                                                    SettingsBridge.setting-legacy-ciphers = c;
+                                                    SettingsBridge.change-legacy-ciphers(c);
+                                                }
                                             }
                                         }
                                     }
@@ -379,7 +385,10 @@ import { AppButton, AppIconButton } from "../../../shared/base/app-button.slint"
                                             show-border: false;
                                             SettingsSwitch {
                                                 checked: SettingsBridge.setting-auto-reconnect;
-                                                toggled(c) => { SettingsBridge.setting-auto-reconnect = c; }
+                                                toggled(c) => {
+                                                    SettingsBridge.setting-auto-reconnect = c;
+                                                    SettingsBridge.change-auto-reconnect(c);
+                                                }
                                             }
                                         }
                                     }

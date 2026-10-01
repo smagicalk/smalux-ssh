@@ -10,6 +10,6 @@ export component StatusDot inherits Rectangle {
     border-radius: dot-size / 2;
 
     background: status == "online" ? AppTheme.success :
-                status == "warning" ? AppTheme.warning :
+                status == "warning" || status == "connecting" ? AppTheme.warning :
                 status == "error" ? AppTheme.danger : AppTheme.disabled-foreground;
 }

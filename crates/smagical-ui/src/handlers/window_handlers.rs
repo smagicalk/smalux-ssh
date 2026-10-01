@@ -68,6 +68,8 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let themes_clone = Rc::clone(&ctx.themes);
     let core_state_theme = ctx.core_state.clone();
+    let renderer_theme = Rc::clone(&ctx.terminal_renderer);
+    let active_terminals_theme = Rc::clone(&ctx.active_terminals);
     wb.on_switch_theme(move |theme_id| {
 
         if let Some(w) = window_weak.upgrade() {
@@ -111,6 +113,14 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     w.global::<SettingsBridge>().set_current_theme_id(normalized_id.into());
                     let is_light = normalized_id.contains("light") || normalized_id.contains("dawn") || normalized_id.contains("latte");
                     w.global::<WindowBridge>().set_is_dark_mode(!is_light);
+
+                    // 同步更新终端光栅化引擎调色板与重绘活跃窗格
+                    crate::terminal::update_terminal_palette_for_color_mode(
+                        &mut *renderer_theme.borrow_mut(),
+                        &mut *active_terminals_theme.borrow_mut(),
+                        is_light,
+                    );
+
                     core_state_theme.events().dispatch(&ThemeChangedEvent {
                         theme_id: normalized_id.to_string(),
                         is_dark: !is_light,
@@ -146,6 +156,8 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let themes_clone = Rc::clone(&ctx.themes);
     let core_state_color_mode = ctx.core_state.clone();
+    let renderer_mode = Rc::clone(&ctx.terminal_renderer);
+    let active_terminals_mode = Rc::clone(&ctx.active_terminals);
     wb.on_toggle_color_mode(move || {
         if let Some(w) = window_weak.upgrade() {
             let is_dark = w.global::<WindowBridge>().get_is_dark_mode();
@@ -164,6 +176,13 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 w.global::<SettingsBridge>().set_current_theme_id("builtin.ui.github-light".into());
                 w.global::<WindowBridge>().set_is_dark_mode(false);
             }
+
+            // 同步切换终端调色板 (浅色模式使用 GitHub Light 纯净白底高对比配色)
+            crate::terminal::update_terminal_palette_for_color_mode(
+                &mut *renderer_mode.borrow_mut(),
+                &mut *active_terminals_mode.borrow_mut(),
+                !next_dark,
+            );
 
             core_state_color_mode.events().dispatch(&ThemeModeToggledEvent {
                 is_dark: next_dark,
@@ -259,8 +278,20 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             let active_count = remote_count + local_count;
 
             // A. 如果设置关闭时最小化到系统托盘 (tray)
+            // 当用户点击关闭按钮且配置 `setting_close_action == "tray"` 时触发：
+            // 1. 若启用了 `setting_lock_on_minimize` 且设置了主密码，立即调用 `storage.lock_vault()` 抹除内存密钥并唤起解锁弹窗；
+            // 2. 隐藏 Slint 渲染窗口与底层 Winit 原生系统窗口，保持后台网络隧道与 SSH 会话常驻；
+            // 3. 发送托盘运行状态 Toast 提示。
             if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
                 if *tray_active_close.borrow() {
+                    let sb = w.global::<SettingsBridge>();
+                    if sb.get_setting_lock_on_minimize() && sb.get_setting_master_password_enabled() {
+                        core_state_close.storage().lock_vault();
+                        sb.set_is_unlock_modal_open(true);
+                        sb.set_unlock_pwd_input("".into());
+                        sb.set_unlock_pwd_error_msg("".into());
+                        tracing::info!(target: "smagical_ui::security", "最小化至托盘已触发自动锁定保险库");
+                    }
                     let _ = w.hide();
                     w.window().with_winit_window(|win| {
                         win.set_visible(false);
@@ -317,11 +348,20 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let window_weak_req = window.as_weak();
     let pane_groups_req = Rc::clone(&ctx.pane_groups);
     let tray_active_req = Rc::clone(&ctx.tray_active);
+    let core_state_req = ctx.core_state.clone();
     window.window().on_close_requested(move || -> slint::CloseRequestResponse {
         if let Some(w) = window_weak_req.upgrade() {
             let active_count: usize = pane_groups_req.borrow().iter().map(|g| g.tabs.len()).sum();
             if w.global::<SettingsBridge>().get_setting_close_action() == "tray" {
                 if *tray_active_req.borrow() {
+                    let sb = w.global::<SettingsBridge>();
+                    if sb.get_setting_lock_on_minimize() && sb.get_setting_master_password_enabled() {
+                        core_state_req.storage().lock_vault();
+                        sb.set_is_unlock_modal_open(true);
+                        sb.set_unlock_pwd_input("".into());
+                        sb.set_unlock_pwd_error_msg("".into());
+                        tracing::info!(target: "smagical_ui::security", "原生关闭转入托盘已触发自动锁定保险库");
+                    }
                     let _ = w.hide();
                     w.window().with_winit_window(|win| {
                         win.set_visible(false);
@@ -357,6 +397,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
     let notif_top = ctx.notifications.clone();
+    let core_state_top = ctx.core_state.clone();
     window.global::<SettingsBridge>().on_toggle_always_on_top(move |always_on_top| {
         if let Some(w) = window_weak.upgrade() {
             w.global::<SettingsBridge>().set_setting_always_on_top(always_on_top);
@@ -367,6 +408,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     slint::winit_030::winit::window::WindowLevel::Normal
                 };
                 winit_window.set_window_level(level);
+            });
+            let storage = core_state_top.storage();
+            crate::async_util::spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.always_on_top = always_on_top;
+                })).await;
             });
             if always_on_top {
                 notif_top.info("窗口置顶已开启", "客户端窗口将始终显示在其他应用之上");
@@ -524,9 +571,15 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 4. 窗口控制: 最小化
+    // 4. 窗口控制: 最小化 (支持最小化自动加锁安全保护)
     // -------------------------------------------------------------------------
-    // 点击右上角最小化按钮时，将主窗口最小化至系统任务栏。
+    // 点击标题栏最小化按钮时，将主窗口最小化至系统任务栏。
+    //
+    // # 自动化保险库安全锁定
+    // 若开启了 `setting_lock_on_minimize` 并且设置了主密码 `setting_master_password_enabled`：
+    // 1. 立即调用底层存储仓储 `storage.lock_vault()` 抹除已派生的解密秘钥；
+    // 2. 预先弹开 Slint 的解锁遮罩模态框 `is_unlock_modal_open = true`；
+    // 3. 用户从任务栏再次点开窗口时，必须重新输入主密码验证后才能继续查看敏感资产。
     let window_weak = window.as_weak();
     let core_state_min = ctx.core_state.clone();
     window.on_minimize_window(move || {
@@ -534,6 +587,17 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             core_state_min.events().dispatch(&WindowStateChangedEvent {
                 state: "minimized".into(),
             });
+
+            // 检查最小化自动锁定安全策略
+            let sb = w.global::<SettingsBridge>();
+            if sb.get_setting_lock_on_minimize() && sb.get_setting_master_password_enabled() {
+                core_state_min.storage().lock_vault();
+                sb.set_is_unlock_modal_open(true);
+                sb.set_unlock_pwd_input("".into());
+                sb.set_unlock_pwd_error_msg("".into());
+                tracing::info!(target: "smagical_ui::security", "窗口最小化已触发自动锁定保险库");
+            }
+
             w.window().set_minimized(true);
         }
     });
@@ -670,20 +734,12 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     wb.on_set_terminal_theme(move |theme_id| {
         if let Some(_w) = window_weak.upgrade() {
             let id_str = theme_id.as_str();
-            if let Some(ref mut renderer) = *renderer_clone.borrow_mut() {
-                let mut palette = crate::terminal::TerminalPalette::default();
-                if id_str.contains("light") {
-                    palette.default_bg = [0xf6, 0xf8, 0xfa, 0xff];
-                    palette.default_fg = [0x24, 0x29, 0x2f, 0xff];
-                    palette.cursor_color = [0x09, 0x69, 0xda, 0xff];
-                }
-                renderer.update_palette(palette);
-            }
-
-            for instance in active_terminals_clone.borrow_mut().values_mut() {
-                instance.parser.mark_dirty();
-            }
-
+            let is_light = id_str.contains("light");
+            crate::terminal::update_terminal_palette_for_color_mode(
+                &mut *renderer_clone.borrow_mut(),
+                &mut *active_terminals_clone.borrow_mut(),
+                is_light,
+            );
             tracing::info!(target: "smagical_ui::settings", "动态更新终端配色方案: {}", id_str);
         }
     });
@@ -699,6 +755,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let wallpaper_preload_timer_ref = Rc::clone(&ctx.wallpaper_preload_timer);
     let wallpapers_ref = Rc::clone(&ctx.wallpapers);
     let active_idx_ref = Rc::clone(&ctx.active_wallpaper_idx);
+    let core_state_wp = ctx.core_state.clone();
     wb.on_set_wallpaper(move |mode, image_path, opacity| {
         if let Some(w) = window_weak.upgrade() {
             let mode_str = mode.as_str();
@@ -706,7 +763,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             let op = if opacity <= 0.0 { 0.20 } else { opacity.min(1.0) };
 
             // 若传入路径为空，自动从内存态壁纸列表与当前索引中极速读取（0ms 纯内存）
-            if path_str.is_empty() || !std::path::Path::new(&path_str).exists() {
+            if (path_str.is_empty() || !std::path::Path::new(&path_str).exists()) && mode_str != "none" {
                 let wps = wallpapers_ref.borrow();
                 let idx = *active_idx_ref.borrow();
                 if !wps.is_empty() && idx < wps.len() && std::path::Path::new(&wps[idx]).exists() {
@@ -716,10 +773,30 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
+            // 若路径是目录，自动解析其内第一张有效图片文件
+            if !path_str.is_empty() && std::path::Path::new(&path_str).is_dir() {
+                let imgs = crate::handlers::theme_handlers::scan_images_in_folder(std::path::Path::new(&path_str));
+                if let Some(first) = imgs.first() {
+                    path_str = first.to_string_lossy().to_string();
+                }
+            }
+
             w.global::<WindowBridge>().set_wallpaper_mode(mode_str.into());
             let theme_global = w.global::<AppTheme>();
             theme_global.set_wallpaper_mode(mode_str.into());
             theme_global.set_wallpaper_opacity(op);
+
+            // 异步持久化当前壁纸配置 (0ms UI 阻塞)
+            let storage = core_state_wp.storage().clone();
+            let m_to_save = mode_str.to_string();
+            let p_to_save = path_str.clone();
+            crate::async_util::spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.wallpaper_mode = m_to_save;
+                    c.wallpaper_path = p_to_save;
+                    c.wallpaper_opacity = op;
+                })).await;
+            });
 
             // 1. 优先从内存 LRU 缓存中极速读取（0ms，不卡顿）
             let cached_img_opt = if !path_str.is_empty() && std::path::Path::new(&path_str).exists() {

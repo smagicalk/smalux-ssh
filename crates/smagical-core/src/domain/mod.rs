@@ -26,6 +26,8 @@ pub mod tunnel;
 pub mod config;
 /// 原生纯 Rust 异步流式 AI 交互与端点服务模型。
 pub mod ai;
+/// 容灾备份与快照管理模型。
+pub mod backup;
 
 pub use group::GroupRecord;
 pub use history::{HistoryRecord, SessionSnapshotConfig};
@@ -33,7 +35,8 @@ pub use host::{HostRecord, HostStatus};
 pub use credential::{CredentialRecord, CredentialType};
 pub use snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable};
 pub use tunnel::{TunnelRecord, TunnelRunMode, TunnelType};
-pub use config::AppConfigRecord;
+pub use config::{AiEndpointProfileRecord, AppConfigRecord, KeywordHighlightRuleRecord};
+pub use backup::{BackupSnapshotRecord, BackupStrategy, BackupTaskRecord, BackupType};
 pub use activity_bar::{ActivityBarItem, ActivityBarRegistry};
 pub use navigation::{NavigationRequest, NavigationRouter};
 pub use terminal_context::{ActiveTerminalSessionContext, TerminalAction};

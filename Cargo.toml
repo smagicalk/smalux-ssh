@@ -2,8 +2,10 @@
 members = [
     "crates/smagical-core",
     "crates/smagical-storage",
+    "crates/smagical-ssh",
     "crates/smagical-ui-view",
     "crates/smagical-ui",
+    "crates/smalux-cli",
 ]
 resolver = "3"
 
@@ -16,11 +18,13 @@ authors = ["smagical"]
 
 [workspace.dependencies]
 anyhow = "1.0.104"
+clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 thiserror = "2.0.20"
 toml = "1.1"
 uuid = { version = "1.26.1", features = ["v4", "serde"] }
+regex = "1.13.1"
 slint = { version = "1.17.1", default-features = false, features = [
     "compat-1-2",
     "backend-winit",
@@ -30,6 +34,9 @@ slint = { version = "1.17.1", default-features = false, features = [
 ] }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 futures-util = "0.3"
+sha2 = "0.10"
+hmac = "0.12"
+chrono = { version = "0.4", features = ["serde"] }
 
 slint-build = "1.17.1"
 directories = "6.0.0"
@@ -54,3 +61,10 @@ debug = 0
 
 [profile.test.package.smagical-ui-view]
 debug = 0
+
+[profile.release]
+# 自动剥离调试符号，极大压缩发布包体积并减少打包磁盘占用
+strip = true
+opt-level = 3
+lto = "thin"
+codegen-units = 1

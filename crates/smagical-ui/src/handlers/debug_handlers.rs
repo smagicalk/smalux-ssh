@@ -3,6 +3,7 @@
 //! 提供内存压测造数、状态批量模拟、拓扑场景预设注入、快速增删改查与实时 Tracing 日志抓取回调。
 
 use std::cell::RefCell;
+use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use slint::{ComponentHandle, Model};
@@ -19,8 +20,8 @@ use crate::handlers::credential_handlers::sync_credentials_ui_async;
 use crate::handlers::snippet_handlers::sync_ui_snippets_async;
 use crate::handlers::AppContext;
 use crate::tree_model::{
-    build_group_options, build_search_tree_nodes, build_visible_tree_nodes,
-    calculate_max_tree_width, ensure_raw_group_hierarchy, RawTreeNode,
+    build_cards_from_records, build_group_options, build_raw_tree, build_search_tree_nodes,
+    build_visible_tree_nodes, calculate_max_tree_width, ensure_raw_group_hierarchy, RawTreeNode,
 };
 
 /// 注册所有开发者调试控制台相关回调。
@@ -141,7 +142,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let master_tree_bs = Arc::clone(&ctx.master_tree);
     let expanded_bs = Arc::clone(&ctx.expanded_groups);
     let search_bs = Arc::clone(&ctx.search_query);
-    let storage_bs = ctx.core_state.storage();
+    let core_state_bs = (*ctx.core_state).clone();
     db.on_batch_update_status(move |status_mode| {
         if let Some(w) = window_weak.upgrade() {
             let st = status_mode.as_str();
@@ -192,7 +193,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
 
             // 异步批量状态更新至存储层 (0ms UI 阻塞)
-            let storage = storage_bs.clone();
+            let storage = core_state_bs.storage();
             let st_owned = st.to_string();
             spawn_async(async move {
                 if let Ok(stored_hosts) = storage.hosts().list_all().await {
@@ -336,7 +337,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let expanded_qh = Arc::clone(&ctx.expanded_groups);
     let selector_qh = Arc::clone(&ctx.selector_expanded_groups);
     let search_qh = Arc::clone(&ctx.search_query);
-    let storage_qh = ctx.core_state.storage();
+    let core_state_qh = (*ctx.core_state).clone();
     let next_hid = Rc::new(RefCell::new(100));
     db.on_quick_add_host(move |name, ip, port_str, group| {
         if let Some(w) = window_weak.upgrade() {
@@ -397,7 +398,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 notes: String::new(),
                 ..Default::default()
             };
-            let storage = storage_qh.clone();
+            let storage = core_state_qh.storage();
             spawn_async(async move {
                 let _ = storage.hosts().save(&host_rec).await;
             });
@@ -484,7 +485,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 一键清空内存树形缓存、列表模型并彻底清空存储层中所有主机与分组记录。
     let window_weak = window.as_weak();
     let master_tree_clr = Arc::clone(&ctx.master_tree);
-    let storage_clr = ctx.core_state.storage();
+    let core_state_clr = (*ctx.core_state).clone();
     db.on_clear_all_data(move || {
         if let Some(w) = window_weak.upgrade() {
             master_tree_clr.write().unwrap().clear();
@@ -493,7 +494,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::GroupOptionData>::new()))));
             w.global::<HostsBridge>().set_tree_content_width(240.0_f32);
             // 异步清空存储层 (0ms UI 阻塞)
-            let storage = storage_clr.clone();
+            let storage = core_state_clr.storage();
             spawn_async(async move {
                 if let Ok(hosts) = storage.hosts().list_all().await {
                     for h in &hosts { let _ = storage.hosts().delete(&h.id).await; }
@@ -515,6 +516,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     let master_tree_rst = Arc::clone(&ctx.master_tree);
     let expanded_rst = Arc::clone(&ctx.expanded_groups);
     let selector_rst = Arc::clone(&ctx.selector_expanded_groups);
+    let core_state_rst = (*ctx.core_state).clone();
     db.on_reset_default_data(move || {
         if let Some(w) = window_weak.upgrade() {
             let (def_tree_raw, def_cards_raw) = get_preset_by_id("minimal");
@@ -552,6 +554,40 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             let next_nodes = build_visible_tree_nodes(&def_tree, &exp);
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
             w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+
+            // 异步重置存储层 (0ms UI 阻塞)
+            let storage = core_state_rst.storage();
+            let def_tree_for_storage = def_tree.clone();
+            spawn_async(async move {
+                if let Ok(hosts) = storage.hosts().list_all().await {
+                    for h in &hosts { let _ = storage.hosts().delete(&h.id).await; }
+                }
+                if let Ok(groups) = storage.groups().list_all().await {
+                    for g in &groups { let _ = storage.groups().delete(&g.id).await; }
+                }
+                for n in &def_tree_for_storage {
+                    if n.is_group {
+                        let grp = if n.parent_id.is_empty() {
+                            smagical_core::GroupRecord::root(n.id.clone(), n.name.clone())
+                        } else {
+                            smagical_core::GroupRecord::child(n.id.clone(), n.name.clone(), n.parent_id.clone(), n.level)
+                        };
+                        let _ = storage.groups().save(&grp).await;
+                    } else {
+                        let host = smagical_core::HostRecord {
+                            id: n.id.clone(),
+                            name: n.name.clone(),
+                            address: n.address.clone(),
+                            port: n.port as u16,
+                            parent_group_id: if n.parent_id.is_empty() { None } else { Some(n.parent_id.clone()) },
+                            status: smagical_core::HostStatus::Online,
+                            ping_ms: n.ping_ms,
+                            ..Default::default()
+                        };
+                        let _ = storage.hosts().save(&host).await;
+                    }
+                }
+            });
 
             tracing::info!(target: "smagical_debug::data", "已重置恢复至默认精简数据集 (Minimal)");
             sync_ui_debug_logs(&w);
@@ -724,7 +760,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 14. 批量生成凭据测试数据
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let storage_bg_cred = ctx.core_state.storage();
+    let core_state_bg_cred = (*ctx.core_state).clone();
     let notif_bg_cred = ctx.notifications.clone();
     db.on_batch_generate_credentials(move |count_str, mode_str, overwrite| {
         if let Some(w) = window_weak.upgrade() {
@@ -795,7 +831,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 batch_records.push(rec);
             }
 
-            let storage = storage_bg_cred.clone();
+            let storage = core_state_bg_cred.storage();
             let window_weak_bg = window_weak.clone();
             let notif = notif_bg_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
@@ -824,7 +860,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 15. 快捷添加单条测试凭据
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let storage_qa_cred = ctx.core_state.storage();
+    let core_state_qa_cred = (*ctx.core_state).clone();
     let notif_qa_cred = ctx.notifications.clone();
     db.on_quick_add_credential(move |ctype, name, data| {
         if let Some(w) = window_weak.upgrade() {
@@ -890,7 +926,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 },
             };
 
-            let storage = storage_qa_cred.clone();
+            let storage = core_state_qa_cred.storage();
             let window_weak_bg = window_weak.clone();
             let notif = notif_qa_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
@@ -911,7 +947,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 16. 恢复默认凭据预设
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let storage_rst_cred = ctx.core_state.storage();
+    let core_state_rst_cred = (*ctx.core_state).clone();
     let notif_rst_cred = ctx.notifications.clone();
     db.on_reset_default_credentials(move || {
         if let Some(w) = window_weak.upgrade() {
@@ -1008,7 +1044,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 },
             ];
 
-            let storage = storage_rst_cred.clone();
+            let storage = core_state_rst_cred.storage();
             let window_weak_bg = window_weak.clone();
             let notif = notif_rst_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
@@ -1035,11 +1071,11 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // 17. 清空所有凭据
     // -------------------------------------------------------------------------
     let window_weak = window.as_weak();
-    let storage_clr_cred = ctx.core_state.storage();
+    let core_state_clr_cred = (*ctx.core_state).clone();
     let notif_clr_cred = ctx.notifications.clone();
     db.on_clear_credentials(move || {
         if let Some(w) = window_weak.upgrade() {
-            let storage = storage_clr_cred.clone();
+            let storage = core_state_clr_cred.storage();
             let window_weak_bg = window_weak.clone();
             let notif = notif_clr_cred.clone();
             let bridge = w.global::<CredentialsBridge>();
@@ -1066,7 +1102,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let storage_snip = ctx.core_state.storage();
+        let core_state_snip = (*ctx.core_state).clone();
         let master_cache = Arc::clone(&ctx.master_snippet_tree);
         let search_query_ref = Rc::clone(&ctx.snippet_search_query);
         let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
@@ -1093,7 +1129,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                     new_snippets.push(snip);
                 }
 
-                let storage = storage_snip.clone();
+                let storage = core_state_snip.storage();
                 let master_cache = Arc::clone(&master_cache);
                 let search_q = search_query_ref.borrow().clone();
                 let exp = expanded_ref.borrow().clone();
@@ -1124,7 +1160,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let storage_snip = ctx.core_state.storage();
+        let core_state_snip = (*ctx.core_state).clone();
         let master_cache = Arc::clone(&ctx.master_snippet_tree);
         let search_query_ref = Rc::clone(&ctx.snippet_search_query);
         let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
@@ -1146,7 +1182,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                     updated_at: "刚刚".to_string(),
                 };
 
-                let storage = storage_snip.clone();
+                let storage = core_state_snip.storage();
                 let master_cache = Arc::clone(&master_cache);
                 let search_q = search_query_ref.borrow().clone();
                 let exp = expanded_ref.borrow().clone();
@@ -1170,14 +1206,14 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let storage_snip = ctx.core_state.storage();
+        let core_state_snip = (*ctx.core_state).clone();
         let master_cache = Arc::clone(&ctx.master_snippet_tree);
         let search_query_ref = Rc::clone(&ctx.snippet_search_query);
         let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
         let notif = ctx.notifications.clone();
         db.on_reset_default_snippets(move || {
             if window_weak.upgrade().is_some() {
-                let storage = storage_snip.clone();
+                let storage = core_state_snip.storage();
                 let master_cache = Arc::clone(&master_cache);
                 let search_q = search_query_ref.borrow().clone();
                 let exp = expanded_ref.borrow().clone();
@@ -1208,14 +1244,14 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let storage_snip = ctx.core_state.storage();
+        let core_state_snip = (*ctx.core_state).clone();
         let master_cache = Arc::clone(&ctx.master_snippet_tree);
         let search_query_ref = Rc::clone(&ctx.snippet_search_query);
         let expanded_ref = Rc::clone(&ctx.expanded_snippet_groups);
         let notif = ctx.notifications.clone();
         db.on_clear_snippets(move || {
             if window_weak.upgrade().is_some() {
-                let storage = storage_snip.clone();
+                let storage = core_state_snip.storage();
                 let master_cache = Arc::clone(&master_cache);
                 let search_q = search_query_ref.borrow().clone();
                 let exp = expanded_ref.borrow().clone();
@@ -1243,7 +1279,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
-        let storage_flag = ctx.core_state.storage();
+        let core_state_flag = (*ctx.core_state).clone();
         db.on_toggle_feature_flag(move |flag_name, enabled| {
             let f = flag_name.as_str();
             let label = match f {
@@ -1265,7 +1301,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 notif.info("实验特性已隐藏", &format!("已在主界面与设置中关闭并隐藏「{}」", label));
             }
             let f_str = f.to_string();
-            let storage = storage_flag.clone();
+            let storage = core_state_flag.storage();
             spawn_async(async move {
                 let _ = storage.config().update(Box::new(move |c| {
                     match f_str.as_str() {
@@ -1296,24 +1332,110 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
         let core_state_mock = ctx.core_state.clone();
+        let master_tree = Arc::clone(&ctx.master_tree);
+        let master_cards = Arc::clone(&ctx.master_cards);
+        let expanded_groups = Arc::clone(&ctx.expanded_groups);
+        let selector_expanded_groups = Arc::clone(&ctx.selector_expanded_groups);
+        let search_query = Arc::clone(&ctx.search_query);
+
         db.on_toggle_mock_storage(move |enabled| {
-            if enabled {
-                let storage = std::sync::Arc::new(smagical_storage::MockStorage::new_seeded());
-                core_state_mock.set_storage(storage, true);
-                tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [MockStorage] 内存种子存储");
-            } else {
-                let storage = std::sync::Arc::new(smagical_storage::MockStorage::new());
-                core_state_mock.set_storage(storage, false);
-                tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [PhysicalStorage] 物理存储模式 (基线空仓储)");
-            }
-            if let Some(w) = window_weak.upgrade() {
-                w.global::<DebugBridge>().set_use_mock_storage(enabled);
-            }
-            if enabled {
-                notif.success("数据层切换成功", "已切换至 [Mock 数据层] 内存种子存储模式");
-            } else {
-                notif.info("数据层切换成功", "已切换至 [物理持久化存储模式] (方便后续接入真实物理存储进行调试)");
-            }
+            let window_weak_inner = window_weak.clone();
+            let notif_inner = notif.clone();
+            let core_state_inner = (*core_state_mock).clone();
+            let master_tree_inner = master_tree.clone();
+            let master_cards_inner = master_cards.clone();
+            let expanded_groups_inner = expanded_groups.clone();
+            let selector_expanded_groups_inner = selector_expanded_groups.clone();
+            let search_query_inner = search_query.clone();
+
+            spawn_async(async move {
+                let (new_storage, success_msg) = if enabled {
+                    let storage: Arc<dyn smagical_core::storage::AppStorage> =
+                        Arc::new(smagical_storage::MockStorage::new_seeded());
+                    let _ = crate::storage_config::save_persisted_storage_mode("mock");
+                    tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [MockStorage] 内存种子存储 (已持久化)");
+                    (storage, "已切换至 [Mock 数据层] 内存种子存储模式")
+                } else {
+                    match smagical_storage::SeaOrmStorage::open_default().await {
+                        Ok(storage) => {
+                            let storage_arc: Arc<dyn smagical_core::storage::AppStorage> = Arc::new(storage);
+                            let _ = crate::storage_config::save_persisted_storage_mode("physical");
+                            tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [SeaOrmStorage] 物理持久化 SQLite 引擎 (已持久化)");
+                            (storage_arc, "已连接至物理持久化 SQLite 数据库")
+                        }
+                        Err(err) => {
+                            tracing::error!(target: "smagical_ui::storage", "打开物理 SQLite 数据库失败: {:?}", err);
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w) = window_weak_inner.upgrade() {
+                                    w.global::<DebugBridge>().set_use_mock_storage(true);
+                                }
+                                notif_inner.error("切换物理数据层失败", format!("打开数据库错误: {:?}", err));
+                            });
+                            return;
+                        }
+                    }
+                };
+
+                core_state_inner.set_storage(new_storage.clone(), enabled);
+
+                // 重新拉取新存储层的主机、分组与凭据并同步至 UI 视图
+                let groups_res = new_storage.groups().list_all().await;
+                let hosts_res = new_storage.hosts().list_all().await;
+                let creds_res = new_storage.credentials().list_all().await;
+
+                let all_groups = groups_res.unwrap_or_default();
+                let all_hosts = hosts_res.unwrap_or_default();
+                let all_creds = creds_res.unwrap_or_default();
+
+                let new_tree = build_raw_tree(&all_groups, &all_hosts, &all_creds);
+                let new_cards = build_cards_from_records(&all_hosts, &all_groups);
+
+                let initial_expanded: HashSet<String> = all_groups
+                    .iter()
+                    .filter(|g| g.is_expanded)
+                    .map(|g| g.id.clone())
+                    .collect();
+
+                let mut initial_selector = HashSet::from(["root".to_string()]);
+                all_groups
+                    .iter()
+                    .filter(|g| g.parent_id.is_none())
+                    .for_each(|g| {
+                        initial_selector.insert(g.id.clone());
+                    });
+
+                let _ = slint::invoke_from_event_loop(move || {
+                    *master_tree_inner.write().unwrap() = new_tree;
+                    *master_cards_inner.write().unwrap() = new_cards.clone();
+                    *expanded_groups_inner.write().unwrap() = initial_expanded;
+                    *selector_expanded_groups_inner.write().unwrap() = initial_selector;
+
+                    if let Some(w) = window_weak_inner.upgrade() {
+                        w.global::<DebugBridge>().set_use_mock_storage(enabled);
+
+                        let tree = master_tree_inner.read().unwrap();
+                        let expanded = expanded_groups_inner.read().unwrap();
+                        let selector_expanded = selector_expanded_groups_inner.read().unwrap();
+                        let q = search_query_inner.read().unwrap().clone();
+
+                        let options = build_group_options(&tree, &selector_expanded);
+                        let nodes = if q.is_empty() {
+                            build_visible_tree_nodes(&tree, &expanded)
+                        } else {
+                            build_search_tree_nodes(&tree, &q)
+                        };
+
+                        let hb = w.global::<HostsBridge>();
+                        hb.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(options))));
+                        hb.set_tree_content_width(calculate_max_tree_width(&nodes));
+                        hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(nodes))));
+                        hb.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards.clone()))));
+                        w.global::<WindowBridge>().set_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
+
+                        notif_inner.success("数据层切换成功", success_msg);
+                    }
+                });
+            });
         });
     }
 
@@ -1374,9 +1496,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     {
         let window_weak = window.as_weak();
         let notif = ctx.notifications.clone();
-        let storage_reset = ctx.core_state.storage();
+        let core_state_reset = (*ctx.core_state).clone();
         db.on_reset_all_settings(move || {
-            let storage = storage_reset.clone();
+            let storage = core_state_reset.storage();
             spawn_async(async move {
                 let _ = storage.config().reset_to_default().await;
             });
@@ -1466,7 +1588,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     }
     {
         let window_weak = window.as_weak();
-        let storage_opacity = ctx.core_state.storage();
+        let core_state_opacity = (*ctx.core_state).clone();
         db.on_change_modal_opacity(move |op| {
             let clamped = op.clamp(0.20, 1.0);
             if let Some(w) = window_weak.upgrade() {
@@ -1474,7 +1596,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 let theme_global = w.global::<AppTheme>();
                 theme_global.set_modal_opacity(clamped);
             }
-            let storage = storage_opacity.clone();
+            let storage = core_state_opacity.storage();
             spawn_async(async move {
                 let _ = storage.config().update(Box::new(move |c| {
                     c.modal_opacity = clamped;

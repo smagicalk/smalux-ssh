@@ -338,6 +338,49 @@ impl TerminalParser {
             lines.join("\r\n")
         }
     }
+
+    /// 提取指定屏幕行号的纯文本字符串 (row: 0..screen_lines)
+    pub fn extract_screen_line_text(&self, screen_row: usize) -> String {
+        let display_offset = self.term.grid().display_offset() as i32;
+        let content = self.term.renderable_content();
+        let cols = self.term.columns();
+        let rows = self.term.screen_lines();
+        if screen_row >= rows {
+            return String::new();
+        }
+
+        let mut chars = Vec::new();
+        for cell in content.display_iter {
+            let col = cell.point.column.0;
+            let screen_r = cell.point.line.0 + display_offset;
+            if screen_r == screen_row as i32 && col < cols {
+                chars.push((col, cell.c));
+            }
+        }
+        chars.sort_by_key(|(c, _)| *c);
+        let mut s = String::new();
+        let mut last_col = 0;
+        for (c, ch) in chars {
+            while last_col < c {
+                s.push(' ');
+                last_col += 1;
+            }
+            s.push(if ch != '\0' { ch } else { ' ' });
+            last_col += 1;
+        }
+        s.trim_end().to_string()
+    }
+
+    /// 根据字符网格坐标反查识别所在词、URL 或 IP 地址
+    pub fn detect_word_or_url_at(
+        &self,
+        col: usize,
+        row: usize,
+        engine: &crate::terminal::highlight::HighlightEngine,
+    ) -> Option<(String, bool)> {
+        let line_text = self.extract_screen_line_text(row);
+        engine.detect_url_or_ip_at(&line_text, col)
+    }
 }
 
 

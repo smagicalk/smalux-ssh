@@ -59,7 +59,6 @@ export {
 import { SettingsGeneralTab } from "features/settings/tabs/general_tab.slint";
 import { SettingsNetworkTab } from "features/settings/tabs/network_tab.slint";
 import { SettingsFilesTab } from "features/settings/tabs/files_tab.slint";
-import { SettingsKeybindingsTab } from "features/settings/tabs/keybindings_tab.slint";
 import { SettingsStorageTab } from "features/settings/tabs/storage_tab.slint";
 import { SettingsSecurityTab } from "features/settings/tabs/security_tab.slint";
 import { SettingsTerminalTab } from "features/settings/tabs/terminal_tab.slint";
@@ -80,10 +79,6 @@ import { AppEmptyState } from "shared/base/app-empty-state.slint";
 import { AppBadge, AppKeyCap } from "shared/base/app-badge.slint";
 
 // 基础组件
-import {
-    CommandPalette,
-    PaletteItemData,
-} from "components/command-palette.slint";
 import {
     CreateGroupModal,
     GroupOptionData,
@@ -109,10 +104,11 @@ import { CredentialsCenterView } from "views/credentials_view.slint";
 import { SnippetsCenterView, SnippetTreeNode } from "views/snippets_view.slint";
 import { TunnelsCenterView, JumpHopData } from "views/tunnels_view.slint";
 export { JumpHopData } from "views/tunnels_view.slint";
-import { SettingsCenterView, SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
-export { SettingKeybindingItem, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
+import { SettingsCenterView, SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
+export { SettingSnapshotItem, KeywordHighlightRule } from "views/settings_view.slint";
 import { SnippetRunModal, SnippetParamFieldData } from "components/snippet-run-modal.slint";
 import { ThemeEditorModal } from "components/theme-editor-modal.slint";
+import { VaultUnlockModal } from "components/vault_unlock_modal.slint";
 
 
 
@@ -220,18 +216,11 @@ export component AppWindow inherits Window {
     forward-focus: main-focus;
     main-focus := FocusScope {
         key-pressed(event) => {
-            if event.modifiers.control && (event.text == "k" || event.text == "K" || event.text == "p" || event.text == "P") {
-                WindowBridge.is-command-palette-open = !WindowBridge.is-command-palette-open;
-                accept
-            } else if (event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D"))) && WindowBridge.is-debug-enabled {
+            if (event.text == Key.F12 || (event.modifiers.control && event.modifiers.shift && (event.text == "d" || event.text == "D"))) && WindowBridge.is-debug-enabled {
                 DebugBridge.is-open = !DebugBridge.is-open;
                 accept
             } else if event.text == Key.Escape {
-
-                if WindowBridge.is-command-palette-open {
-                    WindowBridge.is-command-palette-open = false;
-                    accept
-                } else if DebugBridge.is-open {
+                if DebugBridge.is-open {
                     DebugBridge.is-open = false;
                     accept
                 } else if HostsBridge.is-create-group-open {
@@ -753,21 +742,6 @@ export component AppWindow inherits Window {
         }
     }
 
-    // 浮动 Ctrl+K 指令面板
-    CommandPalette {
-        is-open: WindowBridge.is-command-palette-open;
-        close => { WindowBridge.is-command-palette-open = false; }
-        item-selected(id) => {
-            if id == "5" {
-                WindowBridge.switch-theme("builtin.ui.darcula");
-            } else if id == "6" {
-                WindowBridge.switch-theme("builtin.ui.monokai");
-            } else {
-                HostsBridge.open-host(id);
-            }
-        }
-    }
-
     // 新建主机分组弹窗 (支持树状层级上级选择与名称输入)
     CreateGroupModal {
         is-open: HostsBridge.is-create-group-open;
@@ -1033,6 +1007,9 @@ export component AppWindow inherits Window {
         position: WindowBridge.toast-position;
         close-toast(id) => { WindowBridge.close-toast(id); }
     }
+
+    // 冷启动与主密码解锁全屏遮罩 (z: 1800 顶层)
+    VaultUnlockModal {}
 
     // -------------------------------------------------------------------------
     // 边缘拖动改变窗口大小 (Window Edge & Corner Resize Handles)

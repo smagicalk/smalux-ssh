@@ -1,0 +1,142 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import { AppButton } from "../../../shared/base/app-button.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
+
+export component RemovePasswordModal inherits Rectangle {
+    visible: SettingsBridge.is-remove-pwd-modal-open;
+    width: 100%;
+    height: 100%;
+    background: #000000a6;
+    z: 1500;
+
+    TouchArea {
+        clicked => { SettingsBridge.is-remove-pwd-modal-open = false; }
+    }
+
+    Rectangle {
+        width: 440px;
+        height: 290px;
+        background: AppTheme.modal-background;
+        border-radius: AppTheme.radius-large;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000099;
+        drop-shadow-offset-y: 8px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+
+        TouchArea { /* 阻止背景点击穿透 */ }
+
+        VerticalLayout {
+            padding: 22px;
+            spacing: 14px;
+
+            // 标题栏
+            HorizontalLayout {
+                alignment: space-between;
+                HorizontalLayout {
+                    spacing: 8px;
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../../assets/icons/shield.svg");
+                        width: 18px;
+                        height: 18px;
+                        colorize: #EF4444;
+                    }
+                    Text {
+                        text: @tr("移除主密码保护 (Remove Master Password)");
+                        font-size: 13px;
+                        font-weight: 700;
+                        color: AppTheme.foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                Rectangle {
+                    width: 24px;
+                    height: 24px;
+                    border-radius: 12px;
+                    background: close-rem-t.has-hover ? AppTheme.hover-background : transparent;
+                    close-rem-t := TouchArea {
+                        clicked => { SettingsBridge.is-remove-pwd-modal-open = false; }
+                        mouse-cursor: pointer;
+                    }
+                    Text {
+                        text: "✕";
+                        font-size: 12px;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                        horizontal-alignment: center;
+                    }
+                }
+            }
+
+            // 说明警示
+            Text {
+                text: @tr("移除主密码后，本地资产将回退为开箱即用的默认设备密钥保护，启动时将不再要求输入主密码。请输入当前主密码以确认此操作：");
+                font-size: 11px;
+                color: AppTheme.secondary-foreground;
+                wrap: word-wrap;
+            }
+
+            // 当前密码输入
+            VerticalLayout {
+                spacing: 8px;
+
+                HorizontalLayout {
+                    spacing: 10px;
+                    alignment: center;
+                    Text {
+                        text: @tr("当前主密码:");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        width: 80px;
+                        vertical-alignment: center;
+                    }
+                    AppPasswordInput {
+                        horizontal-stretch: 1;
+                        text <=> SettingsBridge.remove-pwd-input;
+                        placeholder: @tr("输入当前主密码以确认移除...");
+                    }
+                }
+
+                if SettingsBridge.remove-pwd-error-msg != "": Text {
+                    text: SettingsBridge.remove-pwd-error-msg;
+                    font-size: 10px;
+                    color: #EF4444;
+                    font-weight: 600;
+                }
+            }
+
+            // 底部操作按钮
+            HorizontalLayout {
+                alignment: end;
+                spacing: 10px;
+
+                AppButton {
+                    text: @tr("取消");
+                    variant: "secondary";
+                    clicked => {
+                        SettingsBridge.is-remove-pwd-modal-open = false;
+                    }
+                }
+
+                AppButton {
+                    text: @tr("确认移除密码");
+                    variant: "danger";
+                    clicked => {
+                        if SettingsBridge.remove-pwd-input == "" {
+                            SettingsBridge.remove-pwd-error-msg = @tr("请输入当前主密码！");
+                        } else {
+                            SettingsBridge.remove-pwd-error-msg = "";
+                            SettingsBridge.submit-remove-master-password(SettingsBridge.remove-pwd-input);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

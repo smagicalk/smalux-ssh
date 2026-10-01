@@ -19,36 +19,70 @@ use crate::generated::{
     TunnelsBridge, WindowBridge,
 };
 use crate::handlers::AppContext;
+use crate::monitor::IntoSlintMetrics;
 
-/// 历史会话归档实体
+/// AI 历史会话归档快照实体
+///
+/// 当用户清空或归档某台主机的当前对话时，历史记录保存在本实体中供随时调出查阅。
 #[derive(Clone)]
 pub(crate) struct ArchivedAiSession {
+    /// 归档会话全局唯一 UUID
     pub(crate) id: String,
+    /// 依据用户首轮提问智能提取的会话摘要标题
     pub(crate) title: String,
+    /// 会话归属的主机唯一标识符
     pub(crate) host_id: String,
+    /// 会话归属的主机显示名称
     pub(crate) host_name: String,
+    /// 包含系统思考过程、审计建议与建议指令的完整消息历史切片
     pub(crate) messages: Vec<AiChatMessage>,
+    /// 会话最后一次更新的本地时间字符串
     pub(crate) updated_time: String,
 }
 
-/// 单台主机独立的 AI 运维伴生会话实体
+/// 单台主机独立的 AI 运维伴生会话状态实体 (Per-Host AI Isolation)
+///
+/// # 核心隔离保证
+/// - 每个远程 SSH 会话或本地控制台拥有独立的对话流、输入草稿和参数模型；
+/// - 切换终端选项卡时，伴生 AI 对话流瞬时无缝热置换，互不干扰且无串线泄露风险。
 #[derive(Clone)]
 #[allow(dead_code)]
 pub(crate) struct HostAiSession {
+    /// 关联的主机唯一标识符 (Host ID)
     pub(crate) host_id: String,
+    /// 关联的主机展示名称
     pub(crate) host_name: String,
+    /// 当前处于活动态的消息列表
     pub(crate) messages: Vec<AiChatMessage>,
+    /// 用户在输入框中尚未发送的输入草稿内容 (切终端切回时自动恢复)
     pub(crate) draft_input: String,
+    /// 该主机专属选定的大语言模型名称 (如 `"deepseek-reasoner"`)
     pub(crate) selected_model: String,
+    /// 深度思考推理预算 (如 `"深度思考 (CoT)"`)
     pub(crate) thinking_degree: String,
+    /// 预设的运维安全策略模板 (如 `"只读巡检"`)
     pub(crate) audit_policy: String,
+    /// 指令下发审核模式 (如 `"自动"`)
     pub(crate) audit_mode: String,
+    /// 风险阻断级别 (如 `"安全"`)
     pub(crate) auto_audit_level: String,
+    /// 标志当前是否正在流式接收大模型 Token 生成响应
     pub(crate) is_generating: bool,
+    /// 线程安全原子取消标志，当用户点击“停止生成”或关闭抽屉时置为 true 中断 HTTP 流
     pub(crate) abort_flag: Arc<AtomicBool>,
 }
 
 impl HostAiSession {
+    /// 初始化单台主机的专属伴生会话实体
+    ///
+    /// # 处理流程
+    /// 1. 解析目标主机展示名称；
+    /// 2. 自动构建首条带有主机上下文挂接声明的初始欢迎消息；
+    /// 3. 设置默认推理参数（DeepSeek 模型、深度思考模式、安全审计策略）。
+    ///
+    /// # 参数
+    /// - `host_id`: 目标主机唯一 ID；
+    /// - `host_name`: 目标主机展示名称。
     pub(crate) fn new(host_id: &str, host_name: &str) -> Self {
         let display_name = if host_name.is_empty() { "当前主机" } else { host_name };
         let initial_msg = AiChatMessage {
@@ -84,13 +118,25 @@ impl HostAiSession {
 }
 
 /// 右侧伴生抽屉主线程运行时状态中枢
+///
+/// 专用于 UI 线程直连访问，完全消除锁竞争，管理多机隔离的 AI 会话集与惰性性能采样探针。
 pub(crate) struct RightDrawerState {
+    /// 全局应用上下文句柄弱引用
     pub(crate) ctx: Option<AppContext>,
+    /// 每台主机专属的独立 AI 会话映射表，键为 `host_id`
     pub(crate) ai_sessions: HashMap<String, HostAiSession>,
+    /// 会话历史归档仓库
     pub(crate) history_archives: Vec<ArchivedAiSession>,
+    /// 实时监控系统指标采样的定时器句柄（开抽屉即启，关抽屉即停）
     pub(crate) monitor_timer: Option<slint::Timer>,
+    /// 周期性采样的时间序列阶段步进计数器
     pub(crate) sampling_phase: usize,
+    /// 当前抽屉激活绑定的主机 ID
     pub(crate) current_host_id: String,
+    /// Linux 远程探针指标采集引擎（解析 `/proc/stat`, `/proc/meminfo`, `/proc/net/dev` 等）
+    pub(crate) linux_sampler: Arc<crate::monitor::LinuxMetricsSampler>,
+    /// 原子防重入标志：防止上一次异步 SSH 性能拉取未返回前开启重叠采样
+    pub(crate) is_sampling_busy: Arc<AtomicBool>,
 }
 
 impl Default for RightDrawerState {
@@ -102,6 +148,8 @@ impl Default for RightDrawerState {
             monitor_timer: None,
             sampling_phase: 0,
             current_host_id: String::new(),
+            linux_sampler: Arc::new(crate::monitor::LinuxMetricsSampler::default()),
+            is_sampling_busy: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -110,7 +158,17 @@ thread_local! {
     static DRAWER_STATE: RefCell<RightDrawerState> = RefCell::new(RightDrawerState::default());
 }
 
-/// 注册右侧伴生工具栏全套生命周期与 UI 回调处理器
+/// 注册右侧伴生工具栏全套生命周期治理与 UI 回调处理器
+///
+/// 挂载涵盖：
+/// 1. 抽屉打开/关闭与活动标签切换（Monitor 性能监控 / SFTP 文件传输 / Tunnel 专属转发 / AI 副驾驶）；
+/// 2. 惰性按需探针管理（开抽屉启动 2 秒定时间歇采样，关抽屉或失焦立即休眠探针释放服务器资源）；
+/// 3. 每机独立 AI 会话流转、流式代码块解析与高危命令语法审计；
+/// 4. SFTP 快速传输抽屉绑定当前活动终端主机。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用主窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContext) {
     DRAWER_STATE.with(|state_cell| {
         state_cell.borrow_mut().ctx = Some(ctx.clone());
@@ -1154,23 +1212,96 @@ fn start_monitor_sampling_inner(
     let initial_metrics = compute_sample_metrics(host_name, host_id, state.sampling_phase);
     mb.set_metrics(initial_metrics);
 
-    // 建立 1000ms 周期性探针采样定时器
+    // 建立 1500ms 周期性探针采样定时器
     let w_weak = window.as_weak();
     let h_id = host_id.to_string();
     let h_name = host_name.to_string();
+    let sampler = Arc::clone(&state.linux_sampler);
+    let is_busy = Arc::clone(&state.is_sampling_busy);
+
+    let launch_cfg_opt = state.ctx.as_ref().and_then(|c| {
+        crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id)
+    });
+
+    let metrics_service = state.ctx.as_ref().map(|c| c.core_state.metrics());
 
     let timer = slint::Timer::default();
-    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(1000), move || {
+    timer.start(slint::TimerMode::Repeated, std::time::Duration::from_millis(1500), move || {
         if let Some(w) = w_weak.upgrade() {
-            DRAWER_STATE.with(|state_cell| {
-                let mut state = state_cell.borrow_mut();
-                if state.current_host_id != h_id {
-                    return;
+            if let Some(ref cfg) = launch_cfg_opt {
+                // 远程主机模式：通过后台异步任务非阻塞采样真实 Linux 内核指标
+                if !is_busy.swap(true, Ordering::SeqCst) {
+                    let sampler_clone = Arc::clone(&sampler);
+                    let is_busy_clone = Arc::clone(&is_busy);
+                    let w_weak_task = w.as_weak();
+                    let h_id_task = h_id.clone();
+                    let h_name_task = h_name.clone();
+                    let cfg_clone = cfg.clone();
+                    let metrics_svc_clone = metrics_service.clone();
+
+                    crate::async_util::spawn_async(async move {
+                        let mut real_metrics_opt = None;
+
+                        // 1. 优先通过 CoreState 契约驱动 HostMetricsService 执行非阻塞系统指标采集
+                        if let Some(ref svc) = metrics_svc_clone {
+                            if let Ok(snapshot) = svc.sample_metrics(&h_id_task).await {
+                                let mut slint_data = compute_sample_metrics(&h_name_task, &h_id_task, 0);
+                                slint_data.cpu_usage = (snapshot.cpu_usage_percent / 100.0).clamp(0.01, 1.0);
+                                if snapshot.memory_total_bytes > 0 {
+                                    slint_data.ram_usage = (snapshot.memory_used_bytes as f32 / snapshot.memory_total_bytes as f32).clamp(0.01, 1.0);
+                                    slint_data.ram_used = smagical_ssh::monitor::format_bytes(snapshot.memory_used_bytes).into();
+                                    slint_data.ram_total = smagical_ssh::monitor::format_bytes(snapshot.memory_total_bytes).into();
+                                }
+                                if snapshot.disk_total_bytes > 0 {
+                                    slint_data.disk_usage = (snapshot.disk_used_bytes as f32 / snapshot.disk_total_bytes as f32).clamp(0.01, 1.0);
+                                }
+                                slint_data.net_rx_rate = smagical_ssh::monitor::format_rate(snapshot.rx_bytes_per_sec as f32 / (1024.0 * 1024.0)).into();
+                                slint_data.net_tx_rate = smagical_ssh::monitor::format_rate(snapshot.tx_bytes_per_sec as f32 / (1024.0 * 1024.0)).into();
+                                slint_data.last_update_time = "刚刚 (服务契约)".into();
+                                real_metrics_opt = Some(slint_data);
+                            }
+                        }
+
+                        // 2. 若未就绪，回退至远程全量采样解析
+                        if real_metrics_opt.is_none() {
+                            let host_addr = format!("{}:{}", cfg_clone.host, cfg_clone.port);
+                            if let Ok(real_metrics) = sampler_clone.sample_remote(
+                                cfg_clone,
+                                h_name_task.clone(),
+                                host_addr,
+                            ).await {
+                                real_metrics_opt = Some(real_metrics.into_slint());
+                            }
+                        }
+
+                        is_busy_clone.store(false, Ordering::SeqCst);
+
+                        if let Some(metrics_to_render) = real_metrics_opt {
+                            let _ = slint::invoke_from_event_loop(move || {
+                                if let Some(w_ui) = w_weak_task.upgrade() {
+                                    DRAWER_STATE.with(|state_cell| {
+                                        let state = state_cell.borrow();
+                                        if state.current_host_id == h_id_task {
+                                            w_ui.global::<MonitorBridge>().set_metrics(metrics_to_render);
+                                        }
+                                    });
+                                }
+                            });
+                        }
+                    });
                 }
-                state.sampling_phase = state.sampling_phase.wrapping_add(1);
-                let m = compute_sample_metrics(&h_name, &h_id, state.sampling_phase);
-                w.global::<MonitorBridge>().set_metrics(m);
-            });
+            } else {
+                // 本地终端模式：平滑时序回退
+                DRAWER_STATE.with(|state_cell| {
+                    let mut state = state_cell.borrow_mut();
+                    if state.current_host_id != h_id {
+                        return;
+                    }
+                    state.sampling_phase = state.sampling_phase.wrapping_add(1);
+                    let m = compute_sample_metrics(&h_name, &h_id, state.sampling_phase);
+                    w.global::<MonitorBridge>().set_metrics(m);
+                });
+            }
         }
     });
 

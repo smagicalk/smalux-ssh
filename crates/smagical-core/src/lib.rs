@@ -6,6 +6,7 @@
 
 pub mod domain;
 pub mod event;
+pub mod service;
 pub mod state;
 pub mod storage;
 pub mod theme;
@@ -42,6 +43,7 @@ pub use domain::{
         TransferStatus, TransferTask,
     },
 
+    config::{AiEndpointProfileRecord, AppConfigRecord, KeywordHighlightRuleRecord},
     credential::{CredentialRecord, CredentialType},
     group::GroupRecord,
     history::{HistoryRecord, SessionSnapshotConfig},
@@ -51,12 +53,21 @@ pub use domain::{
     snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable},
     terminal_context::{ActiveTerminalSessionContext, TerminalAction},
     tunnel::{JumpHopRecord, TunnelRecord, TunnelRunMode, TunnelType},
+    backup::{BackupSnapshotRecord, BackupStrategy, BackupTaskRecord, BackupType},
 };
 
 pub use state::core_state::CoreState;
 pub use storage::{
-    AppStorage, CredentialRepository, GroupRepository, HistoryRepository, HostRepository,
-    SnippetRepository, StorageError, StorageResult,
+    AppStorage, BackupSnapshotRepository, BackupTaskRepository, CredentialRepository,
+    GroupRepository, HistoryRepository, HostRepository, SnippetRepository, StorageError,
+    StorageResult,
+};
+pub use service::{
+    compute_sha256, create_backup_driver, create_backup_payload, format_bytes_size,
+    restore_backup_payload, BackupDriver, GeneratedKeyPair, GistBackupDriver, HostMetricsService,
+    KeyAlgorithm, KeygenService, LocalBackupDriver, RemoteSnapshotInfo, S3BackupDriver, SftpService,
+    SshServiceError, SshServiceResult, SshSessionService, SshStreamChannel, SystemMetricsSnapshot,
+    TransferProgress, TunnelHandle, TunnelMetricsSnapshot, TunnelService, WebdavBackupDriver,
 };
 
 

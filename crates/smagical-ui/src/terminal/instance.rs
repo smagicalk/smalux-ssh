@@ -4,11 +4,16 @@
 
 use anyhow::Result;
 
+use crate::terminal::backend::TerminalBackend;
 use crate::terminal::parser::TerminalParser;
 use crate::terminal::pty::{PtyProcess, PtySize};
+use crate::terminal::pure_ssh::PureSshProcess;
+use crate::terminal::ssh_config::{KeyTempGuard, SshLaunchConfig};
+use smagical_core::service::ssh::SshStreamChannel;
 
 /// 终端会话的目标类型与启动参数配置 (用于支持原地重新连接)。
 #[derive(Clone, Debug)]
+#[allow(clippy::large_enum_variant)]
 pub enum TerminalTarget {
     /// 本地 Shell 终端环境
     Local {
@@ -23,6 +28,8 @@ pub enum TerminalTarget {
         port: u16,
         /// 登录用户名 (可选)
         username: Option<String>,
+        /// 高级启动配置
+        config: Option<SshLaunchConfig>,
     },
 }
 
@@ -61,12 +68,14 @@ pub struct TerminalInstance {
     pub target: TerminalTarget,
     /// 当前生命周期状态 (运行中 / 已退出等待重连)
     pub state: SessionState,
-    /// 底层 PTY 进程句柄
-    pub pty: PtyProcess,
+    /// 底层终端会话后端 (本地 ConPTY 进程或纯 Rust 原生 SshStreamChannel 管道)
+    pub pty: TerminalBackend,
     /// ANSI / VT100 字符状态机解析器
     pub parser: TerminalParser,
     /// 当前生效的行列几何尺寸
     pub size: PtySize,
+    /// 临时私钥物理文件生命周期托管守卫 (Drop 时自动覆写抹零删除)
+    pub key_guard: Option<KeyTempGuard>,
 }
 
 impl TerminalInstance {
@@ -100,22 +109,14 @@ impl TerminalInstance {
             display_name,
             target: TerminalTarget::Local { shell_id: shell_id.to_string() },
             state: SessionState::Running,
-            pty,
+            pty: TerminalBackend::LocalPty(pty),
             parser,
             size,
+            key_guard: None,
         })
     }
 
-    /// 启动远程 SSH 交互式终端会话实例。
-    ///
-    /// # 参数
-    /// - `session_id`: 会话唯一标识 ID
-    /// - `display_name`: Tab 展示名称
-    /// - `host`: 目标远程主机 IPv4/IPv6 或域名
-    /// - `port`: SSH 监听端口
-    /// - `username`: 登录用户名 (可选)
-    /// - `cols`: 初始字符列数
-    /// - `rows`: 初始字符行数
+    /// 启动远程 SSH 交互式终端会话实例 (基础兼容模式)。
     pub fn spawn_ssh(
         session_id: String,
         display_name: String,
@@ -142,12 +143,145 @@ impl TerminalInstance {
                 host: host.to_string(),
                 port,
                 username: username.map(|s| s.to_string()),
+                config: None,
             },
             state: SessionState::Running,
-            pty,
+            pty: TerminalBackend::LocalPty(pty),
             parser,
             size,
+            key_guard: None,
         })
+    }
+
+    /// 启动配置完备的远程 SSH 交互式终端 (支持私钥凭据挂载、跳板机链式跳转、代理隧道与密码自动应答)
+    pub fn spawn_ssh_advanced(
+        session_id: String,
+        display_name: String,
+        config: SshLaunchConfig,
+        cols: u16,
+        rows: u16,
+    ) -> Result<Self> {
+        let size = PtySize {
+            cols: cols.max(10),
+            rows: rows.max(5),
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+
+        let host = config.host.clone();
+        let port = config.port;
+        let username = config.username.clone();
+
+        let (pty, key_guard) = PtyProcess::spawn_ssh_with_config(&session_id, &config, size)?;
+        let parser = TerminalParser::new(size.cols, size.rows);
+
+        Ok(Self {
+            session_id,
+            display_name,
+            target: TerminalTarget::Ssh {
+                host,
+                port,
+                username,
+                config: Some(config),
+            },
+            state: SessionState::Running,
+            pty: TerminalBackend::LocalPty(pty),
+            parser,
+            size,
+            key_guard,
+        })
+    }
+
+    /// 基于纯 Rust 原生 SshStreamChannel 管道启动远程 SSH 交互式终端会话。
+    ///
+    /// 零外部 `ssh.exe` 依赖，零 ConPTY 依赖，异步双向流直通 VT100。
+    #[allow(clippy::too_many_arguments)]
+    pub fn spawn_pure_ssh_channel(
+        session_id: String,
+        display_name: String,
+        host: String,
+        port: u16,
+        username: Option<String>,
+        config: Option<SshLaunchConfig>,
+        stream: Box<dyn SshStreamChannel>,
+        cols: u16,
+        rows: u16,
+    ) -> Result<Self> {
+        let size = PtySize {
+            cols: cols.max(10),
+            rows: rows.max(5),
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+
+        let pure_ssh = PureSshProcess::new(stream, size);
+        let parser = TerminalParser::new(size.cols, size.rows);
+
+        Ok(Self {
+            session_id,
+            display_name,
+            target: TerminalTarget::Ssh {
+                host,
+                port,
+                username,
+                config,
+            },
+            state: SessionState::Running,
+            pty: TerminalBackend::PureSsh(pure_ssh),
+            parser,
+            size,
+            key_guard: None,
+        })
+    }
+
+    /// 启动处于连接握手等待状态的终端会话实例 (在终端输出区打印连接提示)
+    pub fn spawn_connecting(
+        session_id: String,
+        display_name: String,
+        host: String,
+        port: u16,
+        username: Option<String>,
+        config: Option<SshLaunchConfig>,
+        cols: u16,
+        rows: u16,
+    ) -> Self {
+        let size = PtySize {
+            cols: cols.max(10),
+            rows: rows.max(5),
+            pixel_width: 0,
+            pixel_height: 0,
+        };
+
+        let mut parser = TerminalParser::new(size.cols, size.rows);
+        let addr = if port == 22 || port == 0 {
+            host.clone()
+        } else {
+            format!("{}:{}", host, port)
+        };
+        let user_prefix = match &username {
+            Some(u) if !u.is_empty() => format!("{u}@"),
+            _ => String::new(),
+        };
+        let connect_msg = format!(
+            "\x1b[33m[smalux] 正在连接主机 {user_prefix}{addr} ...\x1b[0m\r\n"
+        );
+        parser.process(connect_msg.as_bytes());
+
+        Self {
+            session_id,
+            display_name,
+            target: TerminalTarget::Ssh {
+                host,
+                port,
+                username,
+                config,
+            },
+            state: SessionState::Running,
+            pty: TerminalBackend::Connecting(size),
+            parser,
+            size,
+            key_guard: None,
+        }
     }
 
     /// 向终端子进程发送键盘按键字符或转义序列。
@@ -273,15 +407,21 @@ impl TerminalInstance {
         let _ = self.pty.kill();
         let new_pty = match &self.target {
             TerminalTarget::Local { shell_id } => {
-                PtyProcess::spawn_local_shell(shell_id, self.size)?
+                TerminalBackend::LocalPty(PtyProcess::spawn_local_shell(shell_id, self.size)?)
             }
-            TerminalTarget::Ssh { host, port, username } => {
-                PtyProcess::spawn_ssh(host, *port, username.as_deref(), self.size)?
+            TerminalTarget::Ssh { host, port, username, config } => {
+                if let Some(cfg) = config {
+                    let (pty, guard) = PtyProcess::spawn_ssh_with_config(&self.session_id, cfg, self.size)?;
+                    self.key_guard = guard;
+                    TerminalBackend::LocalPty(pty)
+                } else {
+                    TerminalBackend::LocalPty(PtyProcess::spawn_ssh(host, *port, username.as_deref(), self.size)?)
+                }
             }
         };
         self.pty = new_pty;
         self.state = SessionState::Running;
-        self.parser.process("\r\n\x1b[36;1m[正在重新建立会话连接...]\x1b[0m\r\n\r\n".as_bytes());
+        self.parser.process("\r\n\x1b[32m[smalux] 会话已重新启动\x1b[0m\r\n\r\n".as_bytes());
         self.parser.mark_dirty();
         Ok(())
     }
@@ -433,6 +573,50 @@ mod tests {
         assert!(reconnect_res.is_ok(), "原地重新连接应当成功: {:?}", reconnect_res.err());
         assert_eq!(instance.current_status(), "online");
         assert!(!instance.is_exited());
+    }
+
+    #[tokio::test]
+    async fn test_spawn_pure_ssh_channel() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let (client_stream, mut server_stream) = tokio::io::duplex(4096);
+        let instance_res = TerminalInstance::spawn_pure_ssh_channel(
+            "sess-pure-ssh".to_string(),
+            "Pure SSH Test".to_string(),
+            "127.0.0.1".to_string(),
+            22,
+            Some("root".to_string()),
+            Box::new(client_stream),
+            80,
+            24,
+        );
+        assert!(instance_res.is_ok());
+        let mut instance = instance_res.unwrap();
+        assert!(instance.is_alive());
+        assert_eq!(instance.current_status(), "online");
+
+        // 模拟远端 SSH 输出 ANSI 文本
+        server_stream.write_all(b"Hello from Pure Rust SSH!\r\n").await.unwrap();
+        server_stream.flush().await.unwrap();
+
+        // 轮询消费输出
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        let updated = instance.poll_output();
+        assert!(updated, "应检测到远端输出到达");
+
+        let snapshot = instance.snapshot_text(5);
+        assert!(snapshot.contains("Hello from Pure Rust SSH!"), "视口文本应包含模拟远端 SSH 输出: {snapshot}");
+
+        // 模拟客户端输入
+        instance.send_input("ls -la\n").unwrap();
+        let mut buf = [0u8; 64];
+        let n = server_stream.read(&mut buf).await.unwrap();
+        assert_eq!(&buf[..n], b"ls -la\n");
+
+        // 模拟关闭连接
+        drop(server_stream);
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        instance.poll_output();
     }
 }
 

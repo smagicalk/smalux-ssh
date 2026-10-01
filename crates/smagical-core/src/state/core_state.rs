@@ -12,6 +12,10 @@ use crate::event::{
     TerminalFocusChangedEvent, TerminalSessionEvent, ThemeChangedEvent,
     WindowStateChangedEvent,
 };
+use crate::service::{
+    HostMetricsService, KeygenService, MockHostMetricsService, MockKeygenService, MockSftpService,
+    MockSshSessionService, MockTunnelService, SftpService, SshSessionService, TunnelService,
+};
 use crate::storage::AppStorage;
 
 /// 无界面依赖的核心状态引擎 (Core State Engine)
@@ -28,6 +32,11 @@ pub struct CoreState {
     right_panels: Arc<RwLock<RightPanelRegistry>>,
     active_terminal: Arc<RwLock<Option<ActiveTerminalSessionContext>>>,
     navigation: Arc<RwLock<NavigationRouter>>,
+    sftp_service: Arc<RwLock<Arc<dyn SftpService>>>,
+    ssh_service: Arc<RwLock<Arc<dyn SshSessionService>>>,
+    tunnel_service: Arc<RwLock<Arc<dyn TunnelService>>>,
+    keygen_service: Arc<RwLock<Arc<dyn KeygenService>>>,
+    metrics_service: Arc<RwLock<Arc<dyn HostMetricsService>>>,
 }
 
 fn attach_default_event_loggers(events: &EventManager) {
@@ -269,6 +278,11 @@ impl CoreState {
         let right_panels = Arc::new(RwLock::new(RightPanelRegistry::default()));
         let active_terminal = Arc::new(RwLock::new(None));
         let navigation = Arc::new(RwLock::new(NavigationRouter::default()));
+        let sftp_service: Arc<RwLock<Arc<dyn SftpService>>> = Arc::new(RwLock::new(Arc::new(MockSftpService::new())));
+        let ssh_service: Arc<RwLock<Arc<dyn SshSessionService>>> = Arc::new(RwLock::new(Arc::new(MockSshSessionService)));
+        let tunnel_service: Arc<RwLock<Arc<dyn TunnelService>>> = Arc::new(RwLock::new(Arc::new(MockTunnelService::default())));
+        let keygen_service: Arc<RwLock<Arc<dyn KeygenService>>> = Arc::new(RwLock::new(Arc::new(MockKeygenService)));
+        let metrics_service: Arc<RwLock<Arc<dyn HostMetricsService>>> = Arc::new(RwLock::new(Arc::new(MockHostMetricsService)));
 
         Self {
             storage: Arc::new(RwLock::new(storage)),
@@ -278,7 +292,67 @@ impl CoreState {
             right_panels,
             active_terminal,
             navigation,
+            sftp_service,
+            ssh_service,
+            tunnel_service,
+            keygen_service,
+            metrics_service,
         }
+    }
+
+    /// 获取当前生效的 SFTP 文件传输服务句柄
+    pub fn sftp(&self) -> Arc<dyn SftpService> {
+        self.sftp_service.read().unwrap().clone()
+    }
+
+    /// 动态替换或热插拔 SFTP 服务实现
+    pub fn set_sftp_service(&self, service: Arc<dyn SftpService>) {
+        let mut guard = self.sftp_service.write().unwrap();
+        *guard = service;
+    }
+
+    /// 获取当前生效的 SSH 远程终端与会话服务句柄
+    pub fn ssh(&self) -> Arc<dyn SshSessionService> {
+        self.ssh_service.read().unwrap().clone()
+    }
+
+    /// 动态替换或热插拔 SSH 会话服务实现
+    pub fn set_ssh_service(&self, service: Arc<dyn SshSessionService>) {
+        let mut guard = self.ssh_service.write().unwrap();
+        *guard = service;
+    }
+
+    /// 获取当前生效的网络隧道与代理服务句柄
+    pub fn tunnels(&self) -> Arc<dyn TunnelService> {
+        self.tunnel_service.read().unwrap().clone()
+    }
+
+    /// 动态替换或热插拔网络隧道服务实现
+    pub fn set_tunnel_service(&self, service: Arc<dyn TunnelService>) {
+        let mut guard = self.tunnel_service.write().unwrap();
+        *guard = service;
+    }
+
+    /// 获取当前生效的密钥对生成与格式转换服务句柄
+    pub fn keygen(&self) -> Arc<dyn KeygenService> {
+        self.keygen_service.read().unwrap().clone()
+    }
+
+    /// 动态替换或热插拔密钥生成服务实现
+    pub fn set_keygen_service(&self, service: Arc<dyn KeygenService>) {
+        let mut guard = self.keygen_service.write().unwrap();
+        *guard = service;
+    }
+
+    /// 获取当前生效的远程系统性能指标采集服务句柄
+    pub fn metrics(&self) -> Arc<dyn HostMetricsService> {
+        self.metrics_service.read().unwrap().clone()
+    }
+
+    /// 动态替换或热插拔性能监控服务实现
+    pub fn set_metrics_service(&self, service: Arc<dyn HostMetricsService>) {
+        let mut guard = self.metrics_service.write().unwrap();
+        *guard = service;
     }
 
     /// 获取底层存储门面实例句柄
@@ -427,6 +501,7 @@ impl CoreState {
 mod tests {
     use super::*;
 
+    /// 用于单元测试的轻量级虚拟仓储桩实现
     struct DummyStorage;
     #[async_trait::async_trait]
     impl AppStorage for DummyStorage {
@@ -437,6 +512,8 @@ mod tests {
         fn snippets(&self) -> &dyn crate::storage::SnippetRepository { unimplemented!() }
         fn tunnels(&self) -> &dyn crate::storage::TunnelRepository { unimplemented!() }
         fn config(&self) -> &dyn crate::storage::ConfigRepository { unimplemented!() }
+        fn backup_tasks(&self) -> &dyn crate::storage::BackupTaskRepository { unimplemented!() }
+        fn backup_snapshots(&self) -> &dyn crate::storage::BackupSnapshotRepository { unimplemented!() }
         async fn reload(&self) -> crate::storage::StorageResult<()> { Ok(()) }
         async fn flush(&self) -> crate::storage::StorageResult<()> { Ok(()) }
     }
@@ -534,5 +611,47 @@ mod tests {
         assert!(executed_called.load(Ordering::SeqCst));
         assert!(grp_saved_called.load(Ordering::SeqCst));
         assert!(grp_deleted_called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_core_state_service_traits_injection_and_mock() {
+        use crate::domain::HostRecord;
+        use crate::service::KeyAlgorithm;
+
+        let state = create_test_state();
+
+        // 1. 测试 SFTP 服务
+        let sftp_items = state.sftp().list_dir("dummy_sess", "/").await.expect("SFTP list_dir 应成功");
+        assert!(!sftp_items.is_empty(), "Mock SFTP 根目录应该有预置种子文件");
+
+        // 2. 测试 SSH 会话服务
+        let host = HostRecord {
+            id: "host-101".to_string(),
+            name: "Test Host".to_string(),
+            address: "192.168.1.10".to_string(),
+            port: 22,
+            status: crate::domain::HostStatus::Online,
+            ..Default::default()
+        };
+        let sess_id = state.ssh().connect(&host, None).await.expect("SSH connect 应成功");
+        assert!(sess_id.contains("host-101"));
+
+        let cmd_out = state.ssh().execute_command(&sess_id, "uname -a").await.expect("SSH exec 应成功");
+        assert_eq!(cmd_out.exit_code, 0);
+
+        // 3. 测试密钥生成服务
+        let kp = state.keygen().generate_keypair(KeyAlgorithm::Ed25519, None, None).expect("生成密钥应成功");
+        assert_eq!(kp.algorithm, KeyAlgorithm::Ed25519);
+        assert!(kp.public_key_openssh.starts_with("ssh-ed25519"));
+
+        // 4. 测试远程监控服务
+        let metrics = state.metrics().sample_metrics(&sess_id).await.expect("采样监控指标应成功");
+        assert!(metrics.cpu_usage_percent > 0.0);
+
+        // 5. 测试服务动态热插拔替换
+        let custom_sftp = Arc::new(MockSftpService::new());
+        state.set_sftp_service(custom_sftp);
+        let reloaded_items = state.sftp().list_dir(&sess_id, "/").await.expect("热插拔后仍可执行");
+        assert!(!reloaded_items.is_empty());
     }
 }

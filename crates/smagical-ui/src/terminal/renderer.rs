@@ -28,11 +28,46 @@ pub struct TerminalPalette {
     pub ansi_colors: [[u8; 4]; 16],
 }
 
+impl TerminalPalette {
+    /// 默认暗黑调色板 (Darcula 主题)
+    pub fn dark() -> Self {
+        Self::default()
+    }
+
+    /// 浅色高对比度调色板 (GitHub Light 主题)
+    pub fn light() -> Self {
+        Self {
+            default_bg: [0xf6, 0xf8, 0xfa, 0xff],     // 浅灰白底 #F6F8FA
+            default_fg: [0x24, 0x29, 0x2f, 0xff],     // 深色清晰黑字 #24292F
+            cursor_color: [0x09, 0x69, 0xda, 0xff],   // 亮蓝光标 #0969DA
+            selection_bg: [0xdd, 0xf4, 0xff, 0xff],   // 浅蓝高亮选区 #DDF4FF
+            ansi_colors: [
+                [0x24, 0x29, 0x2f, 0xff], // 0: Black
+                [0xcf, 0x22, 0x2e, 0xff], // 1: Red
+                [0x1a, 0x7f, 0x37, 0xff], // 2: Green
+                [0x9a, 0x67, 0x00, 0xff], // 3: Yellow
+                [0x09, 0x69, 0xda, 0xff], // 4: Blue
+                [0x82, 0x50, 0xdf, 0xff], // 5: Magenta
+                [0x1b, 0x7c, 0x83, 0xff], // 6: Cyan
+                [0x6e, 0x77, 0x81, 0xff], // 7: White
+                [0x57, 0x60, 0x6a, 0xff], // 8: Bright Black
+                [0xa4, 0x0e, 0x26, 0xff], // 9: Bright Red
+                [0x11, 0x63, 0x29, 0xff], // 10: Bright Green
+                [0x7d, 0x4e, 0x00, 0xff], // 11: Bright Yellow
+                [0x05, 0x50, 0xae, 0xff], // 12: Bright Blue
+                [0x66, 0x39, 0xba, 0xff], // 13: Bright Magenta
+                [0x13, 0x5e, 0x65, 0xff], // 14: Bright Cyan
+                [0x24, 0x29, 0x2f, 0xff], // 15: Bright White
+            ],
+        }
+    }
+}
+
 impl Default for TerminalPalette {
     fn default() -> Self {
         Self {
             default_bg: [0x1e, 0x1f, 0x22, 0xff],     // Darcula 暗黑背景 #1E1F22
-            default_fg: [0xbc, 0xbe, 0xc4, 0xff],     // 柔和白字 #BCBEC4
+            default_fg: [0xf0, 0xf2, 0xf5, 0xff],     // 清晰高亮白字 #F0F2F5 (对齐现代 IDE 终端与界面高对比度)
             cursor_color: [0x35, 0x74, 0xf0, 0xff],   // 亮蓝光标 #3574F0
             selection_bg: [0x21, 0x42, 0x83, 0xff],   // 选区蓝底 #214283
             ansi_colors: [
@@ -43,7 +78,7 @@ impl Default for TerminalPalette {
                 [0x35, 0x74, 0xf0, 0xff], // 4: Blue
                 [0xc7, 0x7d, 0xb4, 0xff], // 5: Magenta
                 [0x00, 0xaa, 0xbe, 0xff], // 6: Cyan
-                [0xbc, 0xbe, 0xc4, 0xff], // 7: White
+                [0xe4, 0xe6, 0xeb, 0xff], // 7: White
                 [0x70, 0x72, 0x78, 0xff], // 8: Bright Black
                 [0xff, 0x6b, 0x7a, 0xff], // 9: Bright Red
                 [0x6f, 0xc9, 0x8f, 0xff], // 10: Bright Green
@@ -64,6 +99,8 @@ const EMBEDDED_JETBRAINS_MONO: &[u8] = smagical_ui_view::JETBRAINS_MONO_BYTES;
 pub struct TerminalRenderer {
     /// 字体解析对象
     font: Font,
+    /// 系统 CJK 回退字体 (用于中文/日文/韩文等多语言字形光栅化)
+    fallback_font: Option<Font>,
     /// 字体点号大小 (默认 14.0 px)
     font_size: f32,
     /// 字符单元格像素宽度 (例如 8 px)
@@ -86,6 +123,8 @@ pub struct TerminalRenderer {
     pub cursor_style: String,
     /// 光标呼吸闪烁开关
     pub cursor_blink: bool,
+    /// 终端关键词、URL 与 IPv4 语法高亮规则引擎
+    pub highlight_engine: crate::terminal::highlight::HighlightEngine,
 }
 
 impl TerminalRenderer {
@@ -99,6 +138,10 @@ impl TerminalRenderer {
 
         let font = Font::from_bytes(font_data, FontSettings::default())
             .map_err(|e| format!("解析等宽字体文件失败: {:?}", e))?;
+
+        let fallback_font = get_system_cjk_font().and_then(|data| {
+            Font::from_bytes(data, FontSettings::default()).ok()
+        });
 
         // 基于基准字符 'M' 与空行度量计算标准等宽网格单元格尺寸
         let m_metrics = font.metrics('M', font_size);
@@ -128,6 +171,7 @@ impl TerminalRenderer {
 
         Ok(Self {
             font,
+            fallback_font,
             font_size,
             cell_width,
             cell_height,
@@ -139,7 +183,16 @@ impl TerminalRenderer {
             palette: TerminalPalette::default(),
             cursor_style: "block".to_string(),
             cursor_blink: true,
+            highlight_engine: crate::terminal::highlight::HighlightEngine::default(),
         })
+    }
+
+    /// 动态热更新终端语法与运维关键词高亮规则
+    pub fn update_highlight_rules<I>(&mut self, rules_iter: I)
+    where
+        I: IntoIterator<Item = (String, String, [u8; 4], bool)>,
+    {
+        self.highlight_engine.update_from_rules(rules_iter);
     }
 
     /// 设置光标形态 ("block" | "beam" | "underline")
@@ -160,7 +213,8 @@ impl TerminalRenderer {
     }
 
     /// 动态热更新调色板配色方案 (ANSI 16 色、前景色、背景色与光标色)。
-    pub fn update_palette(&mut self, palette: TerminalPalette) {
+    pub fn update_palette(&mut self, mut palette: TerminalPalette) {
+        palette.default_bg[3] = self.palette.default_bg[3];
         self.palette = palette;
     }
 
@@ -202,6 +256,11 @@ impl TerminalRenderer {
         }
 
         self.font = font;
+        if self.fallback_font.is_none() {
+            self.fallback_font = get_system_cjk_font().and_then(|data| {
+                Font::from_bytes(data, FontSettings::default()).ok()
+            });
+        }
         self.font_size = font_size;
         self.cell_width = cell_width;
         self.cell_height = cell_height;
@@ -315,8 +374,39 @@ impl TerminalRenderer {
         let padding_y = self.padding_y;
 
 
+        let display_cells: Vec<_> = content.display_iter.collect();
+
+        // 提取可见行文本以执行运维关键词与 URL / IP 语法高亮匹配
+        let mut line_chars: std::collections::BTreeMap<u32, Vec<(usize, char)>> = std::collections::BTreeMap::new();
+        for cell in &display_cells {
+            let col = cell.point.column.0 as u32;
+            let screen_row_i32 = cell.point.line.0 + display_offset;
+            if screen_row_i32 >= 0 && (screen_row_i32 as u32) < rows && col < cols {
+                line_chars.entry(screen_row_i32 as u32).or_default().push((col as usize, cell.c));
+            }
+        }
+
+        let mut row_highlights: std::collections::HashMap<u32, Vec<crate::terminal::highlight::SpanHighlight>> = std::collections::HashMap::new();
+        for (row, mut chars) in line_chars {
+            chars.sort_by_key(|(c, _)| *c);
+            let mut line_str = String::with_capacity(cols as usize);
+            let mut last_col = 0;
+            for (c, ch) in chars {
+                while last_col < c {
+                    line_str.push(' ');
+                    last_col += 1;
+                }
+                line_str.push(if ch != '\0' { ch } else { ' ' });
+                last_col += 1;
+            }
+            let spans = self.highlight_engine.match_line(&line_str);
+            if !spans.is_empty() {
+                row_highlights.insert(row, spans);
+            }
+        }
+
         // 2. 逐字符单元格遍历光栅化 (精准支持回滚历史负行号转换到视口真实行号)
-        for renderable_cell in content.display_iter {
+        for renderable_cell in display_cells {
             let col = renderable_cell.point.column.0 as u32;
             let screen_row_i32 = renderable_cell.point.line.0 + display_offset;
             if screen_row_i32 < 0 || screen_row_i32 as u32 >= rows || col >= cols {
@@ -356,6 +446,14 @@ impl TerminalRenderer {
             };
 
             let flags = renderable_cell.flags;
+            // 宽字符占位符单元格已由前一单元格的 WIDE_CHAR 整体光栅化，跳过以避免右半部字形被覆写
+            if flags.contains(alacritty_terminal::term::cell::Flags::WIDE_CHAR_SPACER) {
+                continue;
+            }
+
+            let is_wide = flags.contains(alacritty_terminal::term::cell::Flags::WIDE_CHAR);
+            let slot_width = if is_wide { cell_width * 2 } else { cell_width };
+
             let mut fg_rgba = if is_selected {
                 [0xff, 0xff, 0xff, 0xff]
             } else {
@@ -366,6 +464,22 @@ impl TerminalRenderer {
             } else {
                 self.resolve_color(renderable_cell.bg, &def_bg)
             };
+
+            // 检查当前单元格是否命中关键词、URL 或 IP 语法高亮规则 (选区优先)
+            let mut is_rule_underline = false;
+            if !is_selected {
+                if let Some(spans) = row_highlights.get(&row) {
+                    for s in spans {
+                        if (col as usize) >= s.start_col && (col as usize) < s.end_col {
+                            fg_rgba = s.color;
+                            if s.underline {
+                                is_rule_underline = true;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
 
 
             // 处理反色 (Inverse video / 选中或反显)
@@ -380,9 +494,9 @@ impl TerminalRenderer {
                 fg_rgba[2] /= 2;
             }
 
-            // 2.1 单元格背景色填充 (若背景不是默认底色)
+            // 2.1 单元格背景色填充 (若背景不是默认底色，支持宽字符双倍单元格跨度)
             if bg_rgba != def_bg {
-                let max_x = (cell_x + cell_width).min(img_width);
+                let max_x = (cell_x + slot_width).min(img_width);
                 let max_y = (cell_y + cell_height).min(img_height);
                 for py in cell_y..max_y {
                     let row_offset = (py * img_width * 4) as usize;
@@ -396,7 +510,7 @@ impl TerminalRenderer {
                 }
             }
 
-            // 2.2 字符字形点阵光栅化 (非隐藏字符)
+            // 2.2 字符字形点阵光栅化 (非隐藏字符，支持 CJK / 宽字符水平居中对齐)
             let ch = renderable_cell.c;
             if ch != ' '
                 && ch != '\0'
@@ -404,7 +518,15 @@ impl TerminalRenderer {
             {
                 let (metrics, bitmap) = self.get_glyph(ch);
                 if metrics.width > 0 && metrics.height > 0 {
-                    let gx = cell_x as i32 + metrics.xmin.max(0);
+                    let gx = if is_wide {
+                        if (metrics.width as u32) < slot_width {
+                            cell_x as i32 + ((slot_width - metrics.width as u32) / 2) as i32
+                        } else {
+                            cell_x as i32 + metrics.xmin.max(0)
+                        }
+                    } else {
+                        cell_x as i32 + metrics.xmin.max(0)
+                    };
                     let gy = cell_y as i32 + baseline - metrics.ymin - metrics.height as i32;
 
                     for by in 0..metrics.height {
@@ -427,15 +549,15 @@ impl TerminalRenderer {
                                 continue;
                             }
 
-                            // 伽马/笔画加黑增强 (Stem Darkening)，消除暗色背景下的发虚感，呈现饱满锐利的字形
-                            let alpha = if raw_alpha >= 230 {
+                            // 伽马/笔画增强 (Stem Darkening & Gamma Correction)，消除暗色背景下细笔画发暗发虚感，呈现饱满锐利的高亮字形
+                            let alpha = if raw_alpha >= 180 {
                                 255
                             } else {
-                                ((raw_alpha * (512 - raw_alpha)) / 256).min(255)
+                                (raw_alpha * 255 / 180).min(255)
                             };
 
                             let px_offset = row_offset + (px as u32 * 4) as usize;
-                            if alpha >= 250 {
+                            if alpha >= 240 {
                                 raw_pixels[px_offset] = fg_rgba[0];
                                 raw_pixels[px_offset + 1] = fg_rgba[1];
                                 raw_pixels[px_offset + 2] = fg_rgba[2];
@@ -451,12 +573,12 @@ impl TerminalRenderer {
                 }
             }
 
-            // 2.3 下划线 (Underline) 绘制
-            if flags.contains(alacritty_terminal::term::cell::Flags::UNDERLINE) {
+            // 2.3 下划线 (Underline) 绘制 (支持 ANSI 原生下划线以及 URL / 高亮规则下划线)
+            if flags.contains(alacritty_terminal::term::cell::Flags::UNDERLINE) || is_rule_underline {
                 let line_y = (cell_y as i32 + baseline + 2).min(img_height as i32 - 1);
                 if line_y >= 0 {
                     let row_offset = (line_y as u32 * img_width * 4) as usize;
-                    let max_x = (cell_x + cell_width).min(img_width);
+                    let max_x = (cell_x + slot_width).min(img_width);
                     for px in cell_x..max_x {
                         let px_offset = row_offset + (px * 4) as usize;
                         raw_pixels[px_offset] = fg_rgba[0];
@@ -470,7 +592,7 @@ impl TerminalRenderer {
             if flags.contains(alacritty_terminal::term::cell::Flags::STRIKEOUT) {
                 let line_y = (cell_y + cell_height / 2).min(img_height - 1);
                 let row_offset = (line_y * img_width * 4) as usize;
-                let max_x = (cell_x + cell_width).min(img_width);
+                let max_x = (cell_x + slot_width).min(img_width);
                 for px in cell_x..max_x {
                     let px_offset = row_offset + (px * 4) as usize;
                     raw_pixels[px_offset] = fg_rgba[0];
@@ -481,7 +603,7 @@ impl TerminalRenderer {
 
 
 
-            // 2.3 光标绘制 (支持方块 block、竖线 beam、下划线 underline，支持呼吸闪烁)
+            // 2.5 光标绘制 (支持方块 block、竖线 beam、下划线 underline，支持宽字符双宽与呼吸闪烁)
             let is_blink_visible = !self.cursor_blink
                 || ((std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() / 530) % 2 == 0);
 
@@ -490,10 +612,11 @@ impl TerminalRenderer {
                 && cursor_point.column.0 == col as usize
                 && cursor_point.line.0 == renderable_cell.point.line.0
             {
+                let cur_w = if is_wide { slot_width } else { cell_width };
                 let (c_min_x, c_max_x, c_min_y, c_max_y) = match self.cursor_style.as_str() {
                     "beam" => (cell_x, (cell_x + 2).min(img_width), cell_y, (cell_y + cell_height).min(img_height)),
-                    "underline" => (cell_x, (cell_x + cell_width).min(img_width), (cell_y + cell_height.saturating_sub(2)).min(img_height), (cell_y + cell_height).min(img_height)),
-                    _ => (cell_x, (cell_x + cell_width).min(img_width), cell_y, (cell_y + cell_height).min(img_height)), // "block"
+                    "underline" => (cell_x, (cell_x + cur_w).min(img_width), (cell_y + cell_height.saturating_sub(2)).min(img_height), (cell_y + cell_height).min(img_height)),
+                    _ => (cell_x, (cell_x + cur_w).min(img_width), cell_y, (cell_y + cell_height).min(img_height)), // "block"
                 };
 
                 for py in c_min_y..c_max_y {
@@ -521,7 +644,17 @@ impl TerminalRenderer {
             self.ascii_cache[code].as_ref().unwrap()
         } else {
             if !self.glyph_cache.contains_key(&ch) {
-                let (metrics, bitmap) = self.font.rasterize(ch, self.font_size);
+                let (metrics, bitmap) = if self.font.lookup_glyph_index(ch) != 0 {
+                    self.font.rasterize(ch, self.font_size)
+                } else if let Some(fb) = &self.fallback_font {
+                    if fb.lookup_glyph_index(ch) != 0 {
+                        fb.rasterize(ch, self.font_size)
+                    } else {
+                        self.font.rasterize(ch, self.font_size)
+                    }
+                } else {
+                    self.font.rasterize(ch, self.font_size)
+                };
                 self.glyph_cache.insert(ch, (metrics, bitmap));
             }
             &self.glyph_cache[&ch]
@@ -602,6 +735,43 @@ fn get_terminal_monospace_font() -> Option<Vec<u8>> {
         "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
         "/usr/share/fonts/truetype/ubuntu/UbuntuMono-R.ttf",
         "/usr/share/fonts/TTF/DejaVuSansMono.ttf",
+    ];
+
+    #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]
+    let candidate_paths: [&str; 0] = [];
+
+    for path in &candidate_paths {
+        if let Ok(data) = std::fs::read(path) {
+            return Some(data);
+        }
+    }
+    None
+}
+
+/// 在当前操作系统中检索可用的 CJK 中文字体二进制数据 (用于等宽终端中文/全角字形回退)
+pub fn get_system_cjk_font() -> Option<Vec<u8>> {
+    #[cfg(windows)]
+    let candidate_paths = [
+        "C:\\Windows\\Fonts\\msyh.ttc",
+        "C:\\Windows\\Fonts\\simhei.ttf",
+        "C:\\Windows\\Fonts\\Deng.ttf",
+        "C:\\Windows\\Fonts\\simsun.ttc",
+    ];
+
+    #[cfg(target_os = "macos")]
+    let candidate_paths = [
+        "/System/Library/Fonts/PingFang.ttc",
+        "/System/Library/Fonts/STHeiti Light.ttc",
+        "/Library/Fonts/Songti.ttc",
+    ];
+
+    #[cfg(target_os = "linux")]
+    let candidate_paths = [
+        "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+        "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc",
+        "/usr/share/fonts/google-noto-cjk/NotoSansCJK-Regular.ttc",
     ];
 
     #[cfg(not(any(windows, target_os = "macos", target_os = "linux")))]

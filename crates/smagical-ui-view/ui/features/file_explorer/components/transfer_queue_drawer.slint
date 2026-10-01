@@ -11,13 +11,15 @@ export component TransferQueueDrawer inherits Rectangle {
     in-out property <bool> is-expanded: false;
     in property <int> local-files-count: 0;
     in property <int> remote-files-count: 0;
+    in-out property <length> queue-height: 180px;
+    in property <length> max-queue-height: 500px;
 
     callback toggle-expand();
     callback clear-completed();
     callback toggle-task-expand(string /* task_id */);
     callback request-transfer-menu(length /* menu_x */, length /* local_my */, string /* task_id */, string /* status */, string /* direction */);
 
-    height: root.is-expanded ? 180px : 28px;
+    height: root.is-expanded ? root.queue-height : 28px;
     background: AppTheme.panel-background;
     clip: true;
 
@@ -27,6 +29,29 @@ export component TransferQueueDrawer inherits Rectangle {
         height: 1px;
         width: 100%;
         background: AppTheme.border;
+    }
+
+    // 顶部拖拽调节手柄 (仅展开状态可向上/向下调节高度)
+    if root.is-expanded: Rectangle {
+        y: 0px;
+        height: 5px;
+        width: 100%;
+        z: 30;
+        background: split-touch.has-hover || split-touch.pressed ? AppTheme.accent : transparent;
+        animate background { duration: 100ms; }
+
+        split-touch := TouchArea {
+            mouse-cursor: row-resize;
+            moved => {
+                if self.pressed {
+                    let delta = self.mouse-y - self.pressed-y;
+                    root.queue-height = Math.max(90px, Math.min(root.max-queue-height, root.queue-height - delta));
+                }
+            }
+            double-clicked => {
+                root.queue-height = 180px;
+            }
+        }
     }
 
     // =========================================================================

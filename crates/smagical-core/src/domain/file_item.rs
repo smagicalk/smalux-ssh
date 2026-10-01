@@ -245,8 +245,11 @@ pub struct RemoteFileTabSession {
     pub host_address: String,
     /// 远程当前工作目录 (如 "/var/www/html" 或 "/root")
     pub current_path: String,
-    /// 连接状态 ("online" | "warning" | "offline")
+    /// 连接状态 ("online" | "warning" | "offline" | "connecting" | "error")
     pub status: String,
+    /// 错误信息 (连接或目录读取失败时记录)
+    #[serde(default)]
+    pub error_msg: Option<String>,
     /// 路径历史记录栈 (用于 <- 后退 和 -> 前进)
     #[serde(default)]
     pub history: Vec<String>,
@@ -272,6 +275,7 @@ impl RemoteFileTabSession {
             host_address: host_address.into(),
             current_path: p.clone(),
             status: "online".into(),
+            error_msg: None,
             history: vec![p],
             history_index: 0,
         }

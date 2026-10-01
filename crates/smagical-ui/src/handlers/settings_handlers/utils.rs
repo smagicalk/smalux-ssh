@@ -1,9 +1,20 @@
 //! 设置中心辅助函数集 (对话框、字体扫描、限速与 SSH 配置解析)
 
 use std::path::{Path, PathBuf};
-use smagical_core::domain::host::{HostRecord, HostStatus};
 
-/// 解析限速字符串为 (数值, 单位)
+/// 解析网络传输限速字符串为数值与单位的二元组 `(数值文本, 单位文本)`
+///
+/// # 支持格式
+/// - `"unlimited"` / `"off"` / `"0"` / 空串 -> `("0", "off")`；
+/// - 带 `"mb"` / `"m"` / `"mb/s"` 结尾 -> `("5", "MB/s")`；
+/// - 带 `"kb"` / `"k"` / `"kb/s"` 结尾 -> `("500", "KB/s")`；
+/// - 纯数字 -> 默认为 `("5", "MB/s")`。
+///
+/// # 参数
+/// - `limit_str`: 原始输入限速配置字符串。
+///
+/// # 返回值
+/// 返回 `(速度数值, 计量单位)`。
 pub(crate) fn parse_speed_limit(limit_str: &str) -> (String, String) {
     let s = limit_str.trim().to_lowercase();
     if s == "unlimited" || s == "off" || s == "0" || s.is_empty() {
@@ -20,7 +31,13 @@ pub(crate) fn parse_speed_limit(limit_str: &str) -> (String, String) {
     }
 }
 
-/// 将 HEX 颜色格式解析为 Slint Color
+/// 将标准 6 位十六进制颜色格式字符串解析为 Slint `Color`
+///
+/// # 参数
+/// - `hex`: 形如 `"#EF4444"` 或 `"EF4444"` 的颜色字符串。
+///
+/// # 返回值
+/// 解析成功返回对应 ARGB 颜色（Alpha=255），失败时安全回退至红色 `#EF4444`。
 pub(crate) fn hex_to_slint_color(hex: &str) -> slint::Color {
     let hex = hex.trim_start_matches('#');
     if hex.len() == 6 {
@@ -35,7 +52,15 @@ pub(crate) fn hex_to_slint_color(hex: &str) -> slint::Color {
     slint::Color::from_argb_u8(255, 239, 68, 68)
 }
 
-/// 发现系统已安装字体与内置高品质设计字体族
+/// 探测操作系统已安装字体，并合并预置高品质跨平台编程字体
+///
+/// # 探测与匹配策略
+/// 1. 预置业界主流等宽与无衬线字体（JetBrains Mono, Fira Code, Cascadia Code, Inter, 微软雅黑等）；
+/// 2. Windows 下自动读取 `%WINDIR%\Fonts` 目录，匹配安装的字体文件名（如 `msyh.ttc`, `cascadia.ttf` 等）；
+/// 3. 执行集合去重，优先保留常用字体在前。
+///
+/// # 返回值
+/// 包含所有检测到的可用字体族名称集合 `Vec<String>`。
 pub fn detect_system_and_builtin_fonts() -> Vec<String> {
     let mut fonts = vec![
         "系统默认 (System Default)".to_string(),
@@ -96,100 +121,15 @@ pub fn detect_system_and_builtin_fonts() -> Vec<String> {
     fonts
 }
 
-/// 解析 OpenSSH 配置文件内容为标准 HostRecord 资产列表
-pub(crate) fn parse_ssh_config(content: &str) -> Vec<HostRecord> {
-    let mut hosts = Vec::new();
-    let mut current_host: Option<HostRecord> = None;
+pub(crate) use smagical_ssh::importer::parse_ssh_config;
+pub(crate) use smagical_ssh::importer::get_default_ssh_config_path as get_ssh_config_path;
 
-    for line in content.lines() {
-        let trimmed = line.trim();
-        if trimmed.is_empty() || trimmed.starts_with('#') {
-            continue;
-        }
-
-        let mut parts = trimmed.split_whitespace();
-        let key = parts.next().unwrap_or("").to_lowercase();
-        let val = parts.next().unwrap_or("");
-
-        if key == "host" {
-            // 遇到新的 Host 条目，归档前一个
-            if let Some(h) = current_host.take() {
-                if !h.name.contains('*') && !h.name.is_empty() {
-                    hosts.push(h);
-                }
-            }
-
-            // 过滤通配符
-            if !val.contains('*') && !val.is_empty() {
-                let host_id = format!("ssh-{}", val.replace(|c: char| !c.is_alphanumeric(), "-"));
-                current_host = Some(HostRecord {
-                    id: host_id,
-                    name: val.to_string(),
-                    address: val.to_string(), // 初始回退为 Host 别名
-                    port: 22,
-                    parent_group_id: None,
-                    credential_id: None,
-                    status: HostStatus::Offline,
-                    ping_ms: 0,
-                    sort_order: 100,
-                    notes: "Imported from ~/.ssh/config".to_string(),
-                    ..Default::default()
-                });
-            }
-        } else if let Some(ref mut h) = current_host {
-            match key.as_str() {
-                "hostname" => {
-                    if !val.is_empty() {
-                        h.address = val.to_string();
-                    }
-                }
-                "port" => {
-                    if let Ok(p) = val.parse::<u16>() {
-                        h.port = p;
-                    }
-                }
-                "user" => {
-                    if !val.is_empty() {
-                        h.notes = format!("User: {}; {}", val, h.notes);
-                    }
-                }
-                "identityfile" => {
-                    if !val.is_empty() {
-                        h.notes = format!("Key: {}; {}", val, h.notes);
-                    }
-                }
-                _ => {}
-            }
-        }
-    }
-
-    if let Some(h) = current_host {
-        if !h.name.contains('*') && !h.name.is_empty() {
-            hosts.push(h);
-        }
-    }
-
-    hosts
-}
-
-/// 获取当前系统的 ~/.ssh/config 路径
-pub(crate) fn get_ssh_config_path() -> PathBuf {
-    #[cfg(windows)]
-    {
-        if let Ok(profile) = std::env::var("USERPROFILE") {
-            return Path::new(&profile).join(".ssh").join("config");
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        if let Ok(home) = std::env::var("HOME") {
-            return Path::new(&home).join(".ssh").join("config");
-        }
-    }
-    PathBuf::from(".ssh/config")
-}
-
-/// 获取默认备份导出路径
+/// 获取系统默认备份导出存放目录
+///
+/// # 查找优先级
+/// 1. 当前用户 `Downloads` 下载目录；
+/// 2. 用户家目录下的隐式数据目录 `~/.smalux-ssh/backups`；
+/// 3. 当前运行工作目录相对路径 `backups/`。
 #[allow(dead_code)]
 pub(crate) fn get_default_backup_dir() -> PathBuf {
     #[cfg(windows)]
@@ -215,7 +155,19 @@ pub(crate) fn get_default_backup_dir() -> PathBuf {
     PathBuf::from("backups")
 }
 
-/// 打开 Windows 原生另存为文件对话框
+/// 调起 Windows 原生“另存为”文件对话框 (SaveFileDialog)
+///
+/// # 跨平台与安全处理
+/// - Windows 下添加 `CREATE_NO_WINDOW (0x08000000)` 隐藏控制台弹窗；
+/// - 指定 `-STA` 单线程单元模型，保障 COM UI 组件兼容性。
+///
+/// # 参数
+/// - `filter`: 文件类型过滤规则串（如 `"ZIP (*.zip)|*.zip"`）；
+/// - `default_filename`: 预填默认文件名（如 `smalux_backup_2026-09-25.zip`）。
+///
+/// # 返回值
+/// - `Some(PathBuf)`: 用户确认选择的完整保存文件绝对路径；
+/// - `None`: 用户取消对话框。
 pub(crate) fn pick_save_file(filter: &str, default_filename: &str) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {
@@ -250,7 +202,14 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {{
     None
 }
 
-/// 打开 Windows 原生打开文件对话框
+/// 调起 Windows 原生“打开文件”对话框 (OpenFileDialog)
+///
+/// # 参数
+/// - `filter`: 文件扩展名过滤条件（如 `"Zip Archives (*.zip)|*.zip"`）。
+///
+/// # 返回值
+/// - `Some(PathBuf)`: 用户成功选中的目标还原文件绝对路径；
+/// - `None`: 用户取消或文件不存在。
 pub(crate) fn pick_open_file(filter: &str) -> Option<PathBuf> {
     #[cfg(target_os = "windows")]
     {

@@ -7,35 +7,110 @@
 pub(crate) mod ai;
 pub(crate) mod backup;
 pub(crate) mod highlight;
-pub(crate) mod keybinding;
+pub(crate) mod security;
 pub(crate) mod utils;
 
-#[allow(unused_imports)]
-pub(crate) use keybinding::get_default_keybindings;
-use utils::{detect_system_and_builtin_fonts, parse_speed_limit};
+pub(crate) use security::{check_vault_lock_on_boot, start_auto_lock_monitor};
+use utils::{detect_system_and_builtin_fonts, hex_to_slint_color, parse_speed_limit};
 
 use std::rc::Rc;
 use slint::ComponentHandle;
+use slint::winit_030::WinitWindowAccessor;
 use crate::async_util::spawn_async;
 use crate::generated::{AppTheme, AppWindow, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use super::theme_handlers::pick_folder;
 
-/// 将持久化 AppConfigRecord 映射写入 Slint SettingsBridge 视图模型
-fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &smagical_core::domain::config::AppConfigRecord) {
+/// 将持久化应用全局配置实体 `AppConfigRecord` 深度水合映射写入 Slint `SettingsBridge` 视图模型
+///
+/// # 映射覆盖范畴
+/// 1. **常规与启动行为 (General)**：语言环境、窗口关闭行为（最小化托盘/退出）、标签关闭确认、开机自启、置顶、Toast 停留时间与自定义数据目录；
+/// 2. **外观与壁纸 (Appearance)**：主题 ID、深色模式、UI 界面字体、壁纸模式、透明度、背景遮罩不透明度、轮播定时器规格与过渡动效；
+/// 3. **终端排版与特效 (Terminal)**：字体名称/字号、光标样式与闪烁、回滚行数、选中文本自动复制、右键直接粘贴、多行危险粘贴二次确认、响铃样式、CRT 显像管复古着色器与关键词高亮规则；
+/// 4. **网络与代理 (Network & Proxy)**：全局出网代理协议、主机、端口、用户名/密码与探测超时；
+/// 5. **SFTP 与文件传输 (SFTP Transfer)**：冲突覆盖策略、隐藏文件展示、单通道并发度、上传/下载带宽限速、软链接解析与断点续传块大小；
+/// 6. **AI 智能助手多端点 (AI Assistants)**：各端点 Profile、激活端点高级超参数与上下文预算。
+///
+/// # 参数
+/// - `bridge`: Slint `SettingsBridge` 全局单例句柄；
+/// - `cfg`: SQLite 仓储中拉取出的应用全局配置实体切片。
+pub(crate) fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &smagical_core::domain::config::AppConfigRecord) {
+    // 1. 常规与启动行为 (General)
+    bridge.set_setting_language(cfg.language.as_str().into());
+    bridge.set_setting_close_action(cfg.close_action.as_str().into());
+    bridge.set_setting_confirm_close_tab(cfg.confirm_close_tab);
+    bridge.set_setting_confirm_close_active(cfg.confirm_close_active);
+    bridge.set_setting_always_on_top(cfg.always_on_top);
+    bridge.set_setting_start_on_boot(cfg.start_on_boot);
+    bridge.set_setting_toast_duration(cfg.toast_duration.as_str().into());
+    if !cfg.custom_data_dir.is_empty() {
+        bridge.set_setting_data_dir(cfg.custom_data_dir.as_str().into());
+    }
+
+    // 2. 外观与壁纸 (Appearance)
+    bridge.set_current_theme_id(cfg.theme_id.as_str().into());
+    bridge.set_is_dark_mode(cfg.is_dark_mode);
     bridge.set_setting_ui_font(cfg.ui_font.as_str().into());
-    bridge.set_setting_terminal_url_click(cfg.terminal_url_click);
-    bridge.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
-    bridge.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
+    bridge.set_setting_wallpaper_mode(cfg.wallpaper_mode.as_str().into());
+    bridge.set_setting_wallpaper_path(cfg.wallpaper_path.as_str().into());
+    bridge.set_setting_wallpaper_opacity(cfg.wallpaper_opacity);
+    bridge.set_setting_modal_opacity(cfg.modal_opacity);
+
+    let slint_strings: Vec<slint::SharedString> = cfg.wallpaper_list.iter().map(|s| s.as_str().into()).collect();
+    bridge.set_setting_wallpaper_list(slint::ModelRc::new(slint::VecModel::from(slint_strings)));
+    bridge.set_setting_wallpaper_active_index(cfg.wallpaper_active_index as i32);
+
+    let slide_interval = cfg.wallpaper_slideshow_interval.clone();
+    let (slide_num, slide_unit) = if slide_interval == "none" || slide_interval == "off" || slide_interval.is_empty() || slide_interval == "startup" {
+        ("0", "off")
+    } else if let Some(s) = slide_interval.strip_suffix('s') {
+        (s, "s")
+    } else if let Some(m) = slide_interval.strip_suffix('m') {
+        (m, "m")
+    } else if let Some(h) = slide_interval.strip_suffix('h') {
+        (h, "h")
+    } else if let Ok(_) = slide_interval.parse::<u64>() {
+        (slide_interval.as_str(), "m")
+    } else {
+        ("0", "off")
+    };
+    bridge.set_setting_wallpaper_slideshow(slide_interval.as_str().into());
+    bridge.set_slideshow_number_input(slide_num.into());
+    bridge.set_slideshow_unit_input(slide_unit.into());
+    bridge.set_setting_wallpaper_transition(cfg.wallpaper_transition_effect.as_str().into());
+
+    // 3. 终端排版与特效 (Terminal)
+    bridge.set_setting_terminal_font(cfg.font_family.as_str().into());
+    bridge.set_setting_terminal_font_size(cfg.font_size as i32);
     bridge.set_setting_cursor_style(cfg.cursor_style.as_str().into());
     bridge.set_setting_cursor_blink(cfg.cursor_blink);
     bridge.set_setting_scrollback_lines(cfg.scrollback_lines as i32);
     bridge.set_scrollback_input(format!("{}", cfg.scrollback_lines).into());
-    bridge.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
     bridge.set_setting_copy_on_select(cfg.copy_on_select);
     bridge.set_setting_paste_on_right_click(cfg.paste_on_right_click);
     bridge.set_setting_warn_multiline_paste(cfg.warn_on_multiline_paste);
-    bridge.set_setting_close_action(cfg.close_action.as_str().into());
+    bridge.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
+    bridge.set_setting_terminal_url_click(cfg.terminal_url_click);
+    bridge.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
+    bridge.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
+    bridge.set_flag_terminal_crt_shader(cfg.flag_terminal_crt_shader);
+    bridge.set_setting_terminal_crt(cfg.flag_terminal_crt_shader);
+
+    if !cfg.keyword_highlight_rules.is_empty() {
+        let rules: Vec<crate::generated::KeywordHighlightRule> = cfg.keyword_highlight_rules.iter().map(|r| {
+            crate::generated::KeywordHighlightRule {
+                id: r.id.as_str().into(),
+                pattern: r.pattern.as_str().into(),
+                remark: r.remark.as_str().into(),
+                color_hex: r.color_hex.as_str().into(),
+                rule_color: hex_to_slint_color(r.color_hex.as_str()),
+                enabled: r.enabled,
+            }
+        }).collect();
+        bridge.set_terminal_keyword_rules(slint::ModelRc::new(slint::VecModel::from(rules)));
+    }
+
+    // 4. 网络与 SSH 设置 (Network & SSH)
     bridge.set_setting_global_proxy_mode(cfg.global_proxy_mode.as_str().into());
     bridge.set_setting_global_proxy_server(cfg.global_proxy_server.as_str().into());
     bridge.set_setting_global_proxy_auth(cfg.global_proxy_auth);
@@ -46,38 +121,16 @@ fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &smagical_core:
     bridge.set_setting_keepalive_count_max(cfg.keepalive_count_max as i32);
     bridge.set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
     bridge.set_setting_tcp_nodelay(cfg.tcp_nodelay);
-    bridge.set_setting_modal_opacity(cfg.modal_opacity);
-    bridge.set_current_theme_id(cfg.theme_id.as_str().into());
-    bridge.set_setting_language(cfg.language.as_str().into());
-    bridge.set_setting_always_on_top(false);
-    bridge.set_setting_start_on_boot(cfg.start_on_boot);
-    bridge.set_setting_confirm_close_tab(cfg.confirm_close_tab);
-    bridge.set_setting_confirm_close_active(cfg.confirm_close_active);
-    bridge.set_setting_toast_duration(cfg.toast_duration.as_str().into());
-    bridge.set_setting_wallpaper_mode(cfg.wallpaper_mode.as_str().into());
-    bridge.set_setting_wallpaper_path(cfg.wallpaper_path.as_str().into());
-    bridge.set_setting_wallpaper_opacity(cfg.wallpaper_opacity);
+    bridge.set_setting_compression(cfg.compression);
+    bridge.set_setting_legacy_ciphers(cfg.legacy_ciphers);
+    bridge.set_setting_auto_reconnect(cfg.auto_reconnect);
 
-    let slide_interval = cfg.wallpaper_slideshow_interval.clone();
-    let (slide_num, slide_unit) = if slide_interval == "none" || slide_interval == "off" || slide_interval.is_empty() {
-        ("0", "off")
-    } else if let Some(s) = slide_interval.strip_suffix('s') {
-        (s, "s")
-    } else if let Some(m) = slide_interval.strip_suffix('m') {
-        (m, "m")
-    } else if let Some(h) = slide_interval.strip_suffix('h') {
-        (h, "h")
-    } else {
-        ("0", "off")
-    };
-    bridge.set_setting_wallpaper_slideshow(slide_interval.as_str().into());
-    bridge.set_slideshow_number_input(slide_num.into());
-    bridge.set_slideshow_unit_input(slide_unit.into());
-    bridge.set_setting_wallpaper_transition(cfg.wallpaper_transition_effect.as_str().into());
-
+    // 5. 传输与文件管理 (Files & SFTP)
     bridge.set_setting_sftp_default_local(cfg.sftp_default_local.as_str().into());
     bridge.set_setting_sftp_default_remote(cfg.sftp_default_remote.as_str().into());
+    bridge.set_setting_sftp_show_hidden(cfg.sftp_show_hidden);
     bridge.set_setting_sftp_confirm_delete(cfg.sftp_confirm_delete);
+    bridge.set_setting_sftp_conflict_policy(cfg.sftp_conflict_policy.as_str().into());
     bridge.set_setting_sftp_concurrency(cfg.sftp_concurrency as i32);
     bridge.set_setting_sftp_resume(cfg.sftp_resume_transfer);
     bridge.set_setting_sftp_preserve_attributes(cfg.sftp_preserve_attributes);
@@ -94,20 +147,143 @@ fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &smagical_core:
     bridge.set_setting_sftp_custom_editor(cfg.sftp_custom_editor.as_str().into());
     bridge.set_setting_sftp_exclude_patterns(cfg.sftp_exclude_patterns.as_str().into());
 
+    // 6. 云同步与备份 (Cloud Sync & Backup)
+    bridge.set_setting_cloud_sync_backend(cfg.cloud_sync_backend.as_str().into());
+    bridge.set_setting_cloud_sync_interval(cfg.cloud_sync_interval.as_str().into());
+    bridge.set_setting_cloud_e2ee_pass(cfg.cloud_sync_e2ee_pass.as_str().into());
+    bridge.set_setting_webdav_url(cfg.cloud_sync_webdav_url.as_str().into());
+    bridge.set_setting_webdav_user(cfg.cloud_sync_webdav_user.as_str().into());
+    bridge.set_setting_webdav_pass(cfg.cloud_sync_webdav_pass.as_str().into());
+    bridge.set_setting_webdav_dir(cfg.cloud_sync_webdav_dir.as_str().into());
+    bridge.set_setting_s3_endpoint(cfg.cloud_sync_s3_endpoint.as_str().into());
+    bridge.set_setting_s3_bucket(cfg.cloud_sync_s3_bucket.as_str().into());
+    bridge.set_setting_s3_region(cfg.cloud_sync_s3_region.as_str().into());
+    bridge.set_setting_s3_key_id(cfg.cloud_sync_s3_key_id.as_str().into());
+    bridge.set_setting_s3_access_key(cfg.cloud_sync_s3_access_key.as_str().into());
+    bridge.set_setting_gist_id(cfg.cloud_sync_gist_id.as_str().into());
+    bridge.set_setting_gist_token(cfg.cloud_sync_gist_token.as_str().into());
+    bridge.set_setting_custom_sync_url(cfg.cloud_sync_custom_url.as_str().into());
+    bridge.set_setting_custom_sync_client_id(cfg.cloud_sync_custom_client_id.as_str().into());
+    bridge.set_setting_custom_sync_token(cfg.cloud_sync_custom_token.as_str().into());
+
+    // 7. 安全与锁屏策略 (Security & Vault)
+    bridge.set_setting_auto_lock_timeout(cfg.auto_lock_timeout.as_str().into());
+    bridge.set_setting_lock_on_minimize(cfg.lock_on_minimize);
+    bridge.set_setting_biometric_unlock(cfg.biometric_unlock);
+    bridge.set_setting_clear_clipboard_timeout(cfg.clear_clipboard_timeout);
+    bridge.set_setting_confirm_dangerous_commands(cfg.confirm_dangerous_commands);
+    bridge.set_setting_session_audit_logging(cfg.session_audit_logging);
+
+    // 8. 日志与追踪级别 (Diagnostics & Tracing)
     let cur_lvl = if cfg.log_level.is_empty() { "INFO".to_string() } else { cfg.log_level.to_uppercase() };
     crate::debug::tracing_layer::set_global_runtime_log_level(&cur_lvl);
     bridge.set_setting_log_level(cur_lvl.as_str().into());
+
+    // 9. AI 助手配置与大模型推理 (AI Copilot & Endpoints)
+    bridge.set_setting_ai_provider(cfg.ai_active_provider.as_str().into());
+    bridge.set_setting_ai_system_prompt(cfg.ai_system_prompt.as_str().into());
+    bridge.set_setting_ai_auto_audit_level(cfg.ai_auto_audit_level.as_str().into());
+
+    if !cfg.ai_endpoints.is_empty() {
+        let mut slint_endpoints: Vec<crate::generated::AiEndpointProfile> = Vec::new();
+        let mut active_ep_opt = None;
+
+        for ep in &cfg.ai_endpoints {
+            let slint_ep = crate::generated::AiEndpointProfile {
+                id: ep.id.as_str().into(),
+                name: ep.name.as_str().into(),
+                base_url: ep.base_url.as_str().into(),
+                api_key: ep.api_key.as_str().into(),
+                api_mode: ep.api_mode.as_str().into(),
+                selected_model: ep.selected_model.as_str().into(),
+                models_csv: ep.models_csv.as_str().into(),
+                is_active: ep.is_active,
+                status_text: ep.status_text.as_str().into(),
+                thinking_degree: ep.thinking_degree.as_str().into(),
+                timeout_secs: ep.timeout_secs,
+                max_context: ep.max_context,
+                max_retries: ep.max_retries,
+                custom_headers: ep.custom_headers.as_str().into(),
+                temperature: ep.temperature.as_str().into(),
+            };
+            if ep.is_active && active_ep_opt.is_none() {
+                active_ep_opt = Some(ep.clone());
+            }
+            slint_endpoints.push(slint_ep);
+        }
+
+        if active_ep_opt.is_none() && !cfg.ai_endpoints.is_empty() {
+            active_ep_opt = Some(cfg.ai_endpoints[0].clone());
+            slint_endpoints[0].is_active = true;
+            slint_endpoints[0].status_text = "已连接".into();
+        }
+
+        bridge.set_setting_ai_endpoints(slint::ModelRc::new(slint::VecModel::from(slint_endpoints)));
+
+        if let Some(active) = active_ep_opt {
+            bridge.set_active_endpoint_id(active.id.as_str().into());
+            bridge.set_setting_ai_base_url(active.base_url.as_str().into());
+            bridge.set_setting_ai_api_key(active.api_key.as_str().into());
+            bridge.set_setting_ai_model(active.selected_model.as_str().into());
+
+            let mut models_vec: Vec<slint::SharedString> = Vec::new();
+            for m in active.models_csv.split(',') {
+                let trimmed = m.trim();
+                if !trimmed.is_empty() {
+                    models_vec.push(trimmed.into());
+                }
+            }
+            if models_vec.is_empty() && !active.selected_model.is_empty() {
+                models_vec.push(active.selected_model.as_str().into());
+            }
+            bridge.set_setting_ai_current_models(slint::ModelRc::new(slint::VecModel::from(models_vec)));
+
+            let th = if active.thinking_degree.is_empty() { "medium" } else { &active.thinking_degree };
+            bridge.set_setting_ai_thinking_budget(th.into());
+            let timeout = if active.timeout_secs <= 0 { 60 } else { active.timeout_secs };
+            bridge.set_setting_ai_timeout_secs(timeout);
+            bridge.set_setting_ai_timeout_secs_input(timeout.to_string().into());
+            let ctx = if active.max_context <= 0 { 32768 } else { active.max_context };
+            bridge.set_setting_ai_max_context(ctx);
+            bridge.set_setting_ai_max_context_input(ctx.to_string().into());
+            let retries = if active.max_retries < 0 { 2 } else { active.max_retries };
+            bridge.set_setting_ai_max_retries(retries);
+            bridge.set_setting_ai_max_retries_input(retries.to_string().into());
+            bridge.set_setting_ai_custom_headers(active.custom_headers.as_str().into());
+            let temp_str = if active.temperature.is_empty() { "0.3" } else { &active.temperature };
+            bridge.set_setting_ai_temperature(temp_str.parse::<f32>().unwrap_or(0.3));
+            bridge.set_setting_ai_temperature_input(temp_str.into());
+        }
+    }
 }
 
 /// 注册偏好设置中心各项配置变更交互回调
+///
+/// # 模块分发治理
+/// 1. 委托子模块初始化：
+///    - `backup::register_backup_handlers`: 快照备份、导入导出与出厂重置；
+///    - `highlight::register_highlight_handlers`: 终端高亮规则增删改查与极坐标拾色器；
+///    - `ai::register_ai_handlers`: AI 多端点生命周期与高级推理超参数；
+///    - `security::register_security_handlers`: 主密码、信封封装与保险库加锁；
+/// 2. 挂载通用偏好设置事件：
+///    - 语言国际化即时切换 (`select_bundled_translation`) 并通知各抽屉与文件树重塑文案；
+///    - 窗口关闭策略、开机自启系统注册表键修改；
+///    - 终端字体与本地可用字体探测枚举 (`detect_system_and_builtin_fonts`)；
+///    - CRT 显像管着色器特效、光标闪烁与回滚历史条数；
+///    - SFTP 传输限速解析 (`parse_speed_limit`) 与并发通道策略；
+///    - 网络出网代理参数动态更新。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用主窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
     let bridge = window.global::<SettingsBridge>();
 
     // 1. 注册各子模块独立回调
     backup::register_backup_handlers(window, ctx);
     highlight::register_highlight_handlers(window, ctx);
-    keybinding::register_keybinding_handlers(window, ctx);
     ai::register_ai_handlers(window, ctx);
+    security::register_security_handlers(window, ctx);
 
     // 2. 国际化多语言切换 (Switch Language via Slint i18n Bundled Translations)
     let switch_lang_impl = {
@@ -175,6 +351,15 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = w_weak_init.upgrade() {
                     apply_config_to_settings_bridge(&w.global::<SettingsBridge>(), &cfg);
+                    let sb = w.global::<SettingsBridge>();
+                    let ai_b = w.global::<crate::generated::AiBridge>();
+                    ai_b.set_available_models(sb.get_setting_ai_current_models());
+                    ai_b.set_selected_model(sb.get_setting_ai_model());
+                    if cfg.always_on_top {
+                        w.window().with_winit_window(|win| {
+                            win.set_window_level(slint::winit_030::winit::window::WindowLevel::AlwaysOnTop);
+                        });
+                    }
                 }
             });
         }
@@ -193,6 +378,60 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         spawn_async(async move {
             let _ = storage.config().update(Box::new(move |c| {
                 c.modal_opacity = op;
+            })).await;
+        });
+    });
+
+    let storage_wp = ctx.core_state.storage().clone();
+    let window_weak_wp = window.as_weak();
+    let wallpapers_ref_wp = Rc::clone(&ctx.wallpapers);
+    let active_idx_ref_wp = Rc::clone(&ctx.active_wallpaper_idx);
+    bridge.on_change_wallpaper(move |mode, path, opacity| {
+        let mode_str = mode.as_str().to_string();
+        let mut path_str = path.as_str().to_string();
+        let op = opacity.clamp(0.01, 1.0);
+
+        if (path_str.is_empty() || !std::path::Path::new(&path_str).exists()) && mode_str != "none" {
+            let wps = wallpapers_ref_wp.borrow();
+            let idx = *active_idx_ref_wp.borrow();
+            if !wps.is_empty() && idx < wps.len() && std::path::Path::new(&wps[idx]).exists() {
+                path_str = wps[idx].clone();
+            } else if let Some(first) = wps.iter().find(|p| std::path::Path::new(p).exists()) {
+                path_str = first.clone();
+            }
+        }
+
+        if let Some(w) = window_weak_wp.upgrade() {
+            let sb = w.global::<SettingsBridge>();
+            sb.set_setting_wallpaper_mode(mode_str.as_str().into());
+            sb.set_setting_wallpaper_opacity(op);
+            if !path_str.is_empty() {
+                sb.set_setting_wallpaper_path(path_str.as_str().into());
+            }
+
+            let wb = w.global::<WindowBridge>();
+            wb.set_wallpaper_mode(mode_str.as_str().into());
+            wb.set_global_wallpaper_opacity(op);
+            wb.set_terminal_wallpaper_opacity(op);
+            if !path_str.is_empty() {
+                wb.set_wallpaper_path(path_str.as_str().into());
+            }
+
+            let theme_global = w.global::<AppTheme>();
+            theme_global.set_wallpaper_mode(mode_str.as_str().into());
+            theme_global.set_wallpaper_opacity(op);
+
+            wb.invoke_set_wallpaper(mode_str.as_str().into(), path_str.as_str().into(), op);
+        }
+
+        let storage = storage_wp.clone();
+        let m_to_save = mode_str.clone();
+        let p_to_save = path_str.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.wallpaper_mode = m_to_save;
+                c.wallpaper_path = p_to_save;
+                c.wallpaper_opacity = op;
             })).await;
         });
     });
@@ -592,6 +831,63 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         );
     });
 
+    let notif_comp = ctx.notifications.clone();
+    let storage_comp = ctx.core_state.storage();
+    let window_weak_comp = window.as_weak();
+    bridge.on_change_compression(move |enabled| {
+        if let Some(w) = window_weak_comp.upgrade() {
+            w.global::<SettingsBridge>().set_setting_compression(enabled);
+        }
+        let storage = storage_comp.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.compression = enabled;
+            })).await;
+        });
+        notif_comp.info(
+            if enabled { "数据流压缩已启用" } else { "数据流压缩已禁用" },
+            if enabled { "已开启 gzip 链路压缩，提升跨国与低带宽网络速度" } else { "已关闭传输数据流压缩" },
+        );
+    });
+
+    let notif_leg = ctx.notifications.clone();
+    let storage_leg = ctx.core_state.storage();
+    let window_weak_leg = window.as_weak();
+    bridge.on_change_legacy_ciphers(move |enabled| {
+        if let Some(w) = window_weak_leg.upgrade() {
+            w.global::<SettingsBridge>().set_setting_legacy_ciphers(enabled);
+        }
+        let storage = storage_leg.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.legacy_ciphers = enabled;
+            })).await;
+        });
+        notif_leg.info(
+            if enabled { "老旧算法兼容已开启" } else { "老旧算法兼容已关闭" },
+            if enabled { "允许协商 3DES、DH Group 1 等已弃用算法" } else { "已恢复安全默认算法协商" },
+        );
+    });
+
+    let notif_reconn = ctx.notifications.clone();
+    let storage_reconn = ctx.core_state.storage();
+    let window_weak_reconn = window.as_weak();
+    bridge.on_change_auto_reconnect(move |enabled| {
+        if let Some(w) = window_weak_reconn.upgrade() {
+            w.global::<SettingsBridge>().set_setting_auto_reconnect(enabled);
+        }
+        let storage = storage_reconn.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.auto_reconnect = enabled;
+            })).await;
+        });
+        notif_reconn.info(
+            if enabled { "自动断线重连已开启" } else { "自动断线重连已关闭" },
+            if enabled { "网络闪断后将使用指数退避算法静默尝试重连" } else { "断线后保持断开状态" },
+        );
+    });
+
     let w_b_tab = window.as_weak();
     let storage_tab = ctx.core_state.storage();
     bridge.on_toggle_confirm_close_tab(move |val| {
@@ -726,6 +1022,51 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
         notif_dl.info("下载限速已调整", &format!("单任务下载速率限制已设定为: {}", if code == "unlimited" { "不限速" } else { &code }));
     });
 
+    let notif_sh = ctx.notifications.clone();
+    let storage_sh = ctx.core_state.storage();
+    let window_weak_sh = window.as_weak();
+    let ctx_sh = ctx.clone();
+    bridge.on_change_sftp_show_hidden(move |enabled| {
+        if let Some(w) = window_weak_sh.upgrade() {
+            w.global::<SettingsBridge>().set_setting_sftp_show_hidden(enabled);
+            crate::handlers::file_handlers::sync_file_explorer_ui(&w, &ctx_sh);
+        }
+        let storage = storage_sh.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_show_hidden = enabled;
+            })).await;
+        });
+        notif_sh.info(
+            if enabled { "已开启显示隐藏文件" } else { "已隐藏以点开头的隐藏文件" },
+            if enabled { "SFTP 文件浏览器中将展示以点开头的隐藏文件 (如 .bashrc, .env)" } else { "文件树仅显示常规文件" },
+        );
+    });
+
+    let notif_cp = ctx.notifications.clone();
+    let storage_cp = ctx.core_state.storage();
+    let window_weak_cp = window.as_weak();
+    bridge.on_change_sftp_conflict_policy(move |policy| {
+        let p_str = policy.to_string();
+        if let Some(w) = window_weak_cp.upgrade() {
+            w.global::<SettingsBridge>().set_setting_sftp_conflict_policy(p_str.clone().into());
+        }
+        let p_save = p_str.clone();
+        let storage = storage_cp.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_conflict_policy = p_save;
+            })).await;
+        });
+        let label = match p_str.as_str() {
+            "overwrite" => "覆盖同名文件",
+            "skip" => "跳过已存在文件",
+            "rename" => "自动重命名后缀",
+            _ => "每次弹窗询问",
+        };
+        notif_cp.info("传输冲突策略已更新", &format!("同名冲突处理策略已设定为「{}」", label));
+    });
+
     // 6. 日志级别与开发者控制台调试联动
     let window_weak_lvl = window.as_weak();
     let notif_lvl = ctx.notifications.clone();
@@ -776,7 +1117,212 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
 
     bridge.set_setting_debug_enabled(window.global::<WindowBridge>().get_is_debug_enabled());
 
-    // 7. 关闭偏好设置中心
+    // 8. 终端字体与字号设置变更 (Terminal Font & Size)
+    let window_weak_tfont = window.as_weak();
+    let storage_tfont = ctx.core_state.storage();
+    let renderer_tfont = Rc::clone(&ctx.terminal_renderer);
+    let active_terminals_tfont = Rc::clone(&ctx.active_terminals);
+    let notif_tfont = ctx.notifications.clone();
+    bridge.on_change_terminal_font(move |font_name, font_size| {
+        let f = font_name.as_str();
+        let size = if font_size <= 0 { 13 } else { font_size };
+        let size_f = size as f32;
+        if let Some(w) = window_weak_tfont.upgrade() {
+            w.global::<SettingsBridge>().set_setting_terminal_font(f.into());
+            w.global::<SettingsBridge>().set_setting_terminal_font_size(size);
+            w.global::<WindowBridge>().set_terminal_font_family(f.into());
+            w.global::<WindowBridge>().set_terminal_font_size(size_f);
+        }
+        let f_owned = f.to_string();
+        let storage = storage_tfont.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.font_family = f_owned;
+                c.font_size = size_f;
+            })).await;
+        });
+        if let Some(ref mut r) = *renderer_tfont.borrow_mut() {
+            if let Some(bytes) = crate::terminal::renderer::find_font_by_name(f) {
+                let _ = r.update_font(&bytes, size_f);
+            } else {
+                let _ = r.update_font_size(size_f);
+            }
+        }
+        for instance in active_terminals_tfont.borrow_mut().values_mut() {
+            instance.parser.mark_dirty();
+        }
+        notif_tfont.info("终端字体已更新", &format!("当前字体: {}, 字号: {}px", f, size));
+    });
+
+    // 9. 终端 CRT 显像管特效开关 (Terminal CRT Shader Effect)
+    let window_weak_crt = window.as_weak();
+    let storage_crt = ctx.core_state.storage();
+    bridge.on_toggle_terminal_crt(move |enabled| {
+        if let Some(w) = window_weak_crt.upgrade() {
+            w.global::<SettingsBridge>().set_flag_terminal_crt_shader(enabled);
+            w.global::<SettingsBridge>().set_setting_terminal_crt(enabled);
+        }
+        let storage = storage_crt.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.flag_terminal_crt_shader = enabled;
+            })).await;
+        });
+    });
+
+    // 10. SFTP 传输首选项完整闭环 Handlers
+    let storage_sftp_r = ctx.core_state.storage();
+    bridge.on_change_sftp_default_remote(move |path| {
+        let p_str = path.to_string();
+        let storage = storage_sftp_r.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_default_remote = p_str;
+            })).await;
+        });
+    });
+
+    let storage_sftp_del = ctx.core_state.storage();
+    bridge.on_change_sftp_confirm_delete(move |val| {
+        let storage = storage_sftp_del.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_confirm_delete = val;
+            })).await;
+        });
+    });
+
+    let storage_sftp_res = ctx.core_state.storage();
+    bridge.on_change_sftp_resume(move |val| {
+        let storage = storage_sftp_res.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_resume_transfer = val;
+            })).await;
+        });
+    });
+
+    let storage_sftp_attr = ctx.core_state.storage();
+    bridge.on_change_sftp_preserve_attributes(move |val| {
+        let storage = storage_sftp_attr.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_preserve_attributes = val;
+            })).await;
+        });
+    });
+
+    let storage_sftp_ed = ctx.core_state.storage();
+    bridge.on_change_sftp_editor_mode(move |mode| {
+        let m_str = mode.to_string();
+        let storage = storage_sftp_ed.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_editor_mode = m_str;
+            })).await;
+        });
+    });
+
+    let storage_sftp_ced = ctx.core_state.storage();
+    bridge.on_change_sftp_custom_editor(move |cmd| {
+        let c_str = cmd.to_string();
+        let storage = storage_sftp_ced.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_custom_editor = c_str;
+            })).await;
+        });
+    });
+
+    let storage_sftp_exc = ctx.core_state.storage();
+    let window_weak_exc = window.as_weak();
+    let ctx_exc = ctx.clone();
+    bridge.on_change_sftp_exclude_patterns(move |pat| {
+        let p_str = pat.to_string();
+        if let Some(w) = window_weak_exc.upgrade() {
+            w.global::<SettingsBridge>().set_setting_sftp_exclude_patterns(p_str.as_str().into());
+            crate::handlers::file_handlers::sync_file_explorer_ui(&w, &ctx_exc);
+        }
+        let storage = storage_sftp_exc.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.sftp_exclude_patterns = p_str;
+            })).await;
+        });
+    });
+
+    // 11. 安全与锁屏策略 Handlers
+    let storage_sec_lk = ctx.core_state.storage();
+    let notif_sec_lk = ctx.notifications.clone();
+    bridge.on_change_auto_lock_timeout(move |timeout| {
+        let t_str = timeout.to_string();
+        let t_clone = t_str.clone();
+        let storage = storage_sec_lk.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.auto_lock_timeout = t_clone;
+            })).await;
+        });
+        notif_sec_lk.info("自动锁定策略已更新", &format!("空闲超时设置为: {}", t_str));
+    });
+
+    let storage_sec_min = ctx.core_state.storage();
+    bridge.on_change_lock_on_minimize(move |val| {
+        let storage = storage_sec_min.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.lock_on_minimize = val;
+            })).await;
+        });
+    });
+
+    let storage_sec_bio = ctx.core_state.storage();
+    bridge.on_change_biometric_unlock(move |val| {
+        let storage = storage_sec_bio.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.biometric_unlock = val;
+            })).await;
+        });
+    });
+
+    let storage_sec_clip = ctx.core_state.storage();
+    bridge.on_change_clear_clipboard_timeout(move |val| {
+        let storage = storage_sec_clip.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.clear_clipboard_timeout = val;
+            })).await;
+        });
+    });
+
+    let storage_sec_cmd = ctx.core_state.storage();
+    bridge.on_change_confirm_dangerous_commands(move |val| {
+        let storage = storage_sec_cmd.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.confirm_dangerous_commands = val;
+            })).await;
+        });
+    });
+
+    let storage_sec_aud = ctx.core_state.storage();
+    let notif_sec_aud = ctx.notifications.clone();
+    bridge.on_change_session_audit_logging(move |val| {
+        crate::audit_logger::set_audit_enabled(val);
+        let storage = storage_sec_aud.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.session_audit_logging = val;
+            })).await;
+        });
+        notif_sec_aud.info(
+            if val { "会话安全审计已开启" } else { "会话安全审计已关闭" },
+            if val { "所有终端命令与操作将结构化记录至本地安全审计日志" } else { "已停止记录会话操作审计" },
+        );
+    });
+
+    // 12. 关闭偏好设置中心
     let w_b = window.as_weak();
     bridge.on_close_settings(move || {
         if let Some(w) = w_b.upgrade() {

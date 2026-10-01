@@ -84,4 +84,7 @@ export global TerminalBridge {
     callback terminal-clear();
     callback search-terminal(string /* query */, bool /* match_case */);
     callback terminal-resize(int /* cols */, int /* rows */);
+    callback open-terminal-url();
+    callback terminal-check-hover-url(string /* session_id */, int /* col */, int /* row */) -> string;
+    callback terminal-open-url(string /* url */);
 }

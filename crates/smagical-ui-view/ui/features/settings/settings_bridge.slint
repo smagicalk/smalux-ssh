@@ -10,16 +10,6 @@ export struct KeywordHighlightRule {
     enabled: bool,
 }
 
-export struct SettingKeybindingItem {
-    id: string,
-    action-name: string,
-    category: string,
-    primary-key: string,
-    secondary-key: string,
-    default-key: string,
-    is-customized: bool,
-}
-
 export struct SettingSnapshotItem {
     id: string,
     timestamp: string,
@@ -183,20 +173,7 @@ export global SettingsBridge {
     in-out property <string> setting-sftp-exclude-patterns: ".git,node_modules,*.tmp";
 
     // -------------------------------------------------------------------------
-    // 6. 快捷键映射 (Shortcuts)
-    // -------------------------------------------------------------------------
-    in-out property <[SettingKeybindingItem]> setting-keybindings: [];
-    in-out property <[SettingKeybindingItem]> keybindings: [];
-    in-out property <string> keybindings-search: "";
-    in-out property <string> keybindings-filter-category: "all";
-    in-out property <string> editing-keybinding-id: "";
-    in-out property <bool> is-keybinding-modal-open: false;
-    in-out property <string> modal-keybinding-id: "";
-    in-out property <string> modal-keybinding-name: "";
-    in-out property <string> modal-keybinding-key: "";
-
-    // -------------------------------------------------------------------------
-    // 7. 数据备份与迁移 (Backup & Storage)
+    // 6. 数据备份与迁移 (Backup & Storage)
     // -------------------------------------------------------------------------
     in-out property <string> setting-backup-master-mode: "off";
     in-out property <bool> setting-backup-auto-enabled: true;
@@ -416,6 +393,16 @@ export global SettingsBridge {
     in-out property <string> master-pwd-confirm: "";
     in-out property <string> master-pwd-error-msg: "";
 
+    // 移除主密码模态弹窗
+    in-out property <bool> is-remove-pwd-modal-open: false;
+    in-out property <string> remove-pwd-input: "";
+    in-out property <string> remove-pwd-error-msg: "";
+
+    // 冷启动保险库解锁遮罩模态弹窗
+    in-out property <bool> is-unlock-modal-open: false;
+    in-out property <string> unlock-pwd-input: "";
+    in-out property <string> unlock-pwd-error-msg: "";
+
     // -------------------------------------------------------------------------
     // 操作回调
     // -------------------------------------------------------------------------
@@ -466,6 +453,11 @@ export global SettingsBridge {
     callback change-host-key-policy(string);
     callback change-network-handshake(int, int, int);
     callback change-tcp-nodelay(bool);
+    callback change-compression(bool);
+    callback change-legacy-ciphers(bool);
+    callback change-auto-reconnect(bool);
+    callback change-sftp-show-hidden(bool);
+    callback change-sftp-conflict-policy(string);
     callback save-proxy-settings(string, string, bool, string, string);
     callback test-proxy-connectivity(string, string);
     callback export-backup-archive(bool);
@@ -478,15 +470,26 @@ export global SettingsBridge {
     callback factory-reset-settings();
     callback toggle-debug-enabled(bool);
     callback set-master-password(string, string);
+    callback submit-remove-master-password(string);
+    callback unlock-vault(string);
+    callback lock-vault();
     callback reset-master-password();
     callback browse-sftp-download-dir();
     callback change-sftp-download-dir(string);
     callback change-sftp-concurrency(int);
-    callback update-keybinding(string, string);
-    callback reset-keybinding(string);
-    callback reset-all-keybindings();
-    callback clear-keybinding(string);
-    pure callback format-keybinding-event(string, bool, bool, bool, bool) -> string;
+    callback change-sftp-default-remote(string);
+    callback change-sftp-confirm-delete(bool);
+    callback change-sftp-resume(bool);
+    callback change-sftp-preserve-attributes(bool);
+    callback change-sftp-editor-mode(string);
+    callback change-sftp-custom-editor(string);
+    callback change-sftp-exclude-patterns(string);
+    callback change-auto-lock-timeout(string);
+    callback change-lock-on-minimize(bool);
+    callback change-biometric-unlock(bool);
+    callback change-clear-clipboard-timeout(bool);
+    callback change-confirm-dangerous-commands(bool);
+    callback change-session-audit-logging(bool);
     callback set-backup-master-mode(string);
     callback toggle-backup-auto(bool);
     callback toggle-backup-local(bool);
@@ -522,5 +525,6 @@ export global SettingsBridge {
     callback remove-model-from-current(string /* model_name */);
     callback select-current-model(string /* model_name */);
     callback change-ai-auto-audit-level(string /* level */);
+    callback change-ai-system-prompt(string /* prompt */);
     callback close-settings();
 }

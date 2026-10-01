@@ -9,22 +9,314 @@ use slint::{ComponentHandle, Model};
 use smagical_core::event::{
     HostAssetChangedEvent, HostGroupToggledEvent, HostTreeReorderedEvent, TerminalSessionEvent,
 };
-use smagical_core::{AppStorage, CredentialRecord, CredentialType, GroupRecord, HostRecord, HostStatus};
+use smagical_core::{
+    AppStorage, CredentialRecord, CredentialType, GroupRecord, HostRecord, HostStatus,
+    SshSessionService,
+};
 use crate::async_util::spawn_async;
 use crate::store::diff::{compute_card_diff, compute_tree_diff};
 
 use crate::generated::{
     AppWindow, CredentialOptionData, FilesBridge, GroupOptionData, HostItemData, HostTreeNode, HostsBridge,
-    JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData, WindowBridge,
+    JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData, TerminalBridge, WindowBridge,
 };
 use crate::handlers::AppContext;
 use crate::session::{sync_active_session_ui, TerminalSessionInfo};
-use crate::terminal::TerminalInstance;
+use crate::terminal::{SshLaunchConfig, TerminalInstance};
 use crate::tree_model::{
     build_cards_from_records, build_group_options, build_raw_tree, build_search_tree_nodes,
     build_visible_tree_nodes, calculate_max_tree_width, move_and_reorder_raw_node, RawTreeNode,
 };
 
+/// 异步后台 SSH 连接就绪结果队列 (UI 线程通过 render_timer 消费，实现 0ms 打开 Tab 与后台异步握手)
+pub(crate) static PENDING_SSH_CONNECTIONS: std::sync::LazyLock<std::sync::Mutex<Vec<(String, Result<TerminalInstance, String>, Option<SshLaunchConfig>)>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+
+/// 异步后台终端输出/进度日志队列 (UI 线程通过 render_timer 快速消费写入终端字符流)
+pub(crate) static PENDING_TERMINAL_LOGS: std::sync::LazyLock<std::sync::Mutex<Vec<(String, String)>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(Vec::new()));
+
+/// 向指定终端会话推送实时文本字符流
+pub(crate) fn emit_terminal_log(session_id: &str, line: &str) {
+    if let Ok(mut logs) = PENDING_TERMINAL_LOGS.lock() {
+        logs.push((session_id.to_string(), line.to_string()));
+    }
+}
+
+/// 启动后台异步 SSH 连接管线 (统一支撑新会话建立与断线重新连接)。
+///
+/// 具备自动凭据挂载、跳板机多跳解析、代理穿透、原生 Rust russh 直连与 OpenSSH 平滑降级。
+pub(crate) fn spawn_ssh_connection_pipeline(
+    sess_id_async: String,
+    session_name_async: String,
+    host_id: String,
+    host_name: String,
+    host_address: String,
+    host_port: u16,
+    default_username: Option<String>,
+    storage: Arc<dyn AppStorage>,
+    ssh_svc: Arc<dyn SshSessionService>,
+    cols: u16,
+    rows: u16,
+) {
+    spawn_async(async move {
+        let host_rec_opt = storage.hosts().get_by_id(&host_id).await.ok().flatten();
+
+        let mut username_opt = default_username;
+        let mut private_key_pem: Option<String> = None;
+        let mut password_plaintext: Option<String> = None;
+        let mut jump_host: Option<String> = None;
+        let mut proxy_type: Option<String> = None;
+        let mut proxy_host: Option<String> = None;
+        let mut proxy_port: Option<u16> = None;
+        let mut keepalive_interval = 30;
+        let mut connect_timeout = 15;
+        let mut cred_record_opt: Option<CredentialRecord> = None;
+
+        if let Some(ref h_rec) = host_rec_opt {
+            if let Some(ref cred_id) = h_rec.credential_id {
+                if !cred_id.is_empty() {
+                    if let Ok(Some(c_rec)) = storage.credentials().get_by_id(cred_id).await {
+                        if let Some(ref u) = c_rec.username {
+                            if !u.trim().is_empty() {
+                                username_opt = Some(u.trim().to_string());
+                            }
+                        }
+                        match c_rec.cred_type {
+                            CredentialType::Key => {
+                                if !c_rec.secret_data.trim().is_empty() {
+                                    private_key_pem = Some(c_rec.secret_data.clone());
+                                }
+                            }
+                            CredentialType::Password => {
+                                if !c_rec.secret_data.is_empty() {
+                                    password_plaintext = Some(c_rec.secret_data.clone());
+                                }
+                            }
+                            _ => {}
+                        }
+                        cred_record_opt = Some(c_rec);
+                    }
+                }
+            }
+
+            if username_opt.is_none() {
+                if let Some(ref u) = h_rec.username {
+                    if !u.trim().is_empty() {
+                        username_opt = Some(u.trim().to_string());
+                    }
+                }
+            }
+            if private_key_pem.is_none() {
+                if let Some(ref k) = h_rec.key_data {
+                    if !k.trim().is_empty() {
+                        private_key_pem = Some(k.clone());
+                    }
+                }
+            }
+            if password_plaintext.is_none() {
+                if let Some(ref p) = h_rec.password {
+                    if !p.is_empty() {
+                        password_plaintext = Some(p.clone());
+                    }
+                }
+            }
+
+            if let Some(ref jsummary) = h_rec.jump_chain_summary {
+                if jsummary.starts_with("preset:") {
+                    let pid = jsummary.trim_start_matches("preset:");
+                    if let Ok(Some(tun)) = storage.tunnels().get_by_id(pid).await {
+                        let hops: Vec<String> = tun.jump_chain.iter()
+                            .filter(|h| h.enabled)
+                            .map(|h| {
+                                let addr = if h.host_address.is_empty() { h.host_name.as_str() } else { h.host_address.as_str() };
+                                if h.host_port == 22 || h.host_port == 0 {
+                                    addr.to_string()
+                                } else {
+                                    format!("{}:{}", addr, h.host_port)
+                                }
+                            })
+                            .collect();
+                        if !hops.is_empty() {
+                            jump_host = Some(hops.join(","));
+                        } else if !tun.remote_host.is_empty() {
+                            jump_host = Some(tun.remote_host);
+                        }
+                    }
+                } else if !jsummary.trim().is_empty() && !jsummary.starts_with("jump_hops:0") {
+                    jump_host = Some(jsummary.clone());
+                }
+            }
+
+            let explicit_proxy = h_rec.proxy_type.as_deref().unwrap_or("direct");
+            if explicit_proxy != "direct" && !explicit_proxy.is_empty() {
+                proxy_type = h_rec.proxy_type.clone();
+                proxy_host = h_rec.proxy_host.clone();
+                proxy_port = h_rec.proxy_port;
+            } else if let Ok(cfg) = storage.config().get().await {
+                if cfg.global_proxy_mode == "custom" && !cfg.global_proxy_server.is_empty() {
+                    if let Some((proto, h, p)) = crate::terminal::ssh_config::parse_proxy_url(&cfg.global_proxy_server) {
+                        proxy_type = Some(proto);
+                        proxy_host = Some(h);
+                        proxy_port = Some(p);
+                    }
+                } else if cfg.global_proxy_mode == "system" {
+                    if let Some((proto, h, p)) = crate::terminal::ssh_config::get_system_proxy() {
+                        proxy_type = Some(proto);
+                        proxy_host = Some(h);
+                        proxy_port = Some(p);
+                    }
+                }
+            }
+
+            if h_rec.keepalive_interval > 0 {
+                keepalive_interval = h_rec.keepalive_interval;
+            }
+            if h_rec.connect_timeout > 0 {
+                connect_timeout = h_rec.connect_timeout;
+            }
+        }
+
+        let effective_address = host_rec_opt.as_ref().map(|h| h.address.clone()).unwrap_or(host_address);
+        let effective_port = host_rec_opt.as_ref().map(|h| h.port).unwrap_or(host_port);
+        let effective_name = host_rec_opt.as_ref().map(|h| h.name.clone()).unwrap_or(host_name);
+
+        let effective_host_rec = host_rec_opt.clone().unwrap_or_else(|| HostRecord {
+            id: host_id.clone(),
+            name: effective_name.clone(),
+            address: effective_address.clone(),
+            port: effective_port,
+            parent_group_id: None,
+            username: username_opt.clone(),
+            password: password_plaintext.clone(),
+            key_data: private_key_pem.clone(),
+            key_passphrase: None,
+            credential_id: None,
+            jump_chain_summary: jump_host.clone(),
+            proxy_type: proxy_type.clone(),
+            proxy_host: proxy_host.clone(),
+            proxy_port,
+            keepalive_interval,
+            connect_timeout,
+            status: HostStatus::Online,
+            ping_ms: 0,
+            sort_order: 0,
+            notes: String::new(),
+            ..Default::default()
+        });
+
+        let auth_desc = if let Some(ref c) = cred_record_opt {
+            match c.cred_type {
+                CredentialType::Key => format!("私钥凭据 [{}]", c.name),
+                CredentialType::Password => format!("密码凭据 [{}]", c.name),
+                CredentialType::Certificate => format!("证书凭据 [{}]", c.name),
+                CredentialType::Agent => "SSH Agent 代理凭据".to_string(),
+            }
+        } else if private_key_pem.is_some() {
+            "内联私钥认证 (Key)".to_string()
+        } else if password_plaintext.is_some() {
+            "内联密码认证 (Password)".to_string()
+        } else {
+            "系统默认凭据".to_string()
+        };
+        let route_desc = if let Some(ref j) = jump_host {
+            format!("跳板机链路 [{j}]")
+        } else if let Some(ref pt) = proxy_type {
+            if pt != "direct" && !proxy_host.as_deref().unwrap_or("").is_empty() {
+                format!("{pt}://{}:{}", proxy_host.as_deref().unwrap_or(""), proxy_port.unwrap_or(0))
+            } else {
+                "直连".to_string()
+            }
+        } else {
+            "直连".to_string()
+        };
+
+        emit_terminal_log(&sess_id_async, &format!("\x1b[38;5;244m[smalux] 认证方式: {auth_desc}\x1b[0m\r\n"));
+        emit_terminal_log(&sess_id_async, &format!("\x1b[38;5;244m[smalux] 网络链路: {route_desc}\x1b[0m\r\n"));
+
+        let launch_config = SshLaunchConfig {
+            host: effective_address.clone(),
+            port: effective_port,
+            username: username_opt.clone(),
+            private_key_pem: private_key_pem.clone(),
+            password: password_plaintext.clone(),
+            jump_host: jump_host.clone(),
+            proxy_type: proxy_type.clone(),
+            proxy_host: proxy_host.clone(),
+            proxy_port,
+            keepalive_interval,
+            connect_timeout,
+            host_key_policy: Some("accept-new".to_string()),
+        };
+
+        let p_sess = sess_id_async.clone();
+        let progress_cb: smagical_core::service::SshProgressCallback = std::sync::Arc::new(move |msg: &str| {
+            emit_terminal_log(&p_sess, &format!("\x1b[36m[smalux]\x1b[0m {msg}\r\n"));
+        });
+
+        // 优先尝试基于纯 Rust 原生 SshSessionService 直连 (零外部 ssh.exe 进程依赖)
+        let cb_for_pure = progress_cb.clone();
+        let launch_cfg_for_pure = launch_config.clone();
+        let pure_ssh_res: Result<TerminalInstance, anyhow::Error> = async {
+            let session_key = ssh_svc
+                .connect_with_progress(&effective_host_rec, cred_record_opt.as_ref(), Some(cb_for_pure.clone()))
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            cb_for_pure("正在请求分配 PTY 虚拟终端通道 (xterm-256color)...");
+            let channel = ssh_svc
+                .open_pty_channel(&session_key, "xterm-256color", rows.max(24), cols.max(80))
+                .await
+                .map_err(|e| anyhow::anyhow!("{e}"))?;
+            cb_for_pure("PTY 终端通道已就绪");
+            TerminalInstance::spawn_pure_ssh_channel(
+                sess_id_async.clone(),
+                session_name_async.clone(),
+                effective_address.clone(),
+                effective_port,
+                username_opt.clone(),
+                Some(launch_cfg_for_pure),
+                channel,
+                cols.max(80),
+                rows.max(24),
+            )
+        }.await;
+
+        let final_res = match pure_ssh_res {
+            Ok(instance) => {
+                tracing::info!(target: "smagical_ui::terminal", "纯 Rust 原生 SSH 交互会话就绪: [{}]", effective_address);
+                Ok(instance)
+            }
+            Err(e) => {
+                tracing::warn!(target: "smagical_ui::terminal", "纯 Rust 原生直连未就绪 ({:?})，平滑回退外部 SSH 驱动模式...", e);
+                emit_terminal_log(&sess_id_async, &format!("\x1b[33m[smalux] 原生 SSH 未就绪 ({e})，正在切换本地 OpenSSH 客户端 (ssh.exe) ...\x1b[0m\r\n"));
+                emit_terminal_log(&sess_id_async, "\x1b[36m[smalux]\x1b[0m 正在通过系统 OpenSSH 启动终端进程...\r\n");
+                TerminalInstance::spawn_ssh_advanced(
+                    sess_id_async.clone(),
+                    session_name_async.clone(),
+                    launch_config.clone(),
+                    cols.max(80),
+                    rows.max(24),
+                )
+                .map_err(|err| format!("SSH 会话连接失败: {}", err))
+            }
+        };
+
+        if let Ok(mut pending) = PENDING_SSH_CONNECTIONS.lock() {
+            pending.push((sess_id_async, final_res, Some(launch_config)));
+        }
+    });
+}
+
+/// 同步主机树状节点至 Slint `HostsBridge` 响应式模型。
+///
+/// # 算法与优化
+/// 1. **增量 Diff 对比**：通过 `compute_tree_diff` 对比旧节点与新节点集，若完全一致则直接短路返回，消除 0ms 冗余重绘；
+/// 2. **自适应内容宽度**：调用 `calculate_max_tree_width` 计算树节点文字层级最大象素宽度，保证长分组名称在水平滚动条中不发生遮挡截断；
+/// 3. **模型装配**：装配 `slint::ModelRc` 并更新 `tree_nodes` 与 `tree_content_width`。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `nodes`: 经过折叠/展开与搜索计算后的可视化树节点切片。
 fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
     let hb = w.global::<HostsBridge>();
     let current_tree = hb.get_tree_nodes();
@@ -47,6 +339,14 @@ fn sync_hosts_bridge_tree(w: &AppWindow, nodes: &[HostTreeNode]) {
     hb.set_tree_content_width(width);
 }
 
+/// 同步主机卡片网格列表至 Slint `HostsBridge`。
+///
+/// # 优化策略
+/// 通过 `compute_card_diff` 执行属性级浅对比，仅当卡片在线状态、地址、分组发生变动时才提交模型重载。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `cards`: 待渲染的主机卡片条目集合切片。
 fn sync_hosts_bridge_cards(w: &AppWindow, cards: &[HostItemData]) {
     let hb = w.global::<HostsBridge>();
     let current_cards = hb.get_hosts();
@@ -67,42 +367,88 @@ fn sync_hosts_bridge_cards(w: &AppWindow, cards: &[HostItemData]) {
     hb.set_hosts(model);
 }
 
+/// 同步新建/编辑弹窗中的父级分组下拉选择器候选项。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `options`: 计算包含缩进层级前缀的分组下拉选项切片。
 fn sync_hosts_bridge_options(w: &AppWindow, options: &[GroupOptionData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
     hb.set_group_options(model);
 }
 
+/// 同步新建/编辑主机弹窗中的关联凭据下拉候选列表。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `options`: 包含密码、私钥与 SSH Agent 的凭据选项列表。
 fn sync_hosts_bridge_credentials(w: &AppWindow, options: &[CredentialOptionData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
     hb.set_credential_options(model);
 }
 
+/// 同步跳板机单跳候选主机下拉列表。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `options`: 可作为 Bastion/Jump 主机的资产条目列表。
 fn sync_hosts_bridge_jump_hosts(w: &AppWindow, options: &[JumpHostOptionData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
     hb.set_jump_host_options(model);
 }
 
+/// 同步预设多跳跳板链路模板列表至 UI。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `options`: 预设链路配置切片。
 fn sync_hosts_bridge_preset_jump_chains(w: &AppWindow, options: &[PresetJumpChainData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
     hb.set_preset_jump_chains(model);
 }
 
+/// 同步网络代理候选配置列表至 UI。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `options`: 包含 SOCKS5 / HTTP 代理服务器的下拉选项。
 fn sync_hosts_bridge_proxies(w: &AppWindow, options: &[ProxyOptionData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(options.to_vec())));
     hb.set_proxy_options(model);
 }
 
+/// 同步新建主机弹窗中当前装配的多跳跳板链路项。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `chain`: 有序多跳跳板节点切片。
 fn sync_hosts_bridge_create_host_jump_chain(w: &AppWindow, chain: &[JumpHopItemData]) {
     let hb = w.global::<HostsBridge>();
     let model = slint::ModelRc::from(Rc::new(slint::VecModel::from(chain.to_vec())));
     hb.set_create_host_jump_chain(model);
 }
 
+/// 纯 UI 渲染函数：根据内存树形结构、展开集合与搜索词，全量装载至 Slint HostsBridge。
+///
+/// # 渲染步骤
+/// 1. 根据 `search_query` 判定：为空时调用 `build_visible_tree_nodes` 根据展开集合扁平化；
+///    非空时调用 `build_search_tree_nodes` 检索匹配节点并自动展开祖先链；
+/// 2. 同步树状节点与自适应宽度；
+/// 3. 对卡片网格依据名称、地址与分组进行模糊匹配与同步；
+/// 4. 重新计算并装配分组下拉选择树。
+///
+/// # 参数
+/// - `w`: Slint 主窗口句柄引用；
+/// - `tree`: 内存全量原始节点树；
+/// - `cards`: 内存全量主机卡片条目；
+/// - `expanded`: 当前侧边栏展开的分组 ID 集合；
+/// - `selector_expanded`: 弹窗分组树展开的节点 ID 集合；
+/// - `search_query`: 当前实时搜索关键词。
 #[allow(dead_code)]
 fn render_hosts_ui(
     w: &AppWindow,
@@ -136,6 +482,16 @@ fn render_hosts_ui(
     sync_hosts_bridge_options(w, &group_options);
 }
 
+/// 异步从存储层拉取全部资产数据并更新主树缓存与 Slint UI。
+///
+/// # 参数
+/// - `storage`: 核心存储仓储接口；
+/// - `master_tree`: 内存全量树全局读写锁；
+/// - `master_cards`: 内存卡片全局读写锁；
+/// - `expanded`: 侧边栏展开集合锁；
+/// - `selector_expanded`: 弹窗下拉展开集合锁；
+/// - `search_query`: 搜索词锁；
+/// - `window_weak`: UI 窗口弱引用句柄。
 async fn sync_ui_hosts_async(
     storage: &dyn AppStorage,
     master_tree: &Arc<RwLock<Vec<RawTreeNode>>>,
@@ -220,9 +576,24 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 3. 节点移动 / 拖拽层级调序回调
+    // 3. 节点移动 / 拖拽层级调序回调 (Drag & Drop Reorder & Reparenting)
     // -------------------------------------------------------------------------
-    // 鼠标拖拽松开后触发：支持树形层级物理迁移与卡片列表视觉调序双模式。
+    // 鼠标在主机树或卡片列表中拖拽释放后触发，具备智能双模式支持：
+    //
+    // # 回调入参
+    // - `src_id`: 被拖拽的源节点 ID（主机 ID 或分组 ID）；
+    // - `target_id`: 目标落点节点 ID（若为根目录则为空或 `"root"`）；
+    // - `drop_position`: 相对落点位置（`"before"` 前插 | `"after"` 后插 | `"inside"` 移入作为子级）。
+    //
+    // # 模式差异处理
+    // 1. **卡片网格列表模式 (`view_mode == "card"`)**：
+    //    - 仅调整纯视觉展示排序，绝对锁定所属分组关系（不修改 `parent_id`）；
+    //    - 异步调用 `storage.hosts().update_list_order` 持久化顺序数组；
+    // 2. **树形层级模式 (`view_mode == "tree"`)**：
+    //    - 物理迁移资产层级拓扑与文件夹归属关系；
+    //    - 调用 `move_and_reorder_raw_node` 执行防无环校验与父子重关联；
+    //    - 若拖入目标分组内部 (`"inside"`)，自动将该目标分组及其祖先加入展开集合并重新展开；
+    //    - 异步更新存储层中 `groups().move_group` 或 `hosts().save`。
     let window_weak = window.as_weak();
     let master_tree_move = Arc::clone(&ctx.master_tree);
     let master_cards_move = Arc::clone(&ctx.master_cards);
@@ -380,9 +751,20 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 4. 拖拽悬停实时计算回调
+    // 4. 拖拽悬停实时计算回调 (Drag Hover Indicator & Legality Assessment)
     // -------------------------------------------------------------------------
-    // 鼠标在列表中拖拽悬停移动时触发，用于实时计算目标节点是否合法并计算高亮吸附下划线/边框位置。
+    // 鼠标在树节点或卡片列表中拖拽滑过时高频触发，执行毫秒级轻量合法性计算：
+    //
+    // # 回调入参
+    // - `src_id`: 当前被拖拽的源节点 ID；
+    // - `target_idx`: 当前鼠标悬停命中的渲染行索引（若小于 0 则视为拖拽至顶层根区域）；
+    // - `_offset_in_row`: 悬停在行内的垂直相对偏移量（预留）。
+    //
+    // # 三大防呆与吸附规则
+    // 1. **自身放置拦截**：若目标节点与源节点相同，设置 `drop_target_valid = false`，禁止自身放入自身；
+    // 2. **循环嵌套阻断**：若源节点为分组，向上逐级回溯目标节点的祖先链，若发现源节点存在于目标节点的祖先链中，
+    //    立即拦截（禁止将父分组拖入其子代分组内造成拓扑成环孤立）；
+    // 3. **吸附反馈**：合法悬停时将吸附位置属性回写至 Slint（文件夹高亮整行边框表示移入内部，主机节点高亮底部横线表示插入后方）。
     let window_weak = window.as_weak();
     let master_tree_hover = Arc::clone(&ctx.master_tree);
     let master_cards_hover = Arc::clone(&ctx.master_cards);
@@ -495,9 +877,19 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 5. 新建分组模态对话框提交回调
+    // 5. 新建分组模态对话框提交回调 (Create Group Dialog Submission)
     // -------------------------------------------------------------------------
-    // 接收弹窗输入的分组名称与指定父级 ID，在树中创建分组并异步持久化到 AppStorage (0ms UI 阻塞)。
+    // 接收弹窗输入的分组名称与指定父级 ID，在树中创建分组并异步持久化到 AppStorage。
+    //
+    // # 回调入参
+    // - `parent_id`: 父级分组 ID（若为根目录或为空，则创建根分组）；
+    // - `name`: 新分组的人类可读展示名称。
+    //
+    // # 处理流程
+    // 1. 自动分配唯一的 `grp-custom-{counter}` 标识符；
+    // 2. 根据父节点计算嵌套层级 `level = parent.level + 1`；
+    // 3. 构造 [`GroupRecord`] 并异步非阻塞写入数据库；
+    // 4. 定位同级兄弟节点末尾作为插入点，自动将父级及自身加入展开集合，立即刷新树形视图。
     let window_weak = window.as_weak();
     let master_tree_create = Arc::clone(&ctx.master_tree);
     let expanded_create = Arc::clone(&ctx.expanded_groups);
@@ -594,8 +986,12 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 6. 主机实时搜索过滤回调 (优化点 1 & 4：下沉至 Tokio 后台并发计算 + 增量比对 Diff，0ms 阻塞 UI)
+    // 6. 主机实时搜索过滤回调 (Search Input Filter Engine)
     // -------------------------------------------------------------------------
+    // 响应顶部资产搜索框输入变化，全量下沉至 Tokio 后台并发计算与增量 Diff 比对，0ms 阻塞 UI 线程。
+    //
+    // # 回调入参
+    // - `query`: 用户输入的搜索匹配字符串（支持主机名、IP、分组与用户名模糊匹配）。
     let window_weak = window.as_weak();
     let host_store_filter = Arc::clone(&ctx.host_store);
     let event_dispatcher_filter = ctx.core_state.event_manager().global().clone();
@@ -609,11 +1005,18 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 7. 打开主机终端会话回调
-    // -------------------------------------------------------------------------
-    // 8. 双击主机 / 本地 Shell 发起终端连接回调
+    // 7. 双击主机 / 本地 Shell 发起终端连接回调 (Open Terminal Session)
     // -------------------------------------------------------------------------
     // 双击树形或卡片列表中的某个主机（或选择本地 Shell）时触发，分配会话 ID 并激活新 Tab。
+    //
+    // # 会话分流与拓扑穿透
+    // 1. **本地 Shell 判定 (`host_id.starts_with("local-")`)**：
+    //    - 提取本地终端描述与启动环境（Git Bash、WSL、PowerShell、CMD 等）；
+    //    - 实例化本地 PTY 进程；
+    // 2. **远程 SSH 会话**：
+    //    - 检查多跳跳板链路（Bastion Chain）与出站网络代理参数；
+    //    - 解析关联解密私钥或密码；
+    //    - 派发终端创建事件并在当前活动分屏窗格挂载新会话。
     let window_weak = window.as_weak();
     let master_tree_open = Arc::clone(&ctx.master_tree);
     let pane_groups_open = Rc::clone(&ctx.pane_groups);
@@ -682,9 +1085,10 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 (sess_id, info)
             } else {
                 let tree = master_tree_open.read().unwrap();
-                let Some(host_node) = tree.iter().find(|n| n.id == h_id && !n.is_group) else {
+                let Some(host_node) = tree.iter().find(|n| n.id == h_id && !n.is_group).cloned() else {
                     return;
                 };
+                drop(tree);
 
                 let mut num = next_session_num_open.borrow_mut();
                 let sess_id = format!("sess-{}", *num);
@@ -696,58 +1100,53 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
                 let session_name = format!("{} #{}", host_node.name, total_sess_count + 1);
 
-                // 纯内存 0ms 获取有效用户名（优先使用凭据，无凭据或未设时回退使用主机直录账号）
-                let username_opt = host_node.effective_username.clone();
-
-                let instance_res = TerminalInstance::spawn_ssh(
-                    sess_id.clone(),
-                    session_name.clone(),
-                    &host_node.address,
-                    host_node.port as u16,
-                    username_opt.as_deref(),
-                    120,
-                    32,
-                )
-                .or_else(|e| {
-                    tracing::warn!(target: "smagical_ui::terminal", "SSH 会话启动失败: {:?}，回退本地终端...", e);
-                    TerminalInstance::spawn_local(
-                        sess_id.clone(),
-                        "local-powershell",
-                        session_name.clone(),
-                        120,
-                        32,
-                    )
-                    .or_else(|_| {
-                        TerminalInstance::spawn_local(
-                            sess_id.clone(),
-                            "local-cmd",
-                            session_name.clone(),
-                            120,
-                            32,
-                        )
-                    })
-                });
-
-                match instance_res {
-                    Ok(instance) => {
-                        active_terminals_open.borrow_mut().insert(sess_id.clone(), instance);
-                    }
-                    Err(err) => {
-                        tracing::error!(target: "smagical_ui::terminal", "终端会话创建失败: {:?}", err);
-                        ctx_open.notify_error("连接失败", format!("无法创建终端会话: {}", err));
-                        return;
-                    }
-                }
-
+                // 立即返回 connecting 状态会话信息，0ms 瞬时开启 Tab (杜绝 UI 线程阻塞假死)
                 let info = TerminalSessionInfo {
                     session_id: sess_id.clone(),
                     host_id: host_node.id.clone(),
                     host_name: host_node.name.clone(),
                     host_address: host_node.address.clone(),
-                    host_status: host_node.status.clone(),
+                    host_status: "connecting".to_string(),
                     ping_ms: host_node.ping_ms,
-                    display_title: session_name,
+                    display_title: session_name.clone(),
                 };
+
+                let tb = w.global::<TerminalBridge>();
+                let cols = (tb.get_terminal_cols() as u16).max(80);
+                let rows = (tb.get_terminal_rows() as u16).max(24);
+                let initial_config = SshLaunchConfig {
+                    host: host_node.address.clone(),
+                    port: host_node.port as u16,
+                    username: host_node.effective_username.clone(),
+                    ..Default::default()
+                };
+                let connecting_inst = TerminalInstance::spawn_connecting(
+                    sess_id.clone(),
+                    session_name.clone(),
+                    host_node.address.clone(),
+                    host_node.port as u16,
+                    host_node.effective_username.clone(),
+                    Some(initial_config),
+                    cols,
+                    rows,
+                );
+                active_terminals_open.borrow_mut().insert(sess_id.clone(), connecting_inst);
+
+                // 启动后台异步 SSH 连接管线 (零 UI 阻塞)
+                spawn_ssh_connection_pipeline(
+                    sess_id.clone(),
+                    session_name.clone(),
+                    host_node.id.clone(),
+                    host_node.name.clone(),
+                    host_node.address.clone(),
+                    host_node.port as u16,
+                    host_node.effective_username.clone(),
+                    ctx_open.core_state.storage().clone(),
+                    ctx_open.core_state.ssh().clone(),
+                    cols,
+                    rows,
+                );
+
                 (sess_id, info)
             };
 
@@ -757,6 +1156,12 @@ pub(crate) fn register_host_handlers(window: &AppWindow, ctx: &AppContext) {
                 host_id: info.host_id.clone(),
                 action: "opened".into(),
             });
+            crate::audit_logger::record_audit_event(
+                &sess_id,
+                &format!("{}({})", info.host_name, info.host_address),
+                "SESSION_OPENED",
+                &format!("已建立终端会话，标题: {}", info.display_title),
+            );
             crate::handlers::history_handlers::sync_ui_history(&w, &ctx_open);
 
 

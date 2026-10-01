@@ -14,6 +14,16 @@ use crate::generated::{AppWindow, JumpHopData, TerminalBridge, TunnelItemData, T
 use crate::handlers::AppContext;
 use crate::tunnel_daemon::TunnelDaemonService;
 
+/// 实时根据勾选的跳板节点生成原生 OpenSSH 多跳命令行预览。
+///
+/// # 算法逻辑
+/// 1. 过滤出所有 `enabled == true` 的跳板节点；
+/// 2. 拼接地址：若端口为 22 则省略，否则追加 `:port`；
+/// 3. 用逗号 `,` 串联生成标准 `ssh -J hop1,hop2 target-user@target-host` 命令并回显至表单。
+///
+/// # 参数
+/// - `tb`: Slint TunnelsBridge 领域总线句柄；
+/// - `hops`: 当前链路的跳板节点切片。
 fn update_jump_command_preview(tb: &TunnelsBridge, hops: &[JumpHopData]) {
     let active_hops: Vec<String> = hops.iter()
         .filter(|h| h.enabled)
@@ -34,6 +44,15 @@ fn update_jump_command_preview(tb: &TunnelsBridge, hops: &[JumpHopData]) {
     tb.set_form_ssh_command(cmd.into());
 }
 
+/// 将核心领域模型 [`TunnelRecord`] 转换为 Slint 渲染所需的数据传输模型 [`TunnelItemData`]。
+///
+/// # 状态推导逻辑
+/// - `is_running == true`: 标记为 `"running"`（绿色运行中）；
+/// - `enabled == true` 且 `run_mode == FollowTerminal`: 标记为 `"standby"`（黄色伴随终端待命）；
+/// - 其余状态: 标记为 `"stopped"`（灰色已停止）。
+///
+/// # 参数
+/// - `t`: 核心领域层隧道数据实体引用。
 fn convert_tunnel_to_item_data(t: &TunnelRecord) -> TunnelItemData {
     let (traffic_in, traffic_out) = t.formatted_traffic();
     let host_addr = t.ssh_host_name.clone();
@@ -78,7 +97,15 @@ fn convert_tunnel_to_item_data(t: &TunnelRecord) -> TunnelItemData {
     }
 }
 
-/// 将网络隧道规则详情同步回显至 TunnelsBridge 表单状态
+/// 将网络隧道规则详情同步回显至 TunnelsBridge 表单状态。
+///
+/// # 属性载入
+/// 载入规则基础属性（ID、名称、类型、SSH 主机、端口绑定、运行模式）、
+/// 动态流量指标（接收与发送字节量）、多跳跳板链路列表以及代理鉴权账号密码。
+///
+/// # 参数
+/// - `tb`: Slint TunnelsBridge 全局单例句柄；
+/// - `tun`: 待回显展示的隧道实体。
 pub(crate) fn load_tunnel_into_bridge(tb: &TunnelsBridge, tun: &TunnelRecord) {
     let (traffic_in, traffic_out) = tun.formatted_traffic();
     let ssh_cmd = tun.generate_ssh_command(&tun.ssh_host_name, "root");
@@ -120,7 +147,26 @@ pub(crate) fn load_tunnel_into_bridge(tb: &TunnelsBridge, tun: &TunnelRecord) {
     tb.set_form_proxy_password(tun.proxy_password.clone().into());
 }
 
-/// 纯 UI 渲染函数：根据全量隧道记录列表、分类与搜索关键词，过滤并装载到 Slint TunnelsBridge
+/// 纯 UI 渲染函数：根据全量隧道记录列表、分类与搜索关键词，过滤并装载到 Slint `TunnelsBridge`
+///
+/// # 业务逻辑
+/// 1. **双重过滤机制**：
+///    - **分类过滤 (`cat`)**：
+///      - `"all"`: 包含所有类型规则；
+///      - `"forward"`: 端口转发规则（包含 `Local`, `Remote`, `Dynamic`, `ReverseDynamic`）；
+///      - `"jump"`: 多跳跳板链路规则（`JumpHost`）；
+///      - `"proxy"`: 出网代理服务器规则（`ProxyServer`）。
+///    - **关键词模糊匹配 (`query`)**：
+///      - 不区分大小写匹配规则名称、远端主机、本地端口、远端端口、关联 SSH 主机名以及备注说明。
+/// 2. **自动状态补全与选中焦点维护**：
+///    - 若当前活动选中项不在过滤结果中，自动选中第一项并加载其表单详情；
+///    - 若当前项仍存在，就地更新其实时运行态（`is_running`、`enabled`、活跃连接数与格式化流量），避免 UI 闪烁。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口上下文句柄；
+/// - `all_tunnels`: 从存储层拉取的全量隧道规则镜像切片；
+/// - `cat`: 当前选中的分类过滤器标识；
+/// - `query`: 搜索框中输入的文本关键词。
 pub(crate) fn render_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRecord], cat: &str, query: &str) {
     let query_lower = query.trim().to_lowercase();
     let filtered: Vec<TunnelItemData> = all_tunnels
@@ -184,7 +230,13 @@ pub(crate) fn render_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRecord]
     }
 }
 
-/// 异步从存储层拉取隧道记录并更新 Slint TunnelsBridge
+/// 异步从存储层拉取全量网络隧道记录并调度回主 UI 线程更新 Slint `TunnelsBridge`
+///
+/// # 参数
+/// - `window_weak`: Slint 主窗口弱引用，用于跨异步边界安全升级；
+/// - `storage`: 仓储服务抽象接口 `Arc<dyn AppStorage>`；
+/// - `cat`: 分类过滤器标识；
+/// - `query`: 检索关键词。
 pub(crate) fn sync_ui_tunnels_async(
     window_weak: slint::Weak<AppWindow>,
     storage: std::sync::Arc<dyn smagical_core::AppStorage>,
@@ -202,6 +254,10 @@ pub(crate) fn sync_ui_tunnels_async(
 }
 
 /// 同步更新 Slint 网络隧道与代理规则列表 (非阻塞发起异步查询)
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let storage = ctx.core_state.storage().clone();
@@ -210,7 +266,20 @@ pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
     sync_ui_tunnels_async(window_weak, storage, cat, query);
 }
 
-/// 纯 UI 渲染函数：同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 TunnelsBridge
+/// 纯 UI 渲染函数：同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 `TunnelsBridge`
+///
+/// # 业务规则
+/// 1. **本地环境保护**：
+///    - 若 `active_host_id` 为 `local-*` 或 `local`，表示为本地 PowerShell/CMD/Bash 终端，不支持且无需配置远程端口转发；
+/// 2. **远程主机归属匹配**：
+///    - 仅过滤出端口转发类型（`Local`, `Remote`, `Dynamic`, `ReverseDynamic`）；
+///    - 匹配 `ssh_host_id` 精确对齐，或回退匹配 `ssh_host_name` 忽略大小写；
+/// 3. **状态绑定**：
+///    - 更新 `TunnelsBridge` 中的 `active_host_name`、`active_host_id` 以及 `host_tunnels` 模型。
+///
+/// # 参数
+/// - `window`: Slint 应用窗口；
+/// - `all_tunnels`: 全量隧道记录切片。
 pub(crate) fn render_host_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRecord]) {
     let term_b = window.global::<TerminalBridge>();
     let host_id = term_b.get_active_host_id().to_string();
@@ -266,6 +335,10 @@ pub(crate) fn render_host_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRe
 }
 
 /// 异步从存储层拉取隧道记录并同步当前活动终端主机专属的端口转发规则
+///
+/// # 参数
+/// - `window_weak`: Slint 主窗口弱引用；
+/// - `storage`: 仓储服务抽象接口。
 pub(crate) fn sync_ui_host_tunnels_async(
     window_weak: slint::Weak<AppWindow>,
     storage: std::sync::Arc<dyn smagical_core::AppStorage>,
@@ -280,18 +353,38 @@ pub(crate) fn sync_ui_host_tunnels_async(
     });
 }
 
-/// 同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 TunnelsBridge
+/// 同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 `TunnelsBridge`
+///
+/// # 参数
+/// - `window`: Slint 应用主窗口；
+/// - `ctx`: 全局应用上下文。
 pub(crate) fn sync_ui_host_tunnels(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let storage = ctx.core_state.storage().clone();
     sync_ui_host_tunnels_async(window_weak, storage);
 }
 
-/// 注册所有网络隧道相关 UI 回调 (全部挂载至 TunnelsBridge 领域总线)
+/// 注册所有网络隧道、跳板机链路与代理服务相关 UI 回调
+///
+/// 本函数将所有网络规则的前端事件完整挂载至 Slint `TunnelsBridge`，涵盖：
+/// 1. **主机专属转发抽屉联动**：实时刷新当前远程会话关联的专属隧道；
+/// 2. **规则选中与双向装载**：在主表单与右侧编辑区双向绑定；
+/// 3. **启停受控流转**：结合 `TunnelRunMode` 判定伴随应用启动还是伴随终端启动；
+/// 4. **热重载保存与生命周期控制**：更新配置前先优雅关闭旧通道释放端口，保存后自动以新配置拉起；
+/// 5. **安全删除审查**：拦截正在运行规则的误删行为；
+/// 6. **跳板机多跳链路交互**：多级 Jump Host 节点的动态增删、上下调序与启闭；
+/// 7. **原生 OpenSSH 命令生成与剪贴板集成**。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
     let tb = window.global::<TunnelsBridge>();
 
-    // 0. 同步主机专属隧道列表
+    // -------------------------------------------------------------------------
+    // 0. 同步主机专属隧道与全量规则列表
+    // -------------------------------------------------------------------------
+    // 触发场景：终端切换会话、主机连接建立或断开、规则列表需要全量重绘时调用。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -303,7 +396,15 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 0.1 打开主机专属端口转发新建弹窗 (直接弹窗，锁定绑定当前主机)
+    // -------------------------------------------------------------------------
+    // 0.1 打开主机专属端口转发新建弹窗
+    // -------------------------------------------------------------------------
+    // 触发场景：在右侧工具栏抽屉中点击“为当前主机新建转发规则”。
+    // 业务逻辑：
+    // 1. 本地终端防御拦截：若当前为本地控制台 (local-*)，直接阻断并弹出告警，防止无意义的网络转发；
+    // 2. 自动绑定上下文：解析当前激活的终端标签 `host_id` 与 `host_name`，绑定到表单；
+    // 3. 初始模板注入：设置默认端口（127.0.0.1:8080 -> 127.0.0.1:80）、运行模式为 FollowTerminal；
+    // 4. 打开 Slint 模态对话框 `is_create_host_tunnel_modal_open`。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -366,7 +467,10 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 0.2 关闭主机专属端口转发新建弹窗
+    // -------------------------------------------------------------------------
+    // 触发场景：用户在主机转发弹窗中点击“取消”或模态框背景遮罩。
     {
         let w_handle = window.as_weak();
         tb.on_close_create_host_tunnel_modal(move || {
@@ -379,7 +483,14 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 1. 选中隧道规则 (查看详情)
+    // -------------------------------------------------------------------------
+    // 触发场景：在隧道列表中点击某项规则。
+    // 业务逻辑：
+    // 1. 设置当前活动选中项 ID；
+    // 2. 退出新建模式与编辑模式；
+    // 3. 异步从 SQLite 存储层拉取实体记录，并调用 `load_tunnel_into_bridge` 回填表单与统计数据。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -407,13 +518,25 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 2. 切换隧道运行状态 (单 Switch 掌管规则启闭，并根据运行模式启停物理通道)
+    // -------------------------------------------------------------------------
+    // 统一处理 `on_toggle_tunnel`、`on_start_tunnel` 与 `on_stop_tunnel`。
+    // 业务状态机流转：
+    // - 停用 (`enabled: false`)：
+    //   调用 `stop_tunnel` 强制释放物理端口监听，清除运行标志，持久化更新。
+    // - 启用 (`enabled: true`)：
+    //   - 若为 `FollowApp`（随应用常驻）：立即尝试拉起底层监听；
+    //   - 若为 `FollowTerminal`（随终端启动）：
+    //     检查其关联的远程主机是否已在当前会话窗格中建立连接。若已连通则立即拉起；若未连通则进入待命 (Standby) 状态。
+    // - 状态广播：分发 `TunnelStateChangedEvent`，并以 Toast 提示端口异常与就绪状态。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
         let toggle_handler = move |id: slint::SharedString, explicit_target: Option<bool>| {
             let id_str = id.to_string();
             let storage = ctx.core_state.storage();
+            let tunnels_svc = ctx.core_state.tunnels();
             let events = ctx.core_state.events().clone();
             let connected_hosts: std::collections::HashSet<String> = ctx
                 .pane_groups
@@ -434,7 +557,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         // 规则被启用：依据运行策略决定是否立即拉起底层监听
                         match tun.run_mode {
                             TunnelRunMode::FollowApp => {
-                                let started = TunnelDaemonService::try_start_tunnel(&storage, &tun).await;
+                                let started = TunnelDaemonService::try_start_tunnel(&storage, &tunnels_svc, &tun).await;
                                 tun.is_running = started;
                                 if !started {
                                     warn_msg = Some(format!(
@@ -452,7 +575,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                                     .unwrap_or(false);
 
                                 if is_host_connected {
-                                    let started = TunnelDaemonService::try_start_tunnel(&storage, &tun).await;
+                                    let started = TunnelDaemonService::try_start_tunnel(&storage, &tunnels_svc, &tun).await;
                                     tun.is_running = started;
                                     if !started {
                                         warn_msg = Some(format!(
@@ -469,7 +592,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         }
                     } else {
                         // 规则被停用：释放端口，停止监听
-                        TunnelDaemonService::stop_tunnel(&storage, &id_str).await;
+                        TunnelDaemonService::stop_tunnel(&storage, &tunnels_svc, &id_str).await;
                         tun.is_running = false;
                     }
 
@@ -532,7 +655,11 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         tb.on_stop_tunnel(t_stop);
     }
 
+    // -------------------------------------------------------------------------
     // 3. 开始新建规则
+    // -------------------------------------------------------------------------
+    // 触发场景：在隧道主页面点击“新建规则”按钮。
+    // 业务逻辑：生成随机时间戳 ID，重置表单为标准 Local 端口转发默认参数，开启编辑模式。
     {
         let w_handle = window.as_weak();
         tb.on_start_create(move || {
@@ -572,7 +699,13 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 3.B 开始新建指定类型的网络规则 (端口转发 / 跳板机 / 出网代理)
+    // -------------------------------------------------------------------------
+    // 触发场景：在新建下拉菜单中明确选择规则类型：
+    // - `"JumpHost"`: 多级跳板链路，初始化 hops 列表，SSH 命令默认 `-J`；
+    // - `"ProxyServer"`: 出网代理服务，默认 SOCKS5 协议，常用端口 7890，启用远端 DNS 与伴随应用启动；
+    // - 其它类型: 本地或远程端口转发模板。
     {
         let w_handle = window.as_weak();
         tb.on_create_new_tunnel(move |target_type| {
@@ -655,7 +788,11 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 4. 取消新建
+    // -------------------------------------------------------------------------
+    // 4. 取消新建规则
+    // -------------------------------------------------------------------------
+    // 触发场景：在新建表单中点击“取消”按钮。
+    // 业务逻辑：退出新建与编辑状态，异步从仓储查询首条规则恢复选中，若无记录则置空。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -684,7 +821,11 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 5. 开始编辑
+    // -------------------------------------------------------------------------
+    // 5. 开始编辑规则
+    // -------------------------------------------------------------------------
+    // 触发场景：在规则详情面板中点击“编辑”按钮。
+    // 业务逻辑：置 `is_editing` 为 true，解锁前端输入控件。
     {
         let w_handle = window.as_weak();
         tb.on_start_edit(move || {
@@ -694,7 +835,11 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 6. 取消编辑
+    // -------------------------------------------------------------------------
+    // 6. 取消编辑规则
+    // -------------------------------------------------------------------------
+    // 触发场景：在编辑状态下点击“取消修改”。
+    // 业务逻辑：关闭可编辑态，从存储层重新拉取当前选中 ID 的最新持久化记录，还原被修改的表单内容。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -719,7 +864,16 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 7. 保存规则 (新建或修改 - 严格遵循“修改时先关闭旧通道、再保存新配置、后根据开关状态重新拉起”的安全热重载生命周期)
+    // -------------------------------------------------------------------------
+    // 7. 保存规则 (新建或修改 - 严格遵循安全热重载生命周期)
+    // -------------------------------------------------------------------------
+    // 处理流程：
+    // 1. 字段非空与合法性校验（规则名称、端口范围）；
+    // 2. 派发前置审查事件 `TunnelBeforeSaveEvent`，允许插件或内置审计拦截高危修改；
+    // 3. 【核心要求：修改时先关闭旧通道】若已有通道处于运行状态，首先调用 `stop_tunnel` 释放物理端口；
+    // 4. 组装新实体记录并持久化保存到仓储中，派发 `TunnelSavedEvent`；
+    // 5. 【核心要求：按新配置重新拉取/拉起】依据用户设定的开关与运行策略（FollowApp / FollowTerminal）决定是否即刻拉起底层通道；
+    // 6. UI 状态全面水合（主页面列表与右侧专属抽屉同步更新）。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -810,6 +964,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                     .collect();
 
                 let storage = ctx.core_state.storage();
+                let tunnels_svc = ctx.core_state.tunnels();
                 let events = ctx.core_state.events().clone();
                 let notif = ctx.notifications.clone();
                 let cat = ctx.tunnel_filter_category.borrow().clone();
@@ -824,7 +979,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                     // 【核心要求：修改时先关闭旧通道】
                     if let Some(ref old_tun) = old_record {
                         if old_tun.is_running {
-                            TunnelDaemonService::stop_tunnel(&storage, &old_tun.id).await;
+                            TunnelDaemonService::stop_tunnel(&storage, &tunnels_svc, &old_tun.id).await;
                             events.dispatch(&TunnelStateChangedEvent {
                                 tunnel_id: old_tun.id.clone(),
                                 is_running: false,
@@ -878,7 +1033,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         if record.enabled {
                             match record.run_mode {
                                 TunnelRunMode::FollowApp => {
-                                    actually_started = TunnelDaemonService::try_start_tunnel(&storage, &record).await;
+                                    actually_started = TunnelDaemonService::try_start_tunnel(&storage, &tunnels_svc, &record).await;
                                     if actually_started {
                                         record.is_running = true;
                                     }
@@ -888,7 +1043,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                                         .map(|hid| connected_hosts.contains(hid))
                                         .unwrap_or(false);
                                     if is_host_connected {
-                                        actually_started = TunnelDaemonService::try_start_tunnel(&storage, &record).await;
+                                        actually_started = TunnelDaemonService::try_start_tunnel(&storage, &tunnels_svc, &record).await;
                                         if actually_started {
                                             record.is_running = true;
                                         }
@@ -936,7 +1091,14 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 8. 删除规则
+    // -------------------------------------------------------------------------
+    // 业务流程与安全防线：
+    // 1. 查询当前规则运行状态，派发前置审查 `TunnelBeforeDeleteEvent`；
+    // 2. 若规则处于运行中，坚决拦截删除操作，防止意外切断正在通信的底层连接；
+    // 3. 执行仓储持久化删除，分发 `TunnelDeletedEvent`；
+    // 4. 重查剩余规则，焦点自动回退至第一项并重新装载表单。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -986,7 +1148,11 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 9. 复制原生 OpenSSH 命令
+    // -------------------------------------------------------------------------
+    // 触发场景：在详情面板中点击“复制 SSH 命令”。
+    // 业务逻辑：调用 `generate_ssh_command` 将规则转换成 OpenSSH CLI 命令行参数并写入系统剪贴板。
     {
         let ctx = ctx.clone();
         tb.on_copy_ssh_command(move |id| {
@@ -1005,7 +1171,10 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 10. 过滤检索与分类切换
+    // -------------------------------------------------------------------------
+    // 触发场景：在搜索框中键入关键词或切换分类 Tab（全部/端口转发/跳板机/代理）。
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -1027,7 +1196,10 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 11. 复制自定义文本
+    // -------------------------------------------------------------------------
+    // 触发场景：点击表单中的 IP:Port、命令预览等文本直接复制到剪贴板。
     {
         let notif_custom_copy = ctx.notifications.clone();
         tb.on_copy_custom_text(move |text, title, msg| {
@@ -1040,7 +1212,10 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 12. 跳板链路节点操作回调 (添加/删除/调序/启停)
+    // -------------------------------------------------------------------------
+    // 12. 跳板链路节点操作回调 (添加 / 删除 / 向上移 / 向下移 / 启闭切换)
+    // -------------------------------------------------------------------------
+    // 业务流转：对多级 Jump Host 节点做有序排列，每次改动后实时重算并更新预览 `-J host1,host2...`。
     {
         let w_handle = window.as_weak();
         tb.on_add_jump_hop(move |id, name, addr, port| {
@@ -1135,6 +1310,8 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
+    // -------------------------------------------------------------------------
     // 13. 初始化同步当前主机专属隧道
+    // -------------------------------------------------------------------------
     sync_ui_host_tunnels(window, ctx);
 }

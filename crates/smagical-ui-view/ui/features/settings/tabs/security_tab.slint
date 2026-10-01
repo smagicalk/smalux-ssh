@@ -49,8 +49,10 @@ export component SettingsSecurityTab inherits VerticalLayout {
                             SettingsBridge.master-pwd-new = "";
                             SettingsBridge.master-pwd-confirm = "";
                             SettingsBridge.master-pwd-error-msg = "";
-                        } else if !c {
-                            SettingsBridge.setting-master-password-enabled = false;
+                        } else if !c && SettingsBridge.setting-master-password-enabled {
+                            SettingsBridge.is-remove-pwd-modal-open = true;
+                            SettingsBridge.remove-pwd-input = "";
+                            SettingsBridge.remove-pwd-error-msg = "";
                         }
                     }
                 }
@@ -59,19 +61,33 @@ export component SettingsSecurityTab inherits VerticalLayout {
 
         if SettingsBridge.setting-master-password-enabled: SettingsRow {
             title: @tr("主密码管理 (Manage Master Password)");
-            subtitle: @tr("随时验证旧密码并更新客户端主密码");
+            subtitle: @tr("更新主密码或离开电脑时手动一键锁定保险箱");
 
-            AppButton {
-                text: @tr("修改主密码...");
-                variant: "secondary";
-                has-icon: true;
-                icon: @image-url("../../../assets/icons/key.svg");
-                clicked => {
-                    SettingsBridge.is-master-pwd-modal-open = true;
-                    SettingsBridge.master-pwd-old = "";
-                    SettingsBridge.master-pwd-new = "";
-                    SettingsBridge.master-pwd-confirm = "";
-                    SettingsBridge.master-pwd-error-msg = "";
+            HorizontalLayout {
+                spacing: 8px;
+
+                AppButton {
+                    text: @tr("立即锁定");
+                    variant: "secondary";
+                    has-icon: true;
+                    icon: @image-url("../../../assets/icons/lock.svg");
+                    clicked => {
+                        SettingsBridge.lock-vault();
+                    }
+                }
+
+                AppButton {
+                    text: @tr("修改主密码...");
+                    variant: "secondary";
+                    has-icon: true;
+                    icon: @image-url("../../../assets/icons/key.svg");
+                    clicked => {
+                        SettingsBridge.is-master-pwd-modal-open = true;
+                        SettingsBridge.master-pwd-old = "";
+                        SettingsBridge.master-pwd-new = "";
+                        SettingsBridge.master-pwd-confirm = "";
+                        SettingsBridge.master-pwd-error-msg = "";
+                    }
                 }
             }
         }
@@ -103,7 +119,10 @@ export component SettingsSecurityTab inherits VerticalLayout {
                         animate background { duration: 120ms; }
 
                         lk-t := TouchArea {
-                            clicked => { SettingsBridge.setting-auto-lock-timeout = lk.id; }
+                            clicked => {
+                                SettingsBridge.setting-auto-lock-timeout = lk.id;
+                                SettingsBridge.change-auto-lock-timeout(lk.id);
+                            }
                             mouse-cursor: pointer;
                         }
 
@@ -128,7 +147,11 @@ export component SettingsSecurityTab inherits VerticalLayout {
             title: @tr("Windows Hello / 生物识别快捷解锁 (Biometric Unlock)");
             subtitle: @tr("允许首次通过主密码解锁后，使用系统指纹或面容识别快捷解锁");
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-biometric-unlock;
+                checked: SettingsBridge.setting-biometric-unlock;
+                toggled(c) => {
+                    SettingsBridge.setting-biometric-unlock = c;
+                    SettingsBridge.change-biometric-unlock(c);
+                }
             }
         }
 
@@ -137,7 +160,11 @@ export component SettingsSecurityTab inherits VerticalLayout {
             subtitle: @tr("将客户端最小化到系统托盘或切出后台时立即清除内存派生密钥");
             show-border: false;
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-lock-on-minimize;
+                checked: SettingsBridge.setting-lock-on-minimize;
+                toggled(c) => {
+                    SettingsBridge.setting-lock-on-minimize = c;
+                    SettingsBridge.change-lock-on-minimize(c);
+                }
             }
         }
     }
@@ -152,7 +179,11 @@ export component SettingsSecurityTab inherits VerticalLayout {
             title: @tr("敏感剪贴板自动清除 (Clear Clipboard Timeout)");
             subtitle: @tr("从凭据库或终端复制密码/私钥 30 秒后自动清空系统剪贴板，防止恶意窥探");
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-clear-clipboard-timeout;
+                checked: SettingsBridge.setting-clear-clipboard-timeout;
+                toggled(c) => {
+                    SettingsBridge.setting-clear-clipboard-timeout = c;
+                    SettingsBridge.change-clear-clipboard-timeout(c);
+                }
             }
         }
 
@@ -160,7 +191,11 @@ export component SettingsSecurityTab inherits VerticalLayout {
             title: @tr("高危破坏性指令执行预警 (Dangerous Command Warning)");
             subtitle: @tr("在终端中输入 rm -rf, mkfs, reboot, fdisk 等危险命令时突出高亮警示");
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-confirm-dangerous-commands;
+                checked: SettingsBridge.setting-confirm-dangerous-commands;
+                toggled(c) => {
+                    SettingsBridge.setting-confirm-dangerous-commands = c;
+                    SettingsBridge.change-confirm-dangerous-commands(c);
+                }
             }
         }
 
@@ -169,7 +204,11 @@ export component SettingsSecurityTab inherits VerticalLayout {
             subtitle: @tr("在本地安全加密记录所有终端连接历史、高危操作命令时间戳与审计踪迹");
             show-border: false;
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-session-audit-logging;
+                checked: SettingsBridge.setting-session-audit-logging;
+                toggled(c) => {
+                    SettingsBridge.setting-session-audit-logging = c;
+                    SettingsBridge.change-session-audit-logging(c);
+                }
             }
         }
     }

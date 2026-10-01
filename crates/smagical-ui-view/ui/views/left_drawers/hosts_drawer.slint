@@ -407,7 +407,7 @@ export component HostsDrawer inherits DrawerContainer {
                                         width: 13px;
                                         height: 13px;
                                         image-fit: contain;
-                                        colorize: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid) ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        colorize: (node.is-expanded || (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid)) ? AppTheme.accent : AppTheme.secondary-foreground;
                                     }
 
                                     if !node.is-group: Image {

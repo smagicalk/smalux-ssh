@@ -259,7 +259,7 @@ mod win_tray {
                                         win.focus_window();
                                     });
                                     // 打开快捷启动器/新建连接窗口
-                                    w.global::<crate::generated::WindowBridge>().set_is_command_palette_open(true);
+                                    w.global::<crate::generated::WindowBridge>().set_is_new_session_modal_open(true);
                                 }
                             });
                         }

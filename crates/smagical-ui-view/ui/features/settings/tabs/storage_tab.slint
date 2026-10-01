@@ -42,7 +42,6 @@ export component SettingsStorageTab inherits VerticalLayout {
         SettingsRow {
             title: @tr("从本地加密备份包还原资产 (Restore Backup)");
             subtitle: @tr("选择本机已导出的 .smalux / .json 备份文件，无损恢复全部主机资产与凭据");
-            show-border: false;
 
             AppButton {
                 width: 156px;
@@ -51,6 +50,35 @@ export component SettingsStorageTab inherits VerticalLayout {
                 has-icon: true;
                 icon: @image-url("../../../assets/icons/upload.svg");
                 clicked => { SettingsBridge.import-external-file(); }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("扫描并导入系统 OpenSSH 资产 (~/.ssh/config)");
+            subtitle: @tr("自动读取本机标准 OpenSSH 配置文件，一键批量收敛主机连接配置入库");
+
+            AppButton {
+                width: 156px;
+                text: @tr("扫描 OpenSSH 导入");
+                variant: "secondary";
+                has-icon: true;
+                icon: @image-url("../../../assets/icons/terminal.svg");
+                clicked => { SettingsBridge.scan-and-import-openssh(); }
+            }
+        }
+
+        SettingsRow {
+            title: @tr("导入第三方终端资产 (Termius / Xshell / CSV / TSV)");
+            subtitle: @tr("支持 Termius JSON/CSV、Xshell .xsh 会话文件与通用资产表格无损转换入库");
+            show-border: false;
+
+            AppButton {
+                width: 156px;
+                text: @tr("第三方资产导入...");
+                variant: "secondary";
+                has-icon: true;
+                icon: @image-url("../../../assets/icons/upload.svg");
+                clicked => { SettingsBridge.import-external-assets(); }
             }
         }
     }

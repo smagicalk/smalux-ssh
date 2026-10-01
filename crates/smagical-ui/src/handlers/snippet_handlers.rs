@@ -18,7 +18,20 @@ use crate::snippet_tree_model::{
     move_and_reorder_raw_snippet_node, RawSnippetTreeNode,
 };
 
-/// 辅助函数：向当前激活终端注入执行命令并广播领域事件
+/// 辅助函数：向当前处于激活状态的终端窗格注入命令文本并广播领域事件
+///
+/// # 处理流程
+/// 1. 获取当前活动窗格 ID (`active_pane_id`)，找到对应的活动会话；
+/// 2. 获取终端实例并调用 `send_input` 写入指令文本；
+///    - 若 `auto_execute` 为 true 且命令末尾无 `\n`，自动追加回车换行符触发执行；
+/// 3. 分发核心状态事件：`TerminalAction::ExecuteCommand` 或 `TerminalAction::PasteText`；
+/// 4. 广播领域事件 `SnippetExecutedEvent` 供审计模块与操作历史记录。
+///
+/// # 参数
+/// - `ctx`: 应用程序全局上下文；
+/// - `snippet_id`: 被执行的代码片段 ID；
+/// - `cmd`: 经变量替换/参数填报后的最终 Shell 命令文本；
+/// - `auto_execute`: 是否在注入后直接按回车立即执行。
 fn execute_snippet_in_terminal(ctx: &AppContext, snippet_id: &str, cmd: &str, auto_execute: bool) {
     let active_pid = ctx.active_pane_id.borrow().clone();
     let groups = ctx.pane_groups.borrow();
@@ -53,7 +66,20 @@ fn execute_snippet_in_terminal(ctx: &AppContext, snippet_id: &str, cmd: &str, au
     });
 }
 
-/// 根据纯数据集合渲染 Slint UI 代码片段树、父级选项与右侧伴生工具栏 (纯内存组装，0ms 阻塞)
+/// 纯内存装配并渲染 Slint UI 代码片段树、父级分组下拉项与右侧伴生快捷工具栏
+///
+/// # 渲染管线
+/// 1. **树节点构建**：根据当前是否有检索关键词，分别调用 `build_visible_snippet_tree_nodes` 或 `build_search_snippet_tree_nodes`；
+/// 2. **父级分组选择**：调用 `build_snippet_group_options_from_records` 生成多层缩进选项；
+/// 3. **伴生快捷命令**：展平所有非分组代码片段至 `QuickCmdData` 集合，供右侧工具栏一键点击投递。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `master`: 原始树形层级节点集合切片；
+/// - `groups`: 全量代码片段文件夹分组记录；
+/// - `snippets`: 全量代码片段实体切片；
+/// - `search_q`: 搜索过滤关键词；
+/// - `expanded`: 当前处于展开状态的文件夹 ID 集合。
 pub(crate) fn render_snippets_ui(
     window: &AppWindow,
     master: &[RawSnippetTreeNode],
@@ -99,7 +125,14 @@ pub(crate) fn render_snippets_ui(
     bridge.set_quick_cmds(ModelRc::new(VecModel::from(quick_list)));
 }
 
-/// 异步从存储层拉取代码片段与分组并同步至 Slint UI (0ms UI 阻塞)
+/// 异步从存储层拉取代码片段与多层分组并调度回 UI 主线程渲染
+///
+/// # 参数
+/// - `window_weak`: Slint 主窗口弱引用；
+/// - `storage`: 仓储服务抽象接口；
+/// - `master_cache`: 全局代码片段树内存缓存的读写锁指针；
+/// - `search_q`: 搜索关键词；
+/// - `expanded`: 文件夹展开 ID 集合。
 pub(crate) fn sync_ui_snippets_async(
     window_weak: slint::Weak<AppWindow>,
     storage: std::sync::Arc<dyn smagical_core::AppStorage>,
@@ -121,6 +154,10 @@ pub(crate) fn sync_ui_snippets_async(
 }
 
 /// 同步并刷新 UI 代码片段树、父级选项与右侧伴生工具栏 (非阻塞异步分发)
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn sync_ui_snippets(window: &AppWindow, ctx: &AppContext) {
     let window_weak = window.as_weak();
     let storage = ctx.core_state.storage().clone();
@@ -130,7 +167,20 @@ pub(crate) fn sync_ui_snippets(window: &AppWindow, ctx: &AppContext) {
     sync_ui_snippets_async(window_weak, storage, master_cache, search_q, expanded);
 }
 
-/// 注册所有代码片段相关 UI 回调 (全部直连 SnippetsBridge)
+/// 注册所有代码片段相关 UI 回调 (全部直连 `SnippetsBridge` 领域总线)
+///
+/// 涵盖核心业务流转：
+/// 1. 树节点过滤检索与展开/折叠状态持久化；
+/// 2. 节点选中切换与详情表单装载（区分文件夹分组与代码片段）；
+/// 3. 新建分组与新建片段、保存校验与落盘；
+/// 4. 节点删除（带子级归属级联安全性）；
+/// 5. 树节点拖拽移动重排序（包含多层防成环防套环检测算法）；
+/// 6. 动态形参解析（`{{PARAM}}`）与参数输入弹窗交互执行；
+/// 7. 终端快速下发与原生剪贴板复制。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
     let sb = window.global::<SnippetsBridge>();
 

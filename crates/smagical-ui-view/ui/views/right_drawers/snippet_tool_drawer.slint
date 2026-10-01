@@ -352,7 +352,7 @@ export component SnippetToolDrawer inherits DrawerContainer {
                                             width: 13px;
                                             height: 13px;
                                             image-fit: contain;
-                                            colorize: AppTheme.accent;
+                                            colorize: node.is-expanded ? AppTheme.accent : AppTheme.secondary-foreground;
                                         }
 
                                         if !node.is-group: Image {

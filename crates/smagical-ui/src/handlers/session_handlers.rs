@@ -36,6 +36,13 @@ fn execute_close_session(
         let _ = instance.pty.kill();
     }
 
+    // 同步断开与注销核心 SSH 会话网络流
+    let ssh_svc = ctx.core_state.ssh();
+    let id_for_disconnect = id_str.to_string();
+    crate::async_util::spawn_async(async move {
+        let _ = ssh_svc.disconnect(&id_for_disconnect).await;
+    });
+
     let mut closed_host_id = String::new();
     let mut target_group_idx = None;
     for (idx, g) in groups.iter_mut().enumerate() {
@@ -87,9 +94,15 @@ fn execute_close_session(
 
     ctx.core_state.events().dispatch(&TerminalSessionEvent {
         session_id: id_str.to_string(),
-        host_id: closed_host_id,
+        host_id: closed_host_id.clone(),
         action: if remaining_host_tabs == 0 { "closed".into() } else { "tab_closed".into() },
     });
+    crate::audit_logger::record_audit_event(
+        id_str,
+        &closed_host_id,
+        "SESSION_CLOSED",
+        &format!("终端会话注销关闭, 剩余主机Tab数: {}", remaining_host_tabs),
+    );
     tracing::info!(target: "smagical_ui::session", "已关闭终端会话: {}", id_str);
 
     let storage_async = ctx.core_state.storage().clone();
@@ -741,12 +754,46 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let pane_groups_snippet = Rc::clone(&ctx.pane_groups);
     let active_pane_id_snippet = Rc::clone(&ctx.active_pane_id);
     let active_terminals_snippet = Rc::clone(&ctx.active_terminals);
+    let notif_snippet = ctx.notifications.clone();
+    let window_weak_snippet = window.as_weak();
     tb.on_send_snippet(move |cmd| {
+        crate::handlers::settings_handlers::security::record_user_activity();
+
         let active_pid = active_pane_id_snippet.borrow().clone();
         let groups = pane_groups_snippet.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
             && let Some(active_sess) = g.get_active_session()
         {
+            let sess_id = active_sess.session_id.clone();
+            let host_info = format!("{}({})", active_sess.host_name, active_sess.host_address);
+            let cmd_str = cmd.to_string();
+
+            // 1. 高危破坏性指令风险判定与安全审计流水线
+            // 调用 `assess_command_risk` 对待下发的代码片段进行语义匹配 (如 rm -rf, mkfs, dd, fork bomb 等)：
+            // - 若为高危指令且启用了 `confirm_dangerous_commands`：弹出即时警告通知，并将指令内容与告警原因记录到审计日志 (`WARN_HIGH_RISK_COMMAND`)；
+            // - 若为常规指令：正常记入片段执行日志 (`EXECUTE_SNIPPET`)。
+            let (risk_lvl, reason) = smagical_core::assess_command_risk(&cmd_str);
+            let confirm_dangerous = window_weak_snippet.upgrade()
+                .map(|w| w.global::<SettingsBridge>().get_setting_confirm_dangerous_commands())
+                .unwrap_or(true);
+
+            if risk_lvl == "high" && confirm_dangerous {
+                notif_snippet.warning("高危指令执行预警", &format!("检测到执行高风险操作: [{}]。{}", cmd_str.trim(), reason));
+                crate::audit_logger::record_audit_event(
+                    &sess_id,
+                    &host_info,
+                    "WARN_HIGH_RISK_COMMAND",
+                    &format!("Command: {}, Reason: {}", cmd_str.trim(), reason),
+                );
+            } else {
+                crate::audit_logger::record_audit_event(
+                    &sess_id,
+                    &host_info,
+                    "EXECUTE_SNIPPET",
+                    &cmd_str.trim(),
+                );
+            }
+
             let mut terminals = active_terminals_snippet.borrow_mut();
             if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
                 let cmd_str = format!("{}\n", cmd);
@@ -764,12 +811,20 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let active_terminals_input = Rc::clone(&ctx.active_terminals);
     let global_split_tree_input = Rc::clone(&ctx.global_split_tree);
     let window_weak_input = window.as_weak();
+    let ctx_input = ctx.clone();
     tb.on_terminal_key_input(move |text, is_ctrl, is_shift, is_alt| {
+        crate::handlers::settings_handlers::security::record_user_activity();
+
         let active_pid = active_pane_id_input.borrow().clone();
-        let groups = pane_groups_input.borrow();
-        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
-            && let Some(active_sess) = g.get_active_session()
-        {
+        let active_sess = {
+            let groups = pane_groups_input.borrow();
+            groups
+                .iter()
+                .find(|g| g.pane_id == active_pid)
+                .or_else(|| groups.first())
+                .and_then(|g| g.get_active_session().cloned())
+        };
+        if let Some(active_sess) = active_sess {
             let active_sess_id = active_sess.session_id.clone();
             let mut terminals = active_terminals_input.borrow_mut();
             if let Some(instance) = terminals.get_mut(&active_sess_id) {
@@ -796,41 +851,104 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
                     if crate::terminal::key_encoder::is_standalone_modifier(text.as_str()) {
                         return;
                     }
-                    // 4. 执行原地重新连接
-                    let reconn_res = instance.reconnect();
-                    drop(terminals);
-                    drop(groups);
 
-                    match reconn_res {
-                        Ok(()) => {
-                            tracing::info!(target: "smagical_ui::terminal", "终端会话 [{}] 原地重新连接成功", active_sess_id);
-                            let mut groups_mut = pane_groups_input.borrow_mut();
-                            for grp in groups_mut.iter_mut() {
-                                for t in grp.tabs.iter_mut() {
-                                    if t.session_id == active_sess_id {
-                                        t.host_status = "online".to_string();
+                    // 4. 执行重新连接
+                    if active_sess.host_id.starts_with("local-") {
+                        // 本地 Shell 原地重新拉起
+                        let reconn_res = instance.reconnect();
+                        drop(terminals);
+
+                        match reconn_res {
+                            Ok(()) => {
+                                tracing::info!(target: "smagical_ui::terminal", "本地终端会话 [{}] 重新启动成功", active_sess_id);
+                                let mut groups_mut = pane_groups_input.borrow_mut();
+                                for grp in groups_mut.iter_mut() {
+                                    for t in grp.tabs.iter_mut() {
+                                        if t.session_id == active_sess_id {
+                                            t.host_status = "online".to_string();
+                                        }
                                     }
                                 }
+                                if let Some(w) = window_weak_input.upgrade() {
+                                    let is_split = global_split_tree_input.borrow().is_some();
+                                    sync_active_session_ui(&w, &groups_mut, &active_pid, is_split);
+                                }
                             }
-                            if let Some(w) = window_weak_input.upgrade() {
-                                let is_split = global_split_tree_input.borrow().is_some();
-                                sync_active_session_ui(&w, &groups_mut, &active_pid, is_split);
+                            Err(err) => {
+                                tracing::error!(target: "smagical_ui::terminal", "本地终端会话 [{}] 重新启动失败: {:?}", active_sess_id, err);
+                                let mut terminals = active_terminals_input.borrow_mut();
+                                if let Some(inst) = terminals.get_mut(&active_sess_id) {
+                                    inst.parser.process(
+                                        format!(
+                                            "\r\n\x1b[31;1m[✖ 重新启动失败: {}]\x1b[0m\r\n\x1b[90m按任意键再次重试，或按 Ctrl+W 关闭标签页\x1b[0m\r\n",
+                                            err
+                                        )
+                                        .as_bytes(),
+                                    );
+                                    inst.parser.mark_dirty();
+                                }
                             }
                         }
-                        Err(err) => {
-                            tracing::error!(target: "smagical_ui::terminal", "终端会话 [{}] 原地重新连接失败: {:?}", active_sess_id, err);
-                            let mut terminals = active_terminals_input.borrow_mut();
-                            if let Some(inst) = terminals.get_mut(&active_sess_id) {
-                                inst.parser.process(
-                                    format!(
-                                        "\r\n\x1b[31;1m[✖ 重新连接失败: {}]\x1b[0m\r\n\x1b[90m按任意键再次重试，或按 Ctrl+W 关闭标签页\x1b[0m\r\n",
-                                        err
-                                    )
-                                    .as_bytes(),
-                                );
-                                inst.parser.mark_dirty();
+                    } else {
+                        // 远程 SSH 主机会话：与初次连接完全一致，直接使用当前主机配置并发起标准异步连接管线
+                        let _ = instance.pty.kill();
+                        let cols = instance.size.cols;
+                        let rows = instance.size.rows;
+                        instance.pty = crate::terminal::TerminalBackend::Connecting(instance.size);
+                        instance.state = crate::terminal::instance::SessionState::Running;
+
+                        let (addr, port) = if let Some((a, p)) = active_sess.host_address.split_once(':') {
+                            (a.to_string(), p.parse::<u16>().unwrap_or(22))
+                        } else {
+                            (active_sess.host_address.clone(), 22)
+                        };
+
+                        let user_prefix = match &instance.target {
+                            crate::terminal::instance::TerminalTarget::Ssh { username, .. } => {
+                                match username {
+                                    Some(u) if !u.is_empty() => format!("{u}@"),
+                                    _ => String::new(),
+                                }
+                            }
+                            _ => String::new(),
+                        };
+                        let connect_msg = format!(
+                            "\r\n\x1b[33m[smalux] 正在连接主机 {user_prefix}{}:{} ...\x1b[0m\r\n",
+                            addr, port
+                        );
+                        instance.parser.process(connect_msg.as_bytes());
+                        instance.parser.mark_dirty();
+
+                        drop(terminals);
+                        let mut groups_mut = pane_groups_input.borrow_mut();
+                        for grp in groups_mut.iter_mut() {
+                            for t in grp.tabs.iter_mut() {
+                                if t.session_id == active_sess_id {
+                                    t.host_status = "warning".to_string();
+                                }
                             }
                         }
+                        if let Some(w) = window_weak_input.upgrade() {
+                            let is_split = global_split_tree_input.borrow().is_some();
+                            sync_active_session_ui(&w, &groups_mut, &active_pid, is_split);
+                        }
+                        drop(groups_mut);
+
+                        let storage = ctx_input.core_state.storage().clone();
+                        let ssh_svc = ctx_input.core_state.ssh().clone();
+                        crate::handlers::host_handlers::spawn_ssh_connection_pipeline(
+                            active_sess_id.clone(),
+                            active_sess.display_title.clone(),
+                            active_sess.host_id.clone(),
+                            active_sess.host_name.clone(),
+                            addr,
+                            port,
+                            None,
+                            storage,
+                            ssh_svc,
+                            cols,
+                            rows,
+                        );
                     }
                     return;
                 }
@@ -995,6 +1113,71 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
+    // 8.0 终端选中链接直接在系统默认浏览器中打开
+    // -------------------------------------------------------------------------
+    let pane_groups_url = Rc::clone(&ctx.pane_groups);
+    let active_pane_id_url = Rc::clone(&ctx.active_pane_id);
+    let active_terminals_url = Rc::clone(&ctx.active_terminals);
+    let notif_url = ctx.notifications.clone();
+    tb.on_open_terminal_url(move || {
+        let active_pid = active_pane_id_url.borrow().clone();
+        let groups = pane_groups_url.borrow();
+        if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
+            && let Some(active_sess) = g.get_active_session()
+        {
+            let mut terminals = active_terminals_url.borrow_mut();
+            if let Some(instance) = terminals.get_mut(&active_sess.session_id) {
+                let text = instance.parser.copy_selection_text();
+                let clean = text.trim().trim_end_matches(&[')', ']', '>', ',', '.', ';', '\'', '"'][..]);
+                if clean.starts_with("http://") || clean.starts_with("https://") {
+                    if let Err(e) = crate::terminal::highlight::open_browser_url(clean) {
+                        notif_url.error("打开链接失败", &e);
+                    } else {
+                        notif_url.info("正在打开链接", clean);
+                    }
+                } else {
+                    notif_url.warning("非有效 URL", "选区文本不是以 http:// 或 https:// 开头的网络超链接");
+                }
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 8.0.1 终端字符坐标反查悬浮 URL 供 Slint UI 动态切换手型光标与高亮交互
+    // -------------------------------------------------------------------------
+    let active_terminals_check_url = Rc::clone(&ctx.active_terminals);
+    let highlight_engine_check = crate::terminal::highlight::HighlightEngine::default();
+    tb.on_terminal_check_hover_url(move |session_id, col, row| {
+        if col < 0 || row < 0 {
+            return slint::SharedString::default();
+        }
+        let terminals = active_terminals_check_url.borrow();
+        if let Some(instance) = terminals.get(session_id.as_str()) {
+            if let Some((url, is_url)) = instance.parser.detect_word_or_url_at(col as usize, row as usize, &highlight_engine_check) {
+                if is_url && !url.is_empty() {
+                    return url.into();
+                }
+            }
+        }
+        slint::SharedString::default()
+    });
+
+    // -------------------------------------------------------------------------
+    // 8.0.2 终端点击超链接直接唤起系统默认浏览器打开
+    // -------------------------------------------------------------------------
+    let notif_open = ctx.notifications.clone();
+    tb.on_terminal_open_url(move |url| {
+        let clean = url.trim().to_string();
+        if !clean.is_empty() {
+            if let Err(e) = crate::terminal::highlight::open_browser_url(&clean) {
+                notif_open.error("打开链接失败", &e);
+            } else {
+                notif_open.info("正在打开链接", &clean);
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
     // 8.1 终端鼠标拖拽划选选区变更回调
     // -------------------------------------------------------------------------
     let pane_groups_sel = Rc::clone(&ctx.pane_groups);
@@ -1039,12 +1222,47 @@ pub(crate) fn register_session_handlers(window: &AppWindow, ctx: &AppContext) {
     let notif_paste = ctx.notifications.clone();
     let window_weak_paste = window.as_weak();
     tb.on_terminal_paste(move || {
+        crate::handlers::settings_handlers::security::record_user_activity();
+
         let active_pid = active_pane_id_paste.borrow().clone();
         let groups = pane_groups_paste.borrow();
         if let Some(g) = groups.iter().find(|g| g.pane_id == active_pid).or_else(|| groups.first())
             && let Some(active_sess) = g.get_active_session()
         {
             if let Ok(text) = arboard::Clipboard::new().and_then(|mut c| c.get_text()) {
+                let sess_id = active_sess.session_id.clone();
+                let host_info = format!("{}({})", active_sess.host_name, active_sess.host_address);
+
+                // 检查高危指令预警与粘贴审计记录
+                // 实时拦截系统剪贴板文本并进行风险分析：
+                // - 若包含高危破坏性 Shell 命令且开启了二次防呆预警：弹出高危告警 Toast，并将完整的危险命令内容与风险原因记录至安全审计日志 (`WARN_HIGH_RISK_PASTE`)；
+                // - 若为正常内容：记录粘贴字数条目 (`TERMINAL_PASTE`)。
+                let (risk_lvl, reason) = smagical_core::assess_command_risk(&text);
+                let confirm_dangerous = window_weak_paste
+                    .upgrade()
+                    .map(|w| w.global::<SettingsBridge>().get_setting_confirm_dangerous_commands())
+                    .unwrap_or(true);
+
+                if risk_lvl == "high" && confirm_dangerous {
+                    notif_paste.warning(
+                        "高危粘贴指令预警",
+                        &format!("剪贴板内容包含高危破坏性命令: {}。已记录审计日志，请仔细核验！", reason),
+                    );
+                    crate::audit_logger::record_audit_event(
+                        &sess_id,
+                        &host_info,
+                        "WARN_HIGH_RISK_PASTE",
+                        &format!("Pasted text: {}, Reason: {}", text.trim(), reason),
+                    );
+                } else {
+                    crate::audit_logger::record_audit_event(
+                        &sess_id,
+                        &host_info,
+                        "TERMINAL_PASTE",
+                        &format!("Pasted {} characters", text.len()),
+                    );
+                }
+
                 let warn_multiline = window_weak_paste
                     .upgrade()
                     .map(|w| w.global::<SettingsBridge>().get_setting_warn_multiline_paste())

@@ -7,6 +7,7 @@ pub mod credential_repo;
 pub mod snippet_repo;
 pub mod tunnel_repo;
 pub mod config_repo;
+pub mod backup_repo;
 pub mod seed_data;
 
 pub use host_repo::MockHostRepository;
@@ -16,10 +17,12 @@ pub use credential_repo::MockCredentialRepository;
 pub use snippet_repo::MockSnippetRepository;
 pub use tunnel_repo::MockTunnelRepository;
 pub use config_repo::MockConfigRepository;
+pub use backup_repo::{MockBackupSnapshotRepository, MockBackupTaskRepository};
 
 use smagical_core::storage::{
-    AppStorage, ConfigRepository, CredentialRepository, GroupRepository, HistoryRepository,
-    HostRepository, SnippetRepository, StorageResult, TunnelRepository,
+    AppStorage, BackupSnapshotRepository, BackupTaskRepository, ConfigRepository,
+    CredentialRepository, GroupRepository, HistoryRepository, HostRepository, SnippetRepository,
+    StorageResult, TunnelRepository,
 };
 
 /// 聚合内存存储实现 (MockStorage)
@@ -32,6 +35,8 @@ pub struct MockStorage {
     snippets_repo: MockSnippetRepository,
     tunnels_repo: MockTunnelRepository,
     config_repo: MockConfigRepository,
+    backup_tasks_repo: MockBackupTaskRepository,
+    backup_snapshots_repo: MockBackupSnapshotRepository,
 }
 
 impl Default for MockStorage {
@@ -53,6 +58,8 @@ impl MockStorage {
             snippets_repo: MockSnippetRepository::new(),
             tunnels_repo: MockTunnelRepository::new(),
             config_repo: MockConfigRepository::new(),
+            backup_tasks_repo: MockBackupTaskRepository::new(),
+            backup_snapshots_repo: MockBackupSnapshotRepository::new(),
         }
     }
 
@@ -69,6 +76,8 @@ impl MockStorage {
             snippets_repo: MockSnippetRepository::with_data(seed.snippets, seed.snippet_groups),
             tunnels_repo: MockTunnelRepository::with_tunnels(seed.tunnels),
             config_repo: MockConfigRepository::new(),
+            backup_tasks_repo: MockBackupTaskRepository::new(),
+            backup_snapshots_repo: MockBackupSnapshotRepository::new(),
         }
     }
 }
@@ -102,6 +111,14 @@ impl AppStorage for MockStorage {
 
     fn config(&self) -> &dyn ConfigRepository {
         &self.config_repo
+    }
+
+    fn backup_tasks(&self) -> &dyn BackupTaskRepository {
+        &self.backup_tasks_repo
+    }
+
+    fn backup_snapshots(&self) -> &dyn BackupSnapshotRepository {
+        &self.backup_snapshots_repo
     }
 
     async fn reload(&self) -> StorageResult<()> {

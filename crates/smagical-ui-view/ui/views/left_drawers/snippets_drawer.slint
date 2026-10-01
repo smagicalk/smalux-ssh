@@ -282,7 +282,7 @@ export component SnippetsDrawer inherits DrawerContainer {
                                         width: 14px;
                                         height: 14px;
                                         image-fit: contain;
-                                        colorize: (node.id == root.selected-id) ? AppTheme.accent : AppTheme.secondary-foreground;
+                                        colorize: (node.is-expanded || node.id == root.selected-id) ? AppTheme.accent : AppTheme.secondary-foreground;
                                     }
 
                                     if !node.is-group: Image {

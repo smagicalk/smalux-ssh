@@ -452,13 +452,25 @@ export component SettingsAiTab inherits VerticalLayout {
                     color: AppTheme.foreground;
                 }
 
-                AppButton {
-                    text: @tr("恢复推荐默认");
-                    variant: "ghost";
-                    height: 22px;
-                    font-size: 10px;
-                    clicked => {
-                        SettingsBridge.reset-ai-system-prompt();
+                HorizontalLayout {
+                    spacing: 8px;
+                    AppButton {
+                        text: @tr("恢复推荐默认");
+                        variant: "ghost";
+                        height: 22px;
+                        font-size: 10px;
+                        clicked => {
+                            SettingsBridge.reset-ai-system-prompt();
+                        }
+                    }
+                    AppButton {
+                        text: @tr("保存配置");
+                        variant: "primary";
+                        height: 22px;
+                        font-size: 10px;
+                        clicked => {
+                            SettingsBridge.save-ai-settings();
+                        }
                     }
                 }
             }
@@ -472,6 +484,9 @@ export component SettingsAiTab inherits VerticalLayout {
             AppTextArea {
                 text <=> SettingsBridge.setting-ai-system-prompt;
                 min-height: 85px;
+                edited(val) => {
+                    SettingsBridge.change-ai-system-prompt(val);
+                }
             }
         }
 

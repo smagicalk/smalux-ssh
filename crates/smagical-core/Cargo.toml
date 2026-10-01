@@ -17,7 +17,10 @@ tracing.workspace = true
 async-trait = { workspace = true }
 reqwest = { workspace = true }
 futures-util = { workspace = true }
-tokio = { workspace = true, features = ["sync", "time"] }
+sha2 = { workspace = true }
+hmac = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true, features = ["sync", "time", "io-util"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros"] }

@@ -71,6 +71,9 @@ export component SettingsFilesTab inherits VerticalLayout {
                 text <=> SettingsBridge.setting-sftp-default-remote;
                 placeholder: "/home";
                 size: "sm";
+                accepted(t) => {
+                    SettingsBridge.change-sftp-default-remote(t);
+                }
             }
         }
 
@@ -78,7 +81,11 @@ export component SettingsFilesTab inherits VerticalLayout {
             title: @tr("显示隐藏文件与点文件 (Show Hidden Files)");
             subtitle: @tr("在 SFTP 文件树与文件浏览器中显示以点开头的隐藏文件 (如 .bashrc, .env)");
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-sftp-show-hidden;
+                checked: SettingsBridge.setting-sftp-show-hidden;
+                toggled(c) => {
+                    SettingsBridge.setting-sftp-show-hidden = c;
+                    SettingsBridge.change-sftp-show-hidden(c);
+                }
             }
         }
 
@@ -87,7 +94,11 @@ export component SettingsFilesTab inherits VerticalLayout {
             subtitle: @tr("在远程服务器上删除文件或目录前弹出模态弹窗二次核验，防止误操作");
             show-border: false;
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-sftp-confirm-delete;
+                checked: SettingsBridge.setting-sftp-confirm-delete;
+                toggled(c) => {
+                    SettingsBridge.setting-sftp-confirm-delete = c;
+                    SettingsBridge.change-sftp-confirm-delete(c);
+                }
             }
         }
     }
@@ -124,7 +135,10 @@ export component SettingsFilesTab inherits VerticalLayout {
                         animate background { duration: 120ms; }
 
                         pol-t := TouchArea {
-                            clicked => { SettingsBridge.setting-sftp-conflict-policy = pol.id; }
+                            clicked => {
+                                SettingsBridge.setting-sftp-conflict-policy = pol.id;
+                                SettingsBridge.change-sftp-conflict-policy(pol.id);
+                            }
                             mouse-cursor: pointer;
                         }
 
@@ -149,7 +163,11 @@ export component SettingsFilesTab inherits VerticalLayout {
             title: @tr("大文件断点续传支持 (Resume Interrupted Transfers)");
             subtitle: @tr("网络中断或任务暂停后自动从断点位置恢复传输，避免大文件重传");
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-sftp-resume;
+                checked: SettingsBridge.setting-sftp-resume;
+                toggled(c) => {
+                    SettingsBridge.setting-sftp-resume = c;
+                    SettingsBridge.change-sftp-resume(c);
+                }
             }
         }
 
@@ -158,7 +176,11 @@ export component SettingsFilesTab inherits VerticalLayout {
             subtitle: @tr("传输时尽可能保留文件的原始 POSIX 读写执行权限与修改时间戳 (mtime/atime)");
             show-border: false;
             SettingsSwitch {
-                checked <=> SettingsBridge.setting-sftp-preserve-attributes;
+                checked: SettingsBridge.setting-sftp-preserve-attributes;
+                toggled(c) => {
+                    SettingsBridge.setting-sftp-preserve-attributes = c;
+                    SettingsBridge.change-sftp-preserve-attributes(c);
+                }
             }
         }
     }
@@ -499,7 +521,10 @@ export component SettingsFilesTab inherits VerticalLayout {
                         animate background { duration: 120ms; }
 
                         ed-t := TouchArea {
-                            clicked => { SettingsBridge.setting-sftp-editor-mode = ed.id; }
+                            clicked => {
+                                SettingsBridge.setting-sftp-editor-mode = ed.id;
+                                SettingsBridge.change-sftp-editor-mode(ed.id);
+                            }
                             mouse-cursor: pointer;
                         }
 
@@ -529,6 +554,9 @@ export component SettingsFilesTab inherits VerticalLayout {
                 text <=> SettingsBridge.setting-sftp-custom-editor;
                 placeholder: "code";
                 size: "sm";
+                accepted(t) => {
+                    SettingsBridge.change-sftp-custom-editor(t);
+                }
             }
         }
 
@@ -542,6 +570,9 @@ export component SettingsFilesTab inherits VerticalLayout {
                 text <=> SettingsBridge.setting-sftp-exclude-patterns;
                 placeholder: ".git, node_modules, *.tmp";
                 size: "sm";
+                accepted(t) => {
+                    SettingsBridge.change-sftp-exclude-patterns(t);
+                }
             }
         }
     }

@@ -1,0 +1,246 @@
+name: Build & Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Git 引用: 分支名、Tag 或 Commit SHA (例如: main, dev, v0.1.0, 7位commit)"
+        required: true
+        default: "main"
+        type: string
+      tag:
+        description: "Release Tag 标签版本号 (可选: 若留空但 ref 为 Release 标签，亦会自动探测挂载)"
+        required: false
+        default: ""
+        type: string
+      build_profile:
+        description: "Cargo 编译 Profile"
+        required: false
+        default: "release"
+        type: choice
+        options:
+          - "release"
+          - "debug"
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # 1. 检查 Release 存在性 (支持智能探测输入的 tag 或 ref)
+  # ----------------------------------------------------------------------------
+  check-release:
+    name: 🔍 检查 Release 状态
+    runs-on: ubuntu-latest
+    outputs:
+      release_exists: ${{ steps.check.outputs.release_exists }}
+      tag_name: ${{ steps.check.outputs.tag_name }}
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: 探测 GitHub Release 存在性
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TARGET_TAG="${{ inputs.tag }}"
+          # 去除首尾空格
+          TARGET_TAG=$(echo "$TARGET_TAG" | xargs)
+          
+          # 智能推导：若未显式指定 tag，检测 inputs.ref 是否对应已有 Release
+          if [ -z "$TARGET_TAG" ]; then
+            CANDIDATE_REF=$(echo "${{ inputs.ref }}" | xargs)
+            if gh release view "$CANDIDATE_REF" > /dev/null 2>&1; then
+              echo "💡 检测到输入的 Git 引用 [$CANDIDATE_REF] 即为一个已发布的 Release！"
+              TARGET_TAG="$CANDIDATE_REF"
+            fi
+          fi
+
+          if [ -z "$TARGET_TAG" ]; then
+            echo "ℹ️ 未提供 Release Tag (或输入的 ref 非 Release)，本次仅构建打包并保存至 Actions Artifacts。"
+            echo "release_exists=false" >> "$GITHUB_OUTPUT"
+            echo "tag_name=" >> "$GITHUB_OUTPUT"
+          else
+            echo "🔎 正在检测 Release [${TARGET_TAG}] 是否已存在..."
+            if gh release view "$TARGET_TAG" > /dev/null 2>&1; then
+              echo "✅ 检测到 Release [${TARGET_TAG}] 已存在！各平台构建完成后将自动上传资产至该 Release。"
+              echo "release_exists=true" >> "$GITHUB_OUTPUT"
+              echo "tag_name=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+            else
+              echo "⚠️ 未在仓库中检测到 Release [${TARGET_TAG}]。"
+              echo "ℹ️ 打包产物将保留在 GitHub Actions 运行页面的 Artifacts 中供下载。"
+              echo "release_exists=false" >> "$GITHUB_OUTPUT"
+              echo "tag_name=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  # ----------------------------------------------------------------------------
+  # 2. 多平台低内存并行构建与打包矩阵
+  # ----------------------------------------------------------------------------
+  build:
+    name: 📦 构建 ${{ matrix.artifact_name }} (${{ matrix.target }})
+    needs: [check-release]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Windows x86_64: 采用 Rust 官方自带 rust-lld 极速链接，并扩展至 8MB 栈空间防溢出
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: smalux-ssh-windows-x86_64
+            archive_ext: zip
+            platform: windows
+            rustflags: "-C linker=rust-lld -C link-arg=/STACK:8000000"
+
+          # Linux x86_64: 采用 mold + clang 极速链接器
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: smalux-ssh-linux-x86_64
+            archive_ext: tar.gz
+            platform: linux
+            rustflags: "-C linker=clang -C link-arg=-fuse-ld=mold"
+
+          # macOS Apple Silicon: 采用原生 ld64
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: smalux-ssh-macos-aarch64
+            archive_ext: tar.gz
+            platform: macos
+            rustflags: ""
+
+    env:
+      # 【内存与资源保护核心配置】
+      # 1. 限制 Cargo 并发作业数为 2，杜绝 Slint 大型 AST 宏展开期内存暴涨导致 7GB OOM 崩溃
+      CARGO_BUILD_JOBS: 2
+      # 2. 禁用增量编译，防止庞大磁盘缓存耗尽 Runner 内存与 IO
+      CARGO_INCREMENTAL: "0"
+      RUST_BACKTRACE: "1"
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # Linux: 4GB Swap 交换内存保护 + 依赖库与 mold 安装
+      - name: 🐧 [Linux] 配置 4GB Swap 交换空间与依赖 (防 OOM & 安装 mold)
+        if: matrix.platform == 'linux'
+        run: |
+          sudo fallocate -l 4G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=4096
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          free -h
+
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            mold clang pkg-config \
+            libfontconfig1-dev libfreetype6-dev libx11-dev libxft-dev \
+            libxcursor-dev libxrandr-dev libxi-dev libxkbcommon-dev \
+            libxkbcommon-x11-dev libwayland-dev libgl1-mesa-dev \
+            libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - name: 🦀 安装 Rust 稳定版工具链
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: 🔨 编译可执行程序 (smagical-ui & smalux-cli)
+        env:
+          RUSTFLAGS: ${{ matrix.rustflags }}
+        run: |
+          cargo build --profile ${{ inputs.build_profile }} --target ${{ matrix.target }} --bin smagical-ui --bin smalux-cli
+
+      # ------------------------------------------------------------------------
+      # 打包归档产物
+      # ------------------------------------------------------------------------
+      - name: 🗜️ [Windows] 组织产物并压缩 (.zip)
+        if: matrix.platform == 'windows'
+        shell: pwsh
+        run: |
+          $pkgDir = "${{ matrix.artifact_name }}"
+          New-Item -ItemType Directory -Force -Path $pkgDir
+          
+          $targetDir = "target/${{ matrix.target }}/${{ inputs.build_profile }}"
+          Copy-Item "$targetDir/smagical-ui.exe" -Destination "$pkgDir/smalux-ssh.exe"
+          Copy-Item "$targetDir/smalux-cli.exe" -Destination "$pkgDir/smalux-cli.exe"
+          if (Test-Path "README.md") { Copy-Item "README.md" -Destination $pkgDir }
+          if (Test-Path "LICENSE") { Copy-Item "LICENSE" -Destination $pkgDir }
+
+          Compress-Archive -Path $pkgDir -DestinationPath "${{ matrix.artifact_name }}.zip" -Force
+          Get-Item "${{ matrix.artifact_name }}.zip" | Select-Object Name, Length
+
+      - name: 🗜️ [Linux / macOS] 组织产物并打包 (.tar.gz)
+        if: matrix.platform != 'windows'
+        run: |
+          PKG_DIR="${{ matrix.artifact_name }}"
+          mkdir -p "$PKG_DIR"
+
+          TARGET_DIR="target/${{ matrix.target }}/${{ inputs.build_profile }}"
+          
+          # 拷贝并规范化命名为 smalux-ssh 与 smalux-cli
+          cp "$TARGET_DIR/smagical-ui" "$PKG_DIR/smalux-ssh"
+          cp "$TARGET_DIR/smalux-cli" "$PKG_DIR/smalux-cli"
+          chmod +x "$PKG_DIR/smalux-ssh" "$PKG_DIR/smalux-cli"
+
+          # 自动剥离符号减小体积 (release 模式)
+          if [ "${{ inputs.build_profile }}" = "release" ]; then
+            strip "$PKG_DIR/smalux-ssh" || true
+            strip "$PKG_DIR/smalux-cli" || true
+          fi
+
+          [ -f README.md ] && cp README.md "$PKG_DIR/"
+          [ -f LICENSE ] && cp LICENSE "$PKG_DIR/"
+
+          tar -czvf "${{ matrix.artifact_name }}.tar.gz" "$PKG_DIR"
+          ls -lh "${{ matrix.artifact_name }}.tar.gz"
+
+      - name: 📤 上传产物至 Actions Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.artifact_name }}.zip
+            ${{ matrix.artifact_name }}.tar.gz
+          retention-days: 14
+
+  # ----------------------------------------------------------------------------
+  # 3. 自动挂载产物至已存在的 Release (附带 SHA256SUMS 校验和)
+  # ----------------------------------------------------------------------------
+  publish-release:
+    name: 🚀 挂载产物至 Release
+    needs: [check-release, build]
+    if: needs.check-release.outputs.release_exists == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: 📥 下载所有平台构建产物
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: 📂 检查下载产物并生成 SHA256 校验清单
+        run: |
+          cd release-assets
+          sha256sum *.zip *.tar.gz > SHA256SUMS.txt
+          cat SHA256SUMS.txt
+          cd ..
+
+      - name: 🚀 执行上传发布包至 Release [${{ needs.check-release.outputs.tag_name }}]
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ needs.check-release.outputs.tag_name }}"
+          echo "正在挂载构建产物至 Release: $TAG"
+          gh release upload "$TAG" release-assets/* --clobber
+          echo "🎉 全部产物与校验和已成功上传挂载至 Release: $TAG"

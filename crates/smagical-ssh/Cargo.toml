@@ -1,0 +1,28 @@
+[package]
+name = "smagical-ssh"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+description = "Headless SSH, SFTP, Key Management, and Remote System Operations Engine"
+
+[dependencies]
+anyhow.workspace = true
+tracing.workspace = true
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+uuid.workspace = true
+chrono = "0.4"
+async-trait = { workspace = true }
+russh = { version = "0.63", default-features = false, features = ["flate2", "ring", "rsa"] }
+russh-sftp = "3.0"
+smagical-core = { path = "../smagical-core" }
+ssh-key = { version = "0.7.0-rc.11", features = ["ed25519", "rsa", "ecdsa", "p256", "getrandom", "std"] }
+rand = "0.10"
+directories = "6.0.0"
+base64 = "0.22"
+
+
+

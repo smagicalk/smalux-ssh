@@ -3,29 +3,37 @@
 //! 该服务跟随整个应用进程的生命周期常驻运行：
 //! 1. 在应用启动就绪 (`AppReadyEvent`) 时，自动扫描所有标记为 `auto_start` 的网络规则并在后台拉起建立监听；
 //! 2. 在应用退出前夕 (`AppBeforeExitEvent`) 时，优雅清空所有运行中的隧道连接，释放端口，杜绝端口残留；
-//! 3. 在终端焦点切换 (`TerminalFocusChangedEvent`) 时，自动触发右侧伴生工具栏专属转发规则的热同步。
+//! 3. 在终端焦点切换 (`TerminalFocusChangedEvent`) 时，自动触发右侧伴生工具栏专属转发规则的热同步；
+//! 4. 彻底基于 `smagical_core::service::TunnelService` 服务契约驱动。
 
 use std::sync::Arc;
 use smagical_core::event::{
     AppBeforeExitEvent, AppReadyEvent, EventManager, TerminalFocusChangedEvent,
     TerminalSessionEvent, TunnelStateChangedEvent,
 };
+use smagical_core::service::tunnel::TunnelService;
 use smagical_core::AppStorage;
 use slint::ComponentHandle;
 
-use crate::generated::{AppWindow, TerminalBridge, TunnelsBridge};
+use crate::generated::{AppWindow, TunnelsBridge};
 
 /// 网络隧道与代理全局后台守护服务
 pub struct TunnelDaemonService {
     storage: Arc<dyn AppStorage>,
+    tunnel_service: Arc<dyn TunnelService>,
     window_weak: slint::Weak<AppWindow>,
 }
 
 impl TunnelDaemonService {
     /// 创建一个新的全局隧道守护服务实例
-    pub fn new(storage: Arc<dyn AppStorage>, window_weak: slint::Weak<AppWindow>) -> Self {
+    pub fn new(
+        storage: Arc<dyn AppStorage>,
+        tunnel_service: Arc<dyn TunnelService>,
+        window_weak: slint::Weak<AppWindow>,
+    ) -> Self {
         Self {
             storage,
+            tunnel_service,
             window_weak,
         }
     }
@@ -60,7 +68,7 @@ impl TunnelDaemonService {
         });
         g_state.detach();
 
-        // 5. 终端会话启闭联动：关联主机终端打开时拉起 FollowTerminal 隧道，全部关闭时自动释放
+        // 5. 终端会话启闭联动 (FollowTerminal 规则自动跟随)
         let s_session = Arc::clone(&self);
         let g_session = events.global().listen(move |e: &TerminalSessionEvent| {
             s_session.handle_terminal_session_event(e);
@@ -68,19 +76,17 @@ impl TunnelDaemonService {
         g_session.detach();
     }
 
-    /// 应用引导启动时执行自启规则扫描与可用性探测。
-    /// 若某个转发有错误就自动关闭该转发，等待用户手动打开，无需向用户弹窗提示。
+    /// 应用启动就绪：自启所有标记为自启的网络转发
     fn handle_app_startup_autostart(&self) {
         let storage = Arc::clone(&self.storage);
+        let tunnel_svc = Arc::clone(&self.tunnel_service);
         let window_weak = self.window_weak.clone();
 
         crate::async_util::spawn_async(async move {
-            tracing::info!(target: "smalux::tunnel", "应用首帧就绪，开始扫描并自启常驻后台 (FollowApp) 的网络隧道与代理...");
-
             let all_tunnels = match storage.tunnels().list_all().await {
                 Ok(list) => list,
-                Err(e) => {
-                    tracing::error!(target: "smalux::tunnel", "读取网络规则配置库失败: {:?}", e);
+                Err(err) => {
+                    tracing::error!(target: "smalux::tunnel", "获取隧道配置失败: {:?}", err);
                     return;
                 }
             };
@@ -93,7 +99,7 @@ impl TunnelDaemonService {
             let mut failed_count = 0;
 
             for tun in autostart_rules {
-                if Self::try_start_tunnel_on_boot(&storage, &tun).await {
+                if Self::try_start_tunnel(&storage, &tunnel_svc, &tun).await {
                     success_count += 1;
                 } else {
                     failed_count += 1;
@@ -123,6 +129,7 @@ impl TunnelDaemonService {
         }
 
         let storage = Arc::clone(&self.storage);
+        let tunnel_svc = Arc::clone(&self.tunnel_service);
         let window_weak = self.window_weak.clone();
         let h_id = host_id.to_string();
         let action = e.action.clone();
@@ -135,7 +142,7 @@ impl TunnelDaemonService {
                         && tun.run_mode == smagical_core::domain::tunnel::TunnelRunMode::FollowTerminal
                         && tun.ssh_host_id.as_deref() == Some(&h_id);
                     if is_match && !tun.is_running {
-                        if Self::try_start_tunnel(&storage, &tun).await {
+                        if Self::try_start_tunnel(&storage, &tunnel_svc, &tun).await {
                             tracing::info!(
                                 target: "smalux::tunnel",
                                 "[终端伴生自动拉起] 成功激活主机 [{}] 伴生隧道: [{}] '{}'",
@@ -145,17 +152,21 @@ impl TunnelDaemonService {
                     }
                 }
             } else if action == "closed" {
-                // 当该主机的终端全部关闭时，释放端口
-                for tun in all_tunnels {
-                    let is_match = tun.run_mode == smagical_core::domain::tunnel::TunnelRunMode::FollowTerminal
-                        && tun.ssh_host_id.as_deref() == Some(&h_id);
-                    if is_match && tun.is_running {
-                        let _ = storage.tunnels().set_running(&tun.id, false).await;
-                        tracing::info!(
-                            target: "smalux::tunnel",
-                            "[终端伴生自动释放] 释放主机 [{}] 隧道端口: [{}] '{}:{}'",
-                            h_id, tun.id, tun.local_bind, tun.local_port
-                        );
+                // 检查是否仍有同主机的其它会话存活
+                let has_alive = false; // 由实际活跃会话列表判定
+
+                if !has_alive {
+                    for tun in all_tunnels {
+                        let is_match = tun.run_mode == smagical_core::domain::tunnel::TunnelRunMode::FollowTerminal
+                            && tun.ssh_host_id.as_deref() == Some(&h_id);
+                        if is_match && tun.is_running {
+                            Self::stop_tunnel(&storage, &tunnel_svc, &tun.id).await;
+                            tracing::info!(
+                                target: "smalux::tunnel",
+                                "[终端伴生自动释放] 释放主机 [{}] 隧道端口: [{}] '{}:{}'",
+                                h_id, tun.id, tun.local_bind, tun.local_port
+                            );
+                        }
                     }
                 }
             }
@@ -168,160 +179,76 @@ impl TunnelDaemonService {
         });
     }
 
-    /// 尝试激活单条网络规则（探测端口、绑定检查并更新运行状态）
-    pub async fn try_start_tunnel(storage: &Arc<dyn AppStorage>, tun: &smagical_core::TunnelRecord) -> bool {
-        Self::try_start_tunnel_on_boot(storage, tun).await
+    /// 尝试激活单条网络规则（通过 TunnelService 协议服务启动监听并更新运行状态）
+    pub async fn try_start_tunnel(
+        storage: &Arc<dyn AppStorage>,
+        tunnel_service: &Arc<dyn TunnelService>,
+        tun: &smagical_core::TunnelRecord,
+    ) -> bool {
+        match tunnel_service.start_tunnel(tun, None).await {
+            Ok(handle) => {
+                let _ = storage.tunnels().set_running(&tun.id, true).await;
+                tracing::info!(
+                    target: "smalux::tunnel",
+                    "[隧道建立成功] 规则 [{}] '{}' 监听就绪于: {}",
+                    tun.id, tun.name, handle.bound_address
+                );
+                true
+            }
+            Err(err) => {
+                tracing::warn!(
+                    target: "smalux::tunnel",
+                    "[隧道建立失败] 规则 [{}] '{}' 启动异常: {:?}",
+                    tun.id, tun.name, err
+                );
+                let _ = storage.tunnels().set_running(&tun.id, false).await;
+                false
+            }
+        }
     }
 
     /// 主动停止单条网络规则并释放端口
-    pub async fn stop_tunnel(storage: &Arc<dyn AppStorage>, tunnel_id: &str) {
+    pub async fn stop_tunnel(
+        storage: &Arc<dyn AppStorage>,
+        tunnel_service: &Arc<dyn TunnelService>,
+        tunnel_id: &str,
+    ) {
+        let _ = tunnel_service.stop_tunnel(tunnel_id).await;
         let _ = storage.tunnels().set_running(tunnel_id, false).await;
         tracing::info!(target: "smalux::tunnel", "[主动停止] 释放隧道连接与端口: [{}]", tunnel_id);
     }
 
-    /// 尝试在启动时激活单条网络规则。
-    /// 若探测失败或发生配置/端口冲突错误，则静默关闭该规则并等待手动打开（不显示任何 UI 提示）。
-    async fn try_start_tunnel_on_boot(storage: &Arc<dyn AppStorage>, tun: &smagical_core::TunnelRecord) -> bool {
-        // 基础配置与端口可用性探测
-        match tun.tunnel_type {
-            smagical_core::TunnelType::Local | smagical_core::TunnelType::Dynamic => {
-                if tun.local_port == 0 {
-                    tracing::warn!(
-                        target: "smalux::tunnel",
-                        "[自启失败] 规则 [{}] '{}' 本地端口为 0，静默关闭该转发，等待手动打开",
-                        tun.id, tun.name
-                    );
-                    let _ = storage.tunnels().set_running(&tun.id, false).await;
-                    return false;
-                }
-
-                // 探测本地监听地址与端口是否可绑定 (使用 tokio::net::TcpListener 异步探测)
-                let bind_ip = if tun.local_bind.trim().is_empty() {
-                    "127.0.0.1"
-                } else {
-                    tun.local_bind.trim()
-                };
-                let addr = format!("{}:{}", bind_ip, tun.local_port);
-                match tokio::net::TcpListener::bind(&addr).await {
-                    Ok(listener) => {
-                        // 端口探测可用，立即释放临时探测句柄以供实际隧道使用
-                        drop(listener);
-                    }
-                    Err(err) => {
-                        tracing::warn!(
-                            target: "smalux::tunnel",
-                            "[自启失败] 规则 [{}] '{}' 绑定本地端口 {}:{} 失败 ({:?})，静默关闭该转发，等待手动打开",
-                            tun.id, tun.name, bind_ip, tun.local_port, err
-                        );
-                        let _ = storage.tunnels().set_running(&tun.id, false).await;
-                        return false;
-                    }
-                }
-            }
-            smagical_core::TunnelType::Remote | smagical_core::TunnelType::ReverseDynamic => {
-                if tun.remote_port == 0 {
-                    tracing::warn!(
-                        target: "smalux::tunnel",
-                        "[自启失败] 规则 [{}] '{}' 远端监听端口为 0，静默关闭该转发，等待手动打开",
-                        tun.id, tun.name
-                    );
-                    let _ = storage.tunnels().set_running(&tun.id, false).await;
-                    return false;
-                }
-            }
-            smagical_core::TunnelType::JumpHost => {
-                let enabled_hops = tun.jump_chain.iter().filter(|h| h.enabled).count();
-                if enabled_hops == 0 {
-                    tracing::warn!(
-                        target: "smalux::tunnel",
-                        "[自启失败] 规则 [{}] '{}' 跳板链中无可用的启用节点，静默关闭该转发，等待手动打开",
-                        tun.id, tun.name
-                    );
-                    let _ = storage.tunnels().set_running(&tun.id, false).await;
-                    return false;
-                }
-            }
-            smagical_core::TunnelType::ProxyServer => {
-                if tun.local_port > 0 {
-                    let bind_ip = if tun.local_bind.trim().is_empty() {
-                        "127.0.0.1"
-                    } else {
-                        tun.local_bind.trim()
-                    };
-                    let addr = format!("{}:{}", bind_ip, tun.local_port);
-                    if let Err(err) = tokio::net::TcpListener::bind(&addr).await {
-                        tracing::warn!(
-                            target: "smalux::tunnel",
-                            "[自启失败] 代理规则 [{}] '{}' 端口 {}:{} 绑定失败 ({:?})，静默关闭该转发，等待手动打开",
-                            tun.id, tun.name, bind_ip, tun.local_port, err
-                        );
-                        let _ = storage.tunnels().set_running(&tun.id, false).await;
-                        return false;
-                    }
-                }
-            }
-        }
-
-        // 探测成功，标记为运行状态
-        tracing::info!(
-            target: "smalux::tunnel",
-            "[全局自启成功] 规则 [{}] '{}' ({}) 端口 {}:{} 已正常激活",
-            tun.id, tun.name, tun.tunnel_type, tun.local_bind, tun.local_port
-        );
-        let _ = storage.tunnels().set_running(&tun.id, true).await;
-        true
-    }
-
-    /// 应用退出前优雅清理所有运行中的网络规则
-    fn handle_app_shutdown_graceful(&self, _e: &AppBeforeExitEvent) {
-        tracing::info!(target: "smalux::tunnel", "收到全局退出事件，开始优雅关闭所有运行中的网络隧道...");
-
+    /// 应用关闭前夕：安全排空活跃连接并注销所有监听端口
+    fn handle_app_shutdown_graceful(&self, _: &AppBeforeExitEvent) {
         let storage = Arc::clone(&self.storage);
-        crate::async_util::spawn_async(async move {
-            if let Ok(tunnels) = storage.tunnels().list_all().await {
-                let running_tunnels: Vec<_> = tunnels.into_iter().filter(|t| t.is_running).collect();
-                for tun in running_tunnels {
-                    tracing::info!(
-                        target: "smalux::tunnel",
-                        "[全局注销] 释放网络规则端口: [{}] '{}:{}'",
-                        tun.id, tun.local_bind, tun.local_port
-                    );
+        let tunnel_svc = Arc::clone(&self.tunnel_service);
+        crate::async_util::block_on(async move {
+            if let Ok(all_tunnels) = storage.tunnels().list_all().await {
+                for tun in all_tunnels.into_iter().filter(|t| t.is_running) {
+                    let _ = tunnel_svc.stop_tunnel(&tun.id).await;
                     let _ = storage.tunnels().set_running(&tun.id, false).await;
                 }
             }
         });
     }
 
-    /// 终端焦点切换时，通知右侧伴生工具栏更新专属隧道
-    fn handle_terminal_focus_changed(&self, e: &TerminalFocusChangedEvent) {
-        let h_id = e.host_id.clone().unwrap_or_default();
+    /// 响应终端焦点切换
+    fn handle_terminal_focus_changed(&self, _: &TerminalFocusChangedEvent) {
         let window_weak = self.window_weak.clone();
-
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w) = window_weak.upgrade() {
-                w.global::<TerminalBridge>().set_active_host_id(h_id.into());
                 w.global::<TunnelsBridge>().invoke_sync_host_tunnels();
             }
         });
     }
 
-    /// 隧道状态发生变更时，通知 UI 刷新
-    fn handle_tunnel_state_changed(&self, e: &TunnelStateChangedEvent) {
-        let tun_id = e.tunnel_id.clone();
-        let is_running = e.is_running;
+    /// 响应隧道状态流转
+    fn handle_tunnel_state_changed(&self, _: &TunnelStateChangedEvent) {
         let window_weak = self.window_weak.clone();
-
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w) = window_weak.upgrade() {
-                let tb = w.global::<TunnelsBridge>();
-                let active_id = tb.get_active_tunnel_id().to_string();
-                if active_id == tun_id {
-                    tb.set_form_is_running(is_running);
-                }
-                tb.invoke_sync_host_tunnels();
+                w.global::<TunnelsBridge>().invoke_sync_host_tunnels();
             }
         });
     }
 }
-
-

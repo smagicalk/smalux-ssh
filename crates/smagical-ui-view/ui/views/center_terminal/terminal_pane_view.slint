@@ -8,6 +8,8 @@ import { AppTheme } from "../../themes/app-theme.slint";
 import { StatusDot } from "../../components/status-dot.slint";
 import { TabItem } from "../../components/tab-item.slint";
 import { TabData } from "tab_bar.slint";
+import { SettingsBridge } from "../../features/settings/settings_bridge.slint";
+import { TerminalBridge } from "../../features/terminal/terminal_bridge.slint";
 
 /// 单个终端分屏窗格独立视口组件
 ///
@@ -45,6 +47,13 @@ export component TerminalPaneView inherits Rectangle {
     in-out property <int> sel-end-col: -1;
     in-out property <int> sel-end-row: -1;
     in-out property <bool> is-selecting: false;
+
+    /// 当前鼠标悬停命中的超链接 URL (用于切换手型指针与点击唤起浏览器)
+    in-out property <string> hovered-url: "";
+    property <int> last-hover-col: -1;
+    property <int> last-hover-row: -1;
+    property <length> press-down-x: 0px;
+    property <length> press-down-y: 0px;
 
     // Tab 拖拽相关状态
     in property <bool> is-dragging-tab: false;
@@ -386,8 +395,21 @@ export component TerminalPaneView inherits Rectangle {
                 vertical-alignment: top;
             }
 
+
             // 5.2 鼠标手势、划选高亮、聚焦切换与右键菜单拦截层
             pane-body-touch := TouchArea {
+                mouse-cursor: (self.has-hover && root.hovered-url != "") ? pointer : text;
+
+                double-clicked => {
+                    let cur-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
+                    let cur-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
+                    let url = TerminalBridge.terminal-check-hover-url(root.active-tab-id, cur-c, cur-r);
+                    let target-url = url != "" ? url : root.hovered-url;
+                    if target-url != "" && SettingsBridge.setting-terminal-url-click {
+                        TerminalBridge.terminal-open-url(target-url);
+                    }
+                }
+
                 pointer-event(event) => {
                     if event.kind == PointerEventKind.down {
                         root.select();
@@ -399,6 +421,8 @@ export component TerminalPaneView inherits Rectangle {
                                 root.context-menu(self.mouse-x, self.mouse-y);
                             }
                         } else if event.button == PointerEventButton.left {
+                            root.press-down-x = self.mouse-x;
+                            root.press-down-y = self.mouse-y;
                             let start-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
                             let start-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
                             root.sel-start-col = start-c;
@@ -421,13 +445,27 @@ export component TerminalPaneView inherits Rectangle {
                 }
 
                 moved => {
+                    let cur-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
+                    let cur-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
                     if root.is-selecting && self.pressed {
-                        let cur-c = Math.max(0, Math.floor((self.mouse-x - 16px) / 8.5px));
-                        let cur-r = Math.max(0, Math.floor((self.mouse-y - 8px) / 18px));
                         root.sel-end-col = cur-c;
                         root.sel-end-row = cur-r;
                         if cur-c != root.sel-start-col || cur-r != root.sel-start-row {
                             root.selection-changed(root.sel-start-col, root.sel-start-row, cur-c, cur-r, true);
+                        }
+                    } else if !self.pressed {
+                        if self.mouse-x < 16px || self.mouse-y < 8px {
+                            root.hovered-url = "";
+                            root.last-hover-col = -1;
+                            root.last-hover-row = -1;
+                        } else if cur-c != root.last-hover-col || cur-r != root.last-hover-row {
+                            root.last-hover-col = cur-c;
+                            root.last-hover-row = cur-r;
+                            if SettingsBridge.setting-terminal-url-click {
+                                root.hovered-url = TerminalBridge.terminal-check-hover-url(root.active-tab-id, cur-c, cur-r);
+                            } else {
+                                root.hovered-url = "";
+                            }
                         }
                     }
                 }
@@ -436,8 +474,6 @@ export component TerminalPaneView inherits Rectangle {
                     root.scroll(event.delta-y);
                     accept
                 }
-
-                mouse-cursor: text;
             }
 
             // 5.3 窗格独立专属微型历史滚动条 (该窗格有回滚历史时在自身右边缘纵贯展示)

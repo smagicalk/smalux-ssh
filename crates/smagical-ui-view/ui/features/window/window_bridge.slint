@@ -29,7 +29,6 @@ export global WindowBridge {
     in-out property <string> active-rendering-pipeline: "winit-skia";
 
     // 模态弹窗状态
-    in-out property <bool> is-command-palette-open: false;
     in-out property <bool> is-debug-modal-open: false;
     in-out property <bool> is-new-session-modal-open: false;
     in-out property <bool> is-create-tmux-open: false;
@@ -81,8 +80,6 @@ export global WindowBridge {
     callback navigate-to(string /* target_tab */, string /* section */);
 
     // 弹窗启闭控制回调
-    callback open-command-palette();
-    callback close-command-palette();
     callback open-debug-modal();
     callback close-debug-modal();
     callback open-new-session-modal();

@@ -851,6 +851,34 @@ pub fn start_local_shell_discovery(
     });
 }
 
+/// 本地终端异步探测全局后台服务 (跟随应用引导生命周期 AppBootEvent 启动)
+pub struct LocalShellDiscoveryService {
+    cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
+    window_weak: slint::Weak<crate::generated::AppWindow>,
+}
+
+impl LocalShellDiscoveryService {
+    /// 创建本地终端异步探测服务实例
+    pub fn new(
+        cached_shells: std::sync::Arc<std::sync::RwLock<Vec<LocalShellItemData>>>,
+        window_weak: slint::Weak<crate::generated::AppWindow>,
+    ) -> Self {
+        Self {
+            cached_shells,
+            window_weak,
+        }
+    }
+
+    /// 注册跟随整个应用生命周期的全局引导自启事件监听 (AppBootEvent)
+    pub fn register(self: std::sync::Arc<Self>, events: &smagical_core::event::EventManager) {
+        let s = std::sync::Arc::clone(&self);
+        let g = events.global().listen(move |_: &smagical_core::event::AppBootEvent| {
+            start_local_shell_discovery(std::sync::Arc::clone(&s.cached_shells), s.window_weak.clone());
+        });
+        g.detach();
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -905,6 +933,25 @@ mod tests {
                 "系统无有效交互式 Linux 发行版时，绝不可在列表中展示 WSL！"
             );
         }
+    }
+
+    #[test]
+    fn test_local_shell_discovery_service_event_trigger() {
+        let events = smagical_core::event::EventManager::new();
+        let cache = std::sync::Arc::new(std::sync::RwLock::new(Vec::new()));
+        let service = std::sync::Arc::new(LocalShellDiscoveryService::new(
+            std::sync::Arc::clone(&cache),
+            slint::Weak::default(),
+        ));
+        service.register(&events);
+
+        // 分发 AppBootEvent
+        events.global().dispatch(&smagical_core::event::AppBootEvent);
+
+        // 给后台异步任务留出极微小的时间探测完成
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        let shells = cache.read().unwrap();
+        assert!(!shells.is_empty(), "AppBootEvent 应唤醒 LocalShellDiscoveryService 填充共享终端缓存");
     }
 }
 

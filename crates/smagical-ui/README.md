@@ -1,153 +1,185 @@
 # smagical-ui
 
-`smagical-ui` 是 **smalux-ssh** 的桌面客户端展示与交互层 crate，基于 [Slint UI](https://slint.dev/) 框架构建。它负责桌面窗口生命周期、UI 视图布局渲染、交互回调路由、本地 Shell 探测、主题动态注入以及多语言国际化支持。
+`smagical-ui` 是 **smalux-ssh** 的桌面客户端业务装配与控制中枢 crate。它基于 [Slint UI](https://slint.dev/) 框架与 Tokio 异步运行时构建，负责桌面窗口生命周期管理、**高性能软件光栅化终端渲染引擎 (PTY/Parser/Renderer/SplitTree)**、**1:1 镜像领域 Handlers 处理器集群**、**增量 Diff 树形状态缓存**、**跨平台本地 Shell 探测**、**系统托盘集成**以及**动态主题运行时热注入**。
+
+界面声明与纯 Slint 视图模型由下层的 [`smagical-ui-view`](../smagical-ui-view/README.md) 提供。
 
 ---
 
-## 📁 目录与模块架构 (特性内聚 Feature-First 架构)
+## 📁 目录结构与模块全景
 
 ```text
 crates/smagical-ui/
-├── Cargo.toml                  # UI crate 依赖与配置
-├── build.rs                    # Slint 编译构建脚本 (slint_build::compile)
-├── extract-translations.ps1    # i18n 提取脚本
-├── messages.po                 # gettext 多语言文案目录
-├── src/
-│   ├── lib.rs                  # 桌面应用入口 (run) 与顶层装配
-│   ├── main.rs                 # 可执行二进制启动入口
-│   ├── tree_model.rs           # 树形视图纯函数操作层 (RawTreeNode, 排序, 拖拽迁移, 搜索过滤)
-│   ├── session.rs              # 终端会话管理与 Slint UI 状态同步
-│   ├── debug_ui.rs             # Tracing 日志面板数据桥接
-│   ├── local_shells.rs         # 跨平台本地 Shell 环境探测与缓存引擎
-│   ├── terminal/               # 终端渲染引擎与分屏模型 (renderer, pty, split_tree)
-│   ├── handlers/               # 1:1 镜像领域服务集群 (无污染解耦绑定)
-│   │   ├── settings/           # 偏好设置、壁纸轮播、终端排版与多端云同步
-│   │   ├── files/              # 本地磁盘 IO、远程 SFTP 与异步传输队列
-│   │   ├── tunnels/            # 端口转发、Bastion 跳板与代理节点健康监控
-│   │   ├── credentials/        # SSH 密钥对生成、金库加密存取与密码生成
-│   │   ├── snippets/           # 脚本层级树与参数化模板动态执行
-│   │   ├── session_handlers.rs # 终端会话生命周期
-│   │   ├── host_handlers.rs    # 主机与分组资产
-│   │   ├── history_handlers.rs # 连接历史记录与快照
-│   │   ├── theme_handlers.rs   # 动态主题切换与主题设计工坊
-│   │   └── window_handlers.rs  # 无边框窗口与托盘
-│   └── theme/                  # Slint 主题注册、内置资源加载与动态应用
-└── ui/
-    ├── main.slint              # 顶层主窗口路由器 (仅 ~550 行，调度主视口)
-    ├── assets/                 # 统一风格 SVG 矢量图标与字体资源
-    ├── themes/                 # 全局设计 Token 与调色板单例 (AppTheme)
-    ├── shared/                 # 🧱 全工程通用共享组件库 (严禁包含业务逻辑)
-    │   ├── base/               # 原子控件 (AppButton, AppFormInput, AppSwitch, AppDropdown, AppSegmentedControl)
-    │   ├── scaffolds/          # 通用脚手架 (AppModalScaffold, AppMasterDetailScaffold, AppFormRow)
-    │   └── feedback/           # 全局反馈 (ToastContainer, MessageDialog, ContextMenuContainer)
-    └── features/               # 📦 按业务特性严格内聚的领域包 (自包含页面、专属表单、专属弹窗与桥接单例)
-        ├── settings/           # 设置中心 (settings_view.slint, settings_bridge.slint, 8 大独立 Tab)
-        ├── file_manager/       # 文件管理 (双盘容器, 统一单盘 FileBrowserPane, 传输队列抽屉, 专属弹窗)
-        ├── tunnels/            # 网络隧道 (隧道主页, 转发/跳板/代理多态表单, 拓扑卡片, 专属弹窗)
-        ├── credentials/        # 安全凭据 (凭据主页, 密钥/密码表单, 专属抽屉)
-        ├── snippets/           # 代码片段 (片段主页, 参数运行弹窗, 专属抽屉)
-        ├── terminal/           # 终端视口 (网格视口, TabBar, 状态栏, 新建会话弹窗)
-        └── hosts/              # 主机资产 (主机树抽屉, 树选择器, 新建分组弹窗)
+├── Cargo.toml                  # 依赖清单 (slint, tokio, portable-pty, alacritty_terminal, fontdue 等)
+├── README.md                   # 模块架构与子模块职责规范文档 (本文档)
+└── src/
+    ├── main.rs                 # 可执行二进制启动入口 (初始化日志与 Tokio 运行时)
+    ├── lib.rs                  # 桌面应用总装中枢 (run: 状态挂载、Handlers 绑定、事件总线监听)
+    ├── async_util.rs           # Slint UI 线程与 Tokio 异步运行时通信桥梁 (run_async, run_async_local)
+    ├── local_shells.rs         # 跨平台本地 Shell (PowerShell, CMD, Git Bash, WSL, Bash) 环境探测与缓存引擎
+    ├── launcher_prewarm.rs     # 快速新建终端启动器 (Launcher) 数据预热与缓存
+    ├── pipeline_config.rs      # 存储模式启动管线装配
+    ├── storage_config.rs       # 存储后端模式初始化策略
+    ├── tree_model.rs           # 主机树纯函数算法层 (RawTreeNode, 扁平化展开, 拖拽重排, 循环成环阻断, 搜索过滤)
+    ├── snippet_tree_model.rs   # 代码片段多级目录树纯函数算法层
+    ├── session.rs              # 终端活跃会话与 Slint UI 状态双向同步
+    ├── debug_ui.rs             # Tracing 日志流与 Slint Debug 面板数据桥接
+    ├── tray.rs                 # 跨平台系统托盘生命周期、托盘菜单与气泡通知集成
+    ├── tunnel_daemon.rs        # 网络隧道后台转发守护进程
+    ├── activity_bar_service.rs # 左侧 48px 活动栏切换与徽章计数服务
+    ├── right_panel_service.rs  # 右侧伴生辅助面板 (AI/监控/SFTP/片段) 互斥展开服务
+    ├── notification_service.rs # 统一 Toast 消息横幅通知调度引擎
+    ├── terminal/               # 🖥️ 高性能终端引擎子系统
+    │   ├── mod.rs              # 终端子系统集中导出
+    │   ├── instance.rs         # 终端实例管理器 (PTY 读写流调度、选择区高亮、鼠标按键事件处理)
+    │   ├── pty.rs              # 基于 portable-pty 的跨平台伪终端进程调度与窗口尺寸同步
+    │   ├── parser.rs           # ANSI / VT100 / XTerm 转义序列状态机解析器
+    │   ├── renderer.rs         # 基于 fontdue 的纯 CPU 软件光栅化字形着色与网格渲染器 (Slint Image)
+    │   ├── split_tree.rs       # 终端分屏二叉树拓扑结构 (水平/垂直切分、焦点轮转、比例自适应)
+    │   ├── highlight.rs        # 正则关键词高亮规则引擎 (IP 地址、URL、错误堆栈着色)
+    │   ├── key_encoder.rs      # 物理按键与修饰键到 VT 转义序列的精准编码器
+    │   └── ssh_config.rs       # 终端 SSH 参数适配器
+    ├── handlers/               # 🎮 1:1 领域事件处理器集群 (无污染解耦绑定)
+    │   ├── mod.rs              # Handlers 统一挂载装配入口 (attach_all_handlers)
+    │   ├── host_handlers.rs    # 主机/分组资产 CRUD、树形拖拽重排与列表排序
+    │   ├── session_handlers.rs # 终端 Tab 会话生命周期 (新建、分屏、聚焦、关闭、重连)
+    │   ├── credential_handlers.rs # 安全凭据存取、SSH 密钥对生成、密码生成与保险库解锁
+    │   ├── tunnel_handlers.rs  # 网络隧道配置、端口占用冲突检测与后台守护进程启闭
+    │   ├── file_handlers.rs    # 双盘文件浏览器 IO、跨栏拖拽上传下载、传输任务队列调度
+    │   ├── right_drawer_handlers.rs # AI 对话交互、实时负载监控、代码片段快执
+    │   ├── window_handlers.rs  # 无边框窗口动作 (拖拽移动、最大化/最小化、关闭至托盘)
+    │   ├── theme_handlers.rs   # 动态主题切换、主题设计工坊实时预览与 TOML 导入
+    │   ├── debug_handlers.rs   # 调试日志流实时拉取、测试场景预设注入、批量数据模拟
+    │   ├── color_utils.rs      # 颜色格式化与十六进制转换工具
+    │   └── settings_handlers/  # 偏好设置分类处理器 (ai, backup, highlight, keybinding, security, utils)
+    ├── store/                  # 💾 增量 Diff 与 UI 状态缓存层
+    │   ├── mod.rs              # 存储缓存导出
+    │   ├── host_store.rs       # 主机树内存缓存与快速索引映射表
+    │   └── diff.rs             # 树形增量 Diff 算法 (避免全量刷新引起 Slint 界面闪烁)
+    ├── theme/                  # 🎨 主题运行时应用子系统
+    │   ├── mod.rs              # 主题导出
+    │   ├── apply.rs            # 将 Core 层 ThemeDefinition 动态注入 Slint AppTheme 运行时属性
+    │   └── builtins.rs         # 静态打包内置的 15+ 套经典主题
+    └── debug/                  # 🛠️ 开发者诊断与内存探针
+        ├── mod.rs              # 调试导出
+        ├── tracing_layer.rs    # 自定义 Tracing Layer，日志捕获至内存环形缓冲区 (CircularBuffer)
+        ├── inspector.rs        # 运行时状态探针与内存诊断
+        ├── batch.rs            # 批量测试数据生成器
+        ├── presets.rs          # 常用网络与服务器模拟场景预设
+        ├── logger.rs           # 调试日志格式化
+        └── models.rs           # 调试视图数据模型
 ```
 
 ---
 
-## 🧩 架构核心：领域桥接单例 (Slint Domain Bridge)
+## 🧩 各子系统与核心子模块 (`mod`) 详细职责解析
 
-为了彻底解决 Slint 中由属性跨层传递导致的“属性穿透爆炸 (Props Drilling)”，全工程引入领域桥接单例模式：
+### 1. `terminal` - 高性能纯 Rust 终端渲染引擎
 
-```slint
-// ui/features/settings/settings_bridge.slint
-export global SettingsBridge {
-    in-out property <string> active-category: "general";
-    in-out property <string> setting-ui-font: "";
-    in-out property <int> setting-scrollback-lines: 10000;
-    // ...各领域专属状态
-    callback switch-theme(string);
-    callback export-backup-archive(bool);
-}
-```
+为了提供丝滑、低延迟且跨平台的终端体验，系统自研了软光栅终端引擎，无需依赖 WebView 或外部终端控件：
 
-- **UI 内部解耦**：子 Tab 与表单组件直接访问 `SettingsBridge`，主视图无需传递数十个属性，`main.slint` 彻底消除穿透绑定；
-- **Rust 后端解耦**：Handler 闭包通过 `window.global::<SettingsBridge>().on_switch_theme(...)` 挂载，与 `AppWindow` 解耦。
-
----
-
-## 🖥️ 界面架构与布局
-
-主窗口采用无边框现代化设计，由 **`ui/main.slint`** 统领全局：
-
-```text
-+-----------------------------------------------------------------------------------+
-| TabBar: [标签 1] [标签 2] [+]   [快捷搜索 Ctrl+K]   [广播] [换肤] [设置] [_] [□] [✕] |
-+----+------------+----------------------------------------------------+------------+----+
-|    |            |                                                    |            |    |
-| 左 |  左侧抽屉  |                                                    |  右侧抽屉  | 右 |
-| 侧 | (240px)    |                                                    | (240px)    | 侧 |
-| 活 |            |                     中央终端主视口                 |            | 工 |
-| 动 | 主机 / 文件|                   (TerminalViewport)               | 监控 / SFTP| 具 |
-| 栏 | 密钥 / 脚本|                                                    | 调试 / 笔记| 栏 |
-|    | 隧道 / 历史|                                                    |            |    |
-|48px| (可折叠)   |                                                    | (可折叠)   |48px|
-+----+------------+----------------------------------------------------+------------+----+
-| StatusBar: 状态: 已连接 (127.0.0.1:22) | UTF-8 | 延迟: 12ms | 主题: Darcula       |
-+-----------------------------------------------------------------------------------+
-```
-
-### 核心交互特性
-
-1. **🌲 主机资产双视图模式 (`HostsDrawer`)**：
-   - **树形层级模式**：支持无限层级拖拽调序（Before / After / Inside）、循环引用阻断保护、超宽节点横向平滑滚动；
-   - **卡片列表模式**：平铺大卡片展示，支持独立拖拽视觉排序（锁定分组属性不变）。
-2. **📂 双盘文件浏览器与传输工作台 (`FileExplorerView`)**：
-   - **独立双栏 Tab 架构**：左栏本地文件系统与右栏远程 SFTP 拥有独立的 Tab 栈、双向历史（后退/前进/上级）与路径输入跳转；
-   - **同栏 Tab 丝滑拖拽调序**：支持左键按住 Tab 左右拖拽重排顺序；跨栏或拖出 Tab 栏自动显示 `🚫 禁止` 置灰反馈与安全复位；
-   - **跨栏拖拽文件传输**：支持本地向远程拖拽上传、远程向本地拖拽下载；同窗口内拖拽自动判定无效；
-   - **多层级传输任务树**：支持多文件与多层级文件夹递归拆解传输任务树，默认折叠汇总显示总进度与传输速率；
-   - **智能右键菜单 (`ContextMenuContainer` & `ContextMenuItem`)**：统一定义 4 大右键菜单（文件、传输、终端视口、终端 Tab），支持智能视口避让翻转、100% 实体高对比度分割线与即时响应消失。
-3. **📂 独立树状分组选择器 (`GroupTreeSelector`)**：
-   - 具备独立折叠三角热区与双击快捷展开，单选圆圈指示与高亮联动。
-4. **✨ 现代化新建分组弹窗 (`CreateGroupModal`)**：
-   - 460x420px 居中精致卡片，内嵌树状上级选择器与纯暗色一键清空输入框。
-5. **🐚 快速新建终端弹窗 (Launcher Modal)**：
-   - 动态列出本地所有可用 Shell 环境与远程主机资产，支持毫秒级拼音/关键字实时模糊过滤。
-6. **🛠️ 开发者调试抽屉 (`DebugDrawer`)**：
-   - 查看全系统实时 Tracing 日志流，支持一键注入场景预设（K8s/微服务/压测）、批量生成主机资产及端口状态模拟。
+- **[`terminal::instance`](src/terminal/instance.rs)**：
+  - 终端实例的核心中枢，连接 PTY 进程与渲染层；
+  - 维护终端选择区状态（鼠标拖选、双击选词、三击选行）、剪贴板文本复制与粘贴；
+  - 提供异步 PTY 输出消费循环，触发脏帧标记与 Slint 局部重绘。
+- **[`terminal::pty`](src/terminal/pty.rs)**：
+  - 基于 `portable-pty` 抽象跨平台伪终端；
+  - 在 Windows 下使用 ConPTY 原生伪终端驱动，在 Linux/macOS 下使用 OpenPTY；
+  - 监听终端视口尺寸变化，动态同步调整 PTY 行列数 (`pty.resize(rows, cols)`)。
+- **[`terminal::parser`](src/terminal/parser.rs)**：
+  - 解析 ANSI / VT100 / XTerm 控制序列（光标移动、清屏、SGR 样式属性、备用屏幕切换）；
+  - 维护回滚缓冲区（Scrollback Buffer），支持最多 100,000 行历史翻页。
+- **[`terminal::renderer`](src/terminal/renderer.rs)**：
+  - 基于 `fontdue` 纯 Rust 字体光栅化器，将 JetBrains Mono 等等宽字体字符转换为像素 Alpha 遮罩；
+  - 内存级字形缓存（Glyph Cache），相同字符零重复光栅化；
+  - 直接在内存中组装 RGBA 像素矩阵并生成 `slint::Image`，实现极高帧率的 CPU 软光栅渲染。
+- **[`terminal::split_tree`](src/terminal/split_tree.rs)**：
+  - 二叉树分屏数据结构（`SplitTree::Leaf` / `SplitTree::Node`）；
+  - 支持无级水平分屏 (`Horizontal`) 与垂直分屏 (`Vertical`)；
+  - 支持动态拖拽调整窗格比例、分屏焦点轮转切换（`Ctrl+Alt+方向键`）、单窗格关闭与自动折叠平衡。
+- **[`terminal::highlight`](src/terminal/highlight.rs)**：
+  - 实时正则匹配引擎：对终端输出流中的 IPv4/IPv6、URL 超链接、时间戳、SQL 关键词、`ERROR` / `WARN` / `FAIL` 进行动态着色增强。
+- **[`terminal::key_encoder`](src/terminal/key_encoder.rs)**：
+  - 将 Slint 键盘事件（键码、Control/Shift/Alt/Meta 状态）精准转换为终端标准的 VT 转义序列（如 `\x1b[A`、`\x1b[1;5C`）。
 
 ---
 
-## 🎨 主题系统集成
+### 2. `handlers` - 1:1 领域事件处理器集群
 
-UI 样式通过 `AppTheme` 单例统一定义，颜色与尺寸令牌与 `smagical-core::theme` 模型严格对应：
+通过统一入口 `attach_all_handlers(&window, &core_state, ...)` 挂载所有 UI 回调，全面解耦视图层与底层业务：
 
-- **丰富预设**：内置 15+ 套经典浅色/深色主题（`Darcula`, `Catppuccin`, `Monokai`, `Nord`, `One Dark`, `Solarized`, `Tokyo Night`, `Rosé Pine` 等）；
-- **平滑换肤**：在 Rust 端通过 `apply_theme_by_id(&window, &themes, theme_id)` 动态将解析后的色值推送到 Slint 运行时属性；
-- 详细规范请参阅 [ui/themes/README.md](ui/themes/README.md)。
+- **`host_handlers`**：
+  - 监听 `HostsBridge` 树形拖拽信号，执行 `move_and_reorder_raw_node`；
+  - 具备**循环成环检测保护**（禁止将父分组拖入其自身的子孙节点内部）；
+  - 增量保存至存储层 (`core_state.storage().hosts().save(...)`)。
+- **`session_handlers`**：
+  - 监听新建 Tab、关闭 Tab、Tab 左右拖拽排序；
+  - 启动快速新建终端启动器（Launcher），列出本地所有 Shell 与主机资产，提供毫秒级拼音/模糊匹配。
+- **`credential_handlers`**：
+  - 生成 Ed25519 / RSA-4096 / ECDSA SSH 密钥对；
+  - 生成高熵强密码；
+  - 弹出主密码保险库解锁对话框并挂载 DEK。
+- **`tunnel_handlers`**：
+  - 本地端口/远端端口占用检测；
+  - 启动/停止后台隧道守护任务 (`tunnel_daemon`)。
+- **`file_handlers`**：
+  - 双盘本地磁盘扫描与路径解析；
+  - 跨栏拖拽上传/下载文件事件拦截；
+  - 多层级传输任务树进度同步。
+- **`right_drawer_handlers`**：
+  - 流式 AI 对话请求与 Markdown 渲染；
+  - 服务器 CPU/内存实时监控图表更新；
+  - 代码片段模板参数提取弹窗与执行注入。
+- **`settings_handlers`**：
+  - 8 大分类偏好读写、主题切换、全量数据导出加密备份与恢复。
 
 ---
 
-## 🌐 国际化 (i18n)
+### 3. `store` - 增量 Diff 与 UI 状态缓存
 
-UI 字符串统一使用 Slint 的 `@tr(...)` 宏包裹：
+- **[`store::diff`](src/store/diff.rs)**：
+  - 实现了基于唯一 ID 的列表增量 Diff 计算算法；
+  - 对比新旧数据树，仅对发生增、删、改或位置变动的节点触发 Slint Model 局部更新，彻底消除全量重刷造成的视觉闪烁与光标重置。
+- **[`store::host_store`](src/store/host_store.rs)**：
+  - 缓存扁平化与树形节点索引，优化搜索与过滤速度。
 
-- **文案目录**：[`messages.po`](messages.po)
-- **提取工具**：`slint-tr-extractor` (v1.16.1)
-- **提取脚本**：
-  ```powershell
-  & 'crates/smagical-ui/extract-translations.ps1'
-  ```
+---
+
+### 4. `theme` - 运行时主题热注入
+
+- **[`theme::apply`](src/theme/apply.rs)**：
+  - 接收 Core 层解析好的 `ThemeDefinition`；
+  - 将数十项颜色 Token（背景色、前景色、强调色、卡片边框、终端 ANSI 16 色）动态注入到 Slint 的 `AppTheme` 全局单例属性中；
+  - 支持无需重启应用实现即时平滑换肤。
+
+---
+
+### 5. `debug` - 开发者诊断与 Tracing 环形缓冲
+
+- **[`debug::tracing_layer`](src/debug/tracing_layer.rs)**：
+  - 实现自定义 `tracing_subscriber::Layer`；
+  - 将全工程产生的 `trace`, `debug`, `info`, `warn`, `error` 日志实时压入带容量限制的内存环形缓冲区（`CircularBuffer`）；
+  - UI 调试抽屉直接从该缓冲区拉取日志，极大方便现场排错。
+
+---
+
+### 6. 顶层服务组件
+
+- **`local_shells.rs`**：跨平台（Windows / Linux / macOS）探测已安装的 PowerShell 7/5.1、CMD、Git Bash、WSL 实例、Bash，并启动时单次探测缓存；
+- **`tray.rs`**：系统托盘常驻，支持关闭主窗口时最小化至托盘、双击托盘图标快速唤醒、托盘右键快捷断开所有会话；
+- **`async_util.rs`**：封装 `run_async` 与 `run_async_local`，妥善处理 Tokio 异步任务与 Slint UI 线程（`slint::invoke_from_event_loop`）之间的数据通信，杜绝界面卡顿与死锁。
 
 ---
 
 ## 🛠️ 常用开发命令
 
 ```bash
-# 启动应用
+# 启动桌面客户端
 cargo run -p smagical-ui
 
-# 静态检查 (0 警告)
+# 静态代码检查 (严格 0 警告)
 cargo clippy -p smagical-ui --all-targets -- -D warnings
 
-# 单元测试 (8 项 UI 纯函数与主题测试)
+# 单元测试 (62+ 项 UI 纯函数、Diff 算法、终端解析与主题测试)
 cargo test -p smagical-ui
 ```

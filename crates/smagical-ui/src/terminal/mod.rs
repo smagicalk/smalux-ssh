@@ -2,12 +2,20 @@
 //!
 //! 包含 PTY 伪终端进程托管、ANSI/VT100 状态机解析与终端会话实例管理。
 
+pub mod backend;
+pub mod highlight;
 pub mod instance;
 pub mod key_encoder;
 pub mod parser;
 pub mod pty;
+pub mod pure_ssh;
 pub mod renderer;
 pub mod split_tree;
+pub mod ssh_config;
+
+pub use backend::TerminalBackend;
+pub use pure_ssh::PureSshProcess;
+pub use highlight::{HighlightEngine, SpanHighlight, open_browser_url};
 
 pub use instance::TerminalInstance;
 pub use key_encoder::encode_key_event;
@@ -18,6 +26,26 @@ pub use split_tree::{
     PaneComputedLayout, PanePixelLayout, SplitNode, SplitOrientation, SplitterComputedLayout,
     SplitterPixelLayout,
 };
+pub use ssh_config::{KeyTempGuard, SshLaunchConfig};
+
+/// 根据主题深浅模式动态同步更新终端全局调色板与各活跃会话的脏标记重绘
+pub fn update_terminal_palette_for_color_mode(
+    renderer_opt: &mut Option<TerminalRenderer>,
+    active_terminals: &mut std::collections::HashMap<String, TerminalInstance>,
+    is_light: bool,
+) {
+    if let Some(renderer) = renderer_opt {
+        let palette = if is_light {
+            TerminalPalette::light()
+        } else {
+            TerminalPalette::dark()
+        };
+        renderer.update_palette(palette);
+    }
+    for instance in active_terminals.values_mut() {
+        instance.parser.mark_dirty();
+    }
+}
 
 
 

@@ -22,6 +22,9 @@ pub struct AppConfigRecord {
     /// 全局操作提示气泡停留时长 ("1.5", "3", "5", "8", "never")，默认 "3"
     #[serde(default = "default_toast_duration")]
     pub toast_duration: String,
+    /// 主窗口始终置顶显示
+    #[serde(default)]
+    pub always_on_top: bool,
 
     /// 当前激活生效的 UI 配色主题 ID (如 "builtin.ui.darcula")
     pub theme_id: String,
@@ -107,6 +110,15 @@ pub struct AppConfigRecord {
     /// 启用 TCP_NODELAY 规避 Nagle 算法降低交互延迟
     #[serde(default = "default_true")]
     pub tcp_nodelay: bool,
+    /// 启用链路层 gzip 数据流压缩 (ssh -C)
+    #[serde(default)]
+    pub compression: bool,
+    /// 兼容遗留设备老旧加密算法 (Legacy Ciphers Fallback)
+    #[serde(default)]
+    pub legacy_ciphers: bool,
+    /// 网络异常断线自动重连 (Auto Reconnect)
+    #[serde(default = "default_true")]
+    pub auto_reconnect: bool,
 
     // --- 传输与文件管理 (SFTP & File Transfers) ---
     /// 默认本地下载存储目录
@@ -142,6 +154,12 @@ pub struct AppConfigRecord {
     /// 传输过滤忽略黑名单
     #[serde(default = "default_sftp_excludes")]
     pub sftp_exclude_patterns: String,
+    /// 显示隐藏文件与点文件
+    #[serde(default)]
+    pub sftp_show_hidden: bool,
+    /// 文件存在重名冲突策略 ("ask", "overwrite", "skip", "rename")
+    #[serde(default = "default_sftp_conflict_policy")]
+    pub sftp_conflict_policy: String,
 
     // --- 多端云同步与数据备份 (Cloud Sync & Backup Matrix) ---
     /// 云同步后端协议 ("off", "webdav", "s3", "gist", "custom")
@@ -219,6 +237,25 @@ pub struct AppConfigRecord {
     #[serde(default)]
     pub session_audit_logging: bool,
 
+    // --- AI 助手与大模型管理 (AI Copilot & Endpoints) ---
+    /// 当前激活的 AI 厂商 ("deepseek", "claude", "openai", "custom")
+    #[serde(default = "default_ai_provider")]
+    pub ai_active_provider: String,
+    /// AI 系统提示词
+    #[serde(default = "default_ai_system_prompt")]
+    pub ai_system_prompt: String,
+    /// 自动化命令安全审查等级 ("strict", "warn", "permissive")
+    #[serde(default = "default_ai_audit_level")]
+    pub ai_auto_audit_level: String,
+    /// AI 端点列表
+    #[serde(default = "default_ai_endpoints")]
+    pub ai_endpoints: Vec<AiEndpointProfileRecord>,
+
+    // --- 自定义终端高亮规则 ---
+    /// 自定义关键词高亮规则列表
+    #[serde(default = "default_keyword_rules")]
+    pub keyword_highlight_rules: Vec<KeywordHighlightRuleRecord>,
+
     /// 开发者调试控制台启用开关 (F12)
     pub debug_enabled: bool,
     /// 全局日志输出等级过滤阈值 ("TRACE", "DEBUG", "INFO", "WARN", "ERROR")
@@ -245,6 +282,7 @@ impl Default for AppConfigRecord {
             confirm_close_active: false,
             custom_data_dir: String::new(),
             toast_duration: default_toast_duration(),
+            always_on_top: false,
 
             // 外观
             theme_id: "builtin.ui.darcula".to_string(),
@@ -286,6 +324,9 @@ impl Default for AppConfigRecord {
             global_proxy_user: String::new(),
             global_proxy_pass: String::new(),
             tcp_nodelay: true,
+            compression: false,
+            legacy_ciphers: false,
+            auto_reconnect: true,
 
             // 传输与文件管理
             sftp_default_local: default_sftp_local(),
@@ -299,6 +340,8 @@ impl Default for AppConfigRecord {
             sftp_editor_mode: default_sftp_editor(),
             sftp_custom_editor: String::new(),
             sftp_exclude_patterns: default_sftp_excludes(),
+            sftp_show_hidden: false,
+            sftp_conflict_policy: default_sftp_conflict_policy(),
 
             // 云同步与数据备份
             cloud_sync_backend: default_off(),
@@ -327,6 +370,15 @@ impl Default for AppConfigRecord {
             clear_clipboard_timeout: true,
             confirm_dangerous_commands: true,
             session_audit_logging: false,
+
+            // AI 助手与大模型管理
+            ai_active_provider: default_ai_provider(),
+            ai_system_prompt: default_ai_system_prompt(),
+            ai_auto_audit_level: default_ai_audit_level(),
+            ai_endpoints: default_ai_endpoints(),
+
+            // 自定义高亮规则
+            keyword_highlight_rules: default_keyword_rules(),
 
             // 调试与特性门控
             debug_enabled: true,
@@ -439,4 +491,149 @@ fn default_auto_lock() -> String {
 
 fn default_toast_duration() -> String {
     "3".to_string()
+}
+
+/// AI 大模型端点持久化配置实体
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AiEndpointProfileRecord {
+    /// 端点唯一标识
+    pub id: String,
+    /// 端点友好显示名称
+    pub name: String,
+    /// 接口基础地址 Base URL
+    pub base_url: String,
+    /// API 授权鉴权密钥
+    pub api_key: String,
+    /// 交互协议模式 ("chat" 或 "response")
+    pub api_mode: String,
+    /// 默认选中推理模型
+    pub selected_model: String,
+    /// 可用模型列表逗号分隔字符串
+    pub models_csv: String,
+    /// 是否作为当前全局激活端点
+    pub is_active: bool,
+    /// 连接状态提示文本
+    pub status_text: String,
+    /// 深度思考档位 ("disabled", "low", "medium", "high")
+    pub thinking_degree: String,
+    /// 请求超时时长 (秒)
+    pub timeout_secs: i32,
+    /// 最大上下文窗口 Tokens
+    pub max_context: i32,
+    /// 失败重试上限次数
+    pub max_retries: i32,
+    /// 自定义请求头 (JSON 或 Key-Value 格式)
+    pub custom_headers: String,
+    /// 推理随机采样温度
+    pub temperature: String,
+}
+
+/// 自定义终端关键词高亮规则记录
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct KeywordHighlightRuleRecord {
+    /// 规则唯一标识
+    pub id: String,
+    /// 正则表达式匹配表达式
+    pub pattern: String,
+    /// 规则用途说明与备注
+    pub remark: String,
+    /// 前景色十六进制值 (如 "#EF4444")
+    pub color_hex: String,
+    /// 是否激活生效
+    pub enabled: bool,
+}
+
+fn default_ai_provider() -> String {
+    "deepseek".to_string()
+}
+
+fn default_ai_system_prompt() -> String {
+    "你是一名精通 Linux/Unix 操作系统内核、网络拓扑与现代运维架构的高级 SRE 运维专家。遵循生产安全第一原则，始终输出语法严谨、带有防御性容错参数的 Shell 指令，主动识别与规避高危操作风险，并在生成复杂命令时简明解释其参数逻辑。".to_string()
+}
+
+fn default_ai_audit_level() -> String {
+    "warn".to_string()
+}
+
+fn default_ai_endpoints() -> Vec<AiEndpointProfileRecord> {
+    vec![
+        AiEndpointProfileRecord {
+            id: "ep-deepseek".to_string(),
+            name: "DeepSeek 官方".to_string(),
+            base_url: "https://api.deepseek.com/v1".to_string(),
+            api_key: String::new(),
+            api_mode: "chat".to_string(),
+            selected_model: "deepseek-reasoner".to_string(),
+            models_csv: "deepseek-reasoner, deepseek-chat".to_string(),
+            is_active: true,
+            status_text: "已连接".to_string(),
+            thinking_degree: "medium".to_string(),
+            timeout_secs: 60,
+            max_context: 32768,
+            max_retries: 2,
+            custom_headers: String::new(),
+            temperature: "0.3".to_string(),
+        },
+        AiEndpointProfileRecord {
+            id: "ep-claude".to_string(),
+            name: "Claude (Anthropic)".to_string(),
+            base_url: "https://api.anthropic.com/v1".to_string(),
+            api_key: String::new(),
+            api_mode: "chat".to_string(),
+            selected_model: "claude-3-7-sonnet-20250219".to_string(),
+            models_csv: "claude-3-7-sonnet-20250219, claude-3-5-sonnet-20241022".to_string(),
+            is_active: false,
+            status_text: "未激活".to_string(),
+            thinking_degree: "high".to_string(),
+            timeout_secs: 60,
+            max_context: 65536,
+            max_retries: 2,
+            custom_headers: String::new(),
+            temperature: "0.2".to_string(),
+        },
+    ]
+}
+
+fn default_keyword_rules() -> Vec<KeywordHighlightRuleRecord> {
+    vec![
+        KeywordHighlightRuleRecord {
+            id: "kw_err".to_string(),
+            pattern: r"\b(ERROR|FATAL|CRITICAL|Failed|Error)\b".to_string(),
+            remark: "致命错误与失败".to_string(),
+            color_hex: "#EF4444".to_string(),
+            enabled: true,
+        },
+        KeywordHighlightRuleRecord {
+            id: "kw_warn".to_string(),
+            pattern: r"\b(WARN|WARNING|Warning|Warn)\b".to_string(),
+            remark: "告警提示与注意".to_string(),
+            color_hex: "#F59E0B".to_string(),
+            enabled: true,
+        },
+        KeywordHighlightRuleRecord {
+            id: "kw_ok".to_string(),
+            pattern: r"\b(SUCCESS|OK|Finished|Done)\b".to_string(),
+            remark: "执行成功与确认".to_string(),
+            color_hex: "#10B981".to_string(),
+            enabled: true,
+        },
+        KeywordHighlightRuleRecord {
+            id: "kw_url".to_string(),
+            pattern: r"https?://[^\s/$.?#].[^\s]*".to_string(),
+            remark: "网络超链接 URL".to_string(),
+            color_hex: "#3B82F6".to_string(),
+            enabled: true,
+        },
+        KeywordHighlightRuleRecord {
+            id: "kw_ip".to_string(),
+            pattern: r"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b".to_string(),
+            remark: "IPv4 主机地址".to_string(),
+            color_hex: "#8B5CF6".to_string(),
+            enabled: true,
+        },
+    ]
+}
+
+fn default_sftp_conflict_policy() -> String {
+    "ask".to_string()
 }

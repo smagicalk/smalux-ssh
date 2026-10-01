@@ -55,9 +55,9 @@ export component CreateBackupModal inherits Rectangle {
         TouchArea {}
 
         VerticalLayout {
-            padding: 24px;
-            spacing: 13px;
-            alignment: space-between;
+            padding: 20px;
+            spacing: 14px;
+            alignment: start;
 
             // 标题栏
             HorizontalLayout {
@@ -100,6 +100,7 @@ export component CreateBackupModal inherits Rectangle {
             // 表单字段列表 (全宽占满设计)
             VerticalLayout {
                 spacing: 11px;
+                vertical-stretch: 1;
 
                 // 1. 任务名称
                 VerticalLayout {

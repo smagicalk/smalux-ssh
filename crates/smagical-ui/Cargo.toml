@@ -17,11 +17,13 @@ arboard.workspace = true
 vt100.workspace = true
 directories.workspace = true
 uuid.workspace = true
+regex = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "time", "json"] }
 tracing-appender.workspace = true
 smagical-core = { path = "../smagical-core" }
+smagical-ssh = { path = "../smagical-ssh" }
 smagical-storage = { path = "../smagical-storage" }
 smagical-ui-view = { path = "../smagical-ui-view" }
 image = { version = "0.25.10", default-features = false, features = ["png", "jpeg", "webp", "bmp"] }
@@ -31,6 +33,7 @@ tokio = { workspace = true, features = ["full"] }
 async-trait = { workspace = true }
 reqwest = { workspace = true }
 futures-util = { workspace = true }
+chrono = { workspace = true }
 
 [target.'cfg(windows)'.dependencies]
 windows-sys = { version = "0.61", features = [

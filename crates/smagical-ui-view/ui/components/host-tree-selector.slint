@@ -161,7 +161,7 @@ export component HostTreeSelector inherits Rectangle {
                                     height: 13px;
                                     image-fit: contain;
                                     colorize: item.is-group
-                                        ? AppTheme.secondary-foreground
+                                        ? (item.is-expanded ? AppTheme.accent : AppTheme.secondary-foreground)
                                         : (item.status == "online" ? AppTheme.success : AppTheme.secondary-foreground);
                                 }
                             }

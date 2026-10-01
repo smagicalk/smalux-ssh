@@ -13,6 +13,10 @@ export global FilesBridge {
     in-out property <string> active-local-tab-id: "";
     in-out property <[FileTabData]> remote-tabs: [];
     in-out property <string> active-remote-tab-id: "";
+    in-out property <bool> is-remote-connecting: false;
+    in-out property <bool> is-remote-loading: false;
+    in-out property <bool> is-remote-error: false;
+    in-out property <string> remote-error-msg: "";
 
     // 路径与文件数据
     in-out property <string> local-current-path: "";
@@ -25,12 +29,15 @@ export global FilesBridge {
     // 传输任务与队列
     in-out property <[TransferItemData]> transfer-tasks: [];
     in-out property <bool> is-transfer-queue-expanded: false;
+    in-out property <length> transfer-queue-height: 180px;
 
     // 导航历史状态
     in-out property <bool> local-can-go-back: false;
     in-out property <bool> local-can-go-forward: false;
     in-out property <bool> remote-can-go-back: false;
     in-out property <bool> remote-can-go-forward: false;
+    in-out property <bool> local-can-go-up: true;
+    in-out property <bool> remote-can-go-up: true;
 
     // 文件主机选择弹窗 (FileHostModal) 状态
     in-out property <bool> is-file-host-modal-open: false;

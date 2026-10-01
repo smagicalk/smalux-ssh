@@ -9,6 +9,7 @@ use std::thread;
 
 use anyhow::{Context, Result};
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize as PortablePtySize};
+use crate::terminal::ssh_config::{KeyTempGuard, SshLaunchConfig};
 
 /// 终端视口网格与像素几何尺寸定义。
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -72,9 +73,19 @@ impl PtyProcess {
     /// # 错误
     /// 若系统 ConPTY/Unix PTY 初始化失败或子进程启动失败，将返回 `anyhow::Result`。
     pub fn spawn_command(
+        cmd: CommandBuilder,
+        size: PtySize,
+        reader_name: String,
+    ) -> Result<Self> {
+        Self::spawn_command_with_auto_password(cmd, size, reader_name, None)
+    }
+
+    /// 启动通用命令行进程并初始化 PTY 双向管道 (支持密码自动应答探测)
+    pub fn spawn_command_with_auto_password(
         mut cmd: CommandBuilder,
         size: PtySize,
         reader_name: String,
+        auto_password: Option<String>,
     ) -> Result<Self> {
         let pty_system = native_pty_system();
         let pair = pty_system
@@ -100,11 +111,19 @@ impl PtyProcess {
 
         let (tx_output, rx_output): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel();
 
-        // 启动后台专用 I/O 读取线程，持续泵送 PTY 字节流
+        let writer_arc = Arc::new(Mutex::new(writer));
+        let writer_for_thread = Arc::clone(&writer_arc);
+
+        // 启动后台专用 I/O 读取线程，持续泵送 PTY 字节流并支持前 8 秒密码自动应答
         thread::Builder::new()
             .name(reader_name)
             .spawn(move || {
                 let mut buf = [0u8; 8192];
+                let mut pwd_opt = auto_password;
+                let started_at = std::time::Instant::now();
+
+                let mut sniff_buf = String::new();
+
                 loop {
                     match reader.read(&mut buf) {
                         Ok(0) => {
@@ -112,7 +131,35 @@ impl PtyProcess {
                             break;
                         }
                         Ok(n) => {
-                            if tx_output.send(buf[..n].to_vec()).is_err() {
+                            let chunk = &buf[..n];
+
+                            // 密码自动应答嗅探 (在启动前 8 秒内有效，支持跨数据分片滑动窗口)
+                            if let Some(ref pwd) = pwd_opt {
+                                if started_at.elapsed().as_secs() < 8 {
+                                    let s = String::from_utf8_lossy(chunk);
+                                    sniff_buf.push_str(&s);
+                                    if sniff_buf.len() > 1024 {
+                                        let trim_start = sniff_buf.len() - 512;
+                                        sniff_buf = sniff_buf[trim_start..].to_string();
+                                    }
+                                    let lower = sniff_buf.to_ascii_lowercase();
+                                    if lower.contains("password") || sniff_buf.contains("密码") || lower.contains("passphrase") {
+                                        tracing::info!(target: "smagical_ui::pty", "检测到远程密码/口令提示符，正在自动填充密码...");
+                                        thread::sleep(std::time::Duration::from_millis(50));
+                                        if let Ok(mut w) = writer_for_thread.lock() {
+                                            let _ = w.write_all(format!("{}\r\n", pwd).as_bytes());
+                                            let _ = w.flush();
+                                        }
+                                        pwd_opt = None; // 阅后即焚，立刻从内存抹除
+                                        sniff_buf.clear();
+                                    }
+                                } else {
+                                    pwd_opt = None; // 超时销毁
+                                    sniff_buf.clear();
+                                }
+                            }
+
+                            if tx_output.send(chunk.to_vec()).is_err() {
                                 // 接收端通道已关闭
                                 break;
                             }
@@ -128,7 +175,7 @@ impl PtyProcess {
 
         Ok(Self {
             master: pair.master,
-            writer: Arc::new(Mutex::new(writer)),
+            writer: writer_arc,
             rx_output,
             child,
             size,
@@ -148,31 +195,49 @@ impl PtyProcess {
         Self::spawn_command(cmd, size, format!("pty-reader-{}", shell_id))
     }
 
-    /// 启动远程 SSH 伪终端交互进程。
-    ///
-    /// # 参数
-    /// - `host`: 目标远程主机 IPv4/IPv6 或域名
-    /// - `port`: SSH 服务监听端口 (通常为 22)
-    /// - `username`: 登录用户名 (可选)
-    /// - `size`: 初始终端视口行列尺寸
-    ///
-    /// # 错误
-    /// 若无法拉起 SSH 客户端进程或 PTY 创建失败，将返回 `anyhow::Result`。
+    /// 启动远程 SSH 伪终端交互进程 (基础快捷方式)。
     pub fn spawn_ssh(
         host: &str,
         port: u16,
         username: Option<&str>,
         size: PtySize,
     ) -> Result<Self> {
+        let config = SshLaunchConfig {
+            host: host.to_string(),
+            port,
+            username: username.map(|s| s.to_string()),
+            ..Default::default()
+        };
+        let (pty, _guard) = Self::spawn_ssh_with_config("default-sess", &config, size)?;
+        Ok(pty)
+    }
+
+    /// 启动配置完备的远程 SSH 交互式终端 (支持私钥凭据挂载、跳板机链式跳转、代理隧道与自动密码应答)
+    pub fn spawn_ssh_with_config(
+        session_id: &str,
+        config: &SshLaunchConfig,
+        size: PtySize,
+    ) -> Result<(Self, Option<KeyTempGuard>)> {
         let mut cmd = CommandBuilder::new("ssh");
-        cmd.arg("-p");
-        cmd.arg(port.to_string());
-        if let Some(user) = username {
-            cmd.arg(format!("{}@{}", user, host));
-        } else {
-            cmd.arg(host);
+
+        // 统一由 smagical-ssh::SshLaunchConfig 构建标准命令行参数与临时私钥守卫
+        let (args, key_guard) = config.build_ssh_args(session_id, true)?;
+        for arg in args {
+            cmd.arg(arg);
         }
-        Self::spawn_command(cmd, size, format!("pty-ssh-{}", host))
+
+        // 目标远程主机 (如 "user@host" 或 "host")
+        cmd.arg(config.destination());
+
+        // 启动 PTY 伪终端进程
+        let pty = Self::spawn_command_with_auto_password(
+            cmd,
+            size,
+            format!("pty-ssh-{}", config.host),
+            config.password.clone(),
+        )?;
+
+        Ok((pty, key_guard))
     }
 
 

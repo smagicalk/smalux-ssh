@@ -2,13 +2,62 @@
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use slint::{ComponentHandle, ModelRc, VecModel};
+use std::sync::Arc;
+use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use smagical_core::AppStorage;
+use smagical_core::domain::config::KeywordHighlightRuleRecord;
+use crate::async_util::spawn_async;
 
 use crate::generated::{AppWindow, KeywordHighlightRule, SettingsBridge};
 use crate::handlers::AppContext;
 use crate::handlers::color_utils::{hsv_to_rgb, rgb_to_hsv, parse_hex_to_rgb};
 use super::utils::hex_to_slint_color;
 
+/// 将 Slint UI 前端高亮规则视图模型转换为持久化实体记录
+///
+/// # 参数
+/// - `list`: Slint UI 层传入的关键词高亮规则数组切片；
+///
+/// # 返回值
+/// 返回准备写入 SQLite 仓储配置表的 `Vec<KeywordHighlightRuleRecord>` 记录集。
+pub(crate) fn rules_to_records(list: &[KeywordHighlightRule]) -> Vec<KeywordHighlightRuleRecord> {
+    list.iter().map(|r| KeywordHighlightRuleRecord {
+        id: r.id.to_string(),
+        pattern: r.pattern.to_string(),
+        remark: r.remark.to_string(),
+        color_hex: r.color_hex.to_string(),
+        enabled: r.enabled,
+    }).collect()
+}
+
+/// 异步将终端关键词高亮规则持久化保存至应用配置仓储
+///
+/// # 参数
+/// - `storage`: 全局仓储服务抽象接口 `Arc<dyn AppStorage>`；
+/// - `records`: 待落盘的规则实体记录集合。
+pub(crate) fn persist_keyword_rules(storage: &Arc<dyn AppStorage>, records: Vec<KeywordHighlightRuleRecord>) {
+    let storage = storage.clone();
+    spawn_async(async move {
+        let _ = storage.config().update(Box::new(move |c| {
+            c.keyword_highlight_rules = records;
+        })).await;
+    });
+}
+
+/// 注册终端运维高亮规则管理与 HSV 拾色器相关 UI 回调
+///
+/// 包含以下功能模块：
+/// 1. **默认与既有规则加载**：内置 ERROR/WARN/SUCCESS/URL/IPv4 常用运维规则模板；
+/// 2. **规则增删改查交互**：新增、编辑、开关切换、物理删除规则，并在修改后自动同步至活跃终端渲染器；
+/// 3. **极坐标 HSV 拾色器圆盘交互**：
+///    - `on_open_keyword_color_wheel`: 打开拾色器并根据 Hex 解析对应极坐标角度与饱和度半径；
+///    - `on_color_wheel_coord_picked`: 拾色器圆盘拖拽坐标换算为色相 (0~360°) 与饱和度 (0~1)；
+///    - `on_color_wheel_brightness_picked`: 拾色器明度滑块调节；
+///    - `on_color_picker_hex_changed`: 直接手动键入十六进制颜色字符串进行实时反解。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `ctx`: 全局应用上下文。
 pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) {
     let bridge = window.global::<SettingsBridge>();
 
@@ -57,14 +106,22 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
             enabled: true,
         },
     ];
-    let rules_state = Rc::new(RefCell::new(initial_rules.clone()));
-    bridge.set_terminal_keyword_rules(ModelRc::from(Rc::new(VecModel::from(initial_rules.clone()))));
-    window.global::<SettingsBridge>().set_terminal_keyword_rules(ModelRc::from(Rc::new(VecModel::from(initial_rules))));
+    let existing = bridge.get_terminal_keyword_rules();
+    let current_rules: Vec<KeywordHighlightRule> = if existing.row_count() > 0 {
+        existing.iter().collect()
+    } else {
+        initial_rules
+    };
+    let rules_state = Rc::new(RefCell::new(current_rules.clone()));
+    sync_rules_to_renderer(ctx, &current_rules);
+    bridge.set_terminal_keyword_rules(ModelRc::from(Rc::new(VecModel::from(current_rules))));
 
     // 注册添加规则
     let rules_state_add = rules_state.clone();
     let window_weak_add = window.as_weak();
     let notif_add = ctx.notifications.clone();
+    let ctx_add = ctx.clone();
+    let storage_add = ctx.core_state.storage().clone();
     bridge.on_add_keyword_rule(move |pattern, remark, color_hex| {
         let p = pattern.as_str().trim();
         if p.is_empty() { return; }
@@ -79,18 +136,22 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
             enabled: true,
         };
         list.push(rule);
+        sync_rules_to_renderer(&ctx_add, &list);
         notif_add.success("已添加高亮规则", &format!("成功添加规则「{}」", p));
         if let Some(w) = window_weak_add.upgrade() {
             let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
+        let records = rules_to_records(&list);
+        persist_keyword_rules(&storage_add, records);
     });
 
     // 注册编辑规则
     let rules_state_edit = rules_state.clone();
     let window_weak_edit = window.as_weak();
     let notif_edit = ctx.notifications.clone();
+    let ctx_edit = ctx.clone();
+    let storage_edit = ctx.core_state.storage().clone();
     bridge.on_update_keyword_rule(move |id, pattern, remark, color_hex| {
         let p = pattern.as_str().trim();
         if p.is_empty() { return; }
@@ -102,41 +163,51 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
             item.rule_color = hex_to_slint_color(color_hex.as_str());
             notif_edit.success("高亮规则已更新", &format!("成功更新规则「{}」", p));
         }
+        sync_rules_to_renderer(&ctx_edit, &list);
         if let Some(w) = window_weak_edit.upgrade() {
             let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
+        let records = rules_to_records(&list);
+        persist_keyword_rules(&storage_edit, records);
     });
 
     // 注册开关规则
     let rules_state_toggle = rules_state.clone();
     let window_weak_toggle = window.as_weak();
+    let ctx_toggle = ctx.clone();
+    let storage_toggle = ctx.core_state.storage().clone();
     bridge.on_toggle_keyword_rule(move |id, enabled| {
         let mut list = rules_state_toggle.borrow_mut();
         if let Some(item) = list.iter_mut().find(|r| r.id == id) {
             item.enabled = enabled;
         }
+        sync_rules_to_renderer(&ctx_toggle, &list);
         if let Some(w) = window_weak_toggle.upgrade() {
             let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
+        let records = rules_to_records(&list);
+        persist_keyword_rules(&storage_toggle, records);
     });
 
     // 注册删除规则
     let rules_state_del = rules_state.clone();
     let window_weak_del = window.as_weak();
     let notif_del = ctx.notifications.clone();
+    let ctx_del = ctx.clone();
+    let storage_del = ctx.core_state.storage().clone();
     bridge.on_delete_keyword_rule(move |id| {
         let mut list = rules_state_del.borrow_mut();
         list.retain(|r| r.id != id);
+        sync_rules_to_renderer(&ctx_del, &list);
         notif_del.info("规则已移除", "已成功删除该条终端高亮规则");
         if let Some(w) = window_weak_del.upgrade() {
             let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model.clone());
             w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
         }
+        let records = rules_to_records(&list);
+        persist_keyword_rules(&storage_del, records);
     });
 
     // 注册高亮规则拾色器圆盘交互
@@ -249,4 +320,31 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
             }
         }
     });
+}
+
+/// 将终端运维高亮规则全量下发至活动终端渲染器
+///
+/// # 算法与数据流
+/// 1. **色彩空间转换**：
+///    - 遍历所有规则，调用 `parse_hex_to_rgb` 将十六进制颜色字符串（如 `#EF4444`）解析为 RGB 三通道，并附带 Alpha=255 构成 `[u8; 4]`；
+///    - 若颜色格式异常，使用防御性回退颜色 `[0xef, 0x44, 0x44, 255]`；
+/// 2. **元组结构映射**：
+///    - 组装为渲染管线专用元组 `(id, pattern, rgba, enabled)`；
+/// 3. **实时热更新**：
+///    - 获取活跃终端着色器 `ctx.terminal_renderer` 实例，调用 `update_highlight_rules` 刷新底层正则表达式匹配引擎，使下一次重绘时高亮立即生效。
+///
+/// # 参数
+/// - `ctx`: 应用程序全局上下文句柄；
+/// - `list`: 当前界面上的全部关键词高亮规则切片。
+fn sync_rules_to_renderer(ctx: &AppContext, list: &[KeywordHighlightRule]) {
+    let tuples: Vec<_> = list.iter().map(|r| {
+        let rgba = parse_hex_to_rgb(r.color_hex.as_str())
+            .map(|(red, g, b)| [red, g, b, 255])
+            .unwrap_or([0xef, 0x44, 0x44, 255]);
+        (r.id.to_string(), r.pattern.to_string(), rgba, r.enabled)
+    }).collect();
+
+    if let Some(ref mut renderer) = *ctx.terminal_renderer.borrow_mut() {
+        renderer.update_highlight_rules(tuples);
+    }
 }

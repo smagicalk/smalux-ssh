@@ -313,7 +313,7 @@ export component TerminalViewport inherits Rectangle {
                 title: root.session-name;
                 image: root.terminal-screen-image;
                 is-active: true;
-                status: "online";
+                status: TerminalBridge.active-host-status;
                 pane-index: 1;
                 total-panes: 1;
                 tabs: root.tabs;

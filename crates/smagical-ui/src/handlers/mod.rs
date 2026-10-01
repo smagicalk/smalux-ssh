@@ -130,6 +130,10 @@ pub(crate) struct AppContext {
     pub tunnel_filter_category: Rc<RefCell<String>>,
     /// 系统托盘是否处于实际就绪状态
     pub tray_active: Rc<RefCell<bool>>,
+    /// 容灾备份全局常驻守护服务句柄
+    pub backup_daemon: Arc<crate::backup_daemon::BackupDaemonService>,
+    /// 纯 Rust 原生 SFTP 驱动服务句柄 (用于长连接池极速复用)
+    pub sftp_driver: Option<Arc<smagical_ssh::RusshSftpDriver>>,
 }
 
 #[allow(dead_code)]

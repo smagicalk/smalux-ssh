@@ -1,13 +1,86 @@
 //! AI 智能助手与大模型多端点管理事件处理器
 
 use std::rc::Rc;
+use std::sync::Arc;
 use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use smagical_core::AppStorage;
+use smagical_core::domain::config::AiEndpointProfileRecord;
+use crate::async_util::spawn_async;
 
 use crate::generated::{
     AiBridge, AiEndpointProfile, AppWindow, SettingsBridge, ToastItemData, WindowBridge,
 };
 use crate::handlers::AppContext;
 
+/// 将 Slint UI 前端 AI 端点视图模型列表转换为领域持久化记录
+///
+/// # 字段映射明细
+/// - `id`: 端点唯一标识符（UUID 或预置 ID）；
+/// - `name`: 端点展示名称（如 "DeepSeek 官方"、"本地 Ollama"）；
+/// - `base_url`: API 网关基础地址（如 `https://api.deepseek.com/v1`）；
+/// - `api_key`: 访问认证密钥令牌（敏感数据存储）；
+/// - `api_mode`: 接口交互协议模式（`chat` 对齐 OpenAI ChatCompletions，`response` 对齐原生流式输出）；
+/// - `selected_model`: 当前选定的默认对话模型；
+/// - `models_csv`: 逗号分隔的可用模型列表；
+/// - `is_active`: 是否为当前全局激活生效的端点；
+/// - `status_text`: 连通性测试或活动状态提示语（如 "已连接"、"未激活"、"测试中..."）；
+/// - `thinking_degree`: 深度思考推理预算（如 `low`, `medium`, `high`）；
+/// - `timeout_secs`: HTTP 请求网络超时阈值（秒）；
+/// - `max_context`: 最大允许上下文 Token 上限；
+/// - `max_retries`: 遇到 429 或 5xx 错误时的指数退避最大重试次数；
+/// - `custom_headers`: 用户自定义附加 HTTP Header（JSON 或 Key:Value 换行串）；
+/// - `temperature`: 生成采样随机性温度参数（0.0 ~ 2.0 浮点数字符串）。
+///
+/// # 参数
+/// - `list`: Slint UI 前端传入的端点视图模型切片；
+///
+/// # 返回值
+/// 返回适合直接落盘写入 SQLite 配置存储的 `Vec<AiEndpointProfileRecord>` 实体集合。
+pub(crate) fn endpoints_to_records(list: &[AiEndpointProfile]) -> Vec<AiEndpointProfileRecord> {
+    list.iter().map(|ep| AiEndpointProfileRecord {
+        id: ep.id.to_string(),
+        name: ep.name.to_string(),
+        base_url: ep.base_url.to_string(),
+        api_key: ep.api_key.to_string(),
+        api_mode: ep.api_mode.to_string(),
+        selected_model: ep.selected_model.to_string(),
+        models_csv: ep.models_csv.to_string(),
+        is_active: ep.is_active,
+        status_text: ep.status_text.to_string(),
+        thinking_degree: ep.thinking_degree.to_string(),
+        timeout_secs: ep.timeout_secs,
+        max_context: ep.max_context,
+        max_retries: ep.max_retries,
+        custom_headers: ep.custom_headers.to_string(),
+        temperature: ep.temperature.to_string(),
+    }).collect()
+}
+
+/// 异步将 AI 端点列表持久化保存至应用配置仓储
+///
+/// # 参数
+/// - `storage`: 全局仓储服务抽象接口 `Arc<dyn AppStorage>`；
+/// - `records`: 转换完成的 AI 端点实体记录集合。
+pub(crate) fn persist_ai_endpoints(storage: &Arc<dyn AppStorage>, records: Vec<AiEndpointProfileRecord>) {
+    let storage = storage.clone();
+    spawn_async(async move {
+        let _ = storage.config().update(Box::new(move |c| {
+            c.ai_endpoints = records;
+        })).await;
+    });
+}
+
+/// 注册所有 AI 智能助手与大模型多端点管理事件处理器
+///
+/// 涵盖四大核心功能域：
+/// 1. **全局大模型与推理参数维护**：保存高级配置（上下文、超时、重试、温度、系统提示词）；
+/// 2. **SRE 专家系统提示词预设与重置**：防御性运维规则提示词下发与实时编辑；
+/// 3. **多提供商预设快速切换**：DeepSeek, Claude, OpenAI, Ollama 快速参数套用；
+/// 4. **多端点管理生命周期**：端点无缝切换、弹窗增删改、模型列表动态增删、远程连通性探活与可用模型列表抓取。
+///
+/// # 参数
+/// - `window`: Slint 顶级应用窗口；
+/// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     let bridge = window.global::<SettingsBridge>();
 
@@ -16,35 +89,95 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     let window_weak_ai_save = window.as_weak();
     let notif_ai_save = ctx.notifications.clone();
+    let storage_ai_save = ctx.core_state.storage().clone();
     bridge.on_save_ai_settings(move || {
         if let Some(w) = window_weak_ai_save.upgrade() {
             let sb = w.global::<SettingsBridge>();
-            if let Ok(ctx_val) = sb.get_setting_ai_max_context_input().trim().parse::<i32>() {
+            let mut ctx_val = sb.get_setting_ai_max_context();
+            if let Ok(val) = sb.get_setting_ai_max_context_input().trim().parse::<i32>() {
+                ctx_val = val;
                 sb.set_setting_ai_max_context(ctx_val);
             }
-            if let Ok(to_val) = sb.get_setting_ai_timeout_secs_input().trim().parse::<i32>() {
+            let mut to_val = sb.get_setting_ai_timeout_secs();
+            if let Ok(val) = sb.get_setting_ai_timeout_secs_input().trim().parse::<i32>() {
+                to_val = val;
                 sb.set_setting_ai_timeout_secs(to_val);
             }
-            if let Ok(ret_val) = sb.get_setting_ai_max_retries_input().trim().parse::<i32>() {
+            let mut ret_val = sb.get_setting_ai_max_retries();
+            if let Ok(val) = sb.get_setting_ai_max_retries_input().trim().parse::<i32>() {
+                ret_val = val;
                 sb.set_setting_ai_max_retries(ret_val);
             }
-            if let Ok(temp_val) = sb.get_setting_ai_temperature_input().trim().parse::<f32>() {
+            let mut temp_val = sb.get_setting_ai_temperature();
+            if let Ok(val) = sb.get_setting_ai_temperature_input().trim().parse::<f32>() {
+                temp_val = val;
                 sb.set_setting_ai_temperature(temp_val);
             }
-            notif_ai_save.success("保存成功", "AI 大模型配置与操作审查策略已更新保存");
+
+            // 更新当前激活端点的高级参数
+            let endpoints_model = sb.get_setting_ai_endpoints();
+            let mut list: Vec<AiEndpointProfile> = endpoints_model.iter().collect();
+            let active_id = sb.get_active_endpoint_id();
+            for ep in list.iter_mut() {
+                if ep.id == active_id {
+                    ep.max_context = ctx_val;
+                    ep.timeout_secs = to_val;
+                    ep.max_retries = ret_val;
+                    ep.temperature = temp_val.to_string().into();
+                }
+            }
+            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+
+            let prompt_val = sb.get_setting_ai_system_prompt().to_string();
+            let records = endpoints_to_records(&list);
+            let storage = storage_ai_save.clone();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.ai_system_prompt = prompt_val;
+                    c.ai_endpoints = records;
+                })).await;
+            });
+
+            notif_ai_save.success("保存成功", "AI 大模型配置与专家系统提示词已更新持久化");
         }
     });
 
     let window_weak_ai_reset = window.as_weak();
+    let storage_ai_reset = ctx.core_state.storage().clone();
     bridge.on_reset_ai_system_prompt(move || {
         if let Some(w) = window_weak_ai_reset.upgrade() {
             let default_prompt = "你是一名精通 Linux/Unix 操作系统内核、网络拓扑与现代运维架构的高级 SRE 运维专家。遵循生产安全第一原则，始终输出语法严谨、带有防御性容错参数的 Shell 指令，主动识别与规避高危操作风险，并在生成复杂命令时简明解释其参数逻辑。";
             w.global::<SettingsBridge>().set_setting_ai_system_prompt(default_prompt.into());
+
+            let prompt_s = default_prompt.to_string();
+            let storage = storage_ai_reset.clone();
+            spawn_async(async move {
+                let _ = storage.config().update(Box::new(move |c| {
+                    c.ai_system_prompt = prompt_s;
+                })).await;
+            });
         }
     });
 
+    let window_weak_ai_prompt = window.as_weak();
+    let storage_ai_prompt = ctx.core_state.storage().clone();
+    bridge.on_change_ai_system_prompt(move |new_prompt| {
+        let p_str = new_prompt.to_string();
+        if let Some(w) = window_weak_ai_prompt.upgrade() {
+            w.global::<SettingsBridge>().set_setting_ai_system_prompt(new_prompt);
+        }
+        let storage = storage_ai_prompt.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.ai_system_prompt = p_str;
+            })).await;
+        });
+    });
+
     let window_weak_ai_provider = window.as_weak();
+    let storage_ai_provider = ctx.core_state.storage().clone();
     bridge.on_switch_ai_provider(move |provider| {
+        let p_str = provider.to_string();
         if let Some(w) = window_weak_ai_provider.upgrade() {
             let sb = w.global::<SettingsBridge>();
             match provider.as_str() {
@@ -67,6 +200,12 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 _ => {}
             }
         }
+        let storage = storage_ai_provider.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.ai_active_provider = p_str;
+            })).await;
+        });
     });
 
     // -------------------------------------------------------------------------
@@ -76,6 +215,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // 1. 一键切换 AI 端点 (switch_ai_endpoint)
     let window_weak_switch_ep = window.as_weak();
     let notif_switch_ep = ctx.notifications.clone();
+    let storage_switch_ep = ctx.core_state.storage().clone();
     bridge.on_switch_ai_endpoint(move |target_id| {
         if let Some(w) = window_weak_switch_ep.upgrade() {
             let sb = w.global::<SettingsBridge>();
@@ -124,7 +264,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list))));
+            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
             sb.set_active_endpoint_id(target_id.clone());
             sb.set_setting_ai_base_url(new_base_url.into());
             sb.set_setting_ai_api_key(new_api_key.into());
@@ -144,7 +284,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let ai_b = w.global::<AiBridge>();
             ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(new_models_vec))));
-            ai_b.set_selected_model(new_selected_model.into());
+            let records = endpoints_to_records(&list);
+            persist_ai_endpoints(&storage_switch_ep, records);
 
             notif_switch_ep.success("端点切换成功", &format!("已无缝切换至: {}", switched_name));
         }
@@ -152,13 +293,20 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
 
     // 1b. 修改自动审核安全级别联动 (change_ai_auto_audit_level)
     let window_weak_audit_lvl = window.as_weak();
+    let storage_audit_lvl = ctx.core_state.storage().clone();
     bridge.on_change_ai_auto_audit_level(move |lvl| {
+        let lvl_str = lvl.to_string();
         if let Some(w) = window_weak_audit_lvl.upgrade() {
-            let lvl_str = lvl.to_string();
             w.global::<SettingsBridge>().set_setting_ai_auto_audit_level(lvl.clone());
             crate::handlers::right_drawer_handlers::update_current_host_auto_audit_level(&w, &lvl_str);
             tracing::info!(target: "smagical_ui::settings", "AI 自动审核级别已切换为: {}", lvl_str);
         }
+        let storage = storage_audit_lvl.clone();
+        spawn_async(async move {
+            let _ = storage.config().update(Box::new(move |c| {
+                c.ai_auto_audit_level = lvl_str;
+            })).await;
+        });
     });
 
     // 2. 打开添加端点弹窗 (open_add_ai_endpoint_modal)
@@ -247,6 +395,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4. 保存端点弹窗数据 (save_ai_endpoint_modal)
     let window_weak_save_ep_modal = window.as_weak();
     let notif_save_ep = ctx.notifications.clone();
+    let storage_save_ep = ctx.core_state.storage().clone();
     bridge.on_save_ai_endpoint_modal(move || {
         if let Some(w) = window_weak_save_ep_modal.upgrade() {
             let sb = w.global::<SettingsBridge>();
@@ -356,7 +505,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 notif_save_ep.success("添加成功", &format!("已添加端点: {}", name));
             }
 
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list))));
+            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            persist_ai_endpoints(&storage_save_ep, endpoints_to_records(&list));
             sb.set_is_ai_endpoint_modal_open(false);
         }
     });
@@ -522,6 +672,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // 5. 删除 AI 端点 (delete_ai_endpoint)
     let window_weak_del_ep = window.as_weak();
     let notif_del_ep = ctx.notifications.clone();
+    let storage_del_ep = ctx.core_state.storage().clone();
     bridge.on_delete_ai_endpoint(move |target_id| {
         if let Some(w) = window_weak_del_ep.upgrade() {
             let sb = w.global::<SettingsBridge>();
@@ -578,7 +729,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 ai_b.set_selected_model(target_model);
             }
 
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list))));
+            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            persist_ai_endpoints(&storage_del_ep, endpoints_to_records(&list));
             notif_del_ep.success("删除成功", "已移除该端点配置");
         }
     });
@@ -586,6 +738,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // 6. 一键向远端接口获取支持的模型 (fetch_endpoint_models)
     let window_weak_fetch = window.as_weak();
     let notif_fetch = ctx.notifications.clone();
+    let storage_fetch = ctx.core_state.storage().clone();
     bridge.on_fetch_endpoint_models(move || {
         if let Some(w) = window_weak_fetch.upgrade() {
             let sb = w.global::<SettingsBridge>();
@@ -610,6 +763,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 custom_headers: if custom_headers.is_empty() { None } else { Some(custom_headers) },
             };
 
+            let storage_fetch_inner = storage_fetch.clone();
             crate::async_util::spawn_async(async move {
                 let discovered_models = match smagical_core::AiClient::new(endpoint_cfg) {
                     Ok(client) => client.fetch_models().await.unwrap_or_default(),
@@ -648,7 +802,9 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                                 ep.selected_model = new_sel.clone().into();
                             }
                         }
-                        sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list))));
+                        sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+                        persist_ai_endpoints(&storage_fetch_inner, endpoints_to_records(&list));
+
                         let cur_toasts = win.global::<WindowBridge>().get_toasts();
                         let mut toasts_vec: Vec<ToastItemData> = cur_toasts.iter().collect();
                         toasts_vec.push(ToastItemData {
@@ -670,6 +826,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // 7. 手动新增模型至当前端点 (add_model_to_current)
     let window_weak_add_m = window.as_weak();
     let notif_add_m = ctx.notifications.clone();
+    let storage_add_m = ctx.core_state.storage().clone();
     bridge.on_add_model_to_current(move |new_model| {
         let trimmed = new_model.trim().to_string();
         if trimmed.is_empty() {
@@ -696,7 +853,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                         ep.models_csv = str_list.join(", ").into();
                     }
                 }
-                sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list))));
+                sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list.clone()))));
+                persist_ai_endpoints(&storage_add_m, endpoints_to_records(&ep_list));
 
                 notif_add_m.success("添加成功", &format!("已添加新模型: {}", trimmed));
             }
@@ -707,6 +865,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
     // 8. 从当前端点移除模型 (remove_model_from_current)
     let window_weak_rm_m = window.as_weak();
     let notif_rm_m = ctx.notifications.clone();
+    let storage_rm_m = ctx.core_state.storage().clone();
     bridge.on_remove_model_from_current(move |target_model| {
         if let Some(w) = window_weak_rm_m.upgrade() {
             let sb = w.global::<SettingsBridge>();
@@ -742,7 +901,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     ep.selected_model = new_sel.clone();
                 }
             }
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list))));
+            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list.clone()))));
+            persist_ai_endpoints(&storage_rm_m, endpoints_to_records(&ep_list));
 
             notif_rm_m.success("已移除", &format!("已将模型 {} 移出当前端点", target_model));
         }
@@ -750,6 +910,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
 
     // 9. 选择当前默认推理模型 (select_current_model)
     let window_weak_sel_m = window.as_weak();
+    let storage_sel_m = ctx.core_state.storage().clone();
     bridge.on_select_current_model(move |model_name| {
         if let Some(w) = window_weak_sel_m.upgrade() {
             let sb = w.global::<SettingsBridge>();
@@ -766,7 +927,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     ep.selected_model = model_name.clone();
                 }
             }
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list))));
+            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list.clone()))));
+            persist_ai_endpoints(&storage_sel_m, endpoints_to_records(&ep_list));
         }
     });
 }
