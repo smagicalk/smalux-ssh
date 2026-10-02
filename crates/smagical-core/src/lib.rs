@@ -4,6 +4,7 @@
 
 #![deny(missing_docs)]
 
+pub mod bootstrap;
 pub mod domain;
 pub mod event;
 pub mod service;

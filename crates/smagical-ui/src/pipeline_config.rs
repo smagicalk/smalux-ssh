@@ -2,50 +2,24 @@
 //!
 //! 负责在应用启动前自磁盘读取用户配置的渲染管线首选项并注入 `SLINT_BACKEND` 环境变量，
 //! 以及在用户更改渲染管线时完成物理文件落盘，实现跨进程与多次启动的真正持久化。
+//! 底层全面收拢至 `smagical_core::bootstrap::BootstrapConfig` (`bootstrap.toml`)。
 
-use std::fs;
 use std::path::PathBuf;
+pub use smagical_core::bootstrap::{
+    get_bootstrap_config_path, BootstrapConfig, DEFAULT_PIPELINE, VALID_PIPELINES,
+};
 
-/// 默认合法渲染管线列表
-pub const VALID_PIPELINES: &[&str] = &[
-    "winit-skia",
-    "winit-skia-opengl",
-    "winit-skia-software",
-];
-
-/// 默认推荐渲染管线
-pub const DEFAULT_PIPELINE: &str = "winit-skia";
-
-/// 获取持久化配置文件路径：~/.config/smalux-ssh/rendering_pipeline.txt
+/// 获取持久化配置文件路径：统一映射至标准 `bootstrap.toml`
 pub fn get_pipeline_config_path() -> Option<PathBuf> {
-    directories::ProjectDirs::from("dev", "smagical", "smalux-ssh")
-        .map(|dirs| dirs.config_dir().join("rendering_pipeline.txt"))
+    get_bootstrap_config_path()
 }
 
 /// 从物理磁盘读取已持久化的渲染管线首选项
 pub fn get_persisted_pipeline() -> Option<String> {
-    let path = get_pipeline_config_path()?;
-    if !path.exists() {
-        return None;
-    }
-    match fs::read_to_string(&path) {
-        Ok(content) => {
-            let trimmed = content.trim();
-            if VALID_PIPELINES.contains(&trimmed) {
-                Some(trimmed.to_string())
-            } else {
-                tracing::warn!(target: "smagical_ui::render", "读取到无效渲染管线配置: [{}], 将回退默认", trimmed);
-                None
-            }
-        }
-        Err(err) => {
-            tracing::warn!(target: "smagical_ui::render", "读取渲染管线配置文件失败: {:?}", err);
-            None
-        }
-    }
+    Some(BootstrapConfig::load().render.pipeline)
 }
 
-/// 将渲染管线配置安全写入物理磁盘
+/// 将渲染管线配置安全写入物理磁盘 (更新 bootstrap.toml 并同步 SLINT_BACKEND 环境变量)
 pub fn save_persisted_pipeline(pipeline: &str) -> std::io::Result<()> {
     let trimmed = pipeline.trim();
     if !VALID_PIPELINES.contains(&trimmed) {
@@ -55,19 +29,16 @@ pub fn save_persisted_pipeline(pipeline: &str) -> std::io::Result<()> {
         ));
     }
 
-    if let Some(path) = get_pipeline_config_path() {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&path, trimmed)?;
-        tracing::info!(target: "smagical_ui::render", "渲染管线已持久化至物理磁盘: [{}] -> {:?}", trimmed, path);
-    }
+    BootstrapConfig::update(|cfg| {
+        cfg.render.pipeline = trimmed.to_string();
+    })?;
 
     // 同步设置当前进程环境变量
     unsafe {
         std::env::set_var("SLINT_BACKEND", trimmed);
     }
 
+    tracing::info!(target: "smagical_ui::render", "渲染管线已持久化至引导配置: [{}]", trimmed);
     Ok(())
 }
 
@@ -82,19 +53,13 @@ pub fn init_runtime_pipeline() -> String {
         }
     }
 
-    // 优先级 2: 从物理磁盘读取上一次保存的渲染管线
-    if let Some(saved) = get_persisted_pipeline() {
-        unsafe {
-            std::env::set_var("SLINT_BACKEND", &saved);
-        }
-        return saved;
-    }
-
-    // 优先级 3: 缺省默认管线
+    // 优先级 2: 从物理磁盘 bootstrap.toml 读取上一次保存的渲染管线
+    let config = BootstrapConfig::load();
+    let saved = config.render.pipeline;
     unsafe {
-        std::env::set_var("SLINT_BACKEND", DEFAULT_PIPELINE);
+        std::env::set_var("SLINT_BACKEND", &saved);
     }
-    DEFAULT_PIPELINE.to_string()
+    saved
 }
 
 #[cfg(test)]
@@ -115,4 +80,3 @@ mod tests {
         assert!(save_persisted_pipeline("winit-femtovg").is_err());
     }
 }
-
