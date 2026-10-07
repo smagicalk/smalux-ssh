@@ -7,10 +7,10 @@
 //! 4. 自动维护 Slint 视图模型 `SettingsBridge` 的模态弹窗与错误提示状态。
 
 use std::collections::HashSet;
-use std::rc::Rc;
 use std::sync::{Arc, RwLock};
 use slint::ComponentHandle;
 use smagical_core::AppStorage;
+use crate::common::{run_on_ui, to_model_rc};
 
 use crate::async_util::spawn_async;
 use crate::generated::{AppWindow, SettingsBridge};
@@ -105,23 +105,19 @@ pub(crate) fn refresh_vault_sensitive_data(
             *c = new_cards;
         }
 
-        let _ = slint::invoke_from_event_loop(move || {
-            if let Some(w) = window_weak.upgrade() {
-                let hb = w.global::<crate::generated::HostsBridge>();
-                let tree_guard = master_tree.read().unwrap();
-                let sel_guard = selector_expanded_groups.read().unwrap();
-                let exp_guard = expanded_groups.read().unwrap();
+        let _ = run_on_ui(window_weak, move |w| {
+            let hb = w.global::<crate::generated::HostsBridge>();
+            let tree_guard = master_tree.read().unwrap();
+            let sel_guard = selector_expanded_groups.read().unwrap();
+            let exp_guard = expanded_groups.read().unwrap();
 
-                let opts = build_group_options(&tree_guard, &sel_guard);
-                hb.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            let opts = build_group_options(&tree_guard, &sel_guard);
+            hb.set_group_options(to_model_rc(opts));
 
-                let nodes = build_visible_tree_nodes(&tree_guard, &exp_guard);
-                hb.set_tree_content_width(calculate_max_tree_width(&nodes));
-                hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(nodes))));
-                hb.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-                    master_cards.read().unwrap().clone(),
-                ))));
-            }
+            let nodes = build_visible_tree_nodes(&tree_guard, &exp_guard);
+            hb.set_tree_content_width(calculate_max_tree_width(&nodes));
+            hb.set_tree_nodes(to_model_rc(nodes));
+            hb.set_hosts(to_model_rc(master_cards.read().unwrap().clone()));
         });
     });
 }
@@ -411,6 +407,12 @@ pub fn start_auto_lock_monitor(
         let mut interval = tokio::time::interval(std::time::Duration::from_secs(10));
         loop {
             interval.tick().await;
+
+            // 若 UI 主窗口已销毁，终止常驻巡检协程，释放 Arc 存储连接与资源
+            if window_weak.upgrade().is_none() {
+                tracing::info!("UI 主窗口已关闭，终止保险库自动锁定巡检后台协程");
+                break;
+            }
 
             // 1. 若当前未启用主密码或未解锁，无需执行锁定
             let has_master = storage.has_custom_master_password().await.unwrap_or(false);

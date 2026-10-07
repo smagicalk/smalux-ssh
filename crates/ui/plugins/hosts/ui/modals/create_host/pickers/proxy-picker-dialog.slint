@@ -1,11 +1,11 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 import { ProxyOptionData } from "@common/features/hosts/hosts_model.slint";
 
 export { ProxyOptionData }
 
-export component ProxyPickerDialog inherits Rectangle {
+component ProxyPickerDialog inherits Rectangle {
     in property <bool> is-open: false;
     in property <[ProxyOptionData]> proxy-options: [];
     in-out property <string> proxy-search-query: "";
@@ -31,6 +31,8 @@ export component ProxyPickerDialog inherits Rectangle {
             background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000066;
             clip: true;
 
             TouchArea { }
@@ -120,7 +122,7 @@ export component ProxyPickerDialog inherits Rectangle {
                 Flickable {
                     vertical-stretch: 1;
                     min-height: 280px;
-                    viewport-height: max(self.height, proxy-items-container.preferred-height);
+                    content-height: max(self.height, proxy-items-container.preferred-height);
 
                     proxy-items-container := VerticalLayout {
                         alignment: start;
@@ -274,3 +276,5 @@ export component ProxyPickerDialog inherits Rectangle {
         }
     }
 }
+
+export { ProxyPickerDialog }

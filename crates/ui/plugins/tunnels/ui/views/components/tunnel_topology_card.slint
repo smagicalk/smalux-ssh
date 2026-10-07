@@ -1,11 +1,11 @@
-﻿// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // 隧道流动流水线可视化拓扑卡片 (Visual Flow Pipeline Topology Card)
 // 动态展现 Node A (本地) -> Link 1 (SSH加密) -> Node B (宿主跳板) -> Link 2 (目标) -> Node C (远端)
 // -----------------------------------------------------------------------------
 
 import { AppTheme } from "@common/themes/app-theme.slint";
 
-export component TunnelTopologyCard inherits Rectangle {
+component TunnelTopologyCard inherits Rectangle {
     in property <string> form-type: "Local";
     in property <bool> form-is-running: false;
     in property <string> form-local-bind: "127.0.0.1";
@@ -107,8 +107,8 @@ export component TunnelTopologyCard inherits Rectangle {
                     alignment: center;
                     Image {
                         source: root.form-type == "Remote" || root.form-type == "ReverseDynamic"
-                            ? @image-url("../../../assets/icons/arrow-left.svg")
-                            : @image-url("../../../assets/icons/arrow-right.svg");
+                            ? @image-url("../../assets/icons/arrow-left.svg")
+                            : @image-url("../../assets/icons/arrow-right.svg");
                         width: 12px;
                         height: 12px;
                         colorize: root.form-is-running
@@ -207,8 +207,8 @@ export component TunnelTopologyCard inherits Rectangle {
                     alignment: center;
                     Image {
                         source: root.form-type == "Remote" || root.form-type == "ReverseDynamic"
-                            ? @image-url("../../../assets/icons/arrow-left.svg")
-                            : @image-url("../../../assets/icons/arrow-right.svg");
+                            ? @image-url("../../assets/icons/arrow-left.svg")
+                            : @image-url("../../assets/icons/arrow-right.svg");
                         width: 12px;
                         height: 12px;
                         colorize: root.form-is-running
@@ -275,3 +275,5 @@ export component TunnelTopologyCard inherits Rectangle {
         }
     }
 }
+
+export { TunnelTopologyCard }

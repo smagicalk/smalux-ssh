@@ -1,12 +1,12 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
-import { GroupTreeSelector, GroupOptionData } from "group-tree-selector.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "@common/shared/composite/group-tree-selector.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 
 export { GroupTreeSelector, GroupOptionData }
 
 /// 新建主机分组弹窗组件 (Create Group Modal)
-export component CreateGroupModal inherits Rectangle {
+component CreateGroupModal inherits Rectangle {
     /// 弹窗主标题
     in property <string> title: @tr("新建主机分组");
     /// 实体分类标签
@@ -63,6 +63,8 @@ export component CreateGroupModal inherits Rectangle {
             background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000066;
 
             VerticalLayout {
                 padding: 16px;
@@ -498,7 +500,7 @@ export component CreateGroupModal inherits Rectangle {
                                         text: @tr("确定选定");
                                         font-size: 11px;
                                         font-weight: 600;
-                                        color: #ffffff;
+                                        color: AppTheme.selected-foreground;
                                         vertical-alignment: center;
                                     }
                                 }
@@ -510,3 +512,5 @@ export component CreateGroupModal inherits Rectangle {
         }
     }
 }
+
+export { CreateGroupModal }

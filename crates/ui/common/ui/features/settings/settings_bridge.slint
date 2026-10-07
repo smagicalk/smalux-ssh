@@ -94,6 +94,8 @@ export global SettingsBridge {
     in-out property <bool> setting-start-on-boot: false;
     in-out property <string> setting-data-dir: "AppData/Local/smalux-ssh";
     in-out property <string> setting-toast-duration: "3";
+    in-out property <string> setting-storage-mode: "mock";
+    in-out property <string> setting-storage-path: "";
 
     // -------------------------------------------------------------------------
     // 2. 外观与壁纸 (Appearance)
@@ -540,5 +542,8 @@ export global SettingsBridge {
     callback select-current-model(string /* model_name */);
     callback change-ai-auto-audit-level(string /* level */);
     callback change-ai-system-prompt(string /* prompt */);
+    callback switch-storage-mode(string /* mode */);
+    callback clear-all-demo-data();
+    callback reset-all-demo-data();
     callback close-settings();
 }

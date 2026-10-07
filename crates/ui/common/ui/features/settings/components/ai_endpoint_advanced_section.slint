@@ -1,0 +1,280 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+
+/// AI 端点高级运行时参数区块 (AiEndpointAdvancedSection)
+component AiEndpointAdvancedSection inherits VerticalLayout {
+    spacing: 8px;
+
+    // 折叠/展开触发栏
+    Rectangle {
+        height: 32px;
+        border-radius: AppTheme.radius-medium;
+        background: adv-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+
+        adv-touch := TouchArea {
+            clicked => {
+                SettingsBridge.modal-endpoint-show-advanced = !SettingsBridge.modal-endpoint-show-advanced;
+            }
+            mouse-cursor: pointer;
+        }
+
+        HorizontalLayout {
+            padding-left: 10px;
+            padding-right: 10px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../../assets/icons/settings.svg");
+                        width: 12px;
+                        height: 12px;
+                        colorize: AppTheme.accent;
+                    }
+                }
+                Text {
+                    text: @tr("高级参数设置 (超时 / 上下文 / 重试 / 自定义请求头)");
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: SettingsBridge.modal-endpoint-show-advanced ? "▲" : "▼";
+                    font-size: 8px;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // 展开的高级表单项
+    if SettingsBridge.modal-endpoint-show-advanced: VerticalLayout {
+        spacing: 10px;
+        padding-left: 4px;
+        padding-right: 4px;
+
+        // 1. 超时时间 (带单位: 秒)
+        VerticalLayout {
+            spacing: 3px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: @tr("最长执行时长 / 请求超时");
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                }
+                Text {
+                    text: @tr("单位: 秒");
+                    font-size: 9px;
+                    color: AppTheme.secondary-foreground;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+
+                // 快捷档位
+                for to in [
+                    { val: 30, label: "30s" },
+                    { val: 60, label: "60s" },
+                    { val: 120, label: "120s" },
+                    { val: 300, label: "300s" },
+                ]: Rectangle {
+                    height: 28px;
+                    border-radius: 4px;
+                    background: SettingsBridge.modal-endpoint-timeout-secs == to.val ? AppTheme.accent.transparentize(80%) :
+                                to-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: SettingsBridge.modal-endpoint-timeout-secs == to.val ? AppTheme.accent : AppTheme.border;
+                    to-touch := TouchArea {
+                        clicked => {
+                            SettingsBridge.modal-endpoint-timeout-secs = to.val;
+                            SettingsBridge.modal-endpoint-timeout-secs-input = to.val;
+                        }
+                        mouse-cursor: pointer;
+                    }
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: to.label;
+                            font-size: 10px;
+                            font-weight: SettingsBridge.modal-endpoint-timeout-secs == to.val ? 700 : 400;
+                            color: SettingsBridge.modal-endpoint-timeout-secs == to.val ? AppTheme.accent : AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 输入框 + 单位
+                AppTextInput {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    text <=> SettingsBridge.modal-endpoint-timeout-secs-input;
+                    placeholder: "60";
+                    suffix-text: @tr("秒");
+                }
+            }
+        }
+
+        // 2. 最大上下文长度 (带单位: Token)
+        VerticalLayout {
+            spacing: 3px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: @tr("最大上下文窗口限制");
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                }
+                Text {
+                    text: @tr("单位: Token");
+                    font-size: 9px;
+                    color: AppTheme.secondary-foreground;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+
+                for ctx-item in [
+                    { val: 16384, label: "16K" },
+                    { val: 32768, label: "32K" },
+                    { val: 65536, label: "64K" },
+                    { val: 131072, label: "128K" },
+                ]: Rectangle {
+                    height: 28px;
+                    border-radius: 4px;
+                    background: SettingsBridge.modal-endpoint-max-context == ctx-item.val ? AppTheme.accent.transparentize(80%) :
+                                ctx-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: SettingsBridge.modal-endpoint-max-context == ctx-item.val ? AppTheme.accent : AppTheme.border;
+                    ctx-touch := TouchArea {
+                        clicked => {
+                            SettingsBridge.modal-endpoint-max-context = ctx-item.val;
+                            SettingsBridge.modal-endpoint-max-context-input = ctx-item.val;
+                        }
+                        mouse-cursor: pointer;
+                    }
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: ctx-item.label;
+                            font-size: 10px;
+                            font-weight: SettingsBridge.modal-endpoint-max-context == ctx-item.val ? 700 : 400;
+                            color: SettingsBridge.modal-endpoint-max-context == ctx-item.val ? AppTheme.accent : AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 输入框 + 单位
+                AppTextInput {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    text <=> SettingsBridge.modal-endpoint-max-context-input;
+                    placeholder: "32768";
+                    suffix-text: "Token";
+                }
+            }
+        }
+
+        // 3. 失败重试次数 (带单位: 次)
+        VerticalLayout {
+            spacing: 3px;
+            HorizontalLayout {
+                alignment: space-between;
+                Text {
+                    text: @tr("网络抖动自动重试次数");
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                }
+                Text {
+                    text: @tr("单位: 次");
+                    font-size: 9px;
+                    color: AppTheme.secondary-foreground;
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+
+                for ret in [
+                    { val: 0, label: "0" },
+                    { val: 1, label: "1" },
+                    { val: 2, label: "2" },
+                    { val: 3, label: "3" },
+                ]: Rectangle {
+                    height: 28px;
+                    border-radius: 4px;
+                    background: SettingsBridge.modal-endpoint-max-retries == ret.val ? AppTheme.accent.transparentize(80%) :
+                                r-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                    border-width: 1px;
+                    border-color: SettingsBridge.modal-endpoint-max-retries == ret.val ? AppTheme.accent : AppTheme.border;
+                    r-touch := TouchArea {
+                        clicked => {
+                            SettingsBridge.modal-endpoint-max-retries = ret.val;
+                            SettingsBridge.modal-endpoint-max-retries-input = ret.val;
+                        }
+                        mouse-cursor: pointer;
+                    }
+                    HorizontalLayout {
+                        padding-left: 8px;
+                        padding-right: 8px;
+                        Text {
+                            text: ret.label + @tr("次");
+                            font-size: 10px;
+                            font-weight: SettingsBridge.modal-endpoint-max-retries == ret.val ? 700 : 400;
+                            color: SettingsBridge.modal-endpoint-max-retries == ret.val ? AppTheme.accent : AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // 输入框 + 单位
+                AppTextInput {
+                    horizontal-stretch: 1;
+                    height: 28px;
+                    text <=> SettingsBridge.modal-endpoint-max-retries-input;
+                    placeholder: "2";
+                    suffix-text: @tr("次");
+                }
+            }
+        }
+
+        // 4. 自定义请求头 (Custom Headers)
+        VerticalLayout {
+            spacing: 3px;
+            Text {
+                text: @tr("自定义请求头 (Custom HTTP Headers)");
+                font-size: 10px;
+                font-weight: 600;
+                color: AppTheme.foreground;
+            }
+            AppTextInput {
+                height: 28px;
+                text <=> SettingsBridge.modal-endpoint-custom-headers;
+                placeholder: "例如: X-Org-ID: devops, X-Proxy-Auth: secret";
+            }
+        }
+    }
+}
+
+export { AiEndpointAdvancedSection }
+

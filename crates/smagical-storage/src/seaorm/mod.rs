@@ -9,6 +9,7 @@ pub mod snippet_repo;
 pub mod tunnel_repo;
 pub mod config_repo;
 pub mod backup_repo;
+pub mod real_seed;
 
 pub use connection::{establish_connection, get_default_sqlite_path, get_default_sqlite_url, init_schema};
 pub use host_repo::SeaOrmHostRepository;
@@ -86,8 +87,8 @@ impl SeaOrmStorage {
             backup_snapshots_repo,
         };
 
-        // 首次初始化自动导入高质量预设种子数据
-        let _ = storage.seed_if_empty().await;
+        // 自动完成真实资产嗅探与生产级默认配置初始化 (杜绝 Mock 假数据侵入生产环境)
+        let _ = storage.ensure_real_user_data().await;
 
         Ok(storage)
     }
@@ -102,44 +103,215 @@ impl SeaOrmStorage {
         &self.vault
     }
 
-    /// 当数据库为空时，自动导入开箱即用的演示种子数据
-    pub async fn seed_if_empty(&self) -> Result<bool> {
-        let host_count = Host::find().count(&self.db).await?;
-        if host_count > 0 {
-            return Ok(false);
+    /// 确保物理数据库完成真实数据与本地资产初始化，并在检测到旧版 Mock 假数据时自动迁移/清理
+    pub async fn ensure_real_user_data(&self) -> Result<bool> {
+        // 1. 检查是否存在历史遗留的假数据 (Mock Seed Data)
+        // 假数据特征: 存在 "auth-gateway-edge", "prod-server-01", "grp-prod", 或 db_initialized == "true"
+        let is_legacy_seed = match SystemMeta::find_by_id("db_initialized").one(&self.db).await {
+            Ok(Some(meta)) => meta.meta_value == "true",
+            _ => false,
+        };
+
+        let has_mock_hosts = Host::find_by_id("auth-gateway-edge").one(&self.db).await.ok().flatten().is_some()
+            || Host::find_by_id("prod-server-01").one(&self.db).await.ok().flatten().is_some()
+            || Host::find_by_id("1").one(&self.db).await.ok().flatten().is_some()
+            || Group::find_by_id("grp-prod").one(&self.db).await.ok().flatten().is_some();
+
+        if is_legacy_seed || has_mock_hosts {
+            info!(target: "smagical_storage::seaorm", "检测到历史遗留 Mock 假数据，正在执行自动清理与真实资产迁移...");
+            // 清理旧版假数据
+            let legacy_host_ids = ["1", "2", "host-k8s-w1", "3", "host-db-s1", "4", "5", "6", "7", "host-staging", "prod-server-01", "auth-gateway-edge", "dev-db-01", "jump-server-01", "stage-k8s-master"];
+            for hid in &legacy_host_ids {
+                let _ = self.hosts_repo.delete(hid).await;
+            }
+            let legacy_group_ids = ["grp-prod", "grp-k8s", "grp-db", "grp-edge", "grp-ai", "grp-dr", "grp-dev", "grp-infra"];
+            for gid in &legacy_group_ids {
+                let _ = self.groups_repo.delete(gid).await;
+            }
+            let legacy_cred_ids = ["cred-prod-ed25519", "cred-bastion-pwd", "cred-1pwd-agent", "cred-dev-rsa", "cred-openssh-agent", "cred-bitwarden-agent", "cred-dev-password", "cred-jump-agent"];
+            for cid in &legacy_cred_ids {
+                let _ = self.credentials_repo.delete(cid).await;
+            }
+            let legacy_tunnel_ids = ["tun-pg-local", "tun-k8s-dash"];
+            for tid in &legacy_tunnel_ids {
+                let _ = self.tunnels_repo.delete(tid).await;
+            }
+            let legacy_snip_groups = ["sg-docker", "sg-sys", "sg-k8s"];
+            for sgid in &legacy_snip_groups {
+                let _ = self.snippets_repo.delete_group(sgid).await;
+            }
+            let legacy_snips = ["snip-docker-ps", "snip-sys-load", "snip-k8s-pods", "snip-curl-health"];
+            for sid in &legacy_snips {
+                let _ = self.snippets_repo.delete(sid).await;
+            }
         }
 
-        info!(target: "smagical_storage::seaorm", "检测到数据库资产表为空，正在导入演示种子数据...");
-
-        // 导入种子数据
-        let seed = crate::mock::seed_data::generate_seed_data();
-        for g in seed.groups {
-            let _ = self.groups_repo.save(&g).await;
+        // 2. 检查系统元数据标识
+        if let Ok(Some(meta)) = SystemMeta::find_by_id("db_initialized").one(&self.db).await {
+            // 如果用户显式清空或用户显式重置为演示数据，则遵循用户意图
+            if meta.meta_value == "cleared" || meta.meta_value == "demo" {
+                return Ok(false);
+            }
+            if meta.meta_value == "real_data" {
+                let host_count = Host::find().count(&self.db).await.unwrap_or(0);
+                let group_count = Group::find().count(&self.db).await.unwrap_or(0);
+                if host_count > 0 || group_count > 0 {
+                    return Ok(false);
+                }
+            }
         }
-        for h in seed.hosts {
+
+        // 3. 执行真实资产与默认生产配置初始化
+        self.seed_real_default_data().await
+    }
+
+    /// 初始化真实用户数据环境：
+    /// 1. 创建默认基础分组 ("我的主机")
+    /// 2. 扫描本机 ~/.ssh (known_hosts 与 config)，若发现资产则建立 "已知主机 (Known Hosts)" 并自动收敛入库
+    /// 3. 导入生产级 Linux 运维命令片段集 (df, free, top, ports 等)
+    /// 4. 写入系统元数据 db_initialized = "real_data"
+    pub async fn seed_real_default_data(&self) -> Result<bool> {
+        info!(target: "smagical_storage::seaorm", "正在初始化真实数据环境与探测本机 OpenSSH 资产...");
+
+        // 1. 创建默认根分组: 我的主机
+        let default_group = smagical_core::domain::group::GroupRecord::root("grp-default", "我的主机");
+        let _ = self.groups_repo.save(&default_group).await;
+
+        // 2. 扫描本地 ~/.ssh
+        let (config_hosts, known_hosts) = real_seed::discover_local_ssh_hosts(
+            Some("grp-known".to_string()),
+            Some("grp-default".to_string()),
+        );
+
+        // 如果在 known_hosts 中发现了已知真实主机，创建 "已知主机" 分组
+        if !known_hosts.is_empty() {
+            let mut known_group = smagical_core::domain::group::GroupRecord::root("grp-known", "已知主机 (Known Hosts)");
+            known_group.sort_order = 1;
+            let _ = self.groups_repo.save(&known_group).await;
+
+            for h in known_hosts {
+                let _ = self.hosts_repo.save(&h).await;
+            }
+        }
+
+        // 保存来自 ~/.ssh/config 的主机
+        for h in config_hosts {
             let _ = self.hosts_repo.save(&h).await;
         }
-        for sg in seed.snippet_groups {
+
+        // 3. 导入生产级常用命令片段
+        let (snip_groups, snips) = real_seed::generate_real_snippets();
+        for sg in snip_groups {
             let _ = self.snippets_repo.save_group(&sg).await;
         }
-        for s in seed.snippets {
+        for s in snips {
             let _ = self.snippets_repo.save(&s).await;
         }
-        for t in seed.tunnels {
-            let _ = self.tunnels_repo.save(&t).await;
+
+        // 4. 更新元数据标记为 real_data
+        let now = chrono::Utc::now().timestamp();
+        match SystemMeta::find_by_id("db_initialized").one(&self.db).await {
+            Ok(Some(existing)) => {
+                let mut act: system_meta::ActiveModel = existing.into();
+                act.meta_value = Set("real_data".to_string());
+                act.updated_at = Set(now);
+                let _ = act.update(&self.db).await;
+            }
+            _ => {
+                let act = system_meta::ActiveModel {
+                    meta_key: Set("db_initialized".to_string()),
+                    meta_value: Set("real_data".to_string()),
+                    updated_at: Set(now),
+                };
+                let _ = act.insert(&self.db).await;
+            }
         }
-        for c in seed.credentials {
-            let _ = self.credentials_repo.save(&c).await;
+
+        info!(target: "smagical_storage::seaorm", "真实数据环境初始化完成 (已完全排除 Mock 演示数据)");
+        Ok(true)
+    }
+
+    /// 兼容旧版调用的别名方法
+    pub async fn seed_if_empty(&self) -> Result<bool> {
+        self.ensure_real_user_data().await
+    }
+
+    /// 清空所有预设演示种子数据（主机、分组、密钥、代码片段与网络隧道规则）
+    pub async fn clear_demo_data(&self) -> Result<()> {
+        info!(target: "smagical_storage::seaorm", "正在清空物理数据库中的所有数据并标记为纯净库...");
+        let now = chrono::Utc::now().timestamp();
+        match SystemMeta::find_by_id("db_initialized").one(&self.db).await {
+            Ok(Some(existing)) => {
+                let mut act: system_meta::ActiveModel = existing.into();
+                act.meta_value = Set("cleared".to_string());
+                act.updated_at = Set(now);
+                let _ = act.update(&self.db).await;
+            }
+            _ => {
+                let act = system_meta::ActiveModel {
+                    meta_key: Set("db_initialized".to_string()),
+                    meta_value: Set("cleared".to_string()),
+                    updated_at: Set(now),
+                };
+                let _ = act.insert(&self.db).await;
+            }
         }
-        for h in seed.history {
-            let _ = self.history_repo.save(&h).await;
+
+        if let Ok(hosts) = self.hosts_repo.list_all().await {
+            for h in hosts { let _ = self.hosts_repo.delete(&h.id).await; }
         }
+        if let Ok(groups) = self.groups_repo.list_all().await {
+            for g in groups { let _ = self.groups_repo.delete(&g.id).await; }
+        }
+        if let Ok(creds) = self.credentials_repo.list_all().await {
+            for c in creds { let _ = self.credentials_repo.delete(&c.id).await; }
+        }
+        if let Ok(snippets) = self.snippets_repo.list_all().await {
+            for s in snippets { let _ = self.snippets_repo.delete(&s.id).await; }
+        }
+        if let Ok(s_groups) = self.snippets_repo.list_groups().await {
+            for sg in s_groups { let _ = self.snippets_repo.delete_group(&sg.id).await; }
+        }
+        if let Ok(tunnels) = self.tunnels_repo.list_all().await {
+            for t in tunnels { let _ = self.tunnels_repo.delete(&t.id).await; }
+        }
+        info!(target: "smagical_storage::seaorm", "物理数据库已全部清空，进入纯净可用状态");
+        Ok(())
+    }
+
+    /// 重新恢复预设演示种子数据
+    pub async fn reset_demo_data(&self) -> Result<()> {
+        let _ = self.clear_demo_data().await;
+        let seed = crate::mock::seed_data::generate_seed_data();
+        for g in seed.groups { let _ = self.groups_repo.save(&g).await; }
+        for h in seed.hosts { let _ = self.hosts_repo.save(&h).await; }
+        for sg in seed.snippet_groups { let _ = self.snippets_repo.save_group(&sg).await; }
+        for s in seed.snippets { let _ = self.snippets_repo.save(&s).await; }
+        for t in seed.tunnels { let _ = self.tunnels_repo.save(&t).await; }
+        for c in seed.credentials { let _ = self.credentials_repo.save(&c).await; }
+        for h in seed.history { let _ = self.history_repo.save(&h).await; }
         for (hid, snap) in seed.snapshots {
             let _ = self.history_repo.save_snapshot(&hid, &snap, 500).await;
         }
-
-        info!(target: "smagical_storage::seaorm", "种子数据初始化导入完成");
-        Ok(true)
+        let now = chrono::Utc::now().timestamp();
+        match SystemMeta::find_by_id("db_initialized").one(&self.db).await {
+            Ok(Some(existing)) => {
+                let mut act: system_meta::ActiveModel = existing.into();
+                act.meta_value = Set("demo".to_string());
+                act.updated_at = Set(now);
+                let _ = act.update(&self.db).await;
+            }
+            _ => {
+                let act = system_meta::ActiveModel {
+                    meta_key: Set("db_initialized".to_string()),
+                    meta_value: Set("demo".to_string()),
+                    updated_at: Set(now),
+                };
+                let _ = act.insert(&self.db).await;
+            }
+        }
+        info!(target: "smagical_storage::seaorm", "预设演示种子数据已重新导入完成");
+        Ok(())
     }
 
     /// 查询保险库当前是否处于解锁就绪状态

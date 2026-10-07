@@ -1,40 +1,563 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { DrawerContainer } from "@common/components/drawer-container.slint";
 import { SearchInput } from "@common/components/search-input.slint";
 import { StatusDot } from "@common/components/status-dot.slint";
-import { AppIconButton } from "@common/components/base/app-icon-button.slint";
-import { AppVScrollBar, AppHScrollBar } from "@common/components/base/app-scroll-bar.slint";
+import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
+import { AppVScrollBar, AppHScrollBar } from "@common/shared/base/app-scroll-bar.slint";
 import { HostContextMenu } from "host_context_menu.slint";
-
 
 import { HostItemData, HostTreeNode, CredentialOptionData, JumpHostOptionData } from "@common/features/hosts/hosts_model.slint";
 import { HostsBridge } from "@common/features/hosts/hosts_bridge.slint";
 
 export { HostItemData, HostTreeNode, CredentialOptionData, JumpHostOptionData }
 
-/// 主机管理抽屉组件 (Hosts Drawer)
-///
-/// 负责展示主机资产的树形层级视图与卡片列表视图，支持实时搜索、折叠展开与横向平滑滚动。
-export component HostsDrawer inherits DrawerContainer {
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 1: 顶部操作与搜索栏
+// -----------------------------------------------------------------------------
+component HostHeaderActions inherits VerticalLayout {
+    in-out property <string> view-mode: "tree";
+    in property <int> hosts-count: 0;
+
+    callback create-group();
+    callback create-host();
+
+    spacing: 8px;
+
+    // 1. 搜索框与视图模式切换胶囊
+    HorizontalLayout {
+        spacing: 6px;
+        height: 28px;
+
+        SearchInput {
+            placeholder: @tr("搜索主机、IP或分组...");
+            horizontal-stretch: 1;
+            changed(query) => { HostsBridge.search-changed(query); }
+            clear => { HostsBridge.search-changed(""); }
+        }
+
+        // 视图模式切换胶囊 (树形 vs 卡片)
+        Rectangle {
+            width: 58px;
+            height: 28px;
+            border-radius: 4px;
+            background: AppTheme.is-global-wallpaper ? transparent : AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding: 2px;
+                spacing: 2px;
+
+                // 树形模式按钮
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 3px;
+                    background: root.view-mode == "tree" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(75%) : AppTheme.control-background) : tree-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+                    border-width: root.view-mode == "tree" ? 1px : 0px;
+                    border-color: root.view-mode == "tree" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(40%) : AppTheme.border) : transparent;
+                    animate background { duration: 120ms; }
+
+                    Image {
+                        source: @image-url("../../assets/icons/tree.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: root.view-mode == "tree" ? AppTheme.accent : tree-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    tree-btn-touch := TouchArea {
+                        clicked => { root.view-mode = "tree"; }
+                        mouse-cursor: pointer;
+                    }
+                }
+
+                // 卡片模式按钮
+                Rectangle {
+                    horizontal-stretch: 1;
+                    border-radius: 3px;
+                    background: root.view-mode == "card" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(75%) : AppTheme.control-background) : card-btn-touch.has-hover ? AppTheme.hover-background : transparent;
+                    border-width: root.view-mode == "card" ? 1px : 0px;
+                    border-color: root.view-mode == "card" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(40%) : AppTheme.border) : transparent;
+                    animate background { duration: 120ms; }
+
+                    Image {
+                        source: @image-url("../../assets/icons/layout-grid.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: root.view-mode == "card" ? AppTheme.accent : card-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    card-btn-touch := TouchArea {
+                        clicked => { root.view-mode = "card"; }
+                        mouse-cursor: pointer;
+                    }
+                }
+            }
+        }
+    }
+
+    // 2. 列表统计与快捷创建栏
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        alignment: space-between;
+        height: 22px;
+
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: start;
+
+            Text {
+                text: root.view-mode == "tree" ? @tr("树形层级视图") : @tr("全部主机列表");
+                font-size: 11px;
+                font-weight: 600;
+                color: AppTheme.secondary-foreground;
+                vertical-alignment: center;
+            }
+
+            Rectangle {
+                height: 16px;
+                border-radius: 8px;
+                background: AppTheme.control-background;
+
+                HorizontalLayout {
+                    padding-left: 6px;
+                    padding-right: 6px;
+
+                    Text {
+                        text: root.hosts-count + " " + @tr("台");
+                        font-size: 9px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // 新建主机与分组动作
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: end;
+
+            AppIconButton {
+                icon: @image-url("../../assets/icons/folder-plus.svg");
+                clicked => { root.create-group(); }
+            }
+
+            AppIconButton {
+                icon: @image-url("../../assets/icons/plus.svg");
+                clicked => { root.create-host(); }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 2: 拖拽顶级根目录目标区
+// -----------------------------------------------------------------------------
+component HostRootDropZone inherits Rectangle {
+    in property <bool> is-active: false;
+
+    height: 28px;
+    border-radius: 4px;
+    background: root.is-active ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
+    border-width: 1.5px;
+    border-color: root.is-active ? AppTheme.accent : AppTheme.border;
+    animate background { duration: 120ms; }
+    animate border-color { duration: 120ms; }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 6px;
+        alignment: center;
+
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../assets/icons/folder.svg");
+                width: 13px;
+                height: 13px;
+                image-fit: contain;
+                colorize: root.is-active ? AppTheme.accent : AppTheme.secondary-foreground;
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Text {
+                text: @tr("移至根目录 (未分组)");
+                font-size: 11px;
+                font-weight: 600;
+                color: root.is-active ? AppTheme.accent : AppTheme.foreground;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 3: 树形单行节点 (解耦 Repeater 内联 AST 节点)
+// -----------------------------------------------------------------------------
+component HostTreeRow inherits Rectangle {
+    in property <HostTreeNode> node;
+    in property <int> idx;
+    in property <bool> is-selected: false;
+    in property <bool> is-drag-source: false;
+    in property <bool> is-drop-target: false;
+    in property <bool> is-drop-target-root: false;
+    in property <bool> drop-target-valid: false;
+    in property <bool> is-dragging: false;
+    in property <length> min-row-width: 0px;
+
+    callback row-clicked();
+    callback row-double-clicked();
+    callback row-right-clicked(length /* mouse_x */, length /* mouse_y */);
+    callback drag-prepare(string /* id */, string /* name */, bool /* is_group */);
+    callback drag-update(length /* mouse_x */, length /* mouse_y */, length /* total_y */);
+    callback drag-drop();
+    callback drag-cancel();
+
+    height: 30px;
+    width: 100%;
+    min-width: root.min-row-width;
+    border-radius: 4px;
+    opacity: root.is-drag-source ? 0.35 : 1.0;
+    background: (root.node.is-group && root.is-drop-target && root.drop-target-valid) ? AppTheme.accent.transparentize(85%) :
+                (root.is-selected && !root.node.is-group) ? AppTheme.control-background :
+                tree-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
+    border-width: 1px;
+    border-color: (root.node.is-group && root.is-drop-target && root.drop-target-valid) ? AppTheme.accent.transparentize(40%) :
+                  (root.is-selected && !root.node.is-group) ? AppTheme.border : transparent;
+
+    animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
+
+    tree-touch := TouchArea {
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                if event.button == PointerEventButton.right {
+                    root.row-right-clicked(self.mouse-x, self.mouse-y);
+                } else {
+                    root.drag-prepare(root.node.id, root.node.name, root.node.is-group);
+                }
+            }
+            if event.kind == PointerEventKind.up {
+                root.drag-drop();
+            }
+            if event.kind == PointerEventKind.cancel {
+                root.drag-cancel();
+            }
+        }
+        moved => {
+            if self.pressed {
+                if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
+                    let total_y = root.idx * 32px + self.mouse-y;
+                    root.drag-update(self.mouse-x, self.mouse-y, total_y);
+                }
+            }
+        }
+        clicked => { root.row-clicked(); }
+        double-clicked => { root.row-double-clicked(); }
+        mouse-cursor: root.is-dragging ? copy : pointer;
+    }
+
+    // 唯一下线指示条
+    if root.is-drop-target && root.drop-target-valid && !root.is-drop-target-root: Rectangle {
+        x: 6px + root.node.level * 14px;
+        y: parent.height - 2px;
+        width: Math.min(125px, parent.width - 16px - root.node.level * 14px);
+        height: 2px;
+        background: AppTheme.accent;
+        border-radius: 1px;
+        z: 20;
+    }
+
+    HorizontalLayout {
+        padding-left: 6px + root.node.level * 14px;
+        padding-right: 12px;
+        spacing: 6px;
+        alignment: space-between;
+
+        HorizontalLayout {
+            spacing: 5px;
+            alignment: start;
+
+            VerticalLayout {
+                alignment: center;
+                if root.node.is-group: Image {
+                    source: root.node.is-expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg");
+                    width: 13px;
+                    height: 13px;
+                    image-fit: contain;
+                    colorize: (root.node.is-expanded || (root.node.is-group && root.is-drop-target && root.drop-target-valid)) ? AppTheme.accent : AppTheme.secondary-foreground;
+                }
+
+                if !root.node.is-group: Image {
+                    source: @image-url("../../assets/icons/server.svg");
+                    width: 12px;
+                    height: 12px;
+                    image-fit: contain;
+                    colorize: root.is-selected ? AppTheme.accent : tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                }
+            }
+
+            if !root.node.is-group: VerticalLayout {
+                alignment: center;
+                StatusDot {
+                    status: root.node.status;
+                    dot-size: 5px;
+                }
+            }
+
+            VerticalLayout {
+                alignment: center;
+                Text {
+                    text: (root.node.is-group && (root.node.name == "默认分组" || root.node.name == "Default Group")) ? @tr("默认分组") : root.node.name;
+                    font-size: 11px;
+                    font-weight: root.node.is-group ? 600 : root.is-selected ? 600 : 400;
+                    color: (root.node.is-group && root.is-drop-target && root.drop-target-valid) ? AppTheme.accent :
+                           root.node.is-group ? AppTheme.foreground :
+                           root.is-selected ? AppTheme.foreground :
+                           tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        HorizontalLayout {
+            spacing: 4px;
+            alignment: end;
+
+            if root.node.is-group && root.is-drop-target && root.drop-target-valid: VerticalLayout {
+                alignment: center;
+                Text {
+                    text: @tr("移入此分组");
+                    font-size: 10px;
+                    font-weight: 700;
+                    color: AppTheme.accent;
+                    vertical-alignment: center;
+                }
+            }
+
+            if root.node.is-group && !(root.is-drop-target && root.drop-target-valid): VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    height: 15px;
+                    border-radius: 7px;
+                    background: AppTheme.control-background;
+
+                    HorizontalLayout {
+                        padding-left: 5px;
+                        padding-right: 5px;
+                        Text {
+                            text: root.node.item-count + "";
+                            font-size: 8px;
+                            font-weight: 600;
+                            color: AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            if !root.node.is-group && root.node.ping-ms > 0: VerticalLayout {
+                alignment: center;
+                Text {
+                    text: root.node.ping-ms + "ms";
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: root.node.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 4: 卡片单行条目 (解耦 Repeater 内联 AST 节点)
+// -----------------------------------------------------------------------------
+component HostCardRow inherits Rectangle {
+    in property <HostItemData> host;
+    in property <int> idx;
+    in property <bool> is-selected: false;
+    in property <bool> is-drag-source: false;
+    in property <bool> is-drop-target: false;
+    in property <bool> drop-target-valid: false;
+    in property <bool> is-dragging: false;
+
+    callback row-clicked();
+    callback row-double-clicked();
+    callback row-right-clicked(length /* mouse_x */, length /* mouse_y */);
+    callback drag-prepare(string /* id */, string /* name */);
+    callback drag-update(length /* mouse_x */, length /* mouse_y */, length /* total_y */);
+    callback drag-drop();
+    callback drag-cancel();
+
+    height: 50px;
+    width: 100%;
+    border-radius: 4px;
+    opacity: root.is-drag-source ? 0.35 : 1.0;
+    background: root.is-selected ? AppTheme.control-background : card-item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background;
+    border-width: 1px;
+    border-color: root.is-selected ? AppTheme.border : card-item-touch.has-hover ? AppTheme.border : AppTheme.border.transparentize(50%);
+
+    animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
+
+    card-item-touch := TouchArea {
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                if event.button == PointerEventButton.right {
+                    root.row-right-clicked(self.mouse-x, self.mouse-y);
+                } else {
+                    root.drag-prepare(root.host.id, root.host.name);
+                }
+            }
+            if event.kind == PointerEventKind.up {
+                root.drag-drop();
+            }
+            if event.kind == PointerEventKind.cancel {
+                root.drag-cancel();
+            }
+        }
+        moved => {
+            if self.pressed {
+                if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
+                    let total_y = root.idx * 56px + self.mouse-y;
+                    root.drag-update(self.mouse-x, self.mouse-y, total_y);
+                }
+            }
+        }
+        clicked => { root.row-clicked(); }
+        double-clicked => { root.row-double-clicked(); }
+        mouse-cursor: root.is-dragging ? copy : pointer;
+    }
+
+    VerticalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 5px;
+        padding-bottom: 5px;
+        spacing: 3px;
+        alignment: center;
+
+        // 卡片顶行：状态灯 + 主机名称 + 分组徽章
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: start;
+
+                VerticalLayout {
+                    alignment: center;
+                    StatusDot {
+                        status: root.host.status;
+                        dot-size: 6px;
+                    }
+                }
+
+                Text {
+                    text: root.host.name;
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    overflow: elide;
+                    vertical-alignment: center;
+                }
+            }
+
+            Rectangle {
+                height: 16px;
+                border-radius: 3px;
+                background: AppTheme.control-background;
+                border-width: 1px;
+                border-color: AppTheme.border.transparentize(40%);
+
+                HorizontalLayout {
+                    padding-left: 5px;
+                    padding-right: 5px;
+
+                    Text {
+                        text: (root.host.group == "未分组" || root.host.group == "Ungrouped") ? @tr("未分组") :
+                              ((root.host.group == "默认分组" || root.host.group == "Default Group") ? @tr("默认分组") : root.host.group);
+                        font-size: 9px;
+                        font-weight: 600;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+
+        // 卡片底行：IP 地址与端口 + 延迟时间
+        HorizontalLayout {
+            spacing: 6px;
+            alignment: space-between;
+
+            Text {
+                text: root.host.address + ":" + root.host.port;
+                font-size: 11px;
+                color: AppTheme.secondary-foreground;
+                overflow: elide;
+                vertical-alignment: center;
+            }
+
+            if root.host.ping-ms > 0: HorizontalLayout {
+                spacing: 3px;
+                alignment: end;
+
+                Text {
+                    text: "●";
+                    font-size: 6px;
+                    color: root.host.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: root.host.ping-ms + "ms";
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: root.host.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
+                    vertical-alignment: center;
+                }
+            }
+        }
+    }
+
+    // 唯一下线指示条
+    if root.is-drop-target && root.drop-target-valid: Rectangle {
+        x: 8px;
+        y: parent.height - 2px;
+        width: parent.width - 16px;
+        height: 2px;
+        background: AppTheme.accent;
+        border-radius: 1px;
+        z: 20;
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 主机管理抽屉组件 (Hosts Drawer)
+// -----------------------------------------------------------------------------
+component HostsDrawer inherits DrawerContainer {
     title: @tr("主机管理");
     collapse-icon: "◀";
 
-    /// 当前视图模式: "tree" (树形层级嵌套模式) | "card" (卡片列表平铺模式)
     in-out property <string> view-mode <=> HostsBridge.hosts-view-mode;
-    /// 当前选中的高亮主机 ID
     in-out property <string> selected-host-id <=> HostsBridge.selected-host-id;
-    /// 当前树形内容的最大呈现宽度（根据节点长名称动态扩展，驱动自适应横向滚动）
     in-out property <length> tree-content-width: HostsBridge.tree-content-width;
-
-    /// 树形层级嵌套数据源 (由 Rust 存储层提供唯一真相源)
     in-out property <[HostTreeNode]> tree-nodes: HostsBridge.tree-nodes;
-
-    /// 卡片模式扁平列表数据源 (由 Rust 存储层提供唯一真相源)
     in property <[HostItemData]> hosts: HostsBridge.hosts;
 
-    /// 双击打开主机终端连接事件回调
     callback host-double-clicked(string /* id */);
-    /// 打开本地 Shell 事件回调
     callback open-local-shell(string /* type */);
 
     /// 右键上下文菜单状态
@@ -66,185 +589,20 @@ export component HostsDrawer inherits DrawerContainer {
         width: 100%;
         height: 100%;
 
-        // 1. 顶部操作栏 (搜索框 + 树形/卡片视图切换器)
-        HorizontalLayout {
-            spacing: 6px;
-            height: 28px;
-
-            // 搜索输入框 (实时搜索与清空)
-            SearchInput {
-                placeholder: @tr("搜索主机、IP或分组...");
-                horizontal-stretch: 1;
-                changed(query) => { HostsBridge.search-changed(query); }
-                clear => { HostsBridge.search-changed(""); }
-            }
-
-            // 视图模式切换胶囊 (树形 vs 卡片)
-            Rectangle {
-                width: 58px;
-                height: 28px;
-                border-radius: 4px;
-                background: AppTheme.is-global-wallpaper ? transparent : AppTheme.surface-background;
-                border-width: 1px;
-                border-color: AppTheme.border;
-
-                HorizontalLayout {
-                    padding: 2px;
-                    spacing: 2px;
-
-                    // 树形模式按钮
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: 3px;
-                        background: root.view-mode == "tree" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(75%) : AppTheme.control-background) : tree-btn-touch.has-hover ? AppTheme.hover-background : transparent;
-                        border-width: root.view-mode == "tree" ? 1px : 0px;
-                        border-color: root.view-mode == "tree" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(40%) : AppTheme.border) : transparent;
-
-                        animate background { duration: 120ms; }
-
-                        Image {
-                            source: @image-url("../../assets/icons/tree.svg");
-                            width: 13px;
-                            height: 13px;
-                            image-fit: contain;
-                            colorize: root.view-mode == "tree" ? AppTheme.accent : tree-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            x: (parent.width - self.width) / 2;
-                            y: (parent.height - self.height) / 2;
-                        }
-
-                        tree-btn-touch := TouchArea {
-                            clicked => { root.view-mode = "tree"; }
-                            mouse-cursor: pointer;
-                        }
-                    }
-
-                    // 卡片模式按钮
-                    Rectangle {
-                        horizontal-stretch: 1;
-                        border-radius: 3px;
-                        background: root.view-mode == "card" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(75%) : AppTheme.control-background) : card-btn-touch.has-hover ? AppTheme.hover-background : transparent;
-                        border-width: root.view-mode == "card" ? 1px : 0px;
-                        border-color: root.view-mode == "card" ? (AppTheme.is-global-wallpaper ? AppTheme.accent.transparentize(40%) : AppTheme.border) : transparent;
-
-                        animate background { duration: 120ms; }
-
-                        Image {
-                            source: @image-url("../../assets/icons/layout-grid.svg");
-                            width: 13px;
-                            height: 13px;
-                            image-fit: contain;
-                            colorize: root.view-mode == "card" ? AppTheme.accent : card-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                            x: (parent.width - self.width) / 2;
-                            y: (parent.height - self.height) / 2;
-                        }
-
-                        card-btn-touch := TouchArea {
-                            clicked => { root.view-mode = "card"; }
-                            mouse-cursor: pointer;
-                        }
-                    }
-                }
-            }
+        // 1. 顶部操作栏
+        HostHeaderActions {
+            view-mode <=> root.view-mode;
+            hosts-count: root.hosts.length;
+            create-group => { HostsBridge.is-create-group-open = true; }
+            create-host => { HostsBridge.open-create-host-modal(""); }
         }
 
-        // 2. 列表统计与快捷创建栏
-        HorizontalLayout {
-            padding-left: 4px;
-            padding-right: 4px;
-            alignment: space-between;
-            height: 22px;
-
-            HorizontalLayout {
-                spacing: 6px;
-                alignment: start;
-
-                Text {
-                    text: root.view-mode == "tree" ? @tr("树形层级视图") : @tr("全部主机列表");
-                    font-size: 11px;
-                    font-weight: 600;
-                    color: AppTheme.secondary-foreground;
-                    vertical-alignment: center;
-                }
-
-                Rectangle {
-                    height: 16px;
-                    border-radius: 8px;
-                    background: AppTheme.control-background;
-
-                    HorizontalLayout {
-                        padding-left: 6px;
-                        padding-right: 6px;
-
-                        Text {
-                            text: root.hosts.length + " " + @tr("台");
-                            font-size: 9px;
-                            font-weight: 600;
-                            color: AppTheme.secondary-foreground;
-                            vertical-alignment: center;
-                        }
-                    }
-                }
-            }
-
-            // 新建主机与分组动作
-            HorizontalLayout {
-                spacing: 4px;
-                alignment: end;
-
-                AppIconButton {
-                    icon: @image-url("../../assets/icons/folder-plus.svg");
-                    clicked => { HostsBridge.is-create-group-open = true; }
-                }
-
-                AppIconButton {
-                    icon: @image-url("../../assets/icons/plus.svg");
-                    clicked => { HostsBridge.open-create-host-modal(""); }
-                }
-            }
-
+        // 2. 拖拽时的顶级根目录放置区
+        if root.is-dragging && root.view-mode == "tree": HostRootDropZone {
+            is-active: root.drop-target-id == "root";
         }
 
-        // 2.5 拖拽时的顶级根目录放置区 (仅在树形模式呈现，列表模式无物理分组概念无需显示)
-        if root.is-dragging && root.view-mode == "tree": Rectangle {
-            height: 28px;
-            border-radius: 4px;
-            background: root.drop-target-id == "root" ? AppTheme.accent.transparentize(70%) : AppTheme.control-background;
-            border-width: 1.5px;
-            border-color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.border;
-            animate background { duration: 120ms; }
-            animate border-color { duration: 120ms; }
-
-            HorizontalLayout {
-                padding-left: 10px;
-                padding-right: 10px;
-                spacing: 6px;
-                alignment: center;
-
-                VerticalLayout {
-                    alignment: center;
-                    Image {
-                        source: @image-url("../../assets/icons/folder.svg");
-                        width: 13px;
-                        height: 13px;
-                        image-fit: contain;
-                        colorize: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.secondary-foreground;
-                    }
-                }
-
-                VerticalLayout {
-                    alignment: center;
-                    Text {
-                        text: @tr("移至根目录 (未分组)");
-                        font-size: 11px;
-                        font-weight: 600;
-                        color: root.drop-target-id == "root" ? AppTheme.accent : AppTheme.foreground;
-                        vertical-alignment: center;
-                    }
-                }
-            }
-        }
-
-        // 3. 核心工作区 (支持 Flickable 视口精确映射、滚轮平滑滚动与拖拽)
+        // 3. 核心工作区 (自然滚轮支持 interactive: true，通过滚动条联动)
         Rectangle {
             vertical-stretch: 1;
             clip: true;
@@ -252,477 +610,293 @@ export component HostsDrawer inherits DrawerContainer {
             scroll-area := Flickable {
                 width: 100%;
                 height: 100%;
-                interactive: false;
-                viewport-width: root.view-mode == "tree" ? Math.max(self.width, root.tree-content-width) : self.width;
-                viewport-height: (root.view-mode == "tree" ? root.tree-nodes.length * 32px : root.hosts.length * 56px) + 8px;
+                interactive: true;
+                content-width: root.view-mode == "tree" ? Math.max(self.width, root.tree-content-width) : self.width;
+                content-height: (root.view-mode == "tree" ? root.tree-nodes.length * 32px : root.hosts.length * 56px) + 8px;
 
-                // 3.1 树形层级结构视图 (Tree View: 支持拖拽移动、根据最宽节点自然撑开，超宽时触发平滑横向滚动)
+                // 3.1 树形层级结构视图
                 if root.view-mode == "tree": VerticalLayout {
                     x: 0px;
                     y: 0px;
                     width: Math.max(scroll-area.width, root.tree-content-width);
-                    height: root.tree-nodes.length * 32px;
+                    height: root.tree-nodes.length * 32px + (HostsBridge.tree-is-truncated ? 36px : 0px);
                     spacing: 2px;
                     alignment: start;
 
-                    for node[idx] in root.tree-nodes: Rectangle {
-                        height: 30px;
-                        width: 100%;
-                        min-width: Math.max(scroll-area.width, root.tree-content-width);
+                    for node[idx] in root.tree-nodes: HostTreeRow {
+                        node: node;
+                        idx: idx;
+                        is-selected: node.id == root.selected-host-id;
+                        is-drag-source: root.is-dragging && node.id == root.drag-source-id;
+                        is-drop-target: root.is-dragging && root.drop-target-index == idx;
+                        is-drop-target-root: root.drop-target-id == "root";
+                        drop-target-valid: root.drop-target-valid;
+                        is-dragging: root.is-dragging;
+                        min-row-width: Math.max(scroll-area.width, root.tree-content-width);
+
+                        row-clicked => {
+                            if !root.is-dragging {
+                                if node.is-group {
+                                    HostsBridge.toggle-group(node.id);
+                                } else {
+                                    root.selected-host-id = node.id;
+                                    HostsBridge.select-host(node.id);
+                                }
+                            }
+                        }
+                        row-double-clicked => {
+                            if !node.is-group && !root.is-dragging {
+                                root.host-double-clicked(node.id);
+                            }
+                        }
+                        row-right-clicked(mouse_x, mouse_y) => {
+                            root.is-context-menu-open = true;
+                            root.context-node-id = node.id;
+                            root.context-node-name = node.name;
+                            root.context-node-is-group = node.is-group;
+                            root.context-node-address = node.address;
+                            root.context-node-port = node.port;
+                            let menu_h = node.is-group ? 124px : 174px;
+                            let base_y = 74px + idx * 32px + mouse_y + scroll-area.content-y;
+                            root.context-menu-y = Math.max(6px, Math.min(root.height - 36px - menu_h - 10px, base_y));
+                            let screen_x = mouse_x + scroll-area.content-x;
+                            root.context-menu-x = Math.max(6px, Math.min(root.width - 180px, screen_x));
+                        }
+                        drag-prepare(id, name, is_grp) => {
+                            root.is-context-menu-open = false;
+                            root.drag-source-id = id;
+                            root.drag-source-name = name;
+                            root.drag-source-is-group = is_grp;
+                            root.is-dragging = false;
+                            root.drop-target-index = -1;
+                        }
+                        drag-update(mouse_x, mouse_y, total_y) => {
+                            root.is-dragging = true;
+                            root.drag-source-id = node.id;
+                            root.drag-source-name = node.name;
+                            root.drag-source-is-group = node.is-group;
+                            root.drag-x = mouse_x;
+                            root.drag-y = total_y;
+
+                            let screen_y = total_y + scroll-area.content-y;
+                            if screen_y < 16px {
+                                root.drop-target-index = -1;
+                                root.drop-target-id = "root";
+                                root.drop-position = "root";
+                                root.drop-target-valid = true;
+                                HostsBridge.request-drag-hover(root.drag-source-id, -1, 0.0);
+                            } else {
+                                let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
+                                root.drop-target-index = target_idx;
+                                root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
+                                HostsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                            }
+                        }
+                        drag-drop => {
+                            if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
+                                if root.drop-target-id == "root" {
+                                    HostsBridge.move-node(root.drag-source-id, "root", "root");
+                                } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
+                                    HostsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                                }
+                            }
+                            root.is-dragging = false;
+                            root.drag-source-id = "";
+                            root.drop-target-id = "";
+                            root.drop-target-name = "";
+                            root.drop-target-index = -1;
+                            root.drop-position = "inside";
+                        }
+                        drag-cancel => {
+                            root.is-dragging = false;
+                            root.drag-source-id = "";
+                            root.drop-target-id = "";
+                            root.drop-target-name = "";
+                            root.drop-target-index = -1;
+                            root.drop-position = "inside";
+                        }
+                    }
+
+                    if HostsBridge.tree-is-truncated: Rectangle {
+                        height: 32px;
                         border-radius: 4px;
-                        opacity: (root.is-dragging && node.id == root.drag-source-id) ? 0.35 : 1.0;
-                        background: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid) ? AppTheme.accent.transparentize(85%) : (node.id == root.selected-host-id && !node.is-group) ? AppTheme.control-background : tree-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : transparent;
+                        background: AppTheme.accent.transparentize(90%);
                         border-width: 1px;
-                        border-color: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid) ? AppTheme.accent.transparentize(40%) : (node.id == root.selected-host-id && !node.is-group) ? AppTheme.border : transparent;
-
-                        animate background { duration: root.is-dragging ? 0ms : 120ms; }
-                        animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
-
-                        tree-touch := TouchArea {
-                            pointer-event(event) => {
-                                if event.kind == PointerEventKind.down {
-                                    if event.button == PointerEventButton.right {
-                                        root.is-context-menu-open = true;
-                                        root.context-node-id = node.id;
-                                        root.context-node-name = node.name;
-                                        root.context-node-is-group = node.is-group;
-                                        root.context-node-address = node.address;
-                                        root.context-node-port = node.port;
-                                        let menu_h = node.is-group ? 124px : 174px;
-                                        let base_y = 74px + idx * 32px + self.mouse-y + scroll-area.viewport-y;
-                                        root.context-menu-y = Math.max(6px, Math.min(root.height - 36px - menu_h - 10px, base_y));
-                                        let screen_x = self.mouse-x + scroll-area.viewport-x;
-                                        root.context-menu-x = Math.max(6px, Math.min(root.width - 180px, screen_x));
-                                    } else {
-                                        root.is-context-menu-open = false;
-                                        root.drag-source-id = node.id;
-                                        root.drag-source-name = node.name;
-                                        root.drag-source-is-group = node.is-group;
-                                        root.is-dragging = false;
-                                        root.drop-target-index = -1;
-                                    }
-                                }
-                                if event.kind == PointerEventKind.up {
-                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" {
-                                        if root.drop-target-id == "root" {
-                                            HostsBridge.move-node(root.drag-source-id, "root", "root");
-                                        } else if (root.drop-target-id != root.drag-source-id || root.drop-position != "inside") {
-                                            HostsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
-                                        }
-                                    }
-                                    root.is-dragging = false;
-                                    root.drag-source-id = "";
-                                    root.drop-target-id = "";
-                                    root.drop-target-name = "";
-                                    root.drop-target-index = -1;
-                                    root.drop-position = "inside";
-                                }
-                                if event.kind == PointerEventKind.cancel {
-                                    // 仅在手势取消时复位状态，绝不执行移动调序
-                                    root.is-dragging = false;
-                                    root.drag-source-id = "";
-                                    root.drop-target-id = "";
-                                    root.drop-target-name = "";
-                                    root.drop-target-index = -1;
-                                    root.drop-position = "inside";
-                                }
-                            }
-                            moved => {
-                                if self.pressed {
-                                    if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
-                                        root.is-dragging = true;
-                                        root.drag-source-id = node.id;
-                                        root.drag-source-name = node.name;
-                                        root.drag-source-is-group = node.is-group;
-                                        root.drag-x = self.mouse-x;
-                                        let total_y = idx * 32px + self.mouse-y;
-                                        root.drag-y = total_y;
-
-                                        let screen_y = total_y + scroll-area.viewport-y;
-                                        if screen_y < 16px {
-                                            root.drop-target-index = -1;
-                                            root.drop-target-id = "root";
-                                            root.drop-position = "root";
-                                            root.drop-target-valid = true;
-                                            HostsBridge.request-drag-hover(root.drag-source-id, -1, 0.0);
-                                        } else {
-                                            let target_idx = Math.max(0, Math.min(root.tree-nodes.length - 1, Math.floor(total_y / 32px)));
-                                            root.drop-target-index = target_idx;
-                                            root.drop-target-valid = (target_idx != idx || root.tree-nodes[target_idx].id != node.id);
-                                            HostsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
-                                        }
-                                    }
-                                }
-                            }
-                            clicked => {
-                                if !root.is-dragging {
-                                    if node.is-group {
-                                        HostsBridge.toggle-group(node.id);
-                                    } else {
-                                        root.selected-host-id = node.id;
-                                        HostsBridge.select-host(node.id);
-                                    }
-                                }
-                            }
-                            double-clicked => {
-                                if !node.is-group && !root.is-dragging {
-                                    root.host-double-clicked(node.id);
-                                }
-                            }
-                            mouse-cursor: root.is-dragging ? copy : pointer;
-                        }
-
-                        // 核心：唯一下线指示条 (Bottom Insertion Line: 从图标起始至名称后方，无起始圆点)
-                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid && root.drop-target-id != "root": Rectangle {
-                            x: 6px + node.level * 14px;
-                            y: parent.height - 2px;
-                            width: Math.min(125px, parent.width - 16px - node.level * 14px);
-                            height: 2px;
-                            background: AppTheme.accent;
-                            border-radius: 1px;
-                            z: 20;
-                        }
-
-
-
+                        border-color: AppTheme.accent.transparentize(70%);
 
                         HorizontalLayout {
-                            // 层级缩进 (level * 14px)
-                            padding-left: 6px + node.level * 14px;
-                            padding-right: 12px;
-                            spacing: 6px;
+                            padding-left: 10px;
+                            padding-right: 10px;
                             alignment: space-between;
 
-                            // 左侧：折叠箭头 + 图标 + 名称
-                            HorizontalLayout {
-                                spacing: 5px;
-                                alignment: start;
-
-                                // 文件夹图标 (折叠/展开形态自适应切换) / 主机终端图标
-                                VerticalLayout {
-                                    alignment: center;
-
-                                    if node.is-group: Image {
-                                        source: node.is-expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg");
-                                        width: 13px;
-                                        height: 13px;
-                                        image-fit: contain;
-                                        colorize: (node.is-expanded || (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid)) ? AppTheme.accent : AppTheme.secondary-foreground;
-                                    }
-
-                                    if !node.is-group: Image {
-                                        source: @image-url("../../assets/icons/server.svg");
-                                        width: 12px;
-                                        height: 12px;
-                                        image-fit: contain;
-                                        colorize: node.id == root.selected-host-id ? AppTheme.accent : tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                                    }
-                                }
-
-                                // 主机在线/离线状态指示灯
-                                if !node.is-group: VerticalLayout {
-                                    alignment: center;
-
-                                    StatusDot {
-                                        status: node.status;
-                                        dot-size: 5px;
-                                    }
-                                }
-
-                                // 节点名称 (自然展开，超宽时触发平滑横向滚动)
-                                VerticalLayout {
-                                    alignment: center;
-
-                                    Text {
-                                        text: (node.is-group && (node.name == "默认分组" || node.name == "Default Group")) ? @tr("默认分组") : node.name;
-                                        font-size: 11px;
-                                        font-weight: node.is-group ? 600 : node.id == root.selected-host-id ? 600 : 400;
-                                        color: (node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid) ? AppTheme.accent : node.is-group ? AppTheme.foreground : node.id == root.selected-host-id ? AppTheme.foreground : tree-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
-                                        vertical-alignment: center;
-                                    }
-                                }
+                            Text {
+                                text: @tr("已显示前 ") + root.tree-nodes.length + @tr(" 个 (共 ") + HostsBridge.tree-total-count + @tr(" 个)");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
                             }
 
-                            // 右侧：如果是分组且为 drop 目标显示高亮提示，否则显示数量/延迟
-                            HorizontalLayout {
-                                spacing: 4px;
-                                alignment: end;
-
-                                if node.is-group && root.is-dragging && root.drop-target-index == idx && root.drop-target-valid: VerticalLayout {
-                                    alignment: center;
-                                    Rectangle {
-                                        height: 18px;
-                                        border-radius: 9px;
-                                        background: AppTheme.accent;
-                                        HorizontalLayout {
-                                            padding-left: 6px;
-                                            padding-right: 6px;
-                                            Text {
-                                                text: @tr("移入此分组");
-                                                font-size: 9px;
-                                                font-weight: 600;
-                                                color: #ffffff;
-                                                vertical-alignment: center;
-                                            }
-                                        }
-                                    }
+                            Rectangle {
+                                border-radius: 3px;
+                                background: exp-all-touch.has-hover ? AppTheme.hover-background : transparent;
+                                exp-all-touch := TouchArea {
+                                    clicked => { HostsBridge.load-all-hosts(); }
+                                    mouse-cursor: pointer;
                                 }
-
-                                if node.is-group && (!root.is-dragging || root.drop-target-index != idx): VerticalLayout {
-                                    alignment: center;
-
-                                    Text {
-                                        text: "(" + node.item-count + ")";
-                                        font-size: 10px;
-                                        color: AppTheme.disabled-foreground;
-                                        vertical-alignment: center;
-                                    }
-                                }
-
-                                if !node.is-group && node.ping-ms > 0: VerticalLayout {
-                                    alignment: center;
-
-                                    Text {
-                                        text: node.ping-ms + "ms";
-                                        font-size: 9px;
-                                        font-weight: 500;
-                                        color: node.ping-ms > 50 ? AppTheme.warning : AppTheme.secondary-foreground;
-                                        vertical-alignment: center;
-                                    }
+                                Text {
+                                    text: @tr("展开全部");
+                                    font-size: 10px;
+                                    font-weight: 600;
+                                    color: AppTheme.accent;
+                                    vertical-alignment: center;
                                 }
                             }
                         }
                     }
                 }
 
-                // 3.2 卡片模式视图 (Card View: 现代化富卡片，严格锁定 100% 宽度，仅纯竖向滚动)
+                // 3.2 卡片模式视图
                 if root.view-mode == "card": VerticalLayout {
                     x: 0px;
                     y: 0px;
                     width: scroll-area.width;
-                    height: root.hosts.length * 56px;
+                    height: root.hosts.length * 56px + (HostsBridge.tree-is-truncated ? 36px : 0px);
                     spacing: 6px;
                     alignment: start;
 
-                    for host[idx] in root.hosts: Rectangle {
-                        height: 50px;
-                        width: 100%;
-                        border-radius: 4px;
-                        opacity: (root.is-dragging && host.id == root.drag-source-id) ? 0.35 : 1.0;
-                        background: host.id == root.selected-host-id ? AppTheme.control-background : card-item-touch.has-hover ? AppTheme.hover-background.transparentize(40%) : AppTheme.surface-background;
-                        border-width: 1px;
-                        border-color: host.id == root.selected-host-id ? AppTheme.border : card-item-touch.has-hover ? AppTheme.border : AppTheme.border.transparentize(50%);
+                    for host[idx] in root.hosts: HostCardRow {
+                        host: host;
+                        idx: idx;
+                        is-selected: host.id == root.selected-host-id;
+                        is-drag-source: root.is-dragging && host.id == root.drag-source-id;
+                        is-drop-target: root.is-dragging && root.drop-target-index == idx;
+                        drop-target-valid: root.drop-target-valid;
+                        is-dragging: root.is-dragging;
 
-                        animate background { duration: root.is-dragging ? 0ms : 120ms; }
-                        animate border-color { duration: root.is-dragging ? 0ms : 120ms; }
-                        animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
-
-                        card-item-touch := TouchArea {
-                            pointer-event(event) => {
-                                if event.kind == PointerEventKind.down {
-                                    if event.button == PointerEventButton.right {
-                                        root.is-context-menu-open = true;
-                                        root.context-node-id = host.id;
-                                        root.context-node-name = host.name;
-                                        root.context-node-is-group = false;
-                                        root.context-node-address = host.address;
-                                        root.context-node-port = host.port;
-                                        let menu_h = 174px;
-                                        let base_y = 74px + idx * 56px + self.mouse-y + scroll-area.viewport-y;
-                                        root.context-menu-y = Math.max(6px, Math.min(root.height - 36px - menu_h - 10px, base_y));
-                                        let screen_x = self.mouse-x;
-                                        root.context-menu-x = Math.max(6px, Math.min(root.width - 180px, screen_x));
-                                    } else {
-                                        root.is-context-menu-open = false;
-                                        root.drag-source-id = host.id;
-                                        root.drag-source-name = host.name;
-                                        root.drag-source-is-group = false;
-                                        root.is-dragging = false;
-                                        root.drop-target-index = -1;
-                                    }
-                                }
-                                if event.kind == PointerEventKind.up {
-                                    if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" && root.drop-target-id != root.drag-source-id {
-                                        HostsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
-                                    }
-                                    root.is-dragging = false;
-                                    root.drag-source-id = "";
-                                    root.drop-target-id = "";
-                                    root.drop-target-name = "";
-                                    root.drop-target-index = -1;
-                                    root.drop-position = "inside";
-                                }
-                                if event.kind == PointerEventKind.cancel {
-                                    root.is-dragging = false;
-                                    root.drag-source-id = "";
-                                    root.drop-target-id = "";
-                                    root.drop-target-name = "";
-                                    root.drop-target-index = -1;
-                                    root.drop-position = "inside";
-                                }
+                        row-clicked => {
+                            if !root.is-dragging {
+                                root.selected-host-id = host.id;
+                                HostsBridge.select-host(host.id);
                             }
-                            moved => {
-                                if self.pressed {
-                                    if Math.abs(self.mouse-x - self.pressed-x) > 3px || Math.abs(self.mouse-y - self.pressed-y) > 3px {
-                                        root.is-dragging = true;
-                                        root.drag-source-id = host.id;
-                                        root.drag-source-name = host.name;
-                                        root.drag-source-is-group = false;
-                                        root.drag-x = self.mouse-x;
-                                        let total_y = idx * 56px + self.mouse-y;
-                                        root.drag-y = total_y;
-
-                                        let target_idx = Math.max(0, Math.min(root.hosts.length - 1, Math.floor((total_y + 24px) / 56px)));
-                                        root.drop-target-index = target_idx;
-                                        root.drop-target-valid = (target_idx != idx || root.hosts[target_idx].id != host.id);
-                                        HostsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
-
-                                    }
-                                }
-                            }
-                            clicked => {
-                                if !root.is-dragging {
-                                    root.selected-host-id = host.id;
-                                    HostsBridge.select-host(host.id);
-                                }
-                            }
-                            double-clicked => {
-                                if !root.is-dragging {
-                                    root.host-double-clicked(host.id);
-                                }
-                            }
-                            mouse-cursor: root.is-dragging ? copy : pointer;
                         }
+                        row-double-clicked => {
+                            if !root.is-dragging {
+                                root.host-double-clicked(host.id);
+                            }
+                        }
+                        row-right-clicked(mouse_x, mouse_y) => {
+                            root.is-context-menu-open = true;
+                            root.context-node-id = host.id;
+                            root.context-node-name = host.name;
+                            root.context-node-is-group = false;
+                            root.context-node-address = host.address;
+                            root.context-node-port = host.port;
+                            let menu_h = 174px;
+                            let base_y = 74px + idx * 56px + mouse_y + scroll-area.content-y;
+                            root.context-menu-y = Math.max(6px, Math.min(root.height - 36px - menu_h - 10px, base_y));
+                            let screen_x = mouse_x;
+                            root.context-menu-x = Math.max(6px, Math.min(root.width - 180px, screen_x));
+                        }
+                        drag-prepare(id, name) => {
+                            root.is-context-menu-open = false;
+                            root.drag-source-id = id;
+                            root.drag-source-name = name;
+                            root.drag-source-is-group = false;
+                            root.is-dragging = false;
+                            root.drop-target-index = -1;
+                        }
+                        drag-update(mouse_x, mouse_y, total_y) => {
+                            root.is-dragging = true;
+                            root.drag-source-id = host.id;
+                            root.drag-source-name = host.name;
+                            root.drag-source-is-group = false;
+                            root.drag-x = mouse_x;
+                            root.drag-y = total_y;
 
-                        VerticalLayout {
-                            padding-left: 8px;
-                            padding-right: 8px;
-                            padding-top: 5px;
-                            padding-bottom: 5px;
-                            spacing: 3px;
-                            alignment: center;
+                            let target_idx = Math.max(0, Math.min(root.hosts.length - 1, Math.floor((total_y + 24px) / 56px)));
+                            root.drop-target-index = target_idx;
+                            root.drop-target-valid = (target_idx != idx || root.hosts[target_idx].id != host.id);
+                            HostsBridge.request-drag-hover(root.drag-source-id, target_idx, 0.0);
+                        }
+                        drag-drop => {
+                            if root.is-dragging && root.drop-target-valid && root.drop-target-id != "" && root.drop-target-id != root.drag-source-id {
+                                HostsBridge.move-node(root.drag-source-id, root.drop-target-id, root.drop-position);
+                            }
+                            root.is-dragging = false;
+                            root.drag-source-id = "";
+                            root.drop-target-id = "";
+                            root.drop-target-name = "";
+                            root.drop-target-index = -1;
+                            root.drop-position = "inside";
+                        }
+                        drag-cancel => {
+                            root.is-dragging = false;
+                            root.drag-source-id = "";
+                            root.drop-target-id = "";
+                            root.drop-target-name = "";
+                            root.drop-target-index = -1;
+                            root.drop-position = "inside";
+                        }
+                    }
 
-                            // 卡片顶行：状态灯 + 主机名称 + 分组徽章
-                            HorizontalLayout {
-                                spacing: 6px;
-                                alignment: space-between;
+                    if HostsBridge.tree-is-truncated: Rectangle {
+                        height: 32px;
+                        border-radius: 4px;
+                        background: AppTheme.accent.transparentize(90%);
+                        border-width: 1px;
+                        border-color: AppTheme.accent.transparentize(70%);
 
-                                HorizontalLayout {
-                                    spacing: 6px;
-                                    alignment: start;
+                        HorizontalLayout {
+                            padding-left: 10px;
+                            padding-right: 10px;
+                            alignment: space-between;
 
-                                    VerticalLayout {
-                                        alignment: center;
-
-                                        StatusDot {
-                                            status: host.status;
-                                            dot-size: 6px;
-                                        }
-                                    }
-
-                                    Text {
-                                        text: host.name;
-                                        font-size: 11px;
-                                        font-weight: 600;
-                                        color: AppTheme.foreground;
-                                        overflow: elide;
-                                        vertical-alignment: center;
-                                    }
-                                }
-
-                                // 分组胶囊
-                                Rectangle {
-                                    height: 16px;
-                                    border-radius: 3px;
-                                    background: AppTheme.control-background;
-                                    border-width: 1px;
-                                    border-color: AppTheme.border.transparentize(40%);
-
-                                    HorizontalLayout {
-                                        padding-left: 5px;
-                                        padding-right: 5px;
-
-                                        Text {
-                                            text: (host.group == "未分组" || host.group == "Ungrouped") ? @tr("未分组") : ((host.group == "默认分组" || host.group == "Default Group") ? @tr("默认分组") : host.group);
-                                            font-size: 9px;
-                                            font-weight: 600;
-                                            color: AppTheme.secondary-foreground;
-                                            vertical-alignment: center;
-                                        }
-                                    }
-                                }
+                            Text {
+                                text: @tr("已显示前 ") + root.hosts.length + @tr(" 个 (共 ") + HostsBridge.tree-total-count + @tr(" 个)");
+                                font-size: 10px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
                             }
 
-                            // 卡片底行：IP 地址与端口 + 延迟时间
-                            HorizontalLayout {
-                                spacing: 6px;
-                                alignment: space-between;
-
+                            Rectangle {
+                                border-radius: 3px;
+                                background: exp-all-card-touch.has-hover ? AppTheme.hover-background : transparent;
+                                exp-all-card-touch := TouchArea {
+                                    clicked => { HostsBridge.load-all-hosts(); }
+                                    mouse-cursor: pointer;
+                                }
                                 Text {
-                                    text: host.address + ":" + host.port;
-                                    font-size: 11px;
-                                    color: AppTheme.secondary-foreground;
-                                    overflow: elide;
+                                    text: @tr("展开全部");
+                                    font-size: 10px;
+                                    font-weight: 600;
+                                    color: AppTheme.accent;
                                     vertical-alignment: center;
                                 }
-
-                                if host.ping-ms > 0: HorizontalLayout {
-                                    spacing: 3px;
-                                    alignment: end;
-
-                                    Text {
-                                        text: "●";
-                                        font-size: 6px;
-                                        color: host.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
-                                        vertical-alignment: center;
-                                    }
-
-                                    Text {
-                                        text: host.ping-ms + "ms";
-                                        font-size: 10px;
-                                        font-weight: 600;
-                                        color: host.ping-ms > 50 ? AppTheme.warning : AppTheme.success;
-                                        vertical-alignment: center;
-                                    }
-                                }
                             }
                         }
-
-                        // 核心：唯一下线指示条 (Bottom Insertion Line: 居中贯穿卡片底部，两端留出 8px 边距，无起始圆点)
-                        if root.is-dragging && root.drop-target-index == idx && root.drop-target-valid: Rectangle {
-                            x: 8px;
-                            y: parent.height - 2px;
-                            width: parent.width - 16px;
-                            height: 2px;
-                            background: AppTheme.accent;
-                            border-radius: 1px;
-                            z: 20;
-                        }
-
-
                     }
                 }
             }
 
             // 悬浮竖向与横向现代化主题滚动条
             AppVScrollBar {
-                viewport-height: scroll-area.viewport-height;
+                content-height: scroll-area.content-height;
                 visible-height: scroll-area.height;
-                viewport-y <=> scroll-area.viewport-y;
-                bottom-offset: (root.view-mode == "tree" && scroll-area.viewport-width > scroll-area.width) ? 6px : 0px;
+                content-y <=> scroll-area.content-y;
+                bottom-offset: (root.view-mode == "tree" && scroll-area.content-width > scroll-area.width) ? 6px : 0px;
             }
 
             if root.view-mode == "tree": AppHScrollBar {
-                viewport-width: scroll-area.viewport-width;
+                content-width: scroll-area.content-width;
                 visible-width: scroll-area.width;
-                viewport-x <=> scroll-area.viewport-x;
-                right-offset: (scroll-area.viewport-height > scroll-area.height) ? 6px : 0px;
+                content-x <=> scroll-area.content-x;
+                right-offset: (scroll-area.content-height > scroll-area.height) ? 6px : 0px;
             }
 
-            // 4. 浮动拖拽跟随卡片 (Drag Ghost Follower: 仅展示被拖动的源节点图标与名称，半透明预览)
+            // 4. 浮动拖拽跟随卡片
             if root.is-dragging: Rectangle {
                 x: 12px;
-                y: Math.max(6px, Math.min(parent.height - 36px, root.drag-y + scroll-area.viewport-y - 14px));
+                y: Math.max(6px, Math.min(parent.height - 36px, root.drag-y + scroll-area.content-y - 14px));
                 width: Math.min(parent.width - 24px, 150px);
                 height: 28px;
                 border-radius: 6px;
@@ -764,7 +938,7 @@ export component HostsDrawer inherits DrawerContainer {
         }
     }
 
-    // 5. 右键上下文菜单浮层 (Host & Group Context Menu Overlay)
+    // 5. 右键上下文菜单浮层
     if root.is-context-menu-open: Rectangle {
         x: 0px;
         y: 0px;
@@ -772,11 +946,8 @@ export component HostsDrawer inherits DrawerContainer {
         height: 100%;
         background: transparent;
 
-        // 透明遮罩拦截点击，点击空白处自动关闭菜单
         TouchArea {
-            clicked => {
-                root.is-context-menu-open = false;
-            }
+            clicked => { root.is-context-menu-open = false; }
             pointer-event(e) => {
                 if e.kind == PointerEventKind.down {
                     root.is-context-menu-open = false;
@@ -829,10 +1000,9 @@ export component HostsDrawer inherits DrawerContainer {
                 root.is-context-menu-open = false;
                 HostsBridge.toggle-group(grp-id);
             }
-            close-menu() => {
-                root.is-context-menu-open = false;
-            }
+            close-menu() => { root.is-context-menu-open = false; }
         }
     }
 }
 
+export { HostsDrawer }

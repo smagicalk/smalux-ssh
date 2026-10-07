@@ -5,16 +5,24 @@ fn main() {
     let manifest_dir = PathBuf::from(std::env::var("CARGO_MANIFEST_DIR").unwrap());
     let common_dir = manifest_dir.join("../common/ui");
     let hosts_dir = manifest_dir.join("../plugins/hosts/ui");
-    let session_tools_dir = manifest_dir.join("../plugins/session_tools/ui");
+    let credentials_dir = manifest_dir.join("../plugins/credentials/ui");
+    let files_dir = manifest_dir.join("../plugins/files/ui");
+    let history_dir = manifest_dir.join("../plugins/history/ui");
     let snippets_dir = manifest_dir.join("../plugins/snippets/ui");
     let tunnels_dir = manifest_dir.join("../plugins/tunnels/ui");
+    let debug_dir = manifest_dir.join("../plugins/debug/ui");
+    let settings_dir = manifest_dir.join("../plugins/settings/ui");
 
     let mut library_paths = HashMap::new();
     library_paths.insert("common".to_string(), common_dir.clone());
     library_paths.insert("plugin-hosts".to_string(), hosts_dir.clone());
-    library_paths.insert("plugin-session-tools".to_string(), session_tools_dir.clone());
+    library_paths.insert("plugin-credentials".to_string(), credentials_dir.clone());
+    library_paths.insert("plugin-files".to_string(), files_dir.clone());
+    library_paths.insert("plugin-history".to_string(), history_dir.clone());
     library_paths.insert("plugin-snippets".to_string(), snippets_dir.clone());
     library_paths.insert("plugin-tunnels".to_string(), tunnels_dir.clone());
+    library_paths.insert("plugin-debug".to_string(), debug_dir.clone());
+    library_paths.insert("plugin-settings".to_string(), settings_dir.clone());
 
     let include_paths = vec![
         common_dir.clone(),

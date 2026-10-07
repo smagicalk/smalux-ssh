@@ -17,6 +17,7 @@ use std::rc::Rc;
 use slint::ComponentHandle;
 use slint::winit_030::WinitWindowAccessor;
 use crate::async_util::spawn_async;
+use crate::common::{num_to_shared, to_model_rc, ToSharedString};
 use crate::generated::{AppTheme, AppWindow, SettingsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use super::theme_handlers::pick_folder;
@@ -36,28 +37,28 @@ use super::theme_handlers::pick_folder;
 /// - `cfg`: SQLite 仓储中拉取出的应用全局配置实体切片。
 pub(crate) fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &smagical_core::domain::config::AppConfigRecord) {
     // 1. 常规与启动行为 (General)
-    bridge.set_setting_language(cfg.language.as_str().into());
-    bridge.set_setting_close_action(cfg.close_action.as_str().into());
+    bridge.set_setting_language(cfg.language.to_shared());
+    bridge.set_setting_close_action(cfg.close_action.to_shared());
     bridge.set_setting_confirm_close_tab(cfg.confirm_close_tab);
     bridge.set_setting_confirm_close_active(cfg.confirm_close_active);
     bridge.set_setting_always_on_top(cfg.always_on_top);
     bridge.set_setting_start_on_boot(cfg.start_on_boot);
-    bridge.set_setting_toast_duration(cfg.toast_duration.as_str().into());
+    bridge.set_setting_toast_duration(cfg.toast_duration.to_shared());
     if !cfg.custom_data_dir.is_empty() {
-        bridge.set_setting_data_dir(cfg.custom_data_dir.as_str().into());
+        bridge.set_setting_data_dir(cfg.custom_data_dir.to_shared());
     }
 
     // 2. 外观与壁纸 (Appearance)
-    bridge.set_current_theme_id(cfg.theme_id.as_str().into());
+    bridge.set_current_theme_id(cfg.theme_id.to_shared());
     bridge.set_is_dark_mode(cfg.is_dark_mode);
-    bridge.set_setting_ui_font(cfg.ui_font.as_str().into());
-    bridge.set_setting_wallpaper_mode(cfg.wallpaper_mode.as_str().into());
-    bridge.set_setting_wallpaper_path(cfg.wallpaper_path.as_str().into());
+    bridge.set_setting_ui_font(cfg.ui_font.to_shared());
+    bridge.set_setting_wallpaper_mode(cfg.wallpaper_mode.to_shared());
+    bridge.set_setting_wallpaper_path(cfg.wallpaper_path.to_shared());
     bridge.set_setting_wallpaper_opacity(cfg.wallpaper_opacity);
     bridge.set_setting_modal_opacity(cfg.modal_opacity);
 
-    let slint_strings: Vec<slint::SharedString> = cfg.wallpaper_list.iter().map(|s| s.as_str().into()).collect();
-    bridge.set_setting_wallpaper_list(slint::ModelRc::new(slint::VecModel::from(slint_strings)));
+    let slint_strings: Vec<slint::SharedString> = cfg.wallpaper_list.iter().map(|s| s.to_shared()).collect();
+    bridge.set_setting_wallpaper_list(to_model_rc(slint_strings));
     bridge.set_setting_wallpaper_active_index(cfg.wallpaper_active_index as i32);
 
     let slide_interval = cfg.wallpaper_slideshow_interval.clone();
@@ -74,100 +75,100 @@ pub(crate) fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &sma
     } else {
         ("0", "off")
     };
-    bridge.set_setting_wallpaper_slideshow(slide_interval.as_str().into());
-    bridge.set_slideshow_number_input(slide_num.into());
-    bridge.set_slideshow_unit_input(slide_unit.into());
-    bridge.set_setting_wallpaper_transition(cfg.wallpaper_transition_effect.as_str().into());
+    bridge.set_setting_wallpaper_slideshow(slide_interval.to_shared());
+    bridge.set_slideshow_number_input(slide_num.to_shared());
+    bridge.set_slideshow_unit_input(slide_unit.to_shared());
+    bridge.set_setting_wallpaper_transition(cfg.wallpaper_transition_effect.to_shared());
 
     // 3. 终端排版与特效 (Terminal)
-    bridge.set_setting_terminal_font(cfg.font_family.as_str().into());
+    bridge.set_setting_terminal_font(cfg.font_family.to_shared());
     bridge.set_setting_terminal_font_size(cfg.font_size as i32);
-    bridge.set_setting_cursor_style(cfg.cursor_style.as_str().into());
+    bridge.set_setting_cursor_style(cfg.cursor_style.to_shared());
     bridge.set_setting_cursor_blink(cfg.cursor_blink);
     bridge.set_setting_scrollback_lines(cfg.scrollback_lines as i32);
-    bridge.set_scrollback_input(format!("{}", cfg.scrollback_lines).into());
+    bridge.set_scrollback_input(num_to_shared(cfg.scrollback_lines));
     bridge.set_setting_copy_on_select(cfg.copy_on_select);
     bridge.set_setting_paste_on_right_click(cfg.paste_on_right_click);
     bridge.set_setting_warn_multiline_paste(cfg.warn_on_multiline_paste);
-    bridge.set_setting_bell_style(cfg.terminal_bell_style.as_str().into());
+    bridge.set_setting_bell_style(cfg.terminal_bell_style.to_shared());
     bridge.set_setting_terminal_url_click(cfg.terminal_url_click);
     bridge.set_setting_terminal_highlight_keywords(cfg.terminal_highlight_keywords);
-    bridge.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.as_str().into());
+    bridge.set_setting_terminal_custom_keywords(cfg.terminal_custom_keywords.to_shared());
     bridge.set_flag_terminal_crt_shader(cfg.flag_terminal_crt_shader);
     bridge.set_setting_terminal_crt(cfg.flag_terminal_crt_shader);
 
     if !cfg.keyword_highlight_rules.is_empty() {
         let rules: Vec<crate::generated::KeywordHighlightRule> = cfg.keyword_highlight_rules.iter().map(|r| {
             crate::generated::KeywordHighlightRule {
-                id: r.id.as_str().into(),
-                pattern: r.pattern.as_str().into(),
-                remark: r.remark.as_str().into(),
-                color_hex: r.color_hex.as_str().into(),
+                id: r.id.to_shared(),
+                pattern: r.pattern.to_shared(),
+                remark: r.remark.to_shared(),
+                color_hex: r.color_hex.to_shared(),
                 rule_color: hex_to_slint_color(r.color_hex.as_str()),
                 enabled: r.enabled,
             }
         }).collect();
-        bridge.set_terminal_keyword_rules(slint::ModelRc::new(slint::VecModel::from(rules)));
+        bridge.set_terminal_keyword_rules(to_model_rc(rules));
     }
 
     // 4. 网络与 SSH 设置 (Network & SSH)
-    bridge.set_setting_global_proxy_mode(cfg.global_proxy_mode.as_str().into());
-    bridge.set_setting_global_proxy_server(cfg.global_proxy_server.as_str().into());
+    bridge.set_setting_global_proxy_mode(cfg.global_proxy_mode.to_shared());
+    bridge.set_setting_global_proxy_server(cfg.global_proxy_server.to_shared());
     bridge.set_setting_global_proxy_auth(cfg.global_proxy_auth);
-    bridge.set_setting_global_proxy_user(cfg.global_proxy_user.as_str().into());
-    bridge.set_setting_global_proxy_pass(cfg.global_proxy_pass.as_str().into());
+    bridge.set_setting_global_proxy_user(cfg.global_proxy_user.to_shared());
+    bridge.set_setting_global_proxy_pass(cfg.global_proxy_pass.to_shared());
     bridge.set_setting_connect_timeout(cfg.ssh_timeout_seconds as i32);
     bridge.set_setting_keepalive_interval(cfg.keepalive_interval as i32);
     bridge.set_setting_keepalive_count_max(cfg.keepalive_count_max as i32);
-    bridge.set_setting_host_key_policy(cfg.host_key_checking.as_str().into());
+    bridge.set_setting_host_key_policy(cfg.host_key_checking.to_shared());
     bridge.set_setting_tcp_nodelay(cfg.tcp_nodelay);
     bridge.set_setting_compression(cfg.compression);
     bridge.set_setting_legacy_ciphers(cfg.legacy_ciphers);
     bridge.set_setting_auto_reconnect(cfg.auto_reconnect);
 
     // 5. 传输与文件管理 (Files & SFTP)
-    bridge.set_setting_sftp_default_local(cfg.sftp_default_local.as_str().into());
-    bridge.set_setting_sftp_default_remote(cfg.sftp_default_remote.as_str().into());
+    bridge.set_setting_sftp_default_local(cfg.sftp_default_local.to_shared());
+    bridge.set_setting_sftp_default_remote(cfg.sftp_default_remote.to_shared());
     bridge.set_setting_sftp_show_hidden(cfg.sftp_show_hidden);
     bridge.set_setting_sftp_confirm_delete(cfg.sftp_confirm_delete);
-    bridge.set_setting_sftp_conflict_policy(cfg.sftp_conflict_policy.as_str().into());
+    bridge.set_setting_sftp_conflict_policy(cfg.sftp_conflict_policy.to_shared());
     bridge.set_setting_sftp_concurrency(cfg.sftp_concurrency as i32);
     bridge.set_setting_sftp_resume(cfg.sftp_resume_transfer);
     bridge.set_setting_sftp_preserve_attributes(cfg.sftp_preserve_attributes);
-    bridge.set_setting_sftp_upload_limit(cfg.sftp_upload_limit.as_str().into());
+    bridge.set_setting_sftp_upload_limit(cfg.sftp_upload_limit.to_shared());
     let (up_num, up_unit) = parse_speed_limit(&cfg.sftp_upload_limit);
-    bridge.set_upload_limit_num(up_num.into());
-    bridge.set_upload_limit_unit(up_unit.into());
+    bridge.set_upload_limit_num(up_num.to_shared());
+    bridge.set_upload_limit_unit(up_unit.to_shared());
 
-    bridge.set_setting_sftp_download_limit(cfg.sftp_download_limit.as_str().into());
+    bridge.set_setting_sftp_download_limit(cfg.sftp_download_limit.to_shared());
     let (dl_num, dl_unit) = parse_speed_limit(&cfg.sftp_download_limit);
-    bridge.set_download_limit_num(dl_num.into());
-    bridge.set_download_limit_unit(dl_unit.into());
-    bridge.set_setting_sftp_editor_mode(cfg.sftp_editor_mode.as_str().into());
-    bridge.set_setting_sftp_custom_editor(cfg.sftp_custom_editor.as_str().into());
-    bridge.set_setting_sftp_exclude_patterns(cfg.sftp_exclude_patterns.as_str().into());
+    bridge.set_download_limit_num(dl_num.to_shared());
+    bridge.set_download_limit_unit(dl_unit.to_shared());
+    bridge.set_setting_sftp_editor_mode(cfg.sftp_editor_mode.to_shared());
+    bridge.set_setting_sftp_custom_editor(cfg.sftp_custom_editor.to_shared());
+    bridge.set_setting_sftp_exclude_patterns(cfg.sftp_exclude_patterns.to_shared());
 
     // 6. 云同步与备份 (Cloud Sync & Backup)
-    bridge.set_setting_cloud_sync_backend(cfg.cloud_sync_backend.as_str().into());
-    bridge.set_setting_cloud_sync_interval(cfg.cloud_sync_interval.as_str().into());
-    bridge.set_setting_cloud_e2ee_pass(cfg.cloud_sync_e2ee_pass.as_str().into());
-    bridge.set_setting_webdav_url(cfg.cloud_sync_webdav_url.as_str().into());
-    bridge.set_setting_webdav_user(cfg.cloud_sync_webdav_user.as_str().into());
-    bridge.set_setting_webdav_pass(cfg.cloud_sync_webdav_pass.as_str().into());
-    bridge.set_setting_webdav_dir(cfg.cloud_sync_webdav_dir.as_str().into());
-    bridge.set_setting_s3_endpoint(cfg.cloud_sync_s3_endpoint.as_str().into());
-    bridge.set_setting_s3_bucket(cfg.cloud_sync_s3_bucket.as_str().into());
-    bridge.set_setting_s3_region(cfg.cloud_sync_s3_region.as_str().into());
-    bridge.set_setting_s3_key_id(cfg.cloud_sync_s3_key_id.as_str().into());
-    bridge.set_setting_s3_access_key(cfg.cloud_sync_s3_access_key.as_str().into());
-    bridge.set_setting_gist_id(cfg.cloud_sync_gist_id.as_str().into());
-    bridge.set_setting_gist_token(cfg.cloud_sync_gist_token.as_str().into());
-    bridge.set_setting_custom_sync_url(cfg.cloud_sync_custom_url.as_str().into());
-    bridge.set_setting_custom_sync_client_id(cfg.cloud_sync_custom_client_id.as_str().into());
-    bridge.set_setting_custom_sync_token(cfg.cloud_sync_custom_token.as_str().into());
+    bridge.set_setting_cloud_sync_backend(cfg.cloud_sync_backend.to_shared());
+    bridge.set_setting_cloud_sync_interval(cfg.cloud_sync_interval.to_shared());
+    bridge.set_setting_cloud_e2ee_pass(cfg.cloud_sync_e2ee_pass.to_shared());
+    bridge.set_setting_webdav_url(cfg.cloud_sync_webdav_url.to_shared());
+    bridge.set_setting_webdav_user(cfg.cloud_sync_webdav_user.to_shared());
+    bridge.set_setting_webdav_pass(cfg.cloud_sync_webdav_pass.to_shared());
+    bridge.set_setting_webdav_dir(cfg.cloud_sync_webdav_dir.to_shared());
+    bridge.set_setting_s3_endpoint(cfg.cloud_sync_s3_endpoint.to_shared());
+    bridge.set_setting_s3_bucket(cfg.cloud_sync_s3_bucket.to_shared());
+    bridge.set_setting_s3_region(cfg.cloud_sync_s3_region.to_shared());
+    bridge.set_setting_s3_key_id(cfg.cloud_sync_s3_key_id.to_shared());
+    bridge.set_setting_s3_access_key(cfg.cloud_sync_s3_access_key.to_shared());
+    bridge.set_setting_gist_id(cfg.cloud_sync_gist_id.to_shared());
+    bridge.set_setting_gist_token(cfg.cloud_sync_gist_token.to_shared());
+    bridge.set_setting_custom_sync_url(cfg.cloud_sync_custom_url.to_shared());
+    bridge.set_setting_custom_sync_client_id(cfg.cloud_sync_custom_client_id.to_shared());
+    bridge.set_setting_custom_sync_token(cfg.cloud_sync_custom_token.to_shared());
 
     // 7. 安全与锁屏策略 (Security & Vault)
-    bridge.set_setting_auto_lock_timeout(cfg.auto_lock_timeout.as_str().into());
+    bridge.set_setting_auto_lock_timeout(cfg.auto_lock_timeout.to_shared());
     bridge.set_setting_lock_on_minimize(cfg.lock_on_minimize);
     bridge.set_setting_biometric_unlock(cfg.biometric_unlock);
     bridge.set_setting_clear_clipboard_timeout(cfg.clear_clipboard_timeout);
@@ -177,12 +178,12 @@ pub(crate) fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &sma
     // 8. 日志与追踪级别 (Diagnostics & Tracing)
     let cur_lvl = if cfg.log_level.is_empty() { "INFO".to_string() } else { cfg.log_level.to_uppercase() };
     crate::debug::tracing_layer::set_global_runtime_log_level(&cur_lvl);
-    bridge.set_setting_log_level(cur_lvl.as_str().into());
+    bridge.set_setting_log_level(cur_lvl.to_shared());
 
     // 9. AI 助手配置与大模型推理 (AI Copilot & Endpoints)
-    bridge.set_setting_ai_provider(cfg.ai_active_provider.as_str().into());
-    bridge.set_setting_ai_system_prompt(cfg.ai_system_prompt.as_str().into());
-    bridge.set_setting_ai_auto_audit_level(cfg.ai_auto_audit_level.as_str().into());
+    bridge.set_setting_ai_provider(cfg.ai_active_provider.to_shared());
+    bridge.set_setting_ai_system_prompt(cfg.ai_system_prompt.to_shared());
+    bridge.set_setting_ai_auto_audit_level(cfg.ai_auto_audit_level.to_shared());
 
     if !cfg.ai_endpoints.is_empty() {
         let mut slint_endpoints: Vec<crate::generated::AiEndpointProfile> = Vec::new();
@@ -190,21 +191,21 @@ pub(crate) fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &sma
 
         for ep in &cfg.ai_endpoints {
             let slint_ep = crate::generated::AiEndpointProfile {
-                id: ep.id.as_str().into(),
-                name: ep.name.as_str().into(),
-                base_url: ep.base_url.as_str().into(),
-                api_key: ep.api_key.as_str().into(),
-                api_mode: ep.api_mode.as_str().into(),
-                selected_model: ep.selected_model.as_str().into(),
-                models_csv: ep.models_csv.as_str().into(),
+                id: ep.id.to_shared(),
+                name: ep.name.to_shared(),
+                base_url: ep.base_url.to_shared(),
+                api_key: ep.api_key.to_shared(),
+                api_mode: ep.api_mode.to_shared(),
+                selected_model: ep.selected_model.to_shared(),
+                models_csv: ep.models_csv.to_shared(),
                 is_active: ep.is_active,
-                status_text: ep.status_text.as_str().into(),
-                thinking_degree: ep.thinking_degree.as_str().into(),
+                status_text: ep.status_text.to_shared(),
+                thinking_degree: ep.thinking_degree.to_shared(),
                 timeout_secs: ep.timeout_secs,
                 max_context: ep.max_context,
                 max_retries: ep.max_retries,
-                custom_headers: ep.custom_headers.as_str().into(),
-                temperature: ep.temperature.as_str().into(),
+                custom_headers: ep.custom_headers.to_shared(),
+                temperature: ep.temperature.to_shared(),
             };
             if ep.is_active && active_ep_opt.is_none() {
                 active_ep_opt = Some(ep.clone());
@@ -218,41 +219,41 @@ pub(crate) fn apply_config_to_settings_bridge(bridge: &SettingsBridge, cfg: &sma
             slint_endpoints[0].status_text = "已连接".into();
         }
 
-        bridge.set_setting_ai_endpoints(slint::ModelRc::new(slint::VecModel::from(slint_endpoints)));
+        bridge.set_setting_ai_endpoints(to_model_rc(slint_endpoints));
 
         if let Some(active) = active_ep_opt {
-            bridge.set_active_endpoint_id(active.id.as_str().into());
-            bridge.set_setting_ai_base_url(active.base_url.as_str().into());
-            bridge.set_setting_ai_api_key(active.api_key.as_str().into());
-            bridge.set_setting_ai_model(active.selected_model.as_str().into());
+            bridge.set_active_endpoint_id(active.id.to_shared());
+            bridge.set_setting_ai_base_url(active.base_url.to_shared());
+            bridge.set_setting_ai_api_key(active.api_key.to_shared());
+            bridge.set_setting_ai_model(active.selected_model.to_shared());
 
             let mut models_vec: Vec<slint::SharedString> = Vec::new();
             for m in active.models_csv.split(',') {
                 let trimmed = m.trim();
                 if !trimmed.is_empty() {
-                    models_vec.push(trimmed.into());
+                    models_vec.push(trimmed.to_shared());
                 }
             }
             if models_vec.is_empty() && !active.selected_model.is_empty() {
-                models_vec.push(active.selected_model.as_str().into());
+                models_vec.push(active.selected_model.to_shared());
             }
-            bridge.set_setting_ai_current_models(slint::ModelRc::new(slint::VecModel::from(models_vec)));
+            bridge.set_setting_ai_current_models(to_model_rc(models_vec));
 
             let th = if active.thinking_degree.is_empty() { "medium" } else { &active.thinking_degree };
-            bridge.set_setting_ai_thinking_budget(th.into());
+            bridge.set_setting_ai_thinking_budget(th.to_shared());
             let timeout = if active.timeout_secs <= 0 { 60 } else { active.timeout_secs };
             bridge.set_setting_ai_timeout_secs(timeout);
-            bridge.set_setting_ai_timeout_secs_input(timeout.to_string().into());
+            bridge.set_setting_ai_timeout_secs_input(num_to_shared(timeout));
             let ctx = if active.max_context <= 0 { 32768 } else { active.max_context };
             bridge.set_setting_ai_max_context(ctx);
-            bridge.set_setting_ai_max_context_input(ctx.to_string().into());
+            bridge.set_setting_ai_max_context_input(num_to_shared(ctx));
             let retries = if active.max_retries < 0 { 2 } else { active.max_retries };
             bridge.set_setting_ai_max_retries(retries);
-            bridge.set_setting_ai_max_retries_input(retries.to_string().into());
-            bridge.set_setting_ai_custom_headers(active.custom_headers.as_str().into());
+            bridge.set_setting_ai_max_retries_input(num_to_shared(retries));
+            bridge.set_setting_ai_custom_headers(active.custom_headers.to_shared());
             let temp_str = if active.temperature.is_empty() { "0.3" } else { &active.temperature };
             bridge.set_setting_ai_temperature(temp_str.parse::<f32>().unwrap_or(0.3));
-            bridge.set_setting_ai_temperature_input(temp_str.into());
+            bridge.set_setting_ai_temperature_input(temp_str.to_shared());
         }
     }
 }
@@ -340,8 +341,8 @@ pub(crate) fn register_settings_handlers(window: &AppWindow, ctx: &AppContext) {
 
     // 3. 界面字体系统与内置字体检测 (UI Font Discovery & Switching)
     let available_fonts = detect_system_and_builtin_fonts();
-    let font_slint_list: Vec<slint::SharedString> = available_fonts.iter().map(|f| f.as_str().into()).collect();
-    bridge.set_available_ui_fonts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(font_slint_list))));
+    let font_slint_list: Vec<slint::SharedString> = available_fonts.iter().map(|f| f.to_shared()).collect();
+    bridge.set_available_ui_fonts(to_model_rc(font_slint_list));
 
     // 异步加载初始持久化配置到 SettingsBridge (0ms UI 阻塞)
     let storage_init = ctx.core_state.storage();

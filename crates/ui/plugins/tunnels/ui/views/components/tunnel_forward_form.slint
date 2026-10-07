@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // 端口转发专属配置表单 (Tunnel Forward Form)
 // 适配 Local (-L), Remote (-R), Dynamic (-D), ReverseDynamic 4 大模式
 // -----------------------------------------------------------------------------
@@ -8,7 +8,7 @@ import { AppFormItem } from "@common/shared/base/app-form-item.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 import { AppTextArea } from "@common/shared/base/app-text-area.slint";
 
-export component TunnelForwardForm inherits VerticalLayout {
+component TunnelForwardForm inherits VerticalLayout {
     in-out property <string> form-type: "Local";
     in property <bool> is-create-mode: false;
     in property <bool> is-editing: false;
@@ -192,7 +192,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                 VerticalLayout {
                     alignment: center;
                     Image {
-                        source: @image-url("../../../assets/icons/server.svg");
+                        source: @image-url("../../assets/icons/server.svg");
                         width: 14px;
                         height: 14px;
                         colorize: root.form-ssh-host-name != "" ? AppTheme.accent : AppTheme.secondary-foreground;
@@ -214,7 +214,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                 if root.is-create-mode || root.is-editing: VerticalLayout {
                     alignment: center;
                     Image {
-                        source: @image-url("../../../assets/icons/chevron-down.svg");
+                        source: @image-url("../../assets/icons/chevron-down.svg");
                         width: 12px;
                         height: 12px;
                         colorize: host-picker-btn-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
@@ -354,7 +354,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                     VerticalLayout {
                         alignment: center;
                         Image {
-                            source: @image-url("../../../assets/icons/terminal.svg");
+                            source: @image-url("../../assets/icons/terminal.svg");
                             width: 13px;
                             height: 13px;
                             image-fit: contain;
@@ -405,7 +405,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                     VerticalLayout {
                         alignment: center;
                         Image {
-                            source: @image-url("../../../assets/icons/server.svg");
+                            source: @image-url("../../assets/icons/server.svg");
                             width: 13px;
                             height: 13px;
                             image-fit: contain;
@@ -470,7 +470,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                         border-width: 1px;
                         border-color: root.form-auto-reconnect ? AppTheme.accent : AppTheme.border;
                         if root.form-auto-reconnect: Image {
-                            source: @image-url("../../../assets/icons/check.svg");
+                            source: @image-url("../../assets/icons/check.svg");
                             width: 9px;
                             height: 9px;
                             image-fit: contain;
@@ -515,7 +515,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                         border-width: 1px;
                         border-color: root.form-compression ? AppTheme.accent : AppTheme.border;
                         if root.form-compression: Image {
-                            source: @image-url("../../../assets/icons/check.svg");
+                            source: @image-url("../../assets/icons/check.svg");
                             width: 9px;
                             height: 9px;
                             image-fit: contain;
@@ -560,7 +560,7 @@ export component TunnelForwardForm inherits VerticalLayout {
                         border-width: 1px;
                         border-color: root.form-remote-dns ? AppTheme.accent : AppTheme.border;
                         if root.form-remote-dns: Image {
-                            source: @image-url("../../../assets/icons/check.svg");
+                            source: @image-url("../../assets/icons/check.svg");
                             width: 9px;
                             height: 9px;
                             image-fit: contain;
@@ -601,3 +601,5 @@ export component TunnelForwardForm inherits VerticalLayout {
         }
     }
 }
+
+export { TunnelForwardForm }

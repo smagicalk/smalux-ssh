@@ -3,9 +3,8 @@
 //! 负责凭据中心 (Master-Detail 布局) 的列表检索、详情回显、实时编辑保存、一键生成密钥/强密码与安全复制。
 //! 通过 `CoreState::events()` (通用强类型事件分发器 `EventDispatcher`) 显式广播领域事件，驱动跨模块协同与安全审计。
 
-use std::rc::Rc;
 use std::sync::{Arc, LazyLock, RwLock};
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::ComponentHandle;
 use smagical_core::domain::credential::{CredentialRecord, CredentialType};
 use smagical_core::event::{
     CredentialCopyType, CredentialDeletedEvent, CredentialSavedEvent,
@@ -14,6 +13,7 @@ use smagical_core::event::{
 };
 use smagical_core::{AppStorage, CoreState};
 
+use crate::common::{matches_any_ignore_case, ToSharedString};
 use crate::generated::{AppWindow, CredentialItemData, CredentialsBridge};
 use crate::handlers::AppContext;
 
@@ -40,19 +40,19 @@ pub(crate) fn load_credential_into_form(window: &AppWindow, cred: &CredentialRec
     let bridge = window.global::<CredentialsBridge>();
     bridge.set_is_credential_create_mode(false);
     bridge.set_is_credential_editing(false);
-    bridge.set_active_credential_id(cred.id.clone().into());
-    bridge.set_credential_form_id(cred.id.clone().into());
-    bridge.set_credential_form_name(cred.name.clone().into());
-    bridge.set_credential_form_type(cred.cred_type.as_str().into());
-    bridge.set_credential_form_algorithm(cred.algorithm.clone().into());
-    bridge.set_credential_form_username(cred.username.clone().unwrap_or_default().into());
-    bridge.set_credential_form_secret_data(cred.secret_data.clone().into());
-    bridge.set_credential_form_passphrase(cred.passphrase.clone().unwrap_or_default().into());
-    bridge.set_credential_form_public_key(cred.public_key.clone().unwrap_or_default().into());
-    bridge.set_credential_form_fingerprint(cred.fingerprint.clone().unwrap_or_default().into());
-    bridge.set_credential_form_notes(cred.notes.clone().into());
+    bridge.set_active_credential_id(cred.id.to_shared());
+    bridge.set_credential_form_id(cred.id.to_shared());
+    bridge.set_credential_form_name(cred.name.to_shared());
+    bridge.set_credential_form_type(cred.cred_type.as_str().to_shared());
+    bridge.set_credential_form_algorithm(cred.algorithm.to_shared());
+    bridge.set_credential_form_username(cred.username.to_shared());
+    bridge.set_credential_form_secret_data(cred.secret_data.to_shared());
+    bridge.set_credential_form_passphrase(cred.passphrase.to_shared());
+    bridge.set_credential_form_public_key(cred.public_key.to_shared());
+    bridge.set_credential_form_fingerprint(cred.fingerprint.to_shared());
+    bridge.set_credential_form_notes(cred.notes.to_shared());
     bridge.set_credential_form_bound_host_count(cred.bound_host_count as i32);
-    bridge.set_credential_form_updated_at(cred.updated_at.clone().into());
+    bridge.set_credential_form_updated_at(cred.updated_at.to_shared());
 }
 
 /// 重置右侧详情面板为新建空白模式。
@@ -117,16 +117,21 @@ pub(crate) fn render_credentials_ui(
                 return false;
             }
 
-            // 2. 关键词模糊搜索
+            // 2. 关键词模糊搜索 (零堆分配匹配)
             if query_lower.is_empty() {
                 return true;
             }
 
-            c.name.to_lowercase().contains(&query_lower)
-                || c.algorithm.to_lowercase().contains(&query_lower)
-                || c.notes.to_lowercase().contains(&query_lower)
-                || c.username.as_deref().unwrap_or_default().to_lowercase().contains(&query_lower)
-                || c.fingerprint.as_deref().unwrap_or_default().to_lowercase().contains(&query_lower)
+            matches_any_ignore_case(
+                &[
+                    &c.name,
+                    &c.algorithm,
+                    &c.notes,
+                    c.username.as_deref().unwrap_or_default(),
+                    c.fingerprint.as_deref().unwrap_or_default(),
+                ],
+                &query_lower,
+            )
         })
         .cloned()
         .collect();
@@ -140,17 +145,17 @@ pub(crate) fn render_credentials_ui(
     let ui_items: Vec<CredentialItemData> = filtered_records
         .iter()
         .map(|c| CredentialItemData {
-            id: c.id.clone().into(),
-            name: c.name.clone().into(),
-            cred_type: c.cred_type.as_str().into(),
-            algorithm: c.algorithm.clone().into(),
-            username: c.username.clone().unwrap_or_default().into(),
-            fingerprint: c.fingerprint.clone().unwrap_or_default().into(),
-            public_key: c.public_key.clone().unwrap_or_default().into(),
+            id: c.id.to_shared(),
+            name: c.name.to_shared(),
+            cred_type: c.cred_type.as_str().to_shared(),
+            algorithm: c.algorithm.to_shared(),
+            username: c.username.to_shared(),
+            fingerprint: c.fingerprint.to_shared(),
+            public_key: c.public_key.to_shared(),
             has_passphrase: c.passphrase.is_some(),
             bound_host_count: c.bound_host_count as i32,
-            updated_at: c.updated_at.clone().into(),
-            notes: c.notes.clone().into(),
+            updated_at: c.updated_at.to_shared(),
+            notes: c.notes.to_shared(),
         })
         .collect();
 
@@ -176,8 +181,11 @@ pub(crate) fn render_credentials_ui(
         }
     }
 
-    let model: ModelRc<CredentialItemData> = Rc::new(VecModel::from(ui_items)).into();
-    bridge.set_credentials(model);
+    crate::store::diff::update_model_rc_in_place(
+        &bridge.get_credentials(),
+        ui_items,
+        |m| bridge.set_credentials(m),
+    );
     bridge.set_credential_filter_category(filter_cat.into());
     bridge.set_credential_search_query(search_q.into());
 }
@@ -204,6 +212,13 @@ pub(crate) fn sync_credentials_ui_async(
             }
         });
     });
+}
+
+/// 显式更新凭据内存缓存
+pub(crate) fn update_credentials_cache(creds: Vec<CredentialRecord>) {
+    if let Ok(mut cache) = CREDENTIALS_CACHE.write() {
+        *cache = creds;
+    }
 }
 
 /// 基于内存缓存快速同步凭据列表至 Slint UI (0ms 瞬时响应，避免任何磁盘 IO 阻塞)
@@ -373,6 +388,7 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
     let notif_save = ctx.notifications.clone();
     bridge.on_save_credential(move |id, name, cred_type, algorithm, username, secret_data, passphrase, public_key, fingerprint, notes| {
         if let Some(w) = window_weak.upgrade() {
+            let bridge = w.global::<CredentialsBridge>();
             let id_str = if id.is_empty() {
                 format!("cred-{}", &uuid::Uuid::new_v4().to_string()[..8])
             } else {
@@ -391,22 +407,37 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
             let pub_opt = if public_key.is_empty() { None } else { Some(public_key.to_string()) };
             let fp_opt = if fingerprint.is_empty() { None } else { Some(fingerprint.to_string()) };
 
-            let bridge = w.global::<CredentialsBridge>();
-            let record = CredentialRecord {
+            let mut record = CredentialRecord {
                 id: id_str.clone(),
                 name: name_str.clone(),
                 cred_type: ctype,
                 algorithm: algorithm.to_string(),
                 username: user_opt.clone(),
                 secret_data: secret_data.to_string(),
-                passphrase: pass_opt,
-                public_key: pub_opt,
+                passphrase: pass_opt.clone(),
+                public_key: pub_opt.clone(),
                 fingerprint: fp_opt.clone(),
                 bound_host_count: bridge.get_credential_form_bound_host_count() as usize,
                 created_at: "2026-09-01 12:00:00".to_string(),
                 updated_at: "2026-09-01 14:40:00".to_string(),
                 notes: notes.to_string(),
             };
+
+            // 若为 SSH 密钥且直接输入了私钥，自动解析推导公钥、指纹与识别算法
+            if record.cred_type == CredentialType::Key && !record.secret_data.trim().is_empty() {
+                let keygen_svc = core_state_save.keygen();
+                if let Ok(info) = keygen_svc.parse_private_key(&record.secret_data, pass_opt.as_deref()) {
+                    if record.public_key.is_none() && info.public_key_openssh.is_some() {
+                        record.public_key = info.public_key_openssh.clone();
+                    }
+                    if record.fingerprint.is_none() && info.fingerprint.is_some() {
+                        record.fingerprint = info.fingerprint.clone();
+                    }
+                    if !info.algorithm.is_empty() && info.algorithm != "Unknown" {
+                        record.algorithm = info.algorithm.clone();
+                    }
+                }
+            }
 
             let is_new = id.is_empty();
             let storage = core_state_save.storage().clone();
@@ -694,6 +725,203 @@ pub(crate) fn register_credential_handlers(window: &AppWindow, ctx: &AppContext)
                 Err(err) => {
                     tracing::error!(target: "smagical_ui::credentials", "现场生成密钥对失败: {:?}", err);
                     notif_gen_key.error("密钥生成失败", format!("生成密钥异常: {}", err));
+                }
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 11b. 打开/关闭生成密钥对模态弹窗回调
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    bridge.on_open_generate_key_modal(move || {
+        if let Some(w) = window_weak.upgrade() {
+            w.global::<CredentialsBridge>().set_is_generate_key_modal_open(true);
+        }
+    });
+
+    let window_weak = window.as_weak();
+    bridge.on_close_generate_key_modal(move || {
+        if let Some(w) = window_weak.upgrade() {
+            w.global::<CredentialsBridge>().set_is_generate_key_modal_open(false);
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 11c. 高级密钥对生成回调 (带算法、口令保护与自定义注释)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_adv = ctx.core_state.clone();
+    let notif_adv = ctx.notifications.clone();
+    bridge.on_generate_key_pair_advanced(move |algorithm, passphrase, comment| {
+        if let Some(w) = window_weak.upgrade() {
+            let algo = algorithm.to_string();
+            let pass_str = passphrase.to_string();
+            let pass_opt = if pass_str.trim().is_empty() { None } else { Some(pass_str.as_str()) };
+            let comment_str = if comment.trim().is_empty() {
+                format!("smalux_{}@smalux.io", &uuid::Uuid::new_v4().to_string()[..8])
+            } else {
+                comment.to_string()
+            };
+
+            let keygen_svc = core_state_adv.keygen();
+            let (algo_type, bits) = match algo.to_ascii_uppercase().as_str() {
+                "RSA-4096" => (smagical_core::service::keygen::KeyAlgorithm::Rsa, Some(4096)),
+                "RSA-2048" | "RSA" => (smagical_core::service::keygen::KeyAlgorithm::Rsa, Some(2048)),
+                "ECDSA-256" | "ECDSA" => (smagical_core::service::keygen::KeyAlgorithm::EcdsaP256, None),
+                _ => (smagical_core::service::keygen::KeyAlgorithm::Ed25519, None),
+            };
+
+            match keygen_svc.generate_keypair(algo_type, bits, pass_opt) {
+                Ok(keypair) => {
+                    let mut pub_key = keypair.public_key_openssh;
+                    if !comment_str.is_empty() {
+                        let parts: Vec<&str> = pub_key.split_whitespace().collect();
+                        if parts.len() == 2 {
+                            pub_key = format!("{pub_key} {comment_str}");
+                        }
+                    }
+                    let fp = keypair.fingerprint;
+                    let priv_key = keypair.private_key_pem;
+
+                    let bridge = w.global::<CredentialsBridge>();
+                    bridge.set_credential_form_algorithm(algo.clone().into());
+                    bridge.set_credential_form_secret_data(priv_key.into());
+                    bridge.set_credential_form_passphrase(pass_str.into());
+                    bridge.set_credential_form_public_key(pub_key.into());
+                    bridge.set_credential_form_fingerprint(fp.clone().into());
+                    bridge.set_is_generate_key_modal_open(false);
+
+                    tracing::info!(
+                        target: "smagical_ui::credentials",
+                        "现场生成全新 SSH 密钥对成功: 算法='{}', 公钥指纹=[{}]",
+                        algo, fp
+                    );
+                    core_state_adv.events().dispatch(&KeyGeneratedEvent {
+                        algorithm: algo.clone(),
+                        fingerprint: fp.clone(),
+                    });
+                    notif_adv.success("密钥生成成功", format!("已生成全新 {} 密钥对并填入表单", algo));
+                }
+                Err(err) => {
+                    tracing::error!(target: "smagical_ui::credentials", "现场生成密钥对失败: {:?}", err);
+                    notif_adv.error("密钥生成失败", format!("生成密钥异常: {}", err));
+                }
+            }
+        }
+    });
+
+    // -------------------------------------------------------------------------
+    // 11d. 从本地文件直接导入私钥回调 (异步 rfd 原生文件选择与自动反解析)
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let keygen_import = ctx.core_state.keygen();
+    let notif_import = ctx.notifications.clone();
+    bridge.on_import_key_from_file(move || {
+        let w_weak = window_weak.clone();
+        let keygen_svc = keygen_import.clone();
+        let notif = notif_import.clone();
+
+        crate::async_util::spawn_async(async move {
+            let default_dir = directories::BaseDirs::new()
+                .map(|b| b.home_dir().join(".ssh"))
+                .filter(|p| p.exists());
+
+            let picked = tokio::task::spawn_blocking(move || {
+                let mut dialog = rfd::FileDialog::new()
+                    .set_title("选择 SSH 私钥文件 (支持 id_*, *.pem, *.key, *.ppk)");
+                if let Some(ref dir) = default_dir {
+                    dialog = dialog.set_directory(dir);
+                }
+                dialog
+                    .add_filter("SSH 私钥文件 (*.pem; *.key; *.ppk; id_*)", &["pem", "key", "ppk", "*"])
+                    .add_filter("所有文件 (*.*)", &["*"])
+                    .pick_file()
+            }).await.unwrap_or(None);
+
+            if let Some(file_path) = picked {
+                let filename = file_path
+                    .file_name()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_else(|| "id_rsa".to_string());
+
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        let keygen_for_ui = keygen_svc.clone();
+                        let _ = slint::invoke_from_event_loop(move || {
+                            if let Some(w) = w_weak.upgrade() {
+                                let bridge = w.global::<CredentialsBridge>();
+                                bridge.set_credential_form_secret_data(content.clone().into());
+
+                                // 若当前凭据名称为空，自动以文件名命名
+                                let cur_name = bridge.get_credential_form_name().to_string();
+                                if cur_name.trim().is_empty() || cur_name == "未命名凭据" {
+                                    bridge.set_credential_form_name(filename.clone().into());
+                                }
+
+                                // 自动触发私钥解析推导公钥、算法和指纹
+                                let pass_str = bridge.get_credential_form_passphrase().to_string();
+                                let pass_opt = if pass_str.trim().is_empty() { None } else { Some(pass_str.as_str()) };
+                                if let Ok(info) = keygen_for_ui.parse_private_key(&content, pass_opt) {
+                                    bridge.set_credential_form_algorithm(info.algorithm.into());
+                                    if let Some(pub_k) = info.public_key_openssh {
+                                        bridge.set_credential_form_public_key(pub_k.into());
+                                    }
+                                    if let Some(fp) = info.fingerprint {
+                                        bridge.set_credential_form_fingerprint(fp.into());
+                                    } else if info.is_encrypted {
+                                        bridge.set_credential_form_fingerprint("🔒 私钥受口令保护，请输入下方 Passphrase 自动解析公钥".into());
+                                    }
+                                }
+
+                                notif.success("私钥导入成功", format!("已载入密钥文件 [{}] 并完成格式识别", filename));
+                            }
+                        });
+                    }
+                    Err(err) => {
+                        notif.error("文件读取失败", format!("无法读取文件 [{}]: {}", filename, err));
+                    }
+                }
+            }
+        });
+    });
+
+    // -------------------------------------------------------------------------
+    // 11e. 输入私钥即时自动解析推导公钥与指纹回调
+    // -------------------------------------------------------------------------
+    let window_weak = window.as_weak();
+    let core_state_parse = ctx.core_state.clone();
+    bridge.on_parse_private_key(move |secret_data, passphrase| {
+        if let Some(w) = window_weak.upgrade() {
+            let sec_str = secret_data.to_string();
+            let pass_str = passphrase.to_string();
+            let pass_opt = if pass_str.trim().is_empty() { None } else { Some(pass_str.as_str()) };
+            let keygen_svc = core_state_parse.keygen();
+
+            let bridge = w.global::<CredentialsBridge>();
+            if sec_str.trim().is_empty() {
+                bridge.set_credential_form_public_key("".into());
+                bridge.set_credential_form_fingerprint("".into());
+                return;
+            }
+
+            match keygen_svc.parse_private_key(&sec_str, pass_opt) {
+                Ok(info) => {
+                    bridge.set_credential_form_algorithm(info.algorithm.into());
+                    if let Some(pub_k) = info.public_key_openssh {
+                        bridge.set_credential_form_public_key(pub_k.into());
+                    }
+                    if let Some(fp) = info.fingerprint {
+                        bridge.set_credential_form_fingerprint(fp.into());
+                    } else if info.is_encrypted {
+                        bridge.set_credential_form_fingerprint("🔒 私钥受口令保护，请输入下方 Passphrase 自动解析公钥".into());
+                        bridge.set_credential_form_public_key("".into());
+                    }
+                }
+                Err(_) => {
+                    if sec_str.contains("PRIVATE KEY") {
+                        bridge.set_credential_form_fingerprint("⚠️ 私钥格式异常或口令不匹配".into());
+                    }
                 }
             }
         }

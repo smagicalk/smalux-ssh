@@ -59,7 +59,11 @@ fn set_autostart_enabled(_enabled: bool) -> std::io::Result<()> {
 /// # 参数
 /// - `window`: Slint 主窗口句柄引用
 /// - `ctx`: 全局应用共享上下文对象引用
-pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
+pub(crate) fn register_window_handlers(
+    window: &AppWindow,
+    ctx: &AppContext,
+    lifecycle: &std::rc::Rc<crate::view_lifecycle::ViewLifecycleManager>,
+) {
     let wb = window.global::<WindowBridge>();
     // -------------------------------------------------------------------------
     // 1. 切换主题配色方案回调
@@ -234,9 +238,10 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     });
 
     // -------------------------------------------------------------------------
-    // 2.2 全局统一路由跳转导航回调 (Navigation Router)
+    // 2.2 全局统一路由跳转导航与生命周期回调 (Navigation Router & Lifecycle)
     // -------------------------------------------------------------------------
     let core_state_nav = ctx.core_state.clone();
+    let lifecycle_nav = Rc::clone(lifecycle);
     wb.on_navigate_to(move |target_tab, section| {
         let t_str = target_tab.as_str();
         let s_str = section.as_str();
@@ -246,6 +251,40 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
         }
         core_state_nav.navigate_to(req);
         tracing::info!(target: "smagical_ui::navigation", "路由中枢成功处理跳转请求: [{}] (section: {:?})", t_str, if s_str.is_empty() { None } else { Some(s_str) });
+        lifecycle_nav.sync_lifecycle();
+    });
+
+    let lifecycle_drawer = Rc::clone(lifecycle);
+    wb.on_toggle_left_drawer(move || {
+        lifecycle_drawer.sync_lifecycle();
+    });
+
+    let lifecycle_main = Rc::clone(lifecycle);
+    wb.on_switch_main_view(move |_view| {
+        lifecycle_main.sync_lifecycle();
+    });
+
+    let core_state_tab = ctx.core_state.clone();
+    let lifecycle_tab = Rc::clone(lifecycle);
+    let window_weak_tab = window.as_weak();
+    wb.on_switch_left_tab(move |tab_id| {
+        core_state_tab.events().dispatch(&smagical_core::event::NavigationTabClickedEvent {
+            tab_id: tab_id.to_string(),
+            query: "".into(),
+        });
+        tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
+        lifecycle_tab.sync_lifecycle();
+        if let Some(w) = window_weak_tab.upgrade() {
+            if tab_id == "debug" {
+                if w.global::<crate::generated::DebugBridge>().get_is_open() {
+                    crate::debug_ui::sync_ui_debug_logs(&w);
+                } else {
+                    crate::debug_ui::unload_ui_debug_logs(&w);
+                }
+            } else if w.global::<crate::generated::DebugBridge>().get_is_open() {
+                crate::debug_ui::sync_ui_debug_logs(&w);
+            }
+        }
     });
 
 
@@ -673,7 +712,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
     let sync_timer = Box::leak(Box::new(slint::Timer::default()));
     sync_timer.start(
         slint::TimerMode::Repeated,
-        std::time::Duration::from_millis(150),
+        std::time::Duration::from_millis(300),
         move || {
             if let Some(w) = window_weak_sync.upgrade() {
                 let is_max = w.window().is_maximized();
@@ -799,7 +838,11 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
             });
 
             // 1. 优先从内存 LRU 缓存中极速读取（0ms，不卡顿）
-            let cached_img_opt = if !path_str.is_empty() && std::path::Path::new(&path_str).exists() {
+            let cached_img_opt = if mode_str == "none" || path_str.is_empty() {
+                wallpaper_cache_ref.borrow_mut().clear();
+                crate::handlers::theme_handlers::clear_wallpaper_raw_cache();
+                Some(slint::Image::default())
+            } else if std::path::Path::new(&path_str).exists() {
                 let mut cache = wallpaper_cache_ref.borrow_mut();
                 if let Some(cached) = cache.get(&path_str) {
                     Some(cached.clone())
@@ -807,7 +850,7 @@ pub(crate) fn register_window_handlers(window: &AppWindow, ctx: &AppContext) {
                     if let Some((raw, rw, rh)) = raw_c.get(&path_str) {
                         let pixel_buffer = slint::SharedPixelBuffer::clone_from_slice(raw, *rw, *rh);
                         let loaded = slint::Image::from_rgba8(pixel_buffer);
-                        if cache.len() >= 4 {
+                        if cache.len() >= 2 {
                             if let Some(oldest) = cache.keys().next().cloned() {
                                 cache.remove(&oldest);
                             }

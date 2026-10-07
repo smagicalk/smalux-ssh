@@ -1,8 +1,8 @@
 //! 右侧辅助抽屉动态注册模型与 Slint UI 视图数据同步服务。
 
-use std::rc::Rc;
 use smagical_core::CoreState;
 use slint::ComponentHandle;
+use crate::common::to_model_rc;
 use crate::generated::{AppWindow, RightToolBarItemData, WindowBridge};
 
 /// 根据语言环境解析右侧伴生工具栏说明提示 (多语言国际化)
@@ -41,7 +41,7 @@ pub fn sync_right_panel_ui(window: &AppWindow, core_state: &CoreState) {
         .collect();
 
     let wb = window.global::<WindowBridge>();
-    wb.set_right_tool_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(items))));
+    wb.set_right_tool_items(to_model_rc(items));
 
     tracing::debug!(target: "smagical_ui::right_panel", "右侧面板注册项已同步 (共 {} 项)", guard.list_visible().len());
 }

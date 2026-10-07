@@ -93,7 +93,64 @@ impl Default for TerminalPalette {
 }
 
 /// 内置官方开源 JetBrains Mono 等宽字体二进制数据 (OFL 许可)
-const EMBEDDED_JETBRAINS_MONO: &[u8] = smagical_ui_view::JETBRAINS_MONO_BYTES;
+const EMBEDDED_JETBRAINS_MONO: &[u8] = crate::JETBRAINS_MONO_BYTES;
+
+/// 单字符单元格渲染紧凑结构体，用于单帧刮板池复用 (0 堆内存开销)
+#[derive(Clone, Copy)]
+pub struct RenderCell {
+    /// 视口列索引
+    pub col: u32,
+    /// 视口行索引
+    pub screen_row: u32,
+    /// Alacritty 网格物理行号 (支持负数历史回滚行)
+    pub line_i32: i32,
+    /// 字符内容
+    pub c: char,
+    /// 前景色彩定义
+    pub fg: AnsiColor,
+    /// 背景色彩定义
+    pub bg: AnsiColor,
+    /// 单元格样式标志位 (宽字符、反色、粗体、下划线等)
+    pub flags: alacritty_terminal::term::cell::Flags,
+}
+
+/// 预分配单帧渲染刮板池，确保 60FPS 渲染热循环 0 堆内存分配
+#[derive(Default)]
+pub struct RenderScratch {
+    /// 预分配复用的单元格收集向量
+    pub display_cells: Vec<RenderCell>,
+    /// 预分配按行分布的字符坐标缓存 (按行索引 0..rows)
+    pub row_chars: Vec<Vec<(usize, char)>>,
+    /// 预分配行高亮匹配结果表
+    pub row_highlights: HashMap<u32, Vec<crate::terminal::highlight::SpanHighlight>>,
+    /// 预分配单行字符串拼装缓冲区
+    pub line_str: String,
+    /// 预分配每行哈希指纹缓存 (按行索引 0..rows)
+    pub row_hashes: Vec<u64>,
+}
+
+impl RenderScratch {
+    /// 重置刮板池各字段，维持已有底层内存容量
+    pub fn reset(&mut self, rows: usize) {
+        self.display_cells.clear();
+        self.row_highlights.clear();
+        self.line_str.clear();
+
+        if self.row_chars.len() < rows {
+            self.row_chars.resize_with(rows, Vec::new);
+        }
+        for r in 0..rows {
+            self.row_chars[r].clear();
+        }
+
+        if self.row_hashes.len() < rows {
+            self.row_hashes.resize(rows, 0);
+        } else {
+            self.row_hashes.truncate(rows);
+            self.row_hashes.fill(0);
+        }
+    }
+}
 
 /// 终端字符点阵光栅化与像素帧生成渲染器。
 pub struct TerminalRenderer {
@@ -125,6 +182,10 @@ pub struct TerminalRenderer {
     pub cursor_blink: bool,
     /// 终端关键词、URL 与 IPv4 语法高亮规则引擎
     pub highlight_engine: crate::terminal::highlight::HighlightEngine,
+    /// 预分配热循环单帧渲染刮板池 (0 堆分配)
+    pub scratch: RenderScratch,
+    /// 全局渲染代际计数器 (调色板/字体等全局参数变更时自增)
+    pub generation: usize,
 }
 
 impl TerminalRenderer {
@@ -136,7 +197,7 @@ impl TerminalRenderer {
         let font_data = get_terminal_monospace_font()
             .ok_or_else(|| "未检索到可用的等宽字体 (JetBrains Mono / Consolas / Cascadia Mono)".to_string())?;
 
-        let font = Font::from_bytes(font_data, FontSettings::default())
+        let font = Font::from_bytes(font_data.as_ref(), FontSettings::default())
             .map_err(|e| format!("解析等宽字体文件失败: {:?}", e))?;
 
         let fallback_font = get_system_cjk_font().and_then(|data| {
@@ -184,6 +245,8 @@ impl TerminalRenderer {
             cursor_style: "block".to_string(),
             cursor_blink: true,
             highlight_engine: crate::terminal::highlight::HighlightEngine::default(),
+            scratch: RenderScratch::default(),
+            generation: 0,
         })
     }
 
@@ -216,6 +279,7 @@ impl TerminalRenderer {
     pub fn update_palette(&mut self, mut palette: TerminalPalette) {
         palette.default_bg[3] = self.palette.default_bg[3];
         self.palette = palette;
+        self.generation = self.generation.wrapping_add(1);
     }
 
     /// 获取当前终端调色板快照。
@@ -267,6 +331,7 @@ impl TerminalRenderer {
         self.baseline = baseline;
         self.ascii_cache = ascii_cache;
         self.glyph_cache.clear();
+        self.generation = self.generation.wrapping_add(1);
 
         Ok(())
     }
@@ -302,6 +367,7 @@ impl TerminalRenderer {
         self.baseline = baseline;
         self.ascii_cache = ascii_cache;
         self.glyph_cache.clear();
+        self.generation = self.generation.wrapping_add(1);
 
         Ok(())
     }
@@ -310,21 +376,121 @@ impl TerminalRenderer {
     pub fn set_background_opacity(&mut self, opacity_pct: u8) {
         let alpha = ((opacity_pct.min(100) as f32 / 100.0) * 255.0).round() as u8;
         self.palette.default_bg[3] = alpha;
+        self.generation = self.generation.wrapping_add(1);
     }
 
     /// 动态设置终端视口内边距留白。
     pub fn set_padding(&mut self, padding_x: u32, padding_y: u32) {
         self.padding_x = padding_x;
         self.padding_y = padding_y;
+        self.generation = self.generation.wrapping_add(1);
     }
 
     /// 获取当前字号。
     pub fn font_size(&self) -> f32 {
         self.font_size
     }
+}
 
+/// 将 ANSI 色彩快速转换为 64 位整型指纹 (用于微秒级行哈希计算)
+#[inline(always)]
+fn ansi_color_to_u64(color: AnsiColor) -> u64 {
+    match color {
+        AnsiColor::Named(named) => named as u64,
+        AnsiColor::Spec(rgb) => ((rgb.r as u64) << 16) | ((rgb.g as u64) << 8) | (rgb.b as u64),
+        AnsiColor::Indexed(idx) => (idx as u64) | 0x1000000,
+    }
+}
 
-    /// 将 `alacritty_terminal` 的网格内容光栅化渲染至 Slint `SharedPixelBuffer<Rgba8Pixel>`。
+impl TerminalRenderer {
+    /// 基于 Ping-Pong 双缓冲与行级脏追踪的高效光栅化。
+    /// 仅对实际发生内容变动、光标移动或选区覆盖的脏行执行局部重绘，
+    /// 其余未变动行完全跳过背景擦除与字形光栅化开销。
+    pub fn render_to_ping_pong(
+        &mut self,
+        term: &alacritty_terminal::Term<TerminalEventListener>,
+        selection: Option<((usize, usize), (usize, usize))>,
+        ping_pong: &mut crate::terminal::double_buffer::PingPongPixelBuffer,
+        session_id: &str,
+    ) {
+        ping_pong.set_session_id(session_id);
+        ping_pong.check_renderer_generation(self.generation);
+
+        let cols = term.columns() as u32;
+        let rows = term.screen_lines() as u32;
+        let display_offset = term.grid().display_offset() as i32;
+        let content = term.renderable_content();
+        let cursor_point = content.cursor.point;
+        let is_cursor_visible = term.mode().contains(TermMode::SHOW_CURSOR) && display_offset == 0;
+        let is_blink_visible = !self.cursor_blink
+            || ((std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() / 530) % 2 == 0);
+
+        let current_cursor = if is_cursor_visible {
+            let cur_row_i32 = cursor_point.line.0 + display_offset;
+            if cur_row_i32 >= 0 && (cur_row_i32 as u32) < rows {
+                Some((cursor_point.column.0, cur_row_i32 as usize, is_blink_visible))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        self.scratch.reset(rows as usize);
+        for cell in content.display_iter {
+            let col = cell.point.column.0 as u32;
+            let screen_row_i32 = cell.point.line.0 + display_offset;
+            if screen_row_i32 >= 0 && (screen_row_i32 as u32) < rows && col < cols {
+                let r = screen_row_i32 as usize;
+                self.scratch.row_chars[r].push((col as usize, cell.c));
+                self.scratch.display_cells.push(RenderCell {
+                    col,
+                    screen_row: screen_row_i32 as u32,
+                    line_i32: cell.point.line.0,
+                    c: cell.c,
+                    fg: cell.fg,
+                    bg: cell.bg,
+                    flags: cell.flags,
+                });
+
+                let cell_hash = (col as u64)
+                    ^ ((cell.c as u64) << 8)
+                    ^ ((cell.flags.bits() as u64) << 32)
+                    ^ (ansi_color_to_u64(cell.fg) << 40)
+                    ^ (ansi_color_to_u64(cell.bg) << 48);
+                self.scratch.row_hashes[r] = self.scratch.row_hashes[r].rotate_left(5) ^ cell_hash;
+            }
+        }
+
+        let dirty_mask = ping_pong.compute_dirty_mask(
+            &self.scratch.row_hashes,
+            current_cursor,
+            selection,
+        );
+
+        if dirty_mask.is_empty() {
+            return;
+        }
+
+        let pixel_buffer = ping_pong.get_back_buffer();
+        self.render_internal_with_collected(
+            term,
+            selection,
+            pixel_buffer,
+            dirty_mask,
+            cursor_point,
+            is_cursor_visible,
+            is_blink_visible,
+        );
+
+        ping_pong.commit_frame_state(
+            &self.scratch.row_hashes,
+            current_cursor,
+            selection,
+        );
+    }
+
+    /// 将 `alacritty_terminal` 的网格内容全量光栅化渲染至 Slint `SharedPixelBuffer<Rgba8Pixel>`。
     ///
     /// # 参数
     /// - `term`: Alacritty 终端状态机实例
@@ -338,9 +504,60 @@ impl TerminalRenderer {
     ) {
         let cols = term.columns() as u32;
         let rows = term.screen_lines() as u32;
+        let display_offset = term.grid().display_offset() as i32;
+        let content = term.renderable_content();
+        let cursor_point = content.cursor.point;
+        let is_cursor_visible = term.mode().contains(TermMode::SHOW_CURSOR) && display_offset == 0;
+        let is_blink_visible = !self.cursor_blink
+            || ((std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() / 530) % 2 == 0);
+
+        self.scratch.reset(rows as usize);
+        for cell in content.display_iter {
+            let col = cell.point.column.0 as u32;
+            let screen_row_i32 = cell.point.line.0 + display_offset;
+            if screen_row_i32 >= 0 && (screen_row_i32 as u32) < rows && col < cols {
+                let r = screen_row_i32 as usize;
+                self.scratch.row_chars[r].push((col as usize, cell.c));
+                self.scratch.display_cells.push(RenderCell {
+                    col,
+                    screen_row: screen_row_i32 as u32,
+                    line_i32: cell.point.line.0,
+                    c: cell.c,
+                    fg: cell.fg,
+                    bg: cell.bg,
+                    flags: cell.flags,
+                });
+            }
+        }
+
+        self.render_internal_with_collected(
+            term,
+            selection,
+            pixel_buffer,
+            crate::terminal::double_buffer::RowDirtyMask::all(),
+            cursor_point,
+            is_cursor_visible,
+            is_blink_visible,
+        );
+    }
+
+    /// 内部核心光栅化引擎：根据行级脏标记掩码选择性光栅化特定行
+    fn render_internal_with_collected(
+        &mut self,
+        _term: &alacritty_terminal::Term<TerminalEventListener>,
+        selection: Option<((usize, usize), (usize, usize))>,
+        pixel_buffer: &mut SharedPixelBuffer<Rgba8Pixel>,
+        dirty_mask: crate::terminal::double_buffer::RowDirtyMask,
+        cursor_point: alacritty_terminal::index::Point,
+        is_cursor_visible: bool,
+        is_blink_visible: bool,
+    ) {
+        if dirty_mask.is_empty() {
+            return;
+        }
+
         let img_width = pixel_buffer.width();
         let img_height = pixel_buffer.height();
-
         if img_width == 0 || img_height == 0 {
             return;
         }
@@ -357,62 +574,71 @@ impl TerminalRenderer {
         let def_bg = self.palette.default_bg;
         let def_fg = self.palette.default_fg;
         let cur_col = self.palette.cursor_color;
+        let padding_x = self.padding_x;
+        let padding_y = self.padding_y;
 
-        // 1. 底色全屏快速填充 (按 32 位整型批量操作，大幅提升高帧率渲染性能)
         let bg_u32 = u32::from_ne_bytes(def_bg);
         let u32_slice: &mut [u32] = unsafe {
             std::slice::from_raw_parts_mut(raw_pixels.as_mut_ptr() as *mut u32, total_bytes / 4)
         };
-        u32_slice.fill(bg_u32);
 
-
-        let display_offset = term.grid().display_offset() as i32;
-        let content = term.renderable_content();
-        let cursor_point = content.cursor.point;
-        let is_cursor_visible = term.mode().contains(TermMode::SHOW_CURSOR) && display_offset == 0;
-        let padding_x = self.padding_x;
-        let padding_y = self.padding_y;
-
-
-        let display_cells: Vec<_> = content.display_iter.collect();
-
-        // 提取可见行文本以执行运维关键词与 URL / IP 语法高亮匹配
-        let mut line_chars: std::collections::BTreeMap<u32, Vec<(usize, char)>> = std::collections::BTreeMap::new();
-        for cell in &display_cells {
-            let col = cell.point.column.0 as u32;
-            let screen_row_i32 = cell.point.line.0 + display_offset;
-            if screen_row_i32 >= 0 && (screen_row_i32 as u32) < rows && col < cols {
-                line_chars.entry(screen_row_i32 as u32).or_default().push((col as usize, cell.c));
-            }
-        }
-
-        let mut row_highlights: std::collections::HashMap<u32, Vec<crate::terminal::highlight::SpanHighlight>> = std::collections::HashMap::new();
-        for (row, mut chars) in line_chars {
-            chars.sort_by_key(|(c, _)| *c);
-            let mut line_str = String::with_capacity(cols as usize);
-            let mut last_col = 0;
-            for (c, ch) in chars {
-                while last_col < c {
-                    line_str.push(' ');
-                    last_col += 1;
+        // 1. 底色填充：全量脏或局部行脏填充 (按 32 位整型批量操作)
+        if dirty_mask.is_all() {
+            u32_slice.fill(bg_u32);
+        } else {
+            let w = img_width as usize;
+            for r in 0..256 {
+                if dirty_mask.is_dirty(r) {
+                    let y_start = (padding_y + r as u32 * cell_height) as usize;
+                    if y_start >= img_height as usize {
+                        break;
+                    }
+                    let y_end = (y_start + cell_height as usize).min(img_height as usize);
+                    for y in y_start..y_end {
+                        let start = y * w;
+                        let end = (start + w).min(u32_slice.len());
+                        u32_slice[start..end].fill(bg_u32);
+                    }
                 }
-                line_str.push(if ch != '\0' { ch } else { ' ' });
-                last_col += 1;
-            }
-            let spans = self.highlight_engine.match_line(&line_str);
-            if !spans.is_empty() {
-                row_highlights.insert(row, spans);
             }
         }
 
-        // 2. 逐字符单元格遍历光栅化 (精准支持回滚历史负行号转换到视口真实行号)
-        for renderable_cell in display_cells {
-            let col = renderable_cell.point.column.0 as u32;
-            let screen_row_i32 = renderable_cell.point.line.0 + display_offset;
-            if screen_row_i32 < 0 || screen_row_i32 as u32 >= rows || col >= cols {
+        // 2. 仅对脏行匹配高亮规则
+        let rows_len = self.scratch.row_chars.len();
+        let mut row_highlights = std::mem::take(&mut self.scratch.row_highlights);
+        for row in 0..rows_len {
+            if !dirty_mask.is_dirty(row) {
                 continue;
             }
-            let row = screen_row_i32 as u32;
+            let chars = &mut self.scratch.row_chars[row];
+            if chars.is_empty() {
+                continue;
+            }
+            chars.sort_unstable_by_key(|(c, _)| *c);
+            self.scratch.line_str.clear();
+            let mut last_col = 0;
+            for &(c, ch) in chars.iter() {
+                while last_col < c {
+                    self.scratch.line_str.push(' ');
+                    last_col += 1;
+                }
+                self.scratch.line_str.push(if ch != '\0' { ch } else { ' ' });
+                last_col += 1;
+            }
+            let spans = self.highlight_engine.match_line(&self.scratch.line_str);
+            if !spans.is_empty() {
+                row_highlights.insert(row as u32, spans);
+            }
+        }
+
+        // 3. 逐字符单元格遍历光栅化 (仅光栅化脏行)
+        let display_cells = std::mem::take(&mut self.scratch.display_cells);
+        for renderable_cell in &display_cells {
+            let row = renderable_cell.screen_row;
+            if !dirty_mask.is_dirty(row as usize) {
+                continue;
+            }
+            let col = renderable_cell.col;
 
             let cell_x = col * cell_width + padding_x;
             let cell_y = row * cell_height + padding_y;
@@ -446,7 +672,6 @@ impl TerminalRenderer {
             };
 
             let flags = renderable_cell.flags;
-            // 宽字符占位符单元格已由前一单元格的 WIDE_CHAR 整体光栅化，跳过以避免右半部字形被覆写
             if flags.contains(alacritty_terminal::term::cell::Flags::WIDE_CHAR_SPACER) {
                 continue;
             }
@@ -481,20 +706,19 @@ impl TerminalRenderer {
                 }
             }
 
-
-            // 处理反色 (Inverse video / 选中或反显)
+            // 处理反色
             if flags.contains(alacritty_terminal::term::cell::Flags::INVERSE) {
                 std::mem::swap(&mut fg_rgba, &mut bg_rgba);
             }
 
-            // 处理暗淡 (Dim / Faint 弱化文字)
+            // 处理暗淡
             if flags.contains(alacritty_terminal::term::cell::Flags::DIM) {
                 fg_rgba[0] /= 2;
                 fg_rgba[1] /= 2;
                 fg_rgba[2] /= 2;
             }
 
-            // 2.1 单元格背景色填充 (若背景不是默认底色，支持宽字符双倍单元格跨度)
+            // 3.1 单元格背景色填充
             if bg_rgba != def_bg {
                 let max_x = (cell_x + slot_width).min(img_width);
                 let max_y = (cell_y + cell_height).min(img_height);
@@ -510,7 +734,7 @@ impl TerminalRenderer {
                 }
             }
 
-            // 2.2 字符字形点阵光栅化 (非隐藏字符，支持 CJK / 宽字符水平居中对齐)
+            // 3.2 字符字形点阵光栅化
             let ch = renderable_cell.c;
             if ch != ' '
                 && ch != '\0'
@@ -549,7 +773,6 @@ impl TerminalRenderer {
                                 continue;
                             }
 
-                            // 伽马/笔画增强 (Stem Darkening & Gamma Correction)，消除暗色背景下细笔画发暗发虚感，呈现饱满锐利的高亮字形
                             let alpha = if raw_alpha >= 180 {
                                 255
                             } else {
@@ -562,7 +785,6 @@ impl TerminalRenderer {
                                 raw_pixels[px_offset + 1] = fg_rgba[1];
                                 raw_pixels[px_offset + 2] = fg_rgba[2];
                             } else {
-                                // Alpha 像素线性插值混合
                                 let inv_a = 255 - alpha;
                                 raw_pixels[px_offset] = ((fg_rgba[0] as u32 * alpha + raw_pixels[px_offset] as u32 * inv_a) / 255) as u8;
                                 raw_pixels[px_offset + 1] = ((fg_rgba[1] as u32 * alpha + raw_pixels[px_offset + 1] as u32 * inv_a) / 255) as u8;
@@ -573,7 +795,7 @@ impl TerminalRenderer {
                 }
             }
 
-            // 2.3 下划线 (Underline) 绘制 (支持 ANSI 原生下划线以及 URL / 高亮规则下划线)
+            // 3.3 下划线绘制
             if flags.contains(alacritty_terminal::term::cell::Flags::UNDERLINE) || is_rule_underline {
                 let line_y = (cell_y as i32 + baseline + 2).min(img_height as i32 - 1);
                 if line_y >= 0 {
@@ -588,7 +810,7 @@ impl TerminalRenderer {
                 }
             }
 
-            // 2.4 删除线 (Strikeout) 绘制
+            // 3.4 删除线绘制
             if flags.contains(alacritty_terminal::term::cell::Flags::STRIKEOUT) {
                 let line_y = (cell_y + cell_height / 2).min(img_height - 1);
                 let row_offset = (line_y * img_width * 4) as usize;
@@ -601,22 +823,17 @@ impl TerminalRenderer {
                 }
             }
 
-
-
-            // 2.5 光标绘制 (支持方块 block、竖线 beam、下划线 underline，支持宽字符双宽与呼吸闪烁)
-            let is_blink_visible = !self.cursor_blink
-                || ((std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() / 530) % 2 == 0);
-
+            // 3.5 光标绘制
             if is_cursor_visible
                 && is_blink_visible
                 && cursor_point.column.0 == col as usize
-                && cursor_point.line.0 == renderable_cell.point.line.0
+                && cursor_point.line.0 == renderable_cell.line_i32
             {
                 let cur_w = if is_wide { slot_width } else { cell_width };
                 let (c_min_x, c_max_x, c_min_y, c_max_y) = match self.cursor_style.as_str() {
                     "beam" => (cell_x, (cell_x + 2).min(img_width), cell_y, (cell_y + cell_height).min(img_height)),
                     "underline" => (cell_x, (cell_x + cur_w).min(img_width), (cell_y + cell_height.saturating_sub(2)).min(img_height), (cell_y + cell_height).min(img_height)),
-                    _ => (cell_x, (cell_x + cur_w).min(img_width), cell_y, (cell_y + cell_height).min(img_height)), // "block"
+                    _ => (cell_x, (cell_x + cur_w).min(img_width), cell_y, (cell_y + cell_height).min(img_height)),
                 };
 
                 for py in c_min_y..c_max_y {
@@ -630,6 +847,10 @@ impl TerminalRenderer {
                 }
             }
         }
+
+        // 将刮板缓冲区所有权归还，供下一帧光栅化复用容量
+        self.scratch.display_cells = display_cells;
+        self.scratch.row_highlights = row_highlights;
     }
 
     /// 高速检索或按需光栅化字符点阵，优先使用 O(1) 扁平 ASCII 数组。
@@ -644,6 +865,10 @@ impl TerminalRenderer {
             self.ascii_cache[code].as_ref().unwrap()
         } else {
             if !self.glyph_cache.contains_key(&ch) {
+                // 1,024 槽上限保护与轻量 GC：避免长时高频日志/多语言/Emoji 输出导致显存点阵无界膨胀
+                if self.glyph_cache.len() >= 1024 {
+                    self.glyph_cache.clear();
+                }
                 let (metrics, bitmap) = if self.font.lookup_glyph_index(ch) != 0 {
                     self.font.rasterize(ch, self.font_size)
                 } else if let Some(fb) = &self.fallback_font {
@@ -708,11 +933,11 @@ impl TerminalRenderer {
     }
 }
 
-/// 在当前操作系统或内置资源中搜寻可用的等宽字体二进制数据。
-fn get_terminal_monospace_font() -> Option<Vec<u8>> {
-    // 1. 优先使用官方开源 JetBrains Mono 嵌入字体
+/// 在当前操作系统或内置资源中搜寻可用的等宽字体二进制数据 (零拷贝共享，消除 400KB+ 堆分配)。
+fn get_terminal_monospace_font() -> Option<std::borrow::Cow<'static, [u8]>> {
+    // 1. 优先使用官方开源 JetBrains Mono 嵌入字体 (直接提供静态内存切片引用)
     if !EMBEDDED_JETBRAINS_MONO.is_empty() {
-        return Some(EMBEDDED_JETBRAINS_MONO.to_vec());
+        return Some(std::borrow::Cow::Borrowed(EMBEDDED_JETBRAINS_MONO));
     }
 
     #[cfg(windows)]
@@ -742,7 +967,7 @@ fn get_terminal_monospace_font() -> Option<Vec<u8>> {
 
     for path in &candidate_paths {
         if let Ok(data) = std::fs::read(path) {
-            return Some(data);
+            return Some(std::borrow::Cow::Owned(data));
         }
     }
     None

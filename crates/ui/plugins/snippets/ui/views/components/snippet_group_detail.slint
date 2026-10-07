@@ -7,7 +7,7 @@
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 
-export component SnippetGroupDetail inherits Rectangle {
+component SnippetGroupDetail inherits Rectangle {
     in property <string> edit_id: "";
     in property <string> edit_title: "";
 
@@ -31,7 +31,7 @@ export component SnippetGroupDetail inherits Rectangle {
                 alignment: center;
 
                 Image {
-                    source: @image-url("../../../assets/icons/folder.svg");
+                    source: @image-url("../../assets/icons/folder.svg");
                     width: 16px;
                     height: 16px;
                     image-fit: contain;
@@ -99,3 +99,5 @@ export component SnippetGroupDetail inherits Rectangle {
         }
     }
 }
+
+export { SnippetGroupDetail }

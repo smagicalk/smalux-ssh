@@ -83,6 +83,52 @@ pub fn get_audit_log_dir() -> PathBuf {
     fallback
 }
 
+/// 解析并获取持久化会话录屏文件 (.cast) 的存储根目录。
+///
+/// 遵循操作系统的通用应用数据目录规范：
+/// - Windows: `%LOCALAPPDATA%\smagical\smalux\recordings`
+/// - Linux: `~/.local/share/smalux/recordings`
+/// - macOS: `~/Library/Application Support/com.smagical.smalux/recordings`
+pub fn get_recordings_dir() -> PathBuf {
+    if let Some(proj_dirs) = directories::ProjectDirs::from("com", "smagical", "smalux") {
+        let dir = proj_dirs.data_local_dir().join("recordings");
+        if fs::create_dir_all(&dir).is_ok() {
+            return dir;
+        }
+    }
+
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        let dir = user_dirs.home_dir().join(".smalux").join("recordings");
+        if fs::create_dir_all(&dir).is_ok() {
+            return dir;
+        }
+    }
+
+    let fallback = PathBuf::from("recordings");
+    let _ = fs::create_dir_all(&fallback);
+    fallback
+}
+
+/// 获取本地所有保存的会话录屏文件路径列表 (按最后修改时间逆序排列)。
+pub fn list_saved_recordings() -> Vec<PathBuf> {
+    let dir = get_recordings_dir();
+    let mut files = Vec::new();
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_file() && path.extension().and_then(|e| e.to_str()) == Some("cast") {
+                files.push(path);
+            }
+        }
+    }
+    files.sort_by(|a, b| {
+        let time_a = a.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        let time_b = b.metadata().and_then(|m| m.modified()).unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+        time_b.cmp(&time_a)
+    });
+    files
+}
+
 /// 异步记录一条格式化的会话操作安全审计事件。
 ///
 /// # 参数

@@ -1,9 +1,8 @@
 //! 侧边栏动态注册模型与 Slint UI 视图数据同步服务。
 
-use std::rc::Rc;
 use smagical_core::CoreState;
-
 use slint::ComponentHandle;
+use crate::common::to_model_rc;
 use crate::generated::{ActivityBarItemData, AppWindow, WindowBridge};
 
 /// 根据语言环境解析活动栏项目说明提示 (多语言国际化)
@@ -60,6 +59,6 @@ pub fn sync_activity_bar_ui(window: &AppWindow, core_state: &CoreState) {
         .collect();
 
     let wb = window.global::<WindowBridge>();
-    wb.set_top_activity_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(top_items))));
-    wb.set_bottom_activity_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(bottom_items))));
+    wb.set_top_activity_items(to_model_rc(top_items));
+    wb.set_bottom_activity_items(to_model_rc(bottom_items));
 }

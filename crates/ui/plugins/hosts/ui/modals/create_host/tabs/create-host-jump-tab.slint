@@ -1,8 +1,8 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 import { HostsBridge } from "@common/features/hosts/hosts_bridge.slint";
 
-export component CreateHostJumpTab inherits VerticalLayout {
+component CreateHostJumpTab inherits VerticalLayout {
     spacing: 10px;
 
     in-out property <string> selected-preset-jump-id: "";
@@ -141,7 +141,7 @@ export component CreateHostJumpTab inherits VerticalLayout {
         border-radius: AppTheme.radius-medium;
         background: AppTheme.control-background;
         border-width: 1px;
-        border-color: #10b981.transparentize(60%);
+        border-color: AppTheme.success.transparentize(60%);
 
         VerticalLayout {
             padding: 24px;
@@ -159,14 +159,14 @@ export component CreateHostJumpTab inherits VerticalLayout {
                         width: 38px;
                         height: 38px;
                         border-radius: 19px;
-                        background: #10b981.transparentize(85%);
+                        background: AppTheme.success.transparentize(85%);
 
                         Image {
                             source: @image-url("../../../assets/icons/zap.svg");
                             width: 18px;
                             height: 18px;
                             image-fit: contain;
-                            colorize: #10b981;
+                            colorize: AppTheme.success;
                             x: (parent.width - self.width) / 2;
                             y: (parent.height - self.height) / 2;
                         }
@@ -224,9 +224,9 @@ export component CreateHostJumpTab inherits VerticalLayout {
             // 动态引用核心优势提示卡片
             Rectangle {
                 border-radius: 4px;
-                background: #10b981.transparentize(92%);
+                background: AppTheme.success.transparentize(92%);
                 border-width: 1px;
-                border-color: #10b981.transparentize(70%);
+                border-color: AppTheme.success.transparentize(70%);
 
                 HorizontalLayout {
                     padding: 10px;
@@ -310,7 +310,7 @@ export component CreateHostJumpTab inherits VerticalLayout {
     // 分支 3: 自定义单跳列表 (未引用预设且配置了单跳主机)
     if root.selected-preset-jump-id == "" && HostsBridge.create-host-jump-chain.length > 0: Flickable {
         height: 320px;
-        viewport-height: Math.max(320px, HostsBridge.create-host-jump-chain.length * 44px);
+        content-height: Math.max(320px, HostsBridge.create-host-jump-chain.length * 44px);
 
         VerticalLayout {
             spacing: 4px;
@@ -465,3 +465,5 @@ export component CreateHostJumpTab inherits VerticalLayout {
         }
     }
 }
+
+export { CreateHostJumpTab }

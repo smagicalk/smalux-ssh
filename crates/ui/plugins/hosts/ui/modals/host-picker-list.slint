@@ -1,9 +1,9 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { HostItemData } from "../drawers/hosts_drawer.slint";
 import { StatusDot } from "@common/components/status-dot.slint";
 
 /// 单个主机资产选择卡片组件
-export component HostPickerCard inherits Rectangle {
+component HostPickerCard inherits Rectangle {
     /// 主机数据源
     in property <HostItemData> host;
     /// 鼠标悬浮高亮强调色
@@ -19,9 +19,6 @@ export component HostPickerCard inherits Rectangle {
     border-width: 1px;
     border-color: host-touch.has-hover ? hover-accent-color : transparent;
     clip: true;
-
-    animate background { duration: 120ms; }
-    animate border-color { duration: 120ms; }
 
     HorizontalLayout {
         padding: 0px;
@@ -126,7 +123,7 @@ export component HostPickerCard inherits Rectangle {
 }
 
 /// 快速主机资产选择列表组件 (Host Picker List)
-export component HostPickerList inherits VerticalLayout {
+component HostPickerList inherits VerticalLayout {
     /// 待展示的主机资产数据列表
     in property <[HostItemData]> hosts: [];
     /// 列表分组标题说明 (若为空字符串则不渲染标题)
@@ -156,3 +153,5 @@ export component HostPickerList inherits VerticalLayout {
         }
     }
 }
+
+export { HostPickerCard, HostPickerList }

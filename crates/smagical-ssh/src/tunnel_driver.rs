@@ -61,6 +61,202 @@ impl RusshTunnelDriver {
         }
     }
 
+    /// 预检本地端口可用性并提供占用冲突诊断建议
+    pub fn check_local_port_availability(bind_host: &str, port: u16) -> SshServiceResult<()> {
+        if port == 0 {
+            return Ok(()); // 0 表示由系统自动分配空闲端口
+        }
+        let host = if bind_host.is_empty() { "127.0.0.1" } else { bind_host };
+        let bind_addr = format!("{host}:{port}");
+
+        match std::net::TcpListener::bind(&bind_addr) {
+            Ok(_) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
+                #[cfg(windows)]
+                let tip = format!(
+                    "本地端口 [{bind_addr}] 已被系统其他进程占用！\n排查建议：请在终端执行 'netstat -ano | findstr :{port}' 查询占用该端口的进程 PID，并在任务管理器或命令行中释放该端口，或修改规则使用其他空闲端口。"
+                );
+                #[cfg(not(windows))]
+                let tip = format!(
+                    "本地端口 [{bind_addr}] 已被系统其他进程占用！\n排查建议：请在终端执行 'lsof -i :{port}' 或 'ss -tulpn | grep :{port}' 查询占用进程并释放端口，或修改规则使用其他空闲端口。"
+                );
+                Err(SshServiceError::Io(std::io::Error::new(
+                    std::io::ErrorKind::AddrInUse,
+                    tip,
+                )))
+            }
+            Err(e) => Err(SshServiceError::Io(std::io::Error::new(
+                e.kind(),
+                format!("预检本地端口 [{bind_addr}] 绑定失败: {e}"),
+            ))),
+        }
+    }
+
+    /// 处理标准 SOCKS5 代理连接协商与出网转发 (RFC 1928 / RFC 1929)
+    async fn handle_socks5_connection(
+        mut client: TcpStream,
+        auth_opt: Option<(String, String)>,
+        metrics: Arc<InternalTunnelMetrics>,
+        is_active: Arc<AtomicBool>,
+    ) {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        // 1. 协商认证方法 (RFC 1928 Section 3)
+        let mut ver_methods = [0u8; 2];
+        if client.read_exact(&mut ver_methods).await.is_err() {
+            return;
+        }
+        if ver_methods[0] != 0x05 {
+            return;
+        }
+        let nmethods = ver_methods[1] as usize;
+        let mut methods = vec![0u8; nmethods];
+        if client.read_exact(&mut methods).await.is_err() {
+            return;
+        }
+
+        // 2. 身份认证判定
+        if let Some((ref req_user, ref req_pass)) = auth_opt {
+            if !req_user.is_empty() {
+                // 要求账号密码认证 (0x02)
+                if !methods.contains(&0x02) {
+                    let _ = client.write_all(&[0x05, 0xFF]).await;
+                    return;
+                }
+                if client.write_all(&[0x05, 0x02]).await.is_err() {
+                    return;
+                }
+                // RFC 1929 用户名/密码子协商
+                let mut sub_ver = [0u8; 2];
+                if client.read_exact(&mut sub_ver).await.is_err() || sub_ver[0] != 0x01 {
+                    let _ = client.write_all(&[0x01, 0x01]).await;
+                    return;
+                }
+                let ulen = sub_ver[1] as usize;
+                let mut ubuf = vec![0u8; ulen];
+                if client.read_exact(&mut ubuf).await.is_err() {
+                    return;
+                }
+                let mut plen_buf = [0u8; 1];
+                if client.read_exact(&mut plen_buf).await.is_err() {
+                    return;
+                }
+                let plen = plen_buf[0] as usize;
+                let mut pbuf = vec![0u8; plen];
+                if client.read_exact(&mut pbuf).await.is_err() {
+                    return;
+                }
+                let uname = String::from_utf8_lossy(&ubuf);
+                let passwd = String::from_utf8_lossy(&pbuf);
+                if uname != *req_user || passwd != *req_pass {
+                    let _ = client.write_all(&[0x01, 0x01]).await;
+                    return;
+                }
+                // 认证成功响应
+                if client.write_all(&[0x01, 0x00]).await.is_err() {
+                    return;
+                }
+            } else {
+                // 无需认证 (0x00)
+                if !methods.contains(&0x00) {
+                    let _ = client.write_all(&[0x05, 0xFF]).await;
+                    return;
+                }
+                if client.write_all(&[0x05, 0x00]).await.is_err() {
+                    return;
+                }
+            }
+        } else {
+            // 无需认证 (0x00)
+            if !methods.contains(&0x00) {
+                let _ = client.write_all(&[0x05, 0xFF]).await;
+                return;
+            }
+            if client.write_all(&[0x05, 0x00]).await.is_err() {
+                return;
+            }
+        }
+
+        // 3. 读取请求命令 (RFC 1928 Section 4)
+        let mut req_header = [0u8; 4];
+        if client.read_exact(&mut req_header).await.is_err() {
+            return;
+        }
+        if req_header[0] != 0x05 {
+            return;
+        }
+        if req_header[1] != 0x01 {
+            // 仅支持 0x01 (CONNECT)
+            let _ = client.write_all(&[0x05, 0x07, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+            return;
+        }
+
+        let target_host = match req_header[3] {
+            0x01 => {
+                // IPv4: 4 字节
+                let mut ip_buf = [0u8; 4];
+                if client.read_exact(&mut ip_buf).await.is_err() {
+                    return;
+                }
+                std::net::Ipv4Addr::from(ip_buf).to_string()
+            }
+            0x03 => {
+                // 域名: 1 字节长度 + 域名字符串
+                let mut dlen_buf = [0u8; 1];
+                if client.read_exact(&mut dlen_buf).await.is_err() {
+                    return;
+                }
+                let mut dbuf = vec![0u8; dlen_buf[0] as usize];
+                if client.read_exact(&mut dbuf).await.is_err() {
+                    return;
+                }
+                String::from_utf8_lossy(&dbuf).to_string()
+            }
+            0x04 => {
+                // IPv6: 16 字节
+                let mut ip_buf = [0u8; 16];
+                if client.read_exact(&mut ip_buf).await.is_err() {
+                    return;
+                }
+                std::net::Ipv6Addr::from(ip_buf).to_string()
+            }
+            _ => {
+                // 不支持的地址类型 (0x08)
+                let _ = client.write_all(&[0x05, 0x08, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+                return;
+            }
+        };
+
+        let mut port_buf = [0u8; 2];
+        if client.read_exact(&mut port_buf).await.is_err() {
+            return;
+        }
+        let target_port = u16::from_be_bytes(port_buf);
+        let target_addr = format!("{target_host}:{target_port}");
+
+        // 4. 连接远程目标 (带 10 秒超时)
+        match tokio::time::timeout(std::time::Duration::from_secs(10), TcpStream::connect(&target_addr)).await {
+            Ok(Ok(target_stream)) => {
+                // 连接成功，响应 0x00 (SUCCESS)
+                if client.write_all(&[0x05, 0x00, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await.is_err() {
+                    return;
+                }
+                // 启动全双工管道
+                Self::forward_bidirectional(client, target_stream, metrics, is_active).await;
+            }
+            Ok(Err(e)) => {
+                debug!("SOCKS5 代理连接远程目标 [{target_addr}] 失败: {e}");
+                // 0x05: Connection Refused
+                let _ = client.write_all(&[0x05, 0x05, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+            }
+            Err(_) => {
+                debug!("SOCKS5 代理连接远程目标 [{target_addr}] 超时");
+                // 0x04: Host Unreachable
+                let _ = client.write_all(&[0x05, 0x04, 0x00, 0x01, 0, 0, 0, 0, 0, 0]).await;
+            }
+        }
+    }
+
     /// 双向带统计的异步流量转发管道
     async fn forward_bidirectional(
         mut client: TcpStream,
@@ -138,6 +334,8 @@ impl TunnelService for RusshTunnelDriver {
         if let Some(old) = map.remove(&tunnel.id) {
             old.is_active.store(false, Ordering::Relaxed);
             old.listener_task.abort();
+            // 短暂让出执行权确保旧套接字已完成物理释放
+            tokio::task::yield_now().await;
         }
 
         let bind_host = if tunnel.local_bind.is_empty() {
@@ -147,11 +345,28 @@ impl TunnelService for RusshTunnelDriver {
         };
         let bind_addr = format!("{}:{}", bind_host, tunnel.local_port);
 
+        // 端口占用预检与冲突防护
+        Self::check_local_port_availability(bind_host, tunnel.local_port)?;
+
         let listener = TcpListener::bind(&bind_addr).await.map_err(|e| {
-            SshServiceError::Io(std::io::Error::new(
-                e.kind(),
-                format!("绑定本地隧道端口 [{bind_addr}] 失败: {e}"),
-            ))
+            if e.kind() == std::io::ErrorKind::AddrInUse {
+                #[cfg(windows)]
+                let tip = format!(
+                    "本地端口 [{bind_addr}] 绑定冲突已被占用！\n排查建议：在终端执行 'netstat -ano | findstr :{}' 查看占用进程 PID 并释放端口。",
+                    tunnel.local_port
+                );
+                #[cfg(not(windows))]
+                let tip = format!(
+                    "本地端口 [{bind_addr}] 绑定冲突已被占用！\n排查建议：在终端执行 'lsof -i :{}' 查看占用进程并释放端口。",
+                    tunnel.local_port
+                );
+                SshServiceError::Io(std::io::Error::new(std::io::ErrorKind::AddrInUse, tip))
+            } else {
+                SshServiceError::Io(std::io::Error::new(
+                    e.kind(),
+                    format!("绑定本地隧道端口 [{bind_addr}] 失败: {e}"),
+                ))
+            }
         })?;
 
         let actual_local_addr = listener
@@ -168,9 +383,14 @@ impl TunnelService for RusshTunnelDriver {
         let metrics_loop = Arc::clone(&metrics);
         let tunnel_id_loop = tunnel.id.clone();
         let actual_local_addr_log = actual_local_addr.clone();
+        let auth_opt = if !tunnel.proxy_username.is_empty() {
+            Some((tunnel.proxy_username.clone(), tunnel.proxy_password.clone()))
+        } else {
+            None
+        };
 
         let listener_task = tokio::spawn(async move {
-            info!("隧道 [{tunnel_id_loop}] 监听已就绪: {actual_local_addr_log} -> {target_addr_str}");
+            info!("隧道 [{tunnel_id_loop}] 监听已就绪: {actual_local_addr_log} -> {target_addr_str} (类型: {:?})", tunnel_type);
 
             while is_active_loop.load(Ordering::Relaxed) {
                 let accept_res = listener.accept().await;
@@ -180,9 +400,20 @@ impl TunnelService for RusshTunnelDriver {
                         let is_active_conn = Arc::clone(&is_active_loop);
                         let metrics_conn = Arc::clone(&metrics_loop);
                         let target_addr = target_addr_str.clone();
+                        let auth_opt_conn = auth_opt.clone();
 
                         tokio::spawn(async move {
                             match tunnel_type {
+                                TunnelType::Dynamic => {
+                                    // 动态 SOCKS5 代理网关协议处理
+                                    Self::handle_socks5_connection(
+                                        client_stream,
+                                        auth_opt_conn,
+                                        metrics_conn,
+                                        is_active_conn,
+                                    )
+                                    .await;
+                                }
                                 TunnelType::Local => {
                                     // 直连或经 SSH 通道转发至远程目标
                                     match TcpStream::connect(&target_addr).await {
@@ -263,6 +494,15 @@ impl TunnelService for RusshTunnelDriver {
             Ok(state.metrics.snapshot())
         } else {
             Err(SshServiceError::NotFound(format!("未找到运行中的隧道 ID: {tunnel_id}")))
+        }
+    }
+
+    async fn is_tunnel_alive(&self, tunnel_id: &str) -> bool {
+        let map = self.active_tunnels.read().await;
+        if let Some(state) = map.get(tunnel_id) {
+            state.is_active.load(Ordering::Relaxed) && !state.listener_task.is_finished()
+        } else {
+            false
         }
     }
 }
@@ -348,5 +588,111 @@ mod tests {
 
         // 再次停止应返回 NotFound
         assert!(driver.stop_tunnel("tun-test-1").await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_check_local_port_availability() {
+        // 1. 端口 0 永远可用
+        assert!(RusshTunnelDriver::check_local_port_availability("127.0.0.1", 0).is_ok());
+
+        // 2. 先主动占用一个本地随机端口
+        let occupied = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = occupied.local_addr().unwrap().port();
+
+        // 3. 预检该端口应返回冲突错误，且错误提示包含诊断排查建议
+        let res = RusshTunnelDriver::check_local_port_availability("127.0.0.1", port);
+        assert!(res.is_err());
+        let err_msg = res.unwrap_err().to_string();
+        assert!(err_msg.contains("已经被系统其他进程占用") || err_msg.contains("排查建议"));
+
+        // 4. 释放套接字后重测
+        drop(occupied);
+        let res2 = RusshTunnelDriver::check_local_port_availability("127.0.0.1", port);
+        assert!(res2.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_socks5_dynamic_tunnel() {
+        let driver = RusshTunnelDriver::new();
+
+        // 1. 模拟后端目标 Echo 服务
+        let echo_listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let echo_addr = echo_listener.local_addr().unwrap();
+
+        tokio::spawn(async move {
+            while let Ok((mut stream, _)) = echo_listener.accept().await {
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    while let Ok(n) = stream.read(&mut buf).await {
+                        if n == 0 {
+                            break;
+                        }
+                        let _ = stream.write_all(&buf[..n]).await;
+                    }
+                });
+            }
+        });
+
+        // 2. 启动动态 SOCKS5 代理网关 (-D)
+        let socks_rec = TunnelRecord {
+            id: "tun-socks5-1".to_string(),
+            name: "SOCKS5 代理网关".to_string(),
+            tunnel_type: TunnelType::Dynamic,
+            ssh_host_id: None,
+            ssh_host_name: "".to_string(),
+            local_bind: "127.0.0.1".to_string(),
+            local_port: 0,
+            remote_host: "".to_string(),
+            remote_port: 0,
+            jump_chain: Vec::new(),
+            enabled: true,
+            is_running: false,
+            run_mode: TunnelRunMode::FollowApp,
+            auto_start: false,
+            auto_reconnect: true,
+            remote_dns: false,
+            compression: false,
+            active_connections: 0,
+            total_bytes_in: 0,
+            total_bytes_out: 0,
+            proxy_proto: "SOCKS5".to_string(),
+            proxy_username: "".to_string(),
+            proxy_password: "".to_string(),
+            notes: "".to_string(),
+            updated_at: "".to_string(),
+        };
+
+        let handle = driver.start_tunnel(&socks_rec, None).await.unwrap();
+        assert!(driver.is_tunnel_alive("tun-socks5-1").await);
+
+        // 3. 客户端连接 SOCKS5 代理并进行 RFC 1928 握手
+        let mut client = TcpStream::connect(&handle.bound_address).await.unwrap();
+
+        // 握手问候: [VER 5, NMETHODS 1, METHOD 0]
+        client.write_all(&[0x05, 0x01, 0x00]).await.unwrap();
+        let mut auth_resp = [0u8; 2];
+        client.read_exact(&mut auth_resp).await.unwrap();
+        assert_eq!(auth_resp, [0x05, 0x00]); // 成功协商为无认证
+
+        // 发送 CONNECT 请求至 Echo 服务
+        let mut req = vec![0x05, 0x01, 0x00, 0x01]; // VER 5, CMD 1, RSV 0, ATYP 1 (IPv4)
+        req.extend_from_slice(&[127, 0, 0, 1]);
+        req.extend_from_slice(&echo_addr.port().to_be_bytes());
+        client.write_all(&req).await.unwrap();
+
+        let mut req_resp = [0u8; 10];
+        client.read_exact(&mut req_resp).await.unwrap();
+        assert_eq!(req_resp[0], 0x05);
+        assert_eq!(req_resp[1], 0x00); // 0x00 = SUCCESS
+
+        // 发送真实数据通过 SOCKS5 转发到 Echo 服务
+        client.write_all(b"Hello SOCKS5 Dynamic Tunnel!").await.unwrap();
+        let mut echo_buf = [0u8; 64];
+        let n = client.read(&mut echo_buf).await.unwrap();
+        assert_eq!(&echo_buf[..n], b"Hello SOCKS5 Dynamic Tunnel!");
+
+        // 4. 停止隧道并校验 alive 状态
+        driver.stop_tunnel("tun-socks5-1").await.unwrap();
+        assert!(!driver.is_tunnel_alive("tun-socks5-1").await);
     }
 }

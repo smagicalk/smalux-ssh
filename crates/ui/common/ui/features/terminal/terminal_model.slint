@@ -61,3 +61,12 @@ export struct TerminalSplitterData {
     /// 像素高度
     height: length,
 }
+
+/// tmux 会话条目模型
+export struct TmuxSessionItem {
+    id: string,
+    name: string,
+    windows-count: int,
+    is-attached: bool,
+    created-time: string,
+}

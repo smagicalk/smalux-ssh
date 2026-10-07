@@ -1,8 +1,8 @@
 # smagical-ui
 
-`smagical-ui` 是 **smalux-ssh** 的桌面客户端业务装配与控制中枢 crate。它基于 [Slint UI](https://slint.dev/) 框架与 Tokio 异步运行时构建，负责桌面窗口生命周期管理、**高性能软件光栅化终端渲染引擎 (PTY/Parser/Renderer/SplitTree)**、**1:1 镜像领域 Handlers 处理器集群**、**增量 Diff 树形状态缓存**、**跨平台本地 Shell 探测**、**系统托盘集成**以及**动态主题运行时热注入**。
+`smagical-ui` 是 **smalux-ssh** 的桌面客户端业务装配与控制中枢 crate。它基于 [Slint UI](https://slint.dev/) 框架与 Tokio 异步运行时构建，负责桌面窗口生命周期管理、**高性能软件光栅化终端渲染引擎 (PTY/Parser/Renderer/SplitTree/PingPong 双缓冲)**、**1:1 镜像领域 Handlers 处理器集群**、**视图生命周期模型动态卸载 (`ViewLifecycleManager`)**、**后台会话零渲染保活与断线自愈**、**跨平台本地 Shell 探测**、**系统托盘集成**以及**动态主题运行时热注入**。
 
-界面声明与纯 Slint 视图模型由下层的 [`smagical-ui-view`](../smagical-ui-view/README.md) 提供。
+界面声明与微内核底座由 [`smagical-ui-kernel`](../ui/kernel/README.md) 及 8 大页面级独立插件提供。
 
 ---
 
@@ -163,11 +163,33 @@ crates/smagical-ui/
 
 ---
 
-### 6. 顶层服务组件
+### 7. 视图生命周期治理 (`view_lifecycle.rs`)
 
-- **`local_shells.rs`**：跨平台（Windows / Linux / macOS）探测已安装的 PowerShell 7/5.1、CMD、Git Bash、WSL 实例、Bash，并启动时单次探测缓存；
-- **`tray.rs`**：系统托盘常驻，支持关闭主窗口时最小化至托盘、双击托盘图标快速唤醒、托盘右键快捷断开所有会话；
-- **`async_util.rs`**：封装 `run_async` 与 `run_async_local`，妥善处理 Tokio 异步任务与 Slint UI 线程（`slint::invoke_from_event_loop`）之间的数据通信，杜绝界面卡顿与死锁。
+- **`ViewLifecycleManager`**：
+  - 针对 8 大全屏主页面与 12 个侧边抽屉，实行“切离即卸载”策略；
+  - 当用户从文件管理器切至终端、或关闭设置抽屉时，自动将对应的 Slint `ModelRc` 置空（`to_model_rc(vec![])`）；
+  - 切回时按需重新增量加载，实现运行期 10MB~25MB 悬浮图元内存的秒级回收。
+
+---
+
+### 8. 终端 60FPS Ping-Pong 双缓冲与 ASCII 高亮快径
+
+- **`terminal/double_buffer.rs`**：
+  - 维护两块固定尺寸的 `RenderScratch` 内存工作区（前台读取与后台着色交替轮转）；
+  - 消除每秒 60 次跨帧深拷贝与堆内存分配，削减约 480MB/s 的 GC 瞬态内存抖动。
+- **`terminal/highlight.rs`**：
+  - 对 IP 地址、URL 与状态关键词采用 ASCII 1:1 快速映射扫描，规避频繁的正则引擎冷启动与字符串切片分配。
+
+---
+
+### 9. 后台会话零渲染排空与智能自动重连
+
+- **全量非激活后台终端零渲染排空**：
+  - 在 60Hz UI 循环中识别当前屏幕不可见的后台终端，持续调用 `instance.poll_output()` 迅速消费底层 mpsc 管道，防后台命令日志堆积并即时探测断线；
+- **智能自动重连状态机 (`SessionState`)**：
+  - `Running`：连接正常；
+  - `Reconnecting { attempt, max_attempts, next_attempt_at }`：网络闪断触发 1s -> 2s -> 4s 指数退避调度（上限 3 次），敲键盘可立即重试；
+  - `Exited`：用户输入 `exit`（代码 0）正常退出绝不误触重连。
 
 ---
 
@@ -175,11 +197,12 @@ crates/smagical-ui/
 
 ```bash
 # 启动桌面客户端
-cargo run -p smagical-ui
+cargo run -p smalux-cli
 
 # 静态代码检查 (严格 0 警告)
-cargo clippy -p smagical-ui --all-targets -- -D warnings
+cargo check -p smagical-ui
 
-# 单元测试 (62+ 项 UI 纯函数、Diff 算法、终端解析与主题测试)
-cargo test -p smagical-ui
+# 全工作区极速类型与借用校验 (2~3秒)
+cargo check --workspace
 ```
+

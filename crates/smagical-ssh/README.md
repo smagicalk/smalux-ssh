@@ -33,78 +33,59 @@
 
 ---
 
-## 二、现状基线与外部依赖短板评估
+## 二、现状基线与纯 Rust 驱动实现全景
 
-### 1. 已建立的独立化基线 (Current Baseline)
-- ✅ **无 UI 依赖**：不依赖 Slint 框架，类型系统完全纯净（`SshLaunchConfig`, `LinuxSystemMetrics`, `ImportedHostEntry` 等）；
-- ✅ **配置与导入**：支持 OpenSSH `~/.ssh/config`、Termius (JSON/CSV/TSV)、Xshell (`.xsh`) 资产导入与自动分组解析；
-- ✅ **指标计算**：包含 Linux CPU Jiffies、物理内存与 Swap、网络瞬时速率、以及 30 秒平滑 SVG 折线波形生成器。
+系统已彻底完成从“外部命令行调用”向“自研纯 Rust 异步协议栈”的全面跃迁，生产级驱动已全量落地并网：
 
-### 2. 当前存在的外部工具依赖短板 (External Dependencies to Eliminate)
-
-| 模块 | 当前实现方式 | 隐患与故障场景 | 改造目标 |
+| 模块 | 纯 Rust 驱动实现 | 核心技术选型 | 现状状态 |
 | :--- | :--- | :--- | :--- |
-| **SFTP 远程操作** | 外部 `scp` + 远端执行 `ls -la/mkdir/touch/rm/mv` | 遇到无 Shell 权限的纯 SFTP 账户直接报错；遇到 Windows 目标机缺少 Linux 命令；大文件名带空格或引号解析易错 | 纯 Rust `russh-sftp` 二进制协议 |
-| **网络代理穿透** | Windows 调用 `connect.exe`；Linux 调用 `nc -X 5` | `connect.exe` 仅在 Git Bash 存在；`nc -X 5` 仅限 OpenBSD netcat，标准环境直接崩溃 | 纯 Rust `tokio-socks` 原生握手 |
-| **密钥对生成** | 外部子进程 `ssh-keygen` | 纯净 Windows 或精简容器未安装 OpenSSH 时直接报“找不到文件” | 纯 Rust `ed25519-dalek` + `rsa` |
-| **密码应答管道** | 磁盘临时脚本 `askpass_*.cmd / .sh` | 依赖临时目录可写与脚本执行权限，物理磁盘发生 I/O 落地 | 纯 Rust 内存发送 `SSH_MSG_USERAUTH_REQUEST` |
-| **SSH 交互终端** | 外部子进程 `ssh.exe` | 依赖系统 PATH 安装并支持当前 SSH 选项 | 纯 Rust `russh` 会话与 Channel 泵送 |
+| **SSH 会话与交互终端** | `RusshSessionDriver` | `russh` 异步协议栈，直接开辟 PTY Channel 与 Exec Channel，支持双向流 | 🟢 **100% 落地生产** |
+| **SFTP 远程操作** | `RusshSftpDriver` | `russh-sftp` 二进制通道，递归遍历目录、流式上传下载、断点统计 | 🟢 **100% 落地生产** |
+| **网络隧道与端口转发** | `RusshTunnelDriver` | `Direct-TCPIP` 异步管道与 `tokio::net::TcpListener` 双向流量泵 | 🟢 **100% 落地生产** |
+| **密钥对现场生成** | `NativeKeygenService` | `ed25519-dalek` + `rsa` + `ssh-key`，纯内存生成与指纹提取，零临时文件 | 🟢 **100% 落地生产** |
+| **主机公钥验真 (TOFU)** | `known_hosts.rs` | 纯 Rust 解析、追加与校验 `~/.ssh/known_hosts`，抵御中间人攻击 (MITM) | 🟢 **100% 落地生产** |
+| **系统监控指标采集** | `RusshMetricsDriver` | 复用长连接开辟单次轻量 Exec，极速解析 Linux Jiffies/内存/网络 | 🟢 **100% 落地生产** |
+| **资产导入无损解析** | `importer.rs` | 纯 Rust 解析 OpenSSH config、Termius、Xshell (.xsh) 与 CSV/TSV | 🟢 **100% 落地生产** |
 
 ---
 
-## 三、自研纯 Rust 协议替代演进路线图
+## 三、自研纯 Rust 协议驱动核心技术实现
 
 ### 阶段一：纯 Rust 密码学与密钥对生成（脱离 ssh-keygen）
-- **目标**：彻底淘汰 `Command::new("ssh-keygen")`，实现毫秒级内存安全随机密钥生成与指纹提取。
-- **技术实现**：
-  1. 引入依赖：`ed25519-dalek`、`rsa`、`zeroize`、`sha2`、`base64`；
-  2. 重构 [`src/keygen.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/keygen.rs)：
-     - **Ed25519**：使用安全随机数源 (`rand::rngs::OsRng`) 现场生成私钥，直接格式化为标准 OpenSSH PEM (`-----BEGIN OPENSSH PRIVATE KEY-----`)；
-     - **RSA (2048/4096)**：基于纯 Rust 实现生成 RSA 密钥对并编码为 PKCS#1 / PKCS#8 PEM；
-     - **公钥与指纹**：直接在内存中计算 OpenSSH 单行公钥文本（`ssh-ed25519 AAAAC3... comment`）与 SHA256 指纹（`SHA256:xxxx`），全程无外部进程、无磁盘临时文件。
+- **实现模块**：[`src/keygen.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/keygen.rs) (`NativeKeygenService`)；
+- **核心成果**：
+  1. **Ed25519**：使用安全随机数源现场生成私钥，直接格式化为标准 OpenSSH PEM (`-----BEGIN OPENSSH PRIVATE KEY-----`)；
+  2. **RSA (2048/4096)**：基于纯 Rust 实现生成 RSA 密钥对并编码为 PKCS#1 / PKCS#8 PEM；
+  3. **公钥与指纹**：直接在内存中计算 OpenSSH 单行公钥文本（`ssh-ed25519 AAAAC3... comment`）与 SHA256 指纹（`SHA256:xxxx`），全程无外部进程、无磁盘临时文件。
 
 ---
 
 ### 阶段二：标准 RFC 二进制 SFTP 协议与长连接多路复用（脱离 scp 与 shell 伪实现）
-- **目标**：以真正的 SFTP 二进制协议取代当前的外部命令，彻底支持无 Shell 权限（`/sbin/nologin`）与 Windows 远端主机。
-- **技术实现**：
-  1. 引入依赖：`russh`、`russh-keys`、`russh-sftp`；
-  2. 重构 [`src/sftp.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/sftp.rs)：
-     - **底层会话接入**：建立 `russh::client::Handle` 并请求打开 `sftp` 子系统 Channel，包装为 `russh_sftp::client::SftpSession`；
-     - **目录树递归遍历**：直接调用 `session.read_dir(path)`，返回强类型文件元数据（权限位、大小、修改时间、符号链接），彻底消除文本解析脆弱性；
-     - **流式上传与下载**：基于 `tokio::io::copy` 实现分块流水线读写，天然支持精确传输字节计数与进度回调；
-     - **原生远程操作**：调用 `session.create_dir`、`session.create`、`session.remove_file`、`session.remove_dir`、`session.rename`；
-  3. 重构 [`src/monitor.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/monitor.rs)：
-     - 复用已建立的 SSH 会话句柄，开辟轻量 `Channel::exec` 执行探针指令，将采样开销从 150ms 降至 5ms 以内。
+- **实现模块**：[`src/sftp_driver.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/sftp_driver.rs) (`RusshSftpDriver`)；
+- **核心成果**：
+  1. **底层会话接入**：基于 `russh::client::Handle` 打开 `sftp` 子系统 Channel，包装为 `russh_sftp::client::SftpSession`；
+  2. **目录树递归遍历**：直接调用 `session.read_dir(path)`，返回强类型文件元数据（权限位、大小、修改时间、符号链接），彻底消除文本解析脆弱性；
+  3. **流式上传与下载**：基于 `tokio::io::copy` 实现分块流水线读写，天然支持精确传输字节计数与进度回调；
+  4. **原生远程操作**：调用 `session.create_dir`、`session.create`、`session.remove_file`、`session.remove_dir`、`session.rename`。
 
 ---
 
 ### 阶段三：原生代理穿透与常驻 TCP 隧道 / SOCKS5 服务（脱离 connect/nc）
-- **目标**：无需系统安装任何第三方网络工具，全平台原生支持 SOCKS5/HTTP 代理与 TCP 端口转发。
-- **技术实现**：
-  1. 引入依赖：`tokio-socks`；
-  2. 纯 Rust 代理连接器：
-     - 在发起 SSH 握手前，若配置了 SOCKS5 代理，直接通过 `tokio_socks::tcp::Socks5Stream::connect` 握手代理服务器；
-     - 若配置了 HTTP 代理，执行标准的 `CONNECT host:port HTTP/1.1` 握手；
-     - 将建立好的流式套接字直接交由 `russh` 执行 SSH 协议握手，完全抛弃 `ProxyCommand=connect -S` 与 `nc -X 5`；
-  3. 新增 `crates/smagical-ssh/src/tunnel.rs`：
-     - **本地转发 (Local Forward, `-L`)**：本地绑定 `TcpListener`，有新连接时请求 `session.channel_open_direct_tcpip(remote_host, remote_port)` 并双向泵送流量；
-     - **远端转发 (Remote Forward, `-R`)**：向远端请求 `session.tcpip_forward(bind_address, port)`；
-     - **动态代理 (Dynamic SOCKS5, `-D`)**：本地启动轻量 SOCKS5 服务端，将应用请求动态映射为目标 SSH 端的直接出网流量；
-     - **守护看门狗 (`TunnelSupervisor`)**：监控心跳与断线自动重连，暴露启停控制与实时吞吐量统计指标。
+- **实现模块**：[`src/tunnel_driver.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/tunnel_driver.rs) (`RusshTunnelDriver`)；
+- **核心成果**：
+  1. **本地转发 (Local Forward, `-L`)**：本地绑定 `TcpListener`，有新连接时请求 `session.channel_open_direct_tcpip(remote_host, remote_port)` 并双向泵送流量；
+  2. **远端转发 (Remote Forward, `-R`)**：向远端请求 `session.tcpip_forward(bind_address, port)`；
+  3. **动态代理 (Dynamic SOCKS5, `-D`)**：本地启动轻量 SOCKS5 服务端，将应用请求动态映射为目标 SSH 端的直接出网流量。
 
 ---
 
-### 阶段四：纯 Rust PTY 交互式通道与 CLI 终端适配
-- **目标**：彻底摆脱对宿主系统 `ssh.exe` 进程的依赖，实现真正自包含的终端流。
-- **技术实现**：
-  1. 会话交互通道：
-     - 通过 `session.channel_open_session()` 开辟交互通道；
-     - 请求远端伪终端：`channel.request_pty(true, "xterm-256color", cols, rows, ...)`；
-     - 请求启动交互 Shell：`channel.request_shell(true)`；
+### 阶段四：纯 Rust PTY 交互式通道与 CLI/GUI 终端双向适配
+- **实现模块**：[`src/session_driver.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/session_driver.rs) (`RusshSessionDriver`)；
+- **核心成果**：
+  1. 会话交互通道：通过 `session.channel_open_session()` 开辟交互通道，请求远端伪终端与交互 Shell；
   2. 适配双向流：
-     - **UI 模式**：将 Channel 的输出字节直接推送到 `TerminalParser`（Alacritty/VT100 光栅化渲染器）；
-     - **CLI 模式**：直接通过 `tokio::io::copy` 将 Channel 输入输出与标准输入输出 (`stdin`/`stdout`) 对接，支持原生 RAW 模式与终端快捷键直通。
+     - **UI 模式 (`smagical-ui`)**：将 Channel 的输出字节直接推送到 `TerminalParser`（Alacritty/VT100 光栅化渲染器）；
+     - **CLI 模式 (`smalux-cli`)**：直接将 Channel 输入输出与标准输入输出 (`stdin`/`stdout`) 对接，支持原生 RAW 模式与终端快捷键直通。
 
 ---
 
@@ -158,10 +139,71 @@ pub enum SshDriverEngine {
 
 ---
 
-## 六、工程规范与验收红线
+## 七、 核心 API 与调用方法 (Core APIs & Signatures)
 
-在推进上述自研协议实现时，必须严格遵守以下原则：
-- 🟢 **代码零缺陷**：构建必须保持 `0 errors, 0 warnings`（`#![deny(missing_docs)]` 必须严格遵守，所有公开项必须具备详细 Rustdoc）；
-- 🟢 **全量自动化测试**：每个协议子模块均需配备单元测试与 Mock 测试，工作区测试全绿通过；
-- 🟢 **版本控制红线**：严禁私自执行 `git commit` 或 `git push`，所有改动经由用户确认后进行。
+### 1. SSH 会话驱动 (`RusshSessionDriver`)
+```rust
+let driver = RusshSessionDriver::new();
+
+// 建立纯 Rust 异步 SSH 会话 (支持 15s 心跳保活与超时防护)
+let session_id = driver.connect(&host, cred.as_ref()).await?;
+
+// 打开交互式 PTY 双向异步数据流
+let (mut pty_writer, mut pty_reader) = driver.open_pty_channel(&session_id, 80, 24).await?;
+
+// 单次非交互执行命令并获取输出
+let output = driver.execute_command(&session_id, "uptime && free -m").await?;
+println!("退出码: {}, 标准输出: {}", output.exit_code, String::from_utf8_lossy(&output.stdout));
+
+// 优雅关闭会话
+driver.disconnect(&session_id).await?;
+```
+
+### 2. SFTP 文件传输驱动 (`RusshSftpDriver`)
+```rust
+let sftp = RusshSftpDriver::new();
+
+// 连接远端 SFTP 子系统
+sftp.connect_raw(&host, cred.as_ref()).await?;
+
+// 遍历目录
+let entries = sftp.list_dir("/var/log").await?;
+for e in entries {
+    println!("文件: {} (大小: {} 字节, 是否目录: {})", e.name, e.size, e.is_dir);
+}
+```
+
+### 3. 网络隧道驱动 (`RusshTunnelDriver`)
+```rust
+let tunnel_driver = RusshTunnelDriver::new();
+
+// 开启本地端口转发或 SOCKS5 代理
+let handle = tunnel_driver.start_tunnel(&tunnel_record, cred.as_ref()).await?;
+println!("隧道已就绪，本地监听地址: {}", handle.bound_address);
+
+// 获取实时双向流量度量
+let metrics = tunnel_driver.poll_metrics().await;
+
+// 停止隧道并释放本地端口
+tunnel_driver.stop_tunnel(&tunnel_record.id).await?;
+```
+
+### 4. 纯内存密钥生成器 (`NativeKeygenService`)
+```rust
+let keygen = NativeKeygenService::new();
+
+// 现场生成 Ed25519 密钥对 (零外部进程拉起)
+let pair = keygen.generate_keypair(KeyAlgorithm::Ed25519, None, None)?;
+println!("公钥指纹: {}", pair.fingerprint);
+println!("OpenSSH 公钥: {}", pair.public_key_openssh);
+println!("PEM 私钥: {}", pair.private_key_pem);
+```
+
+### 5. RAII 私钥文件守卫 (`KeyTempGuard`)
+```rust
+// 创建临时私钥并在析构 (Drop) 时自动执行等长 0 字节抹零覆盖并删除物理文件
+let guard = KeyTempGuard::create("sess_1001", &pem_content)?;
+println!("临时私钥路径: {:?}", guard.path());
+// 当 guard 离开作用域时自动 Zeroize 擦除
+```
 

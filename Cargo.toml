@@ -3,15 +3,18 @@ members = [
     "crates/smagical-core",
     "crates/smagical-storage",
     "crates/smagical-ssh",
-    "crates/smagical-ui-view",
     "crates/smagical-ui",
     "crates/smalux-cli",
     "crates/ui/common",
     "crates/ui/kernel",
     "crates/ui/plugins/hosts",
-    "crates/ui/plugins/session_tools",
+    "crates/ui/plugins/credentials",
+    "crates/ui/plugins/files",
+    "crates/ui/plugins/history",
     "crates/ui/plugins/snippets",
     "crates/ui/plugins/tunnels",
+    "crates/ui/plugins/debug",
+    "crates/ui/plugins/settings",
 ]
 resolver = "3"
 
@@ -91,13 +94,116 @@ windows-sys = { version = "0.61", features = [
 [profile.dev]
 # 降低局部变量调试符号（保留 panic 行号与堆栈追踪），显著降低 PDB 体积和 MSVC 磁盘写入耗时
 debug = 1
+incremental = false
 
-# Slint 自动生成的大型 UI AST 无需调试符号，彻底避免 LLVM 编译期 Out of Memory
-[profile.dev.package.smagical-ui-view]
+# Slint 自动生成的大型 UI AST 无需调试符号与断言分支，彻底避免 LLVM 编译期 Out of Memory
+[profile.dev.package.smagical-ui-kernel]
 debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
 
-[profile.test.package.smagical-ui-view]
+[profile.dev.package.plugin-credentials]
 debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-debug]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-files]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-history]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-hosts]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-settings]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-snippets]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.dev.package.plugin-tunnels]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.smagical-ui-kernel]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-credentials]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-debug]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-files]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-history]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-hosts]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-settings]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-snippets]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
+
+[profile.test.package.plugin-tunnels]
+debug = 0
+debug-assertions = false
+overflow-checks = false
+codegen-units = 16
 
 [profile.release]
 # 自动剥离调试符号，极大压缩发布包体积并减少打包磁盘占用

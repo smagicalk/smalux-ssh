@@ -1,10 +1,10 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 import { JumpHostOptionData, PresetJumpChainData } from "@common/features/hosts/hosts_model.slint";
 
 export { JumpHostOptionData, PresetJumpChainData }
 
-export component JumpPickerDialog inherits Rectangle {
+component JumpPickerDialog inherits Rectangle {
     in property <bool> is-open: false;
     in property <[JumpHostOptionData]> jump-host-options: [];
     in property <[PresetJumpChainData]> preset-jump-chains: [];
@@ -32,6 +32,8 @@ export component JumpPickerDialog inherits Rectangle {
             background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000066;
             clip: true;
 
             TouchArea { }
@@ -175,7 +177,7 @@ export component JumpPickerDialog inherits Rectangle {
                     Flickable {
                         vertical-stretch: 1;
                         min-height: 280px;
-                        viewport-height: max(self.height, jump-hosts-container.preferred-height);
+                        content-height: max(self.height, jump-hosts-container.preferred-height);
 
                         jump-hosts-container := VerticalLayout {
                             alignment: start;
@@ -307,7 +309,7 @@ export component JumpPickerDialog inherits Rectangle {
                     Flickable {
                         vertical-stretch: 1;
                         min-height: 280px;
-                        viewport-height: max(self.height, preset-chains-container.preferred-height);
+                        content-height: max(self.height, preset-chains-container.preferred-height);
 
                         preset-chains-container := VerticalLayout {
                             alignment: start;
@@ -411,7 +413,7 @@ export component JumpPickerDialog inherits Rectangle {
                                                         text: @tr("🔗 引用此预设跳板串");
                                                         font-size: 11px;
                                                         font-weight: 700;
-                                                        color: #ffffff;
+                                                        color: AppTheme.selected-foreground;
                                                         vertical-alignment: center;
                                                     }
                                                 }
@@ -444,3 +446,5 @@ export component JumpPickerDialog inherits Rectangle {
         }
     }
 }
+
+export { JumpPickerDialog }

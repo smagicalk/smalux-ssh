@@ -342,7 +342,7 @@ async fn run_agent_auth_loop(
 }
 
 /// 通过 SOCKS5 代理建立到目标主机的纯 TCP 穿透流
-async fn connect_via_socks5(
+pub(crate) async fn connect_via_socks5(
     proxy_addr: &str,
     target_host: &str,
     target_port: u16,
@@ -410,7 +410,7 @@ async fn connect_via_socks5(
 }
 
 /// 通过 HTTP CONNECT 代理建立到目标主机的纯 TCP 穿透流
-async fn connect_via_http_connect(
+pub(crate) async fn connect_via_http_connect(
     proxy_addr: &str,
     target_host: &str,
     target_port: u16,
@@ -434,6 +434,101 @@ async fn connect_via_http_connect(
     Ok(stream)
 }
 
+/// 跳板机单跳网络节点配置信息。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct JumpHop {
+    /// 可选的登录用户名 (例如 `user@host` 中的 `user`)
+    pub username: Option<String>,
+    /// 跳板机主机名或 IP 地址
+    pub host: String,
+    /// 跳板机 SSH 服务端口 (默认 22)
+    pub port: u16,
+}
+
+/// 解析标准化跳板机链路字符串 (例如 `"bastion1:22,admin@bastion2:2222"`) 为结构化跳板节点列表。
+pub fn parse_jump_chain(summary: &str) -> Vec<JumpHop> {
+    let mut hops = Vec::new();
+    let trimmed = summary.trim();
+    if trimmed.is_empty() || trimmed.starts_with("jump_hops:0") || trimmed.starts_with("preset:") {
+        return hops;
+    }
+    for part in trimmed.split(',') {
+        let part = part.trim();
+        if part.is_empty() {
+            continue;
+        }
+        let (user_opt, host_port) = if let Some((u, hp)) = part.split_once('@') {
+            (if u.trim().is_empty() { None } else { Some(u.trim().to_string()) }, hp)
+        } else {
+            (None, part)
+        };
+        let (host, port) = if let Some((h, p)) = host_port.rsplit_once(':') {
+            (h.trim().to_string(), p.parse::<u16>().unwrap_or(22))
+        } else {
+            (host_port.trim().to_string(), 22)
+        };
+        if !host.is_empty() {
+            hops.push(JumpHop { username: user_opt, host, port });
+        }
+    }
+    hops
+}
+
+/// 探测指定出站代理服务器（SOCKS5 或 HTTP CONNECT）的可用性与往返延迟。
+///
+/// # 参数
+/// * `proxy_type` - 代理协议类型（`"socks5"`、`"socks"`、`"http"`、`"https"`）
+/// * `proxy_host` - 代理服务器 IP 或域名
+/// * `proxy_port` - 代理端口
+/// * `timeout_ms` - 探测超时时间（毫秒，建议 3000~5000ms）
+///
+/// # 返回值
+/// - `Ok(latency_ms)`: 代理存活且可用，返回往返建立连接延迟（毫秒）；
+/// - `Err(error_msg)`: 代理无法连接或协议握手失败原因。
+pub async fn probe_proxy_health(
+    proxy_type: &str,
+    proxy_host: &str,
+    proxy_port: u16,
+    timeout_ms: u64,
+) -> Result<u64, String> {
+    if proxy_host.trim().is_empty() || proxy_port == 0 {
+        return Err("代理地址或端口无效".to_string());
+    }
+    let proxy_addr = format!("{}:{}", proxy_host.trim(), proxy_port);
+    let timeout_dur = std::time::Duration::from_millis(timeout_ms.max(500));
+    let t0 = std::time::Instant::now();
+
+    let mut stream = tokio::time::timeout(timeout_dur, TcpStream::connect(&proxy_addr))
+        .await
+        .map_err(|_| format!("连接代理服务器 [{}] 超时 ({}ms)", proxy_addr, timeout_ms))?
+        .map_err(|e| format!("无法连接代理服务器 [{}]: {}", proxy_addr, e))?;
+
+    let ptype = proxy_type.trim().to_lowercase();
+    if ptype == "socks5" || ptype == "socks" {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        tokio::time::timeout(timeout_dur, stream.write_all(&[0x05, 0x01, 0x00]))
+            .await
+            .map_err(|_| "向 SOCKS5 代理发送问候超时".to_string())?
+            .map_err(|e| format!("发送 SOCKS5 握手失败: {e}"))?;
+
+        let mut resp = [0u8; 2];
+        tokio::time::timeout(timeout_dur, stream.read_exact(&mut resp))
+            .await
+            .map_err(|_| "读取 SOCKS5 响应超时".to_string())?
+            .map_err(|e| format!("读取 SOCKS5 响应失败: {e}"))?;
+
+        if resp[0] != 0x05 {
+            return Err(format!("非标准 SOCKS5 响应 (VER: {})", resp[0]));
+        }
+    } else if ptype == "http" || ptype == "https" {
+        use tokio::io::AsyncWriteExt;
+        let ping_req = b"CONNECT 127.0.0.1:0 HTTP/1.1\r\nHost: 127.0.0.1:0\r\n\r\n";
+        let _ = tokio::time::timeout(timeout_dur, stream.write_all(ping_req)).await;
+    }
+
+    Ok(t0.elapsed().as_millis() as u64)
+}
+
 #[async_trait]
 impl SshSessionService for RusshSessionDriver {
     async fn connect_with_progress(
@@ -449,7 +544,21 @@ impl SshSessionService for RusshSessionDriver {
             host.address, host.port, session_id
         );
 
-        let config = Arc::new(russh::client::Config::default());
+        let mut client_config = russh::client::Config::default();
+        let keepalive_sec = if host.keepalive_interval > 0 {
+            host.keepalive_interval
+        } else {
+            15
+        };
+        client_config.keepalive_interval = Some(std::time::Duration::from_secs(keepalive_sec as u64));
+        client_config.keepalive_max = 3;
+        client_config.inactivity_timeout = None;
+        let connect_timeout_sec = if host.connect_timeout > 0 {
+            host.connect_timeout
+        } else {
+            15
+        };
+        let config = Arc::new(client_config);
         let target_addr = format!("{}:{}", host.address, host.port);
 
         // 若外部未显式提供凭据记录，但主机记录自身直接内联配置了私钥或密码，自动作为内联凭据参与认证
@@ -499,25 +608,7 @@ impl SshSessionService for RusshSessionDriver {
             .unwrap_or("root");
 
         // 1. 检查是否存在跳板机链 (Jump Chain)
-        let mut jump_hops: Vec<(String, u16)> = Vec::new();
-        if let Some(ref jsummary) = host.jump_chain_summary {
-            if !jsummary.trim().is_empty() && !jsummary.starts_with("jump_hops:0") && !jsummary.starts_with("preset:") {
-                for part in jsummary.split(',') {
-                    let part = part.trim();
-                    if !part.is_empty() {
-                        if let Some((h, p)) = part.rsplit_once(':') {
-                            if let Ok(port) = p.parse::<u16>() {
-                                jump_hops.push((h.to_string(), port));
-                            } else {
-                                jump_hops.push((part.to_string(), 22));
-                            }
-                        } else {
-                            jump_hops.push((part.to_string(), 22));
-                        }
-                    }
-                }
-            }
-        }
+        let jump_hops = host.jump_chain_summary.as_deref().map(parse_jump_chain).unwrap_or_default();
 
         // 2. 检查网络代理
         let proxy_type = host.proxy_type.as_deref().unwrap_or("direct");
@@ -526,52 +617,86 @@ impl SshSessionService for RusshSessionDriver {
 
         // 3. 构建底层 Handle (直连 / 代理穿透 / 跳板机 Direct-TCPIP 隧道链)
         let handle = if !jump_hops.is_empty() {
-            info!(target: "smagical_ssh::session", "检测到跳板机链路: {:?}，正在纯内存级建立 Direct-TCPIP 多跳通道...", jump_hops);
-            let (first_host, first_port) = &jump_hops[0];
-            let first_addr = format!("{}:{}", first_host, first_port);
+            let total_hops = jump_hops.len();
+            info!(target: "smagical_ssh::session", "检测到跳板机链路 (共 {} 跳): {:?}，正在纯内存级建立 Direct-TCPIP 多跳通道...", total_hops, jump_hops);
+            let first_hop = &jump_hops[0];
+            let first_addr = format!("{}:{}", first_hop.host, first_hop.port);
+            let first_user = first_hop.username.as_deref().unwrap_or(username);
             if let Some(ref p) = progress {
-                p(&format!("正在发起跳板机网络连接: 第一跳 [{}] ...", first_addr));
+                p(&format!("正在发起跳板机网络连接: [第 1/{} 跳] {} ...", total_hops, first_addr));
             }
-            let mut current_handle = russh::client::connect(config.clone(), first_addr.as_str(), self.make_handler(first_host, *first_port, progress.clone()))
-                .await
-                .map_err(|e| SshServiceError::HostUnreachable(format!("连接第一跳跳板机失败 [{}]: {}", first_addr, e)))?;
-            authenticate_handle(&mut current_handle, username, credential, progress.as_ref()).await?;
+            let timeout_dur = std::time::Duration::from_secs(connect_timeout_sec as u64);
+            let t0 = std::time::Instant::now();
+            let mut current_handle = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect(config.clone(), first_addr.as_str(), self.make_handler(&first_hop.host, first_hop.port, progress.clone()))
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("连接第 1/{} 跳跳板机超时 ({}s) [{}]", total_hops, connect_timeout_sec, first_addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("连接第 1/{} 跳跳板机失败 [{}]: {}", total_hops, first_addr, e)))?;
+            authenticate_handle(&mut current_handle, first_user, credential, progress.as_ref()).await?;
+            let elapsed_ms = t0.elapsed().as_millis();
             if let Some(ref p) = progress {
-                p(&format!("第一跳跳板机 [{}] 认证通过", first_addr));
+                p(&format!("第 1/{} 跳跳板机 [{}] 认证通过 (耗时 {}ms)", total_hops, first_addr, elapsed_ms));
             }
 
-            for hop in &jump_hops[1..] {
+            for (idx, hop) in jump_hops[1..].iter().enumerate() {
+                let hop_num = idx + 2;
+                let hop_addr = format!("{}:{}", hop.host, hop.port);
+                let hop_user = hop.username.as_deref().unwrap_or(username);
                 if let Some(ref p) = progress {
-                    p(&format!("正在建立通往中间跳板机 [{}:{}] 的 Direct-TCPIP 隧道...", hop.0, hop.1));
+                    p(&format!("正在建立通往中间跳板机 [第 {}/{} 跳] [{}] 的 Direct-TCPIP 隧道...", hop_num, total_hops, hop_addr));
                 }
-                let channel = current_handle
-                    .channel_open_direct_tcpip(&hop.0, hop.1 as u32, "127.0.0.1", 0)
-                    .await
-                    .map_err(|e| SshServiceError::ProtocolError(format!("跳板机转发至下一跳 [{}:{}] 失败: {}", hop.0, hop.1, e)))?;
-                let mut next_handle = russh::client::connect_stream(config.clone(), channel.into_stream(), self.make_handler(&hop.0, hop.1, progress.clone()))
-                    .await
-                    .map_err(|e| SshServiceError::HostUnreachable(format!("通过隧道连接中间跳板机 [{}:{}] 失败: {}", hop.0, hop.1, e)))?;
-                authenticate_handle(&mut next_handle, username, credential, progress.as_ref()).await?;
+                let t_hop = std::time::Instant::now();
+                let channel = tokio::time::timeout(
+                    timeout_dur,
+                    current_handle.channel_open_direct_tcpip(&hop.host, hop.port as u32, "127.0.0.1", 0)
+                )
+                .await
+                .map_err(|_| SshServiceError::Timeout(format!("请求建立 Direct-TCPIP 隧道至第 {}/{} 跳 [{}] 超时 ({}s)", hop_num, total_hops, hop_addr, connect_timeout_sec)))?
+                .map_err(|e| SshServiceError::ProtocolError(format!("跳板机转发至第 {}/{} 跳 [{}] 失败: {}", hop_num, total_hops, hop_addr, e)))?;
+
+                let mut next_handle = tokio::time::timeout(
+                    timeout_dur,
+                    russh::client::connect_stream(config.clone(), channel.into_stream(), self.make_handler(&hop.host, hop.port, progress.clone()))
+                )
+                .await
+                .map_err(|_| SshServiceError::Timeout(format!("通过隧道握手中间跳板机 [{}] 超时 ({}s)", hop_addr, connect_timeout_sec)))?
+                .map_err(|e| SshServiceError::HostUnreachable(format!("通过隧道连接中间跳板机 [{}] 失败: {}", hop_addr, e)))?;
+
+                authenticate_handle(&mut next_handle, hop_user, credential, progress.as_ref()).await?;
+                let hop_elapsed = t_hop.elapsed().as_millis();
                 if let Some(ref p) = progress {
-                    p(&format!("中间跳板机 [{}:{}] 认证通过", hop.0, hop.1));
+                    p(&format!("第 {}/{} 跳中间跳板机 [{}] 认证通过 (耗时 {}ms)", hop_num, total_hops, hop_addr, hop_elapsed));
                 }
                 current_handle = next_handle;
             }
 
             // 最后一跳通往目标主机
             if let Some(ref p) = progress {
-                p(&format!("正在建立通往目标主机 [{}] 的 Direct-TCPIP 隧道...", target_addr));
+                p(&format!("正在通过跳板链路建立通往目标主机 [{}] 的 Direct-TCPIP 隧道...", target_addr));
             }
-            let target_channel = current_handle
-                .channel_open_direct_tcpip(&host.address, host.port as u32, "127.0.0.1", 0)
-                .await
-                .map_err(|e| SshServiceError::ProtocolError(format!("跳板机建立通往目标主机 [{}] 的 Direct-TCPIP 隧道失败: {}", target_addr, e)))?;
-            let mut target_handle = russh::client::connect_stream(config.clone(), target_channel.into_stream(), self.make_handler(&host.address, host.port, progress.clone()))
-                .await
-                .map_err(|e| SshServiceError::HostUnreachable(format!("通过跳板机直连目标主机 [{}] 失败: {}", target_addr, e)))?;
+            let t_target = std::time::Instant::now();
+            let target_channel = tokio::time::timeout(
+                timeout_dur,
+                current_handle.channel_open_direct_tcpip(&host.address, host.port as u32, "127.0.0.1", 0)
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("建立通往目标主机 [{}] 的 Direct-TCPIP 隧道超时 ({}s)", target_addr, connect_timeout_sec)))?
+            .map_err(|e| SshServiceError::ProtocolError(format!("跳板机建立通往目标主机 [{}] 的 Direct-TCPIP 隧道失败: {}", target_addr, e)))?;
+
+            let mut target_handle = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect_stream(config.clone(), target_channel.into_stream(), self.make_handler(&host.address, host.port, progress.clone()))
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("通过跳板机直连目标主机 [{}] 握手超时 ({}s)", target_addr, connect_timeout_sec)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("通过跳板机直连目标主机 [{}] 失败: {}", target_addr, e)))?;
+
             authenticate_handle(&mut target_handle, username, credential, progress.as_ref()).await?;
+            let target_elapsed = t_target.elapsed().as_millis();
             if let Some(ref p) = progress {
-                p(&format!("目标主机 [{}] 认证通过", target_addr));
+                p(&format!("目标主机 [{}] 链路握手完成并认证通过 (终跳耗时: {}ms)", target_addr, target_elapsed));
             }
             target_handle
         } else if (proxy_type == "socks5" || proxy_type == "socks") && !proxy_host.is_empty() && proxy_port > 0 {
@@ -580,16 +705,27 @@ impl SshSessionService for RusshSessionDriver {
             if let Some(ref p) = progress {
                 p(&format!("正在连接 SOCKS5 代理服务器 [{}] ...", proxy_addr));
             }
-            let stream = connect_via_socks5(&proxy_addr, &host.address, host.port).await?;
-            if let Some(ref p) = progress {
-                p(&format!("SOCKS5 代理穿透握手成功，正在连接目标 [{}] ...", target_addr));
-            }
-            let mut h = russh::client::connect_stream(config.clone(), stream, self.make_handler(&host.address, host.port, progress.clone()))
+            let timeout_dur = std::time::Duration::from_secs(connect_timeout_sec as u64);
+            let t_proxy = std::time::Instant::now();
+            let stream = tokio::time::timeout(timeout_dur, connect_via_socks5(&proxy_addr, &host.address, host.port))
                 .await
-                .map_err(|e| SshServiceError::HostUnreachable(format!("通过 SOCKS5 代理连接目标 [{}] 失败: {}", target_addr, e)))?;
+                .map_err(|_| SshServiceError::Timeout(format!("连接 SOCKS5 代理超时 ({}s) [{}]", connect_timeout_sec, proxy_addr)))?
+                .map_err(|e| SshServiceError::HostUnreachable(format!("SOCKS5 代理穿透失败 [{}]: {}", proxy_addr, e)))?;
+            let proxy_ms = t_proxy.elapsed().as_millis();
+            if let Some(ref p) = progress {
+                p(&format!("SOCKS5 代理握手成功 (耗时 {}ms)，正在握手目标 [{}] ...", proxy_ms, target_addr));
+            }
+            let mut h = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect_stream(config.clone(), stream, self.make_handler(&host.address, host.port, progress.clone()))
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("通过 SOCKS5 代理连接目标主机超时 ({}s): [{}]", connect_timeout_sec, target_addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("通过 SOCKS5 代理连接目标 [{}] 失败: {}", target_addr, e)))?;
+
             authenticate_handle(&mut h, username, credential, progress.as_ref()).await?;
             if let Some(ref p) = progress {
-                p(&format!("目标主机 [{}] 认证通过", target_addr));
+                p(&format!("目标主机 [{}] 认证通过 (SOCKS5 穿透)", target_addr));
             }
             h
         } else if (proxy_type == "http" || proxy_type == "https") && !proxy_host.is_empty() && proxy_port > 0 {
@@ -598,16 +734,27 @@ impl SshSessionService for RusshSessionDriver {
             if let Some(ref p) = progress {
                 p(&format!("正在连接 HTTP 代理服务器 [{}] ...", proxy_addr));
             }
-            let stream = connect_via_http_connect(&proxy_addr, &host.address, host.port).await?;
-            if let Some(ref p) = progress {
-                p(&format!("HTTP CONNECT 隧道建立成功，正在连接目标 [{}] ...", target_addr));
-            }
-            let mut h = russh::client::connect_stream(config.clone(), stream, self.make_handler(&host.address, host.port, progress.clone()))
+            let timeout_dur = std::time::Duration::from_secs(connect_timeout_sec as u64);
+            let t_proxy = std::time::Instant::now();
+            let stream = tokio::time::timeout(timeout_dur, connect_via_http_connect(&proxy_addr, &host.address, host.port))
                 .await
-                .map_err(|e| SshServiceError::HostUnreachable(format!("通过 HTTP 代理连接目标 [{}] 失败: {}", target_addr, e)))?;
+                .map_err(|_| SshServiceError::Timeout(format!("连接 HTTP 代理超时 ({}s) [{}]", connect_timeout_sec, proxy_addr)))?
+                .map_err(|e| SshServiceError::HostUnreachable(format!("HTTP 代理穿透失败 [{}]: {}", proxy_addr, e)))?;
+            let proxy_ms = t_proxy.elapsed().as_millis();
+            if let Some(ref p) = progress {
+                p(&format!("HTTP CONNECT 隧道建立成功 (耗时 {}ms)，正在握手目标 [{}] ...", proxy_ms, target_addr));
+            }
+            let mut h = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect_stream(config.clone(), stream, self.make_handler(&host.address, host.port, progress.clone()))
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("通过 HTTP 代理连接目标主机超时 ({}s): [{}]", connect_timeout_sec, target_addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("通过 HTTP 代理连接目标 [{}] 失败: {}", target_addr, e)))?;
+
             authenticate_handle(&mut h, username, credential, progress.as_ref()).await?;
             if let Some(ref p) = progress {
-                p(&format!("目标主机 [{}] 认证通过", target_addr));
+                p(&format!("目标主机 [{}] 认证通过 (HTTP 代理穿透)", target_addr));
             }
             h
         } else {
@@ -615,14 +762,24 @@ impl SshSessionService for RusshSessionDriver {
             if let Some(ref p) = progress {
                 p(&format!("正在发起 TCP 网络连接: [{}] ...", target_addr));
             }
-            let mut h = russh::client::connect(config.clone(), target_addr.as_str(), self.make_handler(&host.address, host.port, progress.clone()))
-                .await
-                .map_err(|e| {
-                    if let Some(ref p) = progress {
-                        p(&format!("连接远程主机网络端口失败 [{}]: {}", target_addr, e));
-                    }
-                    SshServiceError::HostUnreachable(format!("连接远程主机失败 [{}]: {}", target_addr, e))
-                })?;
+            let timeout_dur = std::time::Duration::from_secs(connect_timeout_sec as u64);
+            let mut h = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect(config.clone(), target_addr.as_str(), self.make_handler(&host.address, host.port, progress.clone()))
+            )
+            .await
+            .map_err(|_| {
+                if let Some(ref p) = progress {
+                    p(&format!("连接远程主机网络端口超时 ({}s): [{}]", connect_timeout_sec, target_addr));
+                }
+                SshServiceError::Timeout(format!("连接远程主机超时 ({}s): {}", connect_timeout_sec, target_addr))
+            })?
+            .map_err(|e| {
+                if let Some(ref p) = progress {
+                    p(&format!("连接远程主机网络端口失败 [{}]: {}", target_addr, e));
+                }
+                SshServiceError::HostUnreachable(format!("连接远程主机失败 [{}]: {}", target_addr, e))
+            })?;
             if let Some(ref p) = progress {
                 p("TCP 网络连接已建立，正在进行 SSH 协议握手与主机密钥校验...");
             }
@@ -721,11 +878,24 @@ impl SshSessionService for RusshSessionDriver {
         let mut stream = channel.into_stream();
         let mut read_buf = vec![0u8; 4096];
 
+        const MAX_EXEC_OUTPUT_BYTES: usize = 10 * 1024 * 1024; // 10 MB 安全上限
+
         loop {
             match stream.read(&mut read_buf).await {
                 Ok(0) => break,
                 Ok(n) => {
-                    stdout_buf.extend_from_slice(&read_buf[..n]);
+                    if stdout_buf.len() < MAX_EXEC_OUTPUT_BYTES {
+                        let take = (MAX_EXEC_OUTPUT_BYTES - stdout_buf.len()).min(n);
+                        stdout_buf.extend_from_slice(&read_buf[..take]);
+                        if stdout_buf.len() >= MAX_EXEC_OUTPUT_BYTES {
+                            warn!(
+                                target: "smagical_ssh::session",
+                                "会话 [{}] Exec 命令输出达到 10MB 安全上限，已停止读取以防止 OOM",
+                                session_id
+                            );
+                            break;
+                        }
+                    }
                 }
                 Err(e) => {
                     warn!(target: "smagical_ssh::session", "Exec 命令流读取结束: {}", e);

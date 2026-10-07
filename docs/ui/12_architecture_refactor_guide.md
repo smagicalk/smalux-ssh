@@ -26,39 +26,38 @@
 
 ```mermaid
 graph TB
-    subgraph UI_Architecture["UI 表现层 (Slint)"]
+    subgraph UI_Architecture["UI 微前端表现层 (Slint)"]
         direction TB
-        Shared["ui/shared/<br>全工程通用原子控件与脚手架<br>(AppModalScaffold / AppDropdown / AppSegmentedControl)"]
+        Common["crates/ui/common/<br>共享设计系统与通用组件<br>(themes/ + shared/ 原子与复合控件 + scaffolds 脚手架)"]
         
-        subgraph Features["ui/features/ (按业务特性独立成包)"]
-            F_Settings["features/settings/<br>设置主视图 + 8个独立Tab + SettingsBridge"]
-            F_Files["features/file_manager/<br>双盘主页面 + 统合单盘FileBrowserPane + 传输抽屉"]
-            F_Tunnels["features/tunnels/<br>隧道主页面 + 3大网络表单 + 拓扑卡片 + 专属弹窗"]
-            F_Credentials["features/credentials/<br>凭据主页面 + 密钥/密码表单 + 抽屉"]
-            F_Terminal["features/terminal/<br>网格视口 + TabBar + 状态栏 + 专属弹窗"]
+        subgraph Plugins["crates/ui/plugins/ (8 大页面级独立插件)"]
+            F_Settings["plugins/settings/<br>设置主视图 + 8个分类Tab + 抽屉"]
+            F_Files["plugins/files/<br>双盘主页面 + 统合单盘 + 伴生sftp抽屉"]
+            F_Tunnels["plugins/tunnels/<br>隧道主页面 + 3大网络表单 + 伴生控制抽屉"]
+            F_Credentials["plugins/credentials/<br>凭据主页面 + 密钥/密码表单 + 抽屉"]
+            F_Hosts["plugins/hosts/<br>主机抽屉 + 伴生(ai/monitor/tmux)"]
+            F_History["plugins/history/<br>历史中心 + 抽屉"]
+            F_Snippets["plugins/snippets/<br>片段工坊 + 伴生快速命令抽屉"]
+            F_Debug["plugins/debug/<br>调试台 + 场景模拟"]
         end
         
-        AppWindow["ui/main.slint<br>顶层极简主窗口路由器<br>(从 2,459行 瘦身至 550行)"]
+        Kernel["crates/ui/kernel/ (微内核底座)<br>全工程单一 build.rs 入口<br>kernel.slint 主视口 / 终端网格 / 活动栏"]
+        Facade["crates/smagical-ui-view<br>(轻量门面 Facade)"]
         
-        Shared -.->|无业务逻辑依赖| Features
-        Features -->|组装入主视口| AppWindow
+        Common -.->|无业务逻辑依赖| Plugins
+        Plugins -->|@plugin-* 挂载| Kernel
+        Kernel --> Facade
     end
 
-    subgraph Rust_Architecture["Rust 后端层 (Domain Handlers)"]
-        H_Settings["src/handlers/settings/"]
-        H_Files["src/handlers/files/"]
-        H_Tunnels["src/handlers/tunnels/"]
-        H_Credentials["src/handlers/credentials/"]
-        H_Terminal["src/handlers/terminal/"]
-        
-        Mock["crates/smagical-core/src/storage/mock/<br>7 大仓储解耦"]
+    subgraph Rust_Architecture["Rust 后端层 (smagical-ui & core)"]
+        H_Cluster["crates/smagical-ui/src/handlers/<br>1:1 领域 Handlers 集群"]
+        Storage["crates/smagical-storage/<br>SeaORM SQLite + 安全保险库 + Mock"]
+        SSH["crates/smagical-ssh/<br>纯 Rust 原生协议驱动簇"]
     end
 
-    F_Settings <==>|SettingsBridge| H_Settings
-    F_Files <==>|FileBridge| H_Files
-    F_Tunnels <==>|TunnelBridge| H_Tunnels
-    F_Credentials <==>|CredentialBridge| H_Credentials
-    F_Terminal <==>|SessionBridge| H_Terminal
+    Facade <==>|Domain Bridges (HostsBridge, SettingsBridge, etc.)| H_Cluster
+    H_Cluster --> Storage
+    H_Cluster --> SSH
 ```
 
 ### 1. 支柱一：Slint 领域桥接单例 (`Domain Bridge`) —— 终结属性穿透
@@ -126,6 +125,7 @@ graph TB
 - **阶段 4A (安全凭据中心重构)**：凭据主视图、独立模型与表单解耦，消灭 1,792 行巨石；✅ 已完成 (Commit `229b407`)
 - **阶段 4B (命令片段中心重构)**：片段树、编辑区与模型解耦，消灭 902 行巨石；✅ 已完成 (Commit `6bec354`)
 - **阶段 5 (Rust 核心存储层治理)**：拆解 `mock_storage.rs` 2,243 行巨石至 7 大独立仓储与种子引擎；✅ 已完成 (Commit `9b0cfe0`)
+- **阶段 6 (微内核底座与 8 大插件包物理分立)**：建立 `crates/ui/kernel`、`crates/ui/common` 与 `crates/ui/plugins/*`，伴生工具按业务归集至 `companion/`，清理全部死代码与废弃警告，全工作区 Clean Build 零警告达成；✅ 已完成 (当前基线)
 
 ---
 

@@ -1,11 +1,12 @@
 //! Theme management (custom, import, export, delete), Theme Studio modal, and wallpaper gallery/slideshow handlers
 
 use std::{cell::RefCell, path::PathBuf, rc::Rc, time::Duration};
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::ComponentHandle;
 use smagical_core::theme::{
     ThemeId, ThemeKind, ThemeMetadata, ThemePeriod, ThemeRepository, ThemeService,
     UiThemeDefinition, UiThemeMetrics, UiThemeMetricsPatch, UiThemeTokens, UiThemeTokensPatch, THEME_SCHEMA_VERSION,
 };
+use crate::common::{to_model_rc, ToSharedString};
 use crate::generated::{AppWindow, SettingsBridge, ThemeEditorBridge, WindowBridge};
 use super::AppContext;
 use super::color_utils::{hsv_to_rgb, rgb_to_hsv, parse_hex_to_rgb};
@@ -434,7 +435,7 @@ pub fn resolve_all_wallpaper_images(entries: &[String]) -> Vec<String> {
 /// 壁纸像素原始数据三元组：`(RGBA原始字节流, 宽度, 高度)`
 pub type RawWallpaperData = (Vec<u8>, u32, u32);
 
-/// 线程安全的全局壁纸解码原始缓冲缓存池（最多容纳 4 张高分采样图，防止高频换图爆内存）
+/// 线程安全的全局壁纸解码原始缓冲缓存池（最多容纳 2 张高分采样图，防止高频换图爆内存）
 pub static WALLPAPER_RAW_CACHE: std::sync::LazyLock<std::sync::Mutex<std::collections::HashMap<String, RawWallpaperData>>> =
     std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
 
@@ -486,7 +487,7 @@ pub fn load_pixel_buffer_fast(path_str: &str) -> Option<slint::SharedPixelBuffer
 
     let (raw, rw, rh) = decode_and_resize_to_raw(path)?;
     if let Ok(mut raw_c) = WALLPAPER_RAW_CACHE.lock() {
-        if raw_c.len() >= 4 {
+        if raw_c.len() >= 2 {
             if let Some(oldest) = raw_c.keys().next().cloned() {
                 raw_c.remove(&oldest);
             }
@@ -494,6 +495,13 @@ pub fn load_pixel_buffer_fast(path_str: &str) -> Option<slint::SharedPixelBuffer
         raw_c.insert(path_str.to_string(), (raw.clone(), rw, rh));
     }
     Some(slint::SharedPixelBuffer::clone_from_slice(&raw, rw, rh))
+}
+
+/// 清空壁纸内存原始像素缓冲池 (在切换为纯色模式或停用壁纸时立即释放堆内存)
+pub fn clear_wallpaper_raw_cache() {
+    if let Ok(mut raw_c) = WALLPAPER_RAW_CACHE.lock() {
+        raw_c.clear();
+    }
 }
 
 /// 100% 后台异步预加载下一张壁纸
@@ -532,7 +540,7 @@ pub fn schedule_wallpaper_preload(
         let decoded = tokio::task::spawn_blocking(move || decode_and_resize_to_raw(&p)).await.unwrap_or(None);
         if let Some((raw_bytes, rw, rh)) = decoded {
             if let Ok(mut raw_c) = WALLPAPER_RAW_CACHE.lock() {
-                if raw_c.len() >= 4 {
+                if raw_c.len() >= 2 {
                     if let Some(oldest) = raw_c.keys().next().cloned() {
                         raw_c.remove(&oldest);
                     }
@@ -1320,7 +1328,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                         wps.push(path_str.clone());
                     }
                     let new_idx = wps.iter().position(|p| p == &path_str).unwrap_or(0);
-                    let slint_strings: Vec<slint::SharedString> = wps.iter().map(|s| s.as_str().into()).collect();
+                    let slint_strings: Vec<slint::SharedString> = wps.iter().map(|s| s.to_shared()).collect();
                     (new_idx, slint_strings, wps.clone())
                 };
 
@@ -1330,15 +1338,15 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
                 let wb = w.global::<WindowBridge>();
                 wb.set_wallpaper_mode(apply_mode.into());
-                wb.set_wallpaper_path(path_str.as_str().into());
+                wb.set_wallpaper_path(path_str.to_shared());
                 let op = wb.get_global_wallpaper_opacity();
-                wb.invoke_set_wallpaper(apply_mode.into(), path_str.clone().into(), op);
+                wb.invoke_set_wallpaper(apply_mode.into(), path_str.to_shared(), op);
 
                 let sb = w.global::<SettingsBridge>();
-                sb.set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                sb.set_setting_wallpaper_list(to_model_rc(slint_strings));
                 sb.set_setting_wallpaper_active_index(new_idx as i32);
                 sb.set_setting_wallpaper_mode(apply_mode.into());
-                sb.set_setting_wallpaper_path(path_str.as_str().into());
+                sb.set_setting_wallpaper_path(path_str.to_shared());
 
                 let storage = core_state_wp_add.storage().clone();
                 let m_to_save = apply_mode.to_string();
@@ -1411,21 +1419,21 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 *active_idx_ref.borrow_mut() = effective_idx;
 
                 let wb = w.global::<WindowBridge>();
-                wb.set_wallpaper_path(folder_str.as_str().into());
+                wb.set_wallpaper_path(folder_str.to_shared());
 
                 let cur_mode = wb.get_wallpaper_mode().to_string();
                 let apply_mode = if cur_mode == "none" { "global" } else { cur_mode.as_str() };
                 wb.set_wallpaper_mode(apply_mode.into());
                 if !first_image_path.is_empty() {
                     let op = wb.get_global_wallpaper_opacity();
-                    wb.invoke_set_wallpaper(apply_mode.into(), first_image_path.as_str().into(), op);
+                    wb.invoke_set_wallpaper(apply_mode.into(), first_image_path.to_shared(), op);
                 }
 
                 let sb = w.global::<SettingsBridge>();
-                sb.set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                sb.set_setting_wallpaper_list(to_model_rc(slint_strings));
                 sb.set_setting_wallpaper_active_index(effective_idx as i32);
                 sb.set_setting_wallpaper_mode(apply_mode.into());
-                sb.set_setting_wallpaper_path(folder_str.as_str().into());
+                sb.set_setting_wallpaper_path(folder_str.to_shared());
 
                 let storage = core_state_wp_folder.storage().clone();
                 let m_to_save = apply_mode.to_string();
@@ -1473,7 +1481,7 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                     };
                     let is_empty = wps.is_empty();
                     let next_path = if !is_empty { wps[next_active].clone() } else { String::new() };
-                    let slint_strings: Vec<slint::SharedString> = wps.iter().map(|s| s.as_str().into()).collect();
+                    let slint_strings: Vec<slint::SharedString> = wps.iter().map(|s| s.to_shared()).collect();
                     Some((next_active, is_empty, next_path, slint_strings, wps.clone()))
                 } else {
                     None
@@ -1498,9 +1506,9 @@ pub(crate) fn register_theme_and_wallpaper_handlers(window: &AppWindow, ctx: &Ap
                 });
 
                 let sb = w.global::<SettingsBridge>();
-                sb.set_setting_wallpaper_list(ModelRc::new(VecModel::from(slint_strings)));
+                sb.set_setting_wallpaper_list(to_model_rc(slint_strings));
                 sb.set_setting_wallpaper_active_index(next_active as i32);
-                sb.set_setting_wallpaper_path(next_path.as_str().into());
+                sb.set_setting_wallpaper_path(next_path.to_shared());
                 if is_empty {
                     sb.set_setting_wallpaper_mode("none".into());
                 }

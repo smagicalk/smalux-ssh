@@ -10,8 +10,13 @@
 
 ## 🧩 UI 组件与文件结构
 
-- **抽屉主组件**：[`crates/smagical-ui/ui/views/left_drawers/hosts_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/left_drawers/hosts_drawer.slint)
-- **通用抽屉容器**：[`crates/smagical-ui/ui/components/drawer-container.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/drawer-container.slint)
+- **主机抽屉主组件**：[`crates/ui/plugins/hosts/ui/drawers/hosts_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/drawers/hosts_drawer.slint)
+- **新建主机弹窗**：[`crates/ui/plugins/hosts/ui/modals/create-host-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/modals/create-host-modal.slint)
+- **新建分组弹窗**：[`crates/ui/plugins/hosts/ui/modals/create-group-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/modals/create-group-modal.slint)
+- **专属伴生抽屉**：
+  - AI 智能助手：[`crates/ui/plugins/hosts/ui/companion/ai/ai_tool_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/companion/ai/ai_tool_drawer.slint)
+  - 实时性能监控：[`crates/ui/plugins/hosts/ui/companion/monitor/monitor_tool_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/companion/monitor/monitor_tool_drawer.slint)
+  - Tmux 会话管理：[`crates/ui/plugins/hosts/ui/companion/tmux/tmux_tool_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/companion/tmux/tmux_tool_drawer.slint)
 - **纯函数与树算法**：[`crates/smagical-ui/src/tree_model.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/tree_model.rs)
 - **路由回调处理器**：[`crates/smagical-ui/src/handlers/host_handlers.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/host_handlers.rs)
 

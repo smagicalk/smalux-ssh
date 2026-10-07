@@ -3,7 +3,7 @@
 //! 跨平台托管本地子进程（Windows ConPTY、Linux/macOS Unix PTY），处理非阻塞 I/O 流转发与动态网格尺寸伸缩。
 
 use std::io::{Read, Write};
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{sync_channel, Receiver, SyncSender};
 use std::sync::{Arc, Mutex};
 use std::thread;
 
@@ -109,7 +109,7 @@ impl PtyProcess {
         let writer = pair.master.take_writer().context("获取 PTY 写入流失败")?;
         let mut reader = pair.master.try_clone_reader().context("克隆 PTY 读取流失败")?;
 
-        let (tx_output, rx_output): (Sender<Vec<u8>>, Receiver<Vec<u8>>) = channel();
+        let (tx_output, rx_output): (SyncSender<Vec<u8>>, Receiver<Vec<u8>>) = sync_channel(512);
 
         let writer_arc = Arc::new(Mutex::new(writer));
         let writer_for_thread = Arc::clone(&writer_arc);
@@ -269,6 +269,16 @@ impl PtyProcess {
         chunks
     }
 
+    /// 高效消费当前累积的全部输出字节块直接喂入闭包，避免分配中间 Vec<Vec<u8>>
+    pub fn drain_output_into<F: FnMut(&[u8])>(&self, mut consumer: F) -> bool {
+        let mut had_any = false;
+        while let Ok(chunk) = self.rx_output.try_recv() {
+            had_any = true;
+            consumer(&chunk);
+        }
+        had_any
+    }
+
     /// 动态更新终端视口网格行列尺寸（通知子进程 `SIGWINCH` / `ResizePseudoConsole`）。
     ///
     /// # 参数
@@ -313,5 +323,12 @@ impl PtyProcess {
     /// 统一委托给 local_shells 模块，使用已探测验证的绝对路径与专用参数 (如 Git Bash 的 --login -i)。
     fn resolve_command_by_id(shell_id: &str) -> CommandBuilder {
         crate::local_shells::resolve_command_for_shell(shell_id)
+    }
+}
+
+impl Drop for PtyProcess {
+    fn drop(&mut self) {
+        // 确保实例析构时彻底终止底层的子进程，杜绝孤儿进程与句柄泄漏
+        let _ = self.child.kill();
     }
 }

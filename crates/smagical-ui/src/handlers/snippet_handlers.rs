@@ -5,11 +5,12 @@
 
 use std::collections::HashMap;
 
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, Model};
 use smagical_core::domain::snippet::{SnippetGroupRecord, SnippetRecord};
 use smagical_core::domain::terminal_context::TerminalAction;
 use smagical_core::event::{SnippetDeletedEvent, SnippetExecutedEvent, SnippetGroupDeletedEvent, SnippetGroupSavedEvent, SnippetSavedEvent};
 
+use crate::common::{matches_any_ignore_case, run_on_ui, to_model_rc, ToSharedString};
 use crate::generated::{AppWindow, QuickCmdData, SnippetParamFieldData, SnippetsBridge, WindowBridge};
 use crate::handlers::AppContext;
 use crate::snippet_tree_model::{
@@ -94,35 +95,51 @@ pub(crate) fn render_snippets_ui(
         build_search_snippet_tree_nodes(master, search_q)
     };
 
-    let nodes_model = ModelRc::new(VecModel::from(visible_nodes));
     let bridge = window.global::<SnippetsBridge>();
-    bridge.set_tree_nodes(nodes_model);
+    let current_nodes = bridge.get_tree_nodes();
+    crate::store::diff::update_model_rc_in_place(&current_nodes, visible_nodes, |m| bridge.set_tree_nodes(m));
     bridge.set_search_query(search_q.into());
 
     // 分组下拉选项 (纯内存计算)
     let options = build_snippet_group_options_from_records(groups);
-    bridge.set_parent_options(ModelRc::new(VecModel::from(options)));
+    bridge.set_parent_options(to_model_rc(options));
 
-    // 右侧伴生工具栏快速列表 (显示所有非分组代码片段)
+    // 右侧伴生工具栏快速列表 (智能推荐排序：高频常用优先置顶)
     let group_map: HashMap<String, String> = groups.iter().map(|g| (g.id.clone(), g.name.clone())).collect();
-    let quick_list: Vec<QuickCmdData> = snippets
-        .iter()
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+
+    let tracker = crate::snippet_service::get_usage_tracker().read().unwrap();
+    let mut ranked_snippets: Vec<&SnippetRecord> = snippets.iter().collect();
+    ranked_snippets.sort_by(|a, b| {
+        let score_a = tracker.calculate_score(&a.id, a.is_favorite, now);
+        let score_b = tracker.calculate_score(&b.id, b.is_favorite, now);
+        score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| a.sort_order.cmp(&b.sort_order))
+            .then_with(|| a.title.cmp(&b.title))
+    });
+
+    let quick_list: Vec<QuickCmdData> = ranked_snippets
+        .into_iter()
         .map(|s| {
             let cat_name = s.parent_group_id.as_deref()
                 .and_then(|gid| group_map.get(gid))
                 .cloned()
                 .unwrap_or_default();
             QuickCmdData {
-                id: s.id.clone().into(),
-                title: s.title.clone().into(),
-                command: s.content.clone().into(),
+                id: s.id.to_shared(),
+                title: s.title.to_shared(),
+                command: s.content.to_shared(),
                 category: cat_name.into(),
-                language: s.language.clone().into(),
+                language: s.language.to_shared(),
             }
         })
         .collect();
 
-    bridge.set_quick_cmds(ModelRc::new(VecModel::from(quick_list)));
+    let current_quick = bridge.get_quick_cmds();
+    crate::store::diff::update_model_rc_in_place(&current_quick, quick_list, |m| bridge.set_quick_cmds(m));
 }
 
 /// 异步从存储层拉取代码片段与多层分组并调度回 UI 主线程渲染
@@ -280,12 +297,12 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                             format!("识别到 {} 个动态模板参数: {}", vars.len(), var_names.join(", "))
                         };
 
-                        bridge.set_form_id(node.id.clone().into());
-                        bridge.set_form_title(node.name.clone().into());
-                        bridge.set_form_language(node.language.clone().into());
-                        bridge.set_form_code(node.content.clone().into());
+                        bridge.set_form_id(node.id.to_shared());
+                        bridge.set_form_title(node.name.to_shared());
+                        bridge.set_form_language(node.language.to_shared());
+                        bridge.set_form_code(node.content.to_shared());
                         bridge.set_form_auto_execute(node.auto_execute);
-                        bridge.set_form_description(node.description.clone().into());
+                        bridge.set_form_description(node.description.to_shared());
                         bridge.set_form_is_favorite(node.is_favorite);
                         bridge.set_form_updated_at("刚刚".into());
                         bridge.set_form_group_id(cat_id.into());
@@ -644,7 +661,7 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
         });
     }
 
-    // 13. 执行代码片段 (检查是否包含变量参数)
+    // 13. 执行代码片段 (检查是否包含变量参数，智能参数记忆与预填)
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
@@ -667,28 +684,32 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                 };
                 let vars = dummy_rec.extract_variables();
                 if vars.is_empty() {
-                    // 无参数 -> 直接注入当前活跃终端
+                    // 无参数 -> 直接注入当前活跃终端并记录执行频次与按键音效反馈
                     execute_snippet_in_terminal(&ctx, &node.id, &node.content, node.auto_execute);
+                    crate::snippet_service::record_snippet_execution(&node.id, None, None);
                     ctx.notify_success("注入执行", format!("已向活动终端发送 '{}'", node.name));
                 } else if let Some(w) = w_handle.upgrade() {
-                    let default_params: HashMap<String, String> = vars.iter()
-                        .filter_map(|v| v.default_value.as_ref().map(|d| (v.key.clone(), d.clone())))
-                        .collect();
-                    let rendered = dummy_rec.render_content(&default_params);
-
+                    // 动态参数预填：从参数记忆中提取历史输入值 (片段专属 > 全局同名变量 > 模板缺省值)
+                    let memory = ctx.snippet_param_memory.read().unwrap();
+                    let mut resolved_params = HashMap::new();
                     let fields: Vec<SnippetParamFieldData> = vars.iter()
-                        .map(|v| SnippetParamFieldData {
-                            key: v.key.clone().into(),
-                            label: v.label.clone().into(),
-                            value: v.default_value.clone().unwrap_or_default().into(),
-                            default_val: v.default_value.clone().unwrap_or_default().into(),
+                        .map(|v| {
+                            let resolved_val = memory.resolve_param(&node.id, &v.key, v.default_value.as_deref());
+                            resolved_params.insert(v.key.clone(), resolved_val.clone());
+                            SnippetParamFieldData {
+                                key: v.key.to_shared(),
+                                label: v.label.to_shared(),
+                                value: resolved_val.to_shared(),
+                                default_val: v.default_value.clone().unwrap_or_default().to_shared(),
+                            }
                         })
                         .collect();
+                    let rendered = dummy_rec.render_content(&resolved_params);
 
                     let bridge = w.global::<SnippetsBridge>();
-                    bridge.set_run_snippet_id(node.id.clone().into());
-                    bridge.set_run_snippet_title(node.name.clone().into());
-                    bridge.set_run_params_list(ModelRc::new(VecModel::from(fields)));
+                    bridge.set_run_snippet_id(node.id.to_shared());
+                    bridge.set_run_snippet_title(node.name.to_shared());
+                    bridge.set_run_params_list(to_model_rc(fields));
                     bridge.set_run_rendered_command(rendered.into());
                     bridge.set_is_run_modal_open(true);
                 }
@@ -707,12 +728,12 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                 let tree = ctx.master_snippet_tree.read().unwrap();
                 if let Some(node) = tree.iter().find(|n| n.id == id) {
                     let list = bridge.get_run_params_list();
-                    let mut new_fields = Vec::new();
                     let mut params = HashMap::new();
                     for i in 0..list.row_count() {
                         if let Some(mut item) = list.row_data(i) {
                             if i == idx as usize {
                                 item.value = val.clone();
+                                list.set_row_data(i, item.clone());
                             }
                             let v_val = if item.value.as_str().is_empty() {
                                 item.default_val.to_string()
@@ -720,7 +741,6 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                                 item.value.to_string()
                             };
                             params.insert(item.key.to_string(), v_val);
-                            new_fields.push(item);
                         }
                     }
                     let dummy_rec = SnippetRecord {
@@ -737,7 +757,6 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                         updated_at: String::new(),
                     };
                     let rendered = dummy_rec.render_content(&params);
-                    bridge.set_run_params_list(ModelRc::new(VecModel::from(new_fields)));
                     bridge.set_run_rendered_command(rendered.into());
                 }
             }
@@ -766,55 +785,87 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                     tree.iter().find(|n| n.id == id).map(|n| n.auto_execute).unwrap_or(true)
                 };
 
+                // 提取本次用户填写的实参映射表以供动态记忆跨会话复用
+                let list = bridge.get_run_params_list();
+                let mut executed_params = HashMap::new();
+                for i in 0..list.row_count() {
+                    if let Some(item) = list.row_data(i) {
+                        let v = if item.value.as_str().is_empty() {
+                            item.default_val.to_string()
+                        } else {
+                            item.value.to_string()
+                        };
+                        executed_params.insert(item.key.to_string(), v);
+                    }
+                }
+
                 execute_snippet_in_terminal(&ctx, &id, &cmd, auto);
+                // 记录使用频次、持久化本次参数并触发音效物理反馈
+                crate::snippet_service::record_snippet_execution(&id, None, Some(&executed_params));
                 ctx.notify_success("注入执行", "参数化命令已注入活动终端");
                 bridge.set_is_run_modal_open(false);
             }
         });
     }
 
-    // 16. 右侧伴生工具栏搜索过滤
+    // 16. 右侧伴生工具栏搜索过滤 (融入智能推荐排序)
     {
         let ctx = ctx.clone();
         let w_handle = window.as_weak();
         sb.on_filter_quick_cmds(move |query| {
             let q = query.trim().to_lowercase();
             let storage = ctx.core_state.storage();
+            let tracker_arc = ctx.snippet_usage_tracker.clone();
             let w_weak = w_handle.clone();
             crate::async_util::spawn_async(async move {
                 let all_snippets = storage.snippets().list_all().await.unwrap_or_default();
                 let groups = storage.snippets().list_groups().await.unwrap_or_default();
                 let group_map: HashMap<String, String> = groups.into_iter().map(|g| (g.id, g.name)).collect();
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                let tracker = tracker_arc.read().unwrap();
 
-                let filtered: Vec<QuickCmdData> = all_snippets
+                let mut filtered: Vec<SnippetRecord> = all_snippets
                     .into_iter()
                     .filter(|s| {
                         if q.is_empty() {
                             true
                         } else {
-                            s.title.to_lowercase().contains(&q)
-                                || s.content.to_lowercase().contains(&q)
+                            matches_any_ignore_case(&[&s.title, &s.content], &q)
                         }
                     })
+                    .collect();
+
+                // 智能推荐加权排序：置顶星标 -> 频次加权 -> 时间衰减
+                filtered.sort_by(|a, b| {
+                    let score_a = tracker.calculate_score(&a.id, a.is_favorite, now);
+                    let score_b = tracker.calculate_score(&b.id, b.is_favorite, now);
+                    score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.sort_order.cmp(&b.sort_order))
+                        .then_with(|| a.title.cmp(&b.title))
+                });
+
+                let quick_items: Vec<QuickCmdData> = filtered
+                    .into_iter()
                     .map(|s| {
                         let cat_name = s.parent_group_id.as_deref()
                             .and_then(|gid| group_map.get(gid))
                             .cloned()
                             .unwrap_or_default();
                         QuickCmdData {
-                            id: s.id.into(),
-                            title: s.title.into(),
-                            command: s.content.into(),
-                            category: cat_name.into(),
-                            language: s.language.into(),
+                            id: s.id.to_shared(),
+                            title: s.title.to_shared(),
+                            command: s.content.to_shared(),
+                            category: cat_name.to_shared(),
+                            language: s.language.to_shared(),
                         }
                     })
                     .collect();
 
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(w) = w_weak.upgrade() {
-                        w.global::<SnippetsBridge>().set_quick_cmds(ModelRc::new(VecModel::from(filtered)));
-                    }
+                run_on_ui(w_weak, move |w| {
+                    w.global::<SnippetsBridge>().set_quick_cmds(to_model_rc(quick_items));
                 });
             });
         });
@@ -1076,23 +1127,21 @@ pub(crate) fn register_snippet_handlers(window: &AppWindow, ctx: &AppContext) {
                         ("root".to_string(), "根目录 (顶级文件夹)".to_string())
                     };
 
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(w) = w_weak.upgrade() {
-                            let bridge = w.global::<SnippetsBridge>();
-                            bridge.set_form_id(s.id.clone().into());
-                            bridge.set_form_title(s.title.clone().into());
-                            bridge.set_form_language(s.language.clone().into());
-                            bridge.set_form_code(s.content.clone().into());
-                            bridge.set_form_auto_execute(s.auto_execute);
-                            bridge.set_form_description(s.description.clone().into());
-                            bridge.set_form_is_favorite(s.is_favorite);
-                            bridge.set_form_updated_at(s.updated_at.clone().into());
-                            bridge.set_form_group_id(cat_id.into());
-                            bridge.set_form_category_name(cat_name.into());
-                            bridge.set_is_editing(true);
-                            bridge.set_is_create_mode(false);
-                            bridge.set_is_edit_snippet_modal_open(true);
-                        }
+                    run_on_ui(w_weak, move |w| {
+                        let bridge = w.global::<SnippetsBridge>();
+                        bridge.set_form_id(s.id.to_shared());
+                        bridge.set_form_title(s.title.to_shared());
+                        bridge.set_form_language(s.language.to_shared());
+                        bridge.set_form_code(s.content.to_shared());
+                        bridge.set_form_auto_execute(s.auto_execute);
+                        bridge.set_form_description(s.description.to_shared());
+                        bridge.set_form_is_favorite(s.is_favorite);
+                        bridge.set_form_updated_at(s.updated_at.to_shared());
+                        bridge.set_form_group_id(cat_id.into());
+                        bridge.set_form_category_name(cat_name.into());
+                        bridge.set_is_editing(true);
+                        bridge.set_is_create_mode(false);
+                        bridge.set_is_edit_snippet_modal_open(true);
                     });
                 }
             });

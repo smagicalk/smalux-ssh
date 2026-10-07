@@ -4,8 +4,6 @@ use anyhow::Result;
 use smagical_core::CoreState;
 use smagical_ui_common::{SidebarPlugin, SidebarPosition};
 
-slint::include_modules!();
-
 /// 代码片段插件定义
 #[derive(Debug, Default, Clone, Copy)]
 pub struct SnippetsPlugin;

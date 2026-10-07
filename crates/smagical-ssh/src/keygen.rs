@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use rand::rng;
 use smagical_core::service::{
     error::{SshServiceError, SshServiceResult},
-    keygen::{GeneratedKeyPair, KeyAlgorithm, KeygenService},
+    keygen::{GeneratedKeyPair, KeyAlgorithm, KeygenService, ParsedKeyInfo},
 };
 use ssh_key::{Algorithm, EcdsaCurve, HashAlg, LineEnding, PrivateKey, PublicKey};
 
@@ -88,6 +88,88 @@ impl KeygenService for NativeKeygenService {
         let pub_key = PublicKey::from_openssh(public_key_openssh.trim())
             .map_err(|e| SshServiceError::Internal(format!("无效的 OpenSSH 公钥: {e}")))?;
         Ok(pub_key.fingerprint(HashAlg::Sha256).to_string())
+    }
+
+    fn parse_private_key(
+        &self,
+        private_key_pem: &str,
+        passphrase: Option<&str>,
+    ) -> SshServiceResult<ParsedKeyInfo> {
+        let trimmed = private_key_pem.trim();
+        if trimmed.is_empty() {
+            return Err(SshServiceError::Internal("私钥内容为空".to_string()));
+        }
+
+        // 尝试按 OpenSSH PEM 或 PuTTY PPK 格式解析
+        let parsed = PrivateKey::from_openssh(trimmed.as_bytes())
+            .or_else(|_| PrivateKey::from_ppk(trimmed, passphrase.map(|s| s.to_string())))
+            .map_err(|e| SshServiceError::Internal(format!("无法解析的 SSH 私钥格式: {e}")))?;
+
+        let is_encrypted = parsed.is_encrypted();
+        let comment = if parsed.comment().is_empty() {
+            None
+        } else {
+            Some(parsed.comment().to_string())
+        };
+
+        let algorithm_name = match parsed.algorithm() {
+            Algorithm::Ed25519 => "Ed25519".to_string(),
+            Algorithm::Rsa { .. } => "RSA".to_string(),
+            Algorithm::Ecdsa { curve } => match curve {
+                EcdsaCurve::NistP256 => "ECDSA-P256".to_string(),
+                EcdsaCurve::NistP384 => "ECDSA-P384".to_string(),
+                EcdsaCurve::NistP521 => "ECDSA-P521".to_string(),
+            },
+            Algorithm::Dsa => "DSA".to_string(),
+            other => format!("{other:?}"),
+        };
+
+        // 如果未加密，或者提供了口令并成功解密，则提取公钥和 SHA256 指纹
+        let active_key = if is_encrypted {
+            if let Some(pass) = passphrase.filter(|p| !p.is_empty()) {
+                match parsed.clone().decrypt(pass) {
+                    Ok(decrypted) => Some(decrypted),
+                    Err(e) => {
+                        return Err(SshServiceError::Internal(format!("口令解密失败: {e}")));
+                    }
+                }
+            } else {
+                None
+            }
+        } else {
+            Some(parsed)
+        };
+
+        if let Some(key) = active_key {
+            let pub_key = key.public_key();
+            let mut pub_str = pub_key
+                .to_openssh()
+                .map_err(|e| SshServiceError::Internal(format!("编码 OpenSSH 公钥失败: {e}")))?;
+            if let Some(ref c) = comment {
+                let parts: Vec<&str> = pub_str.split_whitespace().collect();
+                if parts.len() == 2 {
+                    pub_str = format!("{pub_str} {c}");
+                }
+            }
+            let fingerprint = pub_key.fingerprint(HashAlg::Sha256).to_string();
+
+            Ok(ParsedKeyInfo {
+                algorithm: algorithm_name,
+                public_key_openssh: Some(pub_str),
+                fingerprint: Some(fingerprint),
+                is_encrypted,
+                comment,
+            })
+        } else {
+            // 受口令保护且尚未输入口令
+            Ok(ParsedKeyInfo {
+                algorithm: algorithm_name,
+                public_key_openssh: None,
+                fingerprint: None,
+                is_encrypted: true,
+                comment,
+            })
+        }
     }
 }
 
@@ -182,5 +264,33 @@ mod tests {
         assert!(pub_key.starts_with("ssh-ed25519"));
         assert!(pub_key.ends_with("test@smalux.io"));
         assert!(fp.starts_with("SHA256:"));
+    }
+
+    #[test]
+    fn test_native_parse_private_key() {
+        let svc = NativeKeygenService::new();
+        // 1. 生成未加密 Ed25519 密钥对并解析
+        let kp = svc.generate_keypair(KeyAlgorithm::Ed25519, None, None).unwrap();
+        let parsed = svc.parse_private_key(&kp.private_key_pem, None).unwrap();
+        assert_eq!(parsed.algorithm, "Ed25519");
+        assert!(!parsed.is_encrypted);
+        assert_eq!(parsed.fingerprint.unwrap(), kp.fingerprint);
+        assert_eq!(parsed.public_key_openssh.unwrap(), kp.public_key_openssh);
+
+        // 2. 生成带口令保护的 Ed25519 密钥对
+        let kp_enc = svc.generate_keypair(KeyAlgorithm::Ed25519, None, Some("my_pass")).unwrap();
+        // 2a. 未传口令解析
+        let parsed_no_pass = svc.parse_private_key(&kp_enc.private_key_pem, None).unwrap();
+        assert!(parsed_no_pass.is_encrypted);
+        assert!(parsed_no_pass.public_key_openssh.is_none());
+
+        // 2b. 传入错误口令解析
+        assert!(svc.parse_private_key(&kp_enc.private_key_pem, Some("bad_pass")).is_err());
+
+        // 2c. 传入正确口令解析
+        let parsed_with_pass = svc.parse_private_key(&kp_enc.private_key_pem, Some("my_pass")).unwrap();
+        assert!(parsed_with_pass.is_encrypted);
+        assert_eq!(parsed_with_pass.public_key_openssh.unwrap(), kp_enc.public_key_openssh);
+        assert_eq!(parsed_with_pass.fingerprint.unwrap(), kp_enc.fingerprint);
     }
 }

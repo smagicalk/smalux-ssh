@@ -11,9 +11,13 @@ build = "build.rs"
 slint.workspace = true
 smagical-ui-common = { path = "../common" }
 plugin-hosts = { path = "../plugins/hosts" }
-plugin-session-tools = { path = "../plugins/session_tools" }
+plugin-credentials = { path = "../plugins/credentials" }
+plugin-files = { path = "../plugins/files" }
+plugin-history = { path = "../plugins/history" }
 plugin-snippets = { path = "../plugins/snippets" }
 plugin-tunnels = { path = "../plugins/tunnels" }
+plugin-debug = { path = "../plugins/debug" }
+plugin-settings = { path = "../plugins/settings" }
 
 [lib]
 test = false

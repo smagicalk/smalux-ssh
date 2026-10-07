@@ -10,9 +10,10 @@
 
 ## 🧩 UI 组件与文件结构
 
-- **主视图组件**：[`crates/smagical-ui/ui/views/file_explorer_view.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/file_explorer_view.slint)
-- **主机选择弹窗**：[`crates/smagical-ui/ui/components/file-host-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/file-host-modal.slint)
-- **右键上下文菜单**：[`crates/smagical-ui/ui/components/context-menu.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/context-menu.slint)
+- **主视图组件**：[`crates/ui/plugins/files/ui/views/file_explorer_view.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/files/ui/views/file_explorer_view.slint)
+- **主机选择弹窗**：[`crates/ui/plugins/files/ui/modals/file-host-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/files/ui/modals/file-host-modal.slint)
+- **右键上下文菜单**：[`crates/ui/common/ui/shared/composite/context-menu.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/shared/composite/context-menu.slint)
+- **伴生传输抽屉**：[`crates/ui/plugins/files/ui/companion/sftp_tool_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/files/ui/companion/sftp_tool_drawer.slint)
 - **领域数据模型**：[`crates/smagical-core/src/domain/file_item.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-core/src/domain/file_item.rs)
 - **路由回调处理器**：[`crates/smagical-ui/src/handlers/file_handlers.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/file_handlers.rs)
 

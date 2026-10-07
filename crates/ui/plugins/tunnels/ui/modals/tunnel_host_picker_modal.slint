@@ -5,10 +5,10 @@
 
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
-import { HostTreeSelector } from "host-tree-selector.slint";
+import { HostTreeSelector } from "@common/shared/composite/host-tree-selector.slint";
 import { HostTreeNode } from "@common/features/hosts/hosts_model.slint";
 
-export component TunnelHostPickerModal inherits Rectangle {
+component TunnelHostPickerModal inherits Rectangle {
     in-out property <bool> is-open: false;
     in property <string> purpose: "host-select"; // "jump-add" | "host-select"
     in property <[HostTreeNode]> tree-nodes: [];
@@ -29,7 +29,7 @@ export component TunnelHostPickerModal inherits Rectangle {
 
     // 遮罩层
     Rectangle {
-        background: #000000.transparentize(50%);
+        background: #000000a6;
         TouchArea {
             // 阻断背景点击
         }
@@ -40,11 +40,11 @@ export component TunnelHostPickerModal inherits Rectangle {
         width: 440px;
         height: 380px;
         border-radius: AppTheme.radius-large;
-        background: AppTheme.panel-background;
+        background: AppTheme.modal-background;
         border-width: 1px;
         border-color: AppTheme.border;
-        drop-shadow-blur: 16px;
-        drop-shadow-color: #000000.transparentize(55%);
+        drop-shadow-blur: 24px;
+        drop-shadow-color: #00000066;
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
 
@@ -65,7 +65,7 @@ export component TunnelHostPickerModal inherits Rectangle {
                     VerticalLayout {
                         alignment: center;
                         Image {
-                            source: @image-url("../../../assets/icons/server.svg");
+                            source: @image-url("../assets/icons/server.svg");
                             width: 15px;
                             height: 15px;
                             colorize: AppTheme.accent;
@@ -99,7 +99,7 @@ export component TunnelHostPickerModal inherits Rectangle {
                     }
 
                     Image {
-                        source: @image-url("../../../assets/icons/window-close.svg");
+                        source: @image-url("../assets/icons/window-close.svg");
                         width: 10px;
                         height: 10px;
                         colorize: host-close-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
@@ -197,3 +197,5 @@ export component TunnelHostPickerModal inherits Rectangle {
         }
     }
 }
+
+export { TunnelHostPickerModal }

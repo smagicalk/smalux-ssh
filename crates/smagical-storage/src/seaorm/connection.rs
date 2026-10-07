@@ -22,7 +22,7 @@ pub fn get_default_sqlite_path() -> PathBuf {
     }
 }
 
-/// 构造标准 SQLite 连接 URL (例如 "sqlite://C:/Users/.../data.db?mode=rwc")
+/// 构造标准 SQLite 连接 URL (启用 mode=rwc 自动创建读写文件，PRAGMA 参数由 establish_connection 统一注入)
 pub fn get_default_sqlite_url() -> String {
     let path = get_default_sqlite_path();
     let path_str = path.to_string_lossy().replace('\\', "/");
@@ -33,11 +33,21 @@ pub fn get_default_sqlite_url() -> String {
 pub async fn establish_connection(db_url: &str) -> Result<DatabaseConnection> {
     tracing::debug!(target: "smagical_storage::seaorm", "正在连接存储数据库: [{}]", db_url);
     let mut opt = ConnectOptions::new(db_url);
-    opt.sqlx_logging(true)
+    opt.max_connections(8)
+        .min_connections(1)
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .idle_timeout(std::time::Duration::from_secs(60))
+        .acquire_timeout(std::time::Duration::from_secs(10))
+        .sqlx_logging(true)
         .sqlx_logging_level(log::LevelFilter::Debug);
     let db = Database::connect(opt)
         .await
         .with_context(|| format!("连接数据库失败: {}", db_url))?;
+
+    // 强化 SQLite 连接层 PRAGMA 参数生效，支持高并发读写并杜绝 Database Locked 异常
+    if db_url.starts_with("sqlite:") {
+        let _ = db.execute_unprepared("PRAGMA journal_mode = WAL; PRAGMA synchronous = NORMAL; PRAGMA busy_timeout = 5000;").await;
+    }
 
     init_schema(&db).await.context("初始化数据库 DDL 结构失败")?;
     Ok(db)

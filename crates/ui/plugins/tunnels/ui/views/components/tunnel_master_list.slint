@@ -7,11 +7,11 @@ import { AppTheme } from "@common/themes/app-theme.slint";
 import { SearchInput } from "@common/components/search-input.slint";
 import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
-import { AppVScrollBar } from "@common/components/base/app-scroll-bar.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
 import { AppSwitch } from "@common/shared/base/app-switch.slint";
 import { TunnelItemData } from "@common/features/tunnels/tunnels_model.slint";
 
-export component TunnelMasterList inherits Rectangle {
+component TunnelMasterList inherits Rectangle {
     in property <[TunnelItemData]> tunnels: [];
     in-out property <string> filter-category: "all";
     in-out property <string> search-query: "";
@@ -199,7 +199,7 @@ export component TunnelMasterList inherits Rectangle {
             scroll-area := Flickable {
                 width: 100%;
                 height: 100%;
-                viewport-height: list-content.preferred-height;
+                content-height: list-content.preferred-height;
 
                 list-content := VerticalLayout {
                     spacing: 6px;
@@ -216,9 +216,7 @@ export component TunnelMasterList inherits Rectangle {
                         ? AppTheme.accent
                         : (tun.is-running
                             ? AppTheme.success.transparentize(70%)
-                            : ((tun.enabled && tun.run-mode == "FollowTerminal") ? #f39c12.transparentize(70%) : AppTheme.border));
-                    animate background { duration: 120ms; }
-                    animate border-color { duration: 120ms; }
+                            : ((tun.enabled && tun.run-mode == "FollowTerminal") ? AppTheme.warning.transparentize(70%) : AppTheme.border));
 
                     tun-touch := TouchArea {
                         clicked => { root.select-tunnel(tun.id); }
@@ -302,7 +300,7 @@ export component TunnelMasterList inherits Rectangle {
                                     VerticalLayout {
                                         alignment: center;
                                         Image {
-                                            source: @image-url("../../../assets/icons/arrow-right.svg");
+                                            source: @image-url("../../assets/icons/arrow-right.svg");
                                             width: 10px;
                                             height: 10px;
                                             colorize: tun.is-running ? AppTheme.accent : AppTheme.secondary-foreground;
@@ -377,7 +375,7 @@ export component TunnelMasterList inherits Rectangle {
                                     text: "• " + @tr("待命中");
                                     font-size: 9px;
                                     font-weight: 600;
-                                    color: #f39c12;
+                                    color: AppTheme.warning;
                                     horizontal-alignment: left;
                                     vertical-alignment: center;
                                 }
@@ -427,8 +425,8 @@ export component TunnelMasterList inherits Rectangle {
                                         alignment: center;
                                         Image {
                                             source: tun.tunnel-type == "JumpHost"
-                                                ? @image-url("../../../assets/icons/shield.svg")
-                                                : @image-url("../../../assets/icons/radio.svg");
+                                                ? @image-url("../../assets/icons/shield.svg")
+                                                : @image-url("../../assets/icons/radio.svg");
                                             width: 12px;
                                             height: 12px;
                                             colorize: tun.tunnel-type == "JumpHost" ? #e67e22 : AppTheme.accent;
@@ -454,10 +452,12 @@ export component TunnelMasterList inherits Rectangle {
         }
 
         AppVScrollBar {
-            viewport-height: scroll-area.viewport-height;
+            content-height: scroll-area.content-height;
             visible-height: scroll-area.height;
-            viewport-y <=> scroll-area.viewport-y;
+            content-y <=> scroll-area.content-y;
         }
         }
     }
 }
+
+export { TunnelMasterList }

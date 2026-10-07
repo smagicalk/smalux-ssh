@@ -3,6 +3,7 @@
 //! 提供针对树形节点与平铺卡片的高性能纯内存差异比对，输出最小变更指令集 (Diff Patch)，
 //! 支持微秒级就地原地刷新 (In-place Row Update)，避免全量销毁与重建 Slint UI 控件。
 
+use crate::common::to_model_rc;
 use crate::generated::{HostItemData, HostTreeNode};
 
 /// 树节点与列表项的局部增量操作指令
@@ -229,6 +230,49 @@ pub fn compute_card_diff(old_cards: &[HostItemData], new_cards: &[HostItemData])
     vec![TreeDiffOp::ReplaceAll {
         items: new_cards.to_vec(),
     }]
+}
+
+/// 智能就地更新 Slint 动态数据模型（仅在行数据发生变化时更新行，杜绝全量 reset 导致 UI 组件重构与鼠标拖拽焦点丢失）。
+pub fn update_model_in_place<T: PartialEq + Clone + 'static>(model: &slint::VecModel<T>, new_items: Vec<T>) {
+    use slint::Model;
+    if model.row_count() == new_items.len() {
+        for (i, item) in new_items.into_iter().enumerate() {
+            if let Some(existing) = model.row_data(i) {
+                if existing != item {
+                    model.set_row_data(i, item);
+                }
+            } else {
+                model.set_row_data(i, item);
+            }
+        }
+    } else {
+        model.set_vec(new_items);
+    }
+}
+
+/// 智能就地更新 Slint `ModelRc<T>`：若当前模型非空且行数相同，逐行对比并调用 `set_row_data` 原地替换脏行；
+/// 若行数变化或初始状态，则通过 `setter` 装配全新的 `ModelRc`。
+pub fn update_model_rc_in_place<T: PartialEq + Clone + 'static, F>(
+    current_model: &slint::ModelRc<T>,
+    new_items: Vec<T>,
+    setter: F,
+) where
+    F: FnOnce(slint::ModelRc<T>),
+{
+    use slint::Model;
+    if current_model.row_count() == new_items.len() && !new_items.is_empty() {
+        for (i, item) in new_items.into_iter().enumerate() {
+            if let Some(existing) = current_model.row_data(i) {
+                if existing != item {
+                    current_model.set_row_data(i, item);
+                }
+            } else {
+                current_model.set_row_data(i, item);
+            }
+        }
+    } else {
+        setter(to_model_rc(new_items));
+    }
 }
 
 #[cfg(test)]

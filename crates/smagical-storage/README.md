@@ -16,7 +16,7 @@ crates/smagical-storage/
     ├── crypto/                 # 工业级安全保险库与密码学底层 (AES-256-GCM + Argon2id)
     │   ├── mod.rs              # CryptoService: KDF 密钥派生、信封加密、金丝雀校验 (RFC 9106)
     │   └── vault.rs            # VaultManager: 数据加密密钥 (DEK) 内存生命周期、动态解密与内存抹零
-    ├── entities/               # SeaORM 关系型实体映射定义 (11 个实体)
+    ├── entities/               # SeaORM 关系型实体映射定义 (13 个实体)
     │   ├── mod.rs              # 实体统一聚合导出
     │   ├── host.rs             # 主机资产数据表 (hosts)
     │   ├── group.rs            # 资产层级分组表 (groups)
@@ -28,7 +28,9 @@ crates/smagical-storage/
     │   ├── snapshot.rs         # 终端输出屏幕快照表 (history_snapshots)
     │   ├── config.rs           # 全局系统偏好配置表 (app_configs)
     │   ├── vault_security.rs   # 保险库主安全表 (vault_securities: Salt, KDF 参数, Canary, 加密 DEK)
-    │   └── system_meta.rs      # 系统元数据与版本追踪表 (system_meta)
+    │   ├── system_meta.rs      # 系统元数据与版本追踪表 (system_meta)
+    │   ├── backup_task.rs      # 多端定时云同步与备份任务表 (backup_tasks)
+    │   └── backup_snapshot.rs  # 本地与远程备份快照归档元数据表 (backup_snapshots)
     ├── seaorm/                 # 基于 SQLite 的 SeaORM 物理持久化仓储实现
     │   ├── mod.rs              # SeaOrmStorage 聚合门面与 AppStorage 实现 (含主密码生命周期)
     │   ├── connection.rs       # 统一连接池、自适应建表 DDL 初始化与保险库 Bootstrap
@@ -80,7 +82,8 @@ crates/smagical-storage/
 - **`Credential`** (`credentials`)：存储凭据类型、用户名、算法、公钥指纹以及被 Vault 物理加密的密码/私钥密文；
 - **`Tunnel`** (`tunnels`)：记录本地/远端转发规则、SOCKS5 代理、跳板拓扑、运行状态与累计收发字节数；
 - **`Snippet`** & **`SnippetGroup`** (`snippets`, `snippet_groups`)：存储脚本模版内容与多级分组目录；
-- **`History`** & **`HistorySnapshot`** (`histories`, `history_snapshots`)：存储终端会话审计足迹与屏幕输出快照。
+- **`History`** & **`HistorySnapshot`** (`histories`, `history_snapshots`)：存储终端会话审计足迹与屏幕输出快照；
+- **`BackupTask`** & **`BackupSnapshot`** (`backup_tasks`, `backup_snapshots`)：存储多端云同步配置策略（S3 / WebDAV / Gist / 本地）与备份归档元数据快照。
 
 ---
 
@@ -117,6 +120,59 @@ crates/smagical-storage/
   - 提供 `get_persisted_storage_mode() -> Option<String>` 与 `save_persisted_storage_mode(mode: &str) -> io::Result<()>`；
   - 支持的值：`"physical"`（默认 SQLite 物理持久化模式）与 `"mock"`（内存仿真模式）；
   - 使得 UI 设置界面的存储模式切换能无感跨进程、跨重启持久生效，亦便于后续自研 CLI 命令行工具读取相同的存储设置。
+
+---
+
+## 三、 核心 API 与调用方法 (Core APIs & Signatures)
+
+### 1. 初始化仓储实例
+```rust
+// 打开本地物理 SQLite 数据库 (自动初始化 schema 并以 WAL 模式运行)
+pub async fn open_default() -> Result<SeaOrmStorage, StorageError>;
+
+// 打开纯内存临时数据库 (适合单元测试与轻量 CI)
+pub async fn open_in_memory() -> Result<SeaOrmStorage, StorageError>;
+
+// 实例化内存仿真种子仓储
+pub fn new() -> MockStorage;
+```
+
+### 2. 保险库主密码与安全锁控制
+```rust
+// 查询当前是否设置了用户自定义主密码
+pub async fn has_custom_master_password(&self) -> Result<bool, StorageError>;
+
+// 使用密码尝试解密主数据密钥 (金丝雀验证)
+pub async fn unlock_vault(&self, password: &str) -> Result<bool, StorageError>;
+
+// 修改主密码 (原子重新派生 KEK 并重加密 DEK)
+pub async fn change_master_password(&self, old_pwd: &str, new_pwd: &str) -> Result<(), StorageError>;
+
+// 移除主密码 (回退至本地机器种子保护)
+pub async fn remove_master_password(&self, old_pwd: &str) -> Result<(), StorageError>;
+```
+
+### 3. 七大业务仓储门面调用
+```rust
+let storage = SeaOrmStorage::open_default().await?;
+
+// 主机资产 CRUD
+let hosts = storage.hosts().list_all().await?;
+let host = storage.hosts().get_by_id("host-id").await?;
+
+// 安全凭据 CRUD (读取时自动透明解密私钥/密码)
+let cred = storage.credentials().get_by_id("cred-id").await?;
+
+// 端口隧道配置
+let tunnels = storage.tunnels().list_all().await?;
+
+// 运维脚本片段
+let snippets = storage.snippets().list_all().await?;
+
+// 会话审计足迹与屏幕快照
+let histories = storage.history().list_recent(50).await?;
+let snapshot = storage.history().get_snapshot("session-id").await?;
+```
 
 ---
 

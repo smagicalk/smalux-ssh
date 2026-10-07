@@ -1,4 +1,4 @@
-﻿// =============================================================================
+// =============================================================================
 // 文件名称: host_context_menu.slint
 // 模块功能: 主机资产树与列表专属右键上下文菜单 (Host & Group Context Menu)
 // 核心设计:
@@ -9,7 +9,7 @@
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { ContextMenuItem, ContextMenuContainer } from "@common/components/context-menu.slint";
 
-export component HostContextMenu inherits ContextMenuContainer {
+component HostContextMenu inherits ContextMenuContainer {
     /// 目标是否为分组节点
     in property <bool> is-group: false;
     /// 目标节点唯一标识
@@ -180,3 +180,5 @@ export component HostContextMenu inherits ContextMenuContainer {
         }
     }
 }
+
+export { HostContextMenu }

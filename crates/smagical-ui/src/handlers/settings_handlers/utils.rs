@@ -121,8 +121,7 @@ pub fn detect_system_and_builtin_fonts() -> Vec<String> {
     fonts
 }
 
-pub(crate) use smagical_ssh::importer::parse_ssh_config;
-pub(crate) use smagical_ssh::importer::get_default_ssh_config_path as get_ssh_config_path;
+
 
 /// 获取系统默认备份导出存放目录
 ///

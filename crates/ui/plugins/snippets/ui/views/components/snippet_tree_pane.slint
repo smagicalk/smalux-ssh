@@ -5,12 +5,12 @@
 // =============================================================================
 
 import { AppTheme } from "@common/themes/app-theme.slint";
-import { AppVScrollBar } from "@common/components/base/app-scroll-bar.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
 import { SearchInput } from "@common/components/search-input.slint";
 import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
 import { SnippetTreeNode } from "@common/features/snippets/snippets_model.slint";
 
-export component SnippetTreePane inherits Rectangle {
+component SnippetTreePane inherits Rectangle {
     in property <[SnippetTreeNode]> tree_nodes: [];
     in-out property <string> search_query: "";
     in-out property <string> selected_id: "";
@@ -105,12 +105,12 @@ export component SnippetTreePane inherits Rectangle {
                 alignment: end;
 
                 AppIconButton {
-                    icon: @image-url("../../../assets/icons/folder-plus.svg");
+                    icon: @image-url("../../assets/icons/folder-plus.svg");
                     clicked => { root.create_group(); }
                 }
 
                 AppIconButton {
-                    icon: @image-url("../../../assets/icons/plus.svg");
+                    icon: @image-url("../../assets/icons/plus.svg");
                     clicked => { root.create_snippet(); }
                 }
             }
@@ -135,7 +135,7 @@ export component SnippetTreePane inherits Rectangle {
                 VerticalLayout {
                     alignment: center;
                     Image {
-                        source: @image-url("../../../assets/icons/folder.svg");
+                        source: @image-url("../../assets/icons/folder.svg");
                         width: 13px;
                         height: 13px;
                         image-fit: contain;
@@ -164,7 +164,7 @@ export component SnippetTreePane inherits Rectangle {
             snippet_scroll := Flickable {
                 width: 100%;
                 height: 100%;
-                viewport-height: list-content.preferred-height;
+                content-height: list-content.preferred-height;
 
                 list-content := VerticalLayout {
                     spacing: 2px;
@@ -183,7 +183,6 @@ export component SnippetTreePane inherits Rectangle {
                             ? AppTheme.accent.transparentize(40%)
                             : (node.id == root.selected_id ? AppTheme.border : transparent);
 
-                        animate background { duration: root.is_dragging ? 0ms : 120ms; }
                         animate opacity { duration: root.is_dragging ? 0ms : 120ms; }
 
                         item-touch := TouchArea {
@@ -230,7 +229,7 @@ export component SnippetTreePane inherits Rectangle {
                                         let total_y = idx * 32px + self.mouse-y;
                                         root.drag_y = total_y;
 
-                                        let screen_y = total_y + snippet_scroll.viewport-y;
+                                        let screen_y = total_y + snippet_scroll.content-y;
                                         if screen_y < 16px {
                                             root.drop_target_index = -1;
                                             root.drop_target_id = "root";
@@ -270,8 +269,8 @@ export component SnippetTreePane inherits Rectangle {
                                 alignment: center;
                                 Image {
                                     source: node.is_group 
-                                        ? (node.is_expanded ? @image-url("../../../assets/icons/folder-open.svg") : @image-url("../../../assets/icons/folder.svg"))
-                                        : @image-url("../../../assets/icons/code.svg");
+                                        ? (node.is_expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg"))
+                                        : @image-url("../../assets/icons/code.svg");
                                     width: 14px;
                                     height: 14px;
                                     image-fit: contain;
@@ -311,10 +310,12 @@ export component SnippetTreePane inherits Rectangle {
             }
 
             AppVScrollBar {
-                viewport-height: snippet_scroll.viewport-height;
+                content-height: snippet_scroll.content-height;
                 visible-height: snippet_scroll.height;
-                viewport-y <=> snippet_scroll.viewport-y;
+                content-y <=> snippet_scroll.content-y;
             }
         }
     }
 }
+
+export { SnippetTreePane }

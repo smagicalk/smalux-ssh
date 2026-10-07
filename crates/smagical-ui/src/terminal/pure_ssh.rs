@@ -105,6 +105,16 @@ impl PureSshProcess {
         chunks
     }
 
+    /// 高效消费当前累积的全部输出字节块直接喂入闭包，避免分配中间 Vec<Vec<u8>>
+    pub fn drain_output_into<F: FnMut(&[u8])>(&self, mut consumer: F) -> bool {
+        let mut had_any = false;
+        while let Ok(chunk) = self.rx_output.try_recv() {
+            had_any = true;
+            consumer(&chunk);
+        }
+        had_any
+    }
+
     /// 动态更新终端视口尺寸
     pub fn resize(&mut self, size: PtySize) -> Result<()> {
         self.size = size;

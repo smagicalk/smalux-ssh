@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use slint::ComponentHandle;
+use crate::common::{run_on_ui, to_model_rc, ToSharedString};
 use crate::generated::{AppWindow, ToastItemData, WindowBridge};
 
 /// 气泡通知业务项
@@ -194,22 +195,20 @@ impl NotificationManager {
     fn sync_ui(&self) {
         let list = self.toasts.lock().unwrap().clone();
         let window = self.window.clone();
-        let _ = slint::invoke_from_event_loop(move || {
-            if let Some(w) = window.upgrade() {
-                let ui_toasts: Vec<ToastItemData> = list
-                    .into_iter()
-                    .map(|t| ToastItemData {
-                        id: t.id.into(),
-                        title: t.title.into(),
-                        message: t.message.into(),
-                        level: t.level.into(),
-                        position: t.position.into(),
-                        duration_ms: t.duration_ms as i32,
-                        closable: t.closable,
-                    })
-                    .collect();
-                w.global::<WindowBridge>().set_toasts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(ui_toasts))));
-            }
+        run_on_ui(window, move |w| {
+            let ui_toasts: Vec<ToastItemData> = list
+                .into_iter()
+                .map(|t| ToastItemData {
+                    id: t.id.to_shared(),
+                    title: t.title.to_shared(),
+                    message: t.message.to_shared(),
+                    level: t.level.to_shared(),
+                    position: t.position.to_shared(),
+                    duration_ms: t.duration_ms as i32,
+                    closable: t.closable,
+                })
+                .collect();
+            w.global::<WindowBridge>().set_toasts(to_model_rc(ui_toasts));
         });
     }
 }

@@ -27,6 +27,18 @@
 
 ---
 
+## 🧩 UI 组件与文件结构
+
+- **主视图入口**：[`crates/ui/plugins/settings/ui/views/settings_view.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/settings/ui/views/settings_view.slint)
+- **设置侧边抽屉**：[`crates/ui/plugins/settings/ui/drawers/settings_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/settings/ui/drawers/settings_drawer.slint)
+- **备份同步抽屉**：[`crates/ui/plugins/settings/ui/drawers/backup_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/settings/ui/drawers/backup_drawer.slint)
+- **主题工坊编辑器**：[`crates/ui/plugins/settings/ui/components/theme-editor-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/settings/ui/components/theme-editor-modal.slint)
+- **色相环取色器**：[`crates/ui/plugins/settings/ui/components/color-wheel-picker-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/settings/ui/components/color-wheel-picker-modal.slint)
+- **领域桥接单例**：[`crates/ui/common/ui/features/settings/settings_bridge.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/features/settings/settings_bridge.slint)
+- **后端设置处理器集群**：[`crates/smagical-ui/src/handlers/settings_handlers/`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/settings_handlers/)
+
+---
+
 ## 二、八大核心业务分类规范
 
 ### 1. 📁 常规设置 (`general`)

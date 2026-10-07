@@ -10,12 +10,12 @@
 //! 7. **快照保留生命周期 (Retention) 修剪**：自动依据任务设定的保留数量，物理修剪远端及数据库中的过期陈旧历史快照。
 
 use std::collections::HashMap;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use slint::{ComponentHandle, ModelRc, VecModel};
+use slint::ComponentHandle;
+use crate::common::{run_on_ui, to_model_rc};
 use smagical_core::domain::backup::{BackupSnapshotRecord, BackupStrategy, BackupTaskRecord};
 use smagical_core::event::{
     AppBeforeExitEvent, AppReadyEvent, ConfigChangedEvent, CredentialDeletedEvent,
@@ -23,7 +23,7 @@ use smagical_core::event::{
     SnippetSavedEvent, TunnelDeletedEvent, TunnelSavedEvent,
 };
 use smagical_core::service::backup::{
-    create_backup_driver, create_backup_payload, format_bytes_size,
+    create_backup_driver, create_backup_payload_with_encryption, format_bytes_size,
 };
 use smagical_core::storage::AppStorage;
 use tokio::sync::Mutex;
@@ -315,6 +315,12 @@ impl BackupDaemonService {
         loop {
             interval.tick().await;
 
+            // 若 UI 主窗口已销毁，终止周期巡检协程，释放 Arc 资源
+            if self.window_weak.upgrade().is_none() {
+                tracing::info!("UI 主窗口已关闭，终止备份巡检后台协程");
+                break;
+            }
+
             // 1. 检查失败待重试队列
             let due_retry_task_ids = {
                 let mut guard = self.retries.lock().await;
@@ -445,9 +451,9 @@ impl BackupDaemonService {
         let task_id = task.id.clone();
         let task_name = task.name.clone();
 
-        // 1. 打包生成全量快照 payload
+        // 1. 打包生成全量快照 payload (支持端到端 AEAD 加密封包)
         let (payload_bytes, hash, hosts_count, _tunnels_count) =
-            match create_backup_payload(storage.as_ref(), true).await {
+            match create_backup_payload_with_encryption(storage.as_ref(), true, None).await {
                 Ok(res) => res,
                 Err(err) => {
                     tracing::error!(target: "smagical_ui::backup", "任务「{}」打包失败: {}", task_name, err);
@@ -494,6 +500,8 @@ impl BackupDaemonService {
                             let _ = driver.delete_snapshot(&p.remote_id).await;
                         }
                     }
+                    // 同步修剪远端存储多端遗留的陈旧镜像
+                    let _ = driver.prune_old_snapshots(keep_count).await;
                 }
 
                 // 4. 更新任务最新状态
@@ -602,10 +610,8 @@ impl BackupDaemonService {
                 })
                 .collect();
 
-            let _ = slint::invoke_from_event_loop(move || {
-                if let Some(w) = window_weak.upgrade() {
-                    w.global::<SettingsBridge>().set_backup_tasks(ModelRc::from(Rc::new(VecModel::from(ui_tasks))));
-                }
+            let _ = run_on_ui(window_weak, move |w| {
+                w.global::<SettingsBridge>().set_backup_tasks(to_model_rc(ui_tasks));
             });
         }
     }

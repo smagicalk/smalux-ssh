@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::path::Path;
 use std::sync::RwLock;
 use slint::ComponentHandle;
+use crate::common::{run_on_ui, to_model_rc};
 use crate::LocalShellItemData;
 
 /// 本地终端配置描述体 (包含完整的二进制路径与启动参数)
@@ -841,12 +842,8 @@ pub fn start_local_shell_discovery(
         }
 
         // 2. 异步回推到 UI 事件循环，就地更新 Slint 启动器数据模型
-        let _ = slint::invoke_from_event_loop(move || {
-            if let Some(w) = window_weak.upgrade() {
-                w.global::<crate::generated::WindowBridge>().set_launcher_local_items(slint::ModelRc::from(std::rc::Rc::new(
-                    slint::VecModel::from(detected),
-                )));
-            }
+        let _ = run_on_ui(window_weak, move |w| {
+            w.global::<crate::generated::WindowBridge>().set_launcher_local_items(to_model_rc(detected));
         });
     });
 }

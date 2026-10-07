@@ -25,7 +25,7 @@ use smagical_core::theme::ThemeService;
 use smagical_core::{CoreState, FileItemData};
 
 
-use slint::ComponentHandle;
+use slint::{ComponentHandle, Model};
 use crate::generated::{AppWindow, HostItemData, LocalShellItemData, WindowBridge};
 use crate::terminal::TerminalInstance;
 use crate::tree_model::RawTreeNode;
@@ -112,6 +112,10 @@ pub(crate) struct AppContext {
     pub local_file_nodes: Rc<RefCell<Vec<FileItemData>>>,
     /// 远程文件列表缓存
     pub remote_file_nodes: Rc<RefCell<Vec<FileItemData>>>,
+    /// 本地文件浏览器视口呈现上限 (默认 200 项，防止海量目录造成 Slint DOM 膨胀卡死)
+    pub local_files_limit: Rc<RefCell<usize>>,
+    /// 远程文件浏览器视口呈现上限 (默认 200 项)
+    pub remote_files_limit: Rc<RefCell<usize>>,
     /// 文件传输任务队列缓存
     pub transfer_tasks: Rc<RefCell<Vec<smagical_core::TransferTask>>>,
     /// 全局气泡通知服务管理器
@@ -123,6 +127,10 @@ pub(crate) struct AppContext {
     pub expanded_snippet_groups: Rc<RefCell<HashSet<String>>>,
     /// 代码片段搜索关键词
     pub snippet_search_query: Rc<RefCell<String>>,
+    /// 代码片段动态参数记忆存储 (跨会话参数预填)
+    pub snippet_param_memory: std::sync::Arc<std::sync::RwLock<smagical_core::domain::snippet::SnippetParamMemory>>,
+    /// 代码片段使用度量追踪与智能评分器 (高频常用命令置顶)
+    pub snippet_usage_tracker: std::sync::Arc<std::sync::RwLock<smagical_core::domain::snippet::SnippetUsageTracker>>,
 
     /// 隧道与网络规则搜索关键词
     pub tunnel_search_query: Rc<RefCell<String>>,
@@ -134,6 +142,8 @@ pub(crate) struct AppContext {
     pub backup_daemon: Arc<crate::backup_daemon::BackupDaemonService>,
     /// 纯 Rust 原生 SFTP 驱动服务句柄 (用于长连接池极速复用)
     pub sftp_driver: Option<Arc<smagical_ssh::RusshSftpDriver>>,
+    /// 高性能并发传输队列调度管理中心
+    pub transfer_manager: Arc<crate::transfer_manager::TransferQueueManager>,
 }
 
 #[allow(dead_code)]
@@ -169,12 +179,22 @@ impl AppContext {
 pub(crate) fn register_all_handlers(window: &AppWindow, ctx: &AppContext) {
     // 0. 挂载全局气泡通知关闭回调
     let notif_mgr = ctx.notifications.clone();
+    let window_weak = window.as_weak();
     window.global::<WindowBridge>().on_close_toast(move |id: slint::SharedString| {
-        notif_mgr.close(&id);
+        let id_str = id.to_string();
+        notif_mgr.close(&id_str);
+        if let Some(w) = window_weak.upgrade() {
+            let wb = w.global::<WindowBridge>();
+            let cur = wb.get_toasts();
+            let remaining: Vec<crate::generated::ToastItemData> =
+                cur.iter().filter(|t| t.id != id).collect();
+            wb.set_toasts(crate::common::to_model_rc(remaining));
+        }
     });
 
-    // 1. 挂载窗口级基础回调 (主题切换、深浅色模式、系统窗口三键操作)
-    window_handlers::register_window_handlers(window, ctx);
+    // 1. 初始化视图生命周期调度器并挂载窗口级基础回调 (路由中枢、主题切换、系统窗口三键操作)
+    let lifecycle = crate::view_lifecycle::ViewLifecycleManager::new(window.as_weak(), ctx.clone());
+    window_handlers::register_window_handlers(window, ctx, &lifecycle);
     // 2. 挂载终端多会话与启动器回调 (Tab 切换/关闭、新建会话、键盘输入、滚轮滑动、剪贴板等)
     session_handlers::register_session_handlers(window, ctx);
     // 3. 挂载主机与分组资产回调 (分组折叠/展开、拖拽调序移动、搜索过滤、双击打开终端等)

@@ -46,6 +46,15 @@ impl TerminalBackend {
         }
     }
 
+    /// 高效消费累积输出字节块喂入闭包，避免分配中间 Vec
+    pub fn drain_output_into<F: FnMut(&[u8])>(&self, consumer: F) -> bool {
+        match self {
+            Self::LocalPty(p) => p.drain_output_into(consumer),
+            Self::PureSsh(p) => p.drain_output_into(consumer),
+            Self::Connecting(_) => false,
+        }
+    }
+
     /// 调整视口几何尺寸
     pub fn resize(&mut self, size: PtySize) -> Result<()> {
         match self {

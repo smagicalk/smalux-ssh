@@ -21,7 +21,7 @@ pub mod tunnel;
 pub mod backup;
 
 pub use error::{SshServiceError, SshServiceResult};
-pub use keygen::{GeneratedKeyPair, KeyAlgorithm, KeygenService};
+pub use keygen::{GeneratedKeyPair, KeyAlgorithm, KeygenService, ParsedKeyInfo};
 pub use metrics::{HostMetricsService, SystemMetricsSnapshot};
 pub use mock::{
     MockHostMetricsService, MockKeygenService, MockSftpService, MockSshSessionService,

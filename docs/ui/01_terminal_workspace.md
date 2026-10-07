@@ -10,9 +10,9 @@
 
 ## 🧩 UI 组件与文件结构
 
-- **视图入口**：[`crates/smagical-ui/ui/views/center_terminal/terminal_viewport.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/center_terminal/terminal_viewport.slint)
-- **Tab 标签栏**：[`crates/smagical-ui/ui/views/center_terminal/tab_bar.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/center_terminal/tab_bar.slint)
-- **窗格分割条**：[`crates/smagical-ui/ui/components/splitter.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/splitter.slint)
+- **视图入口**：[`crates/ui/kernel/ui/views/center_terminal/terminal_viewport.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/kernel/ui/views/center_terminal/terminal_viewport.slint)
+- **Tab 标签栏**：[`crates/ui/kernel/ui/views/center_terminal/tab_bar.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/kernel/ui/views/center_terminal/tab_bar.slint)
+- **窗格分割条**：[`crates/ui/common/ui/shared/composite/splitter.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/shared/composite/splitter.slint)
 - **渲染核心**：[`crates/smagical-ui/src/terminal/renderer.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/terminal/renderer.rs)
 - **分屏树布局**：[`crates/smagical-ui/src/terminal/split_tree.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/terminal/split_tree.rs)
 - **按键编码器**：[`crates/smagical-ui/src/terminal/key_encoder.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/terminal/key_encoder.rs)

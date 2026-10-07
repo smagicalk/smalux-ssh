@@ -1,0 +1,210 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { DrawerContainer } from "@common/components/drawer-container.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
+
+import { ThemeOption } from "@common/features/settings/settings_bridge.slint";
+export { ThemeOption }
+
+/// 偏好设置抽屉 (Settings Drawer)
+component SettingsDrawer inherits DrawerContainer {
+    title: @tr("偏好设置");
+    collapse-icon: "◀";
+
+    in property <[ThemeOption]> themes: [];
+
+
+    in property <string> current-theme-id: "builtin.ui.darcula";
+    /// 开发者调试控制台开关
+    in-out property <bool> is-debug-enabled: true;
+
+    callback switch-theme(string /* theme_id */);
+    /// 切换开发者调试开关回调
+    callback toggle-debug-enabled(bool /* enabled */);
+
+
+    VerticalLayout {
+        padding: 10px;
+        spacing: 12px;
+
+        Text {
+            text: @tr("◐ UI & 终端主题");
+            font-size: 12px;
+            font-weight: 600;
+            color: AppTheme.secondary-foreground;
+        }
+
+        Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            scroll-area := Flickable {
+                width: 100%;
+                height: 100%;
+                content-height: list-content.preferred-height;
+
+                list-content := VerticalLayout {
+                    spacing: 4px;
+
+                for t in root.themes: Rectangle {
+                    height: 38px;
+                    border-radius: AppTheme.radius-medium;
+                    background: t.id == root.current-theme-id ? AppTheme.selected-background : t-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    t-touch := TouchArea {
+                        clicked => { root.switch-theme(t.id); }
+                        mouse-cursor: pointer;
+                    }
+
+                    HorizontalLayout {
+                        padding-left: 10px;
+                        padding-right: 10px;
+                        spacing: 8px;
+                        alignment: center;
+
+                        // 色块预览圆点
+                        Rectangle {
+                            width: 14px;
+                            height: 14px;
+                            border-radius: 7px;
+                            background: t.color-preview;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+                        }
+
+                        Text {
+                            text: t.name;
+                            font-size: 11px;
+                            color: t.id == root.current-theme-id ? AppTheme.selected-foreground : AppTheme.foreground;
+                            horizontal-alignment: left;
+                            horizontal-stretch: 1;
+                            overflow: elide;
+                        }
+
+                        if t.id == root.current-theme-id: Rectangle {
+                            width: 14px;
+                            height: 14px;
+                            y: (parent.height - self.height) / 2;
+
+                            Image {
+                                source: @image-url("../../assets/icons/check.svg");
+                                width: 12px;
+                                height: 12px;
+                                colorize: AppTheme.accent;
+                                image-fit: contain;
+                                x: (parent.width - self.width) / 2;
+                                y: (parent.height - self.height) / 2;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        AppVScrollBar {
+            content-height: scroll-area.content-height;
+            visible-height: scroll-area.height;
+            content-y <=> scroll-area.content-y;
+        }
+    }
+
+        // 终端参数预览卡片
+        Rectangle {
+            height: 80px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            VerticalLayout {
+                padding: 8px;
+                spacing: 4px;
+
+                Text {
+                    text: @tr("⌨️ 终端首选项");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.secondary-foreground;
+                }
+
+                Text {
+                    text: @tr("等宽字体: JetBrains Mono / Fira Code");
+                    font-size: 10px;
+                    color: AppTheme.foreground;
+                }
+
+                Text {
+                    text: @tr("字号: 13px  |  光标: 闪烁块状");
+                    font-size: 10px;
+                    color: AppTheme.secondary-foreground;
+                }
+            }
+        }
+
+        // 开发者控制台开关卡片
+        Rectangle {
+            height: 56px;
+            border-radius: AppTheme.radius-medium;
+            background: AppTheme.surface-background;
+            border-width: 1px;
+            border-color: AppTheme.border;
+
+            HorizontalLayout {
+                padding-left: 10px;
+                padding-right: 10px;
+                alignment: space-between;
+
+                VerticalLayout {
+                    alignment: center;
+                    spacing: 2px;
+
+                    Text {
+                        text: @tr("🛠️ 开发者调试控制台");
+                        font-size: 11px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                    }
+
+                    Text {
+                        text: @tr("在左侧栏显示调试入口并开启诊断抓取");
+                        font-size: 9px;
+                        color: AppTheme.secondary-foreground;
+                    }
+                }
+
+                // 精致滑动开关 (Toggle Switch)
+                VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        width: 36px;
+                        height: 20px;
+                        border-radius: 10px;
+                        background: root.is-debug-enabled ? AppTheme.accent : AppTheme.border;
+                        animate background { duration: 150ms; }
+
+                        Rectangle {
+                            x: root.is-debug-enabled ? parent.width - self.width - 2px : 2px;
+                            y: 2px;
+                            width: 16px;
+                            height: 16px;
+                            border-radius: 8px;
+                            background: white;
+                            animate x { duration: 150ms; }
+                        }
+
+                        TouchArea {
+                            clicked => {
+                                root.is-debug-enabled = !root.is-debug-enabled;
+                                root.toggle-debug-enabled(root.is-debug-enabled);
+                            }
+                            mouse-cursor: pointer;
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export { SettingsDrawer }
+
+

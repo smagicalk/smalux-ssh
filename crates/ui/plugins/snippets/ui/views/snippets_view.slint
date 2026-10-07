@@ -1,21 +1,21 @@
-﻿// =============================================================================
+// =============================================================================
 // 文件名称: snippets_view.slint
 // 模块功能: 全屏代码片段与多层层级管理中心容器 (SnippetsCenterView)
 // 核心设计: 左侧多层文件夹树（支持拖拽） + 右侧沉浸式脚本编辑器与动态变量识别
 // =============================================================================
 
 import { AppTheme } from "@common/themes/app-theme.slint";
-import { SnippetTreeNode, SnippetParamInputData } from "@common/features/snippets/snippets_model.slint";
+import { SnippetTreeNode, SnippetParamFieldData } from "@common/features/snippets/snippets_model.slint";
 import { SnippetsBridge } from "@common/features/snippets/snippets_bridge.slint";
 import { SnippetTreePane } from "components/snippet_tree_pane.slint";
 import { SnippetGroupDetail } from "components/snippet_group_detail.slint";
 import { SnippetEditorPane } from "components/snippet_editor_pane.slint";
 import { FolderPickerModal } from "../modals/folder-picker-modal.slint";
 
-export { SnippetTreeNode, SnippetParamInputData }
+export { SnippetTreeNode, SnippetParamFieldData }
 
 /// 全屏代码片段与多层层级管理中心视图 (SnippetsCenterView)
-export component SnippetsCenterView inherits Rectangle {
+component SnippetsCenterView inherits Rectangle {
     background: AppTheme.window-background;
 
     // 树数据源
@@ -26,14 +26,14 @@ export component SnippetsCenterView inherits Rectangle {
     // 详情编辑器数据绑定
     in property <bool> has_selection: SnippetsBridge.has-selection;
     in property <bool> is_selected_group: SnippetsBridge.is-active-group;
-    in-out property <string> edit_id: SnippetsBridge.form-id;
-    in-out property <string> edit_title: SnippetsBridge.form-title;
-    in-out property <string> edit_category_name: SnippetsBridge.form-category-name;
-    in-out property <string> edit_language: SnippetsBridge.form-language;
-    in-out property <string> edit_content: SnippetsBridge.form-code;
-    in-out property <bool> edit_auto_execute: SnippetsBridge.form-auto-execute;
-    in-out property <string> edit_description: SnippetsBridge.form-description;
-    in-out property <bool> edit_is_favorite: SnippetsBridge.form-is-favorite;
+    in-out property <string> edit_id <=> SnippetsBridge.form-id;
+    in-out property <string> edit_title <=> SnippetsBridge.form-title;
+    in-out property <string> edit_category_name <=> SnippetsBridge.form-category-name;
+    in-out property <string> edit_language <=> SnippetsBridge.form-language;
+    in-out property <string> edit_content <=> SnippetsBridge.form-code;
+    in-out property <bool> edit_auto_execute <=> SnippetsBridge.form-auto-execute;
+    in-out property <string> edit_description <=> SnippetsBridge.form-description;
+    in-out property <bool> edit_is_favorite <=> SnippetsBridge.form-is-favorite;
     in property <string> detected_variables_text: SnippetsBridge.form-detected-variables-text;
     in property <string> edit_updated_at: SnippetsBridge.form-updated-at;
 
@@ -163,7 +163,7 @@ export component SnippetsCenterView inherits Rectangle {
     }
 
     // 文件夹树形选取弹窗
-    FolderPickerModal {
+    if SnippetsBridge.is-folder-picker-open: FolderPickerModal {
         is-open: SnippetsBridge.is-folder-picker-open;
         title: @tr("选择所属文件夹");
         prompt: @tr("请在下方树形结构中点选代码片段的归属文件夹：");
@@ -179,3 +179,5 @@ export component SnippetsCenterView inherits Rectangle {
         }
     }
 }
+
+export { SnippetsCenterView }

@@ -127,6 +127,10 @@ impl RusshSftpDriver {
         password: Option<&str>,
         private_key_pem: Option<&str>,
     ) -> SshServiceResult<()> {
+        let proxy_info = host.proxy_type.as_deref().filter(|&p| p != "direct" && !p.is_empty())
+            .zip(host.proxy_host.as_deref().filter(|&h| !h.is_empty()))
+            .map(|(t, h)| (t, h, host.proxy_port.unwrap_or(0)));
+
         self.connect_raw(
             session_id,
             &host.address,
@@ -134,6 +138,8 @@ impl RusshSftpDriver {
             username,
             password,
             private_key_pem,
+            host.jump_chain_summary.as_deref(),
+            proxy_info,
         ).await
     }
 
@@ -144,6 +150,10 @@ impl RusshSftpDriver {
         config: &crate::ssh_config::SshLaunchConfig,
     ) -> SshServiceResult<()> {
         let username = config.username.as_deref().unwrap_or("root");
+        let proxy_info = config.proxy_type.as_deref().filter(|&p| p != "direct" && !p.is_empty())
+            .zip(config.proxy_host.as_deref().filter(|&h| !h.is_empty()))
+            .map(|(t, h)| (t, h, config.proxy_port.unwrap_or(0)));
+
         self.connect_raw(
             session_id,
             &config.host,
@@ -151,35 +161,18 @@ impl RusshSftpDriver {
             username,
             config.password.as_deref(),
             config.private_key_pem.as_deref(),
+            config.jump_host.as_deref(),
+            proxy_info,
         ).await
     }
 
-    /// 统一底层 SFTP 连接与鉴权实现
-    async fn connect_raw(
-        &self,
-        session_id: &str,
-        host: &str,
-        port: u16,
+    /// 内部认证 Handle 辅助方法
+    async fn authenticate_raw_handle(
+        handle: &mut russh::client::Handle<SftpClientHandler>,
         username: &str,
         password: Option<&str>,
         private_key_pem: Option<&str>,
     ) -> SshServiceResult<()> {
-        info!(
-            target: "smagical_ssh::sftp",
-            "正在发起原生纯 Rust SFTP 连接握手: {}@{}:{}",
-            username, host, port
-        );
-
-        let config = Arc::new(russh::client::Config::default());
-        let addr = format!("{}:{}", host, port);
-        let mut handler = SftpClientHandler::new(host, port, "accept_new");
-        handler.known_hosts_path = self.known_hosts_path.clone();
-
-        let mut handle = russh::client::connect(config, addr.as_str(), handler)
-            .await
-            .map_err(|e| SshServiceError::HostUnreachable(format!("连接远程主机失败: {}", e)))?;
-
-        // 凭据认证优先级：私钥优先，若无或失败则密码认证
         let mut authenticated = false;
 
         if let Some(key_pem) = private_key_pem {
@@ -212,8 +205,143 @@ impl RusshSftpDriver {
         }
 
         if !authenticated {
-            return Err(SshServiceError::AuthFailed("用户名或密码/私钥认证失败".to_string()));
+            return Err(SshServiceError::AuthFailed(format!("用户 [{}] 凭据认证失败", username)));
         }
+        Ok(())
+    }
+
+    /// 统一底层 SFTP 连接与鉴权实现，支持直连、SOCKS5/HTTP 代理及跳板机多跳链路
+    #[allow(clippy::too_many_arguments)]
+    async fn connect_raw(
+        &self,
+        session_id: &str,
+        host: &str,
+        port: u16,
+        username: &str,
+        password: Option<&str>,
+        private_key_pem: Option<&str>,
+        jump_chain: Option<&str>,
+        proxy: Option<(&str, &str, u16)>,
+    ) -> SshServiceResult<()> {
+        info!(
+            target: "smagical_ssh::sftp",
+            "正在发起原生纯 Rust SFTP 连接握手: {}@{}:{}",
+            username, host, port
+        );
+
+        let mut client_config = russh::client::Config::default();
+        client_config.keepalive_interval = Some(std::time::Duration::from_secs(15));
+        client_config.keepalive_max = 3;
+        client_config.inactivity_timeout = None;
+        let config = Arc::new(client_config);
+        let addr = format!("{}:{}", host, port);
+        let timeout_dur = std::time::Duration::from_secs(15);
+        let jump_hops = jump_chain.map(crate::session_driver::parse_jump_chain).unwrap_or_default();
+
+        let handle = if !jump_hops.is_empty() {
+            let total_hops = jump_hops.len();
+            info!(target: "smagical_ssh::sftp", "SFTP 检测到跳板机链路 (共 {} 跳): {:?}", total_hops, jump_hops);
+            let first_hop = &jump_hops[0];
+            let first_addr = format!("{}:{}", first_hop.host, first_hop.port);
+            let first_user = first_hop.username.as_deref().unwrap_or(username);
+            let mut h_first = SftpClientHandler::new(&first_hop.host, first_hop.port, "accept_new");
+            h_first.known_hosts_path = self.known_hosts_path.clone();
+
+            let mut current_handle = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect(config.clone(), first_addr.as_str(), h_first)
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("SFTP 连接第 1/{} 跳跳板机超时 [{}]", total_hops, first_addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("SFTP 连接第 1/{} 跳跳板机失败 [{}]: {}", total_hops, first_addr, e)))?;
+
+            Self::authenticate_raw_handle(&mut current_handle, first_user, password, private_key_pem).await?;
+
+            for (idx, hop) in jump_hops[1..].iter().enumerate() {
+                let hop_num = idx + 2;
+                let hop_addr = format!("{}:{}", hop.host, hop.port);
+                let hop_user = hop.username.as_deref().unwrap_or(username);
+                let channel = tokio::time::timeout(
+                    timeout_dur,
+                    current_handle.channel_open_direct_tcpip(&hop.host, hop.port as u32, "127.0.0.1", 0)
+                )
+                .await
+                .map_err(|_| SshServiceError::Timeout(format!("SFTP 请求建立 Direct-TCPIP 隧道至第 {}/{} 跳 [{}] 超时", hop_num, total_hops, hop_addr)))?
+                .map_err(|e| SshServiceError::ProtocolError(format!("SFTP 跳板机转发至第 {}/{} 跳 [{}] 失败: {}", hop_num, total_hops, hop_addr, e)))?;
+
+                let mut h_hop = SftpClientHandler::new(&hop.host, hop.port, "accept_new");
+                h_hop.known_hosts_path = self.known_hosts_path.clone();
+                let mut next_handle = tokio::time::timeout(
+                    timeout_dur,
+                    russh::client::connect_stream(config.clone(), channel.into_stream(), h_hop)
+                )
+                .await
+                .map_err(|_| SshServiceError::Timeout(format!("SFTP 通过隧道握手中间跳板机 [{}] 超时", hop_addr)))?
+                .map_err(|e| SshServiceError::HostUnreachable(format!("SFTP 通过隧道连接中间跳板机 [{}] 失败: {}", hop_addr, e)))?;
+
+                Self::authenticate_raw_handle(&mut next_handle, hop_user, password, private_key_pem).await?;
+                current_handle = next_handle;
+            }
+
+            let target_channel = tokio::time::timeout(
+                timeout_dur,
+                current_handle.channel_open_direct_tcpip(host, port as u32, "127.0.0.1", 0)
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("SFTP 建立通往目标主机 [{}] 的 Direct-TCPIP 隧道超时", addr)))?
+            .map_err(|e| SshServiceError::ProtocolError(format!("SFTP 跳板机建立通往目标主机 [{}] 的 Direct-TCPIP 隧道失败: {}", addr, e)))?;
+
+            let mut h_target = SftpClientHandler::new(host, port, "accept_new");
+            h_target.known_hosts_path = self.known_hosts_path.clone();
+            let mut target_handle = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect_stream(config.clone(), target_channel.into_stream(), h_target)
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("SFTP 通过跳板机直连目标主机 [{}] 握手超时", addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("SFTP 通过跳板机直连目标主机 [{}] 失败: {}", addr, e)))?;
+
+            Self::authenticate_raw_handle(&mut target_handle, username, password, private_key_pem).await?;
+            target_handle
+        } else if let Some((ptype, phost, pport)) = proxy {
+            let proxy_addr = format!("{}:{}", phost, pport);
+            let stream = if ptype == "socks5" || ptype == "socks" {
+                tokio::time::timeout(timeout_dur, crate::session_driver::connect_via_socks5(&proxy_addr, host, port))
+                    .await
+                    .map_err(|_| SshServiceError::Timeout(format!("SFTP 连接 SOCKS5 代理超时 [{}]", proxy_addr)))?
+                    .map_err(|e| SshServiceError::HostUnreachable(format!("SFTP SOCKS5 代理穿透失败 [{}]: {}", proxy_addr, e)))?
+            } else {
+                tokio::time::timeout(timeout_dur, crate::session_driver::connect_via_http_connect(&proxy_addr, host, port))
+                    .await
+                    .map_err(|_| SshServiceError::Timeout(format!("SFTP 连接 HTTP 代理超时 [{}]", proxy_addr)))?
+                    .map_err(|e| SshServiceError::HostUnreachable(format!("SFTP HTTP 代理穿透失败 [{}]: {}", proxy_addr, e)))?
+            };
+            let mut handler = SftpClientHandler::new(host, port, "accept_new");
+            handler.known_hosts_path = self.known_hosts_path.clone();
+            let mut h = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect_stream(config.clone(), stream, handler)
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("SFTP 通过代理连接目标主机超时: [{}]", addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("SFTP 通过代理连接目标 [{}] 失败: {}", addr, e)))?;
+
+            Self::authenticate_raw_handle(&mut h, username, password, private_key_pem).await?;
+            h
+        } else {
+            let mut handler = SftpClientHandler::new(host, port, "accept_new");
+            handler.known_hosts_path = self.known_hosts_path.clone();
+            let mut h = tokio::time::timeout(
+                timeout_dur,
+                russh::client::connect(config, addr.as_str(), handler)
+            )
+            .await
+            .map_err(|_| SshServiceError::Timeout(format!("连接远程 SFTP 主机超时 (15s): {}", addr)))?
+            .map_err(|e| SshServiceError::HostUnreachable(format!("连接远程主机失败: {}", e)))?;
+
+            Self::authenticate_raw_handle(&mut h, username, password, private_key_pem).await?;
+            h
+        };
 
         // 打开 SFTP 子系统通道
         let channel = handle
@@ -446,59 +574,74 @@ impl SftpService for RusshSftpDriver {
 
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        let mut buffer = vec![0u8; 1024 * 64]; // 64 KB 分块流水线
-        let mut transferred = 0u64;
+        let chunk_size = 128 * 1024; // 128 KB 分块流水线 (双缓冲并发读写)
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(8); // 8 个分块容量背压队列
+
         let start_time = std::time::Instant::now();
-        let mut last_progress_send = std::time::Instant::now();
-        let mut last_sample_time = std::time::Instant::now();
-        let mut last_sample_bytes = 0u64;
-        let mut current_speed = 0u64;
-
-        loop {
-            let bytes_read = remote_file
-                .read(&mut buffer)
-                .await
-                .map_err(SshServiceError::Io)?;
-
-            if bytes_read == 0 {
-                break;
-            }
-
-            local_file
-                .write_all(&buffer[..bytes_read])
-                .await
-                .map_err(SshServiceError::Io)?;
-
-            transferred += bytes_read as u64;
-
-            if let Some(ref tx) = progress_tx {
-                let now = std::time::Instant::now();
-                let sample_elapsed = now.duration_since(last_sample_time).as_secs_f64();
-                if sample_elapsed >= 0.2 {
-                    let bytes_in_sample = transferred.saturating_sub(last_sample_bytes);
-                    let instant_speed = (bytes_in_sample as f64 / sample_elapsed) as u64;
-                    current_speed = if current_speed == 0 {
-                        instant_speed
-                    } else {
-                        ((instant_speed as f64 * 0.7) + (current_speed as f64 * 0.3)) as u64
-                    };
-                    last_sample_time = now;
-                    last_sample_bytes = transferred;
+        let reader_fut = async {
+            let mut read_buf = vec![0u8; chunk_size];
+            loop {
+                let bytes_read = remote_file.read(&mut read_buf).await?;
+                if bytes_read == 0 {
+                    break;
                 }
-
-                if now.duration_since(last_progress_send).as_millis() >= 100 {
-                    let _ = tx.send(TransferProgress {
-                        task_id: format!("dl-{}", remote_path),
-                        transferred_bytes: transferred,
-                        total_bytes: total_size,
-                        speed_bytes_per_sec: current_speed,
-                    });
-                    last_progress_send = now;
+                if tx.send(read_buf[..bytes_read].to_vec()).await.is_err() {
+                    break;
                 }
             }
-        }
+            drop(tx);
+            Ok::<(), std::io::Error>(())
+        };
 
-        local_file.flush().await.map_err(SshServiceError::Io)?;
+        let writer_fut = async {
+            let mut transferred = 0u64;
+            let mut last_progress_send = std::time::Instant::now();
+            let mut last_sample_time = std::time::Instant::now();
+            let mut last_sample_bytes = 0u64;
+            let mut current_speed = 0u64;
+
+            while let Some(chunk) = rx.recv().await {
+                local_file.write_all(&chunk).await?;
+                transferred += chunk.len() as u64;
+
+                if let Some(ref tx_prog) = progress_tx {
+                    let now = std::time::Instant::now();
+                    let sample_elapsed = now.duration_since(last_sample_time).as_secs_f64();
+                    if sample_elapsed >= 0.2 {
+                        let bytes_in_sample = transferred.saturating_sub(last_sample_bytes);
+                        let instant_speed = (bytes_in_sample as f64 / sample_elapsed) as u64;
+                        current_speed = if current_speed == 0 {
+                            instant_speed
+                        } else {
+                            ((instant_speed as f64 * 0.7) + (current_speed as f64 * 0.3)) as u64
+                        };
+                        last_sample_time = now;
+                        last_sample_bytes = transferred;
+                    }
+
+                    if now.duration_since(last_progress_send).as_millis() >= 100 {
+                        let _ = tx_prog.send(TransferProgress {
+                            task_id: format!("dl-{}", remote_path),
+                            transferred_bytes: transferred,
+                            total_bytes: total_size,
+                            speed_bytes_per_sec: current_speed,
+                        });
+                        last_progress_send = now;
+                    }
+                }
+            }
+
+            local_file.flush().await?;
+            Ok::<u64, std::io::Error>(transferred)
+        };
+
+        let (_, transferred) = match tokio::try_join!(reader_fut, writer_fut) {
+            Ok(res) => res,
+            Err(e) => {
+                let _ = tokio::fs::remove_file(local_path).await;
+                return Err(SshServiceError::Io(e));
+            }
+        };
 
         if let Some(ref tx) = progress_tx {
             let elapsed_secs = start_time.elapsed().as_secs_f64().max(0.001);
@@ -513,7 +656,7 @@ impl SftpService for RusshSftpDriver {
 
         info!(
             target: "smagical_ssh::sftp",
-            "纯 Rust 原生 SFTP 下载完成: {} -> {} ({} bytes)",
+            "纯 Rust 原生 SFTP 下载完成 (双缓冲流水线): {} -> {} ({} bytes)",
             remote_path, local_path, transferred
         );
         Ok(())
@@ -540,59 +683,74 @@ impl SftpService for RusshSftpDriver {
 
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-        let mut buffer = vec![0u8; 1024 * 64]; // 64 KB 分块
-        let mut transferred = 0u64;
+        let chunk_size = 128 * 1024; // 128 KB 分块
+        let (tx, mut rx) = tokio::sync::mpsc::channel::<Vec<u8>>(8);
+
         let start_time = std::time::Instant::now();
-        let mut last_progress_send = std::time::Instant::now();
-        let mut last_sample_time = std::time::Instant::now();
-        let mut last_sample_bytes = 0u64;
-        let mut current_speed = 0u64;
-
-        loop {
-            let bytes_read = local_file
-                .read(&mut buffer)
-                .await
-                .map_err(SshServiceError::Io)?;
-
-            if bytes_read == 0 {
-                break;
-            }
-
-            remote_file
-                .write_all(&buffer[..bytes_read])
-                .await
-                .map_err(SshServiceError::Io)?;
-
-            transferred += bytes_read as u64;
-
-            if let Some(ref tx) = progress_tx {
-                let now = std::time::Instant::now();
-                let sample_elapsed = now.duration_since(last_sample_time).as_secs_f64();
-                if sample_elapsed >= 0.2 {
-                    let bytes_in_sample = transferred.saturating_sub(last_sample_bytes);
-                    let instant_speed = (bytes_in_sample as f64 / sample_elapsed) as u64;
-                    current_speed = if current_speed == 0 {
-                        instant_speed
-                    } else {
-                        ((instant_speed as f64 * 0.7) + (current_speed as f64 * 0.3)) as u64
-                    };
-                    last_sample_time = now;
-                    last_sample_bytes = transferred;
+        let reader_fut = async {
+            let mut read_buf = vec![0u8; chunk_size];
+            loop {
+                let bytes_read = local_file.read(&mut read_buf).await?;
+                if bytes_read == 0 {
+                    break;
                 }
-
-                if now.duration_since(last_progress_send).as_millis() >= 100 {
-                    let _ = tx.send(TransferProgress {
-                        task_id: format!("ul-{}", local_path),
-                        transferred_bytes: transferred,
-                        total_bytes: total_size,
-                        speed_bytes_per_sec: current_speed,
-                    });
-                    last_progress_send = now;
+                if tx.send(read_buf[..bytes_read].to_vec()).await.is_err() {
+                    break;
                 }
             }
-        }
+            drop(tx);
+            Ok::<(), std::io::Error>(())
+        };
 
-        remote_file.flush().await.map_err(SshServiceError::Io)?;
+        let writer_fut = async {
+            let mut transferred = 0u64;
+            let mut last_progress_send = std::time::Instant::now();
+            let mut last_sample_time = std::time::Instant::now();
+            let mut last_sample_bytes = 0u64;
+            let mut current_speed = 0u64;
+
+            while let Some(chunk) = rx.recv().await {
+                remote_file.write_all(&chunk).await?;
+                transferred += chunk.len() as u64;
+
+                if let Some(ref tx_prog) = progress_tx {
+                    let now = std::time::Instant::now();
+                    let sample_elapsed = now.duration_since(last_sample_time).as_secs_f64();
+                    if sample_elapsed >= 0.2 {
+                        let bytes_in_sample = transferred.saturating_sub(last_sample_bytes);
+                        let instant_speed = (bytes_in_sample as f64 / sample_elapsed) as u64;
+                        current_speed = if current_speed == 0 {
+                            instant_speed
+                        } else {
+                            ((instant_speed as f64 * 0.7) + (current_speed as f64 * 0.3)) as u64
+                        };
+                        last_sample_time = now;
+                        last_sample_bytes = transferred;
+                    }
+
+                    if now.duration_since(last_progress_send).as_millis() >= 100 {
+                        let _ = tx_prog.send(TransferProgress {
+                            task_id: format!("ul-{}", local_path),
+                            transferred_bytes: transferred,
+                            total_bytes: total_size,
+                            speed_bytes_per_sec: current_speed,
+                        });
+                        last_progress_send = now;
+                    }
+                }
+            }
+
+            remote_file.flush().await?;
+            Ok::<u64, std::io::Error>(transferred)
+        };
+
+        let (_, transferred) = match tokio::try_join!(reader_fut, writer_fut) {
+            Ok(res) => res,
+            Err(e) => {
+                let _ = sftp.remove_file(remote_path).await;
+                return Err(SshServiceError::Io(e));
+            }
+        };
 
         if let Some(ref tx) = progress_tx {
             let elapsed_secs = start_time.elapsed().as_secs_f64().max(0.001);
@@ -607,7 +765,7 @@ impl SftpService for RusshSftpDriver {
 
         info!(
             target: "smagical_ssh::sftp",
-            "纯 Rust 原生 SFTP 上传完成: {} -> {} ({} bytes)",
+            "纯 Rust 原生 SFTP 上传完成 (双缓冲流水线): {} -> {} ({} bytes)",
             local_path, remote_path, transferred
         );
         Ok(())

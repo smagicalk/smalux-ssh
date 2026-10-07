@@ -8,6 +8,7 @@ use std::sync::{Arc, RwLock};
 use smagical_core::event::{AppReadyEvent, ConfigChangedEvent, EventManager, HostAssetChangedEvent, NavigationTabClickedEvent};
 use smagical_core::AppStorage;
 use slint::ComponentHandle;
+use crate::common::{run_on_ui, to_model_rc};
 use crate::generated::{AppWindow, HostItemData};
 
 /// 快速新建终端启动器后台异步预热服务
@@ -72,12 +73,8 @@ impl LauncherPrewarmService {
 
             tracing::debug!(target: "smagical_ui::launcher", "启动器主机数据预热完成，共 {} 台主机，正在异步回推 UI 事件循环...", prewarmed_cards.len());
 
-            let _ = slint::invoke_from_event_loop(move || {
-                if let Some(w) = window_weak.upgrade() {
-                    w.global::<crate::generated::WindowBridge>().set_launcher_host_items(slint::ModelRc::from(std::rc::Rc::new(
-                        slint::VecModel::from(prewarmed_cards),
-                    )));
-                }
+            let _ = run_on_ui(window_weak, move |w| {
+                w.global::<crate::generated::WindowBridge>().set_launcher_host_items(to_model_rc(prewarmed_cards));
             });
 
             if let Ok(mut flag) = prewarming_flag.write() {

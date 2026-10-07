@@ -26,6 +26,12 @@ export global FilesBridge {
     in-out property <string> selected-local-id: "";
     in-out property <string> selected-remote-id: "";
 
+    // 目录超大列表虚拟化/截断与分页控制
+    in-out property <int> local-total-count: 0;
+    in-out property <int> remote-total-count: 0;
+    in-out property <bool> local-is-truncated: false;
+    in-out property <bool> remote-is-truncated: false;
+
     // 传输任务与队列
     in-out property <[TransferItemData]> transfer-tasks: [];
     in-out property <bool> is-transfer-queue-expanded: false;
@@ -68,6 +74,10 @@ export global FilesBridge {
     callback open-remote-item(string /* path */, bool /* is_dir */);
     callback toggle-local-expand(string /* path */);
     callback toggle-remote-expand(string /* path */);
+    callback load-more-local();
+    callback load-all-local();
+    callback load-more-remote();
+    callback load-all-remote();
 
     callback upload-file();
     callback upload-folder();

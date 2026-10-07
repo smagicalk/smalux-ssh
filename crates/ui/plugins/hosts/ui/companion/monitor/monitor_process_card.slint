@@ -1,0 +1,231 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppSwitch } from "@common/shared/base/app-switch.slint";
+import { MonitorProcessItem } from "@common/features/monitor/monitor_bridge.slint";
+
+/// 核心进程统计卡片 (标题集成开关，默认关闭以减少探针开销)
+component MonitorProcessCard inherits Rectangle {
+    in-out property <bool> enable-process-monitor: false;
+    in property <[MonitorProcessItem]> processes: [];
+    callback process-monitor-toggled(bool);
+
+    border-radius: 4px;
+    background: AppTheme.surface-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+
+    VerticalLayout {
+        padding: 8px;
+        spacing: 6px;
+
+        // 卡片标题栏：标题 + 状态指示 + 标题开关 (AppSwitch)
+        HorizontalLayout {
+            alignment: space-between;
+            height: 22px;
+
+            HorizontalLayout {
+                spacing: 5px;
+                alignment: start;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/activity.svg");
+                        width: 12px;
+                        height: 12px;
+                        colorize: root.enable-process-monitor ? AppTheme.accent : AppTheme.disabled-foreground;
+                    }
+                }
+
+                Text {
+                    text: @tr("进程资源统计");
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: AppTheme.foreground;
+                    vertical-alignment: center;
+                }
+
+                if root.enable-process-monitor: Rectangle {
+                    height: 16px;
+                    border-radius: 3px;
+                    background: AppTheme.accent.transparentize(85%);
+                    HorizontalLayout {
+                        padding-left: 5px;
+                        padding-right: 5px;
+                        Text {
+                            text: "Top " + root.processes.length;
+                            font-size: 8px;
+                            font-weight: 700;
+                            color: AppTheme.accent;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                spacing: 6px;
+                alignment: end;
+
+                Text {
+                    text: root.enable-process-monitor ? @tr("采集中") : @tr("已关闭");
+                    font-size: 9px;
+                    color: root.enable-process-monitor ? AppTheme.success : AppTheme.disabled-foreground;
+                    vertical-alignment: center;
+                }
+
+                AppSwitch {
+                    size: "sm";
+                    checked <=> root.enable-process-monitor;
+                    toggled(val) => { root.process-monitor-toggled(val); }
+                }
+            }
+        }
+
+        // 分支 A: 默认关闭状态 (轻量紧凑无扰提示)
+        if !root.enable-process-monitor: Rectangle {
+            height: 28px;
+            border-radius: 3px;
+            background: AppTheme.control-background;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                alignment: space-between;
+
+                Text {
+                    text: @tr("默认关闭进程统计 (保持单行探针零性能损耗)");
+                    font-size: 9px;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("点击右上开关开启");
+                    font-size: 8px;
+                    color: AppTheme.disabled-foreground;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 分支 B: 开启状态 (展开 Top 5 核心进程资源榜)
+        if root.enable-process-monitor: VerticalLayout {
+            spacing: 4px;
+
+            // 列表表头
+            HorizontalLayout {
+                padding-left: 4px;
+                padding-right: 4px;
+                height: 16px;
+
+                Text {
+                    text: "PID";
+                    font-size: 8px;
+                    font-weight: 600;
+                    color: AppTheme.disabled-foreground;
+                    width: 38px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("进程名称");
+                    font-size: 8px;
+                    font-weight: 600;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-stretch: 1;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("用户");
+                    font-size: 8px;
+                    font-weight: 600;
+                    color: AppTheme.disabled-foreground;
+                    width: 38px;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: "CPU";
+                    font-size: 8px;
+                    font-weight: 600;
+                    color: AppTheme.disabled-foreground;
+                    width: 34px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: @tr("内存");
+                    font-size: 8px;
+                    font-weight: 600;
+                    color: AppTheme.disabled-foreground;
+                    width: 34px;
+                    horizontal-alignment: right;
+                    vertical-alignment: center;
+                }
+            }
+
+            // 进程数据行 (条纹隔行背景)
+            for proc[pidx] in root.processes: Rectangle {
+                height: 22px;
+                border-radius: 2px;
+                background: Math.mod(pidx, 2) == 1 ? AppTheme.control-background.transparentize(50%) : transparent;
+
+                HorizontalLayout {
+                    padding-left: 4px;
+                    padding-right: 4px;
+
+                    Text {
+                        text: proc.pid;
+                        font-size: 9px;
+                        color: AppTheme.disabled-foreground;
+                        width: 38px;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: proc.name;
+                        font-size: 9px;
+                        font-weight: 600;
+                        color: AppTheme.foreground;
+                        horizontal-stretch: 1;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: proc.user;
+                        font-size: 8.5px;
+                        color: AppTheme.secondary-foreground;
+                        width: 38px;
+                        overflow: elide;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: proc.cpu-pct;
+                        font-size: 9px;
+                        font-weight: 600;
+                        color: AppTheme.warning;
+                        width: 34px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+
+                    Text {
+                        text: proc.mem-pct;
+                        font-size: 9px;
+                        font-weight: 600;
+                        color: AppTheme.accent;
+                        width: 34px;
+                        horizontal-alignment: right;
+                        vertical-alignment: center;
+                    }
+                }
+            }
+        }
+    }
+}
+
+export { MonitorProcessCard }

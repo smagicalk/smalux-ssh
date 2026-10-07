@@ -1,4 +1,4 @@
-﻿// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // 出网代理专属配置表单 (Tunnel Proxy Form)
 // 适配 SOCKS5, HTTP, HTTPS 静态代理节点，包含凭据与环境变量导出预览
 // -----------------------------------------------------------------------------
@@ -6,7 +6,7 @@
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppPasswordInput } from "@common/shared/base/app-password-input.slint";
 
-export component TunnelProxyForm inherits VerticalLayout {
+component TunnelProxyForm inherits VerticalLayout {
     in property <bool> is-create-mode: false;
     in property <bool> is-editing: false;
     in-out property <string> form-proxy-proto: "SOCKS5";
@@ -417,3 +417,5 @@ export component TunnelProxyForm inherits VerticalLayout {
         }
     }
 }
+
+export { TunnelProxyForm }

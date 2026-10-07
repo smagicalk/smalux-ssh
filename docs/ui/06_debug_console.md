@@ -10,8 +10,8 @@
 
 ## 🧩 UI 组件与文件结构
 
-- **弹窗组件**：[`crates/smagical-ui/ui/components/debug-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/debug-modal.slint)
-- **调试核心服务**：[`crates/smagical-debug/src/lib.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-debug/src/lib.rs)
+- **弹窗组件**：[`crates/ui/plugins/debug/ui/components/debug-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/debug/ui/components/debug-modal.slint)
+- **调试核心服务**：[`crates/smagical-ui/src/debug/`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/debug/)
 - **日志模型同步**：[`crates/smagical-ui/src/debug_ui.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/debug_ui.rs)
 - **路由回调处理器**：[`crates/smagical-ui/src/handlers/debug_handlers.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/debug_handlers.rs)
 

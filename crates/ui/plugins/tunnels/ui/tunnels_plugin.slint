@@ -1,15 +1,13 @@
 import { TunnelsDrawer } from "drawers/tunnels_drawer.slint";
 import { TunnelsCenterView, TunnelItemData, JumpHopData } from "views/tunnels_center_view.slint";
 import { CreateHostTunnelModal } from "modals/create-host-tunnel-modal.slint";
-import { CreateTunnelTypeModal } from "modals/create-tunnel-type-modal.slint";
-
-export component TunnelsView inherits TunnelsCenterView {}
+import { TunnelToolDrawer } from "companion/tunnel_tool_drawer.slint";
 
 export {
     TunnelsDrawer,
     TunnelsCenterView,
     CreateHostTunnelModal,
-    CreateTunnelTypeModal,
+    TunnelToolDrawer,
 }
 
 export { TunnelItemData, JumpHopData }

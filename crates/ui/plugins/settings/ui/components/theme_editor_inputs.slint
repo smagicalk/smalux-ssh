@@ -1,0 +1,121 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTextInput } from "@common/shared/base/app-text-input.slint";
+
+/// 调色板色块定义
+export struct PaletteSwatch {
+    hex: string,
+    c: color,
+}
+
+/// 颜色字段输入组件 (基于通用 AppTextInput 实现全域点击聚焦 + 颜色方块与调色盘弹窗选择)
+component ColorFieldInput inherits VerticalLayout {
+    in property <string> label: "";
+    in-out property <string> hex-value: "#000000";
+    in property <brush> preview-brush: #000000;
+    callback changed(string);
+    callback pick-color();
+
+    spacing: 3px;
+    alignment: start;
+
+    HorizontalLayout {
+        alignment: space-between;
+        Text {
+            text: root.label;
+            font-size: 10px;
+            font-weight: 500;
+            color: AppTheme.secondary-foreground;
+            overflow: elide;
+        }
+    }
+
+    HorizontalLayout {
+        spacing: 4px;
+        height: 28px;
+
+        // 颜色预览小方块 (支持点击弹窗选择颜色)
+        color-box := Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background: root.preview-brush;
+            border-width: box-touch.has-hover ? 2px : 1px;
+            border-color: box-touch.has-hover ? AppTheme.accent : #ffffff40;
+            y: (parent.height - self.height) / 2;
+
+            box-touch := TouchArea {
+                clicked => { root.pick-color(); }
+                mouse-cursor: pointer;
+            }
+        }
+
+        // Hex 文本输入 (采用公共原子组件 AppTextInput，100% 全域点击聚焦)
+        AppTextInput {
+            horizontal-stretch: 1;
+            text <=> root.hex-value;
+            font-size: 11px;
+            monospace: true;
+            size: "sm";
+            input-height: 28px;
+            edited(v) => { root.changed(v); }
+        }
+
+        // 调色盘小按钮 (支持点击弹窗选择颜色)
+        Rectangle {
+            width: 24px;
+            height: 24px;
+            border-radius: 4px;
+            background: btn-p.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+            border-width: 1px;
+            border-color: btn-p.has-hover ? AppTheme.accent : AppTheme.border;
+            y: (parent.height - self.height) / 2;
+
+            btn-p := TouchArea {
+                clicked => { root.pick-color(); }
+                mouse-cursor: pointer;
+            }
+
+            Image {
+                source: @image-url("../assets/icons/palette.svg");
+                width: 12px;
+                height: 12px;
+                colorize: btn-p.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                horizontal-alignment: center;
+                vertical-alignment: center;
+            }
+        }
+    }
+}
+
+/// 规格尺寸数值字段输入组件 (基于通用 AppTextInput 实现全域点击聚焦与后缀单位)
+component MetricFieldInput inherits VerticalLayout {
+    in property <string> label: "";
+    in-out property <string> value-text: "4";
+    callback changed(string);
+
+    spacing: 3px;
+    alignment: start;
+
+    HorizontalLayout {
+        alignment: space-between;
+        Text {
+            text: root.label;
+            font-size: 10px;
+            font-weight: 500;
+            color: AppTheme.secondary-foreground;
+            overflow: elide;
+        }
+    }
+
+    AppTextInput {
+        text <=> root.value-text;
+        font-size: 11px;
+        monospace: true;
+        suffix-text: "px";
+        size: "sm";
+        input-height: 28px;
+        edited(v) => { root.changed(v); }
+    }
+}
+
+export { ColorFieldInput, MetricFieldInput }

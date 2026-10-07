@@ -1,7 +1,7 @@
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { StatusDot } from "@common/components/status-dot.slint";
 import { TabItem } from "@common/components/tab-item.slint";
-import { AppIconButton } from "@common/components/base/app-icon-button.slint";
+import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
 import { TabData } from "tab_bar.slint";
 import { TerminalFindBar } from "terminal_find_bar.slint";
 import { TerminalContextMenu } from "terminal_context_menu.slint";
@@ -610,7 +610,10 @@ export component TerminalViewport inherits Rectangle {
                 can-split: root.context-menu-can-split;
                 copy-text => { TerminalBridge.terminal-copy(); }
                 paste-text => { TerminalBridge.terminal-paste(); }
-                select-all => { }
+                select-all => {
+                    root.has-selection = true;
+                    TerminalBridge.terminal-selection-changed(0, 0, Math.max(0, root.terminal-cols - 1), Math.max(0, root.terminal-rows - 1), true);
+                }
                 clear-screen => { TerminalBridge.terminal-clear(); }
                 split-right => { TerminalBridge.split-terminal("vertical"); }
                 split-down => { TerminalBridge.split-terminal("horizontal"); }

@@ -51,10 +51,17 @@ pub use domain::{
     host::{HostRecord, HostStatus},
     navigation::{NavigationRequest, NavigationRouter},
     right_panel::{RightPanelItem, RightPanelRegistry},
-    snippet::{SnippetGroupRecord, SnippetRecord, SnippetVariable},
+    snippet::{
+        SnippetGroupRecord, SnippetParamMemory, SnippetRecord, SnippetScoredItem,
+        SnippetUsageRecord, SnippetUsageTracker, SnippetVariable,
+    },
     terminal_context::{ActiveTerminalSessionContext, TerminalAction},
     tunnel::{JumpHopRecord, TunnelRecord, TunnelRunMode, TunnelType},
     backup::{BackupSnapshotRecord, BackupStrategy, BackupTaskRecord, BackupType},
+    recording::{
+        AuditFinding, AuditRiskLevel, CastEvent, CastEventType, CastHeader, CastReplayer,
+        CastSession, CastSessionRecorder, RecordingError, RecordingResult, SecurityAuditInspector,
+    },
 };
 
 pub use state::core_state::CoreState;
@@ -66,7 +73,7 @@ pub use storage::{
 pub use service::{
     compute_sha256, create_backup_driver, create_backup_payload, format_bytes_size,
     restore_backup_payload, BackupDriver, GeneratedKeyPair, GistBackupDriver, HostMetricsService,
-    KeyAlgorithm, KeygenService, LocalBackupDriver, RemoteSnapshotInfo, S3BackupDriver, SftpService,
+    KeyAlgorithm, KeygenService, LocalBackupDriver, ParsedKeyInfo, RemoteSnapshotInfo, S3BackupDriver, SftpService,
     SshServiceError, SshServiceResult, SshSessionService, SshStreamChannel, SystemMetricsSnapshot,
     TransferProgress, TunnelHandle, TunnelMetricsSnapshot, TunnelService, WebdavBackupDriver,
 };

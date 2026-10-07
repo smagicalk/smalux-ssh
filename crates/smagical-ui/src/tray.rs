@@ -64,7 +64,7 @@ mod win_tray {
 
     /// 从内嵌的 PNG 资产解析并创建 HICON 句柄
     pub(crate) unsafe fn load_embedded_tray_icon() -> HICON {
-        static TRAY_PNG_BYTES: &[u8] = smagical_ui_view::TRAY_PNG_BYTES;
+        static TRAY_PNG_BYTES: &[u8] = crate::TRAY_PNG_BYTES;
         unsafe {
             CreateIconFromResourceEx(
                 TRAY_PNG_BYTES.as_ptr() as *mut u8,

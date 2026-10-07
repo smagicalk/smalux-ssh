@@ -1,12 +1,9 @@
 import { SnippetsDrawer } from "drawers/snippets_drawer.slint";
-import { SnippetsCenterView, SnippetTreeNode, SnippetParamInputData } from "views/snippets_view.slint";
+import { SnippetsCenterView, SnippetTreeNode } from "views/snippets_view.slint";
 import { CreateSnippetModal } from "modals/create-snippet-modal.slint";
 import { EditSnippetModal } from "modals/edit-snippet-modal.slint";
 import { SnippetRunModal, SnippetParamFieldData } from "modals/snippet-run-modal.slint";
-import { FolderPickerModal } from "modals/folder-picker-modal.slint";
-import { GroupTreeSelector } from "modals/group-tree-selector.slint";
-
-export component SnippetsView inherits SnippetsCenterView {}
+import { SnippetToolDrawer, QuickCmdData } from "companion/snippet_tool_drawer.slint";
 
 export {
     SnippetsDrawer,
@@ -14,8 +11,8 @@ export {
     CreateSnippetModal,
     EditSnippetModal,
     SnippetRunModal,
-    FolderPickerModal,
-    GroupTreeSelector,
+    SnippetToolDrawer,
+    QuickCmdData,
 }
 
 export { SnippetTreeNode, SnippetParamFieldData }

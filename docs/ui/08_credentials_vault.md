@@ -26,9 +26,10 @@
 
 ## 🧩 2. UI 组件与文件结构
 
-- **全屏管理视图**：[`crates/smagical-ui/ui/views/credentials_view.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/credentials_view.slint)
-- **侧边栏抽屉组件**：[`crates/smagical-ui/ui/views/left_drawers/credentials_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/left_drawers/credentials_drawer.slint)
-- **调试工作台选项卡**：[`crates/smagical-ui/ui/components/debug_workbench/debug-credentials-tab.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/debug_workbench/debug-credentials-tab.slint)
+- **全屏管理视图**：[`crates/ui/plugins/credentials/ui/views/credentials_view.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/credentials/ui/views/credentials_view.slint)
+- **侧边栏抽屉组件**：[`crates/ui/plugins/credentials/ui/drawers/credentials_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/credentials/ui/drawers/credentials_drawer.slint)
+- **密钥生成弹窗**：[`crates/ui/plugins/credentials/ui/modals/generate-key-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/credentials/ui/modals/generate-key-modal.slint)
+- **调试工作台选项卡**：[`crates/ui/plugins/debug/ui/components/debug_workbench/debug-credentials-tab.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/debug/ui/components/debug_workbench/debug-credentials-tab.slint)
 - **UI 路由与交互处理器**：[`crates/smagical-ui/src/handlers/credential_handlers.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/credential_handlers.rs)
 - **核心领域模型**：[`crates/smagical-core/src/domain/credential.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-core/src/domain/credential.rs)
 

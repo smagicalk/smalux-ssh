@@ -6,7 +6,7 @@
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { JumpHopData } from "@common/features/tunnels/tunnels_model.slint";
 
-export component TunnelBastionForm inherits VerticalLayout {
+component TunnelBastionForm inherits VerticalLayout {
     in property <bool> is-create-mode: false;
     in property <bool> is-editing: false;
     in-out property <string> form-name: "";
@@ -121,7 +121,7 @@ export component TunnelBastionForm inherits VerticalLayout {
                 VerticalLayout {
                     alignment: center;
                     Image {
-                        source: @image-url("../../../assets/icons/server.svg");
+                        source: @image-url("../../assets/icons/server.svg");
                         width: 14px;
                         height: 14px;
                         colorize: hop.enabled ? AppTheme.accent : AppTheme.secondary-foreground;
@@ -171,7 +171,7 @@ export component TunnelBastionForm inherits VerticalLayout {
                         }
 
                         Image {
-                            source: @image-url("../../../assets/icons/chevron-up.svg");
+                            source: @image-url("../../assets/icons/chevron-up.svg");
                             width: 11px;
                             height: 11px;
                             colorize: ((root.is-create-mode || root.is-editing) && idx > 0)
@@ -197,7 +197,7 @@ export component TunnelBastionForm inherits VerticalLayout {
                         }
 
                         Image {
-                            source: @image-url("../../../assets/icons/chevron-down.svg");
+                            source: @image-url("../../assets/icons/chevron-down.svg");
                             width: 11px;
                             height: 11px;
                             colorize: ((root.is-create-mode || root.is-editing) && idx < root.form-jump-chain.length - 1)
@@ -222,7 +222,7 @@ export component TunnelBastionForm inherits VerticalLayout {
                         }
 
                         Image {
-                            source: @image-url("../../../assets/icons/trash.svg");
+                            source: @image-url("../../assets/icons/trash.svg");
                             width: 11px;
                             height: 11px;
                             colorize: del-hop-touch.has-hover ? #e74c3c : AppTheme.secondary-foreground;
@@ -330,7 +330,7 @@ export component TunnelBastionForm inherits VerticalLayout {
                 VerticalLayout {
                     alignment: center;
                     Image {
-                        source: @image-url("../../../assets/icons/plus.svg");
+                        source: @image-url("../../assets/icons/plus.svg");
                         width: 12px;
                         height: 12px;
                         image-fit: contain;
@@ -416,3 +416,5 @@ export component TunnelBastionForm inherits VerticalLayout {
         }
     }
 }
+
+export { TunnelBastionForm }

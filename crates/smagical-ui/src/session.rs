@@ -1,6 +1,7 @@
 //! 终端会话管理与 Slint UI 同步。
 
 use slint::ComponentHandle;
+use crate::common::{to_model_rc, ToSharedString};
 use crate::generated::{AppWindow, TabData, TerminalBridge};
 
 /// 活跃终端会话运行时信息。
@@ -127,19 +128,19 @@ pub(crate) fn sync_active_session_ui(
 
         let mut res = (String::new(), String::new());
         if let Some(active_sess) = active_group.get_active_session() {
-            let tab_model = slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(active_group.to_tab_data_list())));
+            let tab_model = to_model_rc(active_group.to_tab_data_list());
             tb.set_tabs(tab_model);
-            tb.set_active_session_tab(active_sess.session_id.clone().into());
+            tb.set_active_session_tab(active_sess.session_id.to_shared());
             tb.set_has_active_session(true);
-            tb.set_active_session_name(active_sess.display_title.clone().into());
-            tb.set_active_host_id(active_sess.host_id.clone().into());
-            tb.set_active_host_name(active_sess.host_name.clone().into());
-            tb.set_active_host_address(active_sess.host_address.clone().into());
+            tb.set_active_session_name(active_sess.display_title.to_shared());
+            tb.set_active_host_id(active_sess.host_id.to_shared());
+            tb.set_active_host_name(active_sess.host_name.to_shared());
+            tb.set_active_host_address(active_sess.host_address.to_shared());
             tb.set_active_host_ping_ms(active_sess.ping_ms);
-            tb.set_active_host_status(active_sess.host_status.clone().into());
+            tb.set_active_host_status(active_sess.host_status.to_shared());
             res = (active_sess.host_id.clone(), active_sess.host_name.clone());
         }
-        tb.set_active_pane_id(active_group.pane_id.clone().into());
+        tb.set_active_pane_id(active_group.pane_id.to_shared());
         tb.set_is_split(is_split);
         tb.set_split_count(pane_groups.len() as i32);
         res

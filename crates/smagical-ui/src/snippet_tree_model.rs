@@ -4,6 +4,7 @@
 
 use std::collections::HashSet;
 use smagical_core::AppStorage;
+use crate::common::{matches_any_ignore_case, ToSharedString};
 use crate::generated::{GroupOptionData, SnippetTreeNode};
 
 /// 内存层级全量代码片段树节点（包含未展开节点）
@@ -115,12 +116,18 @@ pub async fn build_raw_snippet_tree_from_storage_async(storage: &dyn AppStorage)
 }
 
 
-/// 对多层嵌套树进行深度优先遍历 (DFS) 排序：分组在前，星标片段靠前
-pub fn sort_snippet_tree_hierarchy(tree: &mut Vec<RawSnippetTreeNode>) {
+/// 结合智能调用度量评分对多层嵌套树进行深度优先遍历 (DFS) 排序：分组在前，星标置顶，高频常用优先
+pub fn sort_snippet_tree_with_intelligence(
+    tree: &mut Vec<RawSnippetTreeNode>,
+    tracker: Option<&smagical_core::domain::snippet::SnippetUsageTracker>,
+    now_timestamp: u64,
+) {
     fn collect_children(
         parent_id: &str,
         tree: &[RawSnippetTreeNode],
         result: &mut Vec<RawSnippetTreeNode>,
+        tracker: Option<&smagical_core::domain::snippet::SnippetUsageTracker>,
+        now_timestamp: u64,
     ) {
         let mut children: Vec<RawSnippetTreeNode> = tree
             .iter()
@@ -128,12 +135,25 @@ pub fn sort_snippet_tree_hierarchy(tree: &mut Vec<RawSnippetTreeNode>) {
             .cloned()
             .collect();
 
-        // 排序规则: 分组在前(true > false)；同类下星标靠前(true > false)；再按 sort_order 升序，最后按名称升序
+        // 排序规则: 分组在前(true > false)；同类下星标靠前(true > false)；再按智能评分降序，最后按 sort_order 升序与名称
         children.sort_by(|a, b| {
-            b.is_group.cmp(&a.is_group)
-                .then_with(|| b.is_favorite.cmp(&a.is_favorite))
-                .then_with(|| a.sort_order.cmp(&b.sort_order))
-                .then_with(|| a.name.cmp(&b.name))
+            let grp_cmp = b.is_group.cmp(&a.is_group);
+            if grp_cmp != std::cmp::Ordering::Equal {
+                return grp_cmp;
+            }
+            let fav_cmp = b.is_favorite.cmp(&a.is_favorite);
+            if fav_cmp != std::cmp::Ordering::Equal {
+                return fav_cmp;
+            }
+            if let Some(t) = tracker {
+                let score_a = t.calculate_score(&a.id, a.is_favorite, now_timestamp);
+                let score_b = t.calculate_score(&b.id, b.is_favorite, now_timestamp);
+                let score_cmp = score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal);
+                if score_cmp != std::cmp::Ordering::Equal {
+                    return score_cmp;
+                }
+            }
+            a.sort_order.cmp(&b.sort_order).then_with(|| a.name.cmp(&b.name))
         });
 
         for child in children {
@@ -141,13 +161,13 @@ pub fn sort_snippet_tree_hierarchy(tree: &mut Vec<RawSnippetTreeNode>) {
             let is_grp = child.is_group;
             result.push(child);
             if is_grp {
-                collect_children(&child_id, tree, result);
+                collect_children(&child_id, tree, result, tracker, now_timestamp);
             }
         }
     }
 
     let mut sorted = Vec::with_capacity(tree.len());
-    collect_children("root", tree, &mut sorted);
+    collect_children("root", tree, &mut sorted, tracker, now_timestamp);
 
     // 容错: 如果有孤立节点，追加到最后
     for node in tree.iter() {
@@ -157,6 +177,11 @@ pub fn sort_snippet_tree_hierarchy(tree: &mut Vec<RawSnippetTreeNode>) {
     }
 
     *tree = sorted;
+}
+
+/// 对多层嵌套树进行深度优先遍历 (DFS) 排序：分组在前，星标片段靠前
+pub fn sort_snippet_tree_hierarchy(tree: &mut Vec<RawSnippetTreeNode>) {
+    sort_snippet_tree_with_intelligence(tree, None, 0);
 }
 
 /// 移动与调序代码片段树形节点（片段或文件夹分组）。
@@ -328,15 +353,15 @@ pub fn build_visible_snippet_tree_nodes(
             };
 
             visible.push(SnippetTreeNode {
-                id: node.id.clone().into(),
-                name: node.name.clone().into(),
-                parent_id: node.parent_id.clone().into(),
+                id: node.id.to_shared(),
+                name: node.name.to_shared(),
+                parent_id: node.parent_id.to_shared(),
                 level: node.level,
                 is_group: node.is_group,
                 is_expanded,
                 has_children: node.has_children,
                 item_count: node.item_count,
-                language: node.language.clone().into(),
+                language: node.language.to_shared(),
                 auto_execute: node.auto_execute,
                 is_favorite: node.is_favorite,
             });
@@ -351,7 +376,7 @@ pub fn build_search_snippet_tree_nodes(
     master_tree: &[RawSnippetTreeNode],
     query: &str,
 ) -> Vec<SnippetTreeNode> {
-    let q = query.trim().to_lowercase();
+    let q = query.trim();
     if q.is_empty() {
         return Vec::new();
     }
@@ -359,11 +384,9 @@ pub fn build_search_snippet_tree_nodes(
     let mut matched_ids = HashSet::new();
     let mut needed_ancestors = HashSet::new();
 
-    // 1. 查找所有直接命中的节点
+    // 1. 查找所有直接命中的节点 (零堆分配匹配)
     for node in master_tree {
-        if node.name.to_lowercase().contains(&q)
-            || node.language.to_lowercase().contains(&q)
-        {
+        if matches_any_ignore_case(&[&node.name, &node.language], q) {
             matched_ids.insert(node.id.clone());
 
             // 收集祖先链
@@ -384,15 +407,15 @@ pub fn build_search_snippet_tree_nodes(
     for node in master_tree {
         if matched_ids.contains(&node.id) || needed_ancestors.contains(&node.id) {
             result.push(SnippetTreeNode {
-                id: node.id.clone().into(),
-                name: node.name.clone().into(),
-                parent_id: node.parent_id.clone().into(),
+                id: node.id.to_shared(),
+                name: node.name.to_shared(),
+                parent_id: node.parent_id.to_shared(),
                 level: node.level,
                 is_group: node.is_group,
                 is_expanded: true, // 搜索模式下分组默认全部展开
                 has_children: node.has_children,
                 item_count: node.item_count,
-                language: node.language.clone().into(),
+                language: node.language.to_shared(),
                 auto_execute: node.auto_execute,
                 is_favorite: node.is_favorite,
             });
@@ -420,10 +443,10 @@ pub fn build_snippet_group_options_from_records(
     for g in groups {
         let prefix = "  ".repeat(g.level as usize);
         options.push(GroupOptionData {
-            id: g.id.clone().into(),
+            id: g.id.to_shared(),
             name: format!("{}📁 {}", prefix, g.name).into(),
             level: g.level as i32 + 1,
-            parent_id: g.parent_id.as_deref().unwrap_or_default().into(),
+            parent_id: g.parent_id.as_deref().unwrap_or_default().to_shared(),
             has_children: false,
             is_expanded: false,
         });

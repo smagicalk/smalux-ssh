@@ -37,6 +37,19 @@
 
 ---
 
+## 🧩 UI 组件与文件结构
+
+- **主视图入口**：[`crates/ui/plugins/tunnels/ui/views/tunnels_view.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/tunnels/ui/views/tunnels_view.slint)
+- **隧道侧边抽屉**：[`crates/ui/plugins/tunnels/ui/drawers/tunnels_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/tunnels/ui/drawers/tunnels_drawer.slint)
+- **伴生控制抽屉**：[`crates/ui/plugins/tunnels/ui/companion/tunnel_tool_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/tunnels/ui/companion/tunnel_tool_drawer.slint)
+- **新建规则类型弹窗**：[`crates/ui/plugins/tunnels/ui/modals/create-tunnel-type-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/tunnels/ui/modals/create-tunnel-type-modal.slint)
+- **主机隧道配置弹窗**：[`crates/ui/plugins/tunnels/ui/modals/create-host-tunnel-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/tunnels/ui/modals/create-host-tunnel-modal.slint)
+- **领域桥接单例**：[`crates/ui/common/ui/features/tunnels/tunnels_bridge.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/features/tunnels/tunnels_bridge.slint)
+- **UI 事件处理器**：[`crates/smagical-ui/src/handlers/tunnel_handlers.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/tunnel_handlers.rs)
+- **纯 Rust 底层隧道驱动**：[`crates/smagical-ssh/src/tunnel_driver.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ssh/src/tunnel_driver.rs) (`RusshTunnelDriver`)
+
+---
+
 ## 二、三大核心网络资产模型
 
 ### 1. ⚡ 端口转发资产 (Port Forwarding)

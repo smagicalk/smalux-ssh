@@ -1,9 +1,9 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 import { AppPasswordInput } from "@common/shared/base/app-password-input.slint";
 import { AppTextArea } from "@common/shared/base/app-text-area.slint";
 
-export component CreateHostGeneralTab inherits VerticalLayout {
+component CreateHostGeneralTab inherits VerticalLayout {
     spacing: 10px;
 
     in-out property <string> host-name: "";
@@ -558,3 +558,6 @@ export component CreateHostGeneralTab inherits VerticalLayout {
         }
     }
 }
+
+export { CreateHostGeneralTab }
+

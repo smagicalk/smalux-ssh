@@ -1,11 +1,11 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
-import { GroupTreeSelector, GroupOptionData } from "group-tree-selector.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "@common/shared/composite/group-tree-selector.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 
 export { GroupOptionData }
 
 /// 通用树状文件夹/分组选取弹窗 (Folder / Group Picker Modal)
-export component FolderPickerModal inherits Rectangle {
+component FolderPickerModal inherits Rectangle {
     in property <bool> is-open: false;
     in property <string> title: @tr("选择所属上级文件夹 / 分组");
     in property <string> prompt: @tr("请在下方树形结构中点选目标归属文件夹（支持多级折叠/展开）：");
@@ -45,7 +45,7 @@ export component FolderPickerModal inherits Rectangle {
             border-width: 1px;
             border-color: AppTheme.border;
             drop-shadow-blur: 24px;
-            drop-shadow-color: #00000080;
+            drop-shadow-color: #00000066;
 
             VerticalLayout {
                 padding: 16px;
@@ -169,3 +169,5 @@ export component FolderPickerModal inherits Rectangle {
         }
     }
 }
+
+export { FolderPickerModal }

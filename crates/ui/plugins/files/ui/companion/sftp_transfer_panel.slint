@@ -1,0 +1,353 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppButton } from "@common/shared/base/app-button.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
+import { TransferItemData } from "@common/features/file_explorer/file_explorer_model.slint";
+import { FilesBridge } from "@common/features/file_explorer/file_explorer_bridge.slint";
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件: 传输任务条目行
+// -----------------------------------------------------------------------------
+component SftpTransferTaskRow inherits Rectangle {
+    in property <TransferItemData> task;
+
+    callback clicked();
+    callback right-clicked(length /* mouse_x */, length /* mouse_y */);
+
+    height: 32px;
+    border-radius: 3px;
+    background: trans-item-touch.has-hover ? AppTheme.hover-background : (root.task.is-dir ? AppTheme.control-background.transparentize(50%) : AppTheme.control-background);
+    border-width: 1px;
+    border-color: root.task.is-dir ? AppTheme.accent.transparentize(80%) : AppTheme.border;
+
+    trans-item-touch := TouchArea {
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                if event.button == PointerEventButton.right {
+                    root.right-clicked(self.mouse-x, self.mouse-y);
+                }
+            }
+        }
+        clicked => { root.clicked(); }
+        mouse-cursor: root.task.is-dir ? pointer : default;
+    }
+
+    VerticalLayout {
+        padding: 4px;
+        spacing: 2px;
+
+        // 上部: 缩进 + 方向 + 折叠三角 + 图标 + 文件/文件夹名 + 项数 + 大小/速度 + 百分比
+        HorizontalLayout {
+            alignment: space-between;
+
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: start;
+                horizontal-stretch: 1;
+
+                // 1. 子项层级缩进
+                if root.task.level > 0: Rectangle {
+                    width: root.task.level * 10px;
+                }
+
+                // 2. 文件夹展开/折叠三角指示 (仅对文件夹显示)
+                if root.task.is-dir: VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: root.task.is-expanded ? "▼" : "▶";
+                        font-size: 8px;
+                        font-weight: 700;
+                        color: AppTheme.secondary-foreground;
+                        vertical-alignment: center;
+                    }
+                }
+
+                // 3. 上传/下载方向标识
+                VerticalLayout {
+                    alignment: center;
+                    Text {
+                        text: root.task.direction == "upload" ? "↑" : "↓";
+                        font-size: 9px;
+                        font-weight: 700;
+                        color: root.task.direction == "upload" ? AppTheme.accent : #10b981;
+                    }
+                }
+
+                // 4. 文件夹或文件图标
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: root.task.is-dir ? @image-url("../../assets/icons/folder.svg") : @image-url("../../assets/icons/file-text.svg");
+                        width: 11px;
+                        height: 11px;
+                        image-fit: contain;
+                        colorize: root.task.is-dir ? #f59e0b : (root.task.direction == "upload" ? AppTheme.accent : #10b981);
+                    }
+                }
+
+                // 5. 任务文件名或目录名
+                VerticalLayout {
+                    alignment: center;
+                    horizontal-stretch: 1;
+                    Text {
+                        text: root.task.filename;
+                        font-size: 9px;
+                        font-weight: root.task.is-dir ? 700 : 600;
+                        color: AppTheme.foreground;
+                        overflow: elide;
+                    }
+                }
+
+                // 6. 文件夹项数概览徽章
+                if root.task.is-dir && root.task.item-count-text != "": VerticalLayout {
+                    alignment: center;
+                    Rectangle {
+                        height: 13px;
+                        border-radius: 2px;
+                        background: AppTheme.hover-background;
+                        HorizontalLayout {
+                            padding-left: 3px;
+                            padding-right: 3px;
+                            alignment: center;
+                            Text {
+                                text: root.task.item-count-text;
+                                font-size: 8px;
+                                color: AppTheme.secondary-foreground;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // 右侧速率与百分比
+            HorizontalLayout {
+                spacing: 4px;
+                alignment: end;
+
+                Text {
+                    text: root.task.speed-text != "" ? root.task.speed-text : root.task.size-text;
+                    font-size: 8px;
+                    color: AppTheme.secondary-foreground;
+                    vertical-alignment: center;
+                }
+
+                Text {
+                    text: Math.round(root.task.progress * 100) + "%";
+                    font-size: 8px;
+                    font-weight: 700;
+                    color: root.task.status == "completed" ? #10b981 : AppTheme.accent;
+                    vertical-alignment: center;
+                }
+            }
+        }
+
+        // 下部: 进度条
+        Rectangle {
+            height: 3px;
+            border-radius: 1px;
+            background: AppTheme.border;
+
+            Rectangle {
+                x: 0px;
+                y: 0px;
+                width: parent.width * Math.max(0.0, Math.min(1.0, root.task.progress));
+                height: 100%;
+                border-radius: 1px;
+                background: root.task.status == "completed" ? #10b981 :
+                            root.task.status == "failed" ? AppTheme.danger : AppTheme.accent;
+            }
+        }
+    }
+}
+
+/// SFTP 底部传输队列与进度面板
+component SftpTransferPanel inherits Rectangle {
+    in-out property <bool> is-transfer-expanded: false;
+    in-out property <length> transfer-panel-height: 150px;
+    in property <[TransferItemData]> transfer-tasks: [];
+    in property <length> drawer-height: 800px;
+
+    callback clear-completed();
+    callback open-transfer-context-menu(string /* id */, string /* name */, string /* path */, string /* status */, length /* click_x */, length /* click_y */);
+
+    width: 100%;
+    height: root.is-transfer-expanded ? root.transfer-panel-height : 26px;
+    background: AppTheme.panel-background;
+    clip: true;
+
+    // 顶部 1px 分界线
+    Rectangle {
+        y: 0px;
+        width: 100%;
+        height: 1px;
+        background: AppTheme.border;
+    }
+
+    // 顶部可拖拽调节手柄 (仅展开状态可向上/向下调节高度)
+    if root.is-transfer-expanded: Rectangle {
+        y: 0px;
+        height: 5px;
+        width: 100%;
+        z: 20;
+        background: split-touch.has-hover || split-touch.pressed ? AppTheme.accent : transparent;
+        animate background { duration: 100ms; }
+
+        split-touch := TouchArea {
+            mouse-cursor: row-resize;
+            moved => {
+                if self.pressed {
+                    let delta = self.mouse-y - self.pressed-y;
+                    root.transfer-panel-height = Math.max(80px, Math.min(root.drawer-height - 120px, root.transfer-panel-height - delta));
+                }
+            }
+            double-clicked => {
+                root.transfer-panel-height = 150px;
+            }
+        }
+    }
+
+    VerticalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        spacing: 4px;
+
+        // 传输面板头部 (点击自由切换展开/折叠)
+        Rectangle {
+            height: 18px;
+
+            header-touch := TouchArea {
+                clicked => {
+                    root.is-transfer-expanded = !root.is-transfer-expanded;
+                }
+                mouse-cursor: pointer;
+            }
+
+            HorizontalLayout {
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 5px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/arrow-up-down.svg");
+                            width: 11px;
+                            height: 11px;
+                            colorize: header-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: @tr("传输进度与队列");
+                            font-size: 10px;
+                            font-weight: 700;
+                            color: header-touch.has-hover ? AppTheme.accent : AppTheme.foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    if root.transfer-tasks.length > 0: Rectangle {
+                        height: 14px;
+                        border-radius: 7px;
+                        background: AppTheme.accent.transparentize(80%);
+                        HorizontalLayout {
+                            padding-left: 5px;
+                            padding-right: 5px;
+                            Text {
+                                text: root.transfer-tasks.length + "";
+                                font-size: 8px;
+                                font-weight: 700;
+                                color: AppTheme.accent;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: end;
+
+                    if root.is-transfer-expanded && root.transfer-tasks.length > 0: AppButton {
+                        text: @tr("清空完成");
+                        variant: "ghost";
+                        height: 16px;
+                        font-size: 8px;
+                        clicked => {
+                            root.clear-completed();
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: root.is-transfer-expanded ? "▼" : "▲";
+                            font-size: 8px;
+                            color: header-touch.has-hover ? AppTheme.accent : AppTheme.secondary-foreground;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+            }
+        }
+
+        // 展开状态下的传输任务列表
+        if root.is-transfer-expanded: Rectangle {
+            vertical-stretch: 1;
+            clip: true;
+
+            trans-scroll := Flickable {
+                width: 100%;
+                height: 100%;
+                content-height: max(self.height, root.transfer-tasks.length * 36px);
+
+                if root.transfer-tasks.length == 0: VerticalLayout {
+                    alignment: center;
+                    height: 100%;
+                    Text {
+                        text: @tr("暂无进行中的文件传输任务");
+                        font-size: 9px;
+                        color: AppTheme.disabled-foreground;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                if root.transfer-tasks.length > 0: VerticalLayout {
+                    spacing: 4px;
+                    padding-right: 4px;
+
+                    // 传输任务 Repeater (提取子组件，消除大型 AST 内联)
+                    for task[t-idx] in root.transfer-tasks: SftpTransferTaskRow {
+                        task: task;
+
+                        clicked => {
+                            if task.is-dir {
+                                FilesBridge.toggle-transfer-expand(task.id);
+                            }
+                        }
+                        right-clicked(mouse_x, mouse_y) => {
+                            let p = task.target-path != "" ? task.target-path : task.source-path;
+                            let click_y = root.y + 26px + t-idx * 36px + trans-scroll.content-y + mouse_y;
+                            let click_x = 8px + mouse_x;
+                            root.open-transfer-context-menu(task.id, task.filename, p, task.status, click_x, click_y);
+                        }
+                    }
+                }
+            }
+
+            if root.transfer-tasks.length > 0: AppVScrollBar {
+                content-height: trans-scroll.content-height;
+                visible-height: trans-scroll.height;
+                content-y <=> trans-scroll.content-y;
+            }
+        }
+    }
+}
+
+export { SftpTransferPanel }

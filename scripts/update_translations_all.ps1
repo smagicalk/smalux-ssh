@@ -4,9 +4,9 @@
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 
 $root = if ($PSScriptRoot) { (Resolve-Path "$PSScriptRoot/..").Path } else { (Resolve-Path ".").Path }
-$uiDir = "$root/crates/smagical-ui-view/ui"
-$poDir = "$root/crates/smagical-ui-view/translations/en/LC_MESSAGES"
-$dictJson = "$root/crates/smagical-ui-view/translations/en_dict.json"
+$uiDir = "$root/crates/ui"
+$poDir = "$root/crates/ui/kernel/translations/en/LC_MESSAGES"
+$dictJson = "$root/crates/ui/kernel/translations/en_dict.json"
 
 Write-Host "1. 扫描所有 Slint 文件提取 @tr(...) 文本..."
 $slintFiles = Get-ChildItem -Path $uiDir -Recurse -Filter "*.slint"

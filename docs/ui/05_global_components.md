@@ -30,7 +30,7 @@ Smalux-SSH 抽象了一套高复用度、轻量且视觉统一的全局基础组
 
 ## 1. 全局气泡通知系统 (`ToastContainer` / `ToastCard`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/toast.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/toast.slint)
+- **Slint 组件**：[`crates/ui/common/ui/components/toast.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/toast.slint)
 - **Rust 管理器**：[`crates/smagical-ui/src/notification_service.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/notification_service.rs)
 
 ### 特性与规范
@@ -53,7 +53,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 2. 右键上下文菜单 (`ContextMenuContainer` / `ContextMenuItem`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/context-menu.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/context-menu.slint)
+- **Slint 组件**：[`crates/ui/common/ui/components/context-menu.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/context-menu.slint)
 
 ### 特性
 - 纯暗色背景 + 柔和投影 + 细边框 (`z: 800`)；
@@ -66,7 +66,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 3. 主机资产选择器 (`HostPickerList` / `HostPickerCard`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/host-picker-list.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/host-picker-list.slint)
+- **Slint 组件**：[`crates/ui/plugins/hosts/ui/modals/host-picker-list.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/modals/host-picker-list.slint)
 
 ### 特性
 - 统一 44px 高度规范卡片；
@@ -78,7 +78,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 4. 通用树状分组选择器 (`GroupTreeSelector`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/group-tree-selector.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/group-tree-selector.slint)
+- **Slint 组件**：[`crates/ui/plugins/hosts/ui/modals/group-tree-selector.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/modals/group-tree-selector.slint)
 
 ### 特性
 - 左侧独立 `18px` 折叠三角热区，支持点击折叠/展开；
@@ -90,7 +90,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 5. 新建主机分组弹窗 (`CreateGroupModal`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/create-group-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/create-group-modal.slint)
+- **Slint 组件**：[`crates/ui/plugins/hosts/ui/modals/create-group-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/hosts/ui/modals/create-group-modal.slint)
 
 ### 特性
 - 居中 `460px x 420px` 精致深色卡片，内容 100% 满宽排布；
@@ -102,7 +102,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 6. 新建终端会话弹窗 (`NewSessionModal`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/new-session-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/new-session-modal.slint)
+- **Slint 组件**：[`crates/ui/kernel/ui/components/new-session-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/kernel/ui/components/new-session-modal.slint)
 
 ### 特性
 - 上半部分呈现本地探测到的 Shell 环境（PowerShell 7, WSL, Git Bash, CMD 等）；
@@ -113,7 +113,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 7. 选择文件会话弹窗 (`FileHostModal`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/file-host-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/file-host-modal.slint)
+- **Slint 组件**：[`crates/ui/plugins/files/ui/modals/file-host-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/files/ui/modals/file-host-modal.slint)
 
 ### 特性
 - 专用于双盘文件管理页面的快速会话连接器；
@@ -124,7 +124,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 8. 会话详情弹窗 (`HistoryDetailModal`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/history-detail-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/history-detail-modal.slint)
+- **Slint 组件**：[`crates/ui/plugins/history/ui/modals/history-detail-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/history/ui/modals/history-detail-modal.slint)
 
 ### 特性
 - 居中展示已归档会话的元数据信息；
@@ -134,7 +134,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 9. 统一消息弹窗 (`MessageDialog`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/message-dialog.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/message-dialog.slint)
+- **Slint 组件**：[`crates/ui/kernel/ui/components/message-dialog.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/kernel/ui/components/message-dialog.slint)
 
 ### 特性
 - 用于阻断性或关键二次确认操作（如删除分组、清空历史）；
@@ -144,7 +144,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 10. 暗色搜索框 (`SearchInput`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/search-input.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/search-input.slint)
+- **Slint 组件**：[`crates/ui/common/ui/components/search-input.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/search-input.slint)
 
 ### 特性
 - 统一暗色输入框背景与高对比度边框；
@@ -155,7 +155,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 11. 健康状态小圆点 (`StatusDot`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/status-dot.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/status-dot.slint)
+- **Slint 组件**：[`crates/ui/common/ui/components/status-dot.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/status-dot.slint)
 
 ### 特性
 - 标准 4 态渲染：`online` (绿), `warning` (黄), `error` (红), `offline` (灰)；
@@ -165,7 +165,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 12. 细粒度进度条 (`ProgressBar`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/progress-bar.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/progress-bar.slint)
+- **Slint 组件**：[`crates/ui/common/ui/components/progress-bar.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/progress-bar.slint)
 
 ### 特性
 - 紧凑 4px ~ 6px 高度槽位；
@@ -175,7 +175,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 13. 标准图标按钮 (`AppIconButton`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/base/app-icon-button.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/base/app-icon-button.slint)
+- **Slint 组件**：[`crates/ui/common/ui/shared/base/app-icon-button.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/shared/base/app-icon-button.slint)
 
 ### 特性
 - 20px ~ 24px 精致正方形热区；
@@ -185,7 +185,7 @@ ctx.notify_error("路径不存在", format!("无法访问目标路径: {}", path
 
 ## 14. 可折叠抽屉容器 (`DrawerContainer`)
 
-- **Slint 组件**：[`crates/smagical-ui/ui/components/drawer-container.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/drawer-container.slint)
+- **Slint 组件**：[`crates/ui/common/ui/components/drawer-container.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/drawer-container.slint)
 
 ### 特性
 - 统一左侧所有二级抽屉（主机、历史、设置等）的标题栏、折叠按钮与分割线排版。

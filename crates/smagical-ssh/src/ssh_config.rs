@@ -38,12 +38,22 @@ impl KeyTempGuard {
         let temp_dir = std::env::temp_dir().join("smalux_keys");
         let _ = std::fs::create_dir_all(&temp_dir);
 
+        #[cfg(windows)]
+        {
+            secure_windows_path_permissions(&temp_dir, true);
+        }
+
         // 使用 session_id 和随机后缀防止冲突
         let file_name = format!("key_{}_{}.pem", session_id, uuid::Uuid::new_v4().simple());
         let path = temp_dir.join(file_name);
 
-        // 写入私钥内容
-        std::fs::write(&path, pem_content.as_bytes())
+        // 写入私钥内容 (确保以换行符结尾)
+        let clean_pem = if pem_content.ends_with('\n') {
+            pem_content.to_string()
+        } else {
+            format!("{}\n", pem_content)
+        };
+        std::fs::write(&path, clean_pem.as_bytes())
             .with_context(|| format!("写入临时私钥文件失败: {:?}", path))?;
 
         // 在 Unix 平台设置 0600 严格权限 (仅所有者可读写)
@@ -53,6 +63,12 @@ impl KeyTempGuard {
             let mut perms = std::fs::metadata(&path)?.permissions();
             perms.set_mode(0o600);
             let _ = std::fs::set_permissions(&path, perms);
+        }
+
+        // 在 Windows 平台收紧 NTFS ACL 权限 (仅当前用户与 SYSTEM，杜绝 OpenSSH bad permissions)
+        #[cfg(windows)]
+        {
+            secure_windows_path_permissions(&path, false);
         }
 
         tracing::debug!(target: "smagical_ssh::security", "临时私钥文件已安全创建: {:?}", path);
@@ -421,6 +437,79 @@ pub fn get_system_proxy() -> Option<(String, String, u16)> {
 
     None
 }
+
+/// 在 Windows 平台收紧 NTFS ACL 权限，满足 OpenSSH 严格权限策略。
+/// 
+/// 确保仅当前用户（所有者）与 SYSTEM 拥有完全控制权限，移除其他所有继承组（如 Users、Authenticated Users）。
+#[cfg(windows)]
+pub fn secure_windows_path_permissions(path: &Path, is_directory: bool) {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+    let username = std::env::var("USERNAME").unwrap_or_default();
+    if username.is_empty() {
+        return;
+    }
+
+    let grant_user = if is_directory {
+        format!("{}:(OI)(CI)F", username)
+    } else {
+        format!("{}:F", username)
+    };
+
+    let grant_system = if is_directory {
+        "SYSTEM:(OI)(CI)F"
+    } else {
+        "SYSTEM:F"
+    };
+
+    let icacls_bin = std::env::var("SystemRoot")
+        .map(|sr| format!("{}\\System32\\icacls.exe", sr))
+        .unwrap_or_else(|_| "icacls.exe".to_string());
+
+    let status = std::process::Command::new(&icacls_bin)
+        .arg(path)
+        .arg("/inheritance:r")
+        .arg("/grant:r")
+        .arg(&grant_user)
+        .arg("/grant:r")
+        .arg(grant_system)
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+
+    if let Ok(s) = status {
+        if s.success() {
+            tracing::debug!(target: "smagical_ssh::security", "已成功通过 icacls 收紧 Windows ACL 权限: {:?}", path);
+            return;
+        }
+    }
+
+    // 兜底方案：调用 powershell 设置 ACL
+    let path_str = path.to_string_lossy().replace('\'', "''");
+    let user_str = username.replace('\'', "''");
+    let ps_script = if is_directory {
+        format!(
+            "$acl = Get-Acl '{path}'; $acl.SetAccessRuleProtection($true, $false); $r1 = New-Object System.Security.AccessControl.FileSystemAccessRule('{user}', 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'); $r2 = New-Object System.Security.AccessControl.FileSystemAccessRule('SYSTEM', 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow'); $acl.ResetAccessRule($r1); $acl.AddAccessRule($r2); Set-Acl '{path}' $acl",
+            path = path_str,
+            user = user_str,
+        )
+    } else {
+        format!(
+            "$acl = Get-Acl '{path}'; $acl.SetAccessRuleProtection($true, $false); $r1 = New-Object System.Security.AccessControl.FileSystemAccessRule('{user}', 'FullControl', 'Allow'); $r2 = New-Object System.Security.AccessControl.FileSystemAccessRule('SYSTEM', 'FullControl', 'Allow'); $acl.ResetAccessRule($r1); $acl.AddAccessRule($r2); Set-Acl '{path}' $acl",
+            path = path_str,
+            user = user_str,
+        )
+    };
+
+    let _ = std::process::Command::new("powershell.exe")
+        .args(["-NoProfile", "-NonInteractive", "-Command", &ps_script])
+        .creation_flags(CREATE_NO_WINDOW)
+        .status();
+}
+
+#[cfg(not(windows))]
+#[allow(dead_code)]
+pub fn secure_windows_path_permissions(_path: &Path, _is_directory: bool) {}
 
 #[cfg(test)]
 mod tests {

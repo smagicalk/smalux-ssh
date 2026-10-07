@@ -3,10 +3,11 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Arc;
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, Model};
 use smagical_core::AppStorage;
 use smagical_core::domain::config::KeywordHighlightRuleRecord;
 use crate::async_util::spawn_async;
+use crate::common::{run_on_ui, to_model_rc};
 
 use crate::generated::{AppWindow, KeywordHighlightRule, SettingsBridge};
 use crate::handlers::AppContext;
@@ -114,7 +115,7 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
     };
     let rules_state = Rc::new(RefCell::new(current_rules.clone()));
     sync_rules_to_renderer(ctx, &current_rules);
-    bridge.set_terminal_keyword_rules(ModelRc::from(Rc::new(VecModel::from(current_rules))));
+    bridge.set_terminal_keyword_rules(to_model_rc(current_rules));
 
     // 注册添加规则
     let rules_state_add = rules_state.clone();
@@ -138,10 +139,10 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
         list.push(rule);
         sync_rules_to_renderer(&ctx_add, &list);
         notif_add.success("已添加高亮规则", &format!("成功添加规则「{}」", p));
-        if let Some(w) = window_weak_add.upgrade() {
-            let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
-        }
+        let list_snapshot = list.clone();
+        run_on_ui(window_weak_add.clone(), move |w| {
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(to_model_rc(list_snapshot));
+        });
         let records = rules_to_records(&list);
         persist_keyword_rules(&storage_add, records);
     });
@@ -164,10 +165,10 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
             notif_edit.success("高亮规则已更新", &format!("成功更新规则「{}」", p));
         }
         sync_rules_to_renderer(&ctx_edit, &list);
-        if let Some(w) = window_weak_edit.upgrade() {
-            let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
-        }
+        let list_snapshot = list.clone();
+        run_on_ui(window_weak_edit.clone(), move |w| {
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(to_model_rc(list_snapshot));
+        });
         let records = rules_to_records(&list);
         persist_keyword_rules(&storage_edit, records);
     });
@@ -183,10 +184,10 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
             item.enabled = enabled;
         }
         sync_rules_to_renderer(&ctx_toggle, &list);
-        if let Some(w) = window_weak_toggle.upgrade() {
-            let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
-        }
+        let list_snapshot = list.clone();
+        run_on_ui(window_weak_toggle.clone(), move |w| {
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(to_model_rc(list_snapshot));
+        });
         let records = rules_to_records(&list);
         persist_keyword_rules(&storage_toggle, records);
     });
@@ -202,10 +203,10 @@ pub(crate) fn register_highlight_handlers(window: &AppWindow, ctx: &AppContext) 
         list.retain(|r| r.id != id);
         sync_rules_to_renderer(&ctx_del, &list);
         notif_del.info("规则已移除", "已成功删除该条终端高亮规则");
-        if let Some(w) = window_weak_del.upgrade() {
-            let model = ModelRc::from(Rc::new(VecModel::from(list.clone())));
-            w.global::<SettingsBridge>().set_terminal_keyword_rules(model);
-        }
+        let list_snapshot = list.clone();
+        run_on_ui(window_weak_del.clone(), move |w| {
+            w.global::<SettingsBridge>().set_terminal_keyword_rules(to_model_rc(list_snapshot));
+        });
         let records = rules_to_records(&list);
         persist_keyword_rules(&storage_del, records);
     });

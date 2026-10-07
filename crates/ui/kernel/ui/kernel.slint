@@ -46,43 +46,38 @@ export {
 // 视图与模型导出
 export { TabData } from "views/center_terminal/tab_bar.slint";
 export { TerminalPaneData, TerminalSplitterData } from "views/center_terminal/terminal_viewport.slint";
-export { FileItemData, FileTabData, TransferItemData } from "views/file_explorer_view.slint";
-export { HistoryItemData, HistoryGroupData } from "views/history_center_view.slint";
-export { SettingSnapshotItem, KeywordHighlightRule, ThemeOption, ThemeRow } from "views/settings_view.slint";
-export { LogEntryData } from "components/debug-modal.slint";
 export { LocalShellItemData } from "components/new-session-modal.slint";
 export { ToastItemData, ToastContainer } from "@common/components/toast.slint";
 export { ActivityBarItemData } from "views/left_activity_bar.slint";
 export { RightToolBarItemData } from "views/right_tool_bar.slint";
 
 // 插件模型导出
-export { HostItemData, HostTreeNode, CredentialOptionData, JumpHostOptionData, CredentialItemData, GroupOptionData } from "@plugin-hosts/hosts_plugin.slint";
-export { QuickCmdData, TmuxSessionItem, SystemMetricsData, DiskPartitionItem, MonitorProcessItem } from "@plugin-session-tools/session_tools_plugin.slint";
-export { SnippetTreeNode, SnippetParamFieldData } from "@plugin-snippets/snippets_plugin.slint";
+export { HostItemData, HostTreeNode, CredentialOptionData, JumpHostOptionData, GroupOptionData, SystemMetricsData, DiskPartitionItem, MonitorProcessItem, TmuxSessionItem } from "@plugin-hosts/hosts_plugin.slint";
+export { CredentialItemData } from "@plugin-credentials/credentials_plugin.slint";
+export { SnippetTreeNode, SnippetParamFieldData, QuickCmdData } from "@plugin-snippets/snippets_plugin.slint";
 export { TunnelItemData, JumpHopData } from "@plugin-tunnels/tunnels_plugin.slint";
+export { FileItemData, FileTabData, TransferItemData } from "@plugin-files/files_plugin.slint";
+export { HistoryItemData, HistoryGroupData } from "@plugin-history/history_plugin.slint";
+export { SettingSnapshotItem, KeywordHighlightRule, ThemeOption } from "@plugin-settings/settings_plugin.slint";
+export { LogEntryData } from "@plugin-debug/debug_plugin.slint";
 
 // 组件导入
-import { HostsDrawer, CredentialsDrawer, CredentialsCenterView, CreateHostModal, CreateGroupModal } from "@plugin-hosts/hosts_plugin.slint";
-import { MonitorDrawer, TunnelToolDrawer, SnippetToolDrawer, SftpToolDrawer, TmuxToolDrawer, AiToolDrawer, CreateTmuxModal } from "@plugin-session-tools/session_tools_plugin.slint";
-import { SnippetsDrawer, SnippetsCenterView, CreateSnippetModal, EditSnippetModal, SnippetRunModal } from "@plugin-snippets/snippets_plugin.slint";
-import { TunnelsDrawer, TunnelsCenterView, CreateHostTunnelModal } from "@plugin-tunnels/tunnels_plugin.slint";
+import { HostsDrawer, CreateHostModal, CreateGroupModal, AiToolDrawer, MonitorDrawer, TmuxToolDrawer, CreateTmuxModal } from "@plugin-hosts/hosts_plugin.slint";
+import { CredentialsDrawer, CredentialsCenterView, GenerateKeyPairModal } from "@plugin-credentials/credentials_plugin.slint";
+import { SnippetsDrawer, SnippetsCenterView, CreateSnippetModal, EditSnippetModal, SnippetRunModal, SnippetToolDrawer } from "@plugin-snippets/snippets_plugin.slint";
+import { TunnelsDrawer, TunnelsCenterView, CreateHostTunnelModal, TunnelToolDrawer } from "@plugin-tunnels/tunnels_plugin.slint";
+import { FilesDrawer, FileExplorerView, FileHostModal, SftpToolDrawer } from "@plugin-files/files_plugin.slint";
+import { HistoryDrawer, HistoryCenterView, HistoryDetailModal } from "@plugin-history/history_plugin.slint";
+import { SettingsCenterView, SettingsDrawer, BackupDrawer, ThemeEditorModal } from "@plugin-settings/settings_plugin.slint";
+import { DebugModal } from "@plugin-debug/debug_plugin.slint";
 
 import { LeftActivityBar } from "views/left_activity_bar.slint";
 import { RightToolBar } from "views/right_tool_bar.slint";
 import { TabBar } from "views/center_terminal/tab_bar.slint";
 import { TerminalViewport } from "views/center_terminal/terminal_viewport.slint";
 import { StatusBar } from "views/center_terminal/status_bar.slint";
-import { HistoryCenterView } from "views/history_center_view.slint";
-import { FileExplorerView } from "views/file_explorer_view.slint";
-import { SettingsCenterView } from "views/settings_view.slint";
-import { BackupDrawer } from "views/left_drawers/backup_drawer.slint";
-import { SettingsDrawer } from "views/left_drawers/settings_drawer.slint";
-import { DebugModal } from "components/debug-modal.slint";
-import { ThemeEditorModal } from "components/theme-editor-modal.slint";
 import { NewSessionModal } from "components/new-session-modal.slint";
-import { HistoryDetailModal } from "components/history-detail-modal.slint";
 import { MessageDialog } from "components/message-dialog.slint";
-import { FileHostModal } from "components/file-host-modal.slint";
 import { VaultUnlockModal } from "components/vault_unlock_modal.slint";
 import { ToastContainer } from "@common/components/toast.slint";
 
@@ -535,33 +530,41 @@ export component AppWindow inherits Window {
                         height: 100%;
                         visible: WindowBridge.active-right-tool == "tmux";
                         has-active-terminal: TerminalBridge.has-active-session;
+                        is-loading: TerminalBridge.tmux-is-loading;
+                        is-installed: TerminalBridge.tmux-is-installed;
+                        sessions: TerminalBridge.tmux-sessions;
                         collapse => {
                             WindowBridge.is-right-drawer-open = false;
                             WindowBridge.toggle-right-drawer();
                         }
                         attach-session(name) => {
-                            TerminalBridge.send-snippet("tmux attach -t " + name);
+                            TerminalBridge.send-snippet("tmux attach -t " + name + "\n");
                         }
                         kill-session(name) => {
-                            TerminalBridge.send-snippet("tmux kill-session -t " + name);
+                            TerminalBridge.send-snippet("tmux kill-session -t " + name + "\n");
+                            TerminalBridge.refresh-tmux();
                         }
                         new-session(name) => {
-                            TerminalBridge.send-snippet("tmux new -s " + name);
+                            TerminalBridge.send-snippet("tmux new -s " + name + "\n");
+                            TerminalBridge.refresh-tmux();
                         }
                         detach-current => {
-                            TerminalBridge.send-snippet("tmux detach");
+                            TerminalBridge.send-snippet("tmux detach\n");
                         }
                         new-window => {
-                            TerminalBridge.send-snippet("tmux new-window");
+                            TerminalBridge.send-snippet("tmux new-window\n");
                         }
                         split-horizontal => {
-                            TerminalBridge.send-snippet("tmux split-window -h");
+                            TerminalBridge.send-snippet("tmux split-window -h\n");
                         }
                         split-vertical => {
-                            TerminalBridge.send-snippet("tmux split-window -v");
+                            TerminalBridge.send-snippet("tmux split-window -v\n");
                         }
                         refresh => {
-                            TerminalBridge.send-snippet("tmux ls");
+                            TerminalBridge.refresh-tmux();
+                        }
+                        install-tmux(cmd) => {
+                            TerminalBridge.send-snippet(cmd + "\n");
                         }
                     }
 
@@ -569,45 +572,9 @@ export component AppWindow inherits Window {
                         width: 100%;
                         height: 100%;
                         visible: WindowBridge.active-right-tool == "ai";
-                        has-active-host: TerminalBridge.has-active-session || AiBridge.has-active-host;
-                        messages <=> AiBridge.messages;
-                        is-generating <=> AiBridge.is-generating;
-                        input-text <=> AiBridge.input-text;
-                        selected-model <=> AiBridge.selected-model;
-                        thinking-degree <=> AiBridge.thinking-degree;
-                        audit-mode <=> AiBridge.audit-mode;
-                        active-host-name <=> AiBridge.active-host-name;
-                        history-sessions <=> AiBridge.history-sessions;
                         collapse => {
                             WindowBridge.is-right-drawer-open = false;
                             WindowBridge.toggle-right-drawer();
-                        }
-                        apply-suggested-cmd(cmd) => {
-                            TerminalBridge.send-snippet(cmd);
-                        }
-                        inject-and-run-cmd(cmd) => {
-                            TerminalBridge.send-snippet(cmd + "\n");
-                        }
-                        send-message(content, model, thinking, audit) => {
-                            AiBridge.send-message(content, model, thinking, audit);
-                        }
-                        new-session => {
-                            AiBridge.new-session();
-                        }
-                        switch-session(id) => {
-                            AiBridge.switch-session(id);
-                        }
-                        delete-session(id) => {
-                            AiBridge.delete-session(id);
-                        }
-                        model-selected(model) => {
-                            AiBridge.model-selected(model);
-                        }
-                        mode-selected(mode) => {
-                            AiBridge.mode-selected(mode);
-                        }
-                        audit-selected(audit) => {
-                            AiBridge.audit-selected(audit);
                         }
                     }
                 }
@@ -646,7 +613,6 @@ export component AppWindow inherits Window {
         is-open: HostsBridge.is-create-group-open;
         default-parent-id: HostsBridge.create-group-default-parent;
         group-options: HostsBridge.group-options;
-        toggle-group(id) => { HostsBridge.toggle-selector-group(id); }
         close => { HostsBridge.is-create-group-open = false; }
         confirm(parent-id, name) => {
             HostsBridge.create-group(parent-id, name);
@@ -655,66 +621,7 @@ export component AppWindow inherits Window {
     }
 
     // 新建与编辑主机资产模态弹窗 (四 Tab 分类、独立网络代理与跳板链路、关联凭据库与即时探活)
-    CreateHostModal {
-        is-open: HostsBridge.is-create-host-modal-open;
-        is-edit-mode: HostsBridge.is-edit-mode;
-        editing-host-id: HostsBridge.editing-host-id;
-        host-name <=> HostsBridge.form-host-name;
-        host-address <=> HostsBridge.form-host-address;
-        host-port-str <=> HostsBridge.form-host-port-str;
-        selected-parent-id <=> HostsBridge.form-parent-id;
-        selected-parent-name <=> HostsBridge.form-parent-name;
-        auth-type <=> HostsBridge.form-auth-type;
-        selected-cred-id <=> HostsBridge.form-cred-id;
-        selected-cred-name <=> HostsBridge.form-cred-name;
-        selected-cred-user <=> HostsBridge.form-cred-user;
-        selected-cred-type <=> HostsBridge.form-cred-type;
-        selected-cred-alg <=> HostsBridge.form-cred-alg;
-        auth-username <=> HostsBridge.form-auth-username;
-        auth-password <=> HostsBridge.form-auth-password;
-        auth-key-username <=> HostsBridge.form-auth-key-username;
-        auth-key-data <=> HostsBridge.form-auth-key-data;
-        auth-key-passphrase <=> HostsBridge.form-auth-key-passphrase;
-        proxy-mode <=> HostsBridge.form-proxy-mode;
-        custom-proxy-proto <=> HostsBridge.form-custom-proxy-proto;
-        custom-proxy-host <=> HostsBridge.form-custom-proxy-host;
-        custom-proxy-port-str <=> HostsBridge.form-custom-proxy-port-str;
-        custom-proxy-username <=> HostsBridge.form-custom-proxy-username;
-        custom-proxy-password <=> HostsBridge.form-custom-proxy-password;
-        keepalive-interval-str <=> HostsBridge.form-keepalive-str;
-        initial-dir <=> HostsBridge.form-initial-dir;
-        startup-cmd <=> HostsBridge.form-startup-cmd;
-        term-type <=> HostsBridge.form-term-type;
-        notes <=> HostsBridge.form-notes;
-        selected-preset-jump-id <=> HostsBridge.form-preset-jump-id;
-        selected-preset-jump-name <=> HostsBridge.form-preset-jump-name;
-        selected-preset-jump-summary <=> HostsBridge.form-preset-jump-summary;
-        selected-preset-jump-hop-count <=> HostsBridge.form-preset-jump-hop-count;
-        default-parent-id: HostsBridge.create-host-default-parent;
-        group-options: HostsBridge.group-options;
-        credential-options: HostsBridge.credential-options;
-        jump-host-options: HostsBridge.jump-host-options;
-        preset-jump-chains: HostsBridge.preset-jump-chains;
-        proxy-options: HostsBridge.proxy-options;
-        test-status: HostsBridge.test-connection-status;
-        test-message: HostsBridge.test-connection-message;
-        toggle-group(id) => { HostsBridge.toggle-selector-group(id); }
-        close => { HostsBridge.close-create-host-modal(); }
-        test-connection(addr, port) => {
-            HostsBridge.test-host-connection(addr, port);
-        }
-        submit(name, addr, port, parent-id, auth-type, cred-id, user, pwd, key-data, key-pass, save-cred, proxy-type, proxy-host, proxy-port, proxy-user, proxy-pwd, jump-summary, keepalive, init-dir, cmd, term, notes) => {
-            HostsBridge.submit-create-host(
-                name, addr, port, parent-id, auth-type, cred-id, user, pwd, key-data, key-pass, save-cred, proxy-type, proxy-host, proxy-port, proxy-user, proxy-pwd, jump-summary, keepalive, init-dir, cmd, term, notes
-            );
-        }
-        filter-credentials(cat, q) => {
-            HostsBridge.filter-create-host-credentials(cat, q);
-        }
-        filter-proxies(q) => {
-            HostsBridge.filter-create-host-proxies(q);
-        }
-    }
+    CreateHostModal { }
 
     // 独立浮动开发者调试与批量数据控制弹窗 (全页面任意时刻可呼出)
     DebugModal { }

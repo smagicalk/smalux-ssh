@@ -41,7 +41,11 @@ impl EventListener for TerminalEventListener {
         if let Event::PtyWrite(text) = event {
             tracing::debug!(target: "smagical_ui::terminal", "向 PTY 回写控制序列 (CPR 等): {:?}", text);
             if let Ok(mut guard) = self.pty_tx.lock() {
-                guard.push(text);
+                if guard.len() < 128 {
+                    guard.push(text);
+                } else {
+                    tracing::warn!(target: "smagical_ui::terminal", "PTY 回写队列达到容量上限 128，丢弃溢出事件");
+                }
             }
         }
     }
@@ -381,7 +385,183 @@ impl TerminalParser {
         let line_text = self.extract_screen_line_text(row);
         engine.detect_url_or_ip_at(&line_text, col)
     }
+
+    /// 一键将终端当前可视窗口全部字符划选为选区 (Select All)
+    pub fn select_all(&mut self) {
+        let (cols, rows) = self.size();
+        if cols > 0 && rows > 0 {
+            self.set_selection((0, 0), (cols.saturating_sub(1), rows.saturating_sub(1)));
+        }
+    }
+
+    /// 在终端历史回滚缓冲区与当前屏幕网格中检索关键词的所有匹配项
+    pub fn find_matches(&self, query: &str, match_case: bool) -> Vec<TerminalSearchMatch> {
+        let trimmed_query = query.trim();
+        if trimmed_query.is_empty() {
+            return Vec::new();
+        }
+
+        let query_needle = if match_case {
+            trimmed_query.to_string()
+        } else {
+            trimmed_query.to_lowercase()
+        };
+
+        let content = self.term.renderable_content();
+        let cols = self.term.columns();
+        let mut line_chars: std::collections::BTreeMap<i32, Vec<(usize, char)>> = std::collections::BTreeMap::new();
+
+        for cell in content.display_iter {
+            let col = cell.point.column.0;
+            let line_i32 = cell.point.line.0;
+            if col < cols {
+                line_chars.entry(line_i32).or_default().push((col, cell.c));
+            }
+        }
+
+        let mut matches = Vec::new();
+        for (line_i32, mut chars) in line_chars {
+            chars.sort_by_key(|(c, _)| *c);
+            let mut line_str = String::new();
+            let mut col_map = Vec::new();
+            for (col, ch) in chars {
+                let actual_ch = if ch != '\0' { ch } else { ' ' };
+                line_str.push(actual_ch);
+                col_map.push(col);
+            }
+
+            let search_target = if match_case {
+                line_str.clone()
+            } else {
+                line_str.to_lowercase()
+            };
+
+            let mut start_pos = 0;
+            while let Some(byte_idx) = search_target[start_pos..].find(&query_needle) {
+                let abs_byte_idx = start_pos + byte_idx;
+                let char_start = search_target[..abs_byte_idx].chars().count();
+                let char_len = query_needle.chars().count();
+                let char_end = char_start + char_len;
+
+                let col_start = col_map.get(char_start).copied().unwrap_or(0);
+                let col_end = col_map.get(char_end.saturating_sub(1)).copied().unwrap_or(col_start + char_len.saturating_sub(1));
+
+                matches.push(TerminalSearchMatch {
+                    line: line_i32,
+                    start_col: col_start,
+                    end_col: col_end,
+                    text: line_str.chars().skip(char_start).take(char_len).collect(),
+                });
+
+                start_pos = abs_byte_idx + query_needle.len().max(1);
+            }
+        }
+
+        matches
+    }
+
+    /// 将视口聚焦并高亮划选指定的搜索匹配项
+    pub fn focus_match(&mut self, m: &TerminalSearchMatch) {
+        let rows = self.term.screen_lines();
+        let history_size = self.term.history_size();
+
+        let target_offset = if m.line < 0 {
+            let raw_offset = (-m.line as usize).saturating_sub(rows / 2);
+            raw_offset.min(history_size)
+        } else {
+            0
+        };
+
+        self.scroll_to_offset(target_offset);
+
+        let display_offset = self.term.grid().display_offset() as i32;
+        let screen_row_i32 = m.line + display_offset;
+        if screen_row_i32 >= 0 && (screen_row_i32 as usize) < rows {
+            let screen_row = screen_row_i32 as usize;
+            self.set_selection((m.start_col, screen_row), (m.end_col, screen_row));
+        }
+    }
 }
+
+/// 终端单条搜索匹配项
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct TerminalSearchMatch {
+    /// 所在网格行号 (负数表示回滚历史行，>= 0 表示当前屏幕行)
+    pub line: i32,
+    /// 匹配起始列 (0-indexed)
+    pub start_col: usize,
+    /// 匹配结束列 (0-indexed, inclusive)
+    pub end_col: usize,
+    /// 匹配命中的纯文本内容
+    pub text: String,
+}
+
+/// 终端会话搜索状态机 (Search State Machine)
+#[derive(Clone, Debug, Default)]
+pub struct TerminalSearchState {
+    /// 当前搜索查询词
+    pub query: String,
+    /// 是否区分大小写
+    pub match_case: bool,
+    /// 匹配项列表
+    pub matches: Vec<TerminalSearchMatch>,
+    /// 当前聚焦的匹配索引 (0-indexed)
+    pub current_index: usize,
+}
+
+impl TerminalSearchState {
+    /// 创建全新的搜索状态
+    pub fn new(query: &str, match_case: bool, matches: Vec<TerminalSearchMatch>) -> Self {
+        Self {
+            query: query.to_string(),
+            match_case,
+            matches,
+            current_index: 0,
+        }
+    }
+
+    /// 获取匹配总数
+    pub fn total_matches(&self) -> usize {
+        self.matches.len()
+    }
+
+    /// 获取当前匹配项基于 1 的序号 (若无匹配返回 0)
+    pub fn current_1_based(&self) -> usize {
+        if self.matches.is_empty() {
+            0
+        } else {
+            self.current_index + 1
+        }
+    }
+
+    /// 获取当前聚焦的匹配项
+    pub fn current_match(&self) -> Option<&TerminalSearchMatch> {
+        self.matches.get(self.current_index)
+    }
+
+    /// 循环导航到下一个匹配项
+    pub fn next_match(&mut self) -> Option<&TerminalSearchMatch> {
+        if self.matches.is_empty() {
+            return None;
+        }
+        self.current_index = (self.current_index + 1) % self.matches.len();
+        self.matches.get(self.current_index)
+    }
+
+    /// 循环导航到上一个匹配项
+    pub fn prev_match(&mut self) -> Option<&TerminalSearchMatch> {
+        if self.matches.is_empty() {
+            return None;
+        }
+        if self.current_index == 0 {
+            self.current_index = self.matches.len() - 1;
+        } else {
+            self.current_index -= 1;
+        }
+        self.matches.get(self.current_index)
+    }
+}
+
 
 
 

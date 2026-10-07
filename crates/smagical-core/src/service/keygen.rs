@@ -26,7 +26,22 @@ pub struct GeneratedKeyPair {
     pub fingerprint: String,
 }
 
-/// 密钥对生成服务契约
+/// 私钥解析结果载荷 (用于手动输入私钥或文件导入时自动识别与提取)
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ParsedKeyInfo {
+    /// 识别的算法标识（如 "Ed25519", "RSA", "ECDSA-P256" 等）
+    pub algorithm: String,
+    /// 导出的 OpenSSH 单行公钥文本（若私钥未加密或成功解密）
+    pub public_key_openssh: Option<String>,
+    /// SHA256 格式公钥指纹 (例如 "SHA256:xxxx...")
+    pub fingerprint: Option<String>,
+    /// 是否受口令（Passphrase）加密保护
+    pub is_encrypted: bool,
+    /// 私钥内置的注释（Comment，若存在）
+    pub comment: Option<String>,
+}
+
+/// 密钥对生成与解析服务契约
 pub trait KeygenService: Send + Sync {
     /// 原生纯 Rust 生成指定算法的密钥对
     fn generate_keypair(
@@ -38,4 +53,12 @@ pub trait KeygenService: Send + Sync {
 
     /// 计算公钥的标准 SHA256 格式指纹
     fn compute_fingerprint(&self, public_key_openssh: &str) -> SshServiceResult<String>;
+
+    /// 解析输入的私钥文本（自动识别算法、提取公钥与指纹，支持口令解密）
+    fn parse_private_key(
+        &self,
+        private_key_pem: &str,
+        passphrase: Option<&str>,
+    ) -> SshServiceResult<ParsedKeyInfo>;
 }
+

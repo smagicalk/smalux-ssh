@@ -16,6 +16,11 @@ export global HostsBridge {
     in-out property <[GroupOptionData]> group-options: [];
     in-out property <length> left-drawer-width: 240px;
 
+    // 大树资产节点性能虚拟化与截断控制
+    in-out property <bool> tree-is-truncated: false;
+    in-out property <int> tree-total-count: 0;
+    callback load-all-hosts();
+
     // 新建与编辑主机弹窗状态与数据源
     in-out property <bool> is-create-host-modal-open: false;
     in-out property <string> create-host-default-parent: "root";

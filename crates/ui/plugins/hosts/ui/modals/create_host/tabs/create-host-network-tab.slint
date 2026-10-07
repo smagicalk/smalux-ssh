@@ -1,8 +1,8 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 import { AppPasswordInput } from "@common/shared/base/app-password-input.slint";
 
-export component CreateHostNetworkTab inherits VerticalLayout {
+component CreateHostNetworkTab inherits VerticalLayout {
     spacing: 12px;
 
     in-out property <string> keepalive-interval-str: "30";
@@ -173,7 +173,7 @@ export component CreateHostNetworkTab inherits VerticalLayout {
                                 width: 6px;
                                 height: 6px;
                                 border-radius: 3px;
-                                background: #10b981; // 绿点表示已选定
+                                background: AppTheme.success; // 绿点表示已选定
                             }
                         }
                     }
@@ -638,3 +638,6 @@ export component CreateHostNetworkTab inherits VerticalLayout {
         }
     }
 }
+
+export { CreateHostNetworkTab }
+

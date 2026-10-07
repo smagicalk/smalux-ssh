@@ -20,6 +20,7 @@ pub fn get_current_timestamp() -> String {
 pub struct DebugLogBuffer {
     entries: VecDeque<DebugLogEntry>,
     max_capacity: usize,
+    version: u64,
 }
 
 impl Default for DebugLogBuffer {
@@ -34,6 +35,7 @@ impl DebugLogBuffer {
         Self {
             entries: VecDeque::with_capacity(max_capacity),
             max_capacity,
+            version: 0,
         }
     }
 
@@ -50,6 +52,7 @@ impl DebugLogBuffer {
         if self.entries.len() > self.max_capacity {
             self.entries.pop_back();
         }
+        self.version = self.version.wrapping_add(1);
     }
 
     /// 获取所有日志条目 (按时间从新到旧排列)
@@ -60,6 +63,12 @@ impl DebugLogBuffer {
     /// 清空所有日志
     pub fn clear(&mut self) {
         self.entries.clear();
+        self.version = self.version.wrapping_add(1);
+    }
+
+    /// 获取当前日志缓冲区的版本号 (每次追加或清空时自增，供 UI 轮询脏检查)
+    pub fn version(&self) -> u64 {
+        self.version
     }
 
     /// 当前日志总数量

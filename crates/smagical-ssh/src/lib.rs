@@ -33,13 +33,17 @@ pub mod known_hosts;
 pub use ssh_config::{execute_remote, KeyTempGuard, SshLaunchConfig};
 pub use keygen::{generate_ssh_keypair, NativeKeygenService};
 pub use sftp_driver::RusshSftpDriver;
-pub use session_driver::RusshSessionDriver;
+pub use session_driver::{JumpHop, parse_jump_chain, probe_proxy_health, RusshSessionDriver};
 pub use tunnel_driver::RusshTunnelDriver;
 pub use metrics_driver::RusshMetricsDriver;
 pub use importer::{ImportedHostEntry, get_default_ssh_config_path, parse_external_assets, parse_ssh_config};
 pub use sftp::{
     AskPassGuard, SftpCommandContext,
+    TransferConflictPolicy, TransferOutcome, TransferIntegrityResult,
+    TransferSpeedMeter, TransferQueue,
     list_remote_directory, upload_path, download_path,
+    upload_path_with_queue, download_path_with_queue,
+    verify_remote_file_size, check_transfer_integrity,
     create_remote_dir, create_remote_file, remove_remote_path, rename_remote_path,
     parse_ls_output,
 };

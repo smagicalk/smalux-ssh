@@ -10,7 +10,7 @@ import { AppButton } from "@common/shared/base/app-button.slint";
 import { StatusDot } from "@common/components/status-dot.slint";
 import { CreateTunnelTypeModal } from "../modals/create-tunnel-type-modal.slint";
 import { HostTreeNode } from "@common/features/hosts/hosts_model.slint";
-import { AppVScrollBar } from "@common/components/base/app-scroll-bar.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
 
 import { JumpHopData, TunnelItemData } from "@common/features/tunnels/tunnels_model.slint";
 import { TunnelsBridge } from "@common/features/tunnels/tunnels_bridge.slint";
@@ -26,7 +26,7 @@ import { TunnelHostPickerModal } from "../modals/tunnel_host_picker_modal.slint"
 export { JumpHopData, TunnelItemData }
 
 /// 网络与隧道全屏管理中心组件 (TunnelsCenterView)
-export component TunnelsCenterView inherits Rectangle {
+component TunnelsCenterView inherits Rectangle {
     in property <[TunnelItemData]> tunnels: TunnelsBridge.tunnels;
     in-out property <string> filter-category: TunnelsBridge.filter-category; // "all" | "forward" | "jump" | "proxy"
     in-out property <string> search-query: TunnelsBridge.search-query;
@@ -350,7 +350,7 @@ export component TunnelsCenterView inherits Rectangle {
                     border-radius: AppTheme.radius-medium;
                     background: AppTheme.panel-background;
                     border-width: 1px;
-                    border-color: #e67e22.transparentize(70%);
+                    border-color: AppTheme.warning.transparentize(70%);
 
                     HorizontalLayout {
                         padding-left: 18px;
@@ -364,7 +364,7 @@ export component TunnelsCenterView inherits Rectangle {
                                 width: 40px;
                                 height: 40px;
                                 border-radius: 8px;
-                                background: #e67e22.transparentize(85%);
+                                background: AppTheme.warning.transparentize(85%);
 
                                 Image {
                                     x: (parent.width - self.width) / 2;
@@ -372,7 +372,7 @@ export component TunnelsCenterView inherits Rectangle {
                                     width: 20px;
                                     height: 20px;
                                     source: @image-url("../../assets/icons/shield.svg");
-                                    colorize: #e67e22;
+                                    colorize: AppTheme.warning;
                                 }
                             }
                         }
@@ -386,7 +386,7 @@ export component TunnelsCenterView inherits Rectangle {
                                 text: @tr("OpenSSH ProxyJump (-J) 堡垒中继资产");
                                 font-size: 13px;
                                 font-weight: 700;
-                                color: #e67e22;
+                                color: AppTheme.warning;
                             }
 
                             Text {
@@ -460,7 +460,7 @@ export component TunnelsCenterView inherits Rectangle {
                     scroll-area := Flickable {
                         width: 100%;
                         height: 100%;
-                        viewport-height: list-content.preferred-height;
+                        content-height: list-content.preferred-height;
 
                         list-content := VerticalLayout {
                             alignment: start;
@@ -490,6 +490,7 @@ export component TunnelsCenterView inherits Rectangle {
                                 root.temp-selected-host-name = root.form-ssh-host-name;
                                 root.temp-selected-host-address = root.form-remote-host;
                                 root.is-host-picker-open = true;
+                                TunnelsBridge.prepare-host-picker();
                             }
                         }
 
@@ -507,6 +508,7 @@ export component TunnelsCenterView inherits Rectangle {
                                 root.temp-selected-host-name = "";
                                 root.temp-selected-host-address = "";
                                 root.is-host-picker-open = true;
+                                TunnelsBridge.prepare-host-picker();
                             }
                             remove-jump-hop(idx) => { TunnelsBridge.remove-jump-hop(idx); }
                             move-jump-hop-up(idx) => { TunnelsBridge.move-jump-hop-up(idx); }
@@ -531,9 +533,9 @@ export component TunnelsCenterView inherits Rectangle {
                 }
 
                 AppVScrollBar {
-                    viewport-height: scroll-area.viewport-height;
+                    content-height: scroll-area.content-height;
                     visible-height: scroll-area.height;
-                    viewport-y <=> scroll-area.viewport-y;
+                    content-y <=> scroll-area.content-y;
                 }
                 }
             }
@@ -541,7 +543,7 @@ export component TunnelsCenterView inherits Rectangle {
     }
 
     // 3. 新建网络资产类型选择弹窗 (Create Tunnel Type Modal)
-    CreateTunnelTypeModal {
+    if root.show-create-modal: CreateTunnelTypeModal {
         is-open <=> root.show-create-modal;
         cancel => { root.show-create-modal = false; }
         select-type(t) => {
@@ -578,3 +580,5 @@ export component TunnelsCenterView inherits Rectangle {
         }
     }
 }
+
+export { TunnelsCenterView }

@@ -1,11 +1,11 @@
 //! AI 智能助手与大模型多端点管理事件处理器
 
-use std::rc::Rc;
 use std::sync::Arc;
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, Model};
 use smagical_core::AppStorage;
 use smagical_core::domain::config::AiEndpointProfileRecord;
 use crate::async_util::spawn_async;
+use crate::common::{num_to_shared, run_on_ui, to_model_rc, ToSharedString};
 
 use crate::generated::{
     AiBridge, AiEndpointProfile, AppWindow, SettingsBridge, ToastItemData, WindowBridge,
@@ -123,10 +123,10 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     ep.max_context = ctx_val;
                     ep.timeout_secs = to_val;
                     ep.max_retries = ret_val;
-                    ep.temperature = temp_val.to_string().into();
+                    ep.temperature = num_to_shared(temp_val);
                 }
             }
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            sb.set_setting_ai_endpoints(to_model_rc(list.clone()));
 
             let prompt_val = sb.get_setting_ai_system_prompt().to_string();
             let records = endpoints_to_records(&list);
@@ -252,11 +252,11 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     for m in ep.models_csv.split(',') {
                         let trimmed = m.trim();
                         if !trimmed.is_empty() {
-                            new_models_vec.push(trimmed.into());
+                            new_models_vec.push(trimmed.to_shared());
                         }
                     }
                     if new_models_vec.is_empty() && !new_selected_model.is_empty() {
-                        new_models_vec.push(new_selected_model.clone().into());
+                        new_models_vec.push(new_selected_model.to_shared());
                     }
                 } else {
                     ep.is_active = false;
@@ -264,12 +264,12 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             }
 
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            sb.set_setting_ai_endpoints(to_model_rc(list.clone()));
             sb.set_active_endpoint_id(target_id.clone());
-            sb.set_setting_ai_base_url(new_base_url.into());
-            sb.set_setting_ai_api_key(new_api_key.into());
-            sb.set_setting_ai_model(new_selected_model.clone().into());
-            sb.set_setting_ai_current_models(ModelRc::from(Rc::new(VecModel::from(new_models_vec.clone()))));
+            sb.set_setting_ai_base_url(new_base_url.to_shared());
+            sb.set_setting_ai_api_key(new_api_key.to_shared());
+            sb.set_setting_ai_model(new_selected_model.to_shared());
+            sb.set_setting_ai_current_models(to_model_rc(new_models_vec.clone()));
 
             sb.set_setting_ai_thinking_budget(if new_thinking_degree.is_empty() { "medium".into() } else { new_thinking_degree.into() });
             sb.set_setting_ai_timeout_secs(new_timeout);
@@ -283,7 +283,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             sb.set_setting_ai_temperature_input(new_temp.into());
 
             let ai_b = w.global::<AiBridge>();
-            ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(new_models_vec))));
+            ai_b.set_available_models(to_model_rc(new_models_vec));
             let records = endpoints_to_records(&list);
             persist_ai_endpoints(&storage_switch_ep, records);
 
@@ -327,7 +327,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 "deepseek-reasoner".into(),
                 "deepseek-chat".into(),
             ];
-            sb.set_modal_endpoint_models_list(ModelRc::from(Rc::new(VecModel::from(default_models))));
+            sb.set_modal_endpoint_models_list(to_model_rc(default_models));
             sb.set_modal_endpoint_new_model_input("".into());
             sb.set_modal_endpoint_thinking_degree("medium".into());
             sb.set_modal_endpoint_timeout_secs(60);
@@ -367,7 +367,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 if models_vec.is_empty() && !ep.selected_model.is_empty() {
                     models_vec.push(ep.selected_model.clone());
                 }
-                sb.set_modal_endpoint_models_list(ModelRc::from(Rc::new(VecModel::from(models_vec))));
+                sb.set_modal_endpoint_models_list(to_model_rc(models_vec));
                 sb.set_modal_endpoint_new_model_input("".into());
                 sb.set_modal_endpoint_thinking_degree(if ep.thinking_degree.is_empty() { "medium".into() } else { ep.thinking_degree.clone() });
                 let timeout = if ep.timeout_secs <= 0 { 60 } else { ep.timeout_secs };
@@ -444,42 +444,42 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 let mut should_sync_active = false;
                 for ep in list.iter_mut() {
                     if ep.id == id {
-                        ep.name = name.clone().into();
-                        ep.base_url = base_url.clone().into();
-                        ep.api_key = api_key.clone().into();
-                        ep.api_mode = api_mode.into();
-                        ep.models_csv = models_csv.clone().into();
-                        ep.selected_model = selected_model.clone().into();
-                        ep.thinking_degree = thinking_degree.clone().into();
+                        ep.name = name.to_shared();
+                        ep.base_url = base_url.to_shared();
+                        ep.api_key = api_key.to_shared();
+                        ep.api_mode = api_mode.to_shared();
+                        ep.models_csv = models_csv.to_shared();
+                        ep.selected_model = selected_model.to_shared();
+                        ep.thinking_degree = thinking_degree.to_shared();
                         ep.timeout_secs = timeout_secs;
                         ep.max_context = max_context;
                         ep.max_retries = max_retries;
-                        ep.custom_headers = custom_headers.clone().into();
-                        ep.temperature = temperature.clone().into();
+                        ep.custom_headers = custom_headers.to_shared();
+                        ep.temperature = temperature.to_shared();
                         if ep.is_active {
                             should_sync_active = true;
                         }
                     }
                 }
                 if should_sync_active {
-                    sb.set_setting_ai_base_url(base_url.into());
-                    sb.set_setting_ai_api_key(api_key.into());
-                    sb.set_setting_ai_model(selected_model.clone().into());
-                    let slint_models: Vec<slint::SharedString> = models_vec.iter().map(|s| s.as_str().into()).collect();
-                    sb.set_setting_ai_current_models(ModelRc::from(Rc::new(VecModel::from(slint_models.clone()))));
+                    sb.set_setting_ai_base_url(base_url.to_shared());
+                    sb.set_setting_ai_api_key(api_key.to_shared());
+                    sb.set_setting_ai_model(selected_model.to_shared());
+                    let slint_models: Vec<slint::SharedString> = models_vec.iter().map(|s| s.to_shared()).collect();
+                    sb.set_setting_ai_current_models(to_model_rc(slint_models.clone()));
                     let ai_b = w.global::<AiBridge>();
-                    ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(slint_models))));
-                    ai_b.set_selected_model(selected_model.into());
-                    sb.set_setting_ai_thinking_budget(thinking_degree.into());
+                    ai_b.set_available_models(to_model_rc(slint_models));
+                    ai_b.set_selected_model(selected_model.to_shared());
+                    sb.set_setting_ai_thinking_budget(thinking_degree.to_shared());
                     sb.set_setting_ai_timeout_secs(timeout_secs);
                     sb.set_setting_ai_timeout_secs_input(timeout_secs.to_string().into());
                     sb.set_setting_ai_max_context(max_context);
                     sb.set_setting_ai_max_context_input(max_context.to_string().into());
                     sb.set_setting_ai_max_retries(max_retries);
                     sb.set_setting_ai_max_retries_input(max_retries.to_string().into());
-                    sb.set_setting_ai_custom_headers(custom_headers.into());
+                    sb.set_setting_ai_custom_headers(custom_headers.to_shared());
                     sb.set_setting_ai_temperature(temperature.parse::<f32>().unwrap_or(0.3));
-                    sb.set_setting_ai_temperature_input(temperature.into());
+                    sb.set_setting_ai_temperature_input(temperature.to_shared());
                 }
                 notif_save_ep.success("修改成功", &format!("已更新端点: {}", name));
             } else {
@@ -487,25 +487,25 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 let is_first = list.is_empty();
                 list.push(AiEndpointProfile {
                     id: new_id.into(),
-                    name: name.clone().into(),
-                    base_url: base_url.into(),
-                    api_key: api_key.into(),
-                    api_mode: api_mode.into(),
-                    selected_model: selected_model.into(),
-                    models_csv: models_csv.into(),
+                    name: name.to_shared(),
+                    base_url: base_url.to_shared(),
+                    api_key: api_key.to_shared(),
+                    api_mode: api_mode.to_shared(),
+                    selected_model: selected_model.to_shared(),
+                    models_csv: models_csv.to_shared(),
                     is_active: is_first,
                     status_text: if is_first { "已连接".into() } else { "未激活".into() },
-                    thinking_degree: thinking_degree.into(),
+                    thinking_degree: thinking_degree.to_shared(),
                     timeout_secs,
                     max_context,
                     max_retries,
-                    custom_headers: custom_headers.into(),
-                    temperature: temperature.into(),
+                    custom_headers: custom_headers.to_shared(),
+                    temperature: temperature.to_shared(),
                 });
                 notif_save_ep.success("添加成功", &format!("已添加端点: {}", name));
             }
 
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            sb.set_setting_ai_endpoints(to_model_rc(list.clone()));
             persist_ai_endpoints(&storage_save_ep, endpoints_to_records(&list));
             sb.set_is_ai_endpoint_modal_open(false);
         }
@@ -521,10 +521,10 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             let cur = sb.get_modal_endpoint_models_list();
             let mut list: Vec<slint::SharedString> = cur.iter().collect();
             if !list.iter().any(|m| m.as_str() == trimmed) {
-                list.push(trimmed.clone().into());
-                sb.set_modal_endpoint_models_list(ModelRc::from(Rc::new(VecModel::from(list))));
+                list.push(trimmed.to_shared());
+                sb.set_modal_endpoint_models_list(to_model_rc(list));
                 if sb.get_modal_endpoint_selected_model().is_empty() {
-                    sb.set_modal_endpoint_selected_model(trimmed.into());
+                    sb.set_modal_endpoint_selected_model(trimmed.to_shared());
                 }
             }
             sb.set_modal_endpoint_new_model_input("".into());
@@ -545,7 +545,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 sb.get_modal_endpoint_selected_model()
             };
             sb.set_modal_endpoint_selected_model(new_sel);
-            sb.set_modal_endpoint_models_list(ModelRc::from(Rc::new(VecModel::from(list))));
+            sb.set_modal_endpoint_models_list(to_model_rc(list));
         }
     });
 
@@ -591,17 +591,15 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                 };
 
                 let discovered_copy = discovered.clone();
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(win) = w_weak.upgrade() {
-                        let sb = win.global::<SettingsBridge>();
-                        sb.set_modal_endpoint_is_fetching_models(false);
-                        let slint_models: Vec<slint::SharedString> = discovered_copy.iter().map(|s| s.as_str().into()).collect();
-                        sb.set_modal_endpoint_models_list(ModelRc::from(Rc::new(VecModel::from(slint_models))));
-                        if !discovered_copy.is_empty() {
-                            let cur_sel = sb.get_modal_endpoint_selected_model().to_string();
-                            if !discovered_copy.contains(&cur_sel) {
-                                sb.set_modal_endpoint_selected_model(discovered_copy[0].clone().into());
-                            }
+                run_on_ui(w_weak, move |win| {
+                    let sb = win.global::<SettingsBridge>();
+                    sb.set_modal_endpoint_is_fetching_models(false);
+                    let slint_models: Vec<slint::SharedString> = discovered_copy.iter().map(|s| s.to_shared()).collect();
+                    sb.set_modal_endpoint_models_list(to_model_rc(slint_models));
+                    if !discovered_copy.is_empty() {
+                        let cur_sel = sb.get_modal_endpoint_selected_model().to_string();
+                        if !discovered_copy.contains(&cur_sel) {
+                            sb.set_modal_endpoint_selected_model(discovered_copy[0].to_shared());
                         }
                     }
                 });
@@ -712,24 +710,24 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     let t = m.trim();
                     if !t.is_empty() { models_vec.push(t.into()); }
                 }
-                sb.set_setting_ai_current_models(ModelRc::from(Rc::new(VecModel::from(models_vec.clone()))));
+                sb.set_setting_ai_current_models(to_model_rc(models_vec.clone()));
                 sb.set_setting_ai_thinking_budget(target_thinking);
                 sb.set_setting_ai_timeout_secs(target_timeout);
-                sb.set_setting_ai_timeout_secs_input(target_timeout.to_string().into());
+                sb.set_setting_ai_timeout_secs_input(num_to_shared(target_timeout));
                 sb.set_setting_ai_max_context(target_context);
-                sb.set_setting_ai_max_context_input(target_context.to_string().into());
+                sb.set_setting_ai_max_context_input(num_to_shared(target_context));
                 sb.set_setting_ai_max_retries(target_retries);
-                sb.set_setting_ai_max_retries_input(target_retries.to_string().into());
+                sb.set_setting_ai_max_retries_input(num_to_shared(target_retries));
                 sb.set_setting_ai_custom_headers(target_headers);
                 sb.set_setting_ai_temperature(target_temp.parse::<f32>().unwrap_or(0.3));
                 sb.set_setting_ai_temperature_input(target_temp);
 
                 let ai_b = w.global::<AiBridge>();
-                ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(models_vec))));
+                ai_b.set_available_models(to_model_rc(models_vec));
                 ai_b.set_selected_model(target_model);
             }
 
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            sb.set_setting_ai_endpoints(to_model_rc(list.clone()));
             persist_ai_endpoints(&storage_del_ep, endpoints_to_records(&list));
             notif_del_ep.success("删除成功", "已移除该端点配置");
         }
@@ -778,10 +776,10 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
 
                         let count = models_to_save.len();
                         let slint_models: Vec<slint::SharedString> = models_to_save.iter().map(|s| s.as_str().into()).collect();
-                        sb.set_setting_ai_current_models(ModelRc::from(Rc::new(VecModel::from(slint_models.clone()))));
+                        sb.set_setting_ai_current_models(to_model_rc(slint_models.clone()));
 
                         let ai_b = win.global::<AiBridge>();
-                        ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(slint_models.clone()))));
+                        ai_b.set_available_models(to_model_rc(slint_models.clone()));
 
                         let cur_sel = sb.get_setting_ai_model().to_string();
                         let new_sel = if !models_to_save.contains(&cur_sel) && !models_to_save.is_empty() {
@@ -789,8 +787,8 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                         } else {
                             cur_sel
                         };
-                        sb.set_setting_ai_model(new_sel.clone().into());
-                        ai_b.set_selected_model(new_sel.clone().into());
+                        sb.set_setting_ai_model(new_sel.to_shared());
+                        ai_b.set_selected_model(new_sel.to_shared());
 
                         let active_id = sb.get_active_endpoint_id();
                         let eps_model = sb.get_setting_ai_endpoints();
@@ -798,17 +796,18 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                         let csv_str = models_to_save.join(", ");
                         for ep in list.iter_mut() {
                             if ep.id == active_id {
-                                ep.models_csv = csv_str.clone().into();
-                                ep.selected_model = new_sel.clone().into();
+                                ep.models_csv = csv_str.to_shared();
+                                ep.selected_model = new_sel.to_shared();
                             }
                         }
-                        sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+                        sb.set_setting_ai_endpoints(to_model_rc(list.clone()));
                         persist_ai_endpoints(&storage_fetch_inner, endpoints_to_records(&list));
 
                         let cur_toasts = win.global::<WindowBridge>().get_toasts();
                         let mut toasts_vec: Vec<ToastItemData> = cur_toasts.iter().collect();
+                        let toast_id = format!("toast-{}", uuid::Uuid::new_v4());
                         toasts_vec.push(ToastItemData {
-                            id: format!("toast-{}", uuid::Uuid::new_v4()).into(),
+                            id: toast_id.clone().into(),
                             title: "获取模型完成".into(),
                             message: format!("成功发现并同步 {} 个可用模型", count).into(),
                             level: "success".into(),
@@ -816,7 +815,19 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                             duration_ms: 3000,
                             closable: true,
                         });
-                        win.global::<WindowBridge>().set_toasts(ModelRc::from(Rc::new(VecModel::from(toasts_vec))));
+                        win.global::<WindowBridge>().set_toasts(to_model_rc(toasts_vec));
+
+                        let win_weak_m = win.as_weak();
+                        let tid: slint::SharedString = toast_id.into();
+                        slint::Timer::single_shot(std::time::Duration::from_millis(3000), move || {
+                            if let Some(w) = win_weak_m.upgrade() {
+                                let wb = w.global::<WindowBridge>();
+                                let cur = wb.get_toasts();
+                                let remaining: Vec<ToastItemData> =
+                                    cur.iter().filter(|t| t.id != tid).collect();
+                                wb.set_toasts(to_model_rc(remaining));
+                            }
+                        });
                     }
                 });
             });
@@ -838,11 +849,11 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             let mut list: Vec<slint::SharedString> = cur_model.iter().collect();
 
             if !list.iter().any(|m| m.as_str() == trimmed) {
-                list.push(trimmed.clone().into());
-                sb.set_setting_ai_current_models(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+                list.push(trimmed.to_shared());
+                sb.set_setting_ai_current_models(to_model_rc(list.clone()));
 
                 let ai_b = w.global::<AiBridge>();
-                ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+                ai_b.set_available_models(to_model_rc(list.clone()));
 
                 let active_id = sb.get_active_endpoint_id();
                 let eps_model = sb.get_setting_ai_endpoints();
@@ -853,7 +864,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                         ep.models_csv = str_list.join(", ").into();
                     }
                 }
-                sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list.clone()))));
+                sb.set_setting_ai_endpoints(to_model_rc(ep_list.clone()));
                 persist_ai_endpoints(&storage_add_m, endpoints_to_records(&ep_list));
 
                 notif_add_m.success("添加成功", &format!("已添加新模型: {}", trimmed));
@@ -878,10 +889,10 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             list.retain(|m| m.as_str() != target_model.as_str());
-            sb.set_setting_ai_current_models(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            sb.set_setting_ai_current_models(to_model_rc(list.clone()));
 
             let ai_b = w.global::<AiBridge>();
-            ai_b.set_available_models(ModelRc::from(Rc::new(VecModel::from(list.clone()))));
+            ai_b.set_available_models(to_model_rc(list.clone()));
 
             let cur_sel = sb.get_setting_ai_model();
             let mut new_sel = cur_sel.clone();
@@ -901,7 +912,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     ep.selected_model = new_sel.clone();
                 }
             }
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list.clone()))));
+            sb.set_setting_ai_endpoints(to_model_rc(ep_list.clone()));
             persist_ai_endpoints(&storage_rm_m, endpoints_to_records(&ep_list));
 
             notif_rm_m.success("已移除", &format!("已将模型 {} 移出当前端点", target_model));
@@ -927,7 +938,7 @@ pub(crate) fn register_ai_handlers(window: &AppWindow, ctx: &AppContext) {
                     ep.selected_model = model_name.clone();
                 }
             }
-            sb.set_setting_ai_endpoints(ModelRc::from(Rc::new(VecModel::from(ep_list.clone()))));
+            sb.set_setting_ai_endpoints(to_model_rc(ep_list.clone()));
             persist_ai_endpoints(&storage_sel_m, endpoints_to_records(&ep_list));
         }
     });

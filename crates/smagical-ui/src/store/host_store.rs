@@ -4,7 +4,6 @@
 //! 并将原本在 UI 线程中的纯 CPU 密集型树节点递归遍历与宽字符计算下沉至 Tokio 线程池并发计算。
 
 use std::collections::HashSet;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, RwLock};
 
@@ -12,10 +11,10 @@ use slint::{ComponentHandle, Model};
 use smagical_core::event::{EventDispatcher, HostSearchFilteredEvent};
 
 use crate::generated::{AppWindow, HostItemData, HostsBridge};
-use crate::store::diff::{compute_card_diff, compute_tree_diff};
+use crate::store::diff::{compute_card_diff, compute_tree_diff, update_model_rc_in_place};
 use crate::tree_model::{
     build_group_options, build_search_tree_nodes, build_visible_tree_nodes,
-    calculate_max_tree_width, RawTreeNode,
+    calculate_max_tree_width, filter_cards, filter_and_cap_tree_nodes, RawTreeNode,
 };
 
 /// 集中式主机资产管理 Store
@@ -33,6 +32,8 @@ pub(crate) struct HostStore {
     pub(crate) search_query: Arc<RwLock<String>>,
     /// 搜索与计算递增版本序列号（防止后台异步任务乱序投递导致输入回退）
     search_version: Arc<AtomicU64>,
+    /// 是否展开全部主机（虚拟视口截断开关）
+    pub(crate) show_all_hosts: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl HostStore {
@@ -51,6 +52,7 @@ impl HostStore {
             selector_expanded_groups: Arc::new(RwLock::new(selector_expanded_groups)),
             search_query: Arc::new(RwLock::new(String::new())),
             search_version: Arc::new(AtomicU64::new(0)),
+            show_all_hosts: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -69,6 +71,7 @@ impl HostStore {
             selector_expanded_groups,
             search_query,
             search_version: Arc::new(AtomicU64::new(0)),
+            show_all_hosts: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
     }
 
@@ -124,34 +127,25 @@ impl HostStore {
         let cards_snapshot = self.master_cards.read().unwrap().clone();
         let expanded_snapshot = self.expanded_groups.read().unwrap().clone();
         let version_atomic = Arc::clone(&self.search_version);
+        let show_all = self.show_all_hosts.load(Ordering::Relaxed);
 
         // 下沉至后台阻塞计算线程池，0 毫秒占用 UI 主线程
         tokio::task::spawn_blocking(move || {
-            let q = query.trim().to_lowercase();
+            let q = query.trim().to_string();
 
-            // 1. 在后台线程执行树形过滤或可见性展开
-            let next_nodes = if q.is_empty() {
+            // 1. 在后台线程执行树形过滤或可见性展开 (O(N) 极速装配)
+            let all_tree_nodes = if q.is_empty() {
                 build_visible_tree_nodes(&tree_snapshot, &expanded_snapshot)
             } else {
                 build_search_tree_nodes(&tree_snapshot, &q)
             };
+            let (next_nodes, tree_truncated, total_tree) = filter_and_cap_tree_nodes(all_tree_nodes, show_all);
 
             // 2. 在后台线程执行宽字符字宽计算
             let content_width = calculate_max_tree_width(&next_nodes);
 
-            // 3. 在后台线程执行卡片平铺列表过滤
-            let filtered_cards: Vec<HostItemData> = if q.is_empty() {
-                cards_snapshot
-            } else {
-                cards_snapshot
-                    .into_iter()
-                    .filter(|h| {
-                        h.name.to_lowercase().contains(&q)
-                            || h.address.to_lowercase().contains(&q)
-                            || h.group.to_lowercase().contains(&q)
-                    })
-                    .collect()
-            };
+            // 3. 在后台线程执行卡片平铺列表过滤 (ASCII 快径与 100 条视口截断)
+            let (filtered_cards, card_truncated, total_cards) = filter_cards(&cards_snapshot, &q, show_all);
 
             // 投递回 UI 线程
             let _ = slint::invoke_from_event_loop(move || {
@@ -162,6 +156,9 @@ impl HostStore {
 
                 if let Some(w) = window_weak.upgrade() {
                     let hb = w.global::<HostsBridge>();
+                    let display_total = if q.is_empty() { total_tree } else { total_cards.max(total_tree) };
+                    hb.set_tree_total_count(display_total as i32);
+                    hb.set_tree_is_truncated(tree_truncated || card_truncated);
 
                     // 利用局部增量比对引擎比对树节点
                     let current_tree = hb.get_tree_nodes();
@@ -176,9 +173,7 @@ impl HostStore {
                     let tree_diffs = compute_tree_diff(&old_nodes, &next_nodes);
                     if !tree_diffs.is_empty() {
                         hb.set_tree_content_width(content_width);
-                        hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-                            next_nodes,
-                        ))));
+                        update_model_rc_in_place(&current_tree, next_nodes, |m| hb.set_tree_nodes(m));
                     }
 
                     // 利用局部增量比对引擎比对卡片列表
@@ -193,9 +188,7 @@ impl HostStore {
 
                     let card_diffs = compute_card_diff(&old_cards, &filtered_cards);
                     if !card_diffs.is_empty() {
-                        hb.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-                            filtered_cards.clone(),
-                        ))));
+                        update_model_rc_in_place(&current_cards, filtered_cards.clone(), |m| hb.set_hosts(m));
                     }
 
                     // 派发搜索匹配完成事件
@@ -220,19 +213,23 @@ impl HostStore {
         let expanded_snapshot = self.expanded_groups.read().unwrap().clone();
         let selector_snapshot = self.selector_expanded_groups.read().unwrap().clone();
         let q = self.search_query.read().unwrap().clone();
+        let show_all = self.show_all_hosts.load(Ordering::Relaxed);
 
         tokio::task::spawn_blocking(move || {
-            let next_nodes = if q.is_empty() {
+            let all_nodes = if q.is_empty() {
                 build_visible_tree_nodes(&tree_snapshot, &expanded_snapshot)
             } else {
                 build_search_tree_nodes(&tree_snapshot, &q)
             };
+            let (next_nodes, is_truncated, total_count) = filter_and_cap_tree_nodes(all_nodes, show_all);
             let content_width = calculate_max_tree_width(&next_nodes);
             let next_options = build_group_options(&tree_snapshot, &selector_snapshot);
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {
                     let hb = w.global::<HostsBridge>();
+                    hb.set_tree_total_count(total_count as i32);
+                    hb.set_tree_is_truncated(is_truncated);
 
                     let current_tree = hb.get_tree_nodes();
                     let current_count = current_tree.row_count();
@@ -246,14 +243,11 @@ impl HostStore {
                     let tree_diffs = compute_tree_diff(&old_nodes, &next_nodes);
                     if !tree_diffs.is_empty() {
                         hb.set_tree_content_width(content_width);
-                        hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-                            next_nodes,
-                        ))));
+                        update_model_rc_in_place(&current_tree, next_nodes, |m| hb.set_tree_nodes(m));
                     }
 
-                    hb.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-                        next_options,
-                    ))));
+                    let current_options = hb.get_group_options();
+                    update_model_rc_in_place(&current_options, next_options, |m| hb.set_group_options(m));
                 }
             });
         });
@@ -288,29 +282,41 @@ impl HostStore {
             }
         }
 
-        // 3. 投递局部更新至界面
+        // 3. 投递局部更新至界面 (微秒级单行通知，杜绝全树重构与重新排版)
         let host_id_owned = host_id.to_string();
         let status_owned = new_status.to_string();
         let _ = slint::invoke_from_event_loop(move || {
+            use slint::Model;
             if let Some(w) = window_weak.upgrade() {
                 let hb = w.global::<HostsBridge>();
-                let current_tree = hb.get_tree_nodes();
-                let count = current_tree.row_count();
-                let mut updated_tree_nodes = Vec::with_capacity(count);
 
-                for i in 0..count {
+                // 3.1 树形节点原地就地更新
+                let current_tree = hb.get_tree_nodes();
+                let tree_count = current_tree.row_count();
+                for i in 0..tree_count {
                     if let Some(mut n) = current_tree.row_data(i) {
                         if n.id == host_id_owned.as_str() {
                             n.status = status_owned.clone().into();
                             n.ping_ms = ping_ms;
+                            current_tree.set_row_data(i, n);
+                            break;
                         }
-                        updated_tree_nodes.push(n);
                     }
                 }
 
-                hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(
-                    updated_tree_nodes,
-                ))));
+                // 3.2 卡片模式节点原地就地更新
+                let current_cards = hb.get_hosts();
+                let card_count = current_cards.row_count();
+                for i in 0..card_count {
+                    if let Some(mut c) = current_cards.row_data(i) {
+                        if c.id == host_id_owned.as_str() {
+                            c.status = status_owned.into();
+                            c.ping_ms = ping_ms;
+                            current_cards.set_row_data(i, c);
+                            break;
+                        }
+                    }
+                }
             }
         });
     }

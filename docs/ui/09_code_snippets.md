@@ -80,9 +80,10 @@ kubectl rollout restart deployment/{{deployment_name}} -n {{namespace:default}}
 
 ### 1. 全屏代码片段中心 (`SnippetsCenterView`)
 
+- **视图入口**：[`crates/ui/plugins/snippets/ui/views/snippets_view.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/snippets/ui/views/snippets_view.slint)
 - **左侧树形导航区 (320px)**：
-  - 统一暗色搜索框 [`SearchInput`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/search-input.slint)；
-  - 标题栏总项数统计与 [`AppIconButton`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/components/base/app-icon-button.slint)（新建文件夹与新建脚本）；
+  - 统一暗色搜索框 [`SearchInput`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/components/search-input.slint)；
+  - 标题栏总项数统计与 [`AppIconButton`](file:///F:/code/rust/smalux-ssh/crates/ui/common/ui/shared/base/app-icon-button.slint)（新建文件夹与新建脚本）；
   - 极细分割线与当前高亮选择背景；
   - 纯净折叠视觉：移除文件夹前的 `>` 符号，直接点击文件夹行进行展开/折叠。
 - **右侧资产查看与编辑区 (自适应填充)**：
@@ -94,15 +95,16 @@ kubectl rollout restart deployment/{{deployment_name}} -n {{namespace:default}}
 
 ### 2. 动态参数填报弹窗 (`SnippetRunModal`)
 
-当执行含有 `{{var}}` 占位符的代码片段时，系统自动弹出动态表单：
-- 动态生成输入框，预填默认值；
-- 支持回车快速提交或 Esc 取消；
-- 提交后自动渲染最终命令并定向注入活动终端窗格。
+- **弹窗入口**：[`crates/ui/plugins/snippets/ui/modals/snippet-run-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/snippets/ui/modals/snippet-run-modal.slint)
+- 当执行含有 `{{var}}` 占位符的代码片段时，系统自动弹出动态表单：
+  - 动态生成输入框，预填默认值；
+  - 支持回车快速提交或 Esc 取消；
+  - 提交后自动渲染最终命令并定向注入活动终端窗格。
 
 ### 3. 左侧抽屉与右侧终端伴生抽屉
 
-- **左侧 [`SnippetsDrawer`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/left_drawers/snippets_drawer.slint)**：完全复刻主机抽屉的树形层级、折叠展开与搜索能力；
-- **右侧 [`SnippetToolDrawer`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/right_drawers/snippet_tool_drawer.slint)**：终端操作时的快捷侧栏，提供即插即用的紧凑分类与注入卡片。
+- **左侧 [`SnippetsDrawer`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/snippets/ui/drawers/snippets_drawer.slint)**：完全复刻主机抽屉的树形层级、折叠展开与搜索能力；
+- **右侧伴生 [`SnippetToolDrawer`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/snippets/ui/companion/snippet_tool_drawer.slint)**：终端操作时的快捷侧栏，提供即插即用的紧凑分类与注入卡片。
 
 ---
 

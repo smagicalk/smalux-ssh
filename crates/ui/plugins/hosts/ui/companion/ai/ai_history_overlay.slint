@@ -1,0 +1,166 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
+import { AppButton } from "@common/shared/base/app-button.slint";
+import { AiHistorySession } from "@common/features/ai/ai_bridge.slint";
+
+/// AI 浮动历史会话记录面板
+component AiHistoryOverlay inherits Rectangle {
+    in-out property <bool> is-open: false;
+    in property <[AiHistorySession]> history-sessions: [];
+
+    callback close();
+    callback switch-session(string /* id */);
+    callback delete-session(string /* id */);
+    callback new-session();
+
+    width: 100%;
+    height: 100%;
+    background: #00000099;
+
+    TouchArea { } // 阻断点击穿透
+
+    Rectangle {
+        width: Math.min(parent.width - 24px, 300px);
+        height: 320px;
+        x: (parent.width - self.width) / 2;
+        y: (parent.height - self.height) / 2;
+        border-radius: AppTheme.radius-large;
+        background: AppTheme.modal-background;
+        border-width: 1px;
+        border-color: AppTheme.border;
+        drop-shadow-blur: 16px;
+        drop-shadow-color: #000000.transparentize(0.5);
+
+        TouchArea { }
+
+        VerticalLayout {
+            padding: 12px;
+            spacing: 8px;
+
+            HorizontalLayout {
+                alignment: space-between;
+                height: 24px;
+
+                HorizontalLayout {
+                    spacing: 5px;
+                    alignment: start;
+
+                    VerticalLayout {
+                        alignment: center;
+                        Image {
+                            source: @image-url("../../assets/icons/clock.svg");
+                            width: 12px;
+                            height: 12px;
+                            colorize: AppTheme.accent;
+                        }
+                    }
+
+                    VerticalLayout {
+                        alignment: center;
+                        Text {
+                            text: @tr("历史对话记录");
+                            font-size: 12px;
+                            font-weight: 700;
+                            color: AppTheme.foreground;
+                        }
+                    }
+                }
+
+                VerticalLayout {
+                    alignment: center;
+                    AppIconButton {
+                        icon: @image-url("../../assets/icons/window-close.svg");
+                        icon-size: 12px;
+                        clicked => { root.close(); }
+                    }
+                }
+            }
+
+            Rectangle {
+                vertical-stretch: 1;
+                clip: true;
+
+                Flickable {
+                    width: 100%;
+                    height: 100%;
+                    content-height: root.history-sessions.length * 48px;
+
+                    VerticalLayout {
+                        spacing: 4px;
+
+                        for sess in root.history-sessions: Rectangle {
+                            height: 44px;
+                            border-radius: AppTheme.radius-medium;
+                            background: sess-touch.has-hover ? AppTheme.hover-background : AppTheme.control-background;
+                            border-width: 1px;
+                            border-color: AppTheme.border;
+
+                            sess-touch := TouchArea {
+                                clicked => {
+                                    root.switch-session(sess.id);
+                                    root.close();
+                                }
+                                mouse-cursor: pointer;
+                            }
+
+                            VerticalLayout {
+                                padding: 6px;
+                                spacing: 2px;
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text {
+                                        text: sess.title;
+                                        font-size: 10px;
+                                        font-weight: 600;
+                                        color: AppTheme.foreground;
+                                        overflow: elide;
+                                        horizontal-stretch: 1;
+                                    }
+
+                                    AppIconButton {
+                                        icon: @image-url("../../assets/icons/trash.svg");
+                                        icon-size: 10px;
+                                        clicked => {
+                                            root.delete-session(sess.id);
+                                        }
+                                    }
+                                }
+
+                                HorizontalLayout {
+                                    alignment: space-between;
+                                    Text {
+                                        text: sess.message-count + " " + @tr("条交互");
+                                        font-size: 8px;
+                                        color: AppTheme.disabled-foreground;
+                                    }
+                                    Text {
+                                        text: sess.updated-time;
+                                        font-size: 8px;
+                                        color: AppTheme.disabled-foreground;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            HorizontalLayout {
+                alignment: end;
+                AppButton {
+                    text: @tr("+ 开启新对话");
+                    variant: "primary";
+                    height: 24px;
+                    font-size: 10px;
+                    clicked => {
+                        root.new-session();
+                        root.close();
+                    }
+                }
+            }
+        }
+    }
+}
+
+export { AiHistoryOverlay }

@@ -23,25 +23,32 @@
 
 ---
 
-## 🏗️ 现代工程布局规范 (Feature-First Directory Topology)
+## 🏗️ 现代工程布局规范 (Microkernel & Plugin Topology)
 
-工程采用 **“共享基础组件集中 (`ui/shared/`) + 页面与专属模块同目录聚合 (`ui/features/<module>/`)”** 拓扑，实现高内聚低耦合：
+工程采用 **“通用基础集中 (`crates/ui/common/`) + 统一构建内核 (`crates/ui/kernel/`) + 页面级独立插件 (`crates/ui/plugins/<plugin>/`)”** 现代化微前端拓扑，实现高内聚低耦合：
 
 ```text
-crates/smagical-ui/ui/
-├── shared/                     # 🧱 全工程通用共享组件库 (严禁依赖任何具体业务逻辑)
-│   ├── base/                   # 原子控件 (按钮、输入框、开关、下拉框、分段器)
-│   ├── scaffolds/              # 结构脚手架 (AppModalScaffold, AppMasterDetailScaffold, AppFormRow)
-│   └── feedback/               # 交互反馈 (ToastContainer, MessageDialog, ContextMenuContainer)
-├── features/                   # 📦 按业务特性高度内聚的领域包 (自包含页面、表单、专属弹窗与 Bridge)
-│   ├── settings/               # 设置主页、8 大分类 Tab、SettingsBridge
-│   ├── file_manager/           # 双盘主页、FileBrowserPane 泛型单盘、传输抽屉
-│   ├── tunnels/                # 隧道主页、转发/跳板/代理专属表单、拓扑卡片
-│   ├── credentials/            # 凭据主页、密钥/密码专属表单、专属抽屉
-│   ├── snippets/               # 脚本片段主页、参数执行弹窗、专属抽屉
-│   ├── terminal/               # 终端视口、标签栏、状态栏、新建会话弹窗
-│   └── hosts/                  # 主机抽屉、树选择器、新建分组弹窗
-└── main.slint                  # 🚀 顶层极简主窗口路由器 (约 550 行，只负责主视口切换调度)
+crates/ui/
+├── common/                     # 🧱 跨插件共享设计系统 (严禁依赖任何具体业务插件)
+│   ├── ui/themes/              # 设计令牌 AppTheme 与 15+ 套终端/界面主题 TOML 预设
+│   ├── ui/shared/base/         # 原子控件 (按钮、输入框、开关、下拉框、分段器)
+│   ├── ui/shared/composite/    # 复合控件 (ContextMenuContainer, SplitPane, DataTable)
+│   └── ui/shared/scaffolds/    # 脚手架 (AppModalScaffold, AppMasterDetailScaffold, AppFormRow)
+├── kernel/                     # 🚀 微内核底座 (全工程单一 Slint build.rs 构建入口)
+│   ├── build.rs                # 挂载 @common 与全部 @plugin-* 虚拟库路径
+│   └── ui/
+│       ├── kernel.slint        # 全局主窗口总装与根视口路由器 (AppWindow)
+│       ├── views/              # 终端核心视口 (terminal_viewport)、活动栏 (left_activity_bar)、工具栏
+│       └── components/         # 全局弹窗 (new-session-modal, vault_unlock_modal 等)
+└── plugins/                    # 📦 8 大页面级独立插件 (与左侧活动栏 8 个图标严格 1:1 对齐)
+    ├── hosts/                  # [页面 1: 主机资产] (含 companion/ 独立伴生目录: ai/, monitor/, tmux/)
+    ├── files/                  # [页面 2: 文件管理器] (含 companion/ sftp 传输抽屉)
+    ├── snippets/               # [页面 3: 代码片段库] (含 companion/ 快速命令抽屉)
+    ├── tunnels/                # [页面 4: 端口隧道拓扑] (含 companion/ 快速控制抽屉)
+    ├── credentials/            # [页面 5: 凭据保管箱] (密钥管理、指纹解析、密钥生成)
+    ├── history/                # [页面 6: 连接审计历史] (时间流审计、终端快照回溯)
+    ├── settings/               # [页面 7: 偏好设置外观] (外观工坊、取色器、全屏设置、备份)
+    └── debug/                  # [页面 8: 开发者调试台] (状态探针、批量模拟、日志查看器)
 ```
 
 ---

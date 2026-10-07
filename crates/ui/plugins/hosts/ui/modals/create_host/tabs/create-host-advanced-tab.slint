@@ -1,8 +1,8 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 import { AppTextArea } from "@common/shared/base/app-text-area.slint";
 
-export component CreateHostAdvancedTab inherits VerticalLayout {
+component CreateHostAdvancedTab inherits VerticalLayout {
     spacing: 12px;
 
     in-out property <string> initial-dir: "";
@@ -80,3 +80,5 @@ export component CreateHostAdvancedTab inherits VerticalLayout {
         }
     }
 }
+
+export { CreateHostAdvancedTab }

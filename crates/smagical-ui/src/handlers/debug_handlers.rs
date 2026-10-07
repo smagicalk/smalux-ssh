@@ -3,13 +3,13 @@
 //! 提供内存压测造数、状态批量模拟、拓扑场景预设注入、快速增删改查与实时 Tracing 日志抓取回调。
 
 use std::cell::RefCell;
-use std::collections::HashSet;
 use std::rc::Rc;
 use std::sync::Arc;
 use slint::{ComponentHandle, Model};
 use smagical_core::event::ConfigChangedEvent;
 use smagical_core::AppStorage;
 use crate::async_util::spawn_async;
+use crate::common::to_model_rc;
 use crate::debug::{
     generate_batch_hosts, get_preset_by_id, BatchGenerateConfig,
 };
@@ -20,7 +20,7 @@ use crate::handlers::credential_handlers::sync_credentials_ui_async;
 use crate::handlers::snippet_handlers::sync_ui_snippets_async;
 use crate::handlers::AppContext;
 use crate::tree_model::{
-    build_cards_from_records, build_group_options, build_raw_tree, build_search_tree_nodes,
+    build_group_options, build_search_tree_nodes,
     build_visible_tree_nodes, calculate_max_tree_width, ensure_raw_group_hierarchy, RawTreeNode,
 };
 
@@ -83,7 +83,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
 
             if overwrite {
                 *master_tree_bg.write().unwrap() = new_tree.clone();
-                w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
+                w.global::<HostsBridge>().set_hosts(to_model_rc(new_cards));
             } else {
                 let mut current_tree = master_tree_bg.write().unwrap();
                 let (leaf_gid, leaf_lvl, _leaf_name) = ensure_raw_group_hierarchy(&mut current_tree, &grp_str);
@@ -101,7 +101,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 let hosts = w.global::<HostsBridge>().get_hosts();
                 let mut host_list: Vec<HostItemData> = (0..hosts.row_count()).filter_map(|i| hosts.row_data(i)).collect();
                 host_list.extend(new_cards);
-                w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+                w.global::<HostsBridge>().set_hosts(to_model_rc(host_list));
             }
 
             // 展开新增的分组
@@ -118,7 +118,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
 
             let tree = master_tree_bg.read().unwrap();
             let opts = build_group_options(&tree, &selector_bg.read().unwrap());
-            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(to_model_rc(opts));
 
             let q = search_bg.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
@@ -127,7 +127,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 build_search_tree_nodes(&tree, &q)
             };
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             tracing::info!(target: "smagical_debug::batch", "批量生成主机资产完成 (共 {} 台, 挂载分组: {})", cnt, grp_str);
             sync_ui_debug_logs(&w);
@@ -190,7 +190,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 card.status = s.into();
                 card.ping_ms = ping;
             }
-            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+            w.global::<HostsBridge>().set_hosts(to_model_rc(host_list));
 
             // 异步批量状态更新至存储层 (0ms UI 阻塞)
             let storage = core_state_bs.storage();
@@ -219,7 +219,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 build_search_tree_nodes(&tree, &q)
             };
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             tracing::info!(target: "smagical_debug::batch", "批量变更全量主机状态为: {}", st);
             sync_ui_debug_logs(&w);
@@ -251,7 +251,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             for card in host_list.iter_mut() {
                 card.port = new_port;
             }
-            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+            w.global::<HostsBridge>().set_hosts(to_model_rc(host_list));
 
             let tree = master_tree_bp.read().unwrap();
             let q = search_bp.read().unwrap().clone();
@@ -261,7 +261,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 build_search_tree_nodes(&tree, &q)
             };
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             tracing::info!(target: "smagical_debug::batch", "批量修改全量主机 SSH 端口为: {}", new_port);
             sync_ui_debug_logs(&w);
@@ -297,7 +297,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 .collect();
 
             *master_tree_inj.write().unwrap() = new_tree.clone();
-            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
+            w.global::<HostsBridge>().set_hosts(to_model_rc(new_cards));
 
             // 预设注入后展开所有顶级及二级分组
             let mut exp = expanded_inj.write().unwrap();
@@ -312,7 +312,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let opts = build_group_options(&new_tree, &sel);
-            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(to_model_rc(opts));
 
             let q = search_inj.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
@@ -321,7 +321,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 build_search_tree_nodes(&new_tree, &q)
             };
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             tracing::info!(target: "smagical_debug::preset", "已成功注入调试场景预设: [{}] (共 {} 个节点)", p_id, new_tree.len());
             sync_ui_debug_logs(&w);
@@ -404,7 +404,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             });
 
             let opts = build_group_options(&tree, &selector_qh.read().unwrap());
-            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(to_model_rc(opts));
 
             let q = search_qh.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
@@ -413,7 +413,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 build_search_tree_nodes(&tree, &q)
             };
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             let card = HostItemData {
                 id: new_id.into(),
@@ -427,7 +427,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             let hosts = w.global::<HostsBridge>().get_hosts();
             let mut host_list: Vec<HostItemData> = (0..hosts.row_count()).filter_map(|i| hosts.row_data(i)).collect();
             host_list.push(card);
-            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(host_list))));
+            w.global::<HostsBridge>().set_hosts(to_model_rc(host_list));
 
             tracing::info!(target: "smagical_debug::data", "快速添加主机: {} ({}:{})", h_name, h_ip, port);
             sync_ui_debug_logs(&w);
@@ -463,7 +463,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let opts = build_group_options(&tree, &selector_qg.read().unwrap());
-            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(to_model_rc(opts));
 
             let q = search_qg.read().unwrap().clone();
             let next_nodes = if q.is_empty() {
@@ -472,7 +472,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 build_search_tree_nodes(&tree, &q)
             };
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             tracing::info!(target: "smagical_debug::data", "快速创建嵌套分组: {}", g_name);
             sync_ui_debug_logs(&w);
@@ -489,9 +489,9 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     db.on_clear_all_data(move || {
         if let Some(w) = window_weak.upgrade() {
             master_tree_clr.write().unwrap().clear();
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostTreeNode>::new()))));
-            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::HostItemData>::new()))));
-            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(Vec::<crate::generated::GroupOptionData>::new()))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(Vec::<crate::generated::HostTreeNode>::new()));
+            w.global::<HostsBridge>().set_hosts(to_model_rc(Vec::<crate::generated::HostItemData>::new()));
+            w.global::<HostsBridge>().set_group_options(to_model_rc(Vec::<crate::generated::GroupOptionData>::new()));
             w.global::<HostsBridge>().set_tree_content_width(240.0_f32);
             // 异步清空存储层 (0ms UI 阻塞)
             let storage = core_state_clr.storage();
@@ -535,7 +535,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
                 .collect();
 
             *master_tree_rst.write().unwrap() = def_tree.clone();
-            w.global::<HostsBridge>().set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(def_cards))));
+            w.global::<HostsBridge>().set_hosts(to_model_rc(def_cards));
 
             let mut exp = expanded_rst.write().unwrap();
             let mut sel = selector_rst.write().unwrap();
@@ -549,11 +549,11 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
             }
 
             let opts = build_group_options(&def_tree, &sel);
-            w.global::<HostsBridge>().set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(opts))));
+            w.global::<HostsBridge>().set_group_options(to_model_rc(opts));
 
             let next_nodes = build_visible_tree_nodes(&def_tree, &exp);
             w.global::<HostsBridge>().set_tree_content_width(calculate_max_tree_width(&next_nodes));
-            w.global::<HostsBridge>().set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(next_nodes))));
+            w.global::<HostsBridge>().set_tree_nodes(to_model_rc(next_nodes));
 
             // 异步重置存储层 (0ms UI 阻塞)
             let storage = core_state_rst.storage();
@@ -1330,111 +1330,15 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
     // -------------------------------------------------------------------------
     {
         let window_weak = window.as_weak();
-        let notif = ctx.notifications.clone();
-        let core_state_mock = ctx.core_state.clone();
-        let master_tree = Arc::clone(&ctx.master_tree);
-        let master_cards = Arc::clone(&ctx.master_cards);
-        let expanded_groups = Arc::clone(&ctx.expanded_groups);
-        let selector_expanded_groups = Arc::clone(&ctx.selector_expanded_groups);
-        let search_query = Arc::clone(&ctx.search_query);
-
+        let w_dbg_switch = window_weak.clone();
+        let ctx_dbg = crate::handlers::settings_handlers::backup::StorageSwitchContext::from(ctx);
         db.on_toggle_mock_storage(move |enabled| {
-            let window_weak_inner = window_weak.clone();
-            let notif_inner = notif.clone();
-            let core_state_inner = (*core_state_mock).clone();
-            let master_tree_inner = master_tree.clone();
-            let master_cards_inner = master_cards.clone();
-            let expanded_groups_inner = expanded_groups.clone();
-            let selector_expanded_groups_inner = selector_expanded_groups.clone();
-            let search_query_inner = search_query.clone();
-
+            let mode = if enabled { "mock" } else { "physical" };
+            let w_inner = w_dbg_switch.clone();
+            let ctx_inner = ctx_dbg.clone();
+            let m = mode.to_string();
             spawn_async(async move {
-                let (new_storage, success_msg) = if enabled {
-                    let storage: Arc<dyn smagical_core::storage::AppStorage> =
-                        Arc::new(smagical_storage::MockStorage::new_seeded());
-                    let _ = crate::storage_config::save_persisted_storage_mode("mock");
-                    tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [MockStorage] 内存种子存储 (已持久化)");
-                    (storage, "已切换至 [Mock 数据层] 内存种子存储模式")
-                } else {
-                    match smagical_storage::SeaOrmStorage::open_default().await {
-                        Ok(storage) => {
-                            let storage_arc: Arc<dyn smagical_core::storage::AppStorage> = Arc::new(storage);
-                            let _ = crate::storage_config::save_persisted_storage_mode("physical");
-                            tracing::info!(target: "smagical_ui::storage", "数据层已切换至: [SeaOrmStorage] 物理持久化 SQLite 引擎 (已持久化)");
-                            (storage_arc, "已连接至物理持久化 SQLite 数据库")
-                        }
-                        Err(err) => {
-                            tracing::error!(target: "smagical_ui::storage", "打开物理 SQLite 数据库失败: {:?}", err);
-                            let _ = slint::invoke_from_event_loop(move || {
-                                if let Some(w) = window_weak_inner.upgrade() {
-                                    w.global::<DebugBridge>().set_use_mock_storage(true);
-                                }
-                                notif_inner.error("切换物理数据层失败", format!("打开数据库错误: {:?}", err));
-                            });
-                            return;
-                        }
-                    }
-                };
-
-                core_state_inner.set_storage(new_storage.clone(), enabled);
-
-                // 重新拉取新存储层的主机、分组与凭据并同步至 UI 视图
-                let groups_res = new_storage.groups().list_all().await;
-                let hosts_res = new_storage.hosts().list_all().await;
-                let creds_res = new_storage.credentials().list_all().await;
-
-                let all_groups = groups_res.unwrap_or_default();
-                let all_hosts = hosts_res.unwrap_or_default();
-                let all_creds = creds_res.unwrap_or_default();
-
-                let new_tree = build_raw_tree(&all_groups, &all_hosts, &all_creds);
-                let new_cards = build_cards_from_records(&all_hosts, &all_groups);
-
-                let initial_expanded: HashSet<String> = all_groups
-                    .iter()
-                    .filter(|g| g.is_expanded)
-                    .map(|g| g.id.clone())
-                    .collect();
-
-                let mut initial_selector = HashSet::from(["root".to_string()]);
-                all_groups
-                    .iter()
-                    .filter(|g| g.parent_id.is_none())
-                    .for_each(|g| {
-                        initial_selector.insert(g.id.clone());
-                    });
-
-                let _ = slint::invoke_from_event_loop(move || {
-                    *master_tree_inner.write().unwrap() = new_tree;
-                    *master_cards_inner.write().unwrap() = new_cards.clone();
-                    *expanded_groups_inner.write().unwrap() = initial_expanded;
-                    *selector_expanded_groups_inner.write().unwrap() = initial_selector;
-
-                    if let Some(w) = window_weak_inner.upgrade() {
-                        w.global::<DebugBridge>().set_use_mock_storage(enabled);
-
-                        let tree = master_tree_inner.read().unwrap();
-                        let expanded = expanded_groups_inner.read().unwrap();
-                        let selector_expanded = selector_expanded_groups_inner.read().unwrap();
-                        let q = search_query_inner.read().unwrap().clone();
-
-                        let options = build_group_options(&tree, &selector_expanded);
-                        let nodes = if q.is_empty() {
-                            build_visible_tree_nodes(&tree, &expanded)
-                        } else {
-                            build_search_tree_nodes(&tree, &q)
-                        };
-
-                        let hb = w.global::<HostsBridge>();
-                        hb.set_group_options(slint::ModelRc::from(Rc::new(slint::VecModel::from(options))));
-                        hb.set_tree_content_width(calculate_max_tree_width(&nodes));
-                        hb.set_tree_nodes(slint::ModelRc::from(Rc::new(slint::VecModel::from(nodes))));
-                        hb.set_hosts(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards.clone()))));
-                        w.global::<WindowBridge>().set_launcher_host_items(slint::ModelRc::from(Rc::new(slint::VecModel::from(new_cards))));
-
-                        notif_inner.success("数据层切换成功", success_msg);
-                    }
-                });
+                crate::handlers::settings_handlers::backup::execute_switch_storage_mode(&m, w_inner, ctx_inner).await;
             });
         });
     }
@@ -1558,6 +1462,7 @@ pub(crate) fn register_debug_handlers(window: &AppWindow, ctx: &AppContext) {
         db.on_close(move || {
             if let Some(w) = window_weak.upgrade() {
                 w.global::<DebugBridge>().set_is_open(false);
+                crate::debug_ui::unload_ui_debug_logs(&w);
             }
         });
     }

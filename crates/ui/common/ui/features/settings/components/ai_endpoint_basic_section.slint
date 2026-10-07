@@ -1,0 +1,103 @@
+import { AppTheme } from "../../../themes/app-theme.slint";
+import { SettingsBridge } from "../settings_bridge.slint";
+import { AppTextInput } from "../../../shared/base/app-text-input.slint";
+import { AppPasswordInput } from "../../../shared/base/app-password-input.slint";
+import { AppDropdown } from "../../../shared/base/app-dropdown.slint";
+
+/// AI 端点基础连接配置区块 (AiEndpointBasicSection)
+component AiEndpointBasicSection inherits VerticalLayout {
+    spacing: 8px;
+
+    HorizontalLayout {
+        spacing: 6px;
+        alignment: start;
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../../assets/icons/server.svg");
+                width: 12px;
+                height: 12px;
+                colorize: AppTheme.accent;
+            }
+        }
+        Text {
+            text: @tr("基础连接信息");
+            font-size: 11px;
+            font-weight: 700;
+            color: AppTheme.foreground;
+        }
+    }
+
+    // 端点名称
+    VerticalLayout {
+        spacing: 3px;
+        Text {
+            text: @tr("端点名称");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.foreground;
+        }
+        AppTextInput {
+            height: 30px;
+            text <=> SettingsBridge.modal-endpoint-name;
+            placeholder: @tr("例如: DeepSeek 官方 / Ollama 本地 / 硅基流动");
+        }
+    }
+
+    // 接口地址 (Base URL)
+    VerticalLayout {
+        spacing: 3px;
+        Text {
+            text: @tr("API 接口地址 (Base URL)");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.foreground;
+        }
+        AppTextInput {
+            height: 30px;
+            text <=> SettingsBridge.modal-endpoint-base-url;
+            placeholder: "https://api.deepseek.com/v1 或 http://localhost:11434/v1";
+        }
+    }
+
+    // API 请求协议模式 (统一规范下拉选择框)
+    VerticalLayout {
+        spacing: 3px;
+        Text {
+            text: @tr("API 请求协议模式");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.foreground;
+        }
+        AppDropdown {
+            items: [
+                { id: "chat", label: @tr("OpenAI Chat 模式 (/v1/chat/completions)") },
+                { id: "response", label: @tr("OpenAI Responses 模式 (/v1/responses)") },
+            ];
+            active-id: SettingsBridge.modal-endpoint-api-mode;
+            active-label: SettingsBridge.modal-endpoint-api-mode == "response" ? @tr("OpenAI Responses 模式 (/v1/responses)") : @tr("OpenAI Chat 模式 (/v1/chat/completions)");
+            selected(id, label) => {
+                SettingsBridge.modal-endpoint-api-mode = id;
+            }
+        }
+    }
+
+    // API Key
+    VerticalLayout {
+        spacing: 3px;
+        Text {
+            text: @tr("API 密钥 (API Key)");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.foreground;
+        }
+        AppPasswordInput {
+            height: 30px;
+            text <=> SettingsBridge.modal-endpoint-api-key;
+            placeholder: "sk-... (本地无授权私有端点可留空)";
+        }
+    }
+}
+
+export { AiEndpointBasicSection }
+

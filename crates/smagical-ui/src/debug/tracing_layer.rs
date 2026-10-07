@@ -313,7 +313,7 @@ pub fn init_tracing(
 
     // 4. 环境过滤 (支持 RUST_LOG 动态控制，默认 smalux/smagical 开头包为 debug，sqlx/sea_orm 为 warn 杜绝常规 SQL 刷屏，其余为 info)
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-        EnvFilter::new("info,sqlx=warn,sea_orm=warn,smagical_ui=debug,smagical_core=debug,smagical_debug=debug")
+        EnvFilter::new("info,sqlx=debug,sea_orm=debug,smagical_ui=debug,smagical_core=debug,smagical_debug=debug")
     });
 
     // 5. 组装全局 Registry

@@ -1,6 +1,6 @@
-import { TabData, TerminalPaneData, TerminalSplitterData } from "./terminal_model.slint";
+import { TabData, TerminalPaneData, TerminalSplitterData, TmuxSessionItem } from "./terminal_model.slint";
 
-export { TabData, TerminalPaneData, TerminalSplitterData }
+export { TabData, TerminalPaneData, TerminalSplitterData, TmuxSessionItem }
 
 /// 终端多会话与多分屏窗格领域全局状态总线 (Terminal Bridge)
 export global TerminalBridge {
@@ -87,4 +87,11 @@ export global TerminalBridge {
     callback open-terminal-url();
     callback terminal-check-hover-url(string /* session_id */, int /* col */, int /* row */) -> string;
     callback terminal-open-url(string /* url */);
+
+    // tmux 领域状态与交互
+    in-out property <bool> tmux-is-loading: false;
+    in-out property <bool> tmux-is-installed: true;
+    in-out property <[TmuxSessionItem]> tmux-sessions: [];
+    callback refresh-tmux();
+    callback install-tmux(string /* cmd */);
 }

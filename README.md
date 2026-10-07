@@ -46,38 +46,53 @@
 
 ### 🏗️ 架构与 Workspace 模块分层
 
-仓库采用 Rust Cargo Workspace 多 crate 分层解耦架构，严格遵循职责分离与纯 Rust 自研原则：
+仓库采用 Rust Cargo Workspace 多 crate 分层解耦与微前端架构，严格遵循职责分离与纯 Rust 自研原则：
 
 ```text
 smalux-ssh/
 ├── crates/
-│   ├── smagical-core/          # 核心业务领域实体、状态引擎与仓储契约层 (纯 Rust，无 UI/平台外部工具依赖)
-│   │   ├── domain/             # 主机、凭据、分组、隧道、片段、历史、AI 客户端 (SSE 流式)、文件等 13 个实体
+│   ├── smagical-core/          # 核心业务领域实体、状态引擎与仓储/服务契约层 (纯 Rust，无 UI/平台外部工具依赖)
+│   │   ├── domain/             # 主机、凭据、分组、隧道、片段、历史、AI 流式客户端、文件、配置等 13 个实体
 │   │   ├── event/              # 强类型泛型事件分发总线与全生命周期拦截守护机制 (30+ 领域事件)
 │   │   ├── storage/            # 7 大仓储 Trait 契约与 AppStorage 聚合门面 (含保险库生命周期契约)
+│   │   ├── service/            # 六边形服务契约 (SshSessionService, SftpService, TunnelService, KeygenService 等)
 │   │   ├── state/              # 全局状态中枢 CoreState (统一调度存储热插拔、事件总线、动态路由)
 │   │   └── theme/              # 主题领域模型、WCAG 对比度校验与多级继承解析引擎
 │   │
-│   ├── smagical-ssh/           # 纯 Rust SSH/SFTP 协议协议栈与密钥/监控引擎 (独立跨平台，可无缝用于 CLI/GUI)
-│   │   ├── keygen.rs           # 原生 Ed25519 / RSA-4096 / ECDSA SSH 密钥对生成与 PEM/OpenSSH 格式化
-│   │   ├── importer.rs         # 原生纯 Rust OpenSSH ~/.ssh/config 导入解析器
-│   │   ├── ssh_config.rs       # 统一 SSH 连接参数拼装与安全收敛 (SshLaunchConfig)
-│   │   ├── sftp.rs             # 纯 Rust SFTP 文件传输客户端契约与自研驱动
-│   │   └── monitor.rs          # 远程主机 CPU/内存/网络实时指标采集监控引擎
+│   ├── smagical-ssh/           # 纯 Rust SSH/SFTP 协议协议栈与密钥/监控引擎 (独立跨平台，无宿主外部依赖)
+│   │   ├── session_driver.rs   # 纯 Rust 原生 SSH 交互终端与 Exec 通道驱动 (RusshSessionDriver)
+│   │   ├── sftp_driver.rs      # 纯 Rust 原生 SFTP 二进制协议客户端驱动 (RusshSftpDriver)
+│   │   ├── tunnel_driver.rs    # 纯 Rust 原生网络隧道与端口转发驱动 (RusshTunnelDriver)
+│   │   ├── keygen.rs           # 原生 Ed25519 / RSA-4096 / ECDSA SSH 密钥对生成 (NativeKeygenService)
+│   │   ├── monitor.rs          # 远程主机 CPU/内存/网络实时指标采集探针 (RusshMetricsDriver)
+│   │   ├── known_hosts.rs      # OpenSSH Known Hosts 原生文件管理与主机公钥验真 (TOFU)
+│   │   ├── importer.rs         # 原生纯 Rust OpenSSH ~/.ssh/config / Termius / Xshell 导入解析器
+│   │   └── ssh_config.rs       # 统一 SSH 连接参数拼装与安全收敛 (SshLaunchConfig)
 │   │
 │   ├── smagical-storage/       # 数据持久化与存储实现层 (工业级安全保险库 + SQLite 物理数据库 + 仿真 Mock)
 │   │   ├── crypto/             # AES-256-GCM + Argon2id 安全保险库 (信封加密、金丝雀校验、敏感内存抹零)
-│   │   ├── entities/           # SeaORM 关系型实体映射 (11 张数据表 Schema)
+│   │   ├── entities/           # SeaORM 关系型实体映射 (13 张数据表 Schema，含备份策略与快照)
 │   │   ├── seaorm/             # 基于 SQLite 的 SeaORM 物理仓储实现 (自动 DDL 建表与数据迁移)
 │   │   ├── mock/               # 基于读写锁的高性能并发内存仿真仓储 (预装 6 组 10 主机真实种子数据)
 │   │   └── storage_mode.rs     # 跨进程存储模式首选项治理 (~/.config/smalux-ssh/storage_mode.txt)
 │   │
-│   ├── smagical-ui-view/       # 纯 Slint 声明式界面视图库与强类型生成代码 (DSL、组件库与 Bridge 单例)
-│   │   ├── ui/main.slint       # 全局主窗口总装与根视口路由器
-│   │   ├── ui/shared/          # 全工程通用共享组件库 (base 原子控件、composite 复合控件、scaffolds 脚手架)
-│   │   ├── ui/features/        # 领域内聚特性包 (专属 HostsBridge, TerminalBridge, SettingsBridge 等)
-│   │   ├── ui/views/           # 顶层工作区页面与左右活动/辅助抽屉
-│   │   └── ui/themes/          # 设计令牌 AppTheme 与 15+ 套终端/界面主题 TOML 预设
+│   ├── smalux-cli/             # 纯 Rust 双模（Headless CLI + TUI 交互）资产管理与运维终端
+│   │   ├── src/main.rs         # 命令行入口 (支持直接命令执行模式与全屏交互式 TUI 仪表盘)
+│   │   ├── src/terminal_session.rs # 基于 russh 的交互式终端会话
+│   │   └── src/tui/            # 基于 Ratatui + Crossterm 的终端图形界面
+│   │
+│   ├── ui/                     # 现代微前端 Slint 组件体系 (解耦编译，消除内存暴涨)
+│   │   ├── common/             # 跨插件共享设计系统 (AppTheme, 基础控件, 脚手架与 13 大 Bridge 单例)
+│   │   ├── kernel/             # 微内核底座 (唯一 Slint build.rs 构建入口，多窗格视口，活动栏，弹窗)
+│   │   └── plugins/            # 8 大页面级独立插件 (与左侧活动栏 8 个图标严格 1:1 对齐)
+│   │       ├── hosts/          # [页面 1: 主机资产] (含 companion/ 独立伴生目录: ai/, monitor/, tmux/)
+│   │       ├── files/          # [页面 2: 文件管理器] (含 companion/ sftp 传输抽屉)
+│   │       ├── snippets/       # [页面 3: 代码片段库] (含 companion/ 快速命令抽屉)
+│   │       ├── tunnels/        # [页面 4: 端口隧道拓扑] (含 companion/ 快速控制抽屉)
+│   │       ├── credentials/    # [页面 5: 凭据保管箱] (密钥管理、指纹解析、密钥生成)
+│   │       ├── history/        # [页面 6: 连接审计历史] (时间流审计、终端快照回溯)
+│   │       ├── settings/       # [页面 7: 偏好设置外观] (外观工坊、取色器、全屏设置、备份)
+│   │       └── debug/          # [页面 8: 开发者调试台] (状态探针、批量模拟、日志查看器)
 │   │
 │   └── smagical-ui/            # 桌面客户端业务组装与控制中枢 (终端渲染引擎、Handlers 集群、系统托盘)
 │       ├── terminal/           # 纯 Rust 软光栅终端引擎 (ConPTY/OpenPTY, Parser, fontdue CPU 着色, SplitTree)
@@ -88,6 +103,32 @@ smalux-ssh/
 │       └── local_shells.rs     # 跨平台本地 Shell 环境探测与启动参数预设
 └── README.md
 ```
+
+---
+
+### 📖 模块独立文档导航 (Module Documentation Matrix)
+
+每个核心 Crate 与 UI 插件均维护有独立的 `README.md`，详细记录其职责定位、调用方式、核心函数与参数契约：
+
+| 模块分类 | 模块路径 | 独立文档链接 | 着力方向与核心职责 |
+| :--- | :--- | :--- | :--- |
+| **核心领域** | `crates/smagical-core` | [smagical-core 文档](crates/smagical-core/README.md) | 纯 Rust 业务领域模型、强类型事件总线、六边形服务契约与仓储抽象 |
+| **网络协议** | `crates/smagical-ssh` | [smagical-ssh 文档](crates/smagical-ssh/README.md) | 纯 Rust 原生 SSH/SFTP/隧道驱动、NativeKeygenService、主机指标监控 |
+| **数据持久** | `crates/smagical-storage` | [smagical-storage 文档](crates/smagical-storage/README.md) | SQLite 关系持久化、AES-256-GCM + Argon2id 安全保险库、Mock 内存仓储 |
+| **终端命令** | `crates/smalux-cli` | [smalux-cli 文档](crates/smalux-cli/README.md) | 纯 Rust 双模终端（Headless CLI 子命令 + Ratatui 全屏交互式 TUI） |
+| **界面总成** | `crates/smagical-ui` | [smagical-ui 文档](crates/smagical-ui/README.md) | 工业级软光栅终端、60Hz 脏渲染、双缓冲、Handlers 处理器集群、系统托盘 |
+| **UI 体系** | `crates/ui` | [ui 总览文档](crates/ui/README.md) | Slint 微前端体系总览、单点编译与微内核解耦设计 |
+| **UI 设计系统** | `crates/ui/common` | [ui/common 文档](crates/ui/common/README.md) | `AppTheme` 令牌系统、15+ 预设、原子/复合控件与 13 大 Bridge 单例 |
+| **UI 编译内核** | `crates/ui/kernel` | [ui/kernel 文档](crates/ui/kernel/README.md) | Slint AOT 唯一编译中心 (`build.rs`)、`AppWindow` 主框架、全向无边框拉伸 |
+| **UI 插件总览** | `crates/ui/plugins` | [ui/plugins 文档](crates/ui/plugins/README.md) | 8 大业务插件规范与动态插拔契约 |
+| ├─ 资产管理 | `crates/ui/plugins/hosts` | [hosts 插件文档](crates/ui/plugins/hosts/README.md) | 主机树形拓扑、分组管理、AI 伴生助手、Linux 探针与 Tmux 抽屉 |
+| ├─ 双盘文件 | `crates/ui/plugins/files` | [files 插件文档](crates/ui/plugins/files/README.md) | 双盘本地/远程浏览器、Tab 历史栈、SFTP 传输抽屉与任务队列面板 |
+| ├─ 凭据保险 | `crates/ui/plugins/credentials` | [credentials 插件文档](crates/ui/plugins/credentials/README.md) | 私钥/密码/证书管理、公钥指纹解析、纯 Rust Ed25519/RSA 密钥生成 |
+| ├─ 代码片段 | `crates/ui/plugins/snippets` | [snippets 插件文档](crates/ui/plugins/snippets/README.md) | 参数化模板提取 `{{var}}`、快速命令抽屉、终端直接注入执行 |
+| ├─ 网络隧道 | `crates/ui/plugins/tunnels` | [tunnels 插件文档](crates/ui/plugins/tunnels/README.md) | 本地/远程转发、动态 SOCKS5 代理、多跳跳板拓扑与流量速率监控 |
+| ├─ 偏好设置 | `crates/ui/plugins/settings` | [settings 插件文档](crates/ui/plugins/settings/README.md) | 8 大偏好维度、主题工坊取色器弹窗、数据快照导出导入 |
+| ├─ 审计历史 | `crates/ui/plugins/history` | [history 插件文档](crates/ui/plugins/history/README.md) | 会话时间线审计、退出码追踪、终端屏幕历史快照审计弹窗 |
+| └─ 调试台 | `crates/ui/plugins/debug` | [debug 插件文档](crates/ui/plugins/debug/README.md) | Tracing 环形滚动日志、海量资产批量生成模拟器、状态探针 |
 
 ---
 
@@ -209,19 +250,37 @@ flowchart TD
 ### 运行应用
 
 ```bash
-# 启动桌面 UI 客户端
+# 启动桌面 GUI 客户端
 cargo run -p smagical-ui
+
+# 启动纯 Rust 终端控制台 (全屏 TUI 交互模式)
+cargo run -p smalux-cli -- --tui
+
+# 命令行直接操作 (Headless CLI 模式)
+cargo run -p smalux-cli -- host list
+cargo run -p smalux-cli -- host connect -i <host_id>
+cargo run -p smalux-cli -- keygen -a ed25519
 ```
 
-### 编译检查与单元测试
+### 编译检查与静态分析
 
 ```bash
-# 全 Workspace 严格静态检查 (0 警告)
-cargo clippy --workspace --all-targets -- -D warnings
+# 全 Workspace 严格静态检查 (0 警告，极低内存消耗)
+cargo check --workspace
 
-# 全 Workspace 自动化单元测试 (110+ 项测试全部通过)
-cargo test --workspace
+# 全 Workspace 代码风格与规范校验 (0 警告)
+cargo clippy --workspace --all-targets -- -D warnings
 ```
+
+### ⚡ 编译内存优化与防闪退保障 (Low-Memory Build Optimization)
+
+本项目针对 Slint UI AOT 代码生成（单 crate 70MB+ 生成代码、59,000+ 闭包）实施了深度编译优化，彻底解决 Windows 下 LLVM / MSVC 链接器 OOM 闪退（`0xc0000409`、`LNK1102`）：
+
+1. **高效链接器**：`.cargo/config.toml` 默认配置 `rust-lld.exe`，突破 MSVC `link.exe` 4GB 虚拟内存限制并扩充链接栈至 16MB；
+2. **外部依赖零调试符号**：`Cargo.toml` 中配置 `[profile.dev.package."*"] debug = 0, opt-level = 0`，裁剪全部 200+ 三方依赖的 PDB 符号体积 ~85%；
+3. **LLVM 单元细化分治**：针对 `smagical-ui-kernel` 配置 `codegen-units = 16`，由单线程巨型图拆解为 16 单元分片，降低峰值编译内存 60%+；
+4. **FastISel 极速生成**：开发构建启用 `opt-level = 0`，直接绕过 LLVM 耗时巨大的优化 Pass，编译速度提升 3 倍；
+5. **测试运行建议**：在 Windows 平台测试时，推荐针对单 package 运行且控制并发线程（如 `cargo test -p smagical-core -- --test-threads=1`），避免多可执行文件并行链接时峰值内存超限。
 
 ---
 

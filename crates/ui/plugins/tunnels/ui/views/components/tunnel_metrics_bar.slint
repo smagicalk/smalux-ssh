@@ -1,11 +1,11 @@
-﻿// -----------------------------------------------------------------------------
+// -----------------------------------------------------------------------------
 // 实时运行与流量度量指标栏 (Tunnel Metrics Bar)
 // 包含运行状态、活跃 TCP 会话、入站流量 (Rx) 与出站流量 (Tx) 四维看板
 // -----------------------------------------------------------------------------
 
 import { AppTheme } from "@common/themes/app-theme.slint";
 
-export component TunnelMetricsBar inherits HorizontalLayout {
+component TunnelMetricsBar inherits HorizontalLayout {
     in property <bool> form-is-running: false;
     in property <int> form-active-connections: 0;
     in property <string> form-traffic-in: "0 KB";
@@ -115,8 +115,10 @@ export component TunnelMetricsBar inherits HorizontalLayout {
                 font-size: 13px;
                 font-weight: 700;
                 font-family: "Cascadia Code, Consolas, monospace";
-                color: #2ecc71;
+                color: AppTheme.success;
             }
         }
     }
 }
+
+export { TunnelMetricsBar }

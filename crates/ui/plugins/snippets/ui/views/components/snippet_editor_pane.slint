@@ -6,11 +6,10 @@
 
 import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
-import { FolderPickerModal } from "../../modals/folder-picker-modal.slint";
-import { GroupOptionData } from "../../modals/group-tree-selector.slint";
+import { GroupOptionData } from "@common/shared/composite/group-tree-selector.slint";
 import { SnippetsBridge } from "@common/features/snippets/snippets_bridge.slint";
 
-export component SnippetEditorPane inherits VerticalLayout {
+component SnippetEditorPane inherits VerticalLayout {
     in-out property <string> edit_id: "";
     in-out property <string> edit_title: "";
     in-out property <string> edit_category_id: SnippetsBridge.form-group-id;
@@ -48,7 +47,7 @@ export component SnippetEditorPane inherits VerticalLayout {
             VerticalLayout {
                 alignment: center;
                 Image {
-                    source: @image-url("../../../assets/icons/code.svg");
+                    source: @image-url("../../assets/icons/code.svg");
                     width: 15px;
                     height: 15px;
                     image-fit: contain;
@@ -170,7 +169,7 @@ export component SnippetEditorPane inherits VerticalLayout {
                     VerticalLayout {
                         alignment: center;
                         Image {
-                            source: @image-url("../../../assets/icons/folder.svg");
+                            source: @image-url("../../assets/icons/folder.svg");
                             width: 14px;
                             height: 14px;
                             image-fit: contain;
@@ -238,7 +237,7 @@ export component SnippetEditorPane inherits VerticalLayout {
                             border-color: root.edit_auto_execute ? AppTheme.accent : AppTheme.border;
 
                             if root.edit_auto_execute: Image {
-                                source: @image-url("../../../assets/icons/check.svg");
+                                source: @image-url("../../assets/icons/check.svg");
                                 width: 8px;
                                 height: 8px;
                                 image-fit: contain;
@@ -385,7 +384,7 @@ export component SnippetEditorPane inherits VerticalLayout {
             flick := Flickable {
                 width: 100%;
                 height: 100%;
-                viewport-height: max(self.height, code-input.preferred-height + 20px);
+                content-height: max(self.height, code-input.preferred-height + 20px);
 
                 VerticalLayout {
                     padding-left: 12px;
@@ -413,7 +412,7 @@ export component SnippetEditorPane inherits VerticalLayout {
             }
 
             // 暗色主题定制竖向滚动条
-            if flick.viewport-height > flick.height: Rectangle {
+            if flick.content-height > flick.height: Rectangle {
                 x: parent.width - 6px;
                 y: 2px;
                 width: 4px;
@@ -422,9 +421,9 @@ export component SnippetEditorPane inherits VerticalLayout {
                 background: transparent;
 
                 Rectangle {
-                    y: -flick.viewport-y * (parent.height - 4px - self.height) / (flick.viewport-height - flick.height);
+                    y: -flick.content-y * (parent.height - 4px - self.height) / (flick.content-height - flick.height);
                     width: 4px;
-                    height: max(20px, (parent.height - 4px) * ((parent.height - 4px) / flick.viewport-height));
+                    height: max(20px, (parent.height - 4px) * ((parent.height - 4px) / flick.content-height));
                     border-radius: 2px;
                     background: sb-touch.has-hover ? AppTheme.secondary-foreground.transparentize(30%) : AppTheme.secondary-foreground.transparentize(65%);
                     animate background { duration: 150ms; }
@@ -496,3 +495,5 @@ export component SnippetEditorPane inherits VerticalLayout {
     }
 
 }
+
+export { SnippetEditorPane }

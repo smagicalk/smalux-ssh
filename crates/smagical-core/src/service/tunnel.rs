@@ -41,4 +41,10 @@ pub trait TunnelService: Send + Sync {
 
     /// 查询指定隧道的即时吞吐度量指标
     async fn query_metrics(&self, tunnel_id: &str) -> SshServiceResult<TunnelMetricsSnapshot>;
+
+    /// 探活指定隧道的健康状态 (返回 true 表示运行正常，false 表示已断开或异常)
+    async fn is_tunnel_alive(&self, tunnel_id: &str) -> bool {
+        self.query_metrics(tunnel_id).await.is_ok()
+    }
 }
+

@@ -9,7 +9,7 @@ use tokio::sync::mpsc::UnboundedSender;
 use crate::domain::file_item::generate_mock_remote_directory;
 use crate::domain::{CredentialRecord, FileItemData, HostRecord, TunnelRecord};
 use crate::service::error::{SshServiceError, SshServiceResult};
-use crate::service::keygen::{GeneratedKeyPair, KeyAlgorithm, KeygenService};
+use crate::service::keygen::{GeneratedKeyPair, KeyAlgorithm, KeygenService, ParsedKeyInfo};
 use crate::service::metrics::{HostMetricsService, SystemMetricsSnapshot};
 use crate::service::sftp::{SftpService, TransferProgress};
 use crate::service::ssh::{CommandExecutionOutput, SshSessionService, SshStreamChannel};
@@ -146,8 +146,21 @@ impl SshSessionService for MockSshSessionService {
         _rows: u16,
         _cols: u16,
     ) -> SshServiceResult<Box<dyn SshStreamChannel>> {
-        // 创建双向内存通道
-        let (client, _server) = duplex(4096);
+        // 创建双向内存通道并模拟交互 Shell (防止立即 EOF 退出)
+        let (client, mut server) = duplex(4096);
+        tokio::spawn(async move {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            let welcome = "\x1b[32m[smalux] Mock SSH 仿真终端已就绪\x1b[0m\r\n$ ";
+            let _ = server.write_all(welcome.as_bytes()).await;
+            let mut buf = [0u8; 1024];
+            while let Ok(n) = server.read(&mut buf).await {
+                if n == 0 {
+                    break;
+                }
+                // 回显输入的字符
+                let _ = server.write_all(&buf[..n]).await;
+            }
+        });
         Ok(Box::new(client))
     }
 
@@ -244,6 +257,41 @@ impl KeygenService for MockKeygenService {
 
     fn compute_fingerprint(&self, _public_key_openssh: &str) -> SshServiceResult<String> {
         Ok("SHA256:MockComputedFingerprint123456789".to_string())
+    }
+
+    fn parse_private_key(
+        &self,
+        private_key_pem: &str,
+        _passphrase: Option<&str>,
+    ) -> SshServiceResult<ParsedKeyInfo> {
+        let is_encrypted = private_key_pem.contains("ENCRYPTED") || private_key_pem.contains("aes");
+        let (algo, pub_key, fp) = if private_key_pem.contains("RSA") {
+            (
+                "RSA".to_string(),
+                Some("ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQDMockRsaPublicKey user@smalux".to_string()),
+                Some("SHA256:MockRsaFingerprint".to_string()),
+            )
+        } else if private_key_pem.contains("EC") {
+            (
+                "ECDSA-P256".to_string(),
+                Some("ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY= user@smalux".to_string()),
+                Some("SHA256:MockEcdsaFingerprint".to_string()),
+            )
+        } else {
+            (
+                "Ed25519".to_string(),
+                Some("ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIG5MockPublicKey user@smalux".to_string()),
+                Some("SHA256:MockEd25519Fingerprint".to_string()),
+            )
+        };
+
+        Ok(ParsedKeyInfo {
+            algorithm: algo,
+            public_key_openssh: pub_key,
+            fingerprint: fp,
+            is_encrypted,
+            comment: Some("user@smalux".to_string()),
+        })
     }
 }
 

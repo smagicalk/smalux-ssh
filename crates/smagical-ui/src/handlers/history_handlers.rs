@@ -1,12 +1,12 @@
 //! 历史会话管理与 Slint UI 抽屉视图数据同步。
 
-use std::rc::Rc;
 use slint::ComponentHandle;
 use smagical_core::event::{
     HistoryClearedEvent, HistoryItemDeletedEvent, HistoryPinToggledEvent,
-    HistoryReconnectRequestedEvent, NavigationTabClickedEvent,
+    HistoryReconnectRequestedEvent,
 };
 use smagical_core::HistoryRecord;
+use crate::common::{matches_any_ignore_case, to_model_rc};
 use crate::generated::{AppWindow, HistoryBridge, HistoryGroupData, HistoryItemData, HostsBridge, TerminalBridge, WindowBridge};
 use crate::handlers::AppContext;
 
@@ -147,19 +147,17 @@ fn map_history_item(r: &HistoryRecord, _now: u64, is_aggregated: bool, is_en: bo
         }
     };
 
-    let time_text = conn_dt.clone();
-
     HistoryItemData {
-        id: r.id.clone().into(),
-        host_id: r.host_id.clone().unwrap_or_default().into(),
-        title: r.title.clone().into(),
-        address: r.address.clone().into(),
-        username: r.username.clone().into(),
-        session_type: r.session_type.clone().into(),
-        time_text: time_text.into(),
+        id: r.id.as_str().into(),
+        host_id: r.host_id.as_deref().unwrap_or_default().into(),
+        title: r.title.as_str().into(),
+        address: r.address.as_str().into(),
+        username: r.username.as_str().into(),
+        session_type: r.session_type.as_str().into(),
+        time_text: conn_dt.into(),
         duration_text: dur_text.into(),
-        exit_status: r.exit_status.clone().into(),
-        error_msg: r.error_msg.clone().unwrap_or_default().into(),
+        exit_status: r.exit_status.as_str().into(),
+        error_msg: r.error_msg.as_deref().unwrap_or_default().into(),
         is_pinned: r.is_pinned,
         connect_count: r.connect_count as i32,
         subtitle: subtitle.into(),
@@ -205,10 +203,10 @@ pub(crate) fn render_history_ui(
         all_records
             .iter()
             .filter(|r| {
-                r.title.to_lowercase().contains(&search_q_lower)
-                    || r.address.to_lowercase().contains(&search_q_lower)
-                    || r.username.to_lowercase().contains(&search_q_lower)
-                    || r.session_type.to_lowercase().contains(&search_q_lower)
+                matches_any_ignore_case(
+                    &[&r.title, &r.address, &r.username, &r.session_type],
+                    &search_q_lower,
+                )
             })
             .cloned()
             .collect()
@@ -242,6 +240,11 @@ pub(crate) fn render_history_ui(
                 .then_with(|| b.connected_at.cmp(&a.connected_at))
         });
 
+        // UI 渲染容量保护：截断至前 300 项活跃/高频主机，防止海量历史导致 Slint 渲染卡顿
+        if aggregated_list.len() > 300 {
+            aggregated_list.truncate(300);
+        }
+
         let items: Vec<HistoryItemData> = aggregated_list
             .iter()
             .map(|r| map_history_item(r, now, true, is_en))
@@ -255,7 +258,7 @@ pub(crate) fn render_history_ui(
                 group_name: if is_en { "All Hosts (By Frequency)".into() } else { "全部主机 (按频次)".into() },
                 item_count: items.len() as i32,
                 is_collapsed: collapsed_set.contains("all_hosts"),
-                items: slint::ModelRc::from(Rc::new(slint::VecModel::from(items))),
+                items: to_model_rc(items),
             }]
         }
     } else {
@@ -288,7 +291,7 @@ pub(crate) fn render_history_ui(
                 group_name: if is_en { "Pinned".into() } else { "置顶常用".into() },
                 item_count: pinned_items.len() as i32,
                 is_collapsed: collapsed_set.contains("pinned"),
-                items: slint::ModelRc::from(Rc::new(slint::VecModel::from(pinned_items))),
+                items: to_model_rc(pinned_items),
             });
         }
         if !today_items.is_empty() {
@@ -297,7 +300,7 @@ pub(crate) fn render_history_ui(
                 group_name: if is_en { "Today".into() } else { "今天".into() },
                 item_count: today_items.len() as i32,
                 is_collapsed: collapsed_set.contains("today"),
-                items: slint::ModelRc::from(Rc::new(slint::VecModel::from(today_items))),
+                items: to_model_rc(today_items),
             });
         }
         if !yesterday_items.is_empty() {
@@ -306,31 +309,58 @@ pub(crate) fn render_history_ui(
                 group_name: if is_en { "Yesterday".into() } else { "昨天".into() },
                 item_count: yesterday_items.len() as i32,
                 is_collapsed: collapsed_set.contains("yesterday"),
-                items: slint::ModelRc::from(Rc::new(slint::VecModel::from(yesterday_items))),
+                items: to_model_rc(yesterday_items),
             });
         }
         if !earlier_items.is_empty() {
+            let earlier_total = earlier_items.len() as i32;
+            if earlier_items.len() > 300 {
+                earlier_items.truncate(300);
+            }
             result_groups.push(HistoryGroupData {
                 group_id: "earlier".into(),
                 group_name: if is_en { "Earlier".into() } else { "更早".into() },
-                item_count: earlier_items.len() as i32,
+                item_count: earlier_total,
                 is_collapsed: collapsed_set.contains("earlier"),
-                items: slint::ModelRc::from(Rc::new(slint::VecModel::from(earlier_items))),
+                items: to_model_rc(earlier_items),
             });
         }
 
         result_groups
     };
 
-    let group_model = slint::ModelRc::from(Rc::new(slint::VecModel::from(groups)));
     let hb = window.global::<HistoryBridge>();
     hb.set_total_count(total_count);
-    hb.set_history_groups(group_model);
+    crate::store::diff::update_model_rc_in_place(
+        &hb.get_history_groups(),
+        groups,
+        |m| hb.set_history_groups(m),
+    );
     hb.set_search_query(search_q.into());
     hb.set_view_mode(view_mode.into());
 }
 
-/// 异步从存储层拉取历史记录并在 Slint UI 中呈现
+fn get_history_cache() -> &'static std::sync::RwLock<Option<Vec<HistoryRecord>>> {
+    static CACHE: std::sync::OnceLock<std::sync::RwLock<Option<Vec<HistoryRecord>>>> = std::sync::OnceLock::new();
+    CACHE.get_or_init(|| std::sync::RwLock::new(None))
+}
+
+/// 强制失效历史记录内存缓存
+#[allow(dead_code)]
+pub(crate) fn invalidate_history_cache() {
+    if let Ok(mut lock) = get_history_cache().write() {
+        *lock = None;
+    }
+}
+
+/// 更新或覆盖历史记录内存镜像
+pub(crate) fn set_history_cache(records: Vec<HistoryRecord>) {
+    if let Ok(mut lock) = get_history_cache().write() {
+        *lock = Some(records);
+    }
+}
+
+/// 异步从存储层拉取历史记录并在 Slint UI 中呈现，同时建立/更新内存一级镜像
 pub(crate) fn sync_ui_history_async(
     window_weak: slint::Weak<AppWindow>,
     storage: std::sync::Arc<dyn smagical_core::AppStorage>,
@@ -340,6 +370,7 @@ pub(crate) fn sync_ui_history_async(
 ) {
     crate::async_util::spawn_async(async move {
         let all_records = storage.history().list_all().await.unwrap_or_default();
+        set_history_cache(all_records.clone());
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w) = window_weak.upgrade() {
                 render_history_ui(&w, &all_records, &search_q, &view_mode, &collapsed_set);
@@ -348,26 +379,24 @@ pub(crate) fn sync_ui_history_async(
     });
 }
 
-/// 兼容接口：同步更新 Slint 历史抽屉数据与视图 (非阻塞发起异步查询)
+/// 极速同步历史抽屉数据与视图：优先从内存一级缓存瞬发计算 (0ms 磁盘 I/O)，未命中时回退异步查库
 pub(crate) fn sync_ui_history(window: &AppWindow, ctx: &AppContext) {
-    let window_weak = window.as_weak();
-    let storage = ctx.core_state.storage().clone();
     let search_q = ctx.history_search_query.borrow().clone();
     let view_mode = ctx.history_view_mode.borrow().clone();
     let collapsed_set = ctx.collapsed_history_groups.borrow().clone();
-    sync_ui_history_async(window_weak, storage, search_q, view_mode, collapsed_set);
-}
 
-/// 兼容接口 (供外部直接入参调用)
-#[allow(dead_code)]
-pub(crate) fn sync_ui_history_from_state(
-    window: &AppWindow,
-    all_records: &[HistoryRecord],
-    search_q: &str,
-    view_mode: &str,
-    collapsed_set: &std::collections::HashSet<String>,
-) {
-    render_history_ui(window, all_records, search_q, view_mode, collapsed_set);
+    // 1. 优先内存一级缓存瞬开路径：切断输入搜索与模式切换时的查库延迟
+    if let Ok(guard) = get_history_cache().read() {
+        if let Some(ref records) = *guard {
+            render_history_ui(window, records, &search_q, &view_mode, &collapsed_set);
+            return;
+        }
+    }
+
+    // 2. 缓存未就绪时发起异步拉取
+    let window_weak = window.as_weak();
+    let storage = ctx.core_state.storage().clone();
+    sync_ui_history_async(window_weak, storage, search_q, view_mode, collapsed_set);
 }
 
 
@@ -407,6 +436,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 });
 
                 let all_records = storage.history().list_all().await.unwrap_or_default();
+                set_history_cache(all_records.clone());
 
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = window_weak.upgrade() {
@@ -456,6 +486,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
                 });
 
                 let all_records = storage.history().list_all().await.unwrap_or_default();
+                set_history_cache(all_records.clone());
 
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = window_weak.upgrade() {
@@ -488,6 +519,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             tracing::info!(target: "smagical_ui::history", "删除历史会话记录: {}", hist_id_str);
 
             let all_records = storage.history().list_all().await.unwrap_or_default();
+            set_history_cache(all_records.clone());
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {
@@ -514,6 +546,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             tracing::info!(target: "smagical_ui::history", "清空历史记录 (保留置顶项)");
 
             let all_records = storage.history().list_all().await.unwrap_or_default();
+            set_history_cache(all_records.clone());
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {
@@ -544,6 +577,7 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
             tracing::info!(target: "smagical_ui::history", "切换历史会话置顶状态: {} -> {}", hist_id_str, if is_pinned { "⭐️ 已置顶" } else { "取消置顶" });
 
             let all_records = storage.history().list_all().await.unwrap_or_default();
+            set_history_cache(all_records.clone());
 
             let _ = slint::invoke_from_event_loop(move || {
                 if let Some(w) = window_weak.upgrade() {
@@ -661,21 +695,6 @@ pub(crate) fn register_history_handlers(window: &AppWindow, ctx: &AppContext) {
     hb.on_close_detail(move || {
         if let Some(w) = window_weak.upgrade() {
             w.global::<HistoryBridge>().set_is_detail_open(false);
-        }
-    });
-
-    // 12. 活动栏视图切换导航日志与事件广播
-    let core_state_nav = ctx.core_state.clone();
-    let window_weak = window.as_weak();
-    window.global::<WindowBridge>().on_switch_left_tab(move |tab_id| {
-        core_state_nav.events().dispatch(&NavigationTabClickedEvent {
-            tab_id: tab_id.to_string(),
-            query: "".into(),
-        });
-        tracing::info!(target: "smagical_ui::navigation", "导航切换侧边栏/主页面视图: [{}]", tab_id);
-
-        if let Some(w) = window_weak.upgrade().filter(|w| tab_id == "debug" || w.global::<crate::generated::DebugBridge>().get_is_open()) {
-            crate::debug_ui::sync_ui_debug_logs(&w);
         }
     });
 }

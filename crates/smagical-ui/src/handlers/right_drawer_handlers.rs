@@ -8,15 +8,17 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
-use slint::{ComponentHandle, ModelRc, VecModel};
+use serde::{Deserialize, Serialize};
+use slint::{ComponentHandle, Model, ModelRc};
 
+use crate::common::{to_model_rc, ToSharedString};
 use crate::generated::{
-    AiBridge, AiChatMessage, AiHistorySession, AppWindow, MonitorBridge, SettingsBridge, SystemMetricsData, TerminalBridge,
-    TunnelsBridge, WindowBridge,
+    AiBridge, AiChatMessage, AiHistorySession, AppWindow, FilesBridge, MonitorBridge, SettingsBridge,
+    SnippetsBridge, SystemMetricsData, TerminalBridge, TmuxSessionItem, TunnelsBridge, WindowBridge,
 };
 use crate::handlers::AppContext;
 use crate::monitor::IntoSlintMetrics;
@@ -117,6 +119,209 @@ impl HostAiSession {
     }
 }
 
+/// AI 消息持久化实体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct StoredAiMessage {
+    pub(crate) id: String,
+    pub(crate) sender: String,
+    pub(crate) content: String,
+    pub(crate) thinking_content: String,
+    pub(crate) is_thinking_expanded: bool,
+    pub(crate) suggested_cmd: String,
+    pub(crate) cmd_risk_level: String,
+    pub(crate) audit_status: String,
+    pub(crate) audit_reason: String,
+    pub(crate) timestamp: String,
+}
+
+impl From<&AiChatMessage> for StoredAiMessage {
+    fn from(m: &AiChatMessage) -> Self {
+        Self {
+            id: m.id.to_string(),
+            sender: m.sender.to_string(),
+            content: m.content.to_string(),
+            thinking_content: m.thinking_content.to_string(),
+            is_thinking_expanded: m.is_thinking_expanded,
+            suggested_cmd: m.suggested_cmd.to_string(),
+            cmd_risk_level: m.cmd_risk_level.to_string(),
+            audit_status: m.audit_status.to_string(),
+            audit_reason: m.audit_reason.to_string(),
+            timestamp: m.timestamp.to_string(),
+        }
+    }
+}
+
+impl From<&StoredAiMessage> for AiChatMessage {
+    fn from(m: &StoredAiMessage) -> Self {
+        Self {
+            id: m.id.to_shared(),
+            sender: m.sender.to_shared(),
+            content: m.content.to_shared(),
+            thinking_content: m.thinking_content.to_shared(),
+            is_thinking_expanded: m.is_thinking_expanded,
+            suggested_cmd: m.suggested_cmd.to_shared(),
+            cmd_risk_level: m.cmd_risk_level.to_shared(),
+            audit_status: m.audit_status.to_shared(),
+            audit_reason: m.audit_reason.to_shared(),
+            timestamp: m.timestamp.to_shared(),
+        }
+    }
+}
+
+/// AI 历史归档会话持久化实体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct StoredArchivedSession {
+    pub(crate) id: String,
+    pub(crate) title: String,
+    pub(crate) host_id: String,
+    pub(crate) host_name: String,
+    pub(crate) messages: Vec<StoredAiMessage>,
+    pub(crate) updated_time: String,
+}
+
+impl From<&ArchivedAiSession> for StoredArchivedSession {
+    fn from(a: &ArchivedAiSession) -> Self {
+        Self {
+            id: a.id.clone(),
+            title: a.title.clone(),
+            host_id: a.host_id.clone(),
+            host_name: a.host_name.clone(),
+            messages: a.messages.iter().map(StoredAiMessage::from).collect(),
+            updated_time: a.updated_time.clone(),
+        }
+    }
+}
+
+impl From<StoredArchivedSession> for ArchivedAiSession {
+    fn from(a: StoredArchivedSession) -> Self {
+        Self {
+            id: a.id,
+            title: a.title,
+            host_id: a.host_id,
+            host_name: a.host_name,
+            messages: a.messages.iter().map(AiChatMessage::from).collect(),
+            updated_time: a.updated_time,
+        }
+    }
+}
+
+/// 单台主机独立的 AI 会话持久化实体
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub(crate) struct StoredHostAiSession {
+    pub(crate) host_id: String,
+    pub(crate) host_name: String,
+    pub(crate) messages: Vec<StoredAiMessage>,
+    pub(crate) draft_input: String,
+    pub(crate) selected_model: String,
+    pub(crate) thinking_degree: String,
+    pub(crate) audit_policy: String,
+    pub(crate) audit_mode: String,
+    pub(crate) auto_audit_level: String,
+}
+
+impl From<&HostAiSession> for StoredHostAiSession {
+    fn from(s: &HostAiSession) -> Self {
+        Self {
+            host_id: s.host_id.clone(),
+            host_name: s.host_name.clone(),
+            messages: s.messages.iter().map(StoredAiMessage::from).collect(),
+            draft_input: s.draft_input.clone(),
+            selected_model: s.selected_model.clone(),
+            thinking_degree: s.thinking_degree.clone(),
+            audit_policy: s.audit_policy.clone(),
+            audit_mode: s.audit_mode.clone(),
+            auto_audit_level: s.auto_audit_level.clone(),
+        }
+    }
+}
+
+impl StoredHostAiSession {
+    pub(crate) fn into_host_ai_session(self) -> HostAiSession {
+        HostAiSession {
+            host_id: self.host_id,
+            host_name: self.host_name,
+            messages: self.messages.iter().map(AiChatMessage::from).collect(),
+            draft_input: self.draft_input,
+            selected_model: self.selected_model,
+            thinking_degree: self.thinking_degree,
+            audit_policy: self.audit_policy,
+            audit_mode: self.audit_mode,
+            auto_audit_level: self.auto_audit_level,
+            is_generating: false,
+            abort_flag: Arc::new(AtomicBool::new(false)),
+        }
+    }
+}
+
+/// AI 全量会话与归档持久化快照
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub(crate) struct StoredAiData {
+    pub(crate) history_archives: Vec<StoredArchivedSession>,
+    pub(crate) active_sessions: HashMap<String, StoredHostAiSession>,
+}
+
+/// 获取 AI 会话历史持久化存储文件路径
+pub(crate) fn get_ai_data_path() -> PathBuf {
+    let sqlite_path = smagical_storage::seaorm::get_default_sqlite_path();
+    if let Some(parent) = sqlite_path.parent() {
+        let _ = std::fs::create_dir_all(parent);
+        parent.join("ai_sessions.json")
+    } else {
+        PathBuf::from("ai_sessions.json")
+    }
+}
+
+/// 从物理磁盘加载 AI 会话与历史归档数据
+pub(crate) fn load_ai_data_from_disk() -> StoredAiData {
+    let path = get_ai_data_path();
+    if path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&path) {
+            if let Ok(data) = serde_json::from_str::<StoredAiData>(&content) {
+                tracing::info!(
+                    target: "smagical_ui::ai",
+                    "已从磁盘恢复 AI 会话数据 (历史归档: {}, 活跃会话: {})",
+                    data.history_archives.len(),
+                    data.active_sessions.len()
+                );
+                return data;
+            }
+        }
+    }
+    StoredAiData::default()
+}
+
+/// 异步非阻塞持久化保存 AI 会话与历史归档至磁盘
+pub(crate) fn save_ai_data_to_disk_async(data: StoredAiData) {
+    crate::async_util::spawn_async(async move {
+        let path = get_ai_data_path();
+        if let Ok(json_str) = serde_json::to_string_pretty(&data) {
+            if let Err(e) = tokio::fs::write(&path, json_str).await {
+                tracing::warn!(target: "smagical_ui::ai", "持久化 AI 会话数据失败: {}", e);
+            }
+        }
+    });
+}
+
+/// 同步阻塞持久化保存 AI 会话与历史归档至磁盘 (用于进程退出清理)
+pub(crate) fn save_ai_data_to_disk_sync(data: &StoredAiData) {
+    let path = get_ai_data_path();
+    if let Ok(json_str) = serde_json::to_string_pretty(data) {
+        if let Err(e) = std::fs::write(&path, json_str) {
+            tracing::warn!(target: "smagical_ui::ai", "同步持久化 AI 会话数据失败: {}", e);
+        }
+    }
+}
+
+/// 提取当前抽屉状态中的全量 AI 会话持久化快照
+pub(crate) fn snapshot_stored_ai_data(state: &RightDrawerState) -> StoredAiData {
+    StoredAiData {
+        history_archives: state.history_archives.iter().map(StoredArchivedSession::from).collect(),
+        active_sessions: state.ai_sessions.iter()
+            .map(|(k, v)| (k.clone(), StoredHostAiSession::from(v)))
+            .collect(),
+    }
+}
+
 /// 右侧伴生抽屉主线程运行时状态中枢
 ///
 /// 专用于 UI 线程直连访问，完全消除锁竞争，管理多机隔离的 AI 会话集与惰性性能采样探针。
@@ -158,6 +363,92 @@ thread_local! {
     static DRAWER_STATE: RefCell<RightDrawerState> = RefCell::new(RightDrawerState::default());
 }
 
+/// 卸载右侧伴生工具绑定的 Slint ModelRc 数据模型，释放 UI 堆内存
+pub(crate) fn unload_right_tool_models(window: &AppWindow, tool_id: &str) {
+    match tool_id {
+        "sftp" => {
+            let fb = window.global::<FilesBridge>();
+            fb.set_remote_files(ModelRc::default());
+            fb.set_transfer_tasks(ModelRc::default());
+            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 SFTP 抽屉 Slint 远程文件与传输任务模型");
+        }
+        "ai" => {
+            let ab = window.global::<AiBridge>();
+            ab.set_messages(ModelRc::default());
+            ab.set_history_sessions(ModelRc::default());
+            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 AI 助手抽屉 Slint 消息与历史模型");
+        }
+        "tunnel" => {
+            let tb = window.global::<TunnelsBridge>();
+            tb.set_host_tunnels(ModelRc::default());
+            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 Tunnels 伴生抽屉 Slint 隧道模型");
+        }
+        "tmux" => {
+            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 Tmux 伴生抽屉 Slint 会话状态");
+        }
+        "snippets" => {
+            let sb = window.global::<SnippetsBridge>();
+            sb.set_quick_cmds(ModelRc::default());
+            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 Snippets 伴生抽屉 Slint 快捷指令模型");
+        }
+        "monitor" => {
+            DRAWER_STATE.with(|state_cell| {
+                let mut state = state_cell.borrow_mut();
+                stop_monitor_sampling_inner(window, &mut state);
+            });
+            tracing::debug!(target: "smalux::lifecycle", "已停止并清空 Monitor 伴生抽屉监控探针与采样");
+        }
+        _ => {}
+    }
+}
+
+/// 重新从纯 Rust 内存状态回填右侧伴生工具 Slint 模型 (微秒级瞬时恢复)
+pub(crate) fn load_right_tool_models(window: &AppWindow, tool_id: &str) {
+    DRAWER_STATE.with(|state_cell| {
+        let mut state = state_cell.borrow_mut();
+        let term_b = window.global::<TerminalBridge>();
+        let h_id = if !state.current_host_id.is_empty() {
+            state.current_host_id.clone()
+        } else {
+            term_b.get_active_host_id().to_string()
+        };
+        let h_name = term_b.get_active_host_name().to_string();
+        state.current_host_id = h_id.clone();
+
+        if tool_id == "monitor" {
+            start_monitor_sampling_inner(window, &mut state, &h_id, &h_name);
+        } else {
+            stop_monitor_sampling_inner(window, &mut state);
+            if tool_id == "tunnel" {
+                if let Some(ref c) = state.ctx {
+                    crate::handlers::tunnel_handlers::sync_ui_host_tunnels(window, c);
+                }
+            } else if tool_id == "ai" {
+                let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
+                    .map(|a| AiHistorySession {
+                        id: a.id.to_shared(),
+                        title: a.title.to_shared(),
+                        message_count: a.messages.len() as i32,
+                        updated_time: a.updated_time.to_shared(),
+                    })
+                    .collect();
+                window.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
+                sync_ai_for_host_inner(window, &mut state, &h_id, &h_name);
+            } else if tool_id == "sftp" {
+                if let Some(ref c) = state.ctx {
+                    crate::handlers::file_handlers::sync_sftp_drawer_for_host(window, c, &h_id, &h_name);
+                }
+            } else if tool_id == "snippets" {
+                if let Some(ref c) = state.ctx {
+                    crate::handlers::snippet_handlers::sync_ui_snippets(window, c);
+                }
+            } else if tool_id == "tmux" {
+                sync_tmux_for_host_with_ctx(window, state.ctx.as_ref(), &h_id, &h_name);
+            }
+        }
+    });
+}
+
 /// 注册右侧伴生工具栏全套生命周期治理与 UI 回调处理器
 ///
 /// 挂载涵盖：
@@ -170,8 +461,24 @@ thread_local! {
 /// - `window`: Slint 顶级应用主窗口；
 /// - `ctx`: 应用程序全局上下文引用。
 pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContext) {
+    let loaded = load_ai_data_from_disk();
     DRAWER_STATE.with(|state_cell| {
-        state_cell.borrow_mut().ctx = Some(ctx.clone());
+        let mut state = state_cell.borrow_mut();
+        state.ctx = Some(ctx.clone());
+        state.history_archives = loaded.history_archives.into_iter().map(ArchivedAiSession::from).collect();
+        for (k, v) in loaded.active_sessions {
+            state.ai_sessions.insert(k, v.into_host_ai_session());
+        }
+
+        let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
+            .map(|a| AiHistorySession {
+                id: a.id.to_shared(),
+                title: a.title.to_shared(),
+                message_count: a.messages.len() as i32,
+                updated_time: a.updated_time.to_shared(),
+            })
+            .collect();
+        window.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
     });
 
     // -------------------------------------------------------------------------
@@ -182,41 +489,22 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
         window.global::<WindowBridge>().on_switch_right_tool(move |tool_id| {
             if let Some(w) = w_weak.upgrade() {
                 let wb = w.global::<WindowBridge>();
+                let prev_tool = wb.get_active_right_tool().to_string();
+                if prev_tool != tool_id.as_str() {
+                    unload_right_tool_models(&w, &prev_tool);
+                }
+
                 wb.set_active_right_tool(tool_id.clone());
                 wb.set_is_right_drawer_open(true);
 
                 DRAWER_STATE.with(|state_cell| {
-                    let mut state = state_cell.borrow_mut();
+                    let state = state_cell.borrow();
                     if let Some(ref c) = state.ctx {
                         c.core_state.toggle_right_panel(&tool_id);
                     }
-
-                    let term_b = w.global::<TerminalBridge>();
-                    let h_id = if !state.current_host_id.is_empty() {
-                        state.current_host_id.clone()
-                    } else {
-                        term_b.get_active_host_id().to_string()
-                    };
-                    let h_name = term_b.get_active_host_name().to_string();
-                    state.current_host_id = h_id.clone();
-
-                    if tool_id == "monitor" {
-                        start_monitor_sampling_inner(&w, &mut state, &h_id, &h_name);
-                    } else {
-                        stop_monitor_sampling_inner(&w, &mut state);
-                        if tool_id == "tunnel" {
-                            if let Some(ref c) = state.ctx {
-                                crate::handlers::tunnel_handlers::sync_ui_host_tunnels(&w, c);
-                            }
-                        } else if tool_id == "ai" {
-                            sync_ai_for_host_inner(&w, &mut state, &h_id, &h_name);
-                        } else if tool_id == "sftp" {
-                            if let Some(ref c) = state.ctx {
-                                crate::handlers::file_handlers::sync_sftp_drawer_for_host(&w, c, &h_id, &h_name);
-                            }
-                        }
-                    }
                 });
+
+                load_right_tool_models(&w, &tool_id);
             }
         });
     }
@@ -230,42 +518,17 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                 let tool_id = wb.get_active_right_tool().to_string();
 
                 DRAWER_STATE.with(|state_cell| {
-                    let mut state = state_cell.borrow_mut();
+                    let state = state_cell.borrow();
                     if let Some(ref c) = state.ctx {
                         c.core_state.right_panels().write().unwrap().set_drawer_open(is_open);
                     }
-
-                    let term_b = w.global::<TerminalBridge>();
-                    let h_id = if !state.current_host_id.is_empty() {
-                        state.current_host_id.clone()
-                    } else {
-                        term_b.get_active_host_id().to_string()
-                    };
-                    let h_name = term_b.get_active_host_name().to_string();
-                    state.current_host_id = h_id.clone();
-
-                    if !is_open {
-                        // 🛑 唯独监控探针在抽屉关闭时立即休眠！其余后台长任务（隧道、传输、AI）保持常驻
-                        stop_monitor_sampling_inner(&w, &mut state);
-                    } else {
-                        if tool_id == "monitor" {
-                            start_monitor_sampling_inner(&w, &mut state, &h_id, &h_name);
-                        } else {
-                            stop_monitor_sampling_inner(&w, &mut state);
-                            if tool_id == "tunnel" {
-                                if let Some(ref c) = state.ctx {
-                                    crate::handlers::tunnel_handlers::sync_ui_host_tunnels(&w, c);
-                                }
-                            } else if tool_id == "ai" {
-                                sync_ai_for_host_inner(&w, &mut state, &h_id, &h_name);
-                            } else if tool_id == "sftp" {
-                                if let Some(ref c) = state.ctx {
-                                    crate::handlers::file_handlers::sync_sftp_drawer_for_host(&w, c, &h_id, &h_name);
-                                }
-                            }
-                        }
-                    }
                 });
+
+                if !is_open {
+                    unload_right_tool_models(&w, &tool_id);
+                } else {
+                    load_right_tool_models(&w, &tool_id);
+                }
             }
         });
     }
@@ -322,7 +585,7 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
 
                     let ai_msg_id = format!("ai-{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis());
                     let placeholder_ai_msg = AiChatMessage {
-                        id: ai_msg_id.clone().into(),
+                        id: ai_msg_id.to_shared(),
                         sender: "assistant".into(),
                         content: "".into(),
                         thinking_content: "".into(),
@@ -485,12 +748,25 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                                                             }
                                                             if is_completed {
                                                                 sess.is_generating = false;
+                                                                let snapshot = snapshot_stored_ai_data(&state);
+                                                                save_ai_data_to_disk_async(snapshot);
                                                             }
                                                         }
 
                                                         if let Some(w2) = w_up.upgrade() {
                                                             if state.current_host_id == h_id_copy || state.current_host_id.is_empty() || state.current_host_id == "default" {
-                                                                sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                                                let ai_b = w2.global::<AiBridge>();
+                                                                let cur_msgs = ai_b.get_messages();
+                                                                if let Some(sess) = state.ai_sessions.get(&h_id_copy) {
+                                                                    if cur_msgs.row_count() == sess.messages.len() && !sess.messages.is_empty() {
+                                                                        // 尾部原地灌入：直接更新末行数据，避免每次接收 Token 重构全局消息列表
+                                                                        let last_idx = sess.messages.len() - 1;
+                                                                        cur_msgs.set_row_data(last_idx, sess.messages[last_idx].clone());
+                                                                        ai_b.set_is_generating(sess.is_generating);
+                                                                    } else {
+                                                                        sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
+                                                                    }
+                                                                }
                                                                 if is_exec && !cmd_to_run.is_empty() {
                                                                     let cmd_with_nl = format!("{}\n", cmd_to_run);
                                                                     w2.global::<TerminalBridge>().invoke_send_snippet(cmd_with_nl.into());
@@ -518,6 +794,8 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                                                                 msg.timestamp = "异常中断".into();
                                                             }
                                                             sess.is_generating = false;
+                                                            let snapshot = snapshot_stored_ai_data(&state);
+                                                            save_ai_data_to_disk_async(snapshot);
                                                         }
                                                         if let Some(w2) = w_up.upgrade() {
                                                             sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
@@ -545,6 +823,8 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                                                     msg.timestamp = "连接失败".into();
                                                 }
                                                 sess.is_generating = false;
+                                                let snapshot = snapshot_stored_ai_data(&state);
+                                                save_ai_data_to_disk_async(snapshot);
                                             }
                                             if let Some(w2) = w_up.upgrade() {
                                                 sync_ai_for_host_inner(&w2, &mut state, &h_id_copy, &h_name_copy);
@@ -641,6 +921,8 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                                             }
                                             if is_final {
                                                 sess.is_generating = false;
+                                                let snapshot = snapshot_stored_ai_data(&state);
+                                                save_ai_data_to_disk_async(snapshot);
                                             }
                                         }
                                         if let Some(w2) = w_up.upgrade() {
@@ -723,18 +1005,20 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                     // 2. 同步更新 AiBridge 的历史会话列表
                     let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
                         .map(|a| AiHistorySession {
-                            id: a.id.clone().into(),
-                            title: a.title.clone().into(),
+                            id: a.id.to_shared(),
+                            title: a.title.to_shared(),
                             message_count: a.messages.len() as i32,
-                            updated_time: a.updated_time.clone().into(),
+                            updated_time: a.updated_time.to_shared(),
                         })
                         .collect();
-                    w.global::<AiBridge>().set_history_sessions(ModelRc::from(Rc::new(VecModel::from(history_ui_list))));
+                    w.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
 
                     // 3. 重置当前主机/全局会话为全新会话
                     state.ai_sessions.insert(target_id.clone(), HostAiSession::new(&target_id, &h_name));
                     sync_ai_for_host_inner(&w, &mut state, &target_id, &h_name);
                     w.global::<AiBridge>().set_input_text("".into());
+                    let snapshot = snapshot_stored_ai_data(&state);
+                    save_ai_data_to_disk_async(snapshot);
                 });
             }
         });
@@ -751,6 +1035,8 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                         restored.messages = arch.messages.clone();
                         state.ai_sessions.insert(h_id.clone(), restored);
                         sync_ai_for_host_inner(&w, &mut state, &h_id, &arch.host_name);
+                        let snapshot = snapshot_stored_ai_data(&state);
+                        save_ai_data_to_disk_async(snapshot);
                     }
                 });
             }
@@ -765,13 +1051,15 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                     state.history_archives.retain(|a| a.id != id.as_str());
                     let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
                         .map(|a| AiHistorySession {
-                            id: a.id.clone().into(),
-                            title: a.title.clone().into(),
+                            id: a.id.to_shared(),
+                            title: a.title.to_shared(),
                             message_count: a.messages.len() as i32,
-                            updated_time: a.updated_time.clone().into(),
+                            updated_time: a.updated_time.to_shared(),
                         })
                         .collect();
-                    w.global::<AiBridge>().set_history_sessions(ModelRc::from(Rc::new(VecModel::from(history_ui_list))));
+                    w.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
+                    let snapshot = snapshot_stored_ai_data(&state);
+                    save_ai_data_to_disk_async(snapshot);
                 });
             }
         });
@@ -924,12 +1212,14 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
                     if let Some(session) = state.ai_sessions.get_mut(&h_id) {
                         for m in session.messages.iter_mut() {
                             if m.id == id_str.as_str() {
-                                m.audit_status = status_str.clone().into();
+                                m.audit_status = status_str.to_shared();
                                 break;
                             }
                         }
                     }
                     sync_ai_for_host_inner(&w, &mut state, &h_id, "当前终端");
+                    let snapshot = snapshot_stored_ai_data(&state);
+                    save_ai_data_to_disk_async(snapshot);
                 });
             }
         });
@@ -974,6 +1264,31 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
             }
         });
     }
+
+    // -------------------------------------------------------------------------
+    // 4. 挂载 TerminalBridge tmux 管理回调
+    // -------------------------------------------------------------------------
+    {
+        let w_weak = window.as_weak();
+        window.global::<TerminalBridge>().on_refresh_tmux(move || {
+            if let Some(w) = w_weak.upgrade() {
+                let tb = w.global::<TerminalBridge>();
+                let h_id = tb.get_active_host_id().to_string();
+                let h_name = tb.get_active_host_name().to_string();
+                sync_tmux_for_host(&w, &h_id, &h_name);
+            }
+        });
+    }
+
+    {
+        let w_weak = window.as_weak();
+        window.global::<TerminalBridge>().on_install_tmux(move |cmd| {
+            if let Some(w) = w_weak.upgrade() {
+                let cmd_with_nl = format!("{}\n", cmd);
+                w.global::<TerminalBridge>().invoke_send_snippet(cmd_with_nl.into());
+            }
+        });
+    }
 }
 
 /// 当终端焦点或激活会话发生切换时，同步右侧栏各工具状态与每机隔离会话
@@ -992,6 +1307,11 @@ pub(crate) fn sync_right_drawers_on_session_change(
             if let Some(sess) = state.ai_sessions.get_mut(&old_host_id) {
                 sess.draft_input = draft;
             }
+        }
+
+        // 同主机多标签切换守卫：如果切换前后宿主主机相同，无需重置伴生抽屉与模型
+        if !new_host_id.is_empty() && old_host_id == new_host_id {
+            return;
         }
 
         state.current_host_id = new_host_id.to_string();
@@ -1020,6 +1340,11 @@ pub(crate) fn sync_right_drawers_on_session_change(
             tb.set_active_host_name("未连接主机".into());
             tb.set_active_host_id("".into());
             tb.set_host_tunnels(ModelRc::default());
+
+            let term_b = window.global::<TerminalBridge>();
+            term_b.set_tmux_sessions(ModelRc::default());
+            term_b.set_tmux_is_loading(false);
+            term_b.set_tmux_is_installed(true);
             return;
         }
 
@@ -1055,6 +1380,8 @@ pub(crate) fn sync_right_drawers_on_session_change(
                 if let Some(ref c) = state.ctx {
                     crate::handlers::file_handlers::sync_sftp_drawer_for_host(window, c, new_host_id, new_host_name);
                 }
+            } else if active_tool == "tmux" {
+                sync_tmux_for_host_with_ctx(window, state.ctx.as_ref(), new_host_id, new_host_name);
             }
         }
     });
@@ -1083,9 +1410,48 @@ pub(crate) fn handle_host_session_closed(
             // 1. AI: 智能熔断后台 API 并释放内存会话
             if let Some(sess) = state.ai_sessions.remove(closed_host_id) {
                 sess.abort_flag.store(true, Ordering::SeqCst);
+                // 检查是否有用户对话，如果有，自动归档保存，防止用户对话数据丢失
+                let user_msgs: Vec<&AiChatMessage> = sess.messages.iter()
+                    .filter(|m| m.sender == "user")
+                    .collect();
+                if !user_msgs.is_empty() {
+                    let first_prompt = user_msgs[0].content.to_string();
+                    let title = if first_prompt.chars().count() > 16 {
+                        format!("{}...", first_prompt.chars().take(16).collect::<String>())
+                    } else {
+                        first_prompt
+                    };
+                    let time_str = {
+                        let now = std::time::SystemTime::now();
+                        let s = now.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs();
+                        let h = ((s % 86400) / 3600 + 8) % 24;
+                        let m = (s % 3600) / 60;
+                        format!("{:02}:{:02}", h, m)
+                    };
+                    let archive = ArchivedAiSession {
+                        id: format!("arch-{}", uuid::Uuid::new_v4().simple()),
+                        title,
+                        host_id: closed_host_id.to_string(),
+                        host_name: sess.host_name.clone(),
+                        messages: sess.messages,
+                        updated_time: time_str,
+                    };
+                    state.history_archives.insert(0, archive);
+                    let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
+                        .map(|a| AiHistorySession {
+                            id: a.id.to_shared(),
+                            title: a.title.to_shared(),
+                            message_count: a.messages.len() as i32,
+                            updated_time: a.updated_time.to_shared(),
+                        })
+                        .collect();
+                    window.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
+                }
+                let snapshot = snapshot_stored_ai_data(&state);
+                save_ai_data_to_disk_async(snapshot);
                 tracing::info!(
                     target: "smagical_ui::companion",
-                    "[AI会话释放] 已中止主机 [{}] 未完成的推理并清除内存会话",
+                    "[AI会话释放与持久化] 已保存并释放主机 [{}] 会话",
                     closed_host_id
                 );
             }
@@ -1101,6 +1467,9 @@ pub(crate) fn handle_host_session_closed(
                 window.global::<AiBridge>().set_active_host_id("".into());
                 window.global::<AiBridge>().set_messages(ModelRc::default());
                 window.global::<TunnelsBridge>().set_host_tunnels(ModelRc::default());
+                term_b.set_tmux_sessions(ModelRc::default());
+                term_b.set_tmux_is_loading(false);
+                term_b.set_tmux_is_installed(true);
                 state.current_host_id = String::new();
             }
         });
@@ -1118,6 +1487,8 @@ pub(crate) fn cleanup_on_exit() {
         for s in state.ai_sessions.values() {
             s.abort_flag.store(true, Ordering::SeqCst);
         }
+        let snapshot = snapshot_stored_ai_data(&state);
+        save_ai_data_to_disk_sync(&snapshot);
     });
 }
 
@@ -1178,15 +1549,18 @@ fn sync_ai_for_host_inner(
             s
         });
 
-    let model = ModelRc::from(Rc::new(VecModel::from(session.messages.clone())));
-    ai_b.set_messages(model);
-    ai_b.set_input_text(session.draft_input.clone().into());
+    crate::store::diff::update_model_rc_in_place(
+        &ai_b.get_messages(),
+        session.messages.clone(),
+        |m| ai_b.set_messages(m),
+    );
+    ai_b.set_input_text(session.draft_input.to_shared());
     ai_b.set_is_generating(session.is_generating);
-    ai_b.set_selected_model(session.selected_model.clone().into());
-    ai_b.set_thinking_degree(session.thinking_degree.clone().into());
-    ai_b.set_audit_policy(session.audit_policy.clone().into());
-    ai_b.set_audit_mode(session.audit_mode.clone().into());
-    ai_b.set_auto_audit_level(session.auto_audit_level.clone().into());
+    ai_b.set_selected_model(session.selected_model.to_shared());
+    ai_b.set_thinking_degree(session.thinking_degree.to_shared());
+    ai_b.set_audit_policy(session.audit_policy.to_shared());
+    ai_b.set_audit_mode(session.audit_mode.to_shared());
+    ai_b.set_auto_audit_level(session.auto_audit_level.to_shared());
 }
 
 /// 启动针对指定主机的实时监控探针定时采样器 (1秒/次)
@@ -1314,6 +1688,147 @@ fn stop_monitor_sampling_inner(window: &AppWindow, state: &mut RightDrawerState)
         timer.stop();
     }
     window.global::<MonitorBridge>().set_is_sampling(false);
+}
+
+/// 同步并刷新目标主机的 tmux 会话列表及探活状态
+pub(crate) fn sync_tmux_for_host(window: &AppWindow, host_id: &str, host_name: &str) {
+    let ctx_opt = DRAWER_STATE.with(|state_cell| {
+        state_cell.try_borrow().ok().and_then(|s| s.ctx.clone())
+    });
+    sync_tmux_for_host_with_ctx(window, ctx_opt.as_ref(), host_id, host_name);
+}
+
+/// 支持直接传入已有 AppContext 引用的内部同步实现，完全规避 DRAWER_STATE RefCell 重入借用冲突
+pub(crate) fn sync_tmux_for_host_with_ctx(
+    window: &AppWindow,
+    ctx: Option<&AppContext>,
+    host_id: &str,
+    _host_name: &str,
+) {
+    let term_b = window.global::<TerminalBridge>();
+    if host_id.is_empty() {
+        term_b.set_tmux_is_loading(false);
+        term_b.set_tmux_is_installed(false);
+        term_b.set_tmux_sessions(ModelRc::default());
+        return;
+    }
+
+    term_b.set_tmux_is_loading(true);
+
+    let h_id = host_id.to_string();
+    let is_local = h_id == "local" || h_id.starts_with("local-");
+
+    let launch_cfg_opt = if !is_local {
+        ctx.and_then(|c| crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id))
+            .or_else(|| {
+                crate::handlers::file_handlers::with_file_app_ctx(|c| {
+                    crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id)
+                }).flatten()
+            })
+    } else {
+        None
+    };
+
+    let w_weak = window.as_weak();
+    crate::async_util::spawn_async(async move {
+        let (is_installed, sessions) = if is_local {
+            // 本地探活与查询
+            let check_cmd = if cfg!(target_os = "windows") { "where.exe" } else { "which" };
+            let installed = tokio::process::Command::new(check_cmd)
+                .arg("tmux")
+                .output()
+                .await
+                .map(|o| o.status.success())
+                .unwrap_or(false);
+
+            if !installed {
+                (false, Vec::new())
+            } else {
+                let list_out = tokio::process::Command::new("tmux")
+                    .args(["list-sessions", "-F", "#{session_name}|#{session_windows}|#{session_attached}|#{session_created}"])
+                    .output()
+                    .await;
+                let items = match list_out {
+                    Ok(out) if out.status.success() => {
+                        let text = String::from_utf8_lossy(&out.stdout);
+                        parse_tmux_session_output(&text)
+                    }
+                    _ => Vec::new(),
+                };
+                (true, items)
+            }
+        } else if let Some(cfg) = launch_cfg_opt {
+            // 远程 SSH 探活与会话查询
+            // 1. 探活：检查远程主机是否安装了 tmux
+            let check_res = smagical_ssh::execute_remote(&cfg, "which tmux 2>/dev/null || command -v tmux 2>/dev/null").await;
+            let installed = match check_res {
+                Ok(out) => out.status.success() && !out.stdout.is_empty(),
+                _ => false,
+            };
+
+            if !installed {
+                (false, Vec::new())
+            } else {
+                // 2. 查询后台 session 列表
+                let list_cmd = "tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}|#{session_created}' 2>/dev/null";
+                let list_res = smagical_ssh::execute_remote(&cfg, list_cmd).await;
+                let items = match list_res {
+                    Ok(out) if out.status.success() => {
+                        let text = String::from_utf8_lossy(&out.stdout);
+                        parse_tmux_session_output(&text)
+                    }
+                    _ => Vec::new(),
+                };
+                (true, items)
+            }
+        } else {
+            (false, Vec::new())
+        };
+
+        let _ = slint::invoke_from_event_loop(move || {
+            if let Some(w) = w_weak.upgrade() {
+                let tb = w.global::<TerminalBridge>();
+                tb.set_tmux_is_loading(false);
+                tb.set_tmux_is_installed(is_installed);
+                tb.set_tmux_sessions(to_model_rc(sessions));
+            }
+        });
+    });
+}
+
+/// 解析 tmux list-sessions 输出为 UI 条目列表
+fn parse_tmux_session_output(output: &str) -> Vec<TmuxSessionItem> {
+    let mut sessions = Vec::new();
+    for line in output.lines() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+        let parts: Vec<&str> = line.split('|').collect();
+        if parts.len() >= 4 {
+            let name = parts[0].trim();
+            let windows_count: i32 = parts[1].trim().parse().unwrap_or(1);
+            let is_attached = parts[2].trim() != "0";
+            let created_ts: u64 = parts[3].trim().parse().unwrap_or(0);
+
+            let created_time = if created_ts > 0 {
+                chrono::DateTime::from_timestamp(created_ts as i64, 0)
+                    .map(|dt| dt.format("%m-%d %H:%M").to_string())
+                    .unwrap_or_else(|| "未知".to_string())
+            } else {
+                "未知".to_string()
+            };
+
+            sessions.push(TmuxSessionItem {
+                id: name.into(),
+                name: name.into(),
+                windows_count,
+                is_attached,
+                created_time: created_time.into(),
+            });
+        }
+    }
+    sessions
 }
 
 /// 生成平滑动态时序指标与波形

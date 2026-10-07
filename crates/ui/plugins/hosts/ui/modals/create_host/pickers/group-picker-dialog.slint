@@ -1,10 +1,10 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
-import { GroupTreeSelector, GroupOptionData } from "../../group-tree-selector.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "@common/shared/composite/group-tree-selector.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 
 export { GroupOptionData }
 
-export component GroupPickerDialog inherits Rectangle {
+component GroupPickerDialog inherits Rectangle {
     in property <bool> is-open: false;
     in property <[GroupOptionData]> group-options: [];
     in-out property <string> temp-selected-group-id: "";
@@ -31,6 +31,8 @@ export component GroupPickerDialog inherits Rectangle {
             background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.accent;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000066;
 
             VerticalLayout {
                 width: 100%;
@@ -126,3 +128,5 @@ export component GroupPickerDialog inherits Rectangle {
         }
     }
 }
+
+export { GroupPickerDialog }

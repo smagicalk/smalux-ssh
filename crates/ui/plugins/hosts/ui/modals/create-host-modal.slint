@@ -1,6 +1,6 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
-import { GroupOptionData } from "group-tree-selector.slint";
+import { GroupOptionData } from "@common/shared/composite/group-tree-selector.slint";
 import { CredentialOptionData, JumpHostOptionData, JumpHopItemData, PresetJumpChainData, ProxyOptionData } from "@common/features/hosts/hosts_model.slint";
 import { HostsBridge } from "@common/features/hosts/hosts_bridge.slint";
 import { GroupPickerDialog } from "create_host/pickers/group-picker-dialog.slint";
@@ -18,53 +18,53 @@ export { CredentialOptionData, JumpHostOptionData, JumpHopItemData, PresetJumpCh
 ///
 /// 采用四 Tab 结构分类组织常规认证、网络与代理、跳板机级联链路及高级选项，
 /// 完美支持凭据中心二级检索、有序跳板串编组、隧道中心代理复用与即时探活。
-export component CreateHostModal inherits Rectangle {
+component CreateHostModal inherits Rectangle {
     /// 弹窗显隐控制开关
-    in property <bool> is-open: false;
+    in property <bool> is-open: HostsBridge.is-create-host-modal-open;
     /// 上级分组树形选项数据列表 (来自 Rust 存储层)
-    in property <[GroupOptionData]> group-options: [];
+    in property <[GroupOptionData]> group-options: HostsBridge.group-options;
     /// 凭据简要下拉选项列表 (来自 Rust 存储层)
-    in property <[CredentialOptionData]> credential-options: [];
+    in property <[CredentialOptionData]> credential-options: HostsBridge.credential-options;
     /// 可作为跳板机的主机列表 (来自 Rust 存储层)
-    in property <[JumpHostOptionData]> jump-host-options: [];
+    in property <[JumpHostOptionData]> jump-host-options: HostsBridge.jump-host-options;
     /// 预设跳板串列表 (来自网络与隧道中心)
-    in property <[PresetJumpChainData]> preset-jump-chains: [];
+    in property <[PresetJumpChainData]> preset-jump-chains: HostsBridge.preset-jump-chains;
     /// 已有代理配置列表 (来自网络与隧道中心)
-    in property <[ProxyOptionData]> proxy-options: [];
+    in property <[ProxyOptionData]> proxy-options: HostsBridge.proxy-options;
     /// 默认预选的上级分组 ID
-    in property <string> default-parent-id: "root";
+    in property <string> default-parent-id: HostsBridge.create-host-default-parent;
     /// 测试连接状态 ("idle" | "testing" | "success" | "error")
-    in property <string> test-status: "idle";
+    in property <string> test-status: HostsBridge.test-connection-status;
     /// 测试连接反馈文本
-    in property <string> test-message: "";
+    in property <string> test-message: HostsBridge.test-connection-message;
     /// 是否为编辑模式 (true 为编辑已有主机，false 为新建主机)
-    in property <bool> is-edit-mode: false;
+    in property <bool> is-edit-mode: HostsBridge.is-edit-mode;
     /// 当前正在编辑的主机 ID
-    in property <string> editing-host-id: "";
+    in property <string> editing-host-id: HostsBridge.editing-host-id;
 
     // 表单状态属性
     property <string> active-tab: "general"; // "general" | "network" | "jump" | "advanced"
-    in-out property <string> host-name: "";
-    in-out property <string> host-address: "";
-    in-out property <string> host-port-str: "22";
-    in-out property <string> selected-parent-id: root.default-parent-id;
-    in-out property <string> selected-parent-name: @tr("根目录 (顶级主机)");
-    in-out property <string> auth-type: "credential"; // "credential" | "password" | "key"
-    in-out property <string> selected-cred-id: "";
-    in-out property <string> selected-cred-name: "";
-    in-out property <string> selected-cred-user: "";
-    in-out property <string> selected-cred-type: "";
-    in-out property <string> selected-cred-alg: "";
-    in-out property <string> auth-username: "root";
-    in-out property <string> auth-password: "";
+    in-out property <string> host-name <=> HostsBridge.form-host-name;
+    in-out property <string> host-address <=> HostsBridge.form-host-address;
+    in-out property <string> host-port-str <=> HostsBridge.form-host-port-str;
+    in-out property <string> selected-parent-id <=> HostsBridge.form-parent-id;
+    in-out property <string> selected-parent-name <=> HostsBridge.form-parent-name;
+    in-out property <string> auth-type <=> HostsBridge.form-auth-type;
+    in-out property <string> selected-cred-id <=> HostsBridge.form-cred-id;
+    in-out property <string> selected-cred-name <=> HostsBridge.form-cred-name;
+    in-out property <string> selected-cred-user <=> HostsBridge.form-cred-user;
+    in-out property <string> selected-cred-type <=> HostsBridge.form-cred-type;
+    in-out property <string> selected-cred-alg <=> HostsBridge.form-cred-alg;
+    in-out property <string> auth-username <=> HostsBridge.form-auth-username;
+    in-out property <string> auth-password <=> HostsBridge.form-auth-password;
     in-out property <bool> save-to-credentials: false;
-    in-out property <string> auth-key-username: "root";
-    in-out property <string> auth-key-data: "";
-    in-out property <string> auth-key-passphrase: "";
+    in-out property <string> auth-key-username <=> HostsBridge.form-auth-key-username;
+    in-out property <string> auth-key-data <=> HostsBridge.form-auth-key-data;
+    in-out property <string> auth-key-passphrase <=> HostsBridge.form-auth-key-passphrase;
     in-out property <bool> save-key-to-credentials: false;
 
     // 网络与代理属性 (严格三段互斥模式：直连 / 引用隧道代理 / 手动自定义)
-    in-out property <string> proxy-mode: "direct"; // "direct" | "tunnel" | "custom"
+    in-out property <string> proxy-mode <=> HostsBridge.form-proxy-mode;
     in-out property <string> selected-tunnel-proxy-id: "";
     in-out property <string> selected-tunnel-proxy-name: "";
     in-out property <string> selected-tunnel-proxy-proto: "SOCKS5";
@@ -72,19 +72,19 @@ export component CreateHostModal inherits Rectangle {
     in-out property <int> selected-tunnel-proxy-port: 1080;
     in-out property <string> selected-tunnel-proxy-user: "";
 
-    in-out property <string> custom-proxy-proto: "socks5"; // "socks5" | "http" | "https"
-    in-out property <string> custom-proxy-host: "";
-    in-out property <string> custom-proxy-port-str: "";
-    in-out property <string> custom-proxy-username: "";
-    in-out property <string> custom-proxy-password: "";
-    in-out property <string> keepalive-interval-str: "30";
+    in-out property <string> custom-proxy-proto <=> HostsBridge.form-custom-proxy-proto;
+    in-out property <string> custom-proxy-host <=> HostsBridge.form-custom-proxy-host;
+    in-out property <string> custom-proxy-port-str <=> HostsBridge.form-custom-proxy-port-str;
+    in-out property <string> custom-proxy-username <=> HostsBridge.form-custom-proxy-username;
+    in-out property <string> custom-proxy-password <=> HostsBridge.form-custom-proxy-password;
+    in-out property <string> keepalive-interval-str <=> HostsBridge.form-keepalive-str;
     in-out property <string> connect-timeout-str: "10";
 
     // 高级选项
-    in-out property <string> initial-dir: "";
-    in-out property <string> startup-cmd: "";
-    in-out property <string> term-type: "xterm-256color";
-    in-out property <string> notes: "";
+    in-out property <string> initial-dir <=> HostsBridge.form-initial-dir;
+    in-out property <string> startup-cmd <=> HostsBridge.form-startup-cmd;
+    in-out property <string> term-type <=> HostsBridge.form-term-type;
+    in-out property <string> notes <=> HostsBridge.form-notes;
 
     // 内部子选择器状态
     property <bool> is-group-picker-open: false;
@@ -107,41 +107,11 @@ export component CreateHostModal inherits Rectangle {
     property <string> proxy-search-query: "";
 
     // 动态引用的隧道中心预设跳板串 (直接引用，网络与隧道中心变更全局自动生效)
-    in-out property <string> selected-preset-jump-id: "";
-    in-out property <string> selected-preset-jump-name: "";
-    in-out property <string> selected-preset-jump-summary: "";
-    in-out property <int> selected-preset-jump-hop-count: 0;
+    in-out property <string> selected-preset-jump-id <=> HostsBridge.form-preset-jump-id;
+    in-out property <string> selected-preset-jump-name <=> HostsBridge.form-preset-jump-name;
+    in-out property <string> selected-preset-jump-summary <=> HostsBridge.form-preset-jump-summary;
+    in-out property <int> selected-preset-jump-hop-count <=> HostsBridge.form-preset-jump-hop-count;
 
-    // 回调定义
-    callback close();
-    callback toggle-group(string /* id */);
-    callback test-connection(string /* address */, int /* port */);
-    callback filter-credentials(string /* category */, string /* query */);
-    callback filter-proxies(string /* query */);
-    callback submit(
-        string /* name */,
-        string /* address */,
-        int /* port */,
-        string /* parent_group_id */,
-        string /* auth_type */,
-        string /* credential_id */,
-        string /* username */,
-        string /* password */,
-        string /* key_data */,
-        string /* key_passphrase */,
-        bool /* save_to_credentials */,
-        string /* proxy_type */,
-        string /* proxy_host */,
-        int /* proxy_port */,
-        string /* proxy_username */,
-        string /* proxy_password */,
-        string /* jump_chain_summary */,
-        int /* keepalive_interval */,
-        string /* initial_dir */,
-        string /* startup_cmd */,
-        string /* term_type */,
-        string /* notes */
-    );
 
     // 重置所有表单字段至默认值
     function reset-form() {
@@ -224,6 +194,8 @@ export component CreateHostModal inherits Rectangle {
             background: AppTheme.modal-background;
             border-width: 1px;
             border-color: AppTheme.border;
+            drop-shadow-blur: 24px;
+            drop-shadow-color: #00000066;
             clip: true;
 
             // 拦截卡片内部点击
@@ -273,7 +245,7 @@ export component CreateHostModal inherits Rectangle {
                         close-btn-touch := TouchArea {
                             clicked => {
                                 root.reset-form();
-                                root.close();
+                                HostsBridge.close-create-host-modal();
                             }
                             mouse-cursor: pointer;
                         }
@@ -380,14 +352,14 @@ export component CreateHostModal inherits Rectangle {
                                     width: 16px;
                                     height: 14px;
                                     border-radius: 7px;
-                                    background: root.selected-preset-jump-id != "" ? #10b981 : AppTheme.accent;
+                                    background: root.selected-preset-jump-id != "" ? AppTheme.success : AppTheme.accent;
                                     y: (parent.height - self.height) / 2;
 
                                     Text {
                                         text: root.selected-preset-jump-id != "" ? "🔗" : HostsBridge.create-host-jump-chain.length;
                                         font-size: 8px;
                                         font-weight: 700;
-                                        color: #ffffff;
+                                        color: AppTheme.selected-foreground;
                                         horizontal-alignment: center;
                                         vertical-alignment: center;
                                     }
@@ -432,7 +404,7 @@ export component CreateHostModal inherits Rectangle {
                 // 1.3 中间主表单内容区 (带平滑垂直滚动)
                 Flickable {
                     vertical-stretch: 1;
-                    viewport-height: form-container.preferred-height;
+                    content-height: form-container.preferred-height;
 
                     form-container := VerticalLayout {
                         spacing: 12px;
@@ -469,7 +441,7 @@ export component CreateHostModal inherits Rectangle {
                                 root.temp-selected-cred-alg = root.selected-cred-alg;
                                 root.cred-filter-category = root.selected-cred-type != "" ? root.selected-cred-type : "all";
                                 root.cred-search-query = "";
-                                root.filter-credentials(root.cred-filter-category, "");
+                                HostsBridge.filter-create-host-credentials(root.cred-filter-category, "");
                                 root.is-cred-picker-open = true;
                             }
                             clear-cred => {
@@ -500,7 +472,7 @@ export component CreateHostModal inherits Rectangle {
 
                             open-proxy-picker => {
                                 root.proxy-search-query = "";
-                                root.filter-proxies("");
+                                HostsBridge.filter-create-host-proxies("");
                                 root.is-proxy-picker-open = true;
                             }
                             clear-tunnel-proxy => {
@@ -563,7 +535,7 @@ export component CreateHostModal inherits Rectangle {
                             variant: "secondary";
                             enabled: root.host-address != "" && root.test-status != "testing";
                             clicked => {
-                                root.test-connection(
+                                HostsBridge.test-host-connection(
                                     root.host-address,
                                     root.host-port-str == "" ? 22 : root.host-port-str.to-float()
                                 );
@@ -576,7 +548,7 @@ export component CreateHostModal inherits Rectangle {
                                 text: "✓ " + root.test-message;
                                 font-size: 11px;
                                 font-weight: 600;
-                                color: #10b981; // 翠绿色
+                                color: AppTheme.success;
                                 vertical-alignment: center;
                             }
                         }
@@ -603,7 +575,7 @@ export component CreateHostModal inherits Rectangle {
                             variant: "secondary";
                             clicked => {
                                 root.reset-form();
-                                root.close();
+                                HostsBridge.close-create-host-modal();
                             }
                         }
 
@@ -623,7 +595,7 @@ export component CreateHostModal inherits Rectangle {
                                 let final-proxy-user = root.proxy-mode == "direct" ? "" : (root.proxy-mode == "tunnel" ? root.selected-tunnel-proxy-user : root.custom-proxy-username);
                                 let final-proxy-pass = root.proxy-mode == "custom" ? root.custom-proxy-password : "";
 
-                                root.submit(
+                                HostsBridge.submit-create-host(
                                     final-name,
                                     root.host-address,
                                     port,
@@ -648,7 +620,7 @@ export component CreateHostModal inherits Rectangle {
                                     root.notes
                                 );
                                 root.reset-form();
-                                root.close();
+                                HostsBridge.close-create-host-modal();
                             }
                         }
                     }
@@ -657,9 +629,9 @@ export component CreateHostModal inherits Rectangle {
         }
 
         // =========================================================================
-        // 2. 所属分组二级树形弹窗 (GroupPickerDialog)
+        // 2. 所属分组二级树形弹窗 (GroupPickerDialog) - 惰性按需挂载
         // =========================================================================
-        GroupPickerDialog {
+        if root.is-group-picker-open: GroupPickerDialog {
             is-open: root.is-group-picker-open;
             group-options: root.group-options;
             temp-selected-group-id <=> root.temp-selected-group-id;
@@ -671,14 +643,14 @@ export component CreateHostModal inherits Rectangle {
                 root.is-group-picker-open = false;
             }
             toggle-group(id) => {
-                root.toggle-group(id);
+                HostsBridge.toggle-selector-group(id);
             }
         }
 
         // =========================================================================
-        // 3. 关联凭据二级分类与搜索选择弹窗 (CredentialPickerDialog)
+        // 3. 关联凭据二级分类与搜索选择弹窗 (CredentialPickerDialog) - 惰性按需挂载
         // =========================================================================
-        CredentialPickerDialog {
+        if root.is-cred-picker-open: CredentialPickerDialog {
             is-open: root.is-cred-picker-open;
             credential-options: root.credential-options;
             cred-filter-category <=> root.cred-filter-category;
@@ -689,7 +661,7 @@ export component CreateHostModal inherits Rectangle {
             temp-selected-cred-type <=> root.temp-selected-cred-type;
             temp-selected-cred-alg <=> root.temp-selected-cred-alg;
             close => { root.is-cred-picker-open = false; }
-            filter-credentials(cat, q) => { root.filter-credentials(cat, q); }
+            filter-credentials(cat, q) => { HostsBridge.filter-create-host-credentials(cat, q); }
             confirmed(id, name, user, ctype, alg) => {
                 root.selected-cred-id = id;
                 root.selected-cred-name = name;
@@ -701,9 +673,9 @@ export component CreateHostModal inherits Rectangle {
         }
 
         // =========================================================================
-        // 4. 添加跳板节点 / 导入预设跳板串二级弹窗 (JumpPickerDialog)
+        // 4. 添加跳板节点 / 导入预设跳板串二级弹窗 (JumpPickerDialog) - 惰性按需挂载
         // =========================================================================
-        JumpPickerDialog {
+        if root.is-jump-picker-open: JumpPickerDialog {
             is-open: root.is-jump-picker-open;
             jump-host-options: root.jump-host-options;
             preset-jump-chains: root.preset-jump-chains;
@@ -729,14 +701,14 @@ export component CreateHostModal inherits Rectangle {
         }
 
         // =========================================================================
-        // 5. 从网络与隧道中心选择已有代理二级弹窗 (ProxyPickerDialog)
+        // 5. 从网络与隧道中心选择已有代理二级弹窗 (ProxyPickerDialog) - 惰性按需挂载
         // =========================================================================
-        ProxyPickerDialog {
+        if root.is-proxy-picker-open: ProxyPickerDialog {
             is-open: root.is-proxy-picker-open;
             proxy-options: root.proxy-options;
             proxy-search-query <=> root.proxy-search-query;
             close => { root.is-proxy-picker-open = false; }
-            filter-proxies(q) => { root.filter-proxies(q); }
+            filter-proxies(q) => { HostsBridge.filter-create-host-proxies(q); }
             select-proxy(id, name, proto, host, port, user) => {
                 root.proxy-mode = "tunnel";
                 root.selected-tunnel-proxy-id = id;
@@ -750,3 +722,6 @@ export component CreateHostModal inherits Rectangle {
         }
     }
 }
+
+export { CreateHostModal }
+

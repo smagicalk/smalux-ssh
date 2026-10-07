@@ -7,17 +7,16 @@
 //! 4. **第三方资产解析**：支持 Termius (JSON/CSV)、Xshell (.xsh) 等多格式资产智能识别入库；
 //! 5. **灾备快照还原流水线**：还原前自动生成本地前置安全快照防丢失，通过驱动拉取远端快照数据并恢复。
 
-use std::rc::Rc;
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, Model};
+use crate::common::{run_on_ui, to_model_rc, ToSharedString};
 
-use smagical_core::domain::credential::CredentialRecord;
 use smagical_core::domain::group::GroupRecord;
-use smagical_core::domain::host::HostRecord;
-use smagical_core::domain::snippet::{SnippetGroupRecord, SnippetRecord};
-use smagical_core::domain::tunnel::TunnelRecord;
 use smagical_core::domain::backup::{BackupStrategy, BackupTaskRecord, BackupType};
 use smagical_core::event::types::HostAssetChangedEvent;
-use smagical_core::service::backup::{create_backup_driver, create_backup_payload, restore_backup_payload};
+use smagical_core::service::backup::{
+    create_backup_driver, create_backup_payload,
+    restore_backup_payload_with_policy, BackupConflictPolicy,
+};
 use crate::backup_daemon::BackupDaemonService;
 
 use crate::generated::{
@@ -25,7 +24,7 @@ use crate::generated::{
 };
 use crate::handlers::AppContext;
 use super::super::theme_handlers::pick_folder;
-use super::utils::{get_ssh_config_path, parse_ssh_config, pick_open_file, pick_save_file};
+use super::utils::{pick_open_file, pick_save_file};
 
 /// 向当前主窗口界面压入一条临时悬浮通知气泡 (Toast)。
 ///
@@ -37,8 +36,9 @@ use super::utils::{get_ssh_config_path, parse_ssh_config, pick_open_file, pick_s
 /// - `duration_ms`: 悬浮留存显示时间（毫秒），超时自动淡出销毁。
 fn push_toast(w: &AppWindow, title: &str, message: &str, level: &str, duration_ms: i32) {
     let wb = w.global::<WindowBridge>();
+    let toast_id = format!("toast-{}", uuid::Uuid::new_v4());
     let toast = crate::generated::ToastItemData {
-        id: format!("toast-{}", uuid::Uuid::new_v4()).into(),
+        id: toast_id.clone().into(),
         title: title.into(),
         message: message.into(),
         level: level.into(),
@@ -50,7 +50,21 @@ fn push_toast(w: &AppWindow, title: &str, message: &str, level: &str, duration_m
     let mut all: Vec<crate::generated::ToastItemData> =
         (0..cur.row_count()).filter_map(|i| cur.row_data(i)).collect();
     all.push(toast);
-    wb.set_toasts(ModelRc::from(Rc::new(VecModel::from(all))));
+    wb.set_toasts(to_model_rc(all));
+
+    if duration_ms > 0 {
+        let w_weak = w.as_weak();
+        let tid: slint::SharedString = toast_id.into();
+        slint::Timer::single_shot(std::time::Duration::from_millis(duration_ms as u64), move || {
+            if let Some(w) = w_weak.upgrade() {
+                let wb = w.global::<WindowBridge>();
+                let cur = wb.get_toasts();
+                let remaining: Vec<crate::generated::ToastItemData> =
+                    cur.iter().filter(|t| t.id != tid).collect();
+                wb.set_toasts(to_model_rc(remaining));
+            }
+        });
+    }
 }
 
 /// 注册设置抽屉中的数据备份、容灾快照、第三方资产导入与出厂重置事件处理器。
@@ -205,76 +219,24 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
                 }
             };
 
-            let val: serde_json::Value = match serde_json::from_str(&content) {
-                Ok(v) => v,
+            let restore_res = restore_backup_payload_with_policy(
+                storage.as_ref(),
+                content.as_bytes(),
+                None,
+                BackupConflictPolicy::Overwrite,
+            ).await;
+
+            let report = match restore_res {
+                Ok(r) => r,
                 Err(e) => {
                     let _ = slint::invoke_from_event_loop(move || {
                         if let Some(w) = window_weak.upgrade() {
-                            push_toast(&w, "还原失败", &format!("无法解析备份文件格式: {}", e), "error", 4500);
+                            push_toast(&w, "还原失败", &format!("解析或还原备份文件失败: {}", e), "error", 4500);
                         }
                     });
                     return;
                 }
             };
-
-            let mut imported_hosts = 0;
-            let mut imported_groups = 0;
-            let mut imported_creds = 0;
-
-            // 还原分组
-            if let Some(groups_arr) = val.get("groups").and_then(|g| g.as_array()) {
-                for g_val in groups_arr {
-                    if let Ok(group_rec) = serde_json::from_value::<GroupRecord>(g_val.clone()) {
-                        let _ = storage.groups().save(&group_rec).await;
-                        imported_groups += 1;
-                    }
-                }
-            }
-
-            // 还原主机
-            if let Some(hosts_arr) = val.get("hosts").and_then(|h| h.as_array()) {
-                for h_val in hosts_arr {
-                    if let Ok(host_rec) = serde_json::from_value::<HostRecord>(h_val.clone()) {
-                        let _ = storage.hosts().save(&host_rec).await;
-                        imported_hosts += 1;
-                    }
-                }
-            }
-
-            // 还原凭据
-            if let Some(creds_arr) = val.get("credentials").and_then(|c| c.as_array()) {
-                for c_val in creds_arr {
-                    if let Ok(cred_rec) = serde_json::from_value::<CredentialRecord>(c_val.clone()) {
-                        let _ = storage.credentials().save(&cred_rec).await;
-                        imported_creds += 1;
-                    }
-                }
-            }
-
-            // 还原隧道
-            if let Some(tunnels_arr) = val.get("tunnels").and_then(|t| t.as_array()) {
-                for t_val in tunnels_arr {
-                    if let Ok(tunnel_rec) = serde_json::from_value::<TunnelRecord>(t_val.clone()) {
-                        let _ = storage.tunnels().save(&tunnel_rec).await;
-                    }
-                }
-            }
-
-            // 还原代码片段与分组
-            if let Some(snips_arr) = val.get("snippets").and_then(|s| s.as_array()) {
-                for s_val in snips_arr {
-                    if let Ok(snip_rec) = serde_json::from_value::<SnippetRecord>(s_val.clone()) {
-                        let _ = storage.snippets().save(&snip_rec).await;
-                    }
-                }
-            }
-            if let Some(groups_arr) = val.get("snippet_groups").and_then(|g| g.as_array()) {
-                for g_val in groups_arr {
-                    if let Ok(snip_grp) = serde_json::from_value::<SnippetGroupRecord>(g_val.clone()) {
-                        let _ = storage.snippets().save_group(&snip_grp).await;
-                    }
-                }
-            }
 
             events.dispatch(&HostAssetChangedEvent {
                 host_id: "batch_import_backup".into(),
@@ -290,7 +252,10 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
                     push_toast(
                         &w,
                         "备份资产还原成功",
-                        &format!("成功从文件还原 {} 台主机、{} 个分组与 {} 条凭据！", imported_hosts, imported_groups, imported_creds),
+                        &format!(
+                            "成功从文件还原 {} 台主机 (跳过 {} 项)、{} 个分组与 {} 条凭据！",
+                            report.imported_hosts, report.skipped_hosts, report.imported_groups, report.imported_credentials
+                        ),
                         "success",
                         3500,
                     );
@@ -312,70 +277,42 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
     // 4. 若有新主机导入成功，派发 `HostAssetChangedEvent` 并刷新 UI 主机树。
     let core_state_ssh = ctx.core_state.clone();
     let window_weak_ssh = window.as_weak();
+    // 2. 扫描并导入系统 OpenSSH 资产 (~/.ssh/config 与 ~/.ssh/known_hosts)
     bridge.on_scan_and_import_openssh(move || {
         let storage_import_ssh = core_state_ssh.storage();
         let events_import_ssh = core_state_ssh.events().clone();
-        let ssh_config_path = get_ssh_config_path();
         let window_weak = window_weak_ssh.clone();
 
         crate::async_util::spawn_async(async move {
-            let exists = tokio::task::spawn_blocking({
-                let p = ssh_config_path.clone();
-                move || p.exists()
-            }).await.unwrap_or(false);
+            let (config_hosts, known_hosts) = tokio::task::spawn_blocking(|| {
+                smagical_storage::seaorm::real_seed::discover_local_ssh_hosts(
+                    Some("grp-known".to_string()),
+                    Some("grp-default".to_string()),
+                )
+            }).await.unwrap_or_default();
 
-            if !exists {
+            if config_hosts.is_empty() && known_hosts.is_empty() {
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = window_weak.upgrade() {
-                        push_toast(
-                            &w,
-                            "未找到配置文件",
-                            &format!("本地不存在 OpenSSH 配置文件: {}", ssh_config_path.display()),
-                            "info",
-                            3500,
-                        );
+                        push_toast(&w, "未发现主机", "从 ~/.ssh 目录下未扫描到任何主机配置或已知主机记录", "info", 3500);
                     }
                 });
                 return;
             }
 
-            let read_res = tokio::task::spawn_blocking({
-                let p = ssh_config_path.clone();
-                move || std::fs::read_to_string(&p)
-            }).await;
-
-            let content = match read_res {
-                Ok(Ok(c)) => c,
-                Ok(Err(e)) => {
-                    tracing::error!(target: "smagical_ui::backup", "读取 ~/.ssh/config 失败: {}", e);
-                    let _ = slint::invoke_from_event_loop(move || {
-                        if let Some(w) = window_weak.upgrade() {
-                            push_toast(&w, "导入失败", &format!("读取配置文件出错: {}", e), "error", 4500);
-                        }
-                    });
-                    return;
+            // 若存在 known_hosts，确保 "已知主机" 分组存在
+            if !known_hosts.is_empty() {
+                if storage_import_ssh.groups().get_by_id("grp-known").await.ok().flatten().is_none() {
+                    let mut known_group = smagical_core::domain::group::GroupRecord::root("grp-known", "已知主机 (Known Hosts)");
+                    known_group.sort_order = 1;
+                    let _ = storage_import_ssh.groups().save(&known_group).await;
                 }
-                Err(e) => {
-                    tracing::error!(target: "smagical_ui::backup", "读取任务异常: {}", e);
-                    return;
-                }
-            };
-
-            let parsed_hosts = parse_ssh_config(&content);
-            if parsed_hosts.is_empty() {
-                let _ = slint::invoke_from_event_loop(move || {
-                    if let Some(w) = window_weak.upgrade() {
-                        push_toast(&w, "未发现主机", "从 ~/.ssh/config 中未解析出任何新主机项", "info", 3500);
-                    }
-                });
-                return;
             }
 
             let mut imported_count = 0;
-            for host in &parsed_hosts {
-                // 若已存在同名或同 ID 主机则跳过，避免覆盖现有配置
+            for host in config_hosts.into_iter().chain(known_hosts.into_iter()) {
                 if storage_import_ssh.hosts().get_by_id(&host.id).await.ok().flatten().is_none() {
-                    let _ = storage_import_ssh.hosts().save(host).await;
+                    let _ = storage_import_ssh.hosts().save(&host).await;
                     imported_count += 1;
                 }
             }
@@ -383,7 +320,7 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
             if imported_count > 0 {
                 events_import_ssh.dispatch(&HostAssetChangedEvent {
                     host_id: "batch_import_openssh".to_string(),
-                    name: "OpenSSH Config".to_string(),
+                    name: "OpenSSH Assets".to_string(),
                     address: "".to_string(),
                     credential_id: None,
                     action: "created".to_string(),
@@ -394,19 +331,19 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
                         w.global::<HostsBridge>().invoke_search_changed("".into());
                         push_toast(
                             &w,
-                            "OpenSSH 导入成功",
-                            &format!("成功识别并导入 {} 台主机资产！", imported_count),
+                            "OpenSSH 资产导入成功",
+                            &format!("成功从 ~/.ssh 识别并导入 {} 台主机资产！", imported_count),
                             "success",
                             3500,
                         );
                     }
                 });
 
-                tracing::info!(target: "smagical_ui::backup", "成功从 ~/.ssh/config 导入 {} 台主机", imported_count);
+                tracing::info!(target: "smagical_ui::backup", "成功从系统 OpenSSH 资产中导入 {} 台主机", imported_count);
             } else {
                 let _ = slint::invoke_from_event_loop(move || {
                     if let Some(w) = window_weak.upgrade() {
-                        push_toast(&w, "无新主机需导入", "~/.ssh/config 中的主机资产均已存在于当前资产库中", "info", 3500);
+                        push_toast(&w, "无新主机需导入", "系统 ~/.ssh 中的主机资产均已存在于当前资产库中", "info", 3500);
                     }
                 });
             }
@@ -677,19 +614,17 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
                     task_id: s.task_id.into(),
                     timestamp: s.timestamp.into(),
                     size_str: s.size_str.into(),
-                    remark: s.remark.into(),
-                    hash: s.hash.into(),
+                    remark: s.remark.to_shared(),
+                    hash: s.hash.to_shared(),
                 })
                 .collect();
 
-            let _ = slint::invoke_from_event_loop(move || {
-                if let Some(w) = window_weak.upgrade() {
-                    let sb = w.global::<SettingsBridge>();
-                    sb.set_active_snapshot_task_id(task_id.into());
-                    sb.set_active_snapshot_task_name(task_name.into());
-                    sb.set_current_task_snapshots(ModelRc::from(Rc::new(VecModel::from(ui_snapshots))));
-                    sb.set_is_snapshots_modal_open(true);
-                }
+            let _ = run_on_ui(window_weak, move |w| {
+                let sb = w.global::<SettingsBridge>();
+                sb.set_active_snapshot_task_id(task_id.to_shared());
+                sb.set_active_snapshot_task_name(task_name.to_shared());
+                sb.set_current_task_snapshots(to_model_rc(ui_snapshots));
+                sb.set_is_snapshots_modal_open(true);
             });
         });
     });
@@ -758,8 +693,13 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
             };
 
             // 4. 执行无损资产还原
-            match restore_backup_payload(storage.as_ref(), &payload_bytes).await {
-                Ok((hosts, groups, creds)) => {
+            match restore_backup_payload_with_policy(
+                storage.as_ref(),
+                &payload_bytes,
+                None,
+                BackupConflictPolicy::Overwrite,
+            ).await {
+                Ok(report) => {
                     events.dispatch(&HostAssetChangedEvent {
                         host_id: "batch_restore_snapshot".into(),
                         name: "Snapshot Restore".into(),
@@ -774,7 +714,10 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
                             w.global::<SettingsBridge>().set_is_snapshots_modal_open(false);
                             notif.success(
                                 "快照镜像已还原",
-                                &format!("已成功无损回滚至快照「{}」！恢复 {} 台主机、{} 个分组与 {} 条凭据", snap_id_str, hosts, groups, creds),
+                                &format!(
+                                    "已成功无损回滚至快照「{}」！恢复 {} 台主机 (跳过 {} 项)、{} 个分组与 {} 条凭据",
+                                    snap_id_str, report.imported_hosts, report.skipped_hosts, report.imported_groups, report.imported_credentials
+                                ),
                             );
                         }
                     });
@@ -962,5 +905,275 @@ pub(crate) fn register_backup_handlers(window: &AppWindow, ctx: &AppContext) {
         crate::async_util::spawn_async(async move {
             daemon.trigger_all_now().await;
         });
+    });
+
+    // 5.16 动态切换数据源模式 (物理 SQLite vs 内存 Mock)
+    let w_switch = window.as_weak();
+    let ctx_switch = StorageSwitchContext::from(ctx);
+    bridge.on_switch_storage_mode(move |mode| {
+        let w_inner = w_switch.clone();
+        let ctx_inner = ctx_switch.clone();
+        let m = mode.to_string();
+        crate::async_util::spawn_async(async move {
+            execute_switch_storage_mode(&m, w_inner, ctx_inner).await;
+        });
+    });
+
+    // 5.17 一键清空预设演示数据
+    let w_clear = window.as_weak();
+    let ctx_clear = StorageSwitchContext::from(ctx);
+    bridge.on_clear_all_demo_data(move || {
+        let w_inner = w_clear.clone();
+        let ctx_inner = ctx_clear.clone();
+        crate::async_util::spawn_async(async move {
+            execute_clear_demo_data(w_inner, ctx_inner).await;
+        });
+    });
+
+    // 5.18 恢复预设演示数据
+    let w_reset = window.as_weak();
+    let ctx_reset = StorageSwitchContext::from(ctx);
+    bridge.on_reset_all_demo_data(move || {
+        let w_inner = w_reset.clone();
+        let ctx_inner = ctx_reset.clone();
+        crate::async_util::spawn_async(async move {
+            execute_reset_demo_data(w_inner, ctx_inner).await;
+        });
+    });
+}
+
+/// 用于存储层切换与清空/恢复操作的跨线程上下文 (保证所有字段均为 Send + Sync + 'static)
+#[derive(Clone)]
+pub(crate) struct StorageSwitchContext {
+    pub core_state: smagical_core::CoreState,
+    pub master_tree: std::sync::Arc<std::sync::RwLock<Vec<crate::tree_model::RawTreeNode>>>,
+    pub master_cards: std::sync::Arc<std::sync::RwLock<Vec<crate::generated::HostItemData>>>,
+    pub expanded_groups: std::sync::Arc<std::sync::RwLock<std::collections::HashSet<String>>>,
+    pub selector_expanded_groups: std::sync::Arc<std::sync::RwLock<std::collections::HashSet<String>>>,
+    pub search_query: std::sync::Arc<std::sync::RwLock<String>>,
+}
+
+impl From<&AppContext> for StorageSwitchContext {
+    fn from(ctx: &AppContext) -> Self {
+        Self {
+            core_state: (*ctx.core_state).clone(),
+            master_tree: ctx.master_tree.clone(),
+            master_cards: ctx.master_cards.clone(),
+            expanded_groups: ctx.expanded_groups.clone(),
+            selector_expanded_groups: ctx.selector_expanded_groups.clone(),
+            search_query: ctx.search_query.clone(),
+        }
+    }
+}
+
+/// 全量热刷新并重新渲染所有与底层存储关联的 Slint 界面 (主机树、凭据、代码片段、网络隧道)
+pub(crate) async fn reload_all_storage_views(
+    storage: &std::sync::Arc<dyn smagical_core::storage::AppStorage>,
+    is_mock: bool,
+    window_weak: slint::Weak<AppWindow>,
+    ctx: &StorageSwitchContext,
+) {
+    let (groups_res, hosts_res, creds_res, snippet_groups_res, snippets_res, tunnels_res) = tokio::join!(
+        storage.groups().list_all(),
+        storage.hosts().list_all(),
+        storage.credentials().list_all(),
+        storage.snippets().list_groups(),
+        storage.snippets().list_all(),
+        storage.tunnels().list_all(),
+    );
+
+    let all_groups = groups_res.unwrap_or_default();
+    let all_hosts = hosts_res.unwrap_or_default();
+    let all_creds = creds_res.unwrap_or_default();
+    let all_snippet_groups = snippet_groups_res.unwrap_or_default();
+    let all_snippets = snippets_res.unwrap_or_default();
+    let all_tunnels = tunnels_res.unwrap_or_default();
+
+    let new_tree = crate::tree_model::build_raw_tree(&all_groups, &all_hosts, &all_creds);
+    let new_cards = crate::tree_model::build_cards_from_records(&all_hosts, &all_groups);
+
+    let initial_expanded: std::collections::HashSet<String> = all_groups
+        .iter()
+        .filter(|g| g.is_expanded)
+        .map(|g| g.id.clone())
+        .collect();
+
+    let mut initial_selector = std::collections::HashSet::from(["root".to_string()]);
+    all_groups
+        .iter()
+        .filter(|g| g.parent_id.is_none())
+        .for_each(|g| {
+            initial_selector.insert(g.id.clone());
+        });
+
+    let master_tree = ctx.master_tree.clone();
+    let master_cards = ctx.master_cards.clone();
+    let expanded_groups = ctx.expanded_groups.clone();
+    let selector_expanded_groups = ctx.selector_expanded_groups.clone();
+    let search_query = ctx.search_query.clone();
+
+    run_on_ui(window_weak, move |w| {
+        *master_tree.write().unwrap() = new_tree;
+        *master_cards.write().unwrap() = new_cards.clone();
+        *expanded_groups.write().unwrap() = initial_expanded;
+        *selector_expanded_groups.write().unwrap() = initial_selector;
+
+        let tree = master_tree.read().unwrap();
+        let expanded = expanded_groups.read().unwrap();
+        let selector_expanded = selector_expanded_groups.read().unwrap();
+        let q = search_query.read().unwrap().clone();
+
+        let options = crate::tree_model::build_group_options(&tree, &selector_expanded);
+        let nodes = if q.is_empty() {
+            crate::tree_model::build_visible_tree_nodes(&tree, &expanded)
+        } else {
+            crate::tree_model::build_search_tree_nodes(&tree, &q)
+        };
+
+        let hb = w.global::<HostsBridge>();
+        hb.set_group_options(to_model_rc(options));
+        hb.set_tree_content_width(crate::tree_model::calculate_max_tree_width(&nodes));
+        hb.set_tree_nodes(to_model_rc(nodes));
+        hb.set_hosts(to_model_rc(new_cards.clone()));
+        w.global::<WindowBridge>().set_launcher_host_items(to_model_rc(new_cards));
+
+        // 刷新凭据库
+        crate::handlers::credential_handlers::update_credentials_cache(all_creds.clone());
+        crate::handlers::credential_handlers::render_credentials_ui(&w, &all_creds, "all", "");
+
+        // 刷新代码片段库
+        let master_snippets = crate::snippet_tree_model::build_raw_snippet_tree(&all_snippet_groups, &all_snippets);
+        let expanded_snippets: std::collections::HashSet<String> = all_snippet_groups.iter().map(|g| g.id.clone()).collect();
+        crate::handlers::snippet_handlers::render_snippets_ui(&w, &master_snippets, &all_snippet_groups, &all_snippets, "", &expanded_snippets);
+
+        // 刷新网络隧道库
+        crate::handlers::tunnel_handlers::render_tunnels_ui(&w, &all_tunnels, "all", "");
+
+        // 同步设置中心与调试中心状态
+        let mode_str = if is_mock { "mock" } else { "physical" };
+        w.global::<SettingsBridge>().set_setting_storage_mode(mode_str.into());
+        w.global::<crate::generated::DebugBridge>().set_use_mock_storage(is_mock);
+    });
+}
+
+/// 执行数据源动态热切换逻辑 (支持在物理持久化 SQLite 与内存 Mock 之间无缝切换并实时落盘首选项)
+pub(crate) async fn execute_switch_storage_mode(
+    mode: &str,
+    window_weak: slint::Weak<AppWindow>,
+    ctx: StorageSwitchContext,
+) {
+    let mode_trimmed = mode.trim().to_lowercase();
+    let is_mock = mode_trimmed == "mock";
+
+    let (new_storage, toast_title, toast_msg) = if is_mock {
+        let storage: std::sync::Arc<dyn smagical_core::storage::AppStorage> =
+            std::sync::Arc::new(smagical_storage::MockStorage::new_seeded());
+        let _ = crate::storage_config::save_persisted_storage_mode("mock");
+        tracing::info!(target: "smagical_ui::storage", "数据层已动态切换至: [MockStorage] 内存演示数据层 (已持久化)");
+        (storage, "已切换至 Mock 演示数据层", "当前处于纯内存模式，所有操作不影响物理数据库")
+    } else {
+        match smagical_storage::SeaOrmStorage::open_default().await {
+            Ok(storage) => {
+                let storage_arc: std::sync::Arc<dyn smagical_core::storage::AppStorage> = std::sync::Arc::new(storage);
+                let _ = crate::storage_config::save_persisted_storage_mode("physical");
+                tracing::info!(target: "smagical_ui::storage", "数据层已动态切换至: [SeaOrmStorage] 物理持久化 SQLite 引擎 (已持久化)");
+                (storage_arc, "已连接至 SQLite 物理数据库", "所有数据均实时持久化落盘至本地 data.db 文件")
+            }
+            Err(err) => {
+                tracing::error!(target: "smagical_ui::storage", "打开物理 SQLite 数据库失败: {:?}", err);
+                let err_msg = format!("打开数据库错误: {:?}", err);
+                run_on_ui(window_weak, move |w| {
+                    push_toast(&w, "切换物理数据层失败", &err_msg, "error", 4000);
+                });
+                return;
+            }
+        }
+    };
+
+    ctx.core_state.set_storage(new_storage.clone(), is_mock);
+    reload_all_storage_views(&new_storage, is_mock, window_weak.clone(), &ctx).await;
+
+    run_on_ui(window_weak, move |w| {
+        push_toast(&w, toast_title, toast_msg, "success", 3000);
+    });
+}
+
+/// 清空当前存储层中的所有预设演示数据
+pub(crate) async fn execute_clear_demo_data(
+    window_weak: slint::Weak<AppWindow>,
+    ctx: StorageSwitchContext,
+) {
+    let storage = ctx.core_state.storage();
+    let is_mock = ctx.core_state.is_mock_storage();
+
+    if let Ok(hosts) = storage.hosts().list_all().await {
+        for h in hosts { let _ = storage.hosts().delete(&h.id).await; }
+    }
+    if let Ok(groups) = storage.groups().list_all().await {
+        for g in groups { let _ = storage.groups().delete(&g.id).await; }
+    }
+    if let Ok(creds) = storage.credentials().list_all().await {
+        for c in creds { let _ = storage.credentials().delete(&c.id).await; }
+    }
+    if let Ok(snippets) = storage.snippets().list_all().await {
+        for s in snippets { let _ = storage.snippets().delete(&s.id).await; }
+    }
+    if let Ok(s_groups) = storage.snippets().list_groups().await {
+        for sg in s_groups { let _ = storage.snippets().delete_group(&sg.id).await; }
+    }
+    if let Ok(tunnels) = storage.tunnels().list_all().await {
+        for t in tunnels { let _ = storage.tunnels().delete(&t.id).await; }
+    }
+
+    reload_all_storage_views(&storage, is_mock, window_weak.clone(), &ctx).await;
+
+    run_on_ui(window_weak, move |w| {
+        push_toast(&w, "演示数据已清空", "已成功移除所有预设演示主机与凭据，当前数据库已重置为纯净空库", "success", 3000);
+    });
+}
+
+/// 恢复预设演示种子数据
+pub(crate) async fn execute_reset_demo_data(
+    window_weak: slint::Weak<AppWindow>,
+    ctx: StorageSwitchContext,
+) {
+    let storage = ctx.core_state.storage();
+    let is_mock = ctx.core_state.is_mock_storage();
+
+    if let Ok(hosts) = storage.hosts().list_all().await {
+        for h in hosts { let _ = storage.hosts().delete(&h.id).await; }
+    }
+    if let Ok(groups) = storage.groups().list_all().await {
+        for g in groups { let _ = storage.groups().delete(&g.id).await; }
+    }
+    if let Ok(creds) = storage.credentials().list_all().await {
+        for c in creds { let _ = storage.credentials().delete(&c.id).await; }
+    }
+    if let Ok(snippets) = storage.snippets().list_all().await {
+        for s in snippets { let _ = storage.snippets().delete(&s.id).await; }
+    }
+    if let Ok(s_groups) = storage.snippets().list_groups().await {
+        for sg in s_groups { let _ = storage.snippets().delete_group(&sg.id).await; }
+    }
+    if let Ok(tunnels) = storage.tunnels().list_all().await {
+        for t in tunnels { let _ = storage.tunnels().delete(&t.id).await; }
+    }
+
+    let seed = smagical_storage::mock::seed_data::generate_seed_data();
+    for g in seed.groups { let _ = storage.groups().save(&g).await; }
+    for h in seed.hosts { let _ = storage.hosts().save(&h).await; }
+    for sg in seed.snippet_groups { let _ = storage.snippets().save_group(&sg).await; }
+    for s in seed.snippets { let _ = storage.snippets().save(&s).await; }
+    for t in seed.tunnels { let _ = storage.tunnels().save(&t).await; }
+    for c in seed.credentials { let _ = storage.credentials().save(&c).await; }
+    for h in seed.history { let _ = storage.history().save(&h).await; }
+    for (hid, snap) in seed.snapshots {
+        let _ = storage.history().save_snapshot(&hid, &snap, 500).await;
+    }
+
+    reload_all_storage_views(&storage, is_mock, window_weak.clone(), &ctx).await;
+
+    run_on_ui(window_weak, move |w| {
+        push_toast(&w, "预设数据已恢复", "已成功重新载入初始预设演示主机、分组与凭据数据", "success", 3000);
     });
 }

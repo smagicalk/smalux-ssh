@@ -2,6 +2,7 @@ use slint::{Brush, Color, ComponentHandle};
 use smagical_core::theme::{ColorScheme, ResolvedUiTheme, ThemeError, ThemeService};
 
 use crate::{AppColorScheme, AppTheme, AppWindow};
+use crate::common::to_model_rc;
 
 /// 将已解析 UI 主题写入当前窗口的 `AppTheme` global。
 pub fn apply_ui_theme(window: &AppWindow, theme: &ResolvedUiTheme) {
@@ -118,30 +119,16 @@ pub fn sync_ui_themes(window: &AppWindow, service: &ThemeService) {
         }
     }
 
-    let chunk_rows = |items: Vec<crate::generated::ThemeOption>| -> Vec<crate::generated::ThemeRow> {
-        items
-            .chunks(5)
-            .map(|chunk| crate::generated::ThemeRow {
-                items: slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk.to_vec()))),
-            })
-            .collect()
-    };
-
-
     let bridge = window.global::<crate::generated::SettingsBridge>();
     bridge.set_custom_themes_count(custom_themes.len() as i32);
     bridge.set_dark_themes_count(dark_themes.len() as i32);
     bridge.set_light_themes_count(light_themes.len() as i32);
 
-    bridge.set_custom_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(custom_themes.clone()))));
-    bridge.set_dark_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(dark_themes.clone()))));
-    bridge.set_light_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(light_themes.clone()))));
+    bridge.set_custom_themes(to_model_rc(custom_themes));
+    bridge.set_dark_themes(to_model_rc(dark_themes));
+    bridge.set_light_themes(to_model_rc(light_themes));
 
-    bridge.set_custom_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(custom_themes)))));
-    bridge.set_dark_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(dark_themes)))));
-    bridge.set_light_theme_rows(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(chunk_rows(light_themes)))));
-
-    bridge.set_themes(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all_options))));
+    bridge.set_themes(to_model_rc(all_options));
 }
 
 fn parse_color(value: &str) -> Color {

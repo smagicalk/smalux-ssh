@@ -3,13 +3,14 @@
 //! 负责规则多维过滤、启停控制、实时拓扑与指标监控、配置保存与删除、原生 OpenSSH 命令生成与复制。
 //! 全面采用 TunnelsBridge 领域总线直连架构。
 
-use slint::{ComponentHandle, Model, ModelRc, VecModel};
+use slint::{ComponentHandle, Model, ModelRc};
 use smagical_core::domain::tunnel::{TunnelRecord, TunnelRunMode, TunnelType};
 use smagical_core::event::{
     TunnelBeforeDeleteEvent, TunnelBeforeSaveEvent, TunnelDeletedEvent, TunnelSavedEvent,
     TunnelStateChangedEvent,
 };
 
+use crate::common::{matches_any_ignore_case, num_to_shared, to_model_rc, ToSharedString};
 use crate::generated::{AppWindow, JumpHopData, TerminalBridge, TunnelItemData, TunnelsBridge};
 use crate::handlers::AppContext;
 use crate::tunnel_daemon::TunnelDaemonService;
@@ -68,20 +69,20 @@ fn convert_tunnel_to_item_data(t: &TunnelRecord) -> TunnelItemData {
     };
 
     TunnelItemData {
-        id: t.id.clone().into(),
-        name: t.name.clone().into(),
-        tunnel_type: t.tunnel_type.as_str().into(),
-        type_badge: t.tunnel_type.display_badge().into(),
-        ssh_host_id: t.ssh_host_id.clone().unwrap_or_default().into(),
-        ssh_host_name: t.ssh_host_name.clone().into(),
-        local_bind: t.local_bind.clone().into(),
+        id: t.id.to_shared(),
+        name: t.name.to_shared(),
+        tunnel_type: t.tunnel_type.as_str().to_shared(),
+        type_badge: t.tunnel_type.display_badge().to_shared(),
+        ssh_host_id: t.ssh_host_id.to_shared(),
+        ssh_host_name: t.ssh_host_name.to_shared(),
+        local_bind: t.local_bind.to_shared(),
         local_port: t.local_port as i32,
-        remote_host: t.remote_host.clone().into(),
+        remote_host: t.remote_host.to_shared(),
         remote_port: t.remote_port as i32,
         route_summary: route_summary.into(),
         is_running: t.is_running,
         enabled: t.enabled,
-        run_mode: t.run_mode.as_str().into(),
+        run_mode: t.run_mode.as_str().to_shared(),
         status_text: status_text.into(),
         status_badge: status_badge.into(),
         auto_start: t.auto_start,
@@ -91,8 +92,8 @@ fn convert_tunnel_to_item_data(t: &TunnelRecord) -> TunnelItemData {
         active_connections: t.active_connections as i32,
         traffic_in: traffic_in.into(),
         traffic_out: traffic_out.into(),
-        notes: t.notes.clone().into(),
-        updated_at: t.updated_at.clone().into(),
+        notes: t.notes.to_shared(),
+        updated_at: t.updated_at.to_shared(),
         ssh_command: ssh_cmd.into(),
     }
 }
@@ -110,17 +111,17 @@ pub(crate) fn load_tunnel_into_bridge(tb: &TunnelsBridge, tun: &TunnelRecord) {
     let (traffic_in, traffic_out) = tun.formatted_traffic();
     let ssh_cmd = tun.generate_ssh_command(&tun.ssh_host_name, "root");
 
-    tb.set_form_id(tun.id.clone().into());
-    tb.set_form_name(tun.name.clone().into());
-    tb.set_form_type(tun.tunnel_type.as_str().into());
-    tb.set_form_ssh_host_id(tun.ssh_host_id.clone().unwrap_or_default().into());
-    tb.set_form_ssh_host_name(tun.ssh_host_name.clone().into());
-    tb.set_form_local_bind(tun.local_bind.clone().into());
-    tb.set_form_local_port(tun.local_port.to_string().into());
-    tb.set_form_remote_host(tun.remote_host.clone().into());
-    tb.set_form_remote_port(tun.remote_port.to_string().into());
+    tb.set_form_id(tun.id.to_shared());
+    tb.set_form_name(tun.name.to_shared());
+    tb.set_form_type(tun.tunnel_type.as_str().to_shared());
+    tb.set_form_ssh_host_id(tun.ssh_host_id.to_shared());
+    tb.set_form_ssh_host_name(tun.ssh_host_name.to_shared());
+    tb.set_form_local_bind(tun.local_bind.to_shared());
+    tb.set_form_local_port(num_to_shared(tun.local_port));
+    tb.set_form_remote_host(tun.remote_host.to_shared());
+    tb.set_form_remote_port(num_to_shared(tun.remote_port));
     tb.set_form_enabled(tun.enabled);
-    tb.set_form_run_mode(tun.run_mode.as_str().into());
+    tb.set_form_run_mode(tun.run_mode.as_str().to_shared());
     tb.set_form_auto_start(tun.auto_start);
     tb.set_form_auto_reconnect(tun.auto_reconnect);
     tb.set_form_remote_dns(tun.remote_dns);
@@ -129,22 +130,22 @@ pub(crate) fn load_tunnel_into_bridge(tb: &TunnelsBridge, tun: &TunnelRecord) {
     tb.set_form_active_connections(tun.active_connections as i32);
     tb.set_form_traffic_in(traffic_in.into());
     tb.set_form_traffic_out(traffic_out.into());
-    tb.set_form_updated_at(tun.updated_at.clone().into());
+    tb.set_form_updated_at(tun.updated_at.to_shared());
     tb.set_form_ssh_command(ssh_cmd.into());
-    tb.set_form_notes(tun.notes.clone().into());
+    tb.set_form_notes(tun.notes.to_shared());
     let hops: Vec<JumpHopData> = tun.jump_chain.iter().map(|h| {
         JumpHopData {
-            host_id: h.host_id.clone().into(),
-            host_name: h.host_name.clone().into(),
-            host_address: h.host_address.clone().into(),
+            host_id: h.host_id.to_shared(),
+            host_name: h.host_name.to_shared(),
+            host_address: h.host_address.to_shared(),
             host_port: h.host_port as i32,
             enabled: h.enabled,
         }
     }).collect();
-    tb.set_form_hops(ModelRc::new(VecModel::from(hops)));
-    tb.set_form_proxy_proto(if tun.proxy_proto.is_empty() { "SOCKS5".into() } else { tun.proxy_proto.clone().into() });
-    tb.set_form_proxy_username(tun.proxy_username.clone().into());
-    tb.set_form_proxy_password(tun.proxy_password.clone().into());
+    tb.set_form_hops(to_model_rc(hops));
+    tb.set_form_proxy_proto(if tun.proxy_proto.is_empty() { "SOCKS5".into() } else { tun.proxy_proto.to_shared() });
+    tb.set_form_proxy_username(tun.proxy_username.to_shared());
+    tb.set_form_proxy_password(tun.proxy_password.to_shared());
 }
 
 /// 纯 UI 渲染函数：根据全量隧道记录列表、分类与搜索关键词，过滤并装载到 Slint `TunnelsBridge`
@@ -184,26 +185,33 @@ pub(crate) fn render_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRecord]
                 return false;
             }
 
-            // 2. 关键词模糊搜索
+            // 2. 关键词模糊搜索 (零堆分配匹配)
             if query_lower.is_empty() {
                 true
             } else {
-                t.name.to_lowercase().contains(&query_lower)
-                    || t.remote_host.to_lowercase().contains(&query_lower)
-                    || t.local_port.to_string().contains(&query_lower)
-                    || t.remote_port.to_string().contains(&query_lower)
-                    || t.ssh_host_name.to_lowercase().contains(&query_lower)
-                    || t.notes.to_lowercase().contains(&query_lower)
+                let lp = t.local_port.to_string();
+                let rp = t.remote_port.to_string();
+                matches_any_ignore_case(
+                    &[
+                        &t.name,
+                        &t.remote_host,
+                        &lp,
+                        &rp,
+                        &t.ssh_host_name,
+                        &t.notes,
+                    ],
+                    &query_lower,
+                )
             }
         })
         .map(|t| convert_tunnel_to_item_data(t))
         .collect();
 
-    let t_model = ModelRc::new(VecModel::from(filtered.clone()));
     let tb = window.global::<TunnelsBridge>();
     tb.set_filter_category(cat.into());
     tb.set_search_query(query.into());
-    tb.set_tunnels(t_model);
+    let current_tunnels = tb.get_tunnels();
+    crate::store::diff::update_model_rc_in_place(&current_tunnels, filtered.clone(), |m| tb.set_tunnels(m));
 
     // 如果当前选中的规则不在当前过滤结果列表中，自动选中第一条有效规则并加载其表单详情
     let current_id = tb.get_active_tunnel_id().to_string();
@@ -263,7 +271,8 @@ pub(crate) fn sync_ui_tunnels(window: &AppWindow, ctx: &AppContext) {
     let storage = ctx.core_state.storage().clone();
     let cat = ctx.tunnel_filter_category.borrow().clone();
     let query = ctx.tunnel_search_query.borrow().clone();
-    sync_ui_tunnels_async(window_weak, storage, cat, query);
+    sync_ui_tunnels_async(window_weak.clone(), storage, cat, query);
+    ctx.host_store.schedule_tree_refresh(window_weak);
 }
 
 /// 纯 UI 渲染函数：同步当前活动终端主机专属的端口转发规则至右侧工具栏抽屉与 `TunnelsBridge`
@@ -331,7 +340,7 @@ pub(crate) fn render_host_tunnels_ui(window: &AppWindow, all_tunnels: &[TunnelRe
 
     tb.set_active_host_name(host_name.into());
     tb.set_active_host_id(host_id.into());
-    tb.set_host_tunnels(ModelRc::new(VecModel::from(host_tunnels)));
+    tb.set_host_tunnels(to_model_rc(host_tunnels));
 }
 
 /// 异步从存储层拉取隧道记录并同步当前活动终端主机专属的端口转发规则
@@ -393,6 +402,17 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 sync_ui_tunnels(&w, &ctx);
                 sync_ui_host_tunnels(&w, &ctx);
             }
+        });
+    }
+
+    // -------------------------------------------------------------------------
+    // 0.05 准备主机选择树 (为跳板机或端口转发宿主选择弹窗预加载主机树)
+    // -------------------------------------------------------------------------
+    {
+        let ctx = ctx.clone();
+        let w_handle = window.as_weak();
+        tb.on_prepare_host_picker(move || {
+            ctx.host_store.schedule_tree_refresh(w_handle.clone());
         });
     }
 
@@ -461,7 +481,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 tb.set_form_traffic_in("0 B".into());
                 tb.set_form_traffic_out("0 B".into());
                 tb.set_form_updated_at("未保存".into());
-                tb.set_form_hops(ModelRc::new(VecModel::default()));
+                tb.set_form_hops(ModelRc::default());
                 tb.set_is_create_host_tunnel_modal_open(true);
             }
         });
@@ -557,13 +577,17 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         // 规则被启用：依据运行策略决定是否立即拉起底层监听
                         match tun.run_mode {
                             TunnelRunMode::FollowApp => {
-                                let started = TunnelDaemonService::try_start_tunnel(&storage, &tunnels_svc, &tun).await;
-                                tun.is_running = started;
-                                if !started {
-                                    warn_msg = Some(format!(
-                                        "'{}' 端口 {}:{} 建立失败，保持待命状态",
-                                        tun.name, tun.local_bind, tun.local_port
-                                    ));
+                                match TunnelDaemonService::try_start_tunnel_with_result(&storage, &tunnels_svc, &tun).await {
+                                    Ok(_) => {
+                                        tun.is_running = true;
+                                    }
+                                    Err(err) => {
+                                        tun.is_running = false;
+                                        warn_msg = Some(format!(
+                                            "'{}' 端口 {}:{} 启动失败:\n{}",
+                                            tun.name, tun.local_bind, tun.local_port, err
+                                        ));
+                                    }
                                 }
                             }
                             TunnelRunMode::FollowTerminal => {
@@ -575,13 +599,17 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                                     .unwrap_or(false);
 
                                 if is_host_connected {
-                                    let started = TunnelDaemonService::try_start_tunnel(&storage, &tunnels_svc, &tun).await;
-                                    tun.is_running = started;
-                                    if !started {
-                                        warn_msg = Some(format!(
-                                            "'{}' 端口 {}:{} 建立失败",
-                                            tun.name, tun.local_bind, tun.local_port
-                                        ));
+                                    match TunnelDaemonService::try_start_tunnel_with_result(&storage, &tunnels_svc, &tun).await {
+                                        Ok(_) => {
+                                            tun.is_running = true;
+                                        }
+                                        Err(err) => {
+                                            tun.is_running = false;
+                                            warn_msg = Some(format!(
+                                                "伴生规则 '{}' 端口 {}:{} 启动失败:\n{}",
+                                                tun.name, tun.local_bind, tun.local_port, err
+                                            ));
+                                        }
                                     }
                                 } else {
                                     // 伴随终端模式：主机终端未开，进入待命中 (Standby) 状态
@@ -608,8 +636,9 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         if let Some(w) = w_weak.upgrade() {
                             if let Some(msg) = warn_msg {
                                 let wb = w.global::<crate::generated::WindowBridge>();
+                                let toast_id = format!("toast-{}", uuid::Uuid::new_v4());
                                 let toast = crate::generated::ToastItemData {
-                                    id: format!("toast-{}", uuid::Uuid::new_v4()).into(),
+                                    id: toast_id.clone().into(),
                                     title: "启动异常".into(),
                                     message: msg.into(),
                                     level: "warning".into(),
@@ -621,7 +650,19 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                                 let mut all: Vec<crate::generated::ToastItemData> =
                                     (0..cur.row_count()).filter_map(|i| cur.row_data(i)).collect();
                                 all.push(toast);
-                                wb.set_toasts(slint::ModelRc::from(std::rc::Rc::new(slint::VecModel::from(all))));
+                                wb.set_toasts(to_model_rc(all));
+
+                                let w_weak_t = w_weak.clone();
+                                let tid: slint::SharedString = toast_id.into();
+                                slint::Timer::single_shot(std::time::Duration::from_millis(3500), move || {
+                                    if let Some(w) = w_weak_t.upgrade() {
+                                        let wb = w.global::<crate::generated::WindowBridge>();
+                                        let cur = wb.get_toasts();
+                                        let remaining: Vec<crate::generated::ToastItemData> =
+                                            cur.iter().filter(|t| t.id != tid).collect();
+                                        wb.set_toasts(to_model_rc(remaining));
+                                    }
+                                });
                             }
                             let tb = w.global::<TunnelsBridge>();
                             let active_id = tb.get_active_tunnel_id().to_string();
@@ -691,7 +732,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 tb.set_form_updated_at("未保存".into());
                 tb.set_form_ssh_command("".into());
                 tb.set_form_notes("".into());
-                tb.set_form_hops(ModelRc::new(VecModel::default()));
+                tb.set_form_hops(ModelRc::default());
                 tb.set_form_proxy_proto("SOCKS5".into());
                 tb.set_form_proxy_username("".into());
                 tb.set_form_proxy_password("".into());
@@ -725,7 +766,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 tb.set_form_updated_at("未保存".into());
                 tb.set_form_ssh_command("".into());
                 tb.set_form_notes("".into());
-                tb.set_form_hops(ModelRc::new(VecModel::default()));
+                tb.set_form_hops(ModelRc::default());
                 tb.set_form_proxy_proto("SOCKS5".into());
                 tb.set_form_proxy_username("".into());
                 tb.set_form_proxy_password("".into());
@@ -745,7 +786,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         tb.set_form_auto_reconnect(false);
                         tb.set_form_remote_dns(false);
                         tb.set_form_compression(false);
-                        tb.set_form_hops(ModelRc::new(VecModel::default()));
+                        tb.set_form_hops(ModelRc::default());
                         tb.set_form_ssh_command("-J <尚未选择启用跳板节点>".into());
                     }
                     "ProxyServer" => {
@@ -765,7 +806,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                         tb.set_form_auto_reconnect(false);
                         tb.set_form_remote_dns(true);
                         tb.set_form_compression(false);
-                        tb.set_form_hops(ModelRc::new(VecModel::default()));
+                        tb.set_form_hops(ModelRc::default());
                         tb.set_form_ssh_command("ALL_PROXY=socks5://127.0.0.1:7890".into());
                     }
                     _ => {
@@ -1233,7 +1274,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                     enabled: true,
                 });
                 update_jump_command_preview(&tb, &hops);
-                tb.set_form_hops(ModelRc::new(VecModel::from(hops)));
+                tb.set_form_hops(to_model_rc(hops));
             }
         });
     }
@@ -1250,7 +1291,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 if idx >= 0 && (idx as usize) < hops.len() {
                     hops.remove(idx as usize);
                     update_jump_command_preview(&tb, &hops);
-                    tb.set_form_hops(ModelRc::new(VecModel::from(hops)));
+                    tb.set_form_hops(to_model_rc(hops));
                 }
             }
         });
@@ -1268,7 +1309,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 if idx > 0 && (idx as usize) < hops.len() {
                     hops.swap((idx - 1) as usize, idx as usize);
                     update_jump_command_preview(&tb, &hops);
-                    tb.set_form_hops(ModelRc::new(VecModel::from(hops)));
+                    tb.set_form_hops(to_model_rc(hops));
                 }
             }
         });
@@ -1286,7 +1327,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 if idx >= 0 && ((idx + 1) as usize) < hops.len() {
                     hops.swap(idx as usize, (idx + 1) as usize);
                     update_jump_command_preview(&tb, &hops);
-                    tb.set_form_hops(ModelRc::new(VecModel::from(hops)));
+                    tb.set_form_hops(to_model_rc(hops));
                 }
             }
         });
@@ -1304,7 +1345,7 @@ pub(crate) fn register_tunnel_handlers(window: &AppWindow, ctx: &AppContext) {
                 if idx >= 0 && (idx as usize) < hops.len() {
                     hops[idx as usize].enabled = !hops[idx as usize].enabled;
                     update_jump_command_preview(&tb, &hops);
-                    tb.set_form_hops(ModelRc::new(VecModel::from(hops)));
+                    tb.set_form_hops(to_model_rc(hops));
                 }
             }
         });

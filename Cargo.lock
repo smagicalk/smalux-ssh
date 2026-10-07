@@ -5339,23 +5339,61 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b4596b6d070b27117e987119b4dac604f3c58cfb0b191112e24771b2faeac1a6"
 
 [[package]]
-name = "plugin-hosts"
+name = "plugin-credentials"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "slint",
- "slint-build",
  "smagical-core",
  "smagical-ui-common",
 ]
 
 [[package]]
-name = "plugin-session-tools"
+name = "plugin-debug"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "slint",
- "slint-build",
+ "smagical-core",
+ "smagical-ui-common",
+]
+
+[[package]]
+name = "plugin-files"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "slint",
+ "smagical-core",
+ "smagical-ui-common",
+]
+
+[[package]]
+name = "plugin-history"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "slint",
+ "smagical-core",
+ "smagical-ui-common",
+]
+
+[[package]]
+name = "plugin-hosts"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "slint",
+ "smagical-core",
+ "smagical-ui-common",
+]
+
+[[package]]
+name = "plugin-settings"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "slint",
  "smagical-core",
  "smagical-ui-common",
 ]
@@ -5366,7 +5404,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "slint",
- "slint-build",
  "smagical-core",
  "smagical-ui-common",
 ]
@@ -5377,7 +5414,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "slint",
- "slint-build",
  "smagical-core",
  "smagical-ui-common",
 ]
@@ -7131,11 +7167,15 @@ dependencies = [
 name = "smagical-core"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm",
+ "argon2",
  "async-trait",
+ "base64 0.23.1",
  "chrono",
  "directories",
  "futures-util",
  "hmac",
+ "rand 0.10.3",
  "reqwest",
  "serde",
  "serde_json",
@@ -7214,7 +7254,8 @@ dependencies = [
  "smagical-core",
  "smagical-ssh",
  "smagical-storage",
- "smagical-ui-view",
+ "smagical-ui-common",
+ "smagical-ui-kernel",
  "tokio",
  "tracing",
  "tracing-appender",
@@ -7231,7 +7272,6 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "slint",
- "slint-build",
  "smagical-core",
 ]
 
@@ -7239,26 +7279,17 @@ dependencies = [
 name = "smagical-ui-kernel"
 version = "0.1.0"
 dependencies = [
+ "plugin-credentials",
+ "plugin-debug",
+ "plugin-files",
+ "plugin-history",
  "plugin-hosts",
- "plugin-session-tools",
+ "plugin-settings",
  "plugin-snippets",
  "plugin-tunnels",
  "slint",
  "slint-build",
  "smagical-ui-common",
-]
-
-[[package]]
-name = "smagical-ui-view"
-version = "0.1.0"
-dependencies = [
- "plugin-hosts",
- "plugin-session-tools",
- "plugin-snippets",
- "plugin-tunnels",
- "slint",
- "smagical-ui-common",
- "smagical-ui-kernel",
 ]
 
 [[package]]

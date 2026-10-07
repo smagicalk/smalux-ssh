@@ -1,8 +1,8 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
 import { DrawerContainer } from "@common/components/drawer-container.slint";
 import { SearchInput } from "@common/components/search-input.slint";
-import { AppIconButton } from "@common/components/base/app-icon-button.slint";
-import { AppVScrollBar } from "@common/components/base/app-scroll-bar.slint";
+import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
 import { SnippetTreeNode } from "@common/features/snippets/snippets_model.slint";
 import { SnippetsBridge } from "@common/features/snippets/snippets_bridge.slint";
 
@@ -11,7 +11,7 @@ export { SnippetTreeNode }
 /// 代码片段管理抽屉组件 (Snippets Drawer)
 ///
 /// 具备与主机抽屉完全一致的现代化树形多层层级折叠展开、分类检索、拖拽调序与分组迁移能力。
-export component SnippetsDrawer inherits DrawerContainer {
+component SnippetsDrawer inherits DrawerContainer {
     title: @tr("代码片段");
     collapse-icon: "◀";
 
@@ -150,7 +150,7 @@ export component SnippetsDrawer inherits DrawerContainer {
             drawer_scroll := Flickable {
                 width: 100%;
                 height: 100%;
-                viewport-height: list-content.preferred-height;
+                content-height: list-content.preferred-height;
 
                 list-content := VerticalLayout {
                     spacing: 2px;
@@ -171,7 +171,6 @@ export component SnippetsDrawer inherits DrawerContainer {
                             ? AppTheme.accent.transparentize(40%)
                             : (node.id == root.selected-id ? AppTheme.border : transparent);
 
-                        animate background { duration: root.is-dragging ? 0ms : 120ms; }
                         animate opacity { duration: root.is-dragging ? 0ms : 120ms; }
 
                         item-touch := TouchArea {
@@ -218,7 +217,7 @@ export component SnippetsDrawer inherits DrawerContainer {
                                         let total_y = idx * 32px + self.mouse-y;
                                         root.drag-y = total_y;
 
-                                        let screen_y = total_y + drawer_scroll.viewport-y;
+                                        let screen_y = total_y + drawer_scroll.content-y;
                                         if screen_y < 16px {
                                             root.drop-target-index = -1;
                                             root.drop-target-id = "root";
@@ -342,10 +341,12 @@ export component SnippetsDrawer inherits DrawerContainer {
             }
 
             AppVScrollBar {
-                viewport-height: drawer_scroll.viewport-height;
+                content-height: drawer_scroll.content-height;
                 visible-height: drawer_scroll.height;
-                viewport-y <=> drawer_scroll.viewport-y;
+                content-y <=> drawer_scroll.content-y;
             }
         }
     }
 }
+
+export { SnippetsDrawer }

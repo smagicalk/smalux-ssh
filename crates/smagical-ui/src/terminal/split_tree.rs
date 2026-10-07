@@ -2,8 +2,10 @@
 //!
 //! 支持任意层级与嵌套深度的二叉分屏 (水平/垂直切分)、递归几何占比推导、动态尺寸调节与窗格生命周期管理。
 
+use serde::{Deserialize, Serialize};
+
 /// 分屏切分方向枚举。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum SplitOrientation {
     /// 左右垂直分割 (新增左右窗格)
     Vertical,
@@ -95,7 +97,7 @@ pub struct PixelRect {
 
 
 /// 终端多窗格二叉分屏树节点。
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum SplitNode {
     /// 叶子节点 (承载具体的终端会话/窗格)
     Leaf {
@@ -497,6 +499,276 @@ impl SplitNode {
     }
 }
 
+/// 经典运维多分屏布局预设枚举。
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SplitLayoutPreset {
+    /// 单屏全屏 (1 窗格)
+    Single,
+    /// 左右等分双屏 (2 窗格, 1:1)
+    DualVertical,
+    /// 上下等分双屏 (2 窗格, 1:1)
+    DualHorizontal,
+    /// 四分田字格 (4 窗格, 2x2)
+    QuadGrid,
+    /// 主辅分屏：一大左两小右 (3 窗格, 1L2R)
+    MainLeftDualRight,
+    /// 主辅分屏：一大上两小下 (3 窗格, 1T2B)
+    MainTopDualBottom,
+    /// 三列并排等分 (3 窗格, 1:1:1)
+    TripleColumns,
+    /// 三行并排等分 (3 窗格, 1:1:1)
+    TripleRows,
+}
+
+impl SplitLayoutPreset {
+    /// 从字符串解析预设标识
+    pub fn from_preset_name(name: &str) -> Option<Self> {
+        match name.to_lowercase().as_str() {
+            "single" | "1" => Some(Self::Single),
+            "dual_vertical" | "dual-vertical" | "v" | "2v" => Some(Self::DualVertical),
+            "dual_horizontal" | "dual-horizontal" | "h" | "2h" => Some(Self::DualHorizontal),
+            "quad_grid" | "quad-grid" | "quad" | "grid" | "4" | "2x2" => Some(Self::QuadGrid),
+            "main_left_dual_right" | "main-left-dual-right" | "1l2r" => Some(Self::MainLeftDualRight),
+            "main_top_dual_bottom" | "main-top-dual-bottom" | "1t2b" => Some(Self::MainTopDualBottom),
+            "triple_columns" | "triple-columns" | "3col" | "3v" => Some(Self::TripleColumns),
+            "triple_rows" | "triple-rows" | "3row" | "3h" => Some(Self::TripleRows),
+            _ => None,
+        }
+    }
+
+    /// 获取预设英文标识名
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Single => "single",
+            Self::DualVertical => "dual_vertical",
+            Self::DualHorizontal => "dual_horizontal",
+            Self::QuadGrid => "quad_grid",
+            Self::MainLeftDualRight => "main_left_dual_right",
+            Self::MainTopDualBottom => "main_top_dual_bottom",
+            Self::TripleColumns => "triple_columns",
+            Self::TripleRows => "triple_rows",
+        }
+    }
+
+    /// 所需最少窗格数
+    pub fn required_panes(&self) -> usize {
+        match self {
+            Self::Single => 1,
+            Self::DualVertical | Self::DualHorizontal => 2,
+            Self::MainLeftDualRight | Self::MainTopDualBottom | Self::TripleColumns | Self::TripleRows => 3,
+            Self::QuadGrid => 4,
+        }
+    }
+
+    /// 根据预设与传入的窗格 (ID, 标题) 列表构建二叉分屏拓扑树。
+    /// 若传入的窗格列表数量不足，将自动使用默认 ID 与标题补齐。
+    pub fn build_tree(&self, panes: &[(String, String)]) -> SplitNode {
+        let get_pane = |idx: usize| -> (String, String) {
+            if let Some((id, title)) = panes.get(idx) {
+                (id.clone(), title.clone())
+            } else {
+                (format!("pane-{}", idx + 1), format!("Pane {}", idx + 1))
+            }
+        };
+
+        match self {
+            Self::Single => {
+                let (id, title) = get_pane(0);
+                SplitNode::new_single(id, title)
+            }
+            Self::DualVertical => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                SplitNode::Branch {
+                    node_id: "branch-preset-v".to_string(),
+                    orientation: SplitOrientation::Vertical,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                }
+            }
+            Self::DualHorizontal => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                SplitNode::Branch {
+                    node_id: "branch-preset-h".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                }
+            }
+            Self::QuadGrid => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                let (id3, t3) = get_pane(2);
+                let (id4, t4) = get_pane(3);
+                // 左侧列 (上 1 + 下 3)
+                let left_col = SplitNode::Branch {
+                    node_id: "branch-quad-left".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id3, title: t3 }),
+                };
+                // 右侧列 (上 2 + 下 4)
+                let right_col = SplitNode::Branch {
+                    node_id: "branch-quad-right".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id4, title: t4 }),
+                };
+                SplitNode::Branch {
+                    node_id: "branch-quad-root".to_string(),
+                    orientation: SplitOrientation::Vertical,
+                    ratio: 0.5,
+                    first: Box::new(left_col),
+                    second: Box::new(right_col),
+                }
+            }
+            Self::MainLeftDualRight => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                let (id3, t3) = get_pane(2);
+                let right_sub = SplitNode::Branch {
+                    node_id: "branch-mldr-right".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id3, title: t3 }),
+                };
+                SplitNode::Branch {
+                    node_id: "branch-mldr-root".to_string(),
+                    orientation: SplitOrientation::Vertical,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(right_sub),
+                }
+            }
+            Self::MainTopDualBottom => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                let (id3, t3) = get_pane(2);
+                let bottom_sub = SplitNode::Branch {
+                    node_id: "branch-mtdb-bottom".to_string(),
+                    orientation: SplitOrientation::Vertical,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id3, title: t3 }),
+                };
+                SplitNode::Branch {
+                    node_id: "branch-mtdb-root".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(bottom_sub),
+                }
+            }
+            Self::TripleColumns => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                let (id3, t3) = get_pane(2);
+                let right_two = SplitNode::Branch {
+                    node_id: "branch-triple-col-right".to_string(),
+                    orientation: SplitOrientation::Vertical,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id3, title: t3 }),
+                };
+                SplitNode::Branch {
+                    node_id: "branch-triple-col-root".to_string(),
+                    orientation: SplitOrientation::Vertical,
+                    ratio: 0.3333,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(right_two),
+                }
+            }
+            Self::TripleRows => {
+                let (id1, t1) = get_pane(0);
+                let (id2, t2) = get_pane(1);
+                let (id3, t3) = get_pane(2);
+                let bottom_two = SplitNode::Branch {
+                    node_id: "branch-triple-row-bottom".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.5,
+                    first: Box::new(SplitNode::Leaf { pane_id: id2, title: t2 }),
+                    second: Box::new(SplitNode::Leaf { pane_id: id3, title: t3 }),
+                };
+                SplitNode::Branch {
+                    node_id: "branch-triple-row-root".to_string(),
+                    orientation: SplitOrientation::Horizontal,
+                    ratio: 0.3333,
+                    first: Box::new(SplitNode::Leaf { pane_id: id1, title: t1 }),
+                    second: Box::new(bottom_two),
+                }
+            }
+        }
+    }
+}
+
+/// 终端分屏拓扑存储模型 (用于持久化保存会话分屏布局)
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct PersistedSplitTopology {
+    /// 分屏拓扑二叉树
+    pub root: SplitNode,
+    /// 活跃/选中聚焦的窗格 ID
+    pub active_pane_id: String,
+    /// 最后保存时间戳 (UNIX 秒)
+    pub updated_at: u64,
+}
+
+impl PersistedSplitTopology {
+    /// 创建新的分屏拓扑存储模型
+    pub fn new(root: SplitNode, active_pane_id: String) -> Self {
+        let updated_at = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        Self {
+            root,
+            active_pane_id,
+            updated_at,
+        }
+    }
+
+    /// 获取分屏拓扑默认持久化存储路径 (`%LOCALAPPDATA%\smagical\smalux\layouts\last_topology.json`)
+    pub fn get_default_path() -> std::path::PathBuf {
+        let base_dir = directories::ProjectDirs::from("com", "smagical", "smalux")
+            .map(|dirs| dirs.data_local_dir().to_path_buf())
+            .unwrap_or_else(|| std::path::PathBuf::from("."));
+        let layout_dir = base_dir.join("layouts");
+        let _ = std::fs::create_dir_all(&layout_dir);
+        layout_dir.join("last_topology.json")
+    }
+
+    /// 保存分屏拓扑到指定文件
+    pub fn save_to_file(&self, path: &std::path::Path) -> std::io::Result<()> {
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+        std::fs::write(path, json)
+    }
+
+    /// 从指定文件加载分屏拓扑
+    pub fn load_from_file(path: &std::path::Path) -> std::io::Result<Self> {
+        let content = std::fs::read_to_string(path)?;
+        serde_json::from_str(&content)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+
+    /// 异步后台持久化分屏拓扑
+    pub fn save_async(&self) {
+        let clone = self.clone();
+        tokio::task::spawn_blocking(move || {
+            let path = Self::get_default_path();
+            let _ = clone.save_to_file(&path);
+        });
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -607,6 +879,59 @@ mod tests {
         assert!(tree.close_pane("p2"));
         assert_eq!(tree.leaf_count(), 1);
         assert_eq!(tree.all_pane_ids(), vec!["p1"]);
+    }
+
+    #[test]
+    fn test_split_layout_presets() {
+        let panes = vec![
+            ("pane-a".to_string(), "Terminal A".to_string()),
+            ("pane-b".to_string(), "Terminal B".to_string()),
+            ("pane-c".to_string(), "Terminal C".to_string()),
+            ("pane-d".to_string(), "Terminal D".to_string()),
+        ];
+
+        // 1. Single
+        let t1 = SplitLayoutPreset::Single.build_tree(&panes);
+        assert_eq!(t1.leaf_count(), 1);
+        assert_eq!(t1.all_pane_ids(), vec!["pane-a"]);
+
+        // 2. DualVertical
+        let t2 = SplitLayoutPreset::DualVertical.build_tree(&panes);
+        assert_eq!(t2.leaf_count(), 2);
+        assert_eq!(t2.all_pane_ids(), vec!["pane-a", "pane-b"]);
+
+        // 3. QuadGrid
+        let t4 = SplitLayoutPreset::QuadGrid.build_tree(&panes);
+        assert_eq!(t4.leaf_count(), 4);
+        assert_eq!(t4.all_pane_ids(), vec!["pane-a", "pane-c", "pane-b", "pane-d"]);
+
+        // 4. MainLeftDualRight
+        let t_mldr = SplitLayoutPreset::MainLeftDualRight.build_tree(&panes);
+        assert_eq!(t_mldr.leaf_count(), 3);
+        assert_eq!(t_mldr.all_pane_ids(), vec!["pane-a", "pane-b", "pane-c"]);
+
+        // 5. Preset from string
+        assert_eq!(SplitLayoutPreset::from_preset_name("quad"), Some(SplitLayoutPreset::QuadGrid));
+        assert_eq!(SplitLayoutPreset::from_preset_name("2v"), Some(SplitLayoutPreset::DualVertical));
+        assert_eq!(SplitLayoutPreset::from_preset_name("unknown"), None);
+    }
+
+    #[test]
+    fn test_persisted_split_topology_serde_roundtrip() {
+        let panes = vec![
+            ("pane-1".to_string(), "Host 1".to_string()),
+            ("pane-2".to_string(), "Host 2".to_string()),
+            ("pane-3".to_string(), "Host 3".to_string()),
+        ];
+        let tree = SplitLayoutPreset::MainLeftDualRight.build_tree(&panes);
+        let orig = PersistedSplitTopology::new(tree, "pane-2".to_string());
+
+        let json = serde_json::to_string(&orig).expect("Serialize topology failed");
+        let decoded: PersistedSplitTopology = serde_json::from_str(&json).expect("Deserialize topology failed");
+
+        assert_eq!(decoded.active_pane_id, "pane-2");
+        assert_eq!(decoded.root.leaf_count(), 3);
+        assert_eq!(decoded.root.all_pane_ids(), vec!["pane-1", "pane-2", "pane-3"]);
     }
 }
 

@@ -10,10 +10,11 @@
 
 ## 🧩 UI 组件与文件结构
 
-- **全屏中心视图**：[`crates/smagical-ui/ui/views/history_center_view.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/history_center_view.slint)
-- **左侧抽屉组件**：[`crates/smagical-ui/ui/views/left_drawers/history_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/ui/views/left_drawers/history_drawer.slint)
+- **全屏中心视图**：[`crates/ui/plugins/history/ui/views/history_center_view.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/history/ui/views/history_center_view.slint)
+- **左侧抽屉组件**：[`crates/ui/plugins/history/ui/drawers/history_drawer.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/history/ui/drawers/history_drawer.slint)
+- **会话详情弹窗**：[`crates/ui/plugins/history/ui/modals/history-detail-modal.slint`](file:///F:/code/rust/smalux-ssh/crates/ui/plugins/history/ui/modals/history-detail-modal.slint)
 - **路由回调处理器**：[`crates/smagical-ui/src/handlers/history_handlers.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-ui/src/handlers/history_handlers.rs)
-- **存储与持久化**：[`crates/smagical-core/src/storage/mock_storage.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-core/src/storage/mock_storage.rs)
+- **数据持久化仓储**：[`crates/smagical-storage/src/seaorm/history_repo.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-storage/src/seaorm/history_repo.rs) 与 [`crates/smagical-storage/src/mock/history_repo.rs`](file:///F:/code/rust/smalux-ssh/crates/smagical-storage/src/mock/history_repo.rs)
 
 ---
 

@@ -1,17 +1,17 @@
-﻿import { AppTheme } from "@common/themes/app-theme.slint";
-import { GroupTreeSelector, GroupOptionData } from "group-tree-selector.slint";
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { GroupTreeSelector, GroupOptionData } from "@common/shared/composite/group-tree-selector.slint";
 import { AppButton } from "@common/shared/base/app-button.slint";
 import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
 import { AppTextInput } from "@common/shared/base/app-text-input.slint";
 import { AppTextArea } from "@common/shared/base/app-text-area.slint";
 import { AppFormItem } from "@common/shared/base/app-form-item.slint";
-import { AppVScrollBar } from "@common/components/base/app-scroll-bar.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
 
 export { GroupOptionData }
 
 /// 新建代码片段弹窗组件 (Create Snippet Modal)
 /// 专为右侧栏及全局极速新建代码片段设计，支持输入名称、选择所属文件夹、编程语言、代码脚本内容、描述与自动执行策略。
-export component CreateSnippetModal inherits Rectangle {
+component CreateSnippetModal inherits Rectangle {
     in property <bool> is-open: false;
     in property <[GroupOptionData]> group-options: [];
 
@@ -48,7 +48,7 @@ export component CreateSnippetModal inherits Rectangle {
             border-width: 1px;
             border-color: AppTheme.border;
             drop-shadow-blur: 24px;
-            drop-shadow-color: #000000.transparentize(0.4);
+            drop-shadow-color: #00000066;
 
             TouchArea { } // 阻止事件穿透
 
@@ -95,7 +95,7 @@ export component CreateSnippetModal inherits Rectangle {
                     scroll-area := Flickable {
                         width: 100%;
                         height: 100%;
-                        viewport-height: max(self.height, form-layout.preferred-height);
+                        content-height: max(self.height, form-layout.preferred-height);
 
                         form-layout := VerticalLayout {
                             padding-right: 6px;
@@ -261,9 +261,9 @@ export component CreateSnippetModal inherits Rectangle {
                     }
 
                     AppVScrollBar {
-                        viewport-height: scroll-area.viewport-height;
+                        content-height: scroll-area.content-height;
                         visible-height: scroll-area.height;
-                        viewport-y <=> scroll-area.viewport-y;
+                        content-y <=> scroll-area.content-y;
                     }
                 }
 
@@ -418,3 +418,5 @@ export component CreateSnippetModal inherits Rectangle {
         }
     }
 }
+
+export { CreateSnippetModal }

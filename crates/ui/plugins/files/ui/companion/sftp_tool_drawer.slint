@@ -1,0 +1,821 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+import { DrawerContainer } from "@common/components/drawer-container.slint";
+import { AppIconButton } from "@common/shared/base/app-icon-button.slint";
+import { AppButton } from "@common/shared/base/app-button.slint";
+import { AppVScrollBar } from "@common/shared/base/app-scroll-bar.slint";
+import { StatusDot } from "@common/components/status-dot.slint";
+import { FileItemData, TransferItemData } from "@common/features/file_explorer/file_explorer_model.slint";
+import { FilesBridge } from "@common/features/file_explorer/file_explorer_bridge.slint";
+import { SftpTransferPanel } from "sftp_transfer_panel.slint";
+import { SftpContextMenu, SftpTransferContextMenu } from "sftp_context_menu.slint";
+
+export { FileItemData, TransferItemData }
+
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 1: 顶部路径与导航工具栏
+// -----------------------------------------------------------------------------
+component SftpNavToolbar inherits Rectangle {
+    in property <string> current-dir: "~";
+    in property <bool> can-go-back: false;
+    in property <bool> can-go-forward: false;
+    in property <bool> is-remote-loading: false;
+    in property <bool> is-transfer-expanded: false;
+    in property <int> transfer-count: 0;
+
+    callback home-clicked();
+    callback back-clicked();
+    callback forward-clicked();
+    callback refresh-clicked();
+    callback toggle-transfer();
+    callback path-submitted(string);
+
+    height: 32px;
+    border-radius: AppTheme.radius-medium;
+    background: AppTheme.control-background;
+    border-width: 1px;
+    border-color: AppTheme.border;
+
+    HorizontalLayout {
+        padding-left: 4px;
+        padding-right: 4px;
+        padding-top: 4px;
+        padding-bottom: 4px;
+        spacing: 4px;
+
+        // 1. 最左端固定图标群：[Home] [<-] [->]
+        HorizontalLayout {
+            spacing: 2px;
+            horizontal-stretch: 0;
+
+            // 1.1 房子图标 (home)
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: home-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    home-touch := TouchArea {
+                        clicked => { root.home-clicked(); }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/home.svg");
+                        width: 13px;
+                        height: 13px;
+                        image-fit: contain;
+                        colorize: home-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+
+            // 1.2 后退按钮 (<-)
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: (root.can-go-back && back-touch.has-hover) ? AppTheme.hover-background : transparent;
+
+                    back-touch := TouchArea {
+                        enabled: root.can-go-back;
+                        clicked => {
+                            if root.can-go-back {
+                                root.back-clicked();
+                            }
+                        }
+                        mouse-cursor: root.can-go-back ? pointer : default;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/arrow-left.svg");
+                        width: 12px;
+                        height: 12px;
+                        image-fit: contain;
+                        colorize: root.can-go-back ? (back-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground) : AppTheme.disabled-foreground.transparentize(60%);
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+
+            // 1.3 前进按钮 (->)
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: (root.can-go-forward && fwd-touch.has-hover) ? AppTheme.hover-background : transparent;
+
+                    fwd-touch := TouchArea {
+                        enabled: root.can-go-forward;
+                        clicked => {
+                            if root.can-go-forward {
+                                root.forward-clicked();
+                            }
+                        }
+                        mouse-cursor: root.can-go-forward ? pointer : default;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/arrow-right.svg");
+                        width: 12px;
+                        height: 12px;
+                        image-fit: contain;
+                        colorize: root.can-go-forward ? (fwd-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground) : AppTheme.disabled-foreground.transparentize(60%);
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+        }
+
+        // 2. 中间：路径输入展示与修改框
+        Rectangle {
+            horizontal-stretch: 1;
+            height: 24px;
+            background: AppTheme.panel-background;
+            border-radius: 3px;
+            border-width: path-input.has-focus ? 1.5px : 1px;
+            border-color: path-input.has-focus ? #10b981 : AppTheme.border.transparentize(40%);
+            clip: true;
+            animate border-color { duration: 120ms; }
+
+            HorizontalLayout {
+                padding-left: 6px;
+                padding-right: 6px;
+                spacing: 4px;
+
+                VerticalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/folder-open.svg");
+                        width: 11px;
+                        height: 11px;
+                        image-fit: contain;
+                        colorize: path-input.has-focus ? #10b981 : AppTheme.secondary-foreground;
+                    }
+                }
+
+                path-input := TextInput {
+                    text: root.current-dir != "" ? root.current-dir : "~";
+                    font-size: 11px;
+                    font-family: "JetBrains Mono, Consolas, monospace";
+                    color: AppTheme.foreground;
+                    horizontal-alignment: left;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                    selection-background-color: AppTheme.selected-background;
+                    selection-foreground-color: AppTheme.selected-foreground;
+
+                    accepted => {
+                        root.path-submitted(self.text);
+                    }
+                }
+            }
+
+            if root.is-remote-loading: Rectangle {
+                x: 0px;
+                y: parent.height - 2px;
+                width: 100%;
+                height: 2px;
+                background: #10b981;
+            }
+        }
+
+        // 3. 最右端固定图标群：[刷新] [传输]
+        HorizontalLayout {
+            spacing: 2px;
+            horizontal-stretch: 0;
+
+            // 3.1 刷新图标
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: refresh-touch.has-hover ? AppTheme.hover-background : transparent;
+
+                    refresh-touch := TouchArea {
+                        clicked => { root.refresh-clicked(); }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/refresh.svg");
+                        width: 12px;
+                        height: 12px;
+                        image-fit: contain;
+                        colorize: refresh-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground;
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+                }
+            }
+
+            // 3.2 传输图标
+            VerticalLayout {
+                alignment: center;
+                Rectangle {
+                    width: 22px;
+                    height: 22px;
+                    border-radius: 3px;
+                    background: (root.is-transfer-expanded || trans-touch.has-hover) ? AppTheme.hover-background : transparent;
+
+                    trans-touch := TouchArea {
+                        clicked => { root.toggle-transfer(); }
+                        mouse-cursor: pointer;
+                    }
+
+                    Image {
+                        source: @image-url("../../assets/icons/arrow-up-down.svg");
+                        width: 12px;
+                        height: 12px;
+                        image-fit: contain;
+                        colorize: root.is-transfer-expanded ? #10b981 : (trans-touch.has-hover ? AppTheme.foreground : AppTheme.secondary-foreground);
+                        x: (parent.width - self.width) / 2;
+                        y: (parent.height - self.height) / 2;
+                    }
+
+                    if root.transfer-count > 0: Rectangle {
+                        x: parent.width - 6px;
+                        y: 1px;
+                        width: 5px;
+                        height: 5px;
+                        border-radius: 2.5px;
+                        background: #10b981;
+                    }
+                }
+            }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 2: 快捷操作与状态栏
+// -----------------------------------------------------------------------------
+component SftpActionBar inherits HorizontalLayout {
+    in property <bool> is-loading: false;
+    in property <int> files-count: 0;
+
+    callback upload-file();
+    callback upload-folder();
+
+    height: 24px;
+    spacing: 6px;
+    alignment: space-between;
+
+    HorizontalLayout {
+        spacing: 4px;
+        alignment: start;
+
+        VerticalLayout {
+            alignment: center;
+            Rectangle {
+                width: 6px;
+                height: 6px;
+                border-radius: 3px;
+                background: root.is-loading ? AppTheme.warning : #10b981;
+                animate background { duration: 150ms; }
+            }
+        }
+
+        VerticalLayout {
+            alignment: center;
+            Text {
+                text: root.is-loading ? @tr("正在加载目录...") : (root.files-count + " " + @tr("项"));
+                font-size: 10px;
+                font-weight: 600;
+                color: root.is-loading ? AppTheme.warning : AppTheme.secondary-foreground;
+                animate color { duration: 150ms; }
+            }
+        }
+    }
+
+    // 上传操作按钮组
+    HorizontalLayout {
+        spacing: 4px;
+
+        AppButton {
+            text: @tr("↑ 上传文件");
+            variant: "primary";
+            height: 22px;
+            font-size: 10px;
+            clicked => { root.upload-file(); }
+        }
+
+        AppButton {
+            text: @tr("📁 上传目录");
+            variant: "secondary";
+            height: 22px;
+            font-size: 10px;
+            clicked => { root.upload-folder(); }
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 3: 紧凑表头
+// -----------------------------------------------------------------------------
+component SftpTableHeader inherits Rectangle {
+    height: 20px;
+    background: AppTheme.panel-background;
+    border-radius: 3px;
+
+    HorizontalLayout {
+        padding-left: 8px;
+        padding-right: 8px;
+        spacing: 6px;
+
+        Text {
+            text: @tr("名称");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.disabled-foreground;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: @tr("大小");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.disabled-foreground;
+            width: 50px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: @tr("时间");
+            font-size: 10px;
+            font-weight: 600;
+            color: AppTheme.disabled-foreground;
+            width: 56px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 4: 上级目录导航行
+// -----------------------------------------------------------------------------
+component SftpUpDirectoryRow inherits Rectangle {
+    callback navigate-up();
+
+    height: 24px;
+    border-radius: AppTheme.radius-small;
+    background: dot-touch.has-hover ? AppTheme.hover-background : transparent;
+    border-width: 1px;
+    border-color: dot-touch.has-hover ? AppTheme.border : transparent;
+
+    dot-touch := TouchArea {
+        clicked => { root.navigate-up(); }
+        double-clicked => { root.navigate-up(); }
+        mouse-cursor: pointer;
+    }
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: @image-url("../../assets/icons/folder.svg");
+                width: 12px;
+                height: 12px;
+                colorize: #10b981;
+            }
+        }
+
+        Text {
+            text: "..";
+            font-size: 11px;
+            font-weight: 700;
+            color: AppTheme.foreground;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: "-";
+            font-size: 9px;
+            color: AppTheme.disabled-foreground;
+            width: 50px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: "-";
+            font-size: 9px;
+            color: AppTheme.disabled-foreground;
+            width: 56px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 私有辅助子组件 5: 紧凑文件条目行 (大幅精简 Repeater AST 展开)
+// -----------------------------------------------------------------------------
+component SftpFileItemRow inherits Rectangle {
+    in property <FileItemData> item;
+    in property <bool> is-selected: false;
+
+    callback clicked();
+    callback double-clicked();
+    callback right-clicked(length /* mouse_x */, length /* mouse_y */);
+
+    height: 24px;
+    border-radius: AppTheme.radius-small;
+    background: root.is-selected ? AppTheme.accent.transparentize(80%) :
+                row-touch.has-hover ? AppTheme.hover-background : transparent;
+    border-width: 1px;
+    border-color: root.is-selected ? AppTheme.accent.transparentize(50%) : transparent;
+
+    row-touch := TouchArea {
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                if event.button == PointerEventButton.right {
+                    root.right-clicked(self.mouse-x, self.mouse-y);
+                }
+            }
+        }
+        clicked => { root.clicked(); }
+        double-clicked => { root.double-clicked(); }
+        mouse-cursor: pointer;
+    }
+
+    HorizontalLayout {
+        padding-left: 6px;
+        padding-right: 6px;
+        spacing: 6px;
+
+        VerticalLayout {
+            alignment: center;
+            Image {
+                source: root.item.is-dir ? (root.item.is-expanded ? @image-url("../../assets/icons/folder-open.svg") : @image-url("../../assets/icons/folder.svg")) : @image-url("../../assets/icons/file-text.svg");
+                width: 12px;
+                height: 12px;
+                colorize: root.item.is-dir ? (root.item.is-expanded ? #10b981 : AppTheme.secondary-foreground) : AppTheme.secondary-foreground;
+            }
+        }
+
+        Text {
+            text: root.item.name;
+            font-size: 11px;
+            font-weight: root.item.is-dir ? 600 : 400;
+            color: root.item.is-dir ? AppTheme.foreground : AppTheme.foreground.transparentize(10%);
+            overflow: elide;
+            horizontal-stretch: 1;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.item.size-formatted;
+            font-size: 9px;
+            color: AppTheme.disabled-foreground;
+            width: 50px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+        }
+
+        Text {
+            text: root.item.modified-formatted;
+            font-size: 8px;
+            color: AppTheme.disabled-foreground;
+            width: 56px;
+            horizontal-alignment: right;
+            vertical-alignment: center;
+            overflow: elide;
+        }
+    }
+}
+
+// -----------------------------------------------------------------------------
+// 快速 SFTP 抽屉 (SFTP Tool Drawer)
+// -----------------------------------------------------------------------------
+component SftpToolDrawer inherits DrawerContainer {
+    title: @tr("SFTP 远程传输");
+    collapse-icon: "▶";
+
+    in-out property <string> current-dir: FilesBridge.remote-current-path != "" ? FilesBridge.remote-current-path : "~";
+    in property <[FileItemData]> files: FilesBridge.remote-files;
+    in property <[TransferItemData]> transfer-tasks: FilesBridge.transfer-tasks;
+    in property <bool> can-go-back: FilesBridge.remote-can-go-back;
+    in property <bool> can-go-forward: FilesBridge.remote-can-go-forward;
+    in property <bool> can-go-up: FilesBridge.remote-can-go-up && root.current-dir != "/" && root.current-dir != "";
+    in-out property <string> selected-id: FilesBridge.selected-remote-id;
+    property <bool> is-transfer-expanded: false;
+    in-out property <length> transfer-panel-height: 150px;
+    in property <bool> has-active-terminal: true;
+
+    /// 右键上下文菜单状态 (文件)
+    in-out property <bool> is-context-menu-open: false;
+    in-out property <string> context-path: "";
+    in-out property <string> context-name: "";
+    in-out property <bool> context-is-dir: false;
+    in-out property <length> context-menu-x: 0px;
+    in-out property <length> context-menu-y: 0px;
+
+    /// 右键上下文菜单状态 (传输任务)
+    in-out property <bool> is-transfer-context-menu-open: false;
+    in-out property <string> context-transfer-id: "";
+    in-out property <string> context-transfer-name: "";
+    in-out property <string> context-transfer-path: "";
+    in-out property <string> context-transfer-status: "";
+    in-out property <length> transfer-context-menu-x: 0px;
+    in-out property <length> transfer-context-menu-y: 0px;
+
+    callback upload-file();
+    callback upload-folder();
+    callback download-file(string /* path */);
+    callback change-dir(string /* path */);
+    callback navigate-up();
+    callback navigate-back();
+    callback navigate-forward();
+    callback refresh();
+    callback clear-completed-transfers();
+
+    // 抽屉主内容外壳 (允许浮层右键菜单绝对定位)
+    Rectangle {
+        width: 100%;
+        height: 100%;
+
+        // 无活跃终端时的占位空状态
+        if !root.has-active-terminal: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: AppTheme.panel-background;
+            z: 200;
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/folder.svg");
+                        width: 36px;
+                        height: 36px;
+                        colorize: AppTheme.disabled-foreground;
+                    }
+                }
+                Text {
+                    text: @tr("未连接主机");
+                    font-size: 13px;
+                    font-weight: 700;
+                    color: AppTheme.foreground;
+                    horizontal-alignment: center;
+                }
+                Text {
+                    text: @tr("请在中央终端打开或连接远程主机\nSFTP 远程文件传输将自动唤醒");
+                    font-size: 10px;
+                    color: AppTheme.disabled-foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+            }
+        }
+
+        // 远程连接中或连接失败全浮层遮罩提示
+        if root.has-active-terminal && (FilesBridge.is-remote-connecting || FilesBridge.is-remote-error): Rectangle {
+            width: 100%;
+            height: 100%;
+            background: AppTheme.panel-background.transparentize(15%);
+            z: 150;
+
+            TouchArea {
+                mouse-cursor: default;
+            }
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+                padding-left: 16px;
+                padding-right: 16px;
+
+                HorizontalLayout {
+                    alignment: center;
+                    StatusDot {
+                        status: FilesBridge.is-remote-error ? "offline" : "connecting";
+                        dot-size: 14px;
+                    }
+                }
+
+                Text {
+                    text: FilesBridge.is-remote-error ? @tr("SFTP 连接失败") : @tr("正在建立 SFTP 远程连接...");
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: FilesBridge.is-remote-error ? AppTheme.danger : AppTheme.foreground;
+                    horizontal-alignment: center;
+                }
+
+                Text {
+                    text: FilesBridge.is-remote-error ? (FilesBridge.remote-error-msg != "" ? FilesBridge.remote-error-msg : @tr("未能连接到远程 SFTP 子系统或认证失败")) : @tr("正在初始化 SFTP 子系统通道，请稍候");
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                    wrap: word-wrap;
+                }
+
+                if FilesBridge.is-remote-error: HorizontalLayout {
+                    alignment: center;
+                    padding-top: 6px;
+
+                    AppButton {
+                        text: @tr("重新连接");
+                        variant: "primary";
+                        height: 28px;
+                        font-size: 11px;
+                        clicked => {
+                            root.refresh();
+                        }
+                    }
+                }
+            }
+        }
+
+        if root.has-active-terminal: VerticalLayout {
+            padding: 0px;
+            spacing: 0px;
+
+            // 上半部分内容区
+            VerticalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-top: 8px;
+                padding-bottom: 6px;
+                spacing: 6px;
+                vertical-stretch: 1;
+
+                // 1. 顶部路径条与操作导航区
+                SftpNavToolbar {
+                    current-dir: root.current-dir;
+                    can-go-back: root.can-go-back;
+                    can-go-forward: root.can-go-forward;
+                    is-remote-loading: FilesBridge.is-remote-loading;
+                    is-transfer-expanded: root.is-transfer-expanded;
+                    transfer-count: root.transfer-tasks.length;
+
+                    home-clicked => { FilesBridge.navigate-remote-path("~"); }
+                    back-clicked => { root.navigate-back(); }
+                    forward-clicked => { root.navigate-forward(); }
+                    refresh-clicked => { root.refresh(); }
+                    toggle-transfer => { root.is-transfer-expanded = !root.is-transfer-expanded; }
+                    path-submitted(p) => { FilesBridge.navigate-remote-path(p); }
+                }
+
+                // 2. 快速操作栏
+                SftpActionBar {
+                    is-loading: FilesBridge.is-remote-loading;
+                    files-count: root.files.length;
+                    upload-file => { root.upload-file(); }
+                    upload-folder => { root.upload-folder(); }
+                }
+
+                // 3. 紧凑表头
+                SftpTableHeader {}
+
+                // 3.5 固定上级目录导航条目
+                if root.can-go-up: SftpUpDirectoryRow {
+                    navigate-up => { root.navigate-up(); }
+                }
+
+                // 4. 核心文件列表区域
+                Rectangle {
+                    vertical-stretch: 1;
+                    clip: true;
+                    opacity: FilesBridge.is-remote-loading ? 0.65 : 1.0;
+                    animate opacity { duration: 120ms; }
+
+                    file-scroll := Flickable {
+                        width: 100%;
+                        height: 100%;
+                        content-height: root.files.length * 25px;
+
+                        VerticalLayout {
+                            x: 0px;
+                            y: 0px;
+                            width: parent.width;
+                            spacing: 1px;
+                            alignment: start;
+
+                            // 真实文件与目录条目 (通过精简子组件消除 AST 膨胀)
+                            for item[idx] in root.files: SftpFileItemRow {
+                                item: item;
+                                is-selected: root.selected-id == item.id;
+
+                                clicked => {
+                                    if !root.is-context-menu-open {
+                                        root.selected-id = item.id;
+                                        FilesBridge.selected-remote-id = item.id;
+                                    }
+                                }
+                                double-clicked => {
+                                    if !root.is-context-menu-open {
+                                        if item.is-dir {
+                                            root.change-dir(item.path);
+                                        } else {
+                                            root.download-file(item.path);
+                                        }
+                                    }
+                                }
+                                right-clicked(mouse_x, mouse_y) => {
+                                    root.is-context-menu-open = true;
+                                    root.context-path = item.path;
+                                    root.context-name = item.name;
+                                    root.context-is-dir = item.is-dir;
+                                    root.selected-id = item.id;
+                                    FilesBridge.selected-remote-id = item.id;
+                                    let base_y = root.can-go-up ? 132px : 102px;
+                                    let click_y = base_y + idx * 25px + file-scroll.content-y + mouse_y;
+                                    let click_x = 8px + mouse_x;
+                                    if click_y + 140px > root.height - 8px {
+                                        root.context-menu-y = Math.max(8px, click_y - 138px);
+                                    } else {
+                                        root.context-menu-y = Math.max(8px, Math.min(root.height - 146px, click_y));
+                                    }
+                                    root.context-menu-x = Math.max(8px, Math.min(root.width - 156px, click_x));
+                                }
+                            }
+                        }
+                    }
+
+                    AppVScrollBar {
+                        content-height: file-scroll.content-height;
+                        visible-height: file-scroll.height;
+                        content-y <=> file-scroll.content-y;
+                    }
+                }
+            }
+
+            // 5. 底部传输进度与过程面板 (模块化子组件)
+            SftpTransferPanel {
+                is-transfer-expanded <=> root.is-transfer-expanded;
+                transfer-panel-height <=> root.transfer-panel-height;
+                transfer-tasks: root.transfer-tasks;
+                drawer-height: root.height;
+                clear-completed => { root.clear-completed-transfers(); }
+                open-transfer-context-menu(id, name, path, status, click_x, click_y) => {
+                    root.is-transfer-context-menu-open = true;
+                    root.is-context-menu-open = false;
+                    root.context-transfer-id = id;
+                    root.context-transfer-name = name;
+                    root.context-transfer-path = path;
+                    root.context-transfer-status = status;
+                    if click_y + 140px > root.height - 8px {
+                        root.transfer-context-menu-y = Math.max(8px, click_y - 135px);
+                    } else {
+                        root.transfer-context-menu-y = Math.max(8px, Math.min(root.height - 145px, click_y));
+                    }
+                    root.transfer-context-menu-x = Math.max(8px, Math.min(root.width - 148px, click_x));
+                }
+            }
+        }
+
+        // 6. 右键上下文菜单浮层 (文件与目录)
+        if root.is-context-menu-open: SftpContextMenu {
+            is-open <=> root.is-context-menu-open;
+            menu-x: root.context-menu-x;
+            menu-y: root.context-menu-y;
+            context-path: root.context-path;
+            context-name: root.context-name;
+            context-is-dir: root.context-is-dir;
+            close => { root.is-context-menu-open = false; }
+            change-dir(path) => { root.change-dir(path); }
+            download-file(path) => { root.download-file(path); }
+            upload-file => { root.upload-file(); }
+            upload-folder => { root.upload-folder(); }
+            refresh => { root.refresh(); }
+        }
+
+        // 7. 浮层传输任务右键上下文菜单
+        if root.is-transfer-context-menu-open: SftpTransferContextMenu {
+            is-open <=> root.is-transfer-context-menu-open;
+            menu-x: root.transfer-context-menu-x;
+            menu-y: root.transfer-context-menu-y;
+            task-id: root.context-transfer-id;
+            task-name: root.context-transfer-name;
+            task-path: root.context-transfer-path;
+            task-status: root.context-transfer-status;
+            close => { root.is-transfer-context-menu-open = false; }
+            change-dir(path) => { root.change-dir(path); }
+            clear-completed => { root.clear-completed-transfers(); }
+        }
+    }
+}
+
+export { SftpToolDrawer }

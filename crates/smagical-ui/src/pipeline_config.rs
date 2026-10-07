@@ -59,6 +59,16 @@ pub fn init_runtime_pipeline() -> String {
     unsafe {
         std::env::set_var("SLINT_BACKEND", &saved);
     }
+
+    // 官方性能监控探针支持 (SLINT_DEBUG_PERFORMANCE=overlay 或 console)
+    if let Ok(perf) = std::env::var("SLINT_DEBUG_PERFORMANCE") {
+        tracing::info!(
+            target: "smalux::render",
+            "已激活 Slint 原生图形渲染性能监控 (SLINT_DEBUG_PERFORMANCE={})",
+            perf
+        );
+    }
+
     saved
 }
 

@@ -153,35 +153,54 @@ impl HighlightEngine {
 
         let mut spans = Vec::new();
 
-        // 字符字节偏移量到字符列号的快速映射表
-        let mut byte_to_char_col = Vec::with_capacity(line_text.len() + 1);
-        let mut current_col = 0usize;
-        for (byte_idx, _) in line_text.char_indices() {
-            while byte_to_char_col.len() < byte_idx {
-                byte_to_char_col.push(current_col.saturating_sub(1));
+        if line_text.is_ascii() {
+            // 极速 ASCII 快径：字节偏移等于字符列号，0 堆内存分配
+            for rule in &self.rules {
+                for m in rule.regex.find_iter(line_text) {
+                    let c_start = m.start();
+                    let c_end = m.end();
+                    if c_start < c_end {
+                        spans.push(SpanHighlight {
+                            start_col: c_start,
+                            end_col: c_end,
+                            color: rule.color_rgba,
+                            underline: rule.is_underline,
+                            is_url: rule.is_url,
+                        });
+                    }
+                }
             }
-            byte_to_char_col.push(current_col);
-            current_col += 1;
-        }
-        while byte_to_char_col.len() <= line_text.len() {
-            byte_to_char_col.push(current_col);
-        }
+        } else {
+            // 慢速路径：仅在包含 UTF-8 多字节字符时构建字节到字符列映射表
+            let mut byte_to_char_col = Vec::with_capacity(line_text.len() + 1);
+            let mut current_col = 0usize;
+            for (byte_idx, _) in line_text.char_indices() {
+                while byte_to_char_col.len() < byte_idx {
+                    byte_to_char_col.push(current_col.saturating_sub(1));
+                }
+                byte_to_char_col.push(current_col);
+                current_col += 1;
+            }
+            while byte_to_char_col.len() <= line_text.len() {
+                byte_to_char_col.push(current_col);
+            }
 
-        for rule in &self.rules {
-            for m in rule.regex.find_iter(line_text) {
-                let b_start = m.start();
-                let b_end = m.end();
-                let c_start = byte_to_char_col.get(b_start).copied().unwrap_or(0);
-                let c_end = byte_to_char_col.get(b_end).copied().unwrap_or(current_col);
+            for rule in &self.rules {
+                for m in rule.regex.find_iter(line_text) {
+                    let b_start = m.start();
+                    let b_end = m.end();
+                    let c_start = byte_to_char_col.get(b_start).copied().unwrap_or(0);
+                    let c_end = byte_to_char_col.get(b_end).copied().unwrap_or(current_col);
 
-                if c_start < c_end {
-                    spans.push(SpanHighlight {
-                        start_col: c_start,
-                        end_col: c_end,
-                        color: rule.color_rgba,
-                        underline: rule.is_underline,
-                        is_url: rule.is_url,
-                    });
+                    if c_start < c_end {
+                        spans.push(SpanHighlight {
+                            start_col: c_start,
+                            end_col: c_end,
+                            color: rule.color_rgba,
+                            underline: rule.is_underline,
+                            is_url: rule.is_url,
+                        });
+                    }
                 }
             }
         }

@@ -1,0 +1,226 @@
+import { AppTheme } from "@common/themes/app-theme.slint";
+
+/// 🖥️ 微型客户端沙盒预览窗口 (Theme Preview Sandbox)
+component ThemePreviewSandbox inherits Rectangle {
+    in property <string> theme-name: "";
+    in property <brush> preview-window-bg: #1e1e2e;
+    in property <brush> preview-panel-bg: #181825;
+    in property <brush> preview-surface-bg: #313244;
+    in property <brush> preview-control-bg: #45475a;
+    in property <brush> preview-foreground: #cdd6f4;
+    in property <brush> preview-secondary-fg: #a6adc8;
+    in property <brush> preview-accent: #89b4fa;
+    in property <brush> preview-border: #45475a;
+
+    width: 370px;
+    border-radius: AppTheme.radius-medium;
+    background: root.preview-panel-bg;
+    border-width: 1px;
+    border-color: root.preview-border;
+    clip: true;
+
+    VerticalLayout {
+        spacing: 0px;
+
+        // 1. 模拟标题栏
+        Rectangle {
+            height: 26px;
+            background: root.preview-panel-bg;
+            border-width: 1px;
+            border-color: root.preview-border;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                spacing: 6px;
+                alignment: space-between;
+
+                // 三色小圆点
+                HorizontalLayout {
+                    spacing: 4px;
+                    alignment: start;
+                    y: (parent.height - 8px) / 2;
+                    Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #ff5f56; }
+                    Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #ffbd2e; }
+                    Rectangle { width: 8px; height: 8px; border-radius: 4px; background: #27c93f; }
+                }
+
+                Text {
+                    text: "smalux-ssh - " + root.theme-name;
+                    font-size: 9px;
+                    font-weight: 600;
+                    color: root.preview-foreground;
+                    vertical-alignment: center;
+                    overflow: elide;
+                }
+
+                Rectangle { width: 28px; }
+            }
+        }
+
+        // 2. 模拟主体 (左侧树 95px + 右侧终端)
+        HorizontalLayout {
+            spacing: 0px;
+            vertical-stretch: 1;
+
+            // 模拟侧边导航栏
+            Rectangle {
+                width: 95px;
+                background: root.preview-panel-bg;
+                border-width: 1px;
+                border-color: root.preview-border;
+
+                VerticalLayout {
+                    padding: 6px;
+                    spacing: 4px;
+                    alignment: start;
+
+                    // 选中项
+                    Rectangle {
+                        height: 22px;
+                        border-radius: 3px;
+                        background: root.preview-accent;
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            spacing: 4px;
+                            Text { text: "●"; font-size: 8px; color: #ffffff; vertical-alignment: center; }
+                            Text { text: "prod-server"; font-size: 8px; font-weight: 600; color: #ffffff; vertical-alignment: center; overflow: elide; }
+                        }
+                    }
+
+                    // 普通项
+                    Rectangle {
+                        height: 20px;
+                        border-radius: 3px;
+                        background: transparent;
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            spacing: 4px;
+                            Text { text: "○"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; }
+                            Text { text: "dev-gateway"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; overflow: elide; }
+                        }
+                    }
+
+                    Rectangle {
+                        height: 20px;
+                        border-radius: 3px;
+                        background: transparent;
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            spacing: 4px;
+                            Text { text: "○"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; }
+                            Text { text: "db-replica"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; overflow: elide; }
+                        }
+                    }
+                }
+            }
+
+            // 模拟终端视口
+            Rectangle {
+                horizontal-stretch: 1;
+                background: root.preview-window-bg;
+
+                VerticalLayout {
+                    spacing: 0px;
+
+                    // 模拟 Tab 栏
+                    Rectangle {
+                        height: 22px;
+                        background: root.preview-surface-bg;
+                        border-width: 1px;
+                        border-color: root.preview-border;
+
+                        HorizontalLayout {
+                            padding-left: 6px;
+                            alignment: start;
+                            Rectangle {
+                                width: 90px;
+                                background: root.preview-window-bg;
+                                border-width: 1px;
+                                border-color: root.preview-border;
+                                HorizontalLayout {
+                                    alignment: center;
+                                    Text { text: "ssh: prod-server"; font-size: 8px; font-weight: 600; color: root.preview-foreground; vertical-alignment: center; }
+                                }
+                                Rectangle {
+                                    y: parent.height - 2px;
+                                    height: 2px;
+                                    width: 100%;
+                                    background: root.preview-accent;
+                                }
+                            }
+                        }
+                    }
+
+                    // 模拟终端内容
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 4px;
+                        alignment: start;
+
+                        HorizontalLayout {
+                            spacing: 4px;
+                            Text { text: "smalux@prod:~$"; font-size: 9px; font-family: "JetBrains Mono"; font-weight: 700; color: root.preview-accent; }
+                            Text { text: "docker ps -a"; font-size: 9px; font-family: "JetBrains Mono"; color: root.preview-foreground; }
+                        }
+
+                        Text {
+                            text: "CONTAINER ID   IMAGE      STATUS";
+                            font-size: 8px;
+                            font-family: "JetBrains Mono";
+                            color: root.preview-secondary-fg;
+                        }
+                        Text {
+                            text: "3a4b5c6d7e8f   redis:7    Up 12 days (healthy)";
+                            font-size: 8px;
+                            font-family: "JetBrains Mono";
+                            color: root.preview-foreground;
+                        }
+
+                        HorizontalLayout {
+                            spacing: 4px;
+                            padding-top: 4px;
+                            Text { text: "smalux@prod:~$"; font-size: 9px; font-family: "JetBrains Mono"; font-weight: 700; color: root.preview-accent; }
+                            Rectangle { width: 5px; height: 10px; background: root.preview-accent; y: (parent.height - self.height) / 2; }
+                        }
+                    }
+                }
+            }
+        }
+
+        // 3. 模拟底部卡片与操作条
+        Rectangle {
+            height: 32px;
+            background: root.preview-surface-bg;
+            border-width: 1px;
+            border-color: root.preview-border;
+
+            HorizontalLayout {
+                padding-left: 8px;
+                padding-right: 8px;
+                alignment: space-between;
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: start;
+                    Text { text: "Latency: 22ms"; font-size: 8px; color: root.preview-secondary-fg; vertical-alignment: center; }
+                }
+
+                HorizontalLayout {
+                    spacing: 6px;
+                    alignment: end;
+
+                    Rectangle {
+                        width: 52px;
+                        height: 20px;
+                        border-radius: 3px;
+                        background: root.preview-accent;
+                        Text { text: "Connect"; font-size: 8px; font-weight: 600; color: #ffffff; horizontal-alignment: center; vertical-alignment: center; }
+                    }
+                }
+            }
+        }
+    }
+}
+
+export { ThemePreviewSandbox }
