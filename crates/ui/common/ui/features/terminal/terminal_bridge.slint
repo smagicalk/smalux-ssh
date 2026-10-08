@@ -94,4 +94,6 @@ export global TerminalBridge {
     in-out property <[TmuxSessionItem]> tmux-sessions: [];
     callback refresh-tmux();
     callback install-tmux(string /* cmd */);
+    callback kill-tmux-session(string /* session_name */);
+    callback create-tmux-session(string /* session_name */);
 }

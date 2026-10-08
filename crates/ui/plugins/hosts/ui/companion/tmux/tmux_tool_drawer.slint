@@ -203,7 +203,7 @@ component TmuxToolDrawer inherits DrawerContainer {
         }
 
         // 未安装 tmux 遮罩与安装命令指引 (z: 150)
-        if root.has-active-terminal && !root.is-installed: Rectangle {
+        if root.has-active-terminal && !root.is-installed && !root.is-loading: Rectangle {
             width: 100%;
             height: 100%;
             background: AppTheme.panel-background;
@@ -318,6 +318,36 @@ component TmuxToolDrawer inherits DrawerContainer {
             }
         }
 
+        // 初始加载探活占位 (z: 140)
+        if root.has-active-terminal && root.is-loading && root.sessions.length == 0: Rectangle {
+            width: 100%;
+            height: 100%;
+            background: AppTheme.panel-background;
+            z: 140;
+
+            VerticalLayout {
+                alignment: center;
+                spacing: 12px;
+
+                HorizontalLayout {
+                    alignment: center;
+                    Image {
+                        source: @image-url("../../assets/icons/refresh.svg");
+                        width: 28px;
+                        height: 28px;
+                        colorize: AppTheme.accent;
+                    }
+                }
+
+                Text {
+                    text: @tr("正在探活与加载 tmux 会话列表...");
+                    font-size: 11px;
+                    color: AppTheme.secondary-foreground;
+                    horizontal-alignment: center;
+                }
+            }
+        }
+
         if root.has-active-terminal: VerticalLayout {
             padding: 8px;
             spacing: 8px;
@@ -372,6 +402,8 @@ component TmuxToolDrawer inherits DrawerContainer {
                         AppIconButton {
                             icon: @image-url("../../assets/icons/refresh.svg");
                             icon-size: 12px;
+                            icon-color: root.is-loading ? AppTheme.accent : AppTheme.secondary-foreground;
+                            enabled: !root.is-loading;
                             clicked => { root.refresh(); }
                         }
                     }
@@ -420,10 +452,10 @@ component TmuxToolDrawer inherits DrawerContainer {
                         padding-right: 5px;
 
                         Text {
-                            text: root.sessions.length + " " + @tr("个");
+                            text: root.is-loading ? @tr("刷新中...") : (root.sessions.length + " " + @tr("个"));
                             font-size: 8px;
                             font-weight: 600;
-                            color: AppTheme.secondary-foreground;
+                            color: root.is-loading ? AppTheme.accent : AppTheme.secondary-foreground;
                             vertical-alignment: center;
                         }
                     }

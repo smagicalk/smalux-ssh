@@ -541,12 +541,10 @@ export component AppWindow inherits Window {
                             TerminalBridge.send-snippet("tmux attach -t " + name + "\n");
                         }
                         kill-session(name) => {
-                            TerminalBridge.send-snippet("tmux kill-session -t " + name + "\n");
-                            TerminalBridge.refresh-tmux();
+                            TerminalBridge.kill-tmux-session(name);
                         }
                         new-session(name) => {
-                            TerminalBridge.send-snippet("tmux new -s " + name + "\n");
-                            TerminalBridge.refresh-tmux();
+                            TerminalBridge.create-tmux-session(name);
                         }
                         detach-current => {
                             TerminalBridge.send-snippet("tmux detach\n");
@@ -648,7 +646,7 @@ export component AppWindow inherits Window {
         active-host-name: TerminalBridge.active-host-name;
         close => { WindowBridge.is-create-tmux-open = false; }
         confirm(name) => {
-            TerminalBridge.send-snippet("tmux new -s " + name + "\n");
+            TerminalBridge.create-tmux-session(name);
             WindowBridge.is-create-tmux-open = false;
         }
     }

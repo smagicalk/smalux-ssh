@@ -334,6 +334,10 @@ pub(crate) struct RightDrawerState {
     pub(crate) history_archives: Vec<ArchivedAiSession>,
     /// 实时监控系统指标采样的定时器句柄（开抽屉即启，关抽屉即停）
     pub(crate) monitor_timer: Option<slint::Timer>,
+    /// tmux 会话列表定时轮询句柄（开抽屉即启，关抽屉即停）
+    pub(crate) tmux_timer: Option<slint::Timer>,
+    /// 原子防重入标志：防止上一次异步 SSH tmux 探活/拉取未返回前开启重叠查询
+    pub(crate) is_tmux_busy: Arc<AtomicBool>,
     /// 周期性采样的时间序列阶段步进计数器
     pub(crate) sampling_phase: usize,
     /// 当前抽屉激活绑定的主机 ID
@@ -351,6 +355,8 @@ impl Default for RightDrawerState {
             ai_sessions: HashMap::new(),
             history_archives: Vec::new(),
             monitor_timer: None,
+            tmux_timer: None,
+            is_tmux_busy: Arc::new(AtomicBool::new(false)),
             sampling_phase: 0,
             current_host_id: String::new(),
             linux_sampler: Arc::new(crate::monitor::LinuxMetricsSampler::default()),
@@ -384,7 +390,11 @@ pub(crate) fn unload_right_tool_models(window: &AppWindow, tool_id: &str) {
             tracing::debug!(target: "smalux::lifecycle", "已释放右侧 Tunnels 伴生抽屉 Slint 隧道模型");
         }
         "tmux" => {
-            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 Tmux 伴生抽屉 Slint 会话状态");
+            DRAWER_STATE.with(|state_cell| {
+                let mut state = state_cell.borrow_mut();
+                stop_tmux_polling_inner(window, &mut state);
+            });
+            tracing::debug!(target: "smalux::lifecycle", "已释放右侧 Tmux 伴生抽屉 Slint 会话状态与轮询");
         }
         "snippets" => {
             let sb = window.global::<SnippetsBridge>();
@@ -416,34 +426,38 @@ pub(crate) fn load_right_tool_models(window: &AppWindow, tool_id: &str) {
         state.current_host_id = h_id.clone();
 
         if tool_id == "monitor" {
+            stop_tmux_polling_inner(window, &mut state);
             start_monitor_sampling_inner(window, &mut state, &h_id, &h_name);
         } else {
             stop_monitor_sampling_inner(window, &mut state);
-            if tool_id == "tunnel" {
-                if let Some(ref c) = state.ctx {
-                    crate::handlers::tunnel_handlers::sync_ui_host_tunnels(window, c);
+            if tool_id == "tmux" {
+                start_tmux_polling_inner(window, &mut state, &h_id, &h_name);
+            } else {
+                stop_tmux_polling_inner(window, &mut state);
+                if tool_id == "tunnel" {
+                    if let Some(ref c) = state.ctx {
+                        crate::handlers::tunnel_handlers::sync_ui_host_tunnels(window, c);
+                    }
+                } else if tool_id == "ai" {
+                    let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
+                        .map(|a| AiHistorySession {
+                            id: a.id.to_shared(),
+                            title: a.title.to_shared(),
+                            message_count: a.messages.len() as i32,
+                            updated_time: a.updated_time.to_shared(),
+                        })
+                        .collect();
+                    window.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
+                    sync_ai_for_host_inner(window, &mut state, &h_id, &h_name);
+                } else if tool_id == "sftp" {
+                    if let Some(ref c) = state.ctx {
+                        crate::handlers::file_handlers::sync_sftp_drawer_for_host(window, c, &h_id, &h_name);
+                    }
+                } else if tool_id == "snippets" {
+                    if let Some(ref c) = state.ctx {
+                        crate::handlers::snippet_handlers::sync_ui_snippets(window, c);
+                    }
                 }
-            } else if tool_id == "ai" {
-                let history_ui_list: Vec<AiHistorySession> = state.history_archives.iter()
-                    .map(|a| AiHistorySession {
-                        id: a.id.to_shared(),
-                        title: a.title.to_shared(),
-                        message_count: a.messages.len() as i32,
-                        updated_time: a.updated_time.to_shared(),
-                    })
-                    .collect();
-                window.global::<AiBridge>().set_history_sessions(to_model_rc(history_ui_list));
-                sync_ai_for_host_inner(window, &mut state, &h_id, &h_name);
-            } else if tool_id == "sftp" {
-                if let Some(ref c) = state.ctx {
-                    crate::handlers::file_handlers::sync_sftp_drawer_for_host(window, c, &h_id, &h_name);
-                }
-            } else if tool_id == "snippets" {
-                if let Some(ref c) = state.ctx {
-                    crate::handlers::snippet_handlers::sync_ui_snippets(window, c);
-                }
-            } else if tool_id == "tmux" {
-                sync_tmux_for_host_with_ctx(window, state.ctx.as_ref(), &h_id, &h_name);
             }
         }
     });
@@ -1289,6 +1303,115 @@ pub(crate) fn register_right_drawer_handlers(window: &AppWindow, ctx: &AppContex
             }
         });
     }
+
+    {
+        let w_weak = window.as_weak();
+        window.global::<TerminalBridge>().on_kill_tmux_session(move |name| {
+            if let Some(w) = w_weak.upgrade() {
+                let session_name = name.to_string();
+                let tb = w.global::<TerminalBridge>();
+                let h_id = tb.get_active_host_id().to_string();
+                let h_name = tb.get_active_host_name().to_string();
+
+                // 1. 乐观更新：立即从当前 UI 列表中移除该会话 (0ms 极速反馈)
+                let remaining: Vec<TmuxSessionItem> = (0..tb.get_tmux_sessions().row_count())
+                    .filter_map(|i| tb.get_tmux_sessions().row_data(i))
+                    .filter(|s| s.name.as_str() != session_name.as_str())
+                    .collect();
+                crate::store::diff::update_model_rc_in_place(
+                    &tb.get_tmux_sessions(),
+                    remaining,
+                    |m| tb.set_tmux_sessions(m),
+                );
+
+                // 2. 后台异步执行真实 kill 命令 (不污染终端用户输入)
+                let is_local = h_id == "local" || h_id.starts_with("local-");
+                let safe_name = sanitize_tmux_name(&session_name);
+                let w_weak_task = w.as_weak();
+                let launch_cfg_opt = if !is_local {
+                    DRAWER_STATE.with(|state_cell| {
+                        state_cell.try_borrow().ok().and_then(|s| {
+                            s.ctx.as_ref().and_then(|c| crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id))
+                        })
+                    }).or_else(|| {
+                        crate::handlers::file_handlers::with_file_app_ctx(|c| {
+                            crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id)
+                        }).flatten()
+                    })
+                } else {
+                    None
+                };
+
+                crate::async_util::spawn_async(async move {
+                    if is_local {
+                        let _ = tokio::process::Command::new("tmux")
+                            .args(["kill-session", "-t", &safe_name])
+                            .output()
+                            .await;
+                    } else if let Some(cfg) = launch_cfg_opt {
+                        let kill_cmd = format!("tmux kill-session -t '{}' 2>/dev/null || true", safe_name);
+                        let _ = smagical_ssh::execute_remote(&cfg, &kill_cmd).await;
+                    }
+
+                    // 执行完成后触发一次静默核对刷新
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w_ui) = w_weak_task.upgrade() {
+                            sync_tmux_for_host(&w_ui, &h_id, &h_name);
+                        }
+                    });
+                });
+            }
+        });
+    }
+
+    {
+        let w_weak = window.as_weak();
+        window.global::<TerminalBridge>().on_create_tmux_session(move |name| {
+            if let Some(w) = w_weak.upgrade() {
+                let session_name = name.to_string();
+                let tb = w.global::<TerminalBridge>();
+                let h_id = tb.get_active_host_id().to_string();
+                let h_name = tb.get_active_host_name().to_string();
+                tb.set_tmux_is_loading(true);
+
+                let is_local = h_id == "local" || h_id.starts_with("local-");
+                let safe_name = sanitize_tmux_name(&session_name);
+                let w_weak_task = w.as_weak();
+                let launch_cfg_opt = if !is_local {
+                    DRAWER_STATE.with(|state_cell| {
+                        state_cell.try_borrow().ok().and_then(|s| {
+                            s.ctx.as_ref().and_then(|c| crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id))
+                        })
+                    }).or_else(|| {
+                        crate::handlers::file_handlers::with_file_app_ctx(|c| {
+                            crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id)
+                        }).flatten()
+                    })
+                } else {
+                    None
+                };
+
+                crate::async_util::spawn_async(async move {
+                    if is_local {
+                        let _ = tokio::process::Command::new("tmux")
+                            .args(["new-session", "-d", "-s", &safe_name])
+                            .output()
+                            .await;
+                    } else if let Some(cfg) = launch_cfg_opt {
+                        let new_cmd = format!("tmux new-session -d -s '{}' 2>/dev/null || true", safe_name);
+                        let _ = smagical_ssh::execute_remote(&cfg, &new_cmd).await;
+                    }
+
+                    // 创建完成后立即触发一次刷新
+                    let _ = slint::invoke_from_event_loop(move || {
+                        if let Some(w_ui) = w_weak_task.upgrade() {
+                            sync_tmux_for_host(&w_ui, &h_id, &h_name);
+                        }
+                    });
+                });
+            }
+        });
+    }
 }
 
 /// 当终端焦点或激活会话发生切换时，同步右侧栏各工具状态与每机隔离会话
@@ -1323,6 +1446,7 @@ pub(crate) fn sync_right_drawers_on_session_change(
         if new_host_id.is_empty() {
             // 所有终端关闭：右侧栏统一重置为优雅空状态
             stop_monitor_sampling_inner(window, &mut state);
+            stop_tmux_polling_inner(window, &mut state);
             let mb = window.global::<MonitorBridge>();
             mb.set_has_active_host(false);
             mb.set_is_sampling(false);
@@ -1366,10 +1490,12 @@ pub(crate) fn sync_right_drawers_on_session_change(
         // 3. 抽屉展开时，实时同步当前激活工具数据
         if is_open {
             if active_tool == "tunnel" {
+                stop_tmux_polling_inner(window, &mut state);
                 if let Some(ref c) = state.ctx {
                     crate::handlers::tunnel_handlers::sync_ui_host_tunnels(window, c);
                 }
             } else if active_tool == "monitor" {
+                stop_tmux_polling_inner(window, &mut state);
                 start_monitor_sampling_inner(
                     window,
                     &mut state,
@@ -1377,12 +1503,17 @@ pub(crate) fn sync_right_drawers_on_session_change(
                     new_host_name,
                 );
             } else if active_tool == "sftp" {
+                stop_tmux_polling_inner(window, &mut state);
                 if let Some(ref c) = state.ctx {
                     crate::handlers::file_handlers::sync_sftp_drawer_for_host(window, c, new_host_id, new_host_name);
                 }
             } else if active_tool == "tmux" {
-                sync_tmux_for_host_with_ctx(window, state.ctx.as_ref(), new_host_id, new_host_name);
+                start_tmux_polling_inner(window, &mut state, new_host_id, new_host_name);
+            } else {
+                stop_tmux_polling_inner(window, &mut state);
             }
+        } else {
+            stop_tmux_polling_inner(window, &mut state);
         }
     });
 }
@@ -1461,6 +1592,7 @@ pub(crate) fn handle_host_session_closed(
             let has_active = term_b.get_has_active_session();
             if !has_active {
                 stop_monitor_sampling_inner(window, &mut state);
+                stop_tmux_polling_inner(window, &mut state);
                 window.global::<MonitorBridge>().set_has_active_host(false);
                 window.global::<AiBridge>().set_has_active_host(false);
                 window.global::<AiBridge>().set_active_host_name("".into());
@@ -1482,6 +1614,9 @@ pub(crate) fn cleanup_on_exit() {
     DRAWER_STATE.with(|state_cell| {
         let mut state = state_cell.borrow_mut();
         if let Some(t) = state.monitor_timer.take() {
+            t.stop();
+        }
+        if let Some(t) = state.tmux_timer.take() {
             t.stop();
         }
         for s in state.ai_sessions.values() {
@@ -1690,12 +1825,70 @@ fn stop_monitor_sampling_inner(window: &AppWindow, state: &mut RightDrawerState)
     window.global::<MonitorBridge>().set_is_sampling(false);
 }
 
-/// 同步并刷新目标主机的 tmux 会话列表及探活状态
+/// 启动针对指定主机的实时 tmux 会话轮询 (2秒/次，静默增量刷新)
+fn start_tmux_polling_inner(
+    window: &AppWindow,
+    state: &mut RightDrawerState,
+    host_id: &str,
+    host_name: &str,
+) {
+    stop_tmux_polling_inner(window, state);
+
+    if host_id.is_empty() {
+        return;
+    }
+
+    // 首次进入：触发一次显式带 loading 状态的快速探活拉取
+    sync_tmux_for_host_with_ctx(window, state.ctx.as_ref(), host_id, host_name, true);
+
+    // 启动 2s 周期性静默轮询 (show_loading = false，无闪烁/无卡顿)
+    let w_weak = window.as_weak();
+    let timer = slint::Timer::default();
+    timer.start(
+        slint::TimerMode::Repeated,
+        std::time::Duration::from_millis(2000),
+        move || {
+            if let Some(w) = w_weak.upgrade() {
+                let wb = w.global::<WindowBridge>();
+                if !wb.get_is_right_drawer_open() || wb.get_active_right_tool() != "tmux" {
+                    return;
+                }
+
+                let (h_id, ctx_opt) = match DRAWER_STATE.with(|state_cell| {
+                    state_cell
+                        .try_borrow()
+                        .ok()
+                        .map(|s| (s.current_host_id.clone(), s.ctx.clone()))
+                }) {
+                    Some(pair) => pair,
+                    None => return,
+                };
+
+                if h_id.is_empty() {
+                    return;
+                }
+
+                sync_tmux_for_host_with_ctx(&w, ctx_opt.as_ref(), &h_id, "", false);
+            }
+        },
+    );
+
+    state.tmux_timer = Some(timer);
+}
+
+/// 停止 tmux 轮询定时器 (关抽屉或切到其它工具/会话时调用)
+fn stop_tmux_polling_inner(_window: &AppWindow, state: &mut RightDrawerState) {
+    if let Some(timer) = state.tmux_timer.take() {
+        timer.stop();
+    }
+}
+
+/// 同步并刷新目标主机的 tmux 会话列表及探活状态 (手动触发或入口调用，默认显示 loading)
 pub(crate) fn sync_tmux_for_host(window: &AppWindow, host_id: &str, host_name: &str) {
     let ctx_opt = DRAWER_STATE.with(|state_cell| {
         state_cell.try_borrow().ok().and_then(|s| s.ctx.clone())
     });
-    sync_tmux_for_host_with_ctx(window, ctx_opt.as_ref(), host_id, host_name);
+    sync_tmux_for_host_with_ctx(window, ctx_opt.as_ref(), host_id, host_name, true);
 }
 
 /// 支持直接传入已有 AppContext 引用的内部同步实现，完全规避 DRAWER_STATE RefCell 重入借用冲突
@@ -1704,6 +1897,7 @@ pub(crate) fn sync_tmux_for_host_with_ctx(
     ctx: Option<&AppContext>,
     host_id: &str,
     _host_name: &str,
+    show_loading: bool,
 ) {
     let term_b = window.global::<TerminalBridge>();
     if host_id.is_empty() {
@@ -1713,7 +1907,22 @@ pub(crate) fn sync_tmux_for_host_with_ctx(
         return;
     }
 
-    term_b.set_tmux_is_loading(true);
+    // 原子防重入标志：若上一次异步 SSH 探活/会话列表拉取尚未返回，跳过当前轮询
+    let is_busy = DRAWER_STATE.with(|state_cell| {
+        state_cell.try_borrow().ok().map(|s| s.is_tmux_busy.clone())
+    })
+    .unwrap_or_else(|| Arc::new(AtomicBool::new(false)));
+
+    if is_busy
+        .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        return;
+    }
+
+    if show_loading {
+        term_b.set_tmux_is_loading(true);
+    }
 
     let h_id = host_id.to_string();
     let is_local = h_id == "local" || h_id.starts_with("local-");
@@ -1723,17 +1932,25 @@ pub(crate) fn sync_tmux_for_host_with_ctx(
             .or_else(|| {
                 crate::handlers::file_handlers::with_file_app_ctx(|c| {
                     crate::handlers::file_handlers::resolve_host_launch_config(c, &h_id)
-                }).flatten()
+                })
+                .flatten()
             })
     } else {
         None
     };
 
     let w_weak = window.as_weak();
+    let is_busy_clone = is_busy.clone();
+    let h_id_task = h_id.clone();
+
     crate::async_util::spawn_async(async move {
-        let (is_installed, sessions) = if is_local {
+        let probe_result = if is_local {
             // 本地探活与查询
-            let check_cmd = if cfg!(target_os = "windows") { "where.exe" } else { "which" };
+            let check_cmd = if cfg!(target_os = "windows") {
+                "where.exe"
+            } else {
+                "which"
+            };
             let installed = tokio::process::Command::new(check_cmd)
                 .arg("tmux")
                 .output()
@@ -1742,10 +1959,14 @@ pub(crate) fn sync_tmux_for_host_with_ctx(
                 .unwrap_or(false);
 
             if !installed {
-                (false, Vec::new())
+                Some((false, Vec::new()))
             } else {
                 let list_out = tokio::process::Command::new("tmux")
-                    .args(["list-sessions", "-F", "#{session_name}|#{session_windows}|#{session_attached}|#{session_created}"])
+                    .args([
+                        "list-sessions",
+                        "-F",
+                        "#{session_name}|#{session_windows}|#{session_attached}|#{session_created}",
+                    ])
                     .output()
                     .await;
                 let items = match list_out {
@@ -1755,53 +1976,82 @@ pub(crate) fn sync_tmux_for_host_with_ctx(
                     }
                     _ => Vec::new(),
                 };
-                (true, items)
+                Some((true, items))
             }
         } else if let Some(cfg) = launch_cfg_opt {
-            // 远程 SSH 探活与会话查询
-            // 1. 探活：检查远程主机是否安装了 tmux
-            let check_res = smagical_ssh::execute_remote(&cfg, "which tmux 2>/dev/null || command -v tmux 2>/dev/null").await;
-            let installed = match check_res {
-                Ok(out) => out.status.success() && !out.stdout.is_empty(),
-                _ => false,
-            };
-
-            if !installed {
-                (false, Vec::new())
-            } else {
-                // 2. 查询后台 session 列表
-                let list_cmd = "tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}|#{session_created}' 2>/dev/null";
-                let list_res = smagical_ssh::execute_remote(&cfg, list_cmd).await;
-                let items = match list_res {
-                    Ok(out) if out.status.success() => {
-                        let text = String::from_utf8_lossy(&out.stdout);
-                        parse_tmux_session_output(&text)
+            // 远程单行复合指令：原子探活 + 获取会话列表 (单次 SSH 往返，极速响应)
+            let probe_cmd = "if command -v tmux >/dev/null 2>&1; then echo 'TMUX_OK'; tmux list-sessions -F '#{session_name}|#{session_windows}|#{session_attached}|#{session_created}' 2>/dev/null || true; else echo 'TMUX_NONE'; fi";
+            let check_res = smagical_ssh::execute_remote(&cfg, probe_cmd).await;
+            match check_res {
+                Ok(out) if out.status.success() => {
+                    let text = String::from_utf8_lossy(&out.stdout);
+                    let trimmed = text.trim();
+                    if trimmed.starts_with("TMUX_NONE") {
+                        Some((false, Vec::new()))
+                    } else if trimmed.starts_with("TMUX_OK") {
+                        let items = parse_tmux_session_output(&text);
+                        Some((true, items))
+                    } else {
+                        None
                     }
-                    _ => Vec::new(),
-                };
-                (true, items)
+                }
+                _ => None,
             }
         } else {
-            (false, Vec::new())
+            Some((false, Vec::new()))
         };
+
+        is_busy_clone.store(false, Ordering::SeqCst);
 
         let _ = slint::invoke_from_event_loop(move || {
             if let Some(w) = w_weak.upgrade() {
                 let tb = w.global::<TerminalBridge>();
                 tb.set_tmux_is_loading(false);
-                tb.set_tmux_is_installed(is_installed);
-                tb.set_tmux_sessions(to_model_rc(sessions));
+                if let Some((is_installed, sessions)) = probe_result {
+                    DRAWER_STATE.with(|state_cell| {
+                        if let Ok(state) = state_cell.try_borrow() {
+                            if state.current_host_id != h_id_task {
+                                return;
+                            }
+                            tb.set_tmux_is_installed(is_installed);
+                            crate::store::diff::update_model_rc_in_place(
+                                &tb.get_tmux_sessions(),
+                                sessions,
+                                |m| tb.set_tmux_sessions(m),
+                            );
+                        }
+                    });
+                }
             }
         });
     });
 }
 
-/// 解析 tmux list-sessions 输出为 UI 条目列表
+/// 安全过滤 tmux 会话名，杜绝非法注入字符并确保 tmux 命名规范
+fn sanitize_tmux_name(name: &str) -> String {
+    let clean: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '_' || c == '-' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if clean.is_empty() {
+        "session".to_string()
+    } else {
+        clean
+    }
+}
+
+/// 解析 tmux list-sessions 输出为 UI 条目列表 (支持复合指令与回退兼容)
 fn parse_tmux_session_output(output: &str) -> Vec<TmuxSessionItem> {
     let mut sessions = Vec::new();
     for line in output.lines() {
         let line = line.trim();
-        if line.is_empty() {
+        if line.is_empty() || line == "TMUX_OK" || line == "TMUX_NONE" {
             continue;
         }
         let parts: Vec<&str> = line.split('|').collect();
@@ -1825,6 +2075,22 @@ fn parse_tmux_session_output(output: &str) -> Vec<TmuxSessionItem> {
                 windows_count,
                 is_attached,
                 created_time: created_time.into(),
+            });
+        } else if let Some((name_part, rest)) = line.split_once(':') {
+            // 兼容未格式化的原生回退输出: "0: 1 windows (created Wed Oct 8) [80x24] (attached)"
+            let name = name_part.trim();
+            let is_attached = rest.contains("(attached)");
+            let windows_count: i32 = rest
+                .split_whitespace()
+                .next()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(1);
+            sessions.push(TmuxSessionItem {
+                id: name.into(),
+                name: name.into(),
+                windows_count,
+                is_attached,
+                created_time: "刚刚".into(),
             });
         }
     }
